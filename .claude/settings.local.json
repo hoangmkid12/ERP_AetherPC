@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(npm config *)",
+      "PowerShell(docker logs kltn_backend *)",
+      "PowerShell(docker restart kltn_backend *)",
+      "PowerShell(docker exec kltn_postgres *)",
+      "PowerShell(Get-Process *)",
+      "PowerShell(docker restart kltn_frontend *)",
+      "PowerShell(docker exec kltn_frontend *)",
+      "PowerShell(Remove-Item *)",
+      "Bash(sed 's/model //')",
+      "Bash(grep -v \"^\\\\.$\")",
+      "Bash(docker --version)",
+      "Bash(docker compose *)",
+      "Bash(npm install *)",
+      "Bash(npx prisma *)",
+      "Bash(npm run *)",
+      "Bash(xargs grep -l \"purchasing\\\\|supplier\\\\|PO\\\\|RFQ\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:5000/)",
+      "Bash(curl -s http://localhost:5000/api/health)"
+    ]
+  }
+}

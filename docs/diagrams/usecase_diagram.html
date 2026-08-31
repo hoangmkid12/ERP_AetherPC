@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>Sơ đồ Use Case - AetherPC</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #fff; font-family: 'Arial', sans-serif; }
+  svg { display: block; }
+  .actor-label { font-size: 11px; font-weight: bold; text-anchor: middle; fill: #1a1a2e; }
+  .uc-text { font-size: 9.5px; text-anchor: middle; fill: #1a1a2e; }
+  .group-label { font-size: 11px; font-weight: bold; fill: #fff; }
+  .system-label { font-size: 16px; font-weight: bold; text-anchor: middle; fill: #1a1a2e; }
+  .relation-label { font-size: 8px; fill: #555; font-style: italic; text-anchor: middle; }
+  .legend-text { font-size: 10px; fill: #333; }
+</style>
+</head>
+<body>
+<svg id="diagram" width="1600" height="2200" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#555"/>
+    </marker>
+    <marker id="arrow-blue" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#2563eb"/>
+    </marker>
+    <marker id="arrow-dash" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#888"/>
+    </marker>
+    <filter id="shadow" x="-5%" y="-5%" width="115%" height="115%">
+      <feDropShadow dx="1" dy="1" stdDeviation="2" flood-color="#00000033"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1600" height="2200" fill="#f8fafc"/>
+
+  <!-- Title -->
+  <rect x="0" y="0" width="1600" height="50" fill="#1a1a2e"/>
+  <text x="800" y="32" class="system-label" fill="#fff" font-size="18">SƠ ĐỒ USE CASE — NỀN TẢNG THƯƠNG MẠI ĐIỆN TỬ BÁN LẺ &amp; LẮP RÁP MÁY TÍNH (AETHERPC)</text>
+
+  <!-- System Boundary -->
+  <rect x="230" y="60" width="1130" height="2080" rx="8" fill="white" stroke="#1a1a2e" stroke-width="2.5"/>
+  <text x="795" y="85" class="system-label" font-size="14" text-anchor="middle">HỆ THỐNG AETHERPC</text>
+
+  <!-- ===================== GROUP BACKGROUNDS ===================== -->
+
+  <!-- Group 1: Mua Hàng -->
+  <rect x="245" y="95" width="520" height="300" rx="6" fill="#dbeafe" stroke="#2563eb" stroke-width="1.5" stroke-dasharray="6,3"/>
+  <text x="260" y="114" font-size="11" font-weight="bold" fill="#1d4ed8">📦 KHỐI MUA HÀNG &amp; KHO</text>
+
+  <!-- Group 2: Lắp Ráp -->
+  <rect x="245" y="410" width="520" height="260" rx="6" fill="#dcfce7" stroke="#16a34a" stroke-width="1.5" stroke-dasharray="6,3"/>
+  <text x="260" y="429" font-size="11" font-weight="bold" fill="#15803d">🔧 KHỐI LẮP RÁP MÁY TÍNH (BOM)</text>
+
+  <!-- Group 3: Bán Hàng -->
+  <rect x="245" y="685" width="520" height="290" rx="6" fill="#fef9c3" stroke="#ca8a04" stroke-width="1.5" stroke-dasharray="6,3"/>
+  <text x="260" y="704" font-size="11" font-weight="bold" fill="#92400e">🛒 KHỐI BÁN HÀNG &amp; ĐẶT HÀNG</text>
+
+  <!-- Group 4: Marketplace -->
+  <rect x="245" y="990" width="520" height="280" rx="6" fill="#fce7f3" stroke="#db2777" stroke-width="1.5" stroke-dasharray="6,3"/>
+  <text x="260" y="1009" font-size="11" font-weight="bold" fill="#9d174d">🏪 KHỐI MARKETPLACE (KÝ GỬI)</text>
+
+  <!-- Group 5: Đối Soát -->
+  <rect x="820" y="95" width="520" height="290" rx="6" fill="#ede9fe" stroke="#7c3aed" stroke-width="1.5" stroke-dasharray="6,3"/>
+  <text x="835" y="114" font-size="11" font-weight="bold" fill="#5b21b6">💰 KHỐI ĐỐI SOÁT &amp; TÀI CHÍNH</text>
+
+  <!-- Group 6: Khiếu Nại -->
+  <rect x="820" y="400" width="520" height="280" rx="6" fill="#ffedd5" stroke="#ea580c" stroke-width="1.5" stroke-dasharray="6,3"/>
+  <text x="835" y="419" font-size="11" font-weight="bold" fill="#c2410c">⚠️ KHỐI KHIẾU NẠI &amp; TRANH CHẤP</text>
+
+  <!-- Group 7: Quản Trị -->
+  <rect x="820" y="695" width="520" height="260" rx="6" fill="#e0f2fe" stroke="#0284c7" stroke-width="1.5" stroke-dasharray="6,3"/>
+  <text x="835" y="714" font-size="11" font-weight="bold" fill="#0369a1">⚙️ KHỐI QUẢN TRỊ HỆ THỐNG</text>
+
+  <!-- Group 8: Nhân Sự & KPI -->
+  <rect x="820" y="970" width="520" height="260" rx="6" fill="#f0fdf4" stroke="#16a34a" stroke-width="1.5" stroke-dasharray="6,3"/>
+  <text x="835" y="989" font-size="11" font-weight="bold" fill="#15803d">👥 KHỐI NHÂN SỰ &amp; DASHBOARD</text>
+
+  <!-- Group 9: Hệ Thống Tự Động -->
+  <rect x="245" y="1285" width="1095" height="200" rx="6" fill="#f1f5f9" stroke="#64748b" stroke-width="1.5" stroke-dasharray="6,3"/>
+  <text x="260" y="1304" font-size="11" font-weight="bold" fill="#334155">🤖 HỆ THỐNG TỰ ĐỘNG (SYSTEM)</text>
+
+  <!-- Group 10: Giao Hàng & Vận Chuyển -->
+  <rect x="245" y="1500" width="1095" height="210" rx="6" fill="#fdf2f8" stroke="#a855f7" stroke-width="1.5" stroke-dasharray="6,3"/>
+  <text x="260" y="1519" font-size="11" font-weight="bold" fill="#7e22ce">🚚 KHỐI GIAO HÀNG &amp; VẬN CHUYỂN</text>
+
+  <!-- Group 11: Bảo Hành & CSKH -->
+  <rect x="245" y="1725" width="1095" height="200" rx="6" fill="#fff7ed" stroke="#f97316" stroke-width="1.5" stroke-dasharray="6,3"/>
+  <text x="260" y="1744" font-size="11" font-weight="bold" fill="#c2410c">🛡️ KHỐI BẢO HÀNH &amp; CHĂM SÓC KHÁCH HÀNG</text>
+
+  <!-- ===================== USE CASES — GROUP 1: MUA HÀNG ===================== -->
+  <!-- UC1: Tạo đề xuất mua hàng -->
+  <ellipse cx="345" cy="145" rx="85" ry="20" fill="white" stroke="#2563eb" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="345" y="141" class="uc-text">Tạo đề xuất</text>
+  <text x="345" y="153" class="uc-text">mua hàng</text>
+
+  <!-- UC2: Phê duyệt đơn mua hàng -->
+  <ellipse cx="510" cy="145" rx="85" ry="20" fill="white" stroke="#2563eb" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="510" y="141" class="uc-text">Phê duyệt</text>
+  <text x="510" y="153" class="uc-text">đơn mua hàng</text>
+
+  <!-- UC3: Gửi RFQ & so sánh báo giá -->
+  <ellipse cx="675" cy="145" rx="85" ry="20" fill="white" stroke="#2563eb" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="675" y="141" class="uc-text">Gửi RFQ &amp; so sánh</text>
+  <text x="675" y="153" class="uc-text">báo giá</text>
+
+  <!-- UC4: Tạo đơn mua hàng (PO) -->
+  <ellipse cx="345" cy="205" rx="85" ry="20" fill="white" stroke="#2563eb" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="345" y="201" class="uc-text">Tạo đơn</text>
+  <text x="345" y="213" class="uc-text">mua hàng (PO)</text>
+
+  <!-- UC5: Nhập kho (GRN) -->
+  <ellipse cx="510" cy="205" rx="85" ry="20" fill="white" stroke="#2563eb" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="510" y="201" class="uc-text">Nhập kho</text>
+  <text x="510" y="213" class="uc-text">(GRN)</text>
+
+  <!-- UC6: Kiểm tra chất lượng QA -->
+  <ellipse cx="675" cy="205" rx="85" ry="20" fill="white" stroke="#2563eb" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="675" y="201" class="uc-text">Kiểm tra</text>
+  <text x="675" y="213" class="uc-text">chất lượng (QA)</text>
+
+  <!-- UC7: Đối soát 3 chiều PO-GRN-HĐ -->
+  <ellipse cx="345" cy="265" rx="85" ry="20" fill="white" stroke="#2563eb" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="345" y="261" class="uc-text">Đối soát 3 chiều</text>
+  <text x="345" y="273" class="uc-text">PO–GRN–HĐ</text>
+
+  <!-- UC8: Quản lý tồn kho -->
+  <ellipse cx="510" cy="265" rx="85" ry="20" fill="white" stroke="#2563eb" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="510" y="261" class="uc-text">Quản lý</text>
+  <text x="510" y="273" class="uc-text">tồn kho</text>
+
+  <!-- UC9: Kiểm kê định kỳ -->
+  <ellipse cx="675" cy="265" rx="85" ry="20" fill="white" stroke="#2563eb" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="675" y="261" class="uc-text">Kiểm kê</text>
+  <text x="675" y="273" class="uc-text">định kỳ</text>
+
+  <!-- UC10: Trả hàng không đạt QA -->
+  <ellipse cx="345" cy="330" rx="85" ry="20" fill="white" stroke="#2563eb" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="345" y="326" class="uc-text">Trả hàng</text>
+  <text x="345" y="338" class="uc-text">không đạt QA</text>
+
+  <!-- UC11: Quản lý nhà cung cấp -->
+  <ellipse cx="510" cy="330" rx="85" ry="20" fill="white" stroke="#2563eb" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="510" y="326" class="uc-text">Quản lý</text>
+  <text x="510" y="338" class="uc-text">nhà cung cấp</text>
+
+  <!-- UC12: Tính ROP tự động -->
+  <ellipse cx="675" cy="330" rx="85" ry="20" fill="white" stroke="#2563eb" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="675" y="326" class="uc-text">Tính ROP &amp;</text>
+  <text x="675" y="338" class="uc-text">cảnh báo tồn kho</text>
+
+  <!-- ===================== USE CASES — GROUP 2: LẮP RÁP ===================== -->
+  <ellipse cx="345" cy="460" rx="85" ry="20" fill="white" stroke="#16a34a" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="345" y="456" class="uc-text">Nhận lệnh</text>
+  <text x="345" y="468" class="uc-text">lắp ráp (BOM)</text>
+
+  <ellipse cx="510" cy="460" rx="85" ry="20" fill="white" stroke="#16a34a" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="510" y="456" class="uc-text">Kiểm tra linh kiện</text>
+  <text x="510" y="468" class="uc-text">theo BOM</text>
+
+  <ellipse cx="675" cy="460" rx="85" ry="20" fill="white" stroke="#16a34a" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="675" y="456" class="uc-text">Quét mã S/N</text>
+  <text x="675" y="468" class="uc-text">linh kiện</text>
+
+  <ellipse cx="345" cy="530" rx="85" ry="20" fill="white" stroke="#16a34a" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="345" y="526" class="uc-text">Lắp ráp</text>
+  <text x="345" y="538" class="uc-text">máy tính</text>
+
+  <ellipse cx="510" cy="530" rx="85" ry="20" fill="white" stroke="#16a34a" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="510" y="526" class="uc-text">QA thành phẩm</text>
+  <text x="510" y="538" class="uc-text">5 bước</text>
+
+  <ellipse cx="675" cy="530" rx="85" ry="20" fill="white" stroke="#16a34a" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="675" y="526" class="uc-text">Nhập thành phẩm</text>
+  <text x="675" y="538" class="uc-text">vào kho</text>
+
+  <ellipse cx="345" cy="600" rx="85" ry="20" fill="white" stroke="#16a34a" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="345" y="596" class="uc-text">Rã hàng khi</text>
+  <text x="345" y="608" class="uc-text">hủy đơn</text>
+
+  <ellipse cx="510" cy="600" rx="85" ry="20" fill="white" stroke="#16a34a" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="510" y="596" class="uc-text">Tạo đề xuất</text>
+  <text x="510" y="608" class="uc-text">mua khẩn</text>
+
+  <ellipse cx="675" cy="600" rx="85" ry="20" fill="white" stroke="#16a34a" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="675" y="596" class="uc-text">Khóa tồn kho</text>
+  <text x="675" y="608" class="uc-text">(Pessimistic Lock)</text>
+
+  <!-- ===================== USE CASES — GROUP 3: BÁN HÀNG ===================== -->
+  <ellipse cx="345" cy="740" rx="85" ry="20" fill="white" stroke="#ca8a04" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="345" y="736" class="uc-text">Xem &amp; tìm kiếm</text>
+  <text x="345" y="748" class="uc-text">sản phẩm</text>
+
+  <ellipse cx="510" cy="740" rx="85" ry="20" fill="white" stroke="#ca8a04" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="510" y="736" class="uc-text">Đặt hàng</text>
+  <text x="510" y="748" class="uc-text">(giỏ hỗn hợp)</text>
+
+  <ellipse cx="675" cy="740" rx="85" ry="20" fill="white" stroke="#ca8a04" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="675" y="736" class="uc-text">Áp mã</text>
+  <text x="675" y="748" class="uc-text">giảm giá</text>
+
+  <ellipse cx="345" cy="810" rx="85" ry="20" fill="white" stroke="#ca8a04" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="345" y="806" class="uc-text">Tách đơn theo</text>
+  <text x="345" y="818" class="uc-text">nguồn hàng</text>
+
+  <ellipse cx="510" cy="810" rx="85" ry="20" fill="white" stroke="#ca8a04" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="510" y="806" class="uc-text">Phân bổ chiết khấu</text>
+  <text x="510" y="818" class="uc-text">theo tỷ trọng</text>
+
+  <ellipse cx="675" cy="810" rx="85" ry="20" fill="white" stroke="#ca8a04" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="675" y="806" class="uc-text">Bán hàng</text>
+  <text x="675" y="818" class="uc-text">tại quầy (POS)</text>
+
+  <ellipse cx="345" cy="880" rx="85" ry="20" fill="white" stroke="#ca8a04" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="345" y="876" class="uc-text">Xem trạng thái</text>
+  <text x="345" y="888" class="uc-text">đơn hàng/sub-order</text>
+
+  <ellipse cx="510" cy="880" rx="85" ry="20" fill="white" stroke="#ca8a04" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="510" y="876" class="uc-text">Đánh giá</text>
+  <text x="510" y="888" class="uc-text">sản phẩm/Seller</text>
+
+  <ellipse cx="675" cy="880" rx="85" ry="20" fill="white" stroke="#ca8a04" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="675" y="876" class="uc-text">Hủy/sửa đơn</text>
+  <text x="675" y="888" class="uc-text">(cấp sub-order)</text>
+
+  <!-- ===================== USE CASES — GROUP 4: MARKETPLACE ===================== -->
+  <ellipse cx="345" cy="1045" rx="85" ry="20" fill="white" stroke="#db2777" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="345" y="1041" class="uc-text">Đăng ký tài khoản</text>
+  <text x="345" y="1053" class="uc-text">Seller (KYC)</text>
+
+  <ellipse cx="510" cy="1045" rx="85" ry="20" fill="white" stroke="#db2777" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="510" y="1041" class="uc-text">Duyệt hồ sơ</text>
+  <text x="510" y="1053" class="uc-text">Seller</text>
+
+  <ellipse cx="675" cy="1045" rx="85" ry="20" fill="white" stroke="#db2777" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="675" y="1041" class="uc-text">Đăng/sửa/gỡ</text>
+  <text x="675" y="1053" class="uc-text">sản phẩm ký gửi</text>
+
+  <ellipse cx="345" cy="1115" rx="85" ry="20" fill="white" stroke="#db2777" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="345" y="1111" class="uc-text">Tạo phiếu</text>
+  <text x="345" y="1123" class="uc-text">ký gửi hàng</text>
+
+  <ellipse cx="510" cy="1115" rx="85" ry="20" fill="white" stroke="#db2777" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="510" y="1111" class="uc-text">QA hàng ký gửi</text>
+  <text x="510" y="1123" class="uc-text">tại khu đệm</text>
+
+  <ellipse cx="675" cy="1115" rx="85" ry="20" fill="white" stroke="#db2777" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="675" y="1111" class="uc-text">Xem bảng</text>
+  <text x="675" y="1123" class="uc-text">đối soát Seller</text>
+
+  <ellipse cx="345" cy="1185" rx="85" ry="20" fill="white" stroke="#db2777" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="345" y="1181" class="uc-text">Phản hồi</text>
+  <text x="345" y="1193" class="uc-text">khiếu nại</text>
+
+  <ellipse cx="510" cy="1185" rx="85" ry="20" fill="white" stroke="#db2777" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="510" y="1181" class="uc-text">Xem lịch sử</text>
+  <text x="510" y="1193" class="uc-text">thanh toán</text>
+
+  <ellipse cx="675" cy="1185" rx="85" ry="20" fill="white" stroke="#db2777" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="675" y="1181" class="uc-text">Cấu hình % hoa hồng</text>
+  <text x="675" y="1193" class="uc-text">theo Seller</text>
+
+  <!-- ===================== USE CASES — GROUP 5: ĐỐI SOÁT TÀI CHÍNH ===================== -->
+  <ellipse cx="920" cy="145" rx="90" ry="20" fill="white" stroke="#7c3aed" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="920" y="141" class="uc-text">Ghi bút toán kép</text>
+  <text x="920" y="153" class="uc-text">(Escrow Ledger)</text>
+
+  <ellipse cx="1100" cy="145" rx="90" ry="20" fill="white" stroke="#7c3aed" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="1100" y="141" class="uc-text">Tạo lệnh thanh toán</text>
+  <text x="1100" y="153" class="uc-text">Seller (Payout)</text>
+
+  <ellipse cx="1280" cy="145" rx="90" ry="20" fill="white" stroke="#7c3aed" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="1280" y="141" class="uc-text">Tính hoa hồng &amp;</text>
+  <text x="1280" y="153" class="uc-text">khấu trừ thuế</text>
+
+  <ellipse cx="920" cy="215" rx="90" ry="20" fill="white" stroke="#7c3aed" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="920" y="211" class="uc-text">Tính phí lưu kho</text>
+  <text x="920" y="223" class="uc-text">ký gửi (Storage Fee)</text>
+
+  <ellipse cx="1100" cy="215" rx="90" ry="20" fill="white" stroke="#7c3aed" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="1100" y="211" class="uc-text">Hạch toán</text>
+  <text x="1100" y="223" class="uc-text">Shipping Variance</text>
+
+  <ellipse cx="1280" cy="215" rx="90" ry="20" fill="white" stroke="#7c3aed" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="1280" y="211" class="uc-text">Xuất hóa đơn</text>
+  <text x="1280" y="223" class="uc-text">VAT</text>
+
+  <ellipse cx="920" cy="285" rx="90" ry="20" fill="white" stroke="#7c3aed" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="920" y="281" class="uc-text">Quản lý công nợ</text>
+  <text x="920" y="293" class="uc-text">tự doanh</text>
+
+  <ellipse cx="1100" cy="285" rx="90" ry="20" fill="white" stroke="#7c3aed" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="1100" y="281" class="uc-text">Xem báo cáo</text>
+  <text x="1100" y="293" class="uc-text">tài chính</text>
+
+  <ellipse cx="1280" cy="285" rx="90" ry="20" fill="white" stroke="#7c3aed" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="1280" y="281" class="uc-text">Thanh toán</text>
+  <text x="1280" y="293" class="uc-text">cho NCC</text>
+
+  <ellipse cx="920" cy="355" rx="90" ry="20" fill="white" stroke="#7c3aed" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="920" y="351" class="uc-text">Mở/đóng ca,</text>
+  <text x="920" y="363" class="uc-text">đối soát quỹ</text>
+
+  <ellipse cx="1100" cy="355" rx="90" ry="20" fill="white" stroke="#7c3aed" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="1100" y="351" class="uc-text">Xem biên lai</text>
+  <text x="1100" y="363" class="uc-text">thuế Seller</text>
+
+  <!-- ===================== USE CASES — GROUP 6: KHIẾU NẠI ===================== -->
+  <ellipse cx="920" cy="450" rx="90" ry="20" fill="white" stroke="#ea580c" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="920" y="446" class="uc-text">Gửi yêu cầu</text>
+  <text x="920" y="458" class="uc-text">khiếu nại/đổi trả</text>
+
+  <ellipse cx="1100" cy="450" rx="90" ry="20" fill="white" stroke="#ea580c" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="1100" y="446" class="uc-text">Tiếp nhận &amp;</text>
+  <text x="1100" y="458" class="uc-text">phân loại khiếu nại</text>
+
+  <ellipse cx="1280" cy="450" rx="90" ry="20" fill="white" stroke="#ea580c" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="1280" y="446" class="uc-text">Phong tỏa Escrow</text>
+  <text x="1280" y="458" class="uc-text">(Frozen/Disputed)</text>
+
+  <ellipse cx="920" cy="520" rx="90" ry="20" fill="white" stroke="#ea580c" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="920" y="516" class="uc-text">Kiểm duyệt</text>
+  <text x="920" y="528" class="uc-text">Audit Log (chống gian lận)</text>
+
+  <ellipse cx="1100" cy="520" rx="90" ry="20" fill="white" stroke="#ea580c" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="1100" y="516" class="uc-text">Phân xử</text>
+  <text x="1100" y="528" class="uc-text">tranh chấp</text>
+
+  <ellipse cx="1280" cy="520" rx="90" ry="20" fill="white" stroke="#ea580c" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="1280" y="516" class="uc-text">Giải phóng/hoàn tiền</text>
+  <text x="1280" y="528" class="uc-text">Escrow</text>
+
+  <ellipse cx="920" cy="590" rx="90" ry="20" fill="white" stroke="#ea580c" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="920" y="586" class="uc-text">Tiếp nhận</text>
+  <text x="920" y="598" class="uc-text">hàng hoàn trả</text>
+
+  <ellipse cx="1100" cy="590" rx="90" ry="20" fill="white" stroke="#ea580c" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="1100" y="586" class="uc-text">Xác nhận bảo hành</text>
+  <text x="1100" y="598" class="uc-text">hàng tự doanh</text>
+
+  <ellipse cx="1280" cy="590" rx="90" ry="20" fill="white" stroke="#ea580c" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="1280" y="586" class="uc-text">Khóa tài khoản</text>
+  <text x="1280" y="598" class="uc-text">nghi gian lận</text>
+
+  <ellipse cx="920" cy="655" rx="90" ry="20" fill="white" stroke="#ea580c" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="920" y="651" class="uc-text">Tra cứu S/N</text>
+  <text x="920" y="663" class="uc-text">linh kiện bảo hành</text>
+
+  <!-- ===================== USE CASES — GROUP 7: QUẢN TRỊ ===================== -->
+  <ellipse cx="920" cy="745" rx="90" ry="20" fill="white" stroke="#0284c7" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="920" y="741" class="uc-text">Duyệt sản phẩm</text>
+  <text x="920" y="753" class="uc-text">đăng bán</text>
+
+  <ellipse cx="1100" cy="745" rx="90" ry="20" fill="white" stroke="#0284c7" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="1100" y="741" class="uc-text">Cấu hình tham số</text>
+  <text x="1100" y="753" class="uc-text">hệ thống</text>
+
+  <ellipse cx="1280" cy="745" rx="90" ry="20" fill="white" stroke="#0284c7" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="1280" y="741" class="uc-text">Quản lý phân quyền</text>
+  <text x="1280" y="753" class="uc-text">tài khoản (RBAC)</text>
+
+  <ellipse cx="920" cy="815" rx="90" ry="20" fill="white" stroke="#0284c7" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="920" y="811" class="uc-text">Quản lý danh mục</text>
+  <text x="920" y="823" class="uc-text">sản phẩm</text>
+
+  <ellipse cx="1100" cy="815" rx="90" ry="20" fill="white" stroke="#0284c7" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="1100" y="811" class="uc-text">Xem log hệ thống</text>
+  <text x="1100" y="823" class="uc-text">&amp; kiểm toán</text>
+
+  <ellipse cx="1280" cy="815" rx="90" ry="20" fill="white" stroke="#0284c7" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="1280" y="811" class="uc-text">Quản lý voucher</text>
+  <text x="1280" y="823" class="uc-text">&amp; chương trình KM</text>
+
+  <ellipse cx="920" cy="885" rx="90" ry="20" fill="white" stroke="#0284c7" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="920" y="881" class="uc-text">Cấu hình</text>
+  <text x="920" y="893" class="uc-text">vận chuyển &amp; kho</text>
+
+  <ellipse cx="1100" cy="885" rx="90" ry="20" fill="white" stroke="#0284c7" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="1100" y="881" class="uc-text">Quản lý Seller</text>
+  <text x="1100" y="893" class="uc-text">(tạm khóa/thu hồi)</text>
+
+  <!-- ===================== USE CASES — GROUP 8: NHÂN SỰ & DASHBOARD ===================== -->
+  <ellipse cx="920" cy="1020" rx="90" ry="20" fill="white" stroke="#16a34a" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="920" y="1016" class="uc-text">Xem dashboard</text>
+  <text x="920" y="1028" class="uc-text">doanh thu tổng</text>
+
+  <ellipse cx="1100" cy="1020" rx="90" ry="20" fill="white" stroke="#16a34a" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="1100" y="1016" class="uc-text">Xem báo cáo</text>
+  <text x="1100" y="1028" class="uc-text">hoa hồng Marketplace</text>
+
+  <ellipse cx="1280" cy="1020" rx="90" ry="20" fill="white" stroke="#16a34a" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="1280" y="1016" class="uc-text">Phê duyệt yêu cầu</text>
+  <text x="1280" y="1028" class="uc-text">mua hàng</text>
+
+  <ellipse cx="920" cy="1090" rx="90" ry="20" fill="white" stroke="#16a34a" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="920" y="1086" class="uc-text">Quản lý hồ sơ</text>
+  <text x="920" y="1098" class="uc-text">nhân viên</text>
+
+  <ellipse cx="1100" cy="1090" rx="90" ry="20" fill="white" stroke="#16a34a" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="1100" y="1086" class="uc-text">Chấm công &amp;</text>
+  <text x="1100" y="1098" class="uc-text">tính lương</text>
+
+  <ellipse cx="1280" cy="1090" rx="90" ry="20" fill="white" stroke="#16a34a" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="1280" y="1086" class="uc-text">Xem KPI</text>
+  <text x="1280" y="1098" class="uc-text">nhân viên</text>
+
+  <ellipse cx="920" cy="1160" rx="90" ry="20" fill="white" stroke="#16a34a" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="920" y="1156" class="uc-text">Phân công</text>
+  <text x="920" y="1168" class="uc-text">công việc</text>
+
+  <ellipse cx="1100" cy="1160" rx="90" ry="20" fill="white" stroke="#16a34a" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="1100" y="1156" class="uc-text">Xem báo cáo</text>
+  <text x="1100" y="1168" class="uc-text">nhân sự</text>
+
+  <!-- ===================== GROUP 9: HỆ THỐNG TỰ ĐỘNG ===================== -->
+  <ellipse cx="345" cy="1345" rx="90" ry="20" fill="white" stroke="#64748b" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="345" y="1341" class="uc-text">Tự động tính ROP</text>
+  <text x="345" y="1353" class="uc-text">&amp; tạo đề xuất mua</text>
+
+  <ellipse cx="545" cy="1345" rx="90" ry="20" fill="white" stroke="#64748b" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="545" y="1341" class="uc-text">Tự động tách đơn</text>
+  <text x="545" y="1353" class="uc-text">tại Checkout</text>
+
+  <ellipse cx="745" cy="1345" rx="90" ry="20" fill="white" stroke="#64748b" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="745" y="1341" class="uc-text">Định kỳ đối soát</text>
+  <text x="745" y="1353" class="uc-text">Seller (hàng tuần)</text>
+
+  <ellipse cx="945" cy="1345" rx="90" ry="20" fill="white" stroke="#64748b" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="945" y="1341" class="uc-text">Tự động cập nhật</text>
+  <text x="945" y="1353" class="uc-text">trạng thái Escrow</text>
+
+  <ellipse cx="1145" cy="1345" rx="90" ry="20" fill="white" stroke="#64748b" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="1145" y="1341" class="uc-text">Gửi thông báo</text>
+  <text x="1145" y="1353" class="uc-text">email/SMS</text>
+
+  <ellipse cx="1295" cy="1345" rx="90" ry="20" fill="white" stroke="#64748b" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="1295" y="1341" class="uc-text">Tính Seller</text>
+  <text x="1295" y="1353" class="uc-text">Trust Score</text>
+
+  <!-- ===================== GROUP 10: GIAO HÀNG ===================== -->
+  <ellipse cx="345" cy="1560" rx="90" ry="20" fill="white" stroke="#a855f7" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="345" y="1556" class="uc-text">Xuất kho</text>
+  <text x="345" y="1568" class="uc-text">theo sub-order</text>
+
+  <ellipse cx="545" cy="1560" rx="90" ry="20" fill="white" stroke="#a855f7" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="545" y="1556" class="uc-text">Lập phiếu</text>
+  <text x="545" y="1568" class="uc-text">giao hàng (DO)</text>
+
+  <ellipse cx="745" cy="1560" rx="90" ry="20" fill="white" stroke="#a855f7" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="745" y="1556" class="uc-text">Gộp kiện &amp; tính</text>
+  <text x="745" y="1568" class="uc-text">Shipping Variance</text>
+
+  <ellipse cx="945" cy="1560" rx="90" ry="20" fill="white" stroke="#a855f7" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="945" y="1556" class="uc-text">Cập nhật trạng thái</text>
+  <text x="945" y="1568" class="uc-text">giao hàng</text>
+
+  <ellipse cx="1145" cy="1560" rx="90" ry="20" fill="white" stroke="#a855f7" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="1145" y="1556" class="uc-text">Xác nhận</text>
+  <text x="1145" y="1568" class="uc-text">giao thành công</text>
+
+  <ellipse cx="1295" cy="1560" rx="90" ry="20" fill="white" stroke="#a855f7" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="1295" y="1556" class="uc-text">Quản lý</text>
+  <text x="1295" y="1568" class="uc-text">shipper</text>
+
+  <ellipse cx="445" cy="1640" rx="90" ry="20" fill="white" stroke="#a855f7" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="445" y="1636" class="uc-text">Theo dõi đơn hàng</text>
+  <text x="445" y="1648" class="uc-text">thời gian thực</text>
+
+  <ellipse cx="645" cy="1640" rx="90" ry="20" fill="white" stroke="#a855f7" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="645" y="1636" class="uc-text">Xử lý giao</text>
+  <text x="645" y="1648" class="uc-text">thất bại</text>
+
+  <ellipse cx="845" cy="1640" rx="90" ry="20" fill="white" stroke="#a855f7" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="845" y="1636" class="uc-text">Tính phí</text>
+  <text x="845" y="1648" class="uc-text">vận chuyển</text>
+
+  <!-- ===================== GROUP 11: BẢO HÀNH & CSKH ===================== -->
+  <ellipse cx="345" cy="1790" rx="90" ry="20" fill="white" stroke="#f97316" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="345" y="1786" class="uc-text">Đăng ký</text>
+  <text x="345" y="1798" class="uc-text">bảo hành</text>
+
+  <ellipse cx="545" cy="1790" rx="90" ry="20" fill="white" stroke="#f97316" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="545" y="1786" class="uc-text">Tra cứu thông tin</text>
+  <text x="545" y="1798" class="uc-text">bảo hành</text>
+
+  <ellipse cx="745" cy="1790" rx="90" ry="20" fill="white" stroke="#f97316" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="745" y="1786" class="uc-text">Xử lý bảo hành</text>
+  <text x="745" y="1798" class="uc-text">/sửa chữa</text>
+
+  <ellipse cx="945" cy="1790" rx="90" ry="20" fill="white" stroke="#f97316" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="945" y="1786" class="uc-text">Chat/hỗ trợ</text>
+  <text x="945" y="1798" class="uc-text">trực tuyến</text>
+
+  <ellipse cx="1145" cy="1790" rx="90" ry="20" fill="white" stroke="#f97316" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="1145" y="1786" class="uc-text">Đăng ký tài khoản</text>
+  <text x="1145" y="1798" class="uc-text">thành viên</text>
+
+  <ellipse cx="1295" cy="1790" rx="90" ry="20" fill="white" stroke="#f97316" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="1295" y="1786" class="uc-text">Quản lý điểm</text>
+  <text x="1295" y="1798" class="uc-text">thưởng/hạng thành viên</text>
+
+  <ellipse cx="445" cy="1870" rx="90" ry="20" fill="white" stroke="#f97316" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="445" y="1866" class="uc-text">Tư vấn</text>
+  <text x="445" y="1878" class="uc-text">cấu hình PC</text>
+
+  <ellipse cx="645" cy="1870" rx="90" ry="20" fill="white" stroke="#f97316" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="645" y="1866" class="uc-text">Đặt lịch</text>
+  <text x="645" y="1878" class="uc-text">mang máy đến</text>
+
+  <!-- ===================== ACTORS — LEFT SIDE ===================== -->
+  <!-- Actor: Khách vãng lai -->
+  <g id="actor-kvl">
+    <circle cx="80" cy="750" r="15" fill="none" stroke="#1a1a2e" stroke-width="2"/>
+    <line x1="80" y1="765" x2="80" y2="810" stroke="#1a1a2e" stroke-width="2"/>
+    <line x1="55" y1="785" x2="105" y2="785" stroke="#1a1a2e" stroke-width="2"/>
+    <line x1="80" y1="810" x2="60" y2="840" stroke="#1a1a2e" stroke-width="2"/>
+    <line x1="80" y1="810" x2="100" y2="840" stroke="#1a1a2e" stroke-width="2"/>
+    <text x="80" y="858" class="actor-label">Khách</text>
+    <text x="80" y="870" class="actor-label">vãng lai</text>
+  </g>
+
+  <!-- Actor: Khách hàng thành viên -->
+  <g id="actor-khtv">
+    <circle cx="80" cy="880" r="15" fill="none" stroke="#1a1a2e" stroke-width="2"/>
+    <line x1="80" y1="895" x2="80" y2="940" stroke="#1a1a2e" stroke-width="2"/>
+    <line x1="55" y1="915" x2="105" y2="915" stroke="#1a1a2e" stroke-width="2"/>
+    <line x1="80" y1="940" x2="60" y2="970" stroke="#1a1a2e" stroke-width="2"/>
+    <line x1="80" y1="940" x2="100" y2="970" stroke="#1a1a2e" stroke-width="2"/>
+    <text x="80" y="988" class="actor-label">KH Thành</text>
+    <text x="80" y="1000" class="actor-label">viên</text>
+  </g>
+
+  <!-- Actor: NCC Nguyên vật liệu -->
+  <g id="actor-ncc">
+    <circle cx="80" cy="195" r="15" fill="none" stroke="#1a1a2e" stroke-width="2"/>
+    <line x1="80" y1="210" x2="80" y2="255" stroke="#1a1a2e" stroke-width="2"/>
+    <line x1="55" y1="230" x2="105" y2="230" stroke="#1a1a2e" stroke-width="2"/>
+    <line x1="80" y1="255" x2="60" y2="285" stroke="#1a1a2e" stroke-width="2"/>
+    <line x1="80" y1="255" x2="100" y2="285" stroke="#1a1a2e" stroke-width="2"/>
+    <text x="80" y="303" class="actor-label">NCC Nguyên</text>
+    <text x="80" y="315" class="actor-label">vật liệu</text>
+  </g>
+
+  <!-- Actor: Nhân viên mua hàng -->
+  <g id="actor-nvmh">
+    <circle cx="80" cy="145" r="15" fill="none" stroke="#1a1a2e" stroke-width="2"/>
+    <line x1="80" y1="160" x2="80" y2="205" stroke="#1a1a2e" stroke-width="2"/>
+    <line x1="55" y1="180" x2="105" y2="180" stroke="#1a1a2e" stroke-width="2"/>
+    <line x1="80" y1="205" x2="60" y2="235" stroke="#1a1a2e" stroke-width="2"/>
+    <line x1="80" y1="205" x2="100" y2="235" stroke="#1a1a2e" stroke-width="2"/>
+    <text x="80" y="253" class="actor-label">NV Mua</text>
+    <text x="80" y="265" class="actor-label">hàng</text>
+  </g>
+
+  <!-- Actor: Kỹ thuật viên -->
+  <g id="actor-ktv">
+    <circle cx="80" cy="530" r="15" fill="none" stroke="#1a1a2e" stroke-width="2"/>
+    <line x1="80" y1="545" x2="80" y2="590" stroke="#1a1a2e" stroke-width="2"/>
+    <line x1="55" y1="565" x2="105" y2="565" stroke="#1a1a2e" stroke-width="2"/>
+    <line x1="80" y1="590" x2="60" y2="620" stroke="#1a1a2e" stroke-width="2"/>
+    <line x1="80" y1="590" x2="100" y2="620" stroke="#1a1a2e" stroke-width="2"/>
+    <text x="80" y="638" class="actor-label">Kỹ thuật</text>
+    <text x="80" y="650" class="actor-label">viên</text>
+  </g>
+
+  <!-- Actor: Nhân viên bán hàng -->
+  <g id="actor-nvbh">
+    <circle cx="80" cy="460" r="15" fill="none" stroke="#1a1a2e" stroke-width="2"/>
+    <line x1="80" y1="475" x2="80" y2="520" stroke="#1a1a2e" stroke-width="2"/>
+    <line x1="55" y1="495" x2="105" y2="495" stroke="#1a1a2e" stroke-width="2"/>
+    <line x1="80" y1="520" x2="60" y2="550" stroke="#1a1a2e" stroke-width="2"/>
+    <line x1="80" y1="520" x2="100" y2="550" stroke="#1a1a2e" stroke-width="2"/>
+    <text x="80" y="568" class="actor-label">NV Bán</text>
+    <text x="80" y="580" class="actor-label">hàng</text>
+  </g>
+
+  <!-- Actor: NCC trên sàn (Seller) -->
+  <g id="actor-seller">
+    <circle cx="80" cy="1080" r="15" fill="none" stroke="#1a1a2e" stroke-width="2"/>
+    <line x1="80" y1="1095" x2="80" y2="1140" stroke="#1a1a2e" stroke-width="2"/>
+    <line x1="55" y1="1115" x2="105" y2="1115" stroke="#1a1a2e" stroke-width="2"/>
+    <line x1="80" y1="1140" x2="60" y2="1170" stroke="#1a1a2e" stroke-width="2"/>
+    <line x1="80" y1="1140" x2="100" y2="1170" stroke="#1a1a2e" stroke-width="2"/>
+    <text x="80" y="1188" class="actor-label">NCC trên</text>
+    <text x="80" y="1200" class="actor-label">Sàn (Seller)</text>
+  </g>
+
+  <!-- ===================== ACTORS — RIGHT SIDE ===================== -->
+  <!-- Actor: Quản lý chất lượng -->
+  <g id="actor-qlcl">
+    <circle cx="1510" cy="205" r="15" fill="none" stroke="#1a1a2e" stroke-width="2"/>
+    <line x1="1510" y1="220" x2="1510" y2="265" stroke="#1a1a2e" stroke-width="2"/>
+    <line x1="1485" y1="240" x2="1535" y2="240" stroke="#1a1a2e" stroke-width="2"/>
+    <line x1="1510" y1="265" x2="1490" y2="295" stroke="#1a1a2e" stroke-width="2"/>
+    <line x1="1510" y1="265" x2="1530" y2="295" stroke="#1a1a2e" stroke-width="2"/>
+    <text x="1510" y="313" class="actor-label">QL Chất</text>
+    <text x="1510" y="325" class="actor-label">lượng</text>
+  </g>
+
+  <!-- Actor: Thủ kho -->
+  <g id="actor-tk">
+    <circle cx="1510" cy="355" r="15" fill="none" stroke="#1a1a2e" stroke-width="2"/>
+    <line x1="1510" y1="370" x2="1510" y2="415" stroke="#1a1a2e" stroke-width="2"/>
+    <line x1="1485" y1="390" x2="1535" y2="390" stroke="#1a1a2e" stroke-width="2"/>
+    <line x1="1510" y1="415" x2="1490" y2="445" stroke="#1a1a2e" stroke-width="2"/>
+    <line x1="1510" y1="415" x2="1530" y2="445" stroke="#1a1a2e" stroke-width="2"/>
+    <text x="1510" y="463" class="actor-label">Thủ kho</text>
+  </g>
+
+  <!-- Actor: Nhân viên kế toán -->
+  <g id="actor-nvkt">
+    <circle cx="1510" cy="145" r="15" fill="none" stroke="#1a1a2e" stroke-width="2"/>
+    <line x1="1510" y1="160" x2="1510" y2="205" stroke="#1a1a2e" stroke-width="2"/>
+    <line x1="1485" y1="180" x2="1535" y2="180" stroke="#1a1a2e" stroke-width="2"/>
+    <line x1="1510" y1="205" x2="1490" y2="235" stroke="#1a1a2e" stroke-width="2"/>
+    <line x1="1510" y1="205" x2="1530" y2="235" stroke="#1a1a2e" stroke-width="2"/>
+    <text x="1510" y="253" class="actor-label">NV Kế</text>
+    <text x="1510" y="265" class="actor-label">toán</text>
+  </g>
+
+  <!-- Actor: Quản trị viên -->
+  <g id="actor-qtv">
+    <circle cx="1510" cy="520" r="15" fill="none" stroke="#1a1a2e" stroke-width="2"/>
+    <line x1="1510" y1="535" x2="1510" y2="580" stroke="#1a1a2e" stroke-width="2"/>
+    <line x1="1485" y1="555" x2="1535" y2="555" stroke="#1a1a2e" stroke-width="2"/>
+    <line x1="1510" y1="580" x2="1490" y2="610" stroke="#1a1a2e" stroke-width="2"/>
+    <line x1="1510" y1="580" x2="1530" y2="610" stroke="#1a1a2e" stroke-width="2"/>
+    <text x="1510" y="628" class="actor-label">Quản trị</text>
+    <text x="1510" y="640" class="actor-label">viên</text>
+  </g>
+
+  <!-- Actor: Giám đốc điều hành -->
+  <g id="actor-gd">
+    <circle cx="1510" cy="1020" r="15" fill="none" stroke="#1a1a2e" stroke-width="2"/>
+    <line x1="1510" y1="1035" x2="1510" y2="1080" stroke="#1a1a2e" stroke-width="2"/>
+    <line x1="1485" y1="1055" x2="1535" y2="1055" stroke="#1a1a2e" stroke-width="2"/>
+    <line x1="1510" y1="1080" x2="1490" y2="1110" stroke="#1a1a2e" stroke-width="2"/>
+    <line x1="1510" y1="1080" x2="1530" y2="1110" stroke="#1a1a2e" stroke-width="2"/>
+    <text x="1510" y="1128" class="actor-label">Giám đốc</text>
+    <text x="1510" y="1140" class="actor-label">Điều hành</text>
+  </g>
+
+  <!-- Actor: Nhân viên CSKH -->
+  <g id="actor-cskh">
+    <circle cx="1510" cy="450" r="15" fill="none" stroke="#1a1a2e" stroke-width="2"/>
+    <line x1="1510" y1="465" x2="1510" y2="510" stroke="#1a1a2e" stroke-width="2"/>
+    <line x1="1485" y1="485" x2="1535" y2="485" stroke="#1a1a2e" stroke-width="2"/>
+    <line x1="1510" y1="510" x2="1490" y2="540" stroke="#1a1a2e" stroke-width="2"/>
+    <line x1="1510" y1="510" x2="1530" y2="540" stroke="#1a1a2e" stroke-width="2"/>
+    <text x="1510" y="558" class="actor-label">NV CSKH</text>
+  </g>
+
+  <!-- Actor: Quản lý giao hàng -->
+  <g id="actor-qlgh">
+    <circle cx="1510" cy="1560" r="15" fill="none" stroke="#1a1a2e" stroke-width="2"/>
+    <line x1="1510" y1="1575" x2="1510" y2="1620" stroke="#1a1a2e" stroke-width="2"/>
+    <line x1="1485" y1="1595" x2="1535" y2="1595" stroke="#1a1a2e" stroke-width="2"/>
+    <line x1="1510" y1="1620" x2="1490" y2="1650" stroke="#1a1a2e" stroke-width="2"/>
+    <line x1="1510" y1="1620" x2="1530" y2="1650" stroke="#1a1a2e" stroke-width="2"/>
+    <text x="1510" y="1668" class="actor-label">QL Giao</text>
+    <text x="1510" y="1680" class="actor-label">hàng</text>
+  </g>
+
+  <!-- Actor: Hệ thống (tự động) -->
+  <g id="actor-sys">
+    <rect x="65" y="1330" width="30" height="30" rx="4" fill="none" stroke="#64748b" stroke-width="2"/>
+    <line x1="80" y1="1360" x2="80" y2="1380" stroke="#64748b" stroke-width="2"/>
+    <line x1="55" y1="1370" x2="105" y2="1370" stroke="#64748b" stroke-width="2"/>
+    <line x1="80" y1="1380" x2="60" y2="1410" stroke="#64748b" stroke-width="2"/>
+    <line x1="80" y1="1380" x2="100" y2="1410" stroke="#64748b" stroke-width="2"/>
+    <text x="80" y="1428" class="actor-label" font-size="10">«system»</text>
+    <text x="80" y="1440" class="actor-label">Hệ thống</text>
+  </g>
+
+  <!-- ===================== CONNECTIONS — Actor to Use Cases ===================== -->
+  <!-- NV Mua hàng → UC1, UC3, UC4 -->
+  <line x1="110" y1="145" x2="260" y2="145" stroke="#555" stroke-width="1.2"/>
+  <line x1="110" y1="145" x2="260" y2="205" stroke="#555" stroke-width="1.2"/>
+  <line x1="110" y1="145" x2="260" y2="265" stroke="#555" stroke-width="1.2"/>
+
+  <!-- NCC NVL → UC3, UC4 -->
+  <line x1="110" y1="210" x2="590" y2="145" stroke="#555" stroke-width="1.2"/>
+  <line x1="110" y1="210" x2="590" y2="205" stroke="#555" stroke-width="1.2"/>
+
+  <!-- NV Bán hàng → Lắp ráp, Bán hàng -->
+  <line x1="110" y1="460" x2="260" y2="460" stroke="#555" stroke-width="1.2"/>
+  <line x1="110" y1="460" x2="260" y2="810" stroke="#555" stroke-width="1.2"/>
+  <line x1="110" y1="460" x2="590" y2="810" stroke="#555" stroke-width="1.2"/>
+
+  <!-- KTV → Lắp ráp -->
+  <line x1="110" y1="530" x2="260" y2="530" stroke="#555" stroke-width="1.2"/>
+  <line x1="110" y1="530" x2="260" y2="600" stroke="#555" stroke-width="1.2"/>
+  <line x1="110" y1="530" x2="590" y2="530" stroke="#555" stroke-width="1.2"/>
+
+  <!-- Khách vãng lai → Xem sản phẩm -->
+  <line x1="110" y1="758" x2="260" y2="740" stroke="#555" stroke-width="1.2"/>
+
+  <!-- KH Thành viên → Đặt hàng, Xem trạng thái, Đánh giá, Khiếu nại -->
+  <line x1="110" y1="895" x2="260" y2="810" stroke="#555" stroke-width="1.2"/>
+  <line x1="110" y1="895" x2="260" y2="880" stroke="#555" stroke-width="1.2"/>
+  <line x1="110" y1="895" x2="425" y2="880" stroke="#555" stroke-width="1.2"/>
+  <line x1="110" y1="895" x2="590" y2="880" stroke="#555" stroke-width="1.2"/>
+  <line x1="110" y1="895" x2="830" y2="450" stroke="#555" stroke-width="1.2"/>
+
+  <!-- Seller → Marketplace UCs -->
+  <line x1="110" y1="1090" x2="260" y2="1045" stroke="#555" stroke-width="1.2"/>
+  <line x1="110" y1="1090" x2="260" y2="1115" stroke="#555" stroke-width="1.2"/>
+  <line x1="110" y1="1090" x2="425" y2="1115" stroke="#555" stroke-width="1.2"/>
+  <line x1="110" y1="1090" x2="260" y2="1185" stroke="#555" stroke-width="1.2"/>
+  <line x1="110" y1="1090" x2="425" y2="1185" stroke="#555" stroke-width="1.2"/>
+  <line x1="110" y1="1090" x2="590" y2="1185" stroke="#555" stroke-width="1.2"/>
+
+  <!-- QA → Group 1 QA, Group 2 QA, Group 4 QA -->
+  <line x1="1375" y1="205" x2="590" y2="205" stroke="#555" stroke-width="1.2"/>
+  <line x1="1375" y1="205" x2="590" y2="530" stroke="#555" stroke-width="1.2"/>
+  <line x1="1375" y1="205" x2="425" y2="1115" stroke="#555" stroke-width="1.2"/>
+
+  <!-- Thủ kho → Kho, Xuất kho, Nhập kho -->
+  <line x1="1375" y1="355" x2="425" y2="205" stroke="#555" stroke-width="1.2"/>
+  <line x1="1375" y1="355" x2="590" y2="265" stroke="#555" stroke-width="1.2"/>
+  <line x1="1375" y1="355" x2="590" y2="600" stroke="#555" stroke-width="1.2"/>
+  <line x1="1375" y1="355" x2="260" y2="1560" stroke="#555" stroke-width="1.2"/>
+
+  <!-- NV Kế toán → Tài chính UCs -->
+  <line x1="1375" y1="145" x2="1010" y2="145" stroke="#555" stroke-width="1.2"/>
+  <line x1="1375" y1="145" x2="1010" y2="215" stroke="#555" stroke-width="1.2"/>
+  <line x1="1375" y1="145" x2="1010" y2="285" stroke="#555" stroke-width="1.2"/>
+  <line x1="1375" y1="145" x2="1190" y2="145" stroke="#555" stroke-width="1.2"/>
+  <line x1="1375" y1="145" x2="1190" y2="215" stroke="#555" stroke-width="1.2"/>
+  <line x1="1375" y1="145" x2="1010" y2="355" stroke="#555" stroke-width="1.2"/>
+
+  <!-- NV CSKH → Khiếu nại UCs -->
+  <line x1="1375" y1="455" x2="1190" y2="450" stroke="#555" stroke-width="1.2"/>
+  <line x1="1375" y1="455" x2="1010" y2="590" stroke="#555" stroke-width="1.2"/>
+
+  <!-- Quản trị viên → Quản trị, Marketplace duyệt, Audit log -->
+  <line x1="1375" y1="520" x2="1010" y2="520" stroke="#555" stroke-width="1.2"/>
+  <line x1="1375" y1="520" x2="1190" y2="520" stroke="#555" stroke-width="1.2"/>
+  <line x1="1375" y1="520" x2="1370" y2="520" stroke="#555" stroke-width="1.2"/>
+  <line x1="1375" y1="520" x2="1010" y2="745" stroke="#555" stroke-width="1.2"/>
+  <line x1="1375" y1="520" x2="590" y2="1045" stroke="#555" stroke-width="1.2"/>
+  <line x1="1375" y1="520" x2="590" y2="1185" stroke="#555" stroke-width="1.2"/>
+
+  <!-- GĐ Điều hành → Dashboard, Phê duyệt -->
+  <line x1="1375" y1="1025" x2="1010" y2="1020" stroke="#555" stroke-width="1.2"/>
+  <line x1="1375" y1="1025" x2="1190" y2="1020" stroke="#555" stroke-width="1.2"/>
+  <line x1="1375" y1="1025" x2="1370" y2="1020" stroke="#555" stroke-width="1.2"/>
+  <line x1="110" y1="145" x2="425" y2="145" stroke="#555" stroke-width="0.8" stroke-dasharray="3,2"/>
+
+  <!-- QL Giao hàng → Giao hàng UCs -->
+  <line x1="1375" y1="1560" x2="1210" y2="1560" stroke="#555" stroke-width="1.2"/>
+  <line x1="1375" y1="1560" x2="1035" y2="1560" stroke="#555" stroke-width="1.2"/>
+
+  <!-- Hệ thống → Auto UCs -->
+  <line x1="110" y1="1355" x2="255" y2="1345" stroke="#64748b" stroke-width="1.2" stroke-dasharray="4,2"/>
+  <line x1="110" y1="1355" x2="455" y2="1345" stroke="#64748b" stroke-width="1.2" stroke-dasharray="4,2"/>
+  <line x1="110" y1="1355" x2="655" y2="1345" stroke="#64748b" stroke-width="1.2" stroke-dasharray="4,2"/>
+  <line x1="110" y1="1355" x2="855" y2="1345" stroke="#64748b" stroke-width="1.2" stroke-dasharray="4,2"/>
+
+  <!-- ===================== include/extend RELATIONSHIPS ===================== -->
+  <!-- "Đặt hàng" <<include>> "Tách đơn" -->
+  <line x1="510" y1="790" x2="345" y2="792" stroke="#2563eb" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arrow-blue)"/>
+  <text x="428" y="783" class="relation-label" fill="#2563eb">«include»</text>
+
+  <!-- "Tách đơn" <<include>> "Phân bổ chiết khấu" -->
+  <line x1="345" y1="830" x2="425" y2="810" stroke="#2563eb" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arrow-blue)"/>
+  <text x="375" y="827" class="relation-label" fill="#2563eb">«include»</text>
+
+  <!-- "Đặt hàng" <<extend>> "Áp mã giảm giá" -->
+  <line x1="595" y1="750" x2="590" y2="740" stroke="#ea580c" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arrow-blue)"/>
+  <text x="590" y="758" class="relation-label" fill="#ea580c">«extend»</text>
+
+  <!-- "Tách đơn" <<include>> "Ghi bút toán kép Escrow" -->
+  <line x1="425" y1="810" x2="835" y2="155" stroke="#7c3aed" stroke-width="1.3" stroke-dasharray="5,3" marker-end="url(#arrow-blue)"/>
+  <text x="620" y="490" class="relation-label" fill="#7c3aed">«include»</text>
+
+  <!-- "Xử lý khiếu nại" <<extend>> "Kiểm duyệt Audit Log" -->
+  <line x1="1010" y1="455" x2="1010" y2="502" stroke="#ea580c" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arrow-blue)"/>
+  <text x="1015" y="480" class="relation-label" fill="#ea580c">«extend»</text>
+
+  <!-- "Đối soát Seller" <<include>> "Tính hoa hồng & thuế" -->
+  <line x1="1100" y1="135" x2="1190" y2="135" stroke="#7c3aed" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arrow-blue)"/>
+  <text x="1143" y="128" class="relation-label" fill="#7c3aed">«include»</text>
+
+  <!-- "Duyệt hồ sơ Seller" <<include>> "Cấu hình hoa hồng" -->
+  <line x1="425" y1="1055" x2="590" y2="1185" stroke="#db2777" stroke-width="1.3" stroke-dasharray="5,3" marker-end="url(#arrow-blue)"/>
+  <text x="498" y="1130" class="relation-label" fill="#db2777">«include»</text>
+
+  <!-- "Kiểm tra linh kiện BOM" <<include>> "Khóa tồn kho" -->
+  <line x1="510" y1="480" x2="590" y2="582" stroke="#16a34a" stroke-width="1.3" stroke-dasharray="5,3" marker-end="url(#arrow-blue)"/>
+  <text x="550" y="536" class="relation-label" fill="#16a34a">«include»</text>
+
+  <!-- ===================== LEGEND ===================== -->
+  <rect x="245" y="1960" width="1095" height="100" rx="6" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1"/>
+  <text x="265" y="1980" font-size="12" font-weight="bold" fill="#1a1a2e">CHÚ THÍCH</text>
+
+  <!-- Actor icon legend -->
+  <circle cx="280" cy="2000" r="8" fill="none" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="280" y1="2008" x2="280" y2="2022" stroke="#1a1a2e" stroke-width="1.5"/>
+  <text x="295" y="2015" class="legend-text">Actor (người dùng)</text>
+
+  <!-- UC ellipse legend -->
+  <ellipse cx="430" cy="2010" rx="35" ry="12" fill="white" stroke="#555" stroke-width="1.5"/>
+  <text x="472" y="2015" class="legend-text">Use Case</text>
+
+  <!-- include arrow -->
+  <line x1="570" y1="2010" x2="620" y2="2010" stroke="#2563eb" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arrow-blue)"/>
+  <text x="628" y="2015" class="legend-text">«include» (luôn thực hiện)</text>
+
+  <!-- extend arrow -->
+  <line x1="800" y1="2010" x2="850" y2="2010" stroke="#ea580c" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arrow-blue)"/>
+  <text x="858" y="2015" class="legend-text">«extend» (điều kiện mới thực hiện)</text>
+
+  <!-- association -->
+  <line x1="1070" y1="2010" x2="1120" y2="2010" stroke="#555" stroke-width="1.5"/>
+  <text x="1128" y="2015" class="legend-text">Liên kết Actor–Use Case</text>
+
+  <!-- Module colors -->
+  <rect x="265" y="2030" width="12" height="12" fill="#dbeafe" stroke="#2563eb" stroke-width="1"/>
+  <text x="283" y="2042" class="legend-text">Mua hàng &amp; Kho</text>
+  <rect x="375" y="2030" width="12" height="12" fill="#dcfce7" stroke="#16a34a" stroke-width="1"/>
+  <text x="393" y="2042" class="legend-text">Lắp ráp BOM</text>
+  <rect x="470" y="2030" width="12" height="12" fill="#fef9c3" stroke="#ca8a04" stroke-width="1"/>
+  <text x="488" y="2042" class="legend-text">Bán hàng</text>
+  <rect x="555" y="2030" width="12" height="12" fill="#fce7f3" stroke="#db2777" stroke-width="1"/>
+  <text x="573" y="2042" class="legend-text">Marketplace</text>
+  <rect x="650" y="2030" width="12" height="12" fill="#ede9fe" stroke="#7c3aed" stroke-width="1"/>
+  <text x="668" y="2042" class="legend-text">Tài chính</text>
+  <rect x="730" y="2030" width="12" height="12" fill="#ffedd5" stroke="#ea580c" stroke-width="1"/>
+  <text x="748" y="2042" class="legend-text">Khiếu nại</text>
+  <rect x="812" y="2030" width="12" height="12" fill="#e0f2fe" stroke="#0284c7" stroke-width="1"/>
+  <text x="830" y="2042" class="legend-text">Quản trị</text>
+  <rect x="897" y="2030" width="12" height="12" fill="#f1f5f9" stroke="#64748b" stroke-width="1"/>
+  <text x="915" y="2042" class="legend-text">Hệ thống tự động</text>
+  <rect x="1020" y="2030" width="12" height="12" fill="#fdf2f8" stroke="#a855f7" stroke-width="1"/>
+  <text x="1038" y="2042" class="legend-text">Giao hàng &amp; Bảo hành</text>
+
+  <!-- Footer -->
+  <rect x="0" y="2160" width="1600" height="40" fill="#1a1a2e"/>
+  <text x="800" y="2185" font-size="11" text-anchor="middle" fill="#94a3b8">Khóa luận tốt nghiệp — Nguyễn Hoàng Mỹ (22633181) — Trường ĐH Công nghiệp TP.HCM — 2026</text>
+</svg>
+</body>
+</html>

@@ -1,0 +1,63 @@
+services:
+  # 1. Database Service (PostgreSQL)
+  db:
+    image: postgres:15-alpine
+    container_name: kltn_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: kltn_erp
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # 2. Backend Service (Express Node.js)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: kltn_backend
+    restart: always
+    ports:
+      - "5000:5000"
+    # Tải biến môi trường từ tệp tin cục bộ .env để lấy GEMINI_API_KEY, v.v.
+    env_file:
+      - ./backend/.env
+    # Ghi đè DATABASE_URL để kết nối tới DB container thay vì localhost của host machine
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/kltn_erp?schema=public
+      - NODE_ENV=development
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+      # Ánh xạ thư mục cào dữ liệu để chạy seed script
+      - ./scraper:/scraper
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # 3. Frontend Service (Vite React)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: kltn_frontend
+    restart: always
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:
+    driver: local

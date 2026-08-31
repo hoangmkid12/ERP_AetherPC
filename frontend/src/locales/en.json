@@ -1,0 +1,26 @@
+{
+  "header": {
+    "products": "Products",
+    "promotions": "Promotions",
+    "pc_builder": "PC Builder",
+    "news": "News",
+    "all_posts": "All Posts",
+    "product_reviews": "Product Reviews",
+    "pc_build_guides": "PC Build Guides",
+    "about_us": "About Us",
+    "company_info": "Company Info",
+    "careers": "Careers",
+    "search_placeholder": "Search...",
+    "login": "Login",
+    "admin_panel": "Admin",
+    "orders": "Orders",
+    "account": "Account",
+    "logout": "Logout",
+    "flash_sale": "FLASH SALE — Up to 30% off CPU & VGA today!",
+    "free_shipping": "Free shipping for orders over 500k VND",
+    "warranty": "24–36 months official warranty"
+  },
+  "home": {
+    "buy_now": "Buy Now"
+  }
+}

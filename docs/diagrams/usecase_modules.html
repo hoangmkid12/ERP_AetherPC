@@ -1,0 +1,1040 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>Use Case Diagrams - AetherPC</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:#e8eaf0;font-family:Arial,sans-serif;}
+.page{width:1120px;margin:30px auto;background:#fff;border:1px solid #bbb;page-break-after:always;position:relative;}
+.page-title{background:#2c3e6b;color:#fff;text-align:center;padding:10px 0;font-size:15px;font-weight:bold;letter-spacing:0.5px;}
+svg{display:block;}
+/* Actor */
+.actor-wrap text{font-size:11px;text-anchor:middle;fill:#1a1a2e;font-family:Arial,sans-serif;}
+/* UC ellipse */
+.uc{fill:#fff;stroke:#1a1a2e;stroke-width:1.3;}
+.uc-text{font-size:10px;text-anchor:middle;fill:#1a1a2e;font-family:Arial,sans-serif;}
+/* System boundary */
+.sys-box{fill:none;stroke:#1a1a2e;stroke-width:2;}
+.sys-label{font-size:11px;fill:#1a1a2e;font-family:Arial,sans-serif;font-weight:bold;}
+/* Relation lines */
+.rel-include{stroke:#1a1a2e;stroke-width:1.2;stroke-dasharray:6,3;}
+.rel-extend{stroke:#1a1a2e;stroke-width:1.2;stroke-dasharray:6,3;}
+.rel-assoc{stroke:#1a1a2e;stroke-width:1.3;}
+.rel-label{font-size:9px;fill:#333;font-family:Arial,sans-serif;font-style:italic;}
+/* Note box */
+.note{fill:#fffde7;stroke:#e6b800;stroke-width:1;}
+.note-text{font-size:9px;fill:#555;font-family:Arial,sans-serif;}
+/* Module label inside boundary */
+.mod-label{font-size:10px;fill:#2c3e6b;font-weight:bold;font-family:Arial,sans-serif;}
+/* page num */
+.pg{font-size:10px;fill:#888;text-anchor:end;font-family:Arial,sans-serif;}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════
+     DIAGRAM 0: TỔNG QUAN (Context Diagram)
+     1120 × 820
+════════════════════════════════════════════════════════════ -->
+<div class="page">
+<div class="page-title">SƠ ĐỒ USE CASE TỔNG QUAN — HỆ THỐNG AETHERPC (Context Diagram)</div>
+<svg width="1120" height="820" xmlns="http://www.w3.org/2000/svg">
+<defs>
+  <marker id="arr" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3z" fill="#1a1a2e"/></marker>
+  <marker id="arr-open" markerWidth="10" markerHeight="10" refX="9" refY="4" orient="auto"><path d="M0,0 L0,8 L9,4z" fill="none" stroke="#1a1a2e" stroke-width="1.2"/></marker>
+</defs>
+
+<!-- System boundary -->
+<rect x="210" y="60" width="700" height="720" rx="6" class="sys-box"/>
+<text x="560" y="82" class="sys-label" text-anchor="middle">Hệ thống AetherPC</text>
+
+<!-- Precondition note -->
+<rect x="220" y="90" width="240" height="38" rx="3" class="note"/>
+<path d="M450,90 L460,100 L460,128 L220,128 L220,90 Z" fill="#fffde7" stroke="#e6b800" stroke-width="1"/>
+<text x="230" y="106" class="note-text">📌 Precondition chung:</text>
+<text x="230" y="119" class="note-text">Mọi actor phải đăng nhập trước</text>
+
+<!-- 8 Module packages inside boundary -->
+<!-- M1 -->
+<rect x="232" y="143" width="185" height="52" rx="5" fill="#dbeafe" stroke="#2563eb" stroke-width="1.5"/>
+<text x="324" y="160" class="mod-label" text-anchor="middle" fill="#1d4ed8">M1. Tài khoản &amp;</text>
+<text x="324" y="175" class="mod-label" text-anchor="middle" fill="#1d4ed8">Bảo mật đăng nhập</text>
+<text x="324" y="188" text-anchor="middle" font-size="9" fill="#555" font-family="Arial">6 use case</text>
+
+<!-- M2 -->
+<rect x="437" y="143" width="185" height="52" rx="5" fill="#fef9c3" stroke="#ca8a04" stroke-width="1.5"/>
+<text x="529" y="160" class="mod-label" text-anchor="middle" fill="#92400e">M2. Bán hàng &amp;</text>
+<text x="529" y="175" class="mod-label" text-anchor="middle" fill="#92400e">Chăm sóc KH</text>
+<text x="529" y="188" text-anchor="middle" font-size="9" fill="#555" font-family="Arial">20 use case</text>
+
+<!-- M3 -->
+<rect x="642" y="143" width="185" height="52" rx="5" fill="#dcfce7" stroke="#16a34a" stroke-width="1.5"/>
+<text x="734" y="160" class="mod-label" text-anchor="middle" fill="#15803d">M3. Mua hàng &amp;</text>
+<text x="734" y="175" class="mod-label" text-anchor="middle" fill="#15803d">Nhà cung cấp</text>
+<text x="734" y="188" text-anchor="middle" font-size="9" fill="#555" font-family="Arial">11 use case</text>
+
+<!-- M4 -->
+<rect x="232" y="220" width="185" height="52" rx="5" fill="#f0fdf4" stroke="#22c55e" stroke-width="1.5"/>
+<text x="324" y="237" class="mod-label" text-anchor="middle" fill="#15803d">M4. Kho vận &amp;</text>
+<text x="324" y="252" class="mod-label" text-anchor="middle" fill="#15803d">Kiểm soát CL</text>
+<text x="324" y="265" text-anchor="middle" font-size="9" fill="#555" font-family="Arial">10 use case</text>
+
+<!-- M5 -->
+<rect x="437" y="220" width="185" height="52" rx="5" fill="#fce7f3" stroke="#db2777" stroke-width="1.5"/>
+<text x="529" y="237" class="mod-label" text-anchor="middle" fill="#9d174d">M5. Quản lý</text>
+<text x="529" y="252" class="mod-label" text-anchor="middle" fill="#9d174d">Nhân sự</text>
+<text x="529" y="265" text-anchor="middle" font-size="9" fill="#555" font-family="Arial">6 use case</text>
+
+<!-- M6 -->
+<rect x="642" y="220" width="185" height="52" rx="5" fill="#ede9fe" stroke="#7c3aed" stroke-width="1.5"/>
+<text x="734" y="237" class="mod-label" text-anchor="middle" fill="#5b21b6">M6. Kế toán –</text>
+<text x="734" y="252" class="mod-label" text-anchor="middle" fill="#5b21b6">Tài chính</text>
+<text x="734" y="265" text-anchor="middle" font-size="9" fill="#555" font-family="Arial">5 use case</text>
+
+<!-- M7 -->
+<rect x="437" y="297" width="185" height="52" rx="5" fill="#e0f2fe" stroke="#0284c7" stroke-width="1.5"/>
+<text x="529" y="314" class="mod-label" text-anchor="middle" fill="#0369a1">M7. Báo cáo &amp;</text>
+<text x="529" y="329" class="mod-label" text-anchor="middle" fill="#0369a1">Điều hành cấp cao</text>
+<text x="529" y="342" text-anchor="middle" font-size="9" fill="#555" font-family="Arial">5 use case</text>
+
+<!-- M8 -->
+<rect x="642" y="297" width="185" height="52" rx="5" fill="#f1f5f9" stroke="#64748b" stroke-width="1.5"/>
+<text x="734" y="314" class="mod-label" text-anchor="middle" fill="#334155">M8. Quản trị hệ thống</text>
+<text x="734" y="329" class="mod-label" text-anchor="middle" fill="#334155">&amp; Dữ liệu danh mục</text>
+<text x="734" y="342" text-anchor="middle" font-size="9" fill="#555" font-family="Arial">4 use case</text>
+
+<!-- ──── ACTORS ──── -->
+<!-- LEFT ACTORS -->
+<!-- Khách vãng lai -->
+<g transform="translate(65,195)">
+  <circle cy="14" r="14" fill="none" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="28" x2="0" y2="58" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="-18" y1="40" x2="18" y2="40" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="58" x2="-15" y2="80" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="58" x2="15" y2="80" stroke="#1a1a2e" stroke-width="1.5"/>
+  <text y="96" text-anchor="middle" font-size="10" font-family="Arial" fill="#1a1a2e">Khách vãng lai</text>
+</g>
+
+<!-- Khách hàng DN -->
+<g transform="translate(65,340)">
+  <circle cy="14" r="14" fill="none" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="28" x2="0" y2="58" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="-18" y1="40" x2="18" y2="40" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="58" x2="-15" y2="80" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="58" x2="15" y2="80" stroke="#1a1a2e" stroke-width="1.5"/>
+  <text y="96" text-anchor="middle" font-size="10" font-family="Arial" fill="#1a1a2e">Khách hàng DN</text>
+</g>
+
+<!-- NV Bán hàng -->
+<g transform="translate(65,480)">
+  <circle cy="14" r="14" fill="none" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="28" x2="0" y2="58" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="-18" y1="40" x2="18" y2="40" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="58" x2="-15" y2="80" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="58" x2="15" y2="80" stroke="#1a1a2e" stroke-width="1.5"/>
+  <text y="96" text-anchor="middle" font-size="10" font-family="Arial" fill="#1a1a2e">NV Bán hàng</text>
+</g>
+
+<!-- NV Mua hàng -->
+<g transform="translate(65,620)">
+  <circle cy="14" r="14" fill="none" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="28" x2="0" y2="58" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="-18" y1="40" x2="18" y2="40" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="58" x2="-15" y2="80" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="58" x2="15" y2="80" stroke="#1a1a2e" stroke-width="1.5"/>
+  <text y="96" text-anchor="middle" font-size="10" font-family="Arial" fill="#1a1a2e">NV Mua hàng</text>
+</g>
+
+<!-- NV Giao hàng -->
+<g transform="translate(65,740)">
+  <circle cy="14" r="14" fill="none" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="28" x2="0" y2="58" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="-18" y1="40" x2="18" y2="40" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="58" x2="-15" y2="80" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="58" x2="15" y2="80" stroke="#1a1a2e" stroke-width="1.5"/>
+  <text y="96" text-anchor="middle" font-size="10" font-family="Arial" fill="#1a1a2e">NV Giao hàng</text>
+</g>
+
+<!-- RIGHT ACTORS -->
+<!-- Quản Trị Viên -->
+<g transform="translate(985,195)">
+  <circle cy="14" r="14" fill="none" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="28" x2="0" y2="58" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="-18" y1="40" x2="18" y2="40" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="58" x2="-15" y2="80" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="58" x2="15" y2="80" stroke="#1a1a2e" stroke-width="1.5"/>
+  <text y="96" text-anchor="middle" font-size="10" font-family="Arial" fill="#1a1a2e">Quản Trị Viên</text>
+</g>
+
+<!-- GĐ Điều Hành -->
+<g transform="translate(985,340)">
+  <circle cy="14" r="14" fill="none" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="28" x2="0" y2="58" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="-18" y1="40" x2="18" y2="40" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="58" x2="-15" y2="80" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="58" x2="15" y2="80" stroke="#1a1a2e" stroke-width="1.5"/>
+  <text y="96" text-anchor="middle" font-size="10" font-family="Arial" fill="#1a1a2e">GĐ Điều hành</text>
+</g>
+
+<!-- NCC -->
+<g transform="translate(985,480)">
+  <circle cy="14" r="14" fill="none" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="28" x2="0" y2="58" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="-18" y1="40" x2="18" y2="40" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="58" x2="-15" y2="80" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="58" x2="15" y2="80" stroke="#1a1a2e" stroke-width="1.5"/>
+  <text y="96" text-anchor="middle" font-size="10" font-family="Arial" fill="#1a1a2e">Nhà Cung Cấp</text>
+</g>
+
+<!-- Thủ Kho -->
+<g transform="translate(985,620)">
+  <circle cy="14" r="14" fill="none" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="28" x2="0" y2="58" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="-18" y1="40" x2="18" y2="40" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="58" x2="-15" y2="80" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="58" x2="15" y2="80" stroke="#1a1a2e" stroke-width="1.5"/>
+  <text y="96" text-anchor="middle" font-size="10" font-family="Arial" fill="#1a1a2e">Thủ Kho / KTV</text>
+</g>
+
+<!-- Kế Toán -->
+<g transform="translate(985,740)">
+  <circle cy="14" r="14" fill="none" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="28" x2="0" y2="58" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="-18" y1="40" x2="18" y2="40" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="58" x2="-15" y2="80" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="58" x2="15" y2="80" stroke="#1a1a2e" stroke-width="1.5"/>
+  <text y="96" text-anchor="middle" font-size="10" font-family="Arial" fill="#1a1a2e">Kế Toán / QL NS</text>
+</g>
+
+<!-- Association lines: actors → modules (representative) -->
+<line x1="97" y1="209" x2="232" y2="180" class="rel-assoc"/>
+<line x1="97" y1="209" x2="437" y2="170" class="rel-assoc"/>
+<line x1="97" y1="354" x2="437" y2="170" class="rel-assoc"/>
+<line x1="97" y1="494" x2="437" y2="170" class="rel-assoc"/>
+<line x1="97" y1="634" x2="232" y2="246" class="rel-assoc"/>
+<line x1="97" y1="634" x2="437" y2="246" class="rel-assoc"/>
+<line x1="97" y1="754" x2="437" y2="170" class="rel-assoc"/>
+<line x1="983" y1="209" x2="827" y2="170" class="rel-assoc"/>
+<line x1="983" y1="209" x2="642" y2="323" class="rel-assoc"/>
+<line x1="983" y1="354" x2="529" y2="297" class="rel-assoc"/>
+<line x1="983" y1="354" x2="437" y2="323" class="rel-assoc"/>
+<line x1="983" y1="494" x2="642" y2="170" class="rel-assoc"/>
+<line x1="983" y1="634" x2="232" y2="246" class="rel-assoc"/>
+<line x1="983" y1="634" x2="437" y2="246" class="rel-assoc"/>
+<line x1="983" y1="754" x2="642" y2="246" class="rel-assoc"/>
+<line x1="983" y1="754" x2="437" y2="323" class="rel-assoc"/>
+
+<!-- Page number -->
+<text x="1105" y="810" class="pg">Trang 1/9</text>
+</svg>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     DIAGRAM 1: M1 — Tài khoản & Bảo mật
+════════════════════════════════════════════════════════════ -->
+<div class="page">
+<div class="page-title">M1 — TÀI KHOẢN, ĐĂNG KÝ &amp; BẢO MẬT ĐĂNG NHẬP</div>
+<svg width="1120" height="520" xmlns="http://www.w3.org/2000/svg">
+<defs><marker id="a1" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3z" fill="#1a1a2e"/></marker></defs>
+
+<!-- System boundary -->
+<rect x="185" y="50" width="740" height="430" rx="6" class="sys-box"/>
+<text x="555" y="72" class="sys-label" text-anchor="middle">Module M1: Tài khoản, Đăng ký &amp; Bảo mật đăng nhập</text>
+
+<!-- Precondition note -->
+<rect x="196" y="82" width="230" height="36" rx="3" class="note"/>
+<text x="206" y="97" class="note-text">📌 Đăng nhập là Precondition chung</text>
+<text x="206" y="110" class="note-text">— không dùng &lt;&lt;include&gt;&gt; tới UC khác</text>
+
+<!-- Use Cases -->
+<!-- UC: Đăng nhập (center, special) -->
+<ellipse cx="555" cy="155" rx="100" ry="24" class="uc"/>
+<text x="555" y="150" class="uc-text">Đăng nhập</text>
+<text x="555" y="163" class="uc-text">(Precondition chung)</text>
+
+<!-- UC: Đăng ký thành viên -->
+<ellipse cx="340" cy="255" rx="92" ry="24" class="uc"/>
+<text x="340" y="250" class="uc-text">Đăng ký</text>
+<text x="340" y="263" class="uc-text">thành viên</text>
+
+<!-- UC: Quản lý tài khoản người dùng -->
+<ellipse cx="555" cy="270" rx="105" ry="24" class="uc"/>
+<text x="555" y="265" class="uc-text">Quản lý tài khoản</text>
+<text x="555" y="278" class="uc-text">người dùng</text>
+
+<!-- UC: Phân quyền truy cập RBAC -->
+<ellipse cx="770" cy="255" rx="100" ry="24" class="uc"/>
+<text x="770" y="250" class="uc-text">Phân quyền</text>
+<text x="770" y="263" class="uc-text">truy cập (RBAC)</text>
+
+<!-- UC: Xem nhật ký hệ thống -->
+<ellipse cx="650" cy="365" rx="100" ry="24" class="uc"/>
+<text x="650" y="360" class="uc-text">Xem nhật ký</text>
+<text x="650" y="373" class="uc-text">hệ thống (Audit log)</text>
+
+<!-- UC: Sao lưu dữ liệu -->
+<ellipse cx="440" cy="365" rx="92" ry="24" class="uc"/>
+<text x="440" y="360" class="uc-text">Sao lưu</text>
+<text x="440" y="373" class="uc-text">dữ liệu</text>
+
+<!-- ACTORS -->
+<!-- Khách vãng lai -->
+<g transform="translate(60,230)">
+  <circle cy="14" r="14" fill="none" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="28" x2="0" y2="55" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="-18" y1="40" x2="18" y2="40" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="55" x2="-14" y2="75" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="55" x2="14" y2="75" stroke="#1a1a2e" stroke-width="1.5"/>
+  <text y="91" text-anchor="middle" font-size="10" font-family="Arial" fill="#1a1a2e">Khách vãng lai</text>
+</g>
+
+<!-- Tất cả Actor (generalized) -->
+<g transform="translate(60,100)">
+  <circle cy="14" r="14" fill="none" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="28" x2="0" y2="55" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="-18" y1="40" x2="18" y2="40" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="55" x2="-14" y2="75" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="55" x2="14" y2="75" stroke="#1a1a2e" stroke-width="1.5"/>
+  <text y="91" text-anchor="middle" font-size="10" font-family="Arial" fill="#1a1a2e">«actor»</text>
+  <text y="103" text-anchor="middle" font-size="10" font-family="Arial" fill="#1a1a2e">Tất cả Actor</text>
+</g>
+
+<!-- Quản Trị Viên -->
+<g transform="translate(1010,230)">
+  <circle cy="14" r="14" fill="none" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="28" x2="0" y2="55" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="-18" y1="40" x2="18" y2="40" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="55" x2="-14" y2="75" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="55" x2="14" y2="75" stroke="#1a1a2e" stroke-width="1.5"/>
+  <text y="91" text-anchor="middle" font-size="10" font-family="Arial" fill="#1a1a2e">Quản Trị Viên</text>
+</g>
+
+<!-- Associations -->
+<line x1="88" y1="114" x2="456" y2="148" class="rel-assoc"/>
+<line x1="88" y1="244" x2="248" y2="255" class="rel-assoc"/>
+<line x1="1010" y1="244" x2="870" y2="255" class="rel-assoc"/>
+<line x1="1010" y1="244" x2="660" y2="270" class="rel-assoc"/>
+<line x1="1010" y1="244" x2="750" y2="365" class="rel-assoc"/>
+<line x1="1010" y1="244" x2="532" y2="365" class="rel-assoc"/>
+
+<!-- include: Quản lý TK << include >> Phân quyền -->
+<line x1="660" y1="270" x2="670" y2="255" class="rel-include" marker-end="url(#a1)"/>
+<text x="668" y="265" class="rel-label" text-anchor="middle">«include»</text>
+
+<text x="1105" y="510" class="pg">Trang 2/9</text>
+</svg>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     DIAGRAM 2: M2 — Bán hàng & CSKH
+════════════════════════════════════════════════════════════ -->
+<div class="page">
+<div class="page-title">M2 — BÁN HÀNG &amp; CHĂM SÓC KHÁCH HÀNG</div>
+<svg width="1120" height="760" xmlns="http://www.w3.org/2000/svg">
+<defs><marker id="a2" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3z" fill="#1a1a2e"/></marker></defs>
+
+<rect x="200" y="50" width="720" height="680" rx="6" class="sys-box"/>
+<text x="560" y="72" class="sys-label" text-anchor="middle">Module M2: Bán hàng &amp; Chăm sóc Khách hàng</text>
+
+<!-- Column 1 UCs (x≈310) -->
+<ellipse cx="310" cy="128" rx="95" ry="22" class="uc"/>
+<text x="310" y="123" class="uc-text">Tìm kiếm</text><text x="310" y="135" class="uc-text">sản phẩm</text>
+
+<ellipse cx="310" cy="192" rx="95" ry="22" class="uc"/>
+<text x="310" y="187" class="uc-text">Xem thông tin</text><text x="310" y="199" class="uc-text">sản phẩm</text>
+
+<ellipse cx="310" cy="256" rx="95" ry="22" class="uc"/>
+<text x="310" y="251" class="uc-text">Chat AI</text><text x="310" y="263" class="uc-text">tư vấn</text>
+
+<ellipse cx="310" cy="340" rx="95" ry="22" class="uc"/>
+<text x="310" y="335" class="uc-text">Quản lý</text><text x="310" y="347" class="uc-text">đơn hàng</text>
+
+<ellipse cx="310" cy="405" rx="95" ry="22" class="uc"/>
+<text x="310" y="400" class="uc-text">Thanh toán</text><text x="310" y="412" class="uc-text">đơn hàng</text>
+
+<ellipse cx="310" cy="468" rx="95" ry="22" class="uc"/>
+<text x="310" y="463" class="uc-text">Xem trạng thái</text><text x="310" y="475" class="uc-text">đơn hàng</text>
+
+<ellipse cx="310" cy="532" rx="95" ry="22" class="uc"/>
+<text x="310" y="527" class="uc-text">Xem điểm</text><text x="310" y="539" class="uc-text">tích lũy</text>
+
+<ellipse cx="310" cy="596" rx="95" ry="22" class="uc"/>
+<text x="310" y="591" class="uc-text">Gửi yêu cầu</text><text x="310" y="603" class="uc-text">đổi trả</text>
+
+<ellipse cx="310" cy="660" rx="95" ry="22" class="uc"/>
+<text x="310" y="655" class="uc-text">Đánh giá,</text><text x="310" y="667" class="uc-text">bình luận</text>
+
+<!-- Column 2 UCs (x≈560) -->
+<ellipse cx="560" cy="128" rx="95" ry="22" class="uc"/>
+<text x="560" y="123" class="uc-text">Xem bảng giá</text><text x="560" y="135" class="uc-text">sỉ (B2B)</text>
+
+<ellipse cx="560" cy="210" rx="95" ry="22" class="uc"/>
+<text x="560" y="205" class="uc-text">Gửi yêu cầu</text><text x="560" y="217" class="uc-text">báo giá</text>
+
+<ellipse cx="560" cy="295" rx="95" ry="22" class="uc"/>
+<text x="560" y="290" class="uc-text">Tạo đơn hàng</text><text x="560" y="302" class="uc-text">công nợ (B2B)</text>
+
+<ellipse cx="560" cy="380" rx="95" ry="22" class="uc"/>
+<text x="560" y="375" class="uc-text">Xử lý &amp; quản lý</text><text x="560" y="387" class="uc-text">đơn hàng</text>
+
+<ellipse cx="560" cy="460" rx="95" ry="22" class="uc"/>
+<text x="560" y="455" class="uc-text">Nhập mã</text><text x="560" y="467" class="uc-text">chiết khấu</text>
+
+<ellipse cx="560" cy="540" rx="95" ry="22" class="uc"/>
+<text x="560" y="535" class="uc-text">Tạo phiếu</text><text x="560" y="547" class="uc-text">hoàn trả</text>
+
+<!-- Column 3 UCs (x≈800) -->
+<ellipse cx="800" cy="128" rx="95" ry="22" class="uc"/>
+<text x="800" y="123" class="uc-text">Xử lý khiếu nại</text><text x="800" y="135" class="uc-text">&amp; sự cố</text>
+
+<ellipse cx="800" cy="210" rx="95" ry="22" class="uc"/>
+<text x="800" y="205" class="uc-text">Tư vấn</text><text x="800" y="217" class="uc-text">khách hàng</text>
+
+<ellipse cx="800" cy="295" rx="95" ry="22" class="uc"/>
+<text x="800" y="290" class="uc-text">Quản lý dữ liệu</text><text x="800" y="302" class="uc-text">khách hàng</text>
+
+<ellipse cx="800" cy="380" rx="95" ry="22" class="uc"/>
+<text x="800" y="375" class="uc-text">Phê duyệt</text><text x="800" y="387" class="uc-text">chiết khấu</text>
+
+<ellipse cx="800" cy="460" rx="95" ry="22" class="uc"/>
+<text x="800" y="455" class="uc-text">Thiết lập hạn mức</text><text x="800" y="467" class="uc-text">công nợ B2B</text>
+
+<ellipse cx="800" cy="540" rx="95" ry="22" class="uc"/>
+<text x="800" y="535" class="uc-text">Xem báo cáo</text><text x="800" y="547" class="uc-text">thống kê bán hàng</text>
+
+<ellipse cx="800" cy="620" rx="95" ry="22" class="uc"/>
+<text x="800" y="615" class="uc-text">Quản lý chương</text><text x="800" y="627" class="uc-text">trình khuyến mãi</text>
+
+<ellipse cx="560" cy="630" rx="95" ry="22" class="uc"/>
+<text x="560" y="625" class="uc-text">Nhận đơn</text><text x="560" y="637" class="uc-text">giao hàng</text>
+
+<ellipse cx="560" cy="700" rx="95" ry="22" class="uc"/>
+<text x="560" y="695" class="uc-text">Cập nhật trạng thái</text><text x="560" y="707" class="uc-text">giao hàng</text>
+
+<!-- ACTORS -->
+<g transform="translate(30,100)">
+  <circle cy="14" r="13" fill="none" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="27" x2="0" y2="52" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="-16" y1="37" x2="16" y2="37" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="52" x2="-13" y2="70" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="52" x2="13" y2="70" stroke="#1a1a2e" stroke-width="1.5"/>
+  <text y="84" text-anchor="middle" font-size="9.5" font-family="Arial" fill="#1a1a2e">Khách vãng lai</text>
+</g>
+<g transform="translate(30,270)">
+  <circle cy="14" r="13" fill="none" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="27" x2="0" y2="52" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="-16" y1="37" x2="16" y2="37" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="52" x2="-13" y2="70" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="52" x2="13" y2="70" stroke="#1a1a2e" stroke-width="1.5"/>
+  <text y="84" text-anchor="middle" font-size="9.5" font-family="Arial" fill="#1a1a2e">Khách hàng DN</text>
+</g>
+<g transform="translate(30,470)">
+  <circle cy="14" r="13" fill="none" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="27" x2="0" y2="52" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="-16" y1="37" x2="16" y2="37" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="52" x2="-13" y2="70" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="52" x2="13" y2="70" stroke="#1a1a2e" stroke-width="1.5"/>
+  <text y="84" text-anchor="middle" font-size="9.5" font-family="Arial" fill="#1a1a2e">NV Bán hàng</text>
+</g>
+<g transform="translate(30,610)">
+  <circle cy="14" r="13" fill="none" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="27" x2="0" y2="52" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="-16" y1="37" x2="16" y2="37" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="52" x2="-13" y2="70" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="52" x2="13" y2="70" stroke="#1a1a2e" stroke-width="1.5"/>
+  <text y="84" text-anchor="middle" font-size="9.5" font-family="Arial" fill="#1a1a2e">NV Giao hàng</text>
+</g>
+<!-- Right actors -->
+<g transform="translate(1060,100)">
+  <circle cy="14" r="13" fill="none" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="27" x2="0" y2="52" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="-16" y1="37" x2="16" y2="37" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="52" x2="-13" y2="70" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="52" x2="13" y2="70" stroke="#1a1a2e" stroke-width="1.5"/>
+  <text y="84" text-anchor="middle" font-size="9.5" font-family="Arial" fill="#1a1a2e">NV CSKH</text>
+</g>
+<g transform="translate(1060,350)">
+  <circle cy="14" r="13" fill="none" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="27" x2="0" y2="52" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="-16" y1="37" x2="16" y2="37" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="52" x2="-13" y2="70" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="52" x2="13" y2="70" stroke="#1a1a2e" stroke-width="1.5"/>
+  <text y="84" text-anchor="middle" font-size="9.5" font-family="Arial" fill="#1a1a2e">QL Bán hàng</text>
+</g>
+
+<!-- Associations -->
+<line x1="58" y1="114" x2="215" y2="128" class="rel-assoc"/>
+<line x1="58" y1="114" x2="215" y2="192" class="rel-assoc"/>
+<line x1="58" y1="114" x2="215" y2="256" class="rel-assoc"/>
+<line x1="58" y1="284" x2="215" y2="340" class="rel-assoc"/>
+<line x1="58" y1="284" x2="215" y2="405" class="rel-assoc"/>
+<line x1="58" y1="284" x2="215" y2="468" class="rel-assoc"/>
+<line x1="58" y1="284" x2="215" y2="532" class="rel-assoc"/>
+<line x1="58" y1="284" x2="215" y2="596" class="rel-assoc"/>
+<line x1="58" y1="284" x2="215" y2="660" class="rel-assoc"/>
+<line x1="58" y1="284" x2="465" y2="128" class="rel-assoc"/>
+<line x1="58" y1="284" x2="465" y2="210" class="rel-assoc"/>
+<line x1="58" y1="284" x2="465" y2="295" class="rel-assoc"/>
+<line x1="58" y1="484" x2="465" y2="380" class="rel-assoc"/>
+<line x1="58" y1="484" x2="465" y2="460" class="rel-assoc"/>
+<line x1="58" y1="484" x2="465" y2="540" class="rel-assoc"/>
+<line x1="58" y1="624" x2="465" y2="630" class="rel-assoc"/>
+<line x1="58" y1="624" x2="465" y2="700" class="rel-assoc"/>
+<line x1="1060" y1="114" x2="895" y2="128" class="rel-assoc"/>
+<line x1="1060" y1="114" x2="895" y2="210" class="rel-assoc"/>
+<line x1="1060" y1="114" x2="895" y2="295" class="rel-assoc"/>
+<line x1="1060" y1="364" x2="895" y2="380" class="rel-assoc"/>
+<line x1="1060" y1="364" x2="895" y2="460" class="rel-assoc"/>
+<line x1="1060" y1="364" x2="895" y2="540" class="rel-assoc"/>
+<line x1="1060" y1="364" x2="895" y2="620" class="rel-assoc"/>
+
+<!-- include/extend relations -->
+<!-- Thanh toán <<include>> Quản lý đơn hàng -->
+<line x1="405" y1="405" x2="405" y2="348" class="rel-include" marker-end="url(#a2)"/>
+<text x="418" y="377" class="rel-label">«include»</text>
+
+<!-- Tạo phiếu hoàn trả <<include>> Xử lý đơn hàng -->
+<line x1="560" y1="518" x2="560" y2="402" class="rel-include" marker-end="url(#a2)"/>
+<text x="572" y="460" class="rel-label">«include»</text>
+
+<!-- Nhập mã chiết khấu <<extend>> Xử lý đơn hàng -->
+<line x1="513" y1="460" x2="513" y2="395" class="rel-extend" marker-end="url(#a2)"/>
+<text x="458" y="430" class="rel-label">«extend»</text>
+
+<!-- Phê duyệt chiết khấu <<extend>> Nhập mã chiết khấu -->
+<line x1="705" y1="380" x2="655" y2="460" class="rel-extend" marker-end="url(#a2)"/>
+<text x="698" y="418" class="rel-label">«extend»</text>
+
+<!-- Tạo đơn công nợ <<include>> Xem bảng giá sỉ -->
+<line x1="560" y1="273" x2="560" y2="150" class="rel-include" marker-end="url(#a2)"/>
+<text x="572" y="210" class="rel-label">«include»</text>
+
+<!-- Xử lý KN <<include>> Quản lý dữ liệu KH -->
+<line x1="800" y1="117" x2="800" y2="273" class="rel-include" marker-end="url(#a2)"/>
+<text x="812" y="195" class="rel-label">«include»</text>
+
+<!-- Cập nhật giao hàng <<include>> Nhận đơn giao hàng -->
+<line x1="560" y1="678" x2="560" y2="652" class="rel-include" marker-end="url(#a2)"/>
+<text x="572" y="665" class="rel-label">«include»</text>
+
+<text x="1105" y="750" class="pg">Trang 3/9</text>
+</svg>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     DIAGRAM 3: M3 — Mua hàng & Nhà cung cấp
+════════════════════════════════════════════════════════════ -->
+<div class="page">
+<div class="page-title">M3 — MUA HÀNG &amp; QUẢN LÝ NHÀ CUNG CẤP</div>
+<svg width="1120" height="600" xmlns="http://www.w3.org/2000/svg">
+<defs><marker id="a3" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3z" fill="#1a1a2e"/></marker></defs>
+
+<rect x="185" y="50" width="750" height="520" rx="6" class="sys-box"/>
+<text x="560" y="72" class="sys-label" text-anchor="middle">Module M3: Mua hàng &amp; Quản lý Nhà cung cấp</text>
+
+<!-- NV Mua hàng UCs (left column x=340) -->
+<ellipse cx="340" cy="130" rx="105" ry="22" class="uc"/>
+<text x="340" y="125" class="uc-text">Xem đề xuất</text><text x="340" y="137" class="uc-text">mua hàng</text>
+
+<ellipse cx="340" cy="196" rx="105" ry="22" class="uc"/>
+<text x="340" y="191" class="uc-text">Tạo yêu cầu mua</text><text x="340" y="203" class="uc-text">hàng (PR)</text>
+
+<ellipse cx="340" cy="262" rx="105" ry="22" class="uc"/>
+<text x="340" y="257" class="uc-text">Nhập báo giá từ</text><text x="340" y="269" class="uc-text">nhà cung cấp</text>
+
+<ellipse cx="340" cy="330" rx="105" ry="22" class="uc"/>
+<text x="340" y="325" class="uc-text">Quản lý đơn mua</text><text x="340" y="337" class="uc-text">hàng (PO)</text>
+
+<ellipse cx="340" cy="398" rx="105" ry="22" class="uc"/>
+<text x="340" y="393" class="uc-text">Thống kê báo cáo</text><text x="340" y="405" class="uc-text">mua hàng</text>
+
+<ellipse cx="340" cy="466" rx="105" ry="22" class="uc"/>
+<text x="340" y="461" class="uc-text">Xem trạng thái</text><text x="340" y="473" class="uc-text">phê duyệt</text>
+
+<!-- NCC UCs (middle column x=565) -->
+<ellipse cx="565" cy="130" rx="105" ry="22" class="uc"/>
+<text x="565" y="125" class="uc-text">Xem đơn mua</text><text x="565" y="137" class="uc-text">hàng (PO)</text>
+
+<ellipse cx="565" cy="198" rx="105" ry="22" class="uc"/>
+<text x="565" y="193" class="uc-text">Xác nhận</text><text x="565" y="205" class="uc-text">đơn hàng</text>
+
+<ellipse cx="565" cy="266" rx="105" ry="22" class="uc"/>
+<text x="565" y="261" class="uc-text">Cập nhật ngày</text><text x="565" y="273" class="uc-text">giao hàng</text>
+
+<ellipse cx="565" cy="334" rx="105" ry="22" class="uc"/>
+<text x="565" y="329" class="uc-text">Nhận yêu cầu</text><text x="565" y="341" class="uc-text">báo giá (RFQ)</text>
+
+<ellipse cx="565" cy="402" rx="105" ry="22" class="uc"/>
+<text x="565" y="397" class="uc-text">Gửi báo giá</text><text x="565" y="409" class="uc-text">(Quotation)</text>
+
+<ellipse cx="565" cy="470" rx="105" ry="22" class="uc"/>
+<text x="565" y="465" class="uc-text">Nhập báo giá</text><text x="565" y="477" class="uc-text">linh kiện</text>
+
+<!-- Approver UCs (right column x=795) -->
+<ellipse cx="795" cy="196" rx="105" ry="22" class="uc"/>
+<text x="795" y="191" class="uc-text">Phê duyệt yêu cầu</text><text x="795" y="203" class="uc-text">mua hàng</text>
+
+<ellipse cx="795" cy="334" rx="105" ry="22" class="uc"/>
+<text x="795" y="329" class="uc-text">Quản lý hóa đơn</text><text x="795" y="341" class="uc-text">mua hàng</text>
+
+<ellipse cx="795" cy="402" rx="105" ry="22" class="uc"/>
+<text x="795" y="397" class="uc-text">Quản lý công nợ</text><text x="795" y="409" class="uc-text">phải trả</text>
+
+<!-- ACTORS -->
+<g transform="translate(25,155)">
+  <circle cy="13" r="13" fill="none" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="26" x2="0" y2="50" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="-15" y1="36" x2="15" y2="36" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="50" x2="-12" y2="68" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="50" x2="12" y2="68" stroke="#1a1a2e" stroke-width="1.5"/>
+  <text y="82" text-anchor="middle" font-size="9.5" font-family="Arial" fill="#1a1a2e">NV Mua hàng</text>
+</g>
+<g transform="translate(25,385)">
+  <circle cy="13" r="13" fill="none" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="26" x2="0" y2="50" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="-15" y1="36" x2="15" y2="36" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="50" x2="-12" y2="68" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="50" x2="12" y2="68" stroke="#1a1a2e" stroke-width="1.5"/>
+  <text y="82" text-anchor="middle" font-size="9.5" font-family="Arial" fill="#1a1a2e">Thủ Kho</text>
+  <text y="94" text-anchor="middle" font-size="9" fill="#666" font-family="Arial">(tạo đề xuất)</text>
+</g>
+<!-- right actors -->
+<g transform="translate(1065,180)">
+  <circle cy="13" r="13" fill="none" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="26" x2="0" y2="50" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="-15" y1="36" x2="15" y2="36" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="50" x2="-12" y2="68" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="50" x2="12" y2="68" stroke="#1a1a2e" stroke-width="1.5"/>
+  <text y="82" text-anchor="middle" font-size="9.5" font-family="Arial" fill="#1a1a2e">GĐ Điều hành</text>
+</g>
+<g transform="translate(1065,370)">
+  <circle cy="13" r="13" fill="none" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="26" x2="0" y2="50" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="-15" y1="36" x2="15" y2="36" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="50" x2="-12" y2="68" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="50" x2="12" y2="68" stroke="#1a1a2e" stroke-width="1.5"/>
+  <text y="82" text-anchor="middle" font-size="9.5" font-family="Arial" fill="#1a1a2e">Kế Toán</text>
+</g>
+<g transform="translate(25,235)">
+  <circle cy="13" r="13" fill="none" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="26" x2="0" y2="50" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="-15" y1="36" x2="15" y2="36" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="50" x2="-12" y2="68" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="50" x2="12" y2="68" stroke="#1a1a2e" stroke-width="1.5"/>
+  <text y="82" text-anchor="middle" font-size="9.5" font-family="Arial" fill="#1a1a2e">Nhà Cung Cấp</text>
+</g>
+
+<!-- Associations -->
+<line x1="53" y1="168" x2="235" y2="130" class="rel-assoc"/>
+<line x1="53" y1="168" x2="235" y2="196" class="rel-assoc"/>
+<line x1="53" y1="168" x2="235" y2="262" class="rel-assoc"/>
+<line x1="53" y1="168" x2="235" y2="330" class="rel-assoc"/>
+<line x1="53" y1="168" x2="235" y2="398" class="rel-assoc"/>
+<line x1="53" y1="168" x2="235" y2="466" class="rel-assoc"/>
+<line x1="53" y1="398" x2="235" y2="130" class="rel-assoc"/>
+<line x1="53" y1="248" x2="460" y2="130" class="rel-assoc"/>
+<line x1="53" y1="248" x2="460" y2="198" class="rel-assoc"/>
+<line x1="53" y1="248" x2="460" y2="266" class="rel-assoc"/>
+<line x1="53" y1="248" x2="460" y2="334" class="rel-assoc"/>
+<line x1="53" y1="248" x2="460" y2="402" class="rel-assoc"/>
+<line x1="53" y1="248" x2="460" y2="470" class="rel-assoc"/>
+<line x1="1065" y1="193" x2="900" y2="196" class="rel-assoc"/>
+<line x1="1065" y1="383" x2="900" y2="334" class="rel-assoc"/>
+<line x1="1065" y1="383" x2="900" y2="402" class="rel-assoc"/>
+
+<!-- include/extend -->
+<!-- PO <<include>> PR -->
+<line x1="340" y1="308" x2="340" y2="218" class="rel-include" marker-end="url(#a3)"/>
+<text x="352" y="264" class="rel-label">«include»</text>
+
+<!-- Phê duyệt <<extend>> PR -->
+<line x1="690" y1="196" x2="445" y2="196" class="rel-extend" marker-end="url(#a3)"/>
+<text x="568" y="188" class="rel-label">«extend»</text>
+
+<!-- Xác nhận đơn <<include>> Xem PO -->
+<line x1="565" y1="176" x2="565" y2="152" class="rel-include" marker-end="url(#a3)"/>
+<text x="577" y="165" class="rel-label">«include»</text>
+
+<!-- Gửi báo giá <<include>> Nhận RFQ -->
+<line x1="565" y1="380" x2="565" y2="356" class="rel-include" marker-end="url(#a3)"/>
+<text x="577" y="368" class="rel-label">«include»</text>
+
+<text x="1105" y="590" class="pg">Trang 4/9</text>
+</svg>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     DIAGRAM 4: M4 — Kho vận & Kiểm soát CL
+════════════════════════════════════════════════════════════ -->
+<div class="page">
+<div class="page-title">M4 — KHO VẬN &amp; KIỂM SOÁT CHẤT LƯỢNG</div>
+<svg width="1120" height="560" xmlns="http://www.w3.org/2000/svg">
+<defs><marker id="a4" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3z" fill="#1a1a2e"/></marker></defs>
+
+<rect x="185" y="50" width="750" height="480" rx="6" class="sys-box"/>
+<text x="560" y="72" class="sys-label" text-anchor="middle">Module M4: Kho vận &amp; Kiểm soát Chất lượng</text>
+
+<!-- Thủ Kho UCs (x=330) -->
+<ellipse cx="330" cy="128" rx="110" ry="22" class="uc"/>
+<text x="330" y="123" class="uc-text">Quản lý nhập kho</text><text x="330" y="135" class="uc-text">(GRN)</text>
+
+<ellipse cx="330" cy="196" rx="110" ry="22" class="uc"/>
+<text x="330" y="191" class="uc-text">Quản lý xuất kho</text><text x="330" y="203" class="uc-text">theo đơn hàng</text>
+
+<ellipse cx="330" cy="264" rx="110" ry="22" class="uc"/>
+<text x="330" y="259" class="uc-text">Quản lý sản phẩm</text><text x="330" y="271" class="uc-text">trong kho</text>
+
+<ellipse cx="330" cy="332" rx="110" ry="22" class="uc"/>
+<text x="330" y="327" class="uc-text">Quản lý trả hàng</text><text x="330" y="339" class="uc-text">/ hoàn kho</text>
+
+<ellipse cx="330" cy="400" rx="110" ry="22" class="uc"/>
+<text x="330" y="395" class="uc-text">Gửi đề xuất</text><text x="330" y="407" class="uc-text">mua hàng</text>
+
+<ellipse cx="330" cy="468" rx="110" ry="22" class="uc"/>
+<text x="330" y="463" class="uc-text">Thống kê</text><text x="330" y="475" class="uc-text">tồn kho</text>
+
+<!-- QL Kho + KTV + QA UCs (x=580) -->
+<ellipse cx="580" cy="128" rx="110" ry="22" class="uc"/>
+<text x="580" y="123" class="uc-text">Báo cáo thống kê</text><text x="580" y="135" class="uc-text">tồn kho</text>
+
+<ellipse cx="580" cy="196" rx="110" ry="22" class="uc"/>
+<text x="580" y="191" class="uc-text">Phê duyệt báo cáo</text><text x="580" y="203" class="uc-text">kiểm kê</text>
+
+<ellipse cx="580" cy="264" rx="110" ry="22" class="uc"/>
+<text x="580" y="259" class="uc-text">Tạo lịch kiểm kê</text><text x="580" y="271" class="uc-text">kho</text>
+
+<ellipse cx="580" cy="350" rx="110" ry="22" class="uc"/>
+<text x="580" y="345" class="uc-text">Nhận lệnh lắp ráp</text><text x="580" y="357" class="uc-text">(BOM)</text>
+
+<ellipse cx="580" cy="420" rx="110" ry="22" class="uc"/>
+<text x="580" y="415" class="uc-text">Cập nhật trạng thái</text><text x="580" y="427" class="uc-text">QA 5 bước</text>
+
+<!-- QA UCs (x=820) -->
+<ellipse cx="820" cy="350" rx="110" ry="22" class="uc"/>
+<text x="820" y="345" class="uc-text">Kiểm tra chất lượng</text><text x="820" y="357" class="uc-text">sản phẩm</text>
+
+<ellipse cx="820" cy="420" rx="110" ry="22" class="uc"/>
+<text x="820" y="415" class="uc-text">Tạo báo cáo thống</text><text x="820" y="427" class="uc-text">kê chất lượng</text>
+
+<ellipse cx="820" cy="200" rx="110" ry="22" class="uc"/>
+<text x="820" y="195" class="uc-text">Thống kê báo cáo</text><text x="820" y="207" class="uc-text">kỹ thuật</text>
+
+<!-- ACTORS -->
+<g transform="translate(25,195)">
+  <circle cy="13" r="13" fill="none" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="26" x2="0" y2="50" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="-15" y1="36" x2="15" y2="36" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="50" x2="-12" y2="68" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="50" x2="12" y2="68" stroke="#1a1a2e" stroke-width="1.5"/>
+  <text y="82" text-anchor="middle" font-size="9.5" font-family="Arial" fill="#1a1a2e">Thủ Kho</text>
+</g>
+<g transform="translate(1065,155)">
+  <circle cy="13" r="13" fill="none" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="26" x2="0" y2="50" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="-15" y1="36" x2="15" y2="36" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="50" x2="-12" y2="68" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="50" x2="12" y2="68" stroke="#1a1a2e" stroke-width="1.5"/>
+  <text y="82" text-anchor="middle" font-size="9.5" font-family="Arial" fill="#1a1a2e">Quản Lý Kho</text>
+</g>
+<g transform="translate(1065,340)">
+  <circle cy="13" r="13" fill="none" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="26" x2="0" y2="50" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="-15" y1="36" x2="15" y2="36" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="50" x2="-12" y2="68" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="50" x2="12" y2="68" stroke="#1a1a2e" stroke-width="1.5"/>
+  <text y="82" text-anchor="middle" font-size="9.5" font-family="Arial" fill="#1a1a2e">Kỹ Thuật Viên</text>
+</g>
+<g transform="translate(1065,430)">
+  <circle cy="13" r="13" fill="none" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="26" x2="0" y2="50" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="-15" y1="36" x2="15" y2="36" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="50" x2="-12" y2="68" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="50" x2="12" y2="68" stroke="#1a1a2e" stroke-width="1.5"/>
+  <text y="82" text-anchor="middle" font-size="9.5" font-family="Arial" fill="#1a1a2e">QL Chất lượng</text>
+</g>
+
+<!-- Associations -->
+<line x1="53" y1="208" x2="220" y2="128" class="rel-assoc"/>
+<line x1="53" y1="208" x2="220" y2="196" class="rel-assoc"/>
+<line x1="53" y1="208" x2="220" y2="264" class="rel-assoc"/>
+<line x1="53" y1="208" x2="220" y2="332" class="rel-assoc"/>
+<line x1="53" y1="208" x2="220" y2="400" class="rel-assoc"/>
+<line x1="53" y1="208" x2="220" y2="468" class="rel-assoc"/>
+<line x1="1065" y1="168" x2="935" y2="128" class="rel-assoc"/>
+<line x1="1065" y1="168" x2="935" y2="196" class="rel-assoc"/>
+<line x1="1065" y1="168" x2="935" y2="264" class="rel-assoc"/>
+<line x1="1065" y1="353" x2="935" y2="350" class="rel-assoc"/>
+<line x1="1065" y1="353" x2="935" y2="420" class="rel-assoc"/>
+<line x1="1065" y1="353" x2="935" y2="200" class="rel-assoc"/>
+<line x1="1065" y1="443" x2="935" y2="350" class="rel-assoc"/>
+<line x1="1065" y1="443" x2="935" y2="420" class="rel-assoc"/>
+
+<!-- include/extend -->
+<!-- Quản lý xuất kho <<include>> Quản lý đơn hàng (cross-ref) -->
+<rect x="205" y="240" width="95" height="20" rx="2" fill="#fffde7" stroke="#e6b800" stroke-width="1"/>
+<text x="252" y="254" text-anchor="middle" font-size="8" font-family="Arial" fill="#555">→ M2: Xác nhận đơn</text>
+
+<!-- Quản lý trả hàng <<include>> Tạo phiếu hoàn trả -->
+<rect x="205" y="310" width="95" height="20" rx="2" fill="#fffde7" stroke="#e6b800" stroke-width="1"/>
+<text x="252" y="324" text-anchor="middle" font-size="8" font-family="Arial" fill="#555">→ M2: Phiếu hoàn trả</text>
+
+<!-- QA <<include>> Nhận lệnh lắp ráp -->
+<line x1="580" y1="398" x2="580" y2="372" class="rel-include" marker-end="url(#a4)"/>
+<text x="592" y="386" class="rel-label">«include»</text>
+
+<!-- Kiểm tra CL <<include>> QA 5 bước -->
+<line x1="710" y1="350" x2="690" y2="420" class="rel-include" marker-end="url(#a4)"/>
+<text x="698" y="388" class="rel-label">«include»</text>
+
+<text x="1105" y="548" class="pg">Trang 5/9</text>
+</svg>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     DIAGRAM 5: M5 — Quản lý Nhân sự
+════════════════════════════════════════════════════════════ -->
+<div class="page">
+<div class="page-title">M5 — QUẢN LÝ NHÂN SỰ</div>
+<svg width="1120" height="440" xmlns="http://www.w3.org/2000/svg">
+<defs><marker id="a5" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3z" fill="#1a1a2e"/></marker></defs>
+
+<rect x="185" y="50" width="750" height="365" rx="6" class="sys-box"/>
+<text x="560" y="72" class="sys-label" text-anchor="middle">Module M5: Quản lý Nhân sự</text>
+
+<!-- QL Nhân sự UCs (x=360) -->
+<ellipse cx="360" cy="130" rx="120" ry="22" class="uc"/>
+<text x="360" y="125" class="uc-text">Cập nhật hệ số hoa hồng</text><text x="360" y="137" class="uc-text">/ phụ cấp</text>
+
+<ellipse cx="360" cy="200" rx="120" ry="22" class="uc"/>
+<text x="360" y="195" class="uc-text">Phân bổ lịch</text><text x="360" y="207" class="uc-text">làm việc</text>
+
+<ellipse cx="360" cy="270" rx="120" ry="22" class="uc"/>
+<text x="360" y="265" class="uc-text">Báo cáo thống kê</text><text x="360" y="277" class="uc-text">nhân sự</text>
+
+<!-- NV UCs (x=620) -->
+<ellipse cx="620" cy="130" rx="120" ry="22" class="uc"/>
+<text x="620" y="125" class="uc-text">Xem lịch</text><text x="620" y="137" class="uc-text">làm việc</text>
+
+<ellipse cx="620" cy="200" rx="120" ry="22" class="uc"/>
+<text x="620" y="195" class="uc-text">Chấm công</text><text x="620" y="207" class="uc-text">(check-in/out)</text>
+
+<ellipse cx="620" cy="270" rx="120" ry="22" class="uc"/>
+<text x="620" y="265" class="uc-text">Tạo đơn xin</text><text x="620" y="277" class="uc-text">nghỉ phép</text>
+
+<!-- GĐ UCs (x=790) -->
+<ellipse cx="790" cy="340" rx="120" ry="22" class="uc"/>
+<text x="790" y="335" class="uc-text">Phê duyệt đơn</text><text x="790" y="347" class="uc-text">nghỉ phép</text>
+
+<ellipse cx="480" cy="340" rx="120" ry="22" class="uc"/>
+<text x="480" y="335" class="uc-text">Phê duyệt</text><text x="480" y="347" class="uc-text">bảng lương</text>
+
+<!-- ACTORS -->
+<g transform="translate(25,165)">
+  <circle cy="13" r="13" fill="none" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="26" x2="0" y2="50" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="-15" y1="36" x2="15" y2="36" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="50" x2="-12" y2="68" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="50" x2="12" y2="68" stroke="#1a1a2e" stroke-width="1.5"/>
+  <text y="82" text-anchor="middle" font-size="9.5" font-family="Arial" fill="#1a1a2e">QL Nhân Sự</text>
+</g>
+<g transform="translate(1065,165)">
+  <circle cy="13" r="13" fill="none" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="26" x2="0" y2="50" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="-15" y1="36" x2="15" y2="36" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="50" x2="-12" y2="68" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="50" x2="12" y2="68" stroke="#1a1a2e" stroke-width="1.5"/>
+  <text y="82" text-anchor="middle" font-size="9.5" font-family="Arial" fill="#1a1a2e">Nhân viên</text>
+  <text y="94" text-anchor="middle" font-size="9" fill="#666" font-family="Arial">(nội bộ)</text>
+</g>
+<g transform="translate(1065,330)">
+  <circle cy="13" r="13" fill="none" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="26" x2="0" y2="50" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="-15" y1="36" x2="15" y2="36" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="50" x2="-12" y2="68" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="50" x2="12" y2="68" stroke="#1a1a2e" stroke-width="1.5"/>
+  <text y="82" text-anchor="middle" font-size="9.5" font-family="Arial" fill="#1a1a2e">GĐ Điều hành</text>
+</g>
+
+<!-- Associations -->
+<line x1="53" y1="178" x2="240" y2="130" class="rel-assoc"/>
+<line x1="53" y1="178" x2="240" y2="200" class="rel-assoc"/>
+<line x1="53" y1="178" x2="240" y2="270" class="rel-assoc"/>
+<line x1="1065" y1="178" x2="740" y2="130" class="rel-assoc"/>
+<line x1="1065" y1="178" x2="740" y2="200" class="rel-assoc"/>
+<line x1="1065" y1="178" x2="740" y2="270" class="rel-assoc"/>
+<line x1="1065" y1="343" x2="910" y2="340" class="rel-assoc"/>
+<line x1="1065" y1="343" x2="600" y2="340" class="rel-assoc"/>
+
+<!-- include/extend -->
+<!-- Phê duyệt nghỉ phép <<include>> Tạo đơn nghỉ -->
+<line x1="741" y1="330" x2="740" y2="280" class="rel-include" marker-end="url(#a5)"/>
+<text x="753" y="306" class="rel-label">«include»</text>
+
+<!-- Phê duyệt bảng lương <<include>> Cập nhật hệ số -->
+<line x1="430" y1="318" x2="390" y2="152" class="rel-include" marker-end="url(#a5)"/>
+<text x="395" y="235" class="rel-label">«include»</text>
+
+<text x="1105" y="430" class="pg">Trang 6/9</text>
+</svg>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     DIAGRAM 6: M6 — Kế toán & Tài chính
+════════════════════════════════════════════════════════════ -->
+<div class="page">
+<div class="page-title">M6 — KẾ TOÁN &amp; TÀI CHÍNH</div>
+<svg width="1120" height="400" xmlns="http://www.w3.org/2000/svg">
+<defs><marker id="a6" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3z" fill="#1a1a2e"/></marker></defs>
+
+<rect x="185" y="50" width="750" height="325" rx="6" class="sys-box"/>
+<text x="560" y="72" class="sys-label" text-anchor="middle">Module M6: Kế toán – Tài chính</text>
+
+<!-- UCs for Kế Toán -->
+<ellipse cx="380" cy="130" rx="120" ry="22" class="uc"/>
+<text x="380" y="125" class="uc-text">Quản lý công nợ</text><text x="380" y="137" class="uc-text">phải trả (NCC)</text>
+
+<ellipse cx="380" cy="200" rx="120" ry="22" class="uc"/>
+<text x="380" y="195" class="uc-text">Tạo lệnh</text><text x="380" y="207" class="uc-text">thanh toán</text>
+
+<ellipse cx="380" cy="270" rx="120" ry="22" class="uc"/>
+<text x="380" y="265" class="uc-text">Quản lý công nợ</text><text x="380" y="277" class="uc-text">phải thu (KH)</text>
+
+<ellipse cx="650" cy="130" rx="120" ry="22" class="uc"/>
+<text x="650" y="125" class="uc-text">Xuất hóa đơn VAT</text><text x="650" y="137" class="uc-text">(theo yêu cầu)</text>
+
+<ellipse cx="650" cy="200" rx="120" ry="22" class="uc"/>
+<text x="650" y="195" class="uc-text">Quản lý hóa đơn</text><text x="650" y="207" class="uc-text">mua hàng</text>
+
+<ellipse cx="515" cy="340" rx="120" ry="22" class="uc"/>
+<text x="515" y="335" class="uc-text">Xem báo cáo</text><text x="515" y="347" class="uc-text">tài chính tổng hợp</text>
+
+<!-- ACTOR -->
+<g transform="translate(25,195)">
+  <circle cy="13" r="13" fill="none" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="26" x2="0" y2="50" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="-15" y1="36" x2="15" y2="36" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="50" x2="-12" y2="68" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="50" x2="12" y2="68" stroke="#1a1a2e" stroke-width="1.5"/>
+  <text y="82" text-anchor="middle" font-size="9.5" font-family="Arial" fill="#1a1a2e">Kế Toán</text>
+</g>
+
+<!-- Associations -->
+<line x1="53" y1="208" x2="260" y2="130" class="rel-assoc"/>
+<line x1="53" y1="208" x2="260" y2="200" class="rel-assoc"/>
+<line x1="53" y1="208" x2="260" y2="270" class="rel-assoc"/>
+<line x1="53" y1="208" x2="530" y2="130" class="rel-assoc"/>
+<line x1="53" y1="208" x2="530" y2="200" class="rel-assoc"/>
+<line x1="53" y1="208" x2="395" y2="340" class="rel-assoc"/>
+
+<!-- include/extend -->
+<!-- Tạo lệnh TT <<include>> Quản lý công nợ phải trả -->
+<line x1="380" y1="178" x2="380" y2="152" class="rel-include" marker-end="url(#a6)"/>
+<text x="392" y="166" class="rel-label">«include»</text>
+
+<!-- Xuất HĐ VAT <<extend>> Thanh toán đơn hàng (cross-ref note) -->
+<rect x="660" y="156" width="115" height="18" rx="2" fill="#fffde7" stroke="#e6b800" stroke-width="1"/>
+<text x="718" y="168" text-anchor="middle" font-size="8" font-family="Arial" fill="#555">«extend» → M2: Thanh toán</text>
+
+<!-- QL hóa đơn MH note -->
+<rect x="660" y="225" width="115" height="18" rx="2" fill="#fffde7" stroke="#e6b800" stroke-width="1"/>
+<text x="718" y="237" text-anchor="middle" font-size="8" font-family="Arial" fill="#555">tham chiếu → M3: PO</text>
+
+<text x="1105" y="390" class="pg">Trang 7/9</text>
+</svg>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     DIAGRAM 7: M7 — Báo cáo & Điều hành cấp cao
+════════════════════════════════════════════════════════════ -->
+<div class="page">
+<div class="page-title">M7 — BÁO CÁO &amp; ĐIỀU HÀNH CẤP CAO</div>
+<svg width="1120" height="380" xmlns="http://www.w3.org/2000/svg">
+<defs><marker id="a7" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3z" fill="#1a1a2e"/></marker></defs>
+
+<rect x="185" y="50" width="750" height="305" rx="6" class="sys-box"/>
+<text x="560" y="72" class="sys-label" text-anchor="middle">Module M7: Báo cáo &amp; Điều hành cấp cao</text>
+
+<ellipse cx="430" cy="130" rx="130" ry="22" class="uc"/>
+<text x="430" y="125" class="uc-text">Xem biểu đồ thống kê</text><text x="430" y="137" class="uc-text">(Dashboard – KPI)</text>
+
+<ellipse cx="430" cy="200" rx="130" ry="22" class="uc"/>
+<text x="430" y="195" class="uc-text">Xem báo cáo dự báo</text><text x="430" y="207" class="uc-text">nhu cầu (Forecast)</text>
+
+<ellipse cx="430" cy="300" rx="130" ry="22" class="uc"/>
+<text x="430" y="295" class="uc-text">Phê duyệt yêu cầu mua hàng</text><text x="430" y="307" class="uc-text">→ tham chiếu M3</text>
+
+<ellipse cx="700" cy="200" rx="130" ry="22" class="uc"/>
+<text x="700" y="195" class="uc-text">Phê duyệt đơn nghỉ phép</text><text x="700" y="207" class="uc-text">→ tham chiếu M5</text>
+
+<ellipse cx="700" cy="300" rx="130" ry="22" class="uc"/>
+<text x="700" y="295" class="uc-text">Phê duyệt bảng lương</text><text x="700" y="307" class="uc-text">→ tham chiếu M5</text>
+
+<!-- ACTOR -->
+<g transform="translate(25,185)">
+  <circle cy="13" r="13" fill="none" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="26" x2="0" y2="50" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="-15" y1="36" x2="15" y2="36" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="50" x2="-12" y2="68" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="50" x2="12" y2="68" stroke="#1a1a2e" stroke-width="1.5"/>
+  <text y="82" text-anchor="middle" font-size="9.5" font-family="Arial" fill="#1a1a2e">GĐ Điều hành</text>
+</g>
+
+<line x1="53" y1="198" x2="300" y2="130" class="rel-assoc"/>
+<line x1="53" y1="198" x2="300" y2="200" class="rel-assoc"/>
+<line x1="53" y1="198" x2="300" y2="300" class="rel-assoc"/>
+<line x1="53" y1="198" x2="570" y2="200" class="rel-assoc"/>
+<line x1="53" y1="198" x2="570" y2="300" class="rel-assoc"/>
+
+<text x="1105" y="368" class="pg">Trang 8/9</text>
+</svg>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     DIAGRAM 8: M8 — Quản trị hệ thống
+════════════════════════════════════════════════════════════ -->
+<div class="page">
+<div class="page-title">M8 — QUẢN TRỊ HỆ THỐNG &amp; DỮ LIỆU DANH MỤC</div>
+<svg width="1120" height="360" xmlns="http://www.w3.org/2000/svg">
+<defs><marker id="a8" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3z" fill="#1a1a2e"/></marker></defs>
+
+<rect x="185" y="50" width="750" height="285" rx="6" class="sys-box"/>
+<text x="560" y="72" class="sys-label" text-anchor="middle">Module M8: Quản trị Hệ thống &amp; Dữ liệu Danh mục</text>
+
+<ellipse cx="380" cy="135" rx="130" ry="22" class="uc"/>
+<text x="380" y="130" class="uc-text">Cấu hình luồng</text><text x="380" y="142" class="uc-text">nghiệp vụ (Workflow)</text>
+
+<ellipse cx="380" cy="210" rx="130" ry="22" class="uc"/>
+<text x="380" y="205" class="uc-text">Quản lý danh mục</text><text x="380" y="217" class="uc-text">sản phẩm</text>
+
+<ellipse cx="650" cy="135" rx="130" ry="22" class="uc"/>
+<text x="650" y="130" class="uc-text">Quản lý thông tin &amp;</text><text x="650" y="142" class="uc-text">thông số kỹ thuật linh kiện</text>
+
+<ellipse cx="650" cy="210" rx="130" ry="22" class="uc"/>
+<text x="650" y="205" class="uc-text">Quản lý hồ sơ</text><text x="650" y="217" class="uc-text">Nhà cung cấp</text>
+
+<ellipse cx="515" cy="295" rx="130" ry="22" class="uc"/>
+<text x="515" y="290" class="uc-text">Xem nhật ký hệ thống</text><text x="515" y="302" class="uc-text">(tham chiếu M1)</text>
+
+<!-- ACTOR -->
+<g transform="translate(25,195)">
+  <circle cy="13" r="13" fill="none" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="26" x2="0" y2="50" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="-15" y1="36" x2="15" y2="36" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="50" x2="-12" y2="68" stroke="#1a1a2e" stroke-width="1.5"/>
+  <line x1="0" y1="50" x2="12" y2="68" stroke="#1a1a2e" stroke-width="1.5"/>
+  <text y="82" text-anchor="middle" font-size="9.5" font-family="Arial" fill="#1a1a2e">Quản Trị Viên</text>
+</g>
+
+<line x1="53" y1="208" x2="250" y2="135" class="rel-assoc"/>
+<line x1="53" y1="208" x2="250" y2="210" class="rel-assoc"/>
+<line x1="53" y1="208" x2="520" y2="135" class="rel-assoc"/>
+<line x1="53" y1="208" x2="520" y2="210" class="rel-assoc"/>
+<line x1="53" y1="208" x2="385" y2="295" class="rel-assoc"/>
+
+<text x="1105" y="350" class="pg">Trang 9/9</text>
+</svg>
+</div>
+
+</body>
+</html>

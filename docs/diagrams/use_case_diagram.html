@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>Sơ đồ Use Case Tổng Quát – AetherPC</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #2b2b2b;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 14px;
+    font-family: Arial, sans-serif;
+  }
+  .controls {
+    margin-bottom: 12px;
+    display: flex;
+    gap: 10px;
+  }
+  .btn {
+    background: #4a7a8a;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 13px;
+    transition: background 0.2s;
+  }
+  .btn:hover {
+    background: #3a6a7a;
+  }
+  .btn-green {
+    background: #28a745;
+  }
+  .btn-green:hover {
+    background: #218838;
+  }
+  .wrap {
+    background: #fff;
+    padding: 6px;
+    border-radius: 4px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+  }
+  svg text { font-family: Arial, Helvetica, sans-serif; }
+  .ft { color: #999; font-size: 11px; margin-top: 8px; }
+</style>
+</head>
+<body>
+
+<div class="controls">
+  <button class="btn btn-green" onclick="downloadPNG()">Tải ảnh PNG chất lượng cao</button>
+  <button class="btn" onclick="downloadSVG()">Tải file SVG (Vector)</button>
+</div>
+
+<div class="wrap">
+  <svg id="d" viewBox="0 0 1800 1350" width="1500" height="1125"
+       xmlns="http://www.w3.org/2000/svg">
+  </svg>
+</div>
+<div class="ft">Sơ đồ Use Case Tổng Quát — KLTN AetherPC Hybrid Retail-Marketplace</div>
+
+<script>
+const svg = document.getElementById('d');
+const NS = 'http://www.w3.org/2000/svg';
+
+function $(t, a) { const e = document.createElementNS(NS, t); for (const k in a) e.setAttribute(k, a[k]); return e; }
+function add(t, a) { const e = $(t, a); svg.appendChild(e); return e; }
+
+function mt(x, y, str, sz, opts) {
+  opts = opts || {};
+  const lines = str.split('\n'), lh = sz * 1.2;
+  const sy = y - ((lines.length - 1) * lh) / 2;
+  const t = $('text', {
+    'text-anchor': opts.a || 'middle',
+    'font-size': sz,
+    'font-weight': opts.b ? 'bold' : 'normal',
+    fill: opts.c || '#1a1a1a'
+  });
+  lines.forEach((l, i) => {
+    const ts = $('tspan', { x, y: sy + i * lh, 'dominant-baseline': 'middle' });
+    ts.textContent = l;
+    t.appendChild(ts);
+  });
+  svg.appendChild(t);
+}
+
+function ovPt(cx, cy, rx, ry, px, py) {
+  const a = Math.atan2(py - cy, px - cx);
+  return { x: cx + rx * Math.cos(a), y: cy + ry * Math.sin(a) };
+}
+
+const RX = 88, RY = 23;
+
+function actor(x, y, name) {
+  add('circle', { cx: x, cy: y - 22, r: 9, fill: 'white', stroke: '#222', 'stroke-width': 1.6 });
+  add('line', { x1: x, y1: y - 13, x2: x, y2: y + 11, stroke: '#222', 'stroke-width': 1.6 });
+  add('line', { x1: x - 13, y1: y - 3, x2: x + 13, y2: y - 3, stroke: '#222', 'stroke-width': 1.6 });
+  add('line', { x1: x, y1: y + 11, x2: x - 10, y2: y + 28, stroke: '#222', 'stroke-width': 1.6 });
+  add('line', { x1: x, y1: y + 11, x2: x + 10, y2: y + 28, stroke: '#222', 'stroke-width': 1.6 });
+  mt(x, y + 44, name, 10);
+}
+
+function uc(cx, cy, text, rx, ry) {
+  rx = rx || RX; ry = ry || RY;
+  add('ellipse', { cx, cy, rx, ry, fill: 'white', stroke: '#222', 'stroke-width': 1.3 });
+  mt(cx, cy, text, 9.5);
+  return { cx, cy, rx, ry };
+}
+
+function assoc(ax, ay, side, cx, cy, rx, ry) {
+  rx = rx || RX; ry = ry || RY;
+  const px = side === 'L' ? ax + 15 : ax - 15;
+  const o = ovPt(cx, cy, rx, ry, px, ay);
+  add('line', { x1: px, y1: ay, x2: o.x, y2: o.y, stroke: '#333', 'stroke-width': 1 });
+}
+
+function incl(f, t) {
+  const fp = ovPt(f.cx, f.cy, f.rx, f.ry, t.cx, t.cy);
+  const tp = ovPt(t.cx, t.cy, t.rx, t.ry, f.cx, f.cy);
+  add('line', {
+    x1: fp.x, y1: fp.y, x2: tp.x, y2: tp.y,
+    stroke: '#222', 'stroke-width': 1, 'stroke-dasharray': '6,3',
+    'marker-end': 'url(#ai)'
+  });
+  mt((fp.x + tp.x) / 2, (fp.y + tp.y) / 2 - 7, '<<include>>', 8, { c: '#333' });
+}
+
+/* Defs */
+const defs = $('defs', {});
+const m1 = $('marker', { id: 'ai', markerWidth: 8, markerHeight: 6, refX: 8, refY: 3, orient: 'auto' });
+m1.appendChild($('polygon', { points: '0 0,8 3,0 6', fill: '#222' }));
+defs.appendChild(m1);
+const m2 = $('marker', { id: 'tg', markerWidth: 12, markerHeight: 9, refX: 12, refY: 4.5, orient: 'auto' });
+m2.appendChild($('polygon', { points: '0 0,12 4.5,0 9', fill: 'white', stroke: '#222', 'stroke-width': 1.2 }));
+defs.appendChild(m2);
+svg.appendChild(defs);
+
+/* ═══ System Boundary ═══ */
+add('rect', { x: 210, y: 25, width: 1380, height: 1300, rx: 5,
+  fill: '#7EC8E3', stroke: '#3a3a3a', 'stroke-width': 2 });
+mt(900, 48, 'Nền tảng TMĐT bán lẻ – lắp ráp máy tính  |  Hybrid Retail-Marketplace (AetherPC)', 14, { b: true, c: '#111' });
+
+/* ═══ DATA ═══ */
+// Actors
+const A = {
+  guest:  { x: 85, y: 130, s: 'L' },
+  member: { x: 85, y: 385, s: 'L' },
+  seller: { x: 85, y: 735, s: 'L' },
+  wh:     { x: 1715, y: 130, s: 'R' },
+  tech:   { x: 1715, y: 310, s: 'R' },
+  sales:  { x: 1715, y: 470, s: 'R' },
+  acct:   { x: 1715, y: 655, s: 'R' },
+  cskh:   { x: 1715, y: 830, s: 'R' },
+  admin:  { x: 1715, y: 1010, s: 'R' },
+  dir:    { x: 1715, y: 1210, s: 'R' },
+};
+const AN = {
+  guest: 'Khách vãng lai', member: 'Khách hàng\nthành viên',
+  seller: 'Nhà cung cấp\ntrên sàn (Seller)',
+  wh: 'Thủ kho /\nQuản lý kho', tech: 'Kỹ thuật viên',
+  sales: 'Nhân viên\nbán hàng', acct: 'Nhân viên\nkế toán',
+  cskh: 'Nhân viên\nCSKH', admin: 'Quản trị viên',
+  dir: 'Giám đốc\nđiều hành',
+};
+
+// Use Cases — tighter grid layout
+const U = {
+  // Guest
+  viewProd:  { cx: 385, cy: 90,  n: 'Xem sản phẩm' },
+  register:  { cx: 385, cy: 160, n: 'Đăng ký tài khoản' },
+  // Shared
+  login:     { cx: 650, cy: 130, n: 'Đăng nhập' },
+  split:     { cx: 680, cy: 345, n: 'Tách đơn hàng\n(Split Order)' },
+  // Member
+  order:     { cx: 405, cy: 270, n: 'Đặt hàng' },
+  editOrd:   { cx: 385, cy: 335, n: 'Sửa/Hủy đơn hàng' },
+  viewSt:    { cx: 405, cy: 400, n: 'Xem trạng thái\nđơn hàng' },
+  rate:      { cx: 385, cy: 465, n: 'Đánh giá\nsản phẩm/Seller' },
+  complain:  { cx: 405, cy: 530, n: 'Gửi khiếu nại\n/đổi trả' },
+  // Seller
+  sKYC:      { cx: 390, cy: 630, n: 'Đăng ký Seller\n(KYC)' },
+  sProd:     { cx: 390, cy: 695, n: 'Đăng/sửa/gỡ\nsản phẩm' },
+  sCons:     { cx: 405, cy: 760, n: 'Tạo phiếu\nký gửi hàng' },
+  sLedger:   { cx: 390, cy: 825, n: 'Xem bảng đối soát' },
+  sDisp:     { cx: 405, cy: 890, n: 'Phản hồi\nkhiếu nại' },
+  // ─── Right side ───
+  // Thủ kho
+  inbound:   { cx: 1340, cy: 80,  n: 'Quản lý nhập kho\n(Staging → GRN)', rx: 95 },
+  outbound:  { cx: 1340, cy: 145, n: 'Quản lý xuất kho\ntheo sub-order', rx: 93 },
+  lot:       { cx: 1340, cy: 210, n: 'Quản lý trạng thái\nlô hàng' },
+  invCount:  { cx: 1130, cy: 145, n: 'Kiểm kê &\nbáo cáo tồn kho' },
+  // KTV
+  asm:       { cx: 1340, cy: 280, n: 'Lắp ráp\ntheo BOM' },
+  scanSN:    { cx: 1340, cy: 345, n: 'Quét S/N\nlinh kiện' },
+  qa5:       { cx: 1130, cy: 280, n: 'Cập nhật\nQA 5 bước' },
+  disasm:    { cx: 1130, cy: 345, n: 'Xử lý rã hàng' },
+  // NV bán hàng
+  pos:       { cx: 1340, cy: 430, n: 'Bán hàng POS\nOmnichannel' },
+  subOrd:    { cx: 1340, cy: 500, n: 'Xử lý sub-order\nonline' },
+  shift:     { cx: 1130, cy: 470, n: 'Mở/đóng ca\nđối soát quỹ' },
+  // NV kế toán
+  arAp:      { cx: 1340, cy: 590, n: 'Quản lý công nợ\nhóa đơn VAT' },
+  settle:    { cx: 1340, cy: 655, n: 'Đối soát Seller' },
+  tax:       { cx: 1340, cy: 720, n: 'Khấu trừ thuế\nGTGT/TNCN' },
+  payout:    { cx: 1130, cy: 620, n: 'Tạo lệnh Payout\ncho Seller' },
+  shipVar:   { cx: 1130, cy: 690, n: 'Hạch toán\nShipping Variance' },
+  // NV CSKH
+  warranty:  { cx: 1340, cy: 800, n: 'Xử lý bảo hành' },
+  mDispute:  { cx: 1340, cy: 865, n: 'Xử lý tranh chấp\nmarketplace' },
+  // QTV
+  appKYC:    { cx: 1340, cy: 950,  n: 'Duyệt hồ sơ\nSeller (KYC)' },
+  appProd:   { cx: 1340, cy: 1015, n: 'Duyệt sản phẩm\nđăng bán' },
+  commis:    { cx: 1130, cy: 950,  n: 'Cấu hình\n% hoa hồng' },
+  fraud:     { cx: 1130, cy: 1015, n: 'Kiểm duyệt\nrủi ro (Audit)' },
+  escal:     { cx: 1340, cy: 1080, n: 'Phân xử\ntranh chấp' },
+  // GĐ
+  appPO:     { cx: 1340, cy: 1175, n: 'Phê duyệt\nmua hàng' },
+  dash:      { cx: 1340, cy: 1245, n: 'Xem dashboard\ndoanh thu' },
+};
+
+// Associations
+const ASSOC = [
+  ['guest','viewProd'],['guest','register'],
+  ['member','order'],['member','editOrd'],['member','viewSt'],['member','rate'],['member','complain'],
+  ['seller','sKYC'],['seller','sProd'],['seller','sCons'],['seller','sLedger'],['seller','sDisp'],
+  ['wh','inbound'],['wh','outbound'],['wh','lot'],['wh','invCount'],
+  ['tech','asm'],['tech','scanSN'],['tech','qa5'],['tech','disasm'],
+  ['sales','pos'],['sales','subOrd'],['sales','shift'],
+  ['acct','arAp'],['acct','settle'],['acct','tax'],['acct','payout'],['acct','shipVar'],
+  ['cskh','warranty'],['cskh','mDispute'],
+  ['admin','appKYC'],['admin','appProd'],['admin','commis'],['admin','fraud'],['admin','escal'],
+  ['dir','appPO'],['dir','dash'],
+];
+
+// Includes
+const INCL = [
+  ['order', 'login'],
+  ['editOrd', 'login'],
+  ['complain', 'login'],
+  ['order', 'split'],
+];
+
+/* ═══ LAYER 2: Association lines ═══ */
+ASSOC.forEach(([ak, uk]) => {
+  const a = A[ak], u = U[uk];
+  assoc(a.x, a.y, a.s, u.cx, u.cy, u.rx, u.ry);
+});
+
+/* ═══ LAYER 3: Include lines ═══ */
+INCL.forEach(([fk, tk]) => {
+  const f = U[fk], t = U[tk];
+  incl(
+    { cx: f.cx, cy: f.cy, rx: f.rx || RX, ry: f.ry || RY },
+    { cx: t.cx, cy: t.cy, rx: t.rx || RX, ry: t.ry || RY }
+  );
+});
+
+/* ═══ LAYER 4: Generalization ═══ */
+add('line', {
+  x1: 60, y1: A.member.y - 34, x2: 60, y2: A.guest.y + 46,
+  stroke: '#222', 'stroke-width': 1.3, 'marker-end': 'url(#tg)'
+});
+
+/* ═══ LAYER 5: Use Case Ovals ═══ */
+for (const k in U) uc(U[k].cx, U[k].cy, U[k].n, U[k].rx, U[k].ry);
+
+/* ═══ LAYER 6: Actors ═══ */
+for (const k in A) actor(A[k].x, A[k].y, AN[k]);
+
+/* ═══ LAYER 7: Watermark ═══ */
+mt(1520, 1310, 'Use Case Diagram — AetherPC', 8.5, { c: '#3a6a7a' });
+
+/* ═══ Downloader Logic ═══ */
+function downloadSVG() {
+  const svgEl = document.getElementById('d').cloneNode(true);
+  svgEl.setAttribute('width', '1800');
+  svgEl.setAttribute('height', '1350');
+  const serializer = new XMLSerializer();
+  const source = serializer.serializeToString(svgEl);
+  const blob = new Blob([source], { type: 'image/svg+xml;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'sodo_usecase_aetherpc.svg';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function downloadPNG() {
+  const svgEl = document.getElementById('d');
+  const serializer = new XMLSerializer();
+  const source = serializer.serializeToString(svgEl);
+  
+  const img = new Image();
+  const svgBlob = new Blob([source], {type: 'image/svg+xml;charset=utf-8'});
+  const svgUrl = URL.createObjectURL(svgBlob);
+  img.src = svgUrl;
+  
+  img.onload = function() {
+    const canvas = document.createElement('canvas');
+    // Save with ultra high definition (double of standard view)
+    canvas.width = 3600;
+    canvas.height = 2700;
+    const ctx = canvas.getContext('2d');
+    
+    // Set white background
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    URL.revokeObjectURL(svgUrl);
+    
+    // Trigger download using Blob to bypass file:/// protocol naming limitations in Chrome
+    canvas.toBlob(function(blob) {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'sodo_usecase_aetherpc.png';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }, 'image/png');
+  };
+}
+</script>
+</body>
+</html>

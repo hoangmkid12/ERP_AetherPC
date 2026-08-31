@@ -1,0 +1,211 @@
+{
+  "intents": [
+    {
+      "intent": "greeting",
+      "utterances": [
+        "xin chào",
+        "chào bạn",
+        "chào shop",
+        "hello shop",
+        "hi shop",
+        "chào cửa hàng",
+        "chào ad",
+        "chào admin",
+        "tư vấn giúp mình với",
+        "tư vấn giúp tôi",
+        "cho hỏi chút",
+        "alo",
+        "ê ad",
+        "có ai online không",
+        "có ai trực không",
+        "dạ chào shop ạ",
+        "tư vấn cho mình bộ pc",
+        "shop tư vấn em với",
+        "shop ơi",
+        "ad ơi"
+      ]
+    },
+    {
+      "intent": "goodbye",
+      "utterances": [
+        "tạm biệt",
+        "tạm biệt shop",
+        "bye shop",
+        "goodbye",
+        "hẹn gặp lại",
+        "hẹn gặp lại shop",
+        "mình đi nha",
+        "tạm biệt ad",
+        "cảm ơn hẹn gặp lại"
+      ]
+    },
+    {
+      "intent": "thanks",
+      "utterances": [
+        "cảm ơn",
+        "cám ơn",
+        "cảm ơn shop",
+        "cám ơn shop",
+        "thanks",
+        "thank shop",
+        "cảm ơn ad nhiều nha",
+        "ok cảm ơn bạn",
+        "ok cám ơn",
+        "tư vấn tuyệt vời cảm ơn shop",
+        "đã hiểu cảm ơn bạn nhiều"
+      ]
+    },
+    {
+      "intent": "pc_build",
+      "utterances": [
+        "tư vấn build pc",
+        "tư vấn lắp máy tính",
+        "mình muốn build bộ pc",
+        "tôi muốn mua một dàn máy tính",
+        "build pc gaming tầm 15 triệu",
+        "tư vấn cấu hình pc 20tr",
+        "tư vấn pc thiết kế đồ họa",
+        "muốn ráp pc làm đồ họa 30 triệu",
+        "build máy tính văn phòng giá rẻ",
+        "ráp một bộ pc tầm 10tr",
+        "build pc chơi game liên minh",
+        "cần build pc chơi game nặng",
+        "tư vấn case pc tầm 25 triệu",
+        "tôi cần cấu hình pc làm việc",
+        "ráp máy tính văn phòng khoảng 8tr",
+        "cấu hình máy tính chơi game khoảng 15tr",
+        "ráp pc gaming",
+        "build pc văn phòng",
+        "tư vấn ráp máy tính chơi game",
+        "build pc 22tr mượt valorant",
+        "ráp máy 35tr làm blender 3d",
+        "pc 40tr chạy ai llama vram 16gb",
+        "ráp pc màu trắng full argb",
+        "cấu hình pc livestream vtuber",
+        "build pc 12tr",
+        "dàn máy 18 triệu",
+        "tư vấn cấu hình máy tính 15tr",
+        "build dàn máy 25tr"
+      ]
+    },
+    {
+      "intent": "product_search",
+      "utterances": [
+        "tìm màn hình 144hz",
+        "tìm màn hình dell",
+        "có bán card đồ họa rtx 4060 không",
+        "tìm vga asus",
+        "có ram ddr5 16gb không",
+        "tìm ssd nvme 1tb",
+        "muốn mua nguồn 750w",
+        "tìm vỏ case cỏ",
+        "bên bạn có tản nhiệt nước không",
+        "tìm cpu ryzen 5",
+        "có cpu intel core i5 không",
+        "tìm mainboard b760",
+        "muốn mua chuột logitech",
+        "tìm bàn phím cơ razer",
+        "có lót chuột không",
+        "muốn mua tai nghe gaming",
+        "tìm chuột dưới 500k",
+        "tìm màn hình tầm 3 triệu",
+        "vga gigabyte",
+        "ssd samsung 500gb",
+        "tìm bàn phím cơ",
+        "tìm card msi rtx 4070 super",
+        "tìm ram corsair vengeance rgb",
+        "tìm tản nhiệt deepcool ak620",
+        "có nguồn corsair 850w gold không",
+        "cho xem các mẫu màn hình",
+        "bàn phím cơ giá bao nhiêu",
+        "card màn hình rẻ nhất"
+      ]
+    },
+    {
+      "intent": "game_advice",
+      "utterances": [
+        "chơi valorant cần máy bao nhiêu",
+        "cấu hình chơi gta 5 mượt",
+        "máy tính chơi fo4 fifa online",
+        "pc chơi lmht lol max setting",
+        "cần dàn pc chơi pubg 60fps",
+        "cấu hình chơi genshin impact",
+        "máy tính cho học sinh sinh viên học lập trình",
+        "cấu hình dựng phim premiere pro 4k"
+      ]
+    },
+    {
+      "intent": "policy_warranty",
+      "utterances": [
+        "chính sách bảo hành thế nào",
+        "bảo hành bao lâu",
+        "sản phẩm được bảo hành mấy năm",
+        "hàng lỗi đổi trả thế nào",
+        "lỗi có được đổi mới không",
+        "chính sách 1 đổi 1 thế nào",
+        "màn hình bị sọc có được bảo hành không",
+        "gửi bảo hành ở đâu",
+        "thời gian bảo hành mất bao lâu",
+        "chính sách đổi trả sản phẩm",
+        "đổi mới trong bao lâu"
+      ]
+    },
+    {
+      "intent": "policy_delivery",
+      "utterances": [
+        "giao hàng mất bao lâu",
+        "có freeship không",
+        "phí vận chuyển thế nào",
+        "giao hàng ở tphcm bao lâu thì nhận được",
+        "phí ship ra hà nội bao nhiêu",
+        "giao hỏa tốc được không",
+        "nhận hàng rồi thanh toán được không",
+        "ship tỉnh mất mấy ngày",
+        "chính sách vận chuyển",
+        "có ship cod không",
+        "ship hà nội hcm bao nhiêu tiền",
+        "ship các tỉnh khác bao nhiêu"
+      ]
+    },
+    {
+      "intent": "policy_payment",
+      "utterances": [
+        "có trả góp không",
+        "hướng dẫn trả góp",
+        "trả góp qua thẻ tín dụng thế nào",
+        "shop thanh toán bằng gì",
+        "quét mã qr được chiết khấu không",
+        "chuyển khoản ngân hàng được không",
+        "thanh toán momo được không",
+        "lãi suất trả góp là bao nhiêu",
+        "có hỗ trợ trả góp 0% không"
+      ]
+    },
+    {
+      "intent": "policy_contact",
+      "utterances": [
+        "địa chỉ shop ở đâu",
+        "hotline liên hệ là gì",
+        "số điện thoại hỗ trợ",
+        "giờ mở cửa của shop",
+        "shop hoạt động từ mấy giờ đến mấy giờ",
+        "email hỗ trợ của shop là gì",
+        "địa chỉ bảo hành ở đâu",
+        "cửa hàng ở quận mấy",
+        "gặp nhân viên cskh",
+        "cho số tổng đài"
+      ]
+    },
+    {
+      "intent": "hardware_advice",
+      "utterances": [
+        "nếu chọn intel hay amd",
+        "so sánh i5 13400f và ryzen 5 7600",
+        "chơi game chọn card nvidia hay radeon",
+        "cần bao nhiêu ram để edit video 4k",
+        "tản khí hay tản nước tốt hơn",
+        "nguồn 650w có đủ chạy rtx 4070 không"
+      ]
+    }
+  ]
+}

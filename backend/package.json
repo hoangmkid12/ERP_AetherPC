@@ -1,0 +1,43 @@
+{
+  "name": "kltn-erp-backend",
+  "version": "1.0.0",
+  "description": "Backend ERP System for Computer Components using Node.js, Express & Prisma",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon -L --config nodemon.json src/server.js",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "db:seed": "node prisma/seed.js",
+    "queue:worker": "node src/services/orderWorker.js",
+    "queue:producer-demo": "node src/enqueue_demo.js"
+  },
+  "dependencies": {
+    "@nlpjs/basic": "^5.0.0-alpha.5",
+    "@prisma/client": "^6.19.3",
+    "bcryptjs": "^2.4.3",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "helmet": "^7.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "morgan": "^1.10.0",
+    "node-nlp": "^5.0.0-alpha.5",
+    "nodemailer": "^9.0.3",
+    "ws": "^8.21.2",
+    "ioredis": "^5.3.2"
+  },
+  "engines": {
+    "node": ">=16"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0",
+    "prisma": "^6.19.3"
+  },
+  "allowScripts": {
+    "@prisma/client@6.19.3": true,
+    "@prisma/engines@6.19.3": true,
+    "prisma@6.19.3": true
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "header": {
+    "products": "Sản Phẩm",
+    "promotions": "Khuyến Mãi",
+    "pc_builder": "Tự Build PC",
+    "news": "Tin Tức",
+    "all_posts": "Tất Cả Bài Viết",
+    "product_reviews": "Review Sản Phẩm",
+    "pc_build_guides": "Hướng Dẫn Build PC",
+    "about_us": "Về Chúng Tôi",
+    "company_info": "Giới Thiệu Công Ty",
+    "careers": "Tuyển Dụng",
+    "search_placeholder": "Tìm kiếm...",
+    "login": "Đăng Nhập",
+    "admin_panel": "Quản Trị",
+    "orders": "Đơn Hàng",
+    "account": "Tài Khoản",
+    "logout": "Đăng Xuất",
+    "flash_sale": "FLASH SALE — Giảm đến 30% linh kiện CPU & VGA hôm nay!",
+    "free_shipping": "Miễn phí vận chuyển cho đơn từ 500.000₫",
+    "warranty": "Bảo hành chính hãng 24–36 tháng"
+  },
+  "home": {
+    "buy_now": "Mua Ngay"
+  }
+}

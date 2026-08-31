@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>Bản vẽ Sơ đồ BPMN - KLTN AetherPC</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #202020;
+    color: #eee;
+    font-family: Arial, sans-serif;
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+  }
+  .sidebar {
+    width: 320px;
+    background: #181818;
+    border-right: 1px solid #333;
+    display: flex;
+    flex-direction: column;
+    padding: 16px;
+    overflow-y: auto;
+  }
+  .sidebar h2 {
+    font-size: 16px;
+    margin-bottom: 16px;
+    color: #4a7a8a;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid #333;
+    padding-bottom: 8px;
+  }
+  .menu-btn {
+    background: #252525;
+    color: #ccc;
+    border: 1px solid #333;
+    padding: 10px 14px;
+    border-radius: 4px;
+    cursor: pointer;
+    text-align: left;
+    font-size: 12.5px;
+    line-height: 1.4;
+    margin-bottom: 8px;
+    transition: all 0.2s;
+  }
+  .menu-btn:hover {
+    background: #2e2e2e;
+    color: #fff;
+    border-color: #4a7a8a;
+  }
+  .menu-btn.active {
+    background: #4a7a8a;
+    color: #fff;
+    border-color: #6bb0c4;
+    font-weight: bold;
+  }
+  .main-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: #222;
+  }
+  .header {
+    background: #181818;
+    padding: 12px 24px;
+    border-bottom: 1px solid #333;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .header h1 {
+    font-size: 16px;
+    color: #fff;
+    font-weight: normal;
+  }
+  .controls {
+    display: flex;
+    gap: 10px;
+  }
+  .btn {
+    background: #4a7a8a;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 12px;
+    transition: background 0.2s;
+  }
+  .btn:hover {
+    background: #3a6a7a;
+  }
+  .btn-green {
+    background: #28a745;
+  }
+  .btn-green:hover {
+    background: #218838;
+  }
+  .canvas-container {
+    flex: 1;
+    overflow: auto;
+    padding: 24px;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+  }
+  .canvas-wrapper {
+    background: #fff;
+    border-radius: 4px;
+    padding: 16px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+  }
+  svg text { font-family: Arial, Helvetica, sans-serif; }
+</style>
+</head>
+<body>
+
+<div class="sidebar">
+  <h2>Các kịch bản BPMN</h2>
+  <div id="menu"></div>
+</div>
+
+<div class="main-content">
+  <div class="header">
+    <h1 id="title">Đang tải sơ đồ...</h1>
+    <div class="controls">
+      <button class="btn btn-green" onclick="downloadPNG()">Tải ảnh PNG chất lượng cao</button>
+      <button class="btn" onclick="downloadSVG()">Tải file SVG (Vector)</button>
+    </div>
+  </div>
+  <div class="canvas-container">
+    <div class="canvas-wrapper">
+      <svg id="canvas" viewBox="0 0 1700 850" width="1360" height="680" xmlns="http://www.w3.org/2000/svg"></svg>
+    </div>
+  </div>
+</div>
+
+<script>
+const NS = 'http://www.w3.org/2000/svg';
+
+/* Sơ đồ dữ liệu BPMN */
+const diagrams = {
+  d1: {
+    title: "Kịch bản 1 — Mua hàng (First-party Procurement)",
+    lanes: ["Hệ thống (System)", "Nhân viên mua hàng", "Giám đốc điều hành", "Nhà cung cấp NVL", "Thủ kho", "Nhân viên kế toán"],
+    nodes: [
+      { id: 'start', type: 'start', lane: 0, x: 90, name: 'Tồn kho khả dụng\n< ROP' },
+      { id: 't1', type: 'task', lane: 0, x: 200, name: 'Tính toán & tự động\nkhởi tạo PR nháp' },
+      { id: 't2', type: 'task', lane: 1, x: 380, name: 'Xác nhận PR,\ntạo yêu cầu PO' },
+      { id: 't3', type: 'task', lane: 2, x: 560, name: 'Xem xét phê duyệt' },
+      { id: 'g1', type: 'gateway', lane: 2, x: 710, labelPos: 'bottom', name: 'Duyệt?' },
+      { id: 'end1', type: 'end', lane: 2, x: 710, y: -75, labelPos: 'top', name: 'Từ chối PO\n(Hủy đề xuất)' },
+      { id: 't4', type: 'task', lane: 1, x: 880, name: 'Gửi RFQ & so sánh,\ntạo PO chính thức' },
+      { id: 't5', type: 'task', lane: 3, x: 1060, name: 'Giao linh kiện\ntới kho đệm' },
+      { id: 't6', type: 'task', lane: 4, x: 1240, name: 'Tiếp nhận, kiểm tra\nQA & tạo GRN' },
+      { id: 't7', type: 'task', lane: 5, x: 1420, name: 'Đối soát 3 chiều,\nghi nhận nợ & thanh toán' },
+      { id: 'end2', type: 'end', lane: 5, x: 1560, name: 'Hoàn tất mua hàng' }
+    ],
+    flows: [
+      { from: 'start', to: 't1' },
+      { from: 't1', to: 't2', elbow: true },
+      { from: 't2', to: 't3', elbow: true },
+      { from: 't3', to: 'g1' },
+      { from: 'g1', to: 'end1', label: 'Không' },
+      { from: 'g1', to: 't4', label: 'Có', elbow: true },
+      { from: 't4', to: 't5', elbow: true },
+      { from: 't5', to: 't6', elbow: true },
+      { from: 't6', to: 't7', elbow: true },
+      { from: 't7', to: 'end2' }
+    ]
+  },
+  d2: {
+    title: "Kịch bản 2 — Kho & Kiểm tra chất lượng (Staging & QA)",
+    lanes: ["Thủ kho", "Quản lý chất lượng", "Nhân viên kế toán", "Quản lý kho"],
+    nodes: [
+      { id: 'start', type: 'start', lane: 0, x: 90, name: 'Hàng về đến\ncổng kho' },
+      { id: 't1', type: 'task', lane: 0, x: 200, y: -30, name: 'Đưa hàng vào\nkhu đệm (Staging)' },
+      { id: 't2', type: 'task', lane: 1, x: 380, name: 'Kiểm tra QA\n(theo bộ tiêu chí)' },
+      { id: 'g1', type: 'gateway', lane: 1, x: 520, name: 'Đạt QA?' },
+      { id: 't3', type: 'task', lane: 0, x: 670, y: -35, name: 'Lập biên bản từ chối,\ntrả hàng quay đầu' },
+      { id: 'end1', type: 'end', lane: 0, x: 820, y: -35, name: 'Từ chối nhập kho' },
+      { id: 't4', type: 'task', lane: 0, x: 670, y: 35, name: 'Tạo GRN chính thức,\ngán Bin Location' },
+      { id: 'g2', type: 'gateway', lane: 2, x: 820, name: 'Nguồn gốc?' },
+      { id: 't5', type: 'task', lane: 2, x: 980, y: -30, name: 'Ghi nhận hàng tự doanh\nvào tài sản tồn kho' },
+      { id: 't6', type: 'task', lane: 2, x: 980, y: 30, name: 'Ghi nhận hàng ký gửi\ntài khoản ngoài bảng' },
+      { id: 't7', type: 'task', lane: 3, x: 1190, name: 'Định kỳ kiểm kê,\nphê duyệt báo cáo kho' },
+      { id: 'end2', type: 'end', lane: 3, x: 1350, name: 'Hoàn tất' }
+    ],
+    flows: [
+      { from: 'start', to: 't1', elbow: true },
+      { from: 't1', to: 't2', elbow: true },
+      { from: 't2', to: 'g1' },
+      { from: 'g1', to: 't3', label: 'Không', elbow: true },
+      { from: 't3', to: 'end1' },
+      { from: 'g1', to: 't4', label: 'Có', elbow: true },
+      { from: 't4', to: 'g2', elbow: true },
+      { from: 'g2', to: 't5', label: 'Tự doanh', elbow: true },
+      { from: 'g2', to: 't6', label: 'Ký gửi', elbow: true },
+      { from: 't5', to: 't7', elbow: true },
+      { from: 't6', to: 't7', elbow: true },
+      { from: 't7', to: 'end2' }
+    ]
+  },
+  d3: {
+    title: "Kịch bản 3 — Lắp ráp máy tính theo BOM (Assembly & Locking)",
+    lanes: ["Hệ thống", "Nhân viên bán hàng", "Kỹ thuật viên", "Quản lý chất lượng", "Thủ kho"],
+    nodes: [
+      { id: 'start', type: 'start', lane: 1, x: 90, name: 'Đơn hàng lắp ráp\nxác nhận' },
+      { id: 't1', type: 'task', lane: 0, x: 220, name: 'Dựng BOM & Khóa bi quan\nSELECT FOR UPDATE (ID tăng dần)' },
+      { id: 'g1', type: 'gateway', lane: 0, x: 340, labelPos: 'bottom', name: 'Thành công?' },
+      { id: 'end1', type: 'end', lane: 0, x: 340, y: -80, labelPos: 'top', name: 'Deadlock / Hủy\nRollback CSDL' },
+      { id: 'g2', type: 'gateway', lane: 0, x: 460, name: 'Hợp lệ ký gửi?' },
+      { id: 't2', type: 'task', lane: 1, x: 600, y: -35, name: 'Cảnh báo / Yêu cầu\nthỏa thuận chia sẻ DT' },
+      { id: 'end2', type: 'end', lane: 1, x: 720, y: -35, name: 'Dừng đơn hàng' },
+      { id: 't_confirm', type: 'task', lane: 1, x: 600, y: 35, name: 'Xác nhận đủ linh kiện\n& tạo Lệnh lắp ráp' },
+      { id: 't3', type: 'task', lane: 2, x: 760, y: 35, name: 'Quét S/N linh kiện\n& thực hiện lắp ráp' },
+      { id: 't4', type: 'task', lane: 2, x: 920, y: 35, name: 'Cập nhật QA 5 bước' },
+      { id: 't5', type: 'task', lane: 3, x: 1080, name: 'Kiểm tra thành phẩm\ncuối theo checklist' },
+      { id: 'g3', type: 'gateway', lane: 3, x: 1210, name: 'Đạt QA?' },
+      { id: 't6', type: 'task', lane: 2, x: 1080, y: -45, name: 'Trả về sửa chữa\n/ Thay linh kiện' },
+      { id: 't7', type: 'task', lane: 4, x: 1350, name: 'Nhập kho thành phẩm,\nchuyển Sẵn sàng giao' },
+      { id: 'end3', type: 'end', lane: 4, x: 1480, name: 'Hoàn tất lắp ráp' }
+    ],
+    flows: [
+      { from: 'start', to: 't1', elbow: true },
+      { from: 't1', to: 'g1' },
+      { from: 'g1', to: 'end1', label: 'Không' },
+      { from: 'g1', to: 'g2', label: 'Có' },
+      { from: 'g2', to: 't2', label: 'Không hợp lệ', elbow: true },
+      { from: 't2', to: 'end2' },
+      { from: 'g2', to: 't_confirm', label: 'Hợp lệ', elbow: true },
+      { from: 't_confirm', to: 't3', elbow: true },
+      { from: 't3', to: 't4' },
+      { from: 't4', to: 't5', elbow: true },
+      { from: 't5', to: 'g3' },
+      { from: 'g3', to: 't6', label: 'Không', elbow: true },
+      { from: 't6', to: 't3', elbow: true },
+      { from: 'g3', to: 't7', label: 'Có', elbow: true },
+      { from: 't7', to: 'end3' }
+    ]
+  },
+  d4: {
+    title: "Kịch bản 4 — Bán hàng tại quầy (POS Omnichannel)",
+    lanes: ["Nhân viên bán hàng", "Hệ thống", "Thủ kho", "Nhân viên kế toán"],
+    nodes: [
+      { id: 'start', type: 'start', lane: 0, x: 90, name: 'Mở ca bán hàng,\nghi nhận tiền quỹ' },
+      { id: 't1', type: 'task', lane: 0, x: 200, name: 'Quét/chọn sản phẩm\n(Tự doanh + Ký gửi)' },
+      { id: 't2', type: 'task', lane: 0, x: 370, name: 'Áp dụng chiết khấu\n& thanh toán hóa đơn' },
+      { id: 't3', type: 'task', lane: 1, x: 540, name: 'Tự động phân tách dòng\nhàng theo nguồn gốc' },
+      { id: 't4', type: 'task', lane: 2, x: 710, name: 'Trừ tồn kho thực tế\n(Áp dụng khóa bi quan)' },
+      { id: 't5', type: 'task', lane: 3, x: 880, name: 'Ghi nhận doanh thu tự doanh\n& công nợ ký gửi Seller' },
+      { id: 't6', type: 'task', lane: 0, x: 1050, name: 'Đóng ca, đối soát\nquỹ tiền mặt' },
+      { id: 'end1', type: 'end', lane: 0, x: 1200, name: 'Hoàn tất ca bán' }
+    ],
+    flows: [
+      { from: 'start', to: 't1' },
+      { from: 't1', to: 't2' },
+      { from: 't2', to: 't3', elbow: true },
+      { from: 't3', to: 't4', elbow: true },
+      { from: 't4', to: 't5', elbow: true },
+      { from: 't5', to: 't6', elbow: true },
+      { from: 't6', to: 'end1' }
+    ]
+  },
+  d5: {
+    title: "Kịch bản 5 — Đăng ký & Duyệt hồ sơ Seller (Onboarding/KYC)",
+    lanes: ["Nhà cung cấp (Seller)", "Hệ thống", "Quản trị viên (Admin)"],
+    nodes: [
+      { id: 'start', type: 'start', lane: 0, x: 90, name: 'Seller đăng ký\ntrên portal' },
+      { id: 't1', type: 'task', lane: 0, x: 200, name: 'Cung cấp MST/CCCD\n& thông tin ngân hàng' },
+      { id: 't2', type: 'task', lane: 1, x: 370, name: 'Kiểm tra định dạng\n& chuyển Chờ duyệt' },
+      { id: 't3', type: 'task', lane: 2, x: 540, name: 'Đánh giá hồ sơ KYC' },
+      { id: 'g1', type: 'gateway', lane: 2, x: 680, name: 'Hợp lệ?' },
+      { id: 't4', type: 'task', lane: 2, x: 840, y: -35, name: 'Từ chối hồ sơ,\nyêu cầu nộp lại' },
+      { id: 'end1', type: 'end', lane: 2, x: 1000, y: -35, name: 'KYC thất bại' },
+      { id: 't5', type: 'task', lane: 2, x: 840, y: 35, name: 'Phê duyệt KYC, cấu hình\n% hoa hồng sàn' },
+      { id: 't6', type: 'task', lane: 1, x: 1020, name: 'Cấp quyền truy cập\nSeller Dashboard' },
+      { id: 'end2', type: 'end', lane: 0, x: 1180, name: 'Seller kích hoạt' }
+    ],
+    flows: [
+      { from: 'start', to: 't1' },
+      { from: 't1', to: 't2', elbow: true },
+      { from: 't2', to: 't3', elbow: true },
+      { from: 't3', to: 'g1' },
+      { from: 'g1', to: 't4', label: 'Không', elbow: true },
+      { from: 't4', to: 'end1' },
+      { from: 'g1', to: 't5', label: 'Có', elbow: true },
+      { from: 't5', to: 't6', elbow: true },
+      { from: 't6', to: 'end2', elbow: true }
+    ]
+  },
+  d6: {
+    title: "Kịch bản 6 — Đăng sản phẩm & Ký gửi (Listing & Consignment)",
+    lanes: ["Nhà cung cấp (Seller)", "Quản trị viên (Admin)", "Thủ kho", "Quản lý chất lượng", "Nhân viên kế toán"],
+    nodes: [
+      { id: 'start', type: 'start', lane: 0, x: 90, name: 'Seller tạo tin đăng\nsản phẩm mới' },
+      { id: 't1', type: 'task', lane: 1, x: 200, name: 'Kiểm duyệt nội dung\nsản phẩm' },
+      { id: 'g1', type: 'gateway', lane: 1, x: 350, labelPos: 'bottom', name: 'Duyệt?' },
+      { id: 'end1', type: 'end', lane: 1, x: 350, y: -80, labelPos: 'top', name: 'Từ chối đăng tải' },
+      { id: 't2', type: 'task', lane: 0, x: 500, name: 'Tạo phiếu ký gửi\n& giao hàng tới kho' },
+      { id: 't3', type: 'task', lane: 2, x: 670, name: 'Tiếp nhận tại khu đệm\n(Staging Area)' },
+      { id: 't4', type: 'task', lane: 3, x: 840, name: 'Kiểm tra QA vật lý,\nđóng gói sản phẩm' },
+      { id: 'g2', type: 'gateway', lane: 3, x: 980, name: 'Đạt QA?' },
+      { id: 't5', type: 'task', lane: 2, x: 1140, y: -30, name: 'Từ chối nhập,\ntrả hàng về Seller' },
+      { id: 'end2', type: 'end', lane: 2, x: 1300, y: -30, name: 'Trả hàng ký gửi' },
+      { id: 't6', type: 'task', lane: 2, x: 1140, y: 30, name: 'Tạo GRN ký gửi, gán vị trí\n& chuyển Sẵn sàng bán' },
+      { id: 't7', type: 'task', lane: 4, x: 1310, name: 'Tính phí lưu kho\n(khi vượt mốc miễn phí)' },
+      { id: 'end3', type: 'end', lane: 0, x: 1470, name: 'Sản phẩm ký gửi lên sàn' }
+    ],
+    flows: [
+      { from: 'start', to: 't1', elbow: true },
+      { from: 't1', to: 'g1' },
+      { from: 'g1', to: 'end1', label: 'Không' },
+      { from: 'g1', to: 't2', label: 'Có', elbow: true },
+      { from: 't2', to: 't3', elbow: true },
+      { from: 't3', to: 't4', elbow: true },
+      { from: 't4', to: 'g2' },
+      { from: 'g2', to: 't5', label: 'Không', elbow: true },
+      { from: 't5', to: 'end2' },
+      { from: 'g2', to: 't6', label: 'Có', elbow: true },
+      { from: 't6', to: 't7', elbow: true },
+      { from: 't7', to: 'end3', elbow: true }
+    ]
+  },
+  d7: {
+    title: "Kịch bản 7 — Xử lý đơn hàng hỗn hợp & Tách đơn (Split Order)",
+    lanes: ["Khách hàng", "Hệ thống", "Thủ kho", "Quản lý giao hàng", "Shipper", "Nhân viên kế toán"],
+    nodes: [
+      { id: 'start', type: 'start', lane: 0, x: 90, name: 'Khách hàng đặt hàng\ngiỏ hàng hỗn hợp' },
+      { id: 't1', type: 'task', lane: 1, x: 200, name: 'Tách đơn hàng gốc thành\ncác sub-order theo Seller' },
+      { id: 't2', type: 'task', lane: 1, x: 370, name: 'Phân bổ chiết khấu voucher\ntheo tỷ trọng giá trị sub-order' },
+      { id: 't3', type: 'task', lane: 1, x: 540, name: 'Ghi nhận Escrow Ledger\n(Tạm giữ dòng tiền)' },
+      { id: 't4', type: 'task', lane: 2, x: 710, name: 'Thủ kho xuất kho riêng\ntừng sub-order' },
+      { id: 't5', type: 'task', lane: 3, x: 880, name: 'Gộp nhiều sub-order\nvào chung kiện giao' },
+      { id: 't6', type: 'task', lane: 4, x: 1050, name: 'Giao hàng thành công\nđến khách hàng' },
+      { id: 't7', type: 'task', lane: 1, x: 1220, name: 'Tính Shipping Variance\n(Phí thu - Phí thực tế)' },
+      { id: 't8', type: 'task', lane: 5, x: 1390, name: 'Hạch toán Shipping Variance\nvào doanh thu dịch vụ sàn' },
+      { id: 'end1', type: 'end', lane: 0, x: 1540, name: 'Hoàn tất xử lý đơn' }
+    ],
+    flows: [
+      { from: 'start', to: 't1', elbow: true },
+      { from: 't1', to: 't2' },
+      { from: 't2', to: 't3' },
+      { from: 't3', to: 't4', elbow: true },
+      { from: 't4', to: 't5', elbow: true },
+      { from: 't5', to: 't6', elbow: true },
+      { from: 't6', to: 't7', elbow: true },
+      { from: 't7', to: 't8', elbow: true },
+      { from: 't8', to: 'end1', elbow: true }
+    ]
+  },
+  d8: {
+    title: "Kịch bản 8 — Đối soát & Thanh toán (Settlement & Payout)",
+    lanes: ["Hệ thống", "Nhân viên kế toán", "Quản trị viên (Admin)"],
+    nodes: [
+      { id: 'start', type: 'start', lane: 0, x: 90, name: 'Chu kỳ đối soát\nhàng tuần kích hoạt' },
+      { id: 't1', type: 'task', lane: 0, x: 200, name: 'Tổng hợp các sub-order\nđã giao & hết hạn khiếu nại' },
+      { id: 't2', type: 'task', lane: 0, x: 370, name: 'Tính doanh thu thực nhận\n(Trừ hoa hồng, phí kho, thuế)' },
+      { id: 't3', type: 'task', lane: 0, x: 540, name: 'Tạo bút toán kế toán kép\n(Ghi nhận nợ/có ví Seller)' },
+      { id: 't4', type: 'task', lane: 1, x: 710, name: 'Xem bảng đối soát,\ntạo lệnh Payout' },
+      { id: 't5', type: 'task', lane: 2, x: 880, name: 'Kiểm tra Audit Log rủi ro\n(đơn giá trị cao/voucher lớn)' },
+      { id: 'g1', type: 'gateway', lane: 2, x: 1020, labelPos: 'left', name: 'Cảnh báo?' },
+      { id: 't6', type: 'task', lane: 2, x: 1020, y: -75, name: 'Chuyển trạng thái tạm giữ\nđể kiểm duyệt thủ công' },
+      { id: 'end1', type: 'end', lane: 2, x: 1200, y: -75, name: 'Tạm khóa đối soát' },
+      { id: 't7', type: 'task', lane: 2, x: 1020, y: 75, name: 'Phê duyệt thanh toán,\ngiải phóng dòng tiền' },
+      { id: 'end2', type: 'end', lane: 1, x: 1200, name: 'Seller nhận tiền' }
+    ],
+    flows: [
+      { from: 'start', to: 't1' },
+      { from: 't1', to: 't2' },
+      { from: 't2', to: 't3' },
+      { from: 't3', to: 't4', elbow: true },
+      { from: 't4', to: 't5', elbow: true },
+      { from: 't5', to: 'g1' },
+      { from: 'g1', to: 't6', label: 'Có' },
+      { from: 't6', to: 'end1' },
+      { from: 'g1', to: 't7', label: 'Không' },
+      { from: 't7', to: 'end2', elbow: true }
+    ]
+  },
+  d9: {
+    title: "Kịch bản 9 — Xử lý khiếu nại & Kiểm duyệt gian lận (Disputes & Fraud)",
+    lanes: ["Khách hàng", "Hệ thống", "Nhân viên CSKH", "Seller", "Quản trị viên (Admin)", "Thủ kho"],
+    nodes: [
+      { id: 'start', type: 'start', lane: 0, x: 90, name: 'Khách hàng gửi\nyêu cầu khiếu nại' },
+      { id: 't1', type: 'task', lane: 1, x: 200, name: 'Phong tỏa dòng tiền\nescrow của sub-order' },
+      { id: 't2', type: 'task', lane: 2, x: 370, name: 'Tiếp nhận khiếu nại,\ngửi thông tin cho Seller' },
+      { id: 't3', type: 'task', lane: 3, x: 540, name: 'Seller phản hồi khiếu nại\n(chấp nhận hoặc từ chối)' },
+      { id: 'g1', type: 'gateway', lane: 3, x: 680, name: 'Seller đồng ý?' },
+      // Nhánh trên: Phân xử hành chính khi Seller không đồng ý
+      { id: 't4', type: 'task', lane: 4, x: 810, y: -35, name: 'Admin phân xử dựa trên\nbằng chứng 2 bên' },
+      { id: 'g2', type: 'gateway', lane: 4, x: 950, y: -35, name: 'Xử khách thắng?' },
+      { id: 't5', type: 'task', lane: 1, x: 1090, y: -35, name: 'Giải phóng Escrow\ncho Seller' },
+      { id: 'end1', type: 'end', lane: 3, x: 1250, y: -35, name: 'Từ chối khiếu nại' },
+      // Nhánh dưới: Kiểm duyệt gian lận khi Seller đồng ý hoàn tiền
+      { id: 't6', type: 'task', lane: 4, x: 850, y: 35, name: 'Kiểm duyệt Audit rủi ro\n(IP trùng lặp, hành vi voucher)' },
+      { id: 'g3', type: 'gateway', lane: 4, x: 990, y: 35, name: 'Gian lận?' },
+      { id: 't7', type: 'task', lane: 4, x: 1130, y: 35, name: 'Khóa tài khoản,\nphong tỏa dòng tiền' },
+      { id: 'end2', type: 'end', lane: 4, x: 1270, y: 35, name: 'Xử lý gian lận' },
+      // Tác vụ chung & Tiếp nhận hoàn trả
+      { id: 't8', type: 'task', lane: 1, x: 1140, y: 35, name: 'Hoàn tiền cho khách hàng' },
+      { id: 't9', type: 'task', lane: 5, x: 1320, name: 'Tiếp nhận hàng hoàn,\nphân loại (trả Seller/hủy)' },
+      { id: 'end3', type: 'end', lane: 0, x: 1470, name: 'Hoàn tất khiếu nại' }
+    ],
+    flows: [
+      { from: 'start', to: 't1', elbow: true },
+      { from: 't1', to: 't2', elbow: true },
+      { from: 't2', to: 't3', elbow: true },
+      { from: 't3', to: 'g1' },
+      { from: 'g1', to: 't4', label: 'Không', elbow: true },
+      { from: 't4', to: 'g2' },
+      { from: 'g2', to: 't5', label: 'Không', elbow: true },
+      { from: 't5', to: 'end1', elbow: true },
+      { from: 'g1', to: 't6', label: 'Có', elbow: true },
+      { from: 't6', to: 'g3' },
+      { from: 'g3', to: 't7', label: 'Có' },
+      { from: 't7', to: 'end2' },
+      { from: 'g3', to: 't8', label: 'Không', elbow: true },
+      { from: 'g2', to: 't8', label: 'Có', elbow: true },
+      { from: 't8', to: 't9', elbow: true },
+      { from: 't9', to: 'end3', elbow: true }
+    ]
+  }
+};
+
+/* Khởi tạo menu */
+const menu = document.getElementById('menu');
+let activeId = 'd3'; // Kịch bản 3 mặc định hoạt động
+
+for (const [id, data] of Object.entries(diagrams)) {
+  const btn = document.createElement('button');
+  btn.className = `menu-btn ${id === activeId ? 'active' : ''}`;
+  btn.id = `btn-${id}`;
+  btn.innerText = data.title;
+  btn.onclick = () => loadDiagram(id);
+  menu.appendChild(btn);
+}
+
+loadDiagram(activeId);
+
+/* Hàm vẽ sơ đồ */
+function loadDiagram(id) {
+  document.querySelectorAll('.menu-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(`btn-${id}`).classList.add('active');
+  activeId = id;
+
+  const data = diagrams[id];
+  document.getElementById('title').innerText = data.title;
+
+  const canvas = document.getElementById('canvas');
+  canvas.innerHTML = ''; // Xóa sạch canvas cũ
+
+  // Chiều cao làn lớn đảm bảo không bao giờ bị cắt nét hay tràn viền
+  const laneHeight = 145;
+  const headerWidth = 50;
+  const startX = 20;
+  const poolWidth = 1600;
+  const totalLanes = data.lanes.length;
+  const poolHeight = totalLanes * laneHeight;
+
+  canvas.setAttribute('viewBox', `0 0 ${poolWidth + 100} ${poolHeight + 100}`);
+  canvas.setAttribute('width', (poolWidth + 100).toString());
+  canvas.setAttribute('height', (poolHeight + 100).toString());
+
+  // Thêm Defs cho marker mũi tên
+  const defs = document.createElementNS(NS, 'defs');
+  
+  // Arrowhead cho nét thường
+  const m1 = document.createElementNS(NS, 'marker');
+  m1.setAttribute('id', 'arr');
+  m1.setAttribute('markerWidth', '10');
+  m1.setAttribute('markerHeight', '7');
+  m1.setAttribute('refX', '9');
+  m1.setAttribute('refY', '3.5');
+  m1.setAttribute('orient', 'auto');
+  const p1 = document.createElementNS(NS, 'polygon');
+  p1.setAttribute('points', '0 0, 10 3.5, 0 7');
+  p1.setAttribute('fill', '#333');
+  m1.appendChild(p1);
+  defs.appendChild(m1);
+  canvas.appendChild(defs);
+
+  // 1. Vẽ Pool lớn
+  const poolRect = document.createElementNS(NS, 'rect');
+  poolRect.setAttribute('x', startX.toString());
+  poolRect.setAttribute('y', '30');
+  poolRect.setAttribute('width', poolWidth.toString());
+  poolRect.setAttribute('height', poolHeight.toString());
+  poolRect.setAttribute('fill', 'none');
+  poolRect.setAttribute('stroke', '#333');
+  poolRect.setAttribute('stroke-width', '2');
+  canvas.appendChild(poolRect);
+
+  // 2. Vẽ các Lane
+  data.lanes.forEach((laneName, index) => {
+    const y = 30 + index * laneHeight;
+
+    // Đường ngăn giữa các Lane
+    if (index > 0) {
+      const line = document.createElementNS(NS, 'line');
+      line.setAttribute('x1', startX.toString());
+      line.setAttribute('y1', y.toString());
+      line.setAttribute('x2', (startX + poolWidth).toString());
+      line.setAttribute('y2', y.toString());
+      line.setAttribute('stroke', '#444');
+      line.setAttribute('stroke-width', '1.5');
+      canvas.appendChild(line);
+    }
+
+    // Tiêu đề của Lane (Nằm dọc ở cột bên trái)
+    const textGroup = document.createElementNS(NS, 'g');
+    textGroup.setAttribute('transform', `translate(${startX + 22}, ${y + laneHeight / 2}) rotate(-90)`);
+    const text = document.createElementNS(NS, 'text');
+    text.setAttribute('text-anchor', 'middle');
+    text.setAttribute('font-size', '11px');
+    text.setAttribute('font-weight', 'bold');
+    text.setAttribute('fill', '#333');
+    text.textContent = laneName;
+    textGroup.appendChild(text);
+    canvas.appendChild(textGroup);
+  });
+
+  // Đường phân cách dọc của header cột trái
+  const vertLine = document.createElementNS(NS, 'line');
+  vertLine.setAttribute('x1', (startX + headerWidth).toString());
+  vertLine.setAttribute('y1', '30');
+  vertLine.setAttribute('x2', (startX + headerWidth).toString());
+  vertLine.setAttribute('y2', (30 + poolHeight).toString());
+  vertLine.setAttribute('stroke', '#333');
+  vertLine.setAttribute('stroke-width', '2');
+  canvas.appendChild(vertLine);
+
+  // 3. Định vị tọa độ các node và lưu trữ để vẽ flow
+  const nodeCoords = {};
+
+  data.nodes.forEach(node => {
+    const laneY = 30 + node.lane * laneHeight;
+    const offset = node.y || 0; 
+    const nodeY = laneY + (laneHeight / 2) + offset;
+    const nodeX = startX + headerWidth + node.x;
+
+    nodeCoords[node.id] = { x: nodeX, y: nodeY, type: node.type };
+
+    if (node.type === 'start') {
+      const c = document.createElementNS(NS, 'circle');
+      c.setAttribute('cx', nodeX.toString());
+      c.setAttribute('cy', nodeY.toString());
+      c.setAttribute('r', '17');
+      c.setAttribute('fill', '#e6f4ea');
+      c.setAttribute('stroke', '#137333');
+      c.setAttribute('stroke-width', '2.5');
+      canvas.appendChild(c);
+
+      const labelOffset = node.labelPos === 'top' ? -34 : 34;
+      drawTextLines(nodeX, nodeY + labelOffset, node.name, 9.5, 'middle', '#333');
+    } 
+    else if (node.type === 'end') {
+      const c = document.createElementNS(NS, 'circle');
+      c.setAttribute('cx', nodeX.toString());
+      c.setAttribute('cy', nodeY.toString());
+      c.setAttribute('r', '17');
+      c.setAttribute('fill', '#fce8e6');
+      c.setAttribute('stroke', '#c5221f');
+      c.setAttribute('stroke-width', '4');
+      canvas.appendChild(c);
+
+      const labelOffset = node.labelPos === 'top' ? -34 : 34;
+      drawTextLines(nodeX, nodeY + labelOffset, node.name, 9.5, 'middle', '#333');
+    } 
+    else if (node.type === 'gateway') {
+      const size = 23;
+      const poly = document.createElementNS(NS, 'polygon');
+      const pts = `${nodeX},${nodeY - size} ${nodeX + size},${nodeY} ${nodeX},${nodeY + size} ${nodeX - size},${nodeY}`;
+      poly.setAttribute('points', pts);
+      poly.setAttribute('fill', '#fef7e0');
+      poly.setAttribute('stroke', '#b06000');
+      poly.setAttribute('stroke-width', '2.5');
+      canvas.appendChild(poly);
+
+      const sign = document.createElementNS(NS, 'text');
+      sign.setAttribute('x', nodeX.toString());
+      sign.setAttribute('y', (nodeY + 3.5).toString());
+      sign.setAttribute('text-anchor', 'middle');
+      sign.setAttribute('font-size', '14px');
+      sign.setAttribute('font-weight', 'bold');
+      sign.setAttribute('fill', '#b06000');
+      sign.textContent = '×';
+      canvas.appendChild(sign);
+
+      // Hệ thống tính toán nhãn rẽ nhánh theo các hướng top/bottom/left/right linh hoạt
+      let labelX = nodeX;
+      let labelY = nodeY;
+      let labelAnchor = 'middle';
+
+      if (node.labelPos === 'top') {
+        labelY = nodeY - 34;
+      } else if (node.labelPos === 'bottom') {
+        labelY = nodeY + 34;
+      } else if (node.labelPos === 'left') {
+        labelX = nodeX - 32;
+        labelY = nodeY - 12;
+        labelAnchor = 'end';
+      } else if (node.labelPos === 'right') {
+        labelX = nodeX + 32;
+        labelY = nodeY - 12;
+        labelAnchor = 'start';
+      } else {
+        labelY = nodeY - 34; // Mặc định trên
+      }
+      drawTextLines(labelX, labelY, node.name, 9.5, labelAnchor, '#333');
+    } 
+    else if (node.type === 'task') {
+      const w = 135;
+      const h = 56;
+      const r = document.createElementNS(NS, 'rect');
+      r.setAttribute('x', (nodeX - w / 2).toString());
+      r.setAttribute('y', (nodeY - h / 2).toString());
+      r.setAttribute('width', w.toString());
+      r.setAttribute('height', h.toString());
+      r.setAttribute('rx', '4');
+      r.setAttribute('ry', '4');
+      r.setAttribute('fill', '#f5f7fa');
+      r.setAttribute('stroke', '#3a5a6a');
+      r.setAttribute('stroke-width', '1.5');
+      canvas.appendChild(r);
+
+      drawTextLines(nodeX, nodeY, node.name, 10, 'middle', '#333');
+    }
+  });
+
+  // 4. Vẽ các luồng điều hướng (Sequence Flows)
+  data.flows.forEach(flow => {
+    const fromNode = nodeCoords[flow.from];
+    const toNode = nodeCoords[flow.to];
+
+    if (!fromNode || !toNode) return;
+
+    let pathD = '';
+    let labelX = 0, labelY = 0;
+    let textAnchor = 'middle';
+
+    const wFrom = fromNode.type === 'task' ? 135 : (fromNode.type === 'gateway' ? 46 : 34);
+    const hFrom = fromNode.type === 'task' ? 56 : (fromNode.type === 'gateway' ? 46 : 34);
+    const wTo = toNode.type === 'task' ? 135 : (toNode.type === 'gateway' ? 46 : 34);
+    const hTo = toNode.type === 'task' ? 56 : (toNode.type === 'gateway' ? 46 : 34);
+
+    // Hỗ trợ vẽ đường thẳng đứng khi hai node cùng trục dọc (khoảng cách X < 15)
+    if (Math.abs(fromNode.x - toNode.x) < 15) {
+      const startXVal = fromNode.x;
+      const endXVal = toNode.x;
+      
+      const isUp = toNode.y < fromNode.y;
+      const startYVal = fromNode.y + (isUp ? -hFrom/2 : hFrom/2);
+      const endYVal = toNode.y + (isUp ? hTo/2 : -hTo/2);
+      
+      pathD = `M ${startXVal} ${startYVal} L ${endXVal} ${endYVal}`;
+      labelX = startXVal + 8;
+      labelY = (startYVal + endYVal) / 2;
+      textAnchor = 'start';
+    } 
+    else if (flow.elbow) {
+      if (toNode.x < fromNode.x) {
+        // Luồng đi ngược từ phải qua trái (Ví dụ: vòng lặp sửa lỗi)
+        const startXVal = fromNode.x - wFrom / 2;
+        const startYVal = fromNode.y;
+        
+        const endXVal = toNode.x + wTo / 2;
+        const endYVal = toNode.y;
+
+        // Bẻ góc tại khoảng trống bên phải của Node đích để tránh đè lên các node ở giữa
+        const midX = endXVal + 12.5; 
+        
+        pathD = `M ${startXVal} ${startYVal} L ${midX} ${startYVal} L ${midX} ${endYVal} L ${endXVal} ${endYVal}`;
+        
+        labelX = midX + 6;
+        labelY = (startYVal + endYVal) / 2;
+        textAnchor = 'start';
+      } else {
+        // Luồng đi xuôi từ trái qua phải (Mặc định)
+        const startXVal = fromNode.x + wFrom / 2;
+        const startYVal = fromNode.y;
+        
+        const endXVal = toNode.x - wTo / 2;
+        const endYVal = toNode.y;
+
+        const midX = startXVal + 25; 
+        
+        pathD = `M ${startXVal} ${startYVal} L ${midX} ${startYVal} L ${midX} ${endYVal} L ${endXVal} ${endYVal}`;
+        
+        labelX = midX + 6;
+        labelY = (startYVal + endYVal) / 2;
+        textAnchor = 'start';
+      }
+    } 
+    else {
+      if (toNode.x < fromNode.x) {
+        const startXVal = fromNode.x - wFrom / 2;
+        const endXVal = toNode.x + wTo / 2;
+        pathD = `M ${startXVal} ${fromNode.y} L ${endXVal} ${toNode.y}`;
+
+        labelX = (startXVal + endXVal) / 2;
+        labelY = fromNode.y - 7;
+        textAnchor = 'middle';
+      } else {
+        const startXVal = fromNode.x + wFrom / 2;
+        const endXVal = toNode.x - wTo / 2;
+        pathD = `M ${startXVal} ${fromNode.y} L ${endXVal} ${toNode.y}`;
+
+        labelX = (startXVal + endXVal) / 2;
+        labelY = fromNode.y - 7;
+        textAnchor = 'middle';
+      }
+    }
+
+    const path = document.createElementNS(NS, 'path');
+    path.setAttribute('d', pathD);
+    path.setAttribute('stroke', '#333');
+    path.setAttribute('stroke-width', '1.3');
+    path.setAttribute('fill', 'none');
+    path.setAttribute('marker-end', 'url(#arr)');
+    canvas.appendChild(path);
+
+    if (flow.label) {
+      const text = document.createElementNS(NS, 'text');
+      text.setAttribute('x', labelX.toString());
+      text.setAttribute('y', labelY.toString());
+      text.setAttribute('font-size', '9.5px');
+      text.setAttribute('fill', '#555');
+      text.setAttribute('font-weight', 'bold');
+      text.setAttribute('text-anchor', textAnchor);
+      text.textContent = flow.label;
+      canvas.appendChild(text);
+    }
+  });
+}
+
+function drawTextLines(x, y, str, size, anchor, color) {
+  if (!str) return;
+  const lines = str.split('\n');
+  const lh = size * 1.25;
+  const startY = y - ((lines.length - 1) * lh) / 2;
+  const text = document.createElementNS(NS, 'text');
+  text.setAttribute('font-size', size.toString());
+  text.setAttribute('text-anchor', anchor);
+  text.setAttribute('fill', color);
+  
+  lines.forEach((line, i) => {
+    const tspan = document.createElementNS(NS, 'tspan');
+    tspan.setAttribute('x', x.toString());
+    tspan.setAttribute('y', (startY + i * lh).toString());
+    tspan.setAttribute('dominant-baseline', 'middle');
+    tspan.textContent = line;
+    text.appendChild(tspan);
+  });
+  document.getElementById('canvas').appendChild(text);
+}
+
+function removeVietnameseTones(str) {
+  str = str.replace(/à|á|ạ|ả|ã|â|ầ|ấ|ậ|ẩ|ẫ|ă|ằ|ắ|ặ|ẳ|ẵ/g,"a"); 
+  str = str.replace(/è|é|ẹ|ẻ|ẽ|ê|ề|ế|ệ|ể|ễ/g,"e"); 
+  str = str.replace(/ì|í|ị|ỉ|ĩ/g,"i"); 
+  str = str.replace(/ò|ó|ọ|ỏ|õ|ô|ồ|ố|ộ|ổ|ỗ|ơ|ờ|ớ|ợ|ở|ỡ/g,"o"); 
+  str = str.replace(/ù|ú|ụ|ủ|ũ|ư|ừ|ứ|ự|ử|ữ/g,"u"); 
+  str = str.replace(/ỳ|ý|ỵ|ỷ|ỹ/g,"y"); 
+  str = str.replace(/đ/g,"d");
+  str = str.replace(/À|Á|Ạ|Ả|Ã|Â|Ầ|Ấ|Ậ|Ẩ|Ẫ|Ă|Ằ|Ắ|Ặ|Ẳ|Ẵ/g, "A");
+  str = str.replace(/È|É|Ẹ|Ẻ|Ẽ|Ê|Ề|Ế|Ệ|Ể|Ễ/g, "E");
+  str = str.replace(/Ì|Í|Ị|Ỉ|Ĩ/g, "I");
+  str = str.replace(/Ò|Ó|Ọ|Ỏ|Õ|Ô|Ồ|Ố|Ộ|Ổ|Ỗ|Ơ|Ờ|Ớ|Ợ|Ở|Ỡ/g, "O");
+  str = str.replace(/Ù|Ú|Ụ|Ủ|U|Ư|Ừ|Ứ|Ự|Ử|Ữ/g, "U");
+  str = str.replace(/Ỳ|Ý|Y|Ỷ|Ỹ/g, "Y");
+  str = str.replace(/Đ/g, "D");
+  return str.normalize('NFD').replace(/[\u0300-\u036f]/g, "");
+}
+
+function getExportFileName() {
+  const data = diagrams[activeId];
+  let cleanTitle = data.title;
+  if (cleanTitle.includes('—')) {
+    cleanTitle = cleanTitle.split('—')[1].trim();
+  } else if (cleanTitle.includes('-')) {
+    cleanTitle = cleanTitle.split('-')[1].trim();
+  }
+  
+  // Loại bỏ dấu tiếng Việt để tránh lỗi tải file UUID của Chrome
+  cleanTitle = removeVietnameseTones(cleanTitle);
+  // Loại bỏ các ký tự đặc biệt không hợp lệ trên Windows
+  cleanTitle = cleanTitle.replace(/[^a-zA-Z0-9\s()_-]/g, ' ');
+  cleanTitle = cleanTitle.replace(/\s+/g, ' ').trim();
+  
+  return `BPMN_${cleanTitle}`;
+}
+
+/* Các hàm xử lý xuất dữ liệu ảnh */
+function downloadSVG() {
+  const svgEl = document.getElementById('canvas').cloneNode(true);
+  const serializer = new XMLSerializer();
+  const source = serializer.serializeToString(svgEl);
+  const blob = new Blob([source], { type: 'image/svg+xml;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${getExportFileName()}.svg`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function downloadPNG() {
+  const svgEl = document.getElementById('canvas');
+  const serializer = new XMLSerializer();
+  const source = serializer.serializeToString(svgEl);
+  
+  const img = new Image();
+  const svgBlob = new Blob([source], {type: 'image/svg+xml;charset=utf-8'});
+  const svgUrl = URL.createObjectURL(svgBlob);
+  img.src = svgUrl;
+  
+  img.onload = function() {
+    const canvas = document.createElement('canvas');
+    const bbox = svgEl.viewBox.baseVal;
+    canvas.width = bbox.width * 2;
+    canvas.height = bbox.height * 2;
+    const ctx = canvas.getContext('2d');
+    
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    URL.revokeObjectURL(svgUrl);
+    
+    // Sử dụng toDataURL thay cho toBlob để Chrome nhận diện chính xác thuộc tính download của thẻ <a>
+    const dataUrl = canvas.toDataURL('image/png');
+    const a = document.createElement('a');
+    a.href = dataUrl;
+    a.download = `${getExportFileName()}.png`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+{
+  "watch": ["src"],
+  "ext": "js,mjs,cjs",
+  "ignore": [
+    "logs/*",
+    "email_logs.json",
+    "*.log",
+    "node_modules"
+  ]
+}
