@@ -210,15 +210,16 @@ export const useHRStore = create((set, get) => ({
     try {
       set({ error: null });
       const lowerUser = (employeeData.username || employeeData.email?.split('@')[0] || '').trim().toLowerCase();
-      let newEmployee = null;
-      try {
-        newEmployee = await api.post('/hr/employees', employeeData);
-      } catch (_) {
-        newEmployee = await api.post('/employees', employeeData);
-      }
+      // api.js wraps every response as { success, data } — reading `.id` off
+      // the raw response (instead of `.data.id`) always returned undefined,
+      // so every employee created here fell back to a fake `Date.now()` id
+      // that never matched the real database row.
+      const res = await api.post('/hr/employees', employeeData);
+      const newEmployee = res?.data;
+      if (!newEmployee) throw new Error(res?.message || 'Không thể tạo nhân viên.');
 
       const newEmpObj = {
-        id: newEmployee?.id || Date.now(),
+        id: newEmployee.id,
         fullname: employeeData.fullName || employeeData.fullname || lowerUser,
         username: lowerUser,
         email: employeeData.email || `${lowerUser}@kltn-erp.vn`,
@@ -276,10 +277,22 @@ export const useHRStore = create((set, get) => ({
   updateEmployee: async (employeeId, employeeData) => {
     try {
       set({ error: null });
-      const updated = await api.put(`/employees/${employeeId}`, employeeData);
-      
+      // Real route is PUT /hr/employees/:id (hr.routes.js) — the bare
+      // /employees/:id this called previously always 404'd: the app.js
+      // mount at /api/v1/employees re-exposes the *whole* hr router there,
+      // so its own internal `/employees/:id` route only resolves at
+      // /api/v1/employees/employees/:id (doubled), never at the single path.
+      const res = await api.put(`/hr/employees/${employeeId}`, employeeData);
+      const serverEmp = res?.data;
+      if (!serverEmp) throw new Error(res?.message || 'Không thể cập nhật nhân viên.');
+      // Server returns real column names (fullName/baseSalary); the rest of
+      // this store's local `employees` shape uses fullname/salary — merge
+      // rather than replace so every other screen reading the lowercase
+      // fields doesn't see them go blank until the next full refetch.
+      const updated = { ...serverEmp, fullname: serverEmp.fullName, salary: parseFloat(serverEmp.baseSalary) };
+
       set(state => {
-        const employees = state.employees.map(e => e.id === employeeId ? updated : e);
+        const employees = state.employees.map(e => e.id === employeeId ? { ...e, ...updated } : e);
         try {
           localStorage.setItem(STORAGE_KEYS.employees, JSON.stringify(employees));
         } catch (e) {}
@@ -298,22 +311,32 @@ export const useHRStore = create((set, get) => ({
   /**
    * Delete an employee
    */
+  // There is no real DELETE /employees/:id backend route (and hard-deleting
+  // an employee would cascade-delete their real Attendance/LeaveRequest/
+  // Payroll history per schema.prisma's onDelete: Cascade — not what an ERP
+  // should do for compliance/audit reasons). This previously called a
+  // nonexistent, wrongly-mounted path and always 404'd. Deactivating via the
+  // real PATCH /hr/employees/:id/status endpoint is the correct, already-
+  // built equivalent: removes the account from the active roster and blocks
+  // login without destroying their historical records.
   deleteEmployee: async (employeeId) => {
     try {
       set({ error: null });
-      await api.delete(`/employees/${employeeId}`);
-      
+      const res = await api.patch(`/hr/employees/${employeeId}/status`, { status: 'INACTIVE' });
+      const updatedEmp = res?.data;
+      if (!updatedEmp) throw new Error(res?.message || 'Không thể vô hiệu hóa nhân viên.');
+
       set(state => {
-        const employees = state.employees.filter(e => e.id !== employeeId);
+        const employees = state.employees.map(e => (e.id === employeeId ? { ...e, ...updatedEmp, status: 'INACTIVE' } : e));
         try {
           localStorage.setItem(STORAGE_KEYS.employees, JSON.stringify(employees));
         } catch (e) {}
         return { employees };
       });
     } catch (err) {
-      const errorMsg = err.message || 'Failed to delete employee';
+      const errorMsg = err.message || 'Failed to deactivate employee';
       set({ error: errorMsg });
-      console.error('Error deleting employee:', err);
+      console.error('Error deactivating employee:', err);
       throw err;
     }
   },

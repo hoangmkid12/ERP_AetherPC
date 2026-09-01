@@ -270,7 +270,7 @@ export default function Sidebar() {
       // Phê duyệt bảng lương nhân sự toàn công ty
       const submittedPayrolls = (payrolls || []).filter(p => p.status === 'SUBMITTED_TO_CEO');
       if (submittedPayrolls.length > 0) {
-        const totalFund = submittedPayrolls.reduce((sum, p) => sum + (p.netSalary || 0), 0);
+        const totalFund = submittedPayrolls.reduce((sum, p) => sum + (Number(p.netSalary) || 0), 0);
         list.push({
           id: 'NOTIF-CEO-PAYROLL',
           title: `Phê duyệt Bảng lương nhân sự`,

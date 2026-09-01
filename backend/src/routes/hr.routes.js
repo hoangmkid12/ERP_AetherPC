@@ -157,7 +157,25 @@ router.patch('/employees/:id/status', authMiddleware(['ADMIN', 'HR', 'CEO']), as
       where: { id: parseInt(id) },
       data: { status }
     });
-    res.json({ success: true, data: emp });
+    res.json({ success: true, data: { ...emp, passwordHash: undefined } });
+  } catch (err) { next(err); }
+});
+
+// PATCH /api/v1/hr/employees/:id/reset-password – đặt lại mật khẩu về mặc
+// định "123456". SystemAdmin.jsx's "Reset Pass" nút trước đây không gọi API
+// nào cả — chỉ hiện toast "đã đặt lại thành công" trong khi mật khẩu thật
+// không hề đổi.
+router.patch('/employees/:id/reset-password', authMiddleware(['ADMIN', 'HR', 'CEO']), async (req, res, next) => {
+  try {
+    const bcrypt = require('bcryptjs');
+    const { id } = req.params;
+    const salt = await bcrypt.genSalt(10);
+    const passwordHash = await bcrypt.hash('123456', salt);
+    const emp = await prisma.employee.update({
+      where: { id: parseInt(id) },
+      data: { passwordHash }
+    });
+    res.json({ success: true, message: `Đã đặt lại mật khẩu cho ${emp.fullName} về mặc định.`, data: { ...emp, passwordHash: undefined } });
   } catch (err) { next(err); }
 });
 

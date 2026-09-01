@@ -576,7 +576,7 @@ export default function QualityControl() {
     }
   };
 
-  const handleSubmitRmaInspection = (e) => {
+  const handleSubmitRmaInspection = async (e) => {
     e.preventDefault();
     if (!selectedRMA) return;
 
@@ -608,17 +608,25 @@ export default function QualityControl() {
       resolutionText = `Từ chối đổi trả (${warrantySealStatus === 'LOST_UNIDENTIFIED' ? 'Không thể định danh nguồn gốc / Mất tem' : 'Vi phạm điều kiện bảo hành'}). QC: ${inspectorName}`;
     }
 
-    // 1. Update in ERP context & Backend API
+    // 1. Update in ERP context & Backend API — must succeed for real before
+    // we save a local QA log / show success; the real system of record is
+    // the backend qc-inspect call, not the local qaLogs audit trail.
     if (typeof updateReturnStatus === 'function') {
-      updateReturnStatus(selectedRMA.id, statusKey, {
-        qcDecision: rmaDecision,
-        qcDefectType: rmaDefectType,
-        qcNotes: rmaNotes,
-        qcProofPhoto: qcProofPhoto || null,
-        qcInspectedAt: new Date().toISOString(),
-        qcInspector: inspectorName,
-        note: resolutionText
-      });
+      try {
+        await updateReturnStatus(selectedRMA.id, statusKey, {
+          qcDecision: rmaDecision,
+          qcDefectType: rmaDefectType,
+          qcNotes: rmaNotes,
+          qcProofPhoto: qcProofPhoto || null,
+          qcInspectedAt: new Date().toISOString(),
+          qcInspector: inspectorName,
+          note: resolutionText
+        });
+      } catch (err) {
+        setSubmitting(false);
+        showToast('Thẩm Định Thất Bại', err.message || 'Không thể lưu kết quả thẩm định lên máy chủ.', 'error');
+        return;
+      }
     }
 
     // 2. Create QA Log for Customer RMA

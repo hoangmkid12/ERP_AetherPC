@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useSalesStore } from '../../stores';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../services/api';
-import { notify, confirm, promptText } from '../../context/NotificationContext';
+import { notify } from '../../context/NotificationContext';
 import { COMPLAINT_STATUS, RETURN_STATUS, getStatusLabel, getStatusInfo } from '../../utils/statusLabels';
 import {
   HeadphonesIcon, AlertCircle, MessageSquare, RefreshCw, CheckCircle,
@@ -44,7 +44,6 @@ export default function CustomerService() {
   const addComplaint = useSalesStore(state => state.addComplaint);
   const updateComplaintStatus = useSalesStore(state => state.updateComplaintStatus);
   const returnRequests = useSalesStore(state => state.returnRequests) || [];
-  const updateReturnStatus = useSalesStore(state => state.updateReturnStatus);
   const orders = useSalesStore(state => state.orders) || [];
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -687,36 +686,17 @@ export default function CustomerService() {
                       </span>
                     </td>
                     <td style={{ padding: '0.65rem 0.85rem', textAlign: 'center' }}>
-                      {ret.status === 'PENDING' ? (
-                        <div style={{ display: 'flex', justifyContent: 'center', gap: '0.35rem' }}>
-                          <button
-                            onClick={async () => {
-                              if (await confirm(`Xác nhận ĐỒNG Ý THU HỒI đơn RMA #${ret.id} và giao Shipper đến lấy?`)) {
-                                updateReturnStatus(ret.id, 'RETURN_APPROVED', 'CSKH đã duyệt yêu cầu thu hồi hàng');
-                              }
-                            }}
-                            style={{ backgroundColor: '#16a34a', color: '#ffffff', border: 'none', borderRadius: '4px', padding: '0.3rem 0.65rem', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer' }}
-                          >
-                            ✓ Duyệt Thu Hồi
-                          </button>
-                          <button
-                            onClick={async () => {
-                              const reason = await promptText('Nhập lý do từ chối yêu cầu đổi trả:');
-                              if (reason) updateReturnStatus(ret.id, 'REJECTED', reason);
-                            }}
-                            style={{ backgroundColor: '#ef4444', color: '#ffffff', border: 'none', borderRadius: '4px', padding: '0.3rem 0.65rem', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}
-                          >
-                            ✕ Từ Chối
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => setSelectedReturnDetail(ret)}
-                          style={{ backgroundColor: '#ffffff', color: '#8b5cf6', border: '1px solid #ddd6fe', borderRadius: '4px', padding: '0.3rem 0.65rem', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}
-                        >
-                          <Eye size={12} /> Chi Tiết
-                        </button>
-                      )}
+                      {/* ReturnRequest thật không bao giờ ở trạng thái PENDING — backend
+                          (createReturnRequest) luôn set thẳng RETURN_APPROVED ngay khi tạo,
+                          nên nút Duyệt/Từ Chối thủ công trước đây ở đây không bao giờ hiện
+                          ra được với dữ liệu thật (và nếu có cũng gọi vào API không tồn
+                          tại) — đã bỏ, chỉ còn đúng luồng thật là xem chi tiết. */}
+                      <button
+                        onClick={() => setSelectedReturnDetail(ret)}
+                        style={{ backgroundColor: '#ffffff', color: '#8b5cf6', border: '1px solid #ddd6fe', borderRadius: '4px', padding: '0.3rem 0.65rem', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}
+                      >
+                        <Eye size={12} /> Chi Tiết
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -911,10 +891,14 @@ export default function CustomerService() {
               <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
                 <button
                   type="button"
-                  onClick={() => {
-                    updateComplaintStatus(selectedTicket.id, 'IN_PROGRESS', null, resolution);
-                    setSelectedTicket(null);
-                    notify('Đã chuyển trạng thái sang ĐANG XỬ LÝ', 'info');
+                  onClick={async () => {
+                    try {
+                      await updateComplaintStatus(selectedTicket.id, 'IN_PROGRESS', null, resolution);
+                      setSelectedTicket(null);
+                      notify('Đã chuyển trạng thái sang ĐANG XỬ LÝ', 'info');
+                    } catch (err) {
+                      notify(`Không thể cập nhật: ${err.message || 'lỗi kết nối máy chủ'}.`, 'error');
+                    }
                   }}
                   style={{ backgroundColor: '#f59e0b', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.45rem 0.85rem', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer' }}
                 >
@@ -922,10 +906,14 @@ export default function CustomerService() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    updateComplaintStatus(selectedTicket.id, 'RESOLVED', null, resolution || 'Đã giải quyết thỏa đáng');
-                    setSelectedTicket(null);
-                    notify('Đã đóng Ticket thành công.', 'success');
+                  onClick={async () => {
+                    try {
+                      await updateComplaintStatus(selectedTicket.id, 'RESOLVED', null, resolution || 'Đã giải quyết thỏa đáng');
+                      setSelectedTicket(null);
+                      notify('Đã đóng Ticket thành công.', 'success');
+                    } catch (err) {
+                      notify(`Không thể cập nhật: ${err.message || 'lỗi kết nối máy chủ'}.`, 'error');
+                    }
                   }}
                   style={{ backgroundColor: '#16a34a', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.45rem 1.1rem', fontSize: '0.8rem', fontWeight: 800, cursor: 'pointer' }}
                 >
@@ -1005,35 +993,9 @@ export default function CustomerService() {
                   Đóng
                 </button>
 
-                {selectedReturnDetail.status === 'PENDING' && (
-                  <>
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        const reason = await promptText('Nhập lý do từ chối yêu cầu đổi trả:');
-                        if (reason) {
-                          updateReturnStatus(selectedReturnDetail.id, 'REJECTED', reason);
-                          setSelectedReturnDetail(null);
-                          notify('Đã từ chối yêu cầu đổi trả.', 'info');
-                        }
-                      }}
-                      style={{ backgroundColor: '#ef4444', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.5rem 1rem', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}
-                    >
-                      ✕ Từ Chối
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        updateReturnStatus(selectedReturnDetail.id, 'RETURN_APPROVED', 'CSKH đã duyệt yêu cầu thu hồi hàng');
-                        setSelectedReturnDetail(null);
-                        notify('Đã duyệt yêu cầu thu hồi hàng thành công. Đã điều phối cho Shipper đến nhà khách lấy.', 'success');
-                      }}
-                      style={{ backgroundColor: '#16a34a', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.5rem 1.25rem', fontSize: '0.8rem', fontWeight: 800, cursor: 'pointer' }}
-                    >
-                      ✓ Đồng Ý Thu Hồi (Giao Shipper)
-                    </button>
-                  </>
-                )}
+                {/* ReturnRequest thật không bao giờ ở trạng thái PENDING (xem ghi chú ở
+                    bảng danh sách phía trên) — đã bỏ cặp nút Duyệt/Từ Chối không bao giờ
+                    hiện ra được với dữ liệu thật. */}
               </div>
 
             </div>

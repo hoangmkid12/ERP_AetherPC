@@ -1099,14 +1099,14 @@ const processRefund = async (req, res, next) => {
     });
 
     if (!order) {
+      // ReturnRequest has no `rmaNumber` column (never did) — this used to
+      // query it anyway and crash with a PrismaClientValidationError any
+      // time execution reached this fallback (i.e. whenever the caller
+      // passed the return's own id instead of a real orderId, which is
+      // exactly what Accountant.jsx's refund flow does when a return has no
+      // linked orderId). Only `id` is a real, matchable field here.
       const retReq = await prisma.returnRequest.findFirst({
-        where: {
-          OR: [
-            { id },
-            { rmaNumber: id },
-            { rmaNumber: `RET-${id}` }
-          ]
-        },
+        where: { id },
         include: { order: { include: { customer: true } } }
       });
       if (retReq && retReq.order) {

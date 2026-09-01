@@ -45,6 +45,7 @@ export default function MyOrders() {
   const [showComplaintModal, setShowComplaintModal] = useState(false);
   const [complaintForm, setComplaintForm] = useState({ orderId: '', title: '', description: '', priority: 'HIGH' });
   const [complaintSuccess, setComplaintSuccess] = useState(false);
+  const [submittingComplaint, setSubmittingComplaint] = useState(false);
   const [viewTicketDetail, setViewTicketDetail] = useState(null);
   // Proof of Delivery (POD) Image Lightbox Modal State
   const [viewProofImage, setViewProofImage] = useState(null);
@@ -62,7 +63,10 @@ export default function MyOrders() {
       if (typeof updateReturnStatus === 'function') {
         try {
           await updateReturnStatus(returnItem.orderId || returnItem.id, 'REFUNDED', confirmedData);
-        } catch (_) {}
+        } catch (err) {
+          notify(`Không thể ghi nhận xác nhận: ${err.message || 'lỗi kết nối máy chủ'}.`, 'error');
+          return;
+        }
       }
 
       // Sync local storage
@@ -311,26 +315,34 @@ export default function MyOrders() {
     }
   };
 
-  const handleComplaintSubmit = () => {
+  const handleComplaintSubmit = async () => {
     if (!complaintForm.title.trim() || !complaintForm.description.trim()) {
       addNotification('Vui lòng nhập đầy đủ tiêu đề và nội dung khiếu nại.', 'error');
       return;
     }
-    addComplaint({
-      customerName: user?.fullname || selectedOrder?.customerName || 'Khách Hàng',
-      phone: user?.phone || selectedOrder?.phone || '0901234567',
-      email: user?.email || selectedOrder?.email || 'khachhang@email.com',
-      orderId: complaintForm.orderId || selectedOrder?.orderId || '',
-      title: complaintForm.title,
-      description: complaintForm.description,
-      priority: complaintForm.priority || 'HIGH',
-      evidenceUrl: complaintForm.evidenceUrl || ''
-    });
+    if (typeof addComplaint !== 'function') return;
+    setSubmittingComplaint(true);
+    try {
+      await addComplaint({
+        customerName: user?.fullname || selectedOrder?.customerName || 'Khách Hàng',
+        phone: user?.phone || selectedOrder?.phone || '0901234567',
+        email: user?.email || selectedOrder?.email || 'khachhang@email.com',
+        orderId: complaintForm.orderId || selectedOrder?.orderId || '',
+        title: complaintForm.title,
+        description: complaintForm.description,
+        priority: complaintForm.priority || 'HIGH',
+        evidenceUrl: complaintForm.evidenceUrl || ''
+      });
 
-    setShowComplaintModal(false);
-    setComplaintForm({ orderId: '', title: '', description: '', priority: 'HIGH', evidenceUrl: '' });
-    setComplaintSuccess(true);
-    setTimeout(() => setComplaintSuccess(false), 6000);
+      setShowComplaintModal(false);
+      setComplaintForm({ orderId: '', title: '', description: '', priority: 'HIGH', evidenceUrl: '' });
+      setComplaintSuccess(true);
+      setTimeout(() => setComplaintSuccess(false), 6000);
+    } catch (err) {
+      addNotification(`Gửi khiếu nại thất bại: ${err.message || 'lỗi kết nối máy chủ'}.`, 'error');
+    } finally {
+      setSubmittingComplaint(false);
+    }
   };
 
   const getStatusProgress = (status, returnItem = null, order = null) => {
@@ -1844,8 +1856,8 @@ export default function MyOrders() {
 
               <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
                 <button type="button" onClick={() => setShowComplaintModal(false)} className="btn btn-secondary" style={{ borderRadius: '10px' }}>Hủy</button>
-                <button type="button" onClick={handleComplaintSubmit} className="btn btn-primary" style={{ borderRadius: '10px', backgroundColor: '#ef4444', border: 'none', color: '#fff', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.5rem 1.25rem' }}>
-                  <AlertCircle size={16}/> Gửi Khiếu Nại
+                <button type="button" onClick={handleComplaintSubmit} disabled={submittingComplaint} className="btn btn-primary" style={{ borderRadius: '10px', backgroundColor: submittingComplaint ? '#9ca3af' : '#ef4444', border: 'none', color: '#fff', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.5rem 1.25rem' }}>
+                  <AlertCircle size={16}/> {submittingComplaint ? 'Đang gửi...' : 'Gửi Khiếu Nại'}
                 </button>
               </div>
             </div>

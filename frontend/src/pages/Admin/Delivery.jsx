@@ -2007,9 +2007,13 @@ export default function Delivery() {
                                     notify(`Chỉ Shipper đã trực tiếp giao đơn #${ret.orderId} (${matchedOrder.assignedShipperName || matchedOrder.assignedShipper}) mới có quyền thu hồi đơn này!`, 'error');
                                     return;
                                   }
-                                  await updateReturnStatus(ret.id, 'RETURNING_TO_WAREHOUSE', { note: `Shipper ${user?.fullname || user?.username} đã lấy hàng tại nhà khách` });
-                                  setApiReturns(prev => prev.map(item => item.id === ret.id ? { ...item, status: 'RETURNING_TO_WAREHOUSE' } : item));
-                                  addNotification('Đã xác nhận thu hồi kiện hàng từ khách! Đang vận chuyển về kho.', 'success');
+                                  try {
+                                    await updateReturnStatus(ret.id, 'RETURNING_TO_WAREHOUSE', { note: `Shipper ${user?.fullname || user?.username} đã lấy hàng tại nhà khách` });
+                                    setApiReturns(prev => prev.map(item => item.id === ret.id ? { ...item, status: 'RETURNING_TO_WAREHOUSE' } : item));
+                                    addNotification('Đã xác nhận thu hồi kiện hàng từ khách! Đang vận chuyển về kho.', 'success');
+                                  } catch (err) {
+                                    addNotification(`Không thể xác nhận thu hồi: ${err.message || 'lỗi kết nối máy chủ'}.`, 'error');
+                                  }
                                 }}
                                 style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.45rem 0.85rem', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer' }}
                               >
@@ -2024,9 +2028,13 @@ export default function Delivery() {
                                     notify(`Chỉ Shipper đã trực tiếp giao đơn #${ret.orderId} mới có quyền bàn giao kiện hàng về kho!`, 'error');
                                     return;
                                   }
-                                  await updateReturnStatus(ret.id, 'DELIVERED_TO_WAREHOUSE', { note: `Shipper ${user?.fullname || user?.username} đã bàn giao kiện hàng về kho cho QC` });
-                                  setApiReturns(prev => prev.map(item => item.id === ret.id ? { ...item, status: 'DELIVERED_TO_WAREHOUSE' } : item));
-                                  addNotification('Đã bàn giao kiện hàng về kho thành công! Chờ QC kiểm định.', 'success');
+                                  try {
+                                    await updateReturnStatus(ret.id, 'DELIVERED_TO_WAREHOUSE', { note: `Shipper ${user?.fullname || user?.username} đã bàn giao kiện hàng về kho cho QC` });
+                                    setApiReturns(prev => prev.map(item => item.id === ret.id ? { ...item, status: 'DELIVERED_TO_WAREHOUSE' } : item));
+                                    addNotification('Đã bàn giao kiện hàng về kho thành công! Chờ QC kiểm định.', 'success');
+                                  } catch (err) {
+                                    addNotification(`Không thể bàn giao: ${err.message || 'lỗi kết nối máy chủ'}.`, 'error');
+                                  }
                                 }}
                                 style={{ backgroundColor: '#16a34a', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.45rem 0.85rem', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer' }}
                               >

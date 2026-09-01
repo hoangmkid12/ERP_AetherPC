@@ -238,19 +238,26 @@ export default function HRManager() {
     });
   }, [employees, payrolls]);
 
-  const handleAddEmployee = () => {
+  const [creatingEmployee, setCreatingEmployee] = useState(false);
+  const handleAddEmployee = async () => {
     if (!newEmpForm.fullname || !newEmpForm.username || !newEmpForm.salary) {
       notify('Vui lòng điền đầy đủ họ tên, username và lương cơ bản!', 'error');
       return;
     }
+    if (typeof addEmployee !== 'function') return;
     const regionToSave = newEmpForm.role === 'DELIVERY' ? newEmpForm.deliveryRegion : null;
     const phoneToSave = newEmpForm.role === 'DELIVERY' ? newEmpForm.phone : '';
-    if (typeof addEmployee === 'function') {
-      addEmployee(newEmpForm.fullname, newEmpForm.username, newEmpForm.role, newEmpForm.salary, newEmpForm.department, regionToSave, phoneToSave);
+    setCreatingEmployee(true);
+    try {
+      await addEmployee(newEmpForm.fullname, newEmpForm.username, newEmpForm.role, newEmpForm.salary, newEmpForm.department, regionToSave, phoneToSave);
+      setNewEmpForm({ fullname: '', username: '', role: 'SALES', department: 'Kinh Doanh', deliveryRegion: 'HCM_KV1', phone: '', salary: '8500000' });
+      setShowAddEmpModal(false);
+      notify('Đã tạo hồ sơ nhân viên mới thành công.', 'success');
+    } catch (err) {
+      notify(`Tạo nhân viên thất bại: ${err.message || 'lỗi kết nối máy chủ'}.`, 'error');
+    } finally {
+      setCreatingEmployee(false);
     }
-    setNewEmpForm({ fullname: '', username: '', role: 'SALES', department: 'Kinh Doanh', deliveryRegion: 'HCM_KV1', phone: '', salary: '8500000' });
-    setShowAddEmpModal(false);
-    notify('Đã tạo hồ sơ nhân viên mới thành công.', 'success');
   };
 
   const [submittingPayroll, setSubmittingPayroll] = useState(false);
@@ -949,9 +956,10 @@ export default function HRManager() {
                 <button
                   type="button"
                   onClick={handleAddEmployee}
-                  style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.45rem 1.1rem', fontSize: '0.8rem', fontWeight: 800, cursor: 'pointer' }}
+                  disabled={creatingEmployee}
+                  style={{ backgroundColor: creatingEmployee ? '#9ca3af' : '#2563eb', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.45rem 1.1rem', fontSize: '0.8rem', fontWeight: 800, cursor: creatingEmployee ? 'default' : 'pointer' }}
                 >
-                  Tạo Hồ Sơ
+                  {creatingEmployee ? 'Đang tạo...' : 'Tạo Hồ Sơ'}
                 </button>
               </div>
             </div>

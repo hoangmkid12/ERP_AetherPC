@@ -823,6 +823,11 @@ model ReturnRequest {
 model Complaint {
   id             String    @id @default(uuid()) @map("id")
   customerId     String?   @map("customer_id") @db.VarChar(50)
+  // Tham chiếu mềm tới Order.orderId (không FK cứng — khách có thể gõ sai
+  // mã đơn, hoặc khiếu nại không gắn với đơn nào). CustomerService.jsx đọc
+  // trực tiếp field này để hiển thị, trước đây bị gộp vào description và
+  // luôn hiển thị rỗng/undefined ở UI.
+  orderId        String?   @map("order_id") @db.VarChar(50)
   customerName   String    @map("customer_name") @db.VarChar(150)
   phone          String?   @db.VarChar(20)
   email          String?   @db.VarChar(100)

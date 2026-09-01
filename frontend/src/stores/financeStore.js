@@ -118,63 +118,13 @@ export const useFinanceStore = create((set, get) => ({
   },
 
   /**
-   * Create a ledger entry
-   */
-  createLedgerEntry: async (entryData) => {
-    try {
-      set({ error: null });
-      const newEntry = await api.post('/ledger', entryData);
-      
-      set(state => {
-        const updated = [...state.ledger, newEntry];
-        try {
-          localStorage.setItem(STORAGE_KEYS.ledger, JSON.stringify(updated));
-        } catch (e) {}
-        return { ledger: updated };
-      });
-      
-      return newEntry;
-    } catch (err) {
-      const errorMsg = err.message || 'Failed to create ledger entry';
-      set({ error: errorMsg });
-      console.error('Error creating ledger entry:', err);
-      throw err;
-    }
-  },
-
-  /**
-   * Update a ledger entry
-   */
-  updateLedgerEntry: async (entryId, entryData) => {
-    try {
-      set({ error: null });
-      const updated = await api.put(`/ledger/${entryId}`, entryData);
-      
-      set(state => {
-        const ledger = state.ledger.map(e => e.id === entryId ? updated : e);
-        try {
-          localStorage.setItem(STORAGE_KEYS.ledger, JSON.stringify(ledger));
-        } catch (e) {}
-        return { ledger };
-      });
-      
-      return updated;
-    } catch (err) {
-      const errorMsg = err.message || 'Failed to update ledger entry';
-      set({ error: errorMsg });
-      console.error('Error updating ledger entry:', err);
-      throw err;
-    }
-  },
-
-  /**
    * Delete a ledger entry
    */
   deleteLedgerEntry: async (entryId) => {
     try {
       set({ error: null });
       await api.delete(`/ledger/${entryId}`);
-      
+
       set(state => {
         const ledger = state.ledger.filter(e => e.id !== entryId);
         try {
@@ -418,7 +368,7 @@ export const useFinanceStore = create((set, get) => ({
   getTotalIncome: () => {
     return get().ledger
       .filter(e => e.type === 'INCOME')
-      .reduce((sum, e) => sum + (e.amount || 0), 0);
+      .reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
   },
 
   /**
@@ -427,7 +377,7 @@ export const useFinanceStore = create((set, get) => ({
   getTotalExpenses: () => {
     return get().ledger
       .filter(e => e.type === 'EXPENSE')
-      .reduce((sum, e) => sum + (e.amount || 0), 0);
+      .reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
   },
 
   /**
@@ -457,7 +407,7 @@ export const useFinanceStore = create((set, get) => ({
    * Get total purchase order amount
    */
   getTotalPOAmount: () => {
-    return get().purchaseOrders.reduce((sum, po) => sum + (po.totalAmount || 0), 0);
+    return get().purchaseOrders.reduce((sum, po) => sum + (Number(po.totalAmount) || 0), 0);
   },
 
   /**

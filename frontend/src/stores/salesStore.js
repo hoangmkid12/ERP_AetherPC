@@ -314,33 +314,6 @@ export const useSalesStore = create((set, get) => ({
   },
 
   /**
-   * Update an order
-   */
-  updateOrder: async (orderId, orderData) => {
-    try {
-      set({ error: null });
-      const updated = await api.put(`/orders/${orderId}`, orderData);
-      
-      set(state => {
-        const orders = state.orders.map(o => 
-          (o.orderId === orderId || o.id === orderId) ? updated : o
-        );
-        try {
-          localStorage.setItem(STORAGE_KEYS.orders, JSON.stringify(orders));
-        } catch (e) {}
-        return { orders };
-      });
-      
-      return updated;
-    } catch (err) {
-      const errorMsg = err.message || 'Failed to update order';
-      set({ error: errorMsg });
-      console.error('Error updating order:', err);
-      throw err;
-    }
-  },
-
-  /**
    * Update order status with notes and extra data (including POD, payment method, bankRefCode)
    */
   updateOrderStatus: async (orderId, newStatus, note = null, extraData = {}) => {
@@ -572,187 +545,43 @@ export const useSalesStore = create((set, get) => ({
       return { returnRequests };
     });
 
-    try {
-      const targetApiId = capturedOrderId || returnId;
-      if (status === 'RETURNING_TO_WAREHOUSE') {
-        await api.patch(`/orders/returns/${targetApiId}/pickup`, extraObj);
-      } else if (status === 'DELIVERED_TO_WAREHOUSE') {
-        await api.patch(`/orders/returns/${targetApiId}/deliver-warehouse`, extraObj);
-      } else if (status === 'QC_PASSED' || status === 'REJECTED') {
-        await api.patch(`/orders/returns/${targetApiId}/qc-inspect`, extraObj);
-      } else if (['RESTOCKED', 'EXCHANGED', 'VENDOR_WARRANTY', 'INSPECTED_SCRAP'].includes(status)) {
-        // Backend infers the real outcome (restock / exchange / send-to-
-        // vendor / scrap) from `shelfLocation` in the body, not from this
-        // status value itself — see confirmReturnWarehouse.
-        await api.patch(`/orders/returns/${targetApiId}/restock`, extraObj);
-      } else if (status === 'REFUNDED') {
-        await api.patch(`/orders/returns/${targetApiId}/refund`, extraObj);
-      } else {
-        await api.put(`/returns/${targetApiId}`, { status, ...extraObj });
-      }
-    } catch (err) {
-      console.warn(`[SalesStore] Return status sync notice:`, err.message);
+    // KHÔNG được nuốt lỗi ở đây (trước đây chỉ console.warn rồi coi như xong):
+    // hàm này cập nhật RMA/hoàn tiền/nhập kho — nếu API thật thất bại mà vẫn
+    // resolve bình thường, mọi màn hình gọi hàm này (Kế Toán hoàn tiền, Kho
+    // nhập lại hàng, QC thẩm định, Shipper thu hồi) đều tưởng đã thành công
+    // trong khi backend chưa hề ghi nhận gì. Ném lỗi thật để nơi gọi biết và
+    // báo đúng cho người dùng.
+    const targetApiId = capturedOrderId || returnId;
+    if (status === 'RETURNING_TO_WAREHOUSE') {
+      await api.patch(`/orders/returns/${targetApiId}/pickup`, extraObj);
+    } else if (status === 'DELIVERED_TO_WAREHOUSE') {
+      await api.patch(`/orders/returns/${targetApiId}/deliver-warehouse`, extraObj);
+    } else if (status === 'QC_PASSED' || status === 'REJECTED') {
+      await api.patch(`/orders/returns/${targetApiId}/qc-inspect`, extraObj);
+    } else if (['RESTOCKED', 'EXCHANGED', 'VENDOR_WARRANTY', 'INSPECTED_SCRAP'].includes(status)) {
+      // Backend infers the real outcome (restock / exchange / send-to-
+      // vendor / scrap) from `shelfLocation` in the body, not from this
+      // status value itself — see confirmReturnWarehouse.
+      await api.patch(`/orders/returns/${targetApiId}/restock`, extraObj);
+    } else if (status === 'REFUNDED') {
+      await api.patch(`/orders/returns/${targetApiId}/refund`, extraObj);
+    } else {
+      throw new Error(`Không có API thật cho trạng thái "${status}".`);
     }
   },
 
   /**
-   * Delete an order
+   * Add complaint — awaits the real POST /complaints and stores the
+   * server-assigned id (a Prisma-generated UUID), not a client-invented one.
+   * A client id here previously meant any status update made in the same
+   * session (before the next full refetch) targeted an id the backend had
+   * never heard of and 404'd.
    */
-  deleteOrder: async (orderId) => {
-    try {
-      set({ error: null });
-      await api.delete(`/orders/${orderId}`);
-      
-      set(state => {
-        const orders = state.orders.filter(o => o.orderId !== orderId && o.id !== orderId);
-        try {
-          localStorage.setItem(STORAGE_KEYS.orders, JSON.stringify(orders));
-        } catch (e) {}
-        return { orders };
-      });
-    } catch (err) {
-      const errorMsg = err.message || 'Failed to delete order';
-      set({ error: errorMsg });
-      console.error('Error deleting order:', err);
-      throw err;
-    }
-  },
+  addComplaint: async (data) => {
+    const res = await api.post('/complaints', data);
+    const newTicket = res?.data;
+    if (!newTicket) throw new Error(res?.message || 'Không thể gửi khiếu nại.');
 
-  /**
-   * Create return request
-   */
-  createReturnRequest: async (returnData) => {
-    try {
-      set({ error: null });
-      const newReturn = await api.post('/returns', returnData);
-      
-      set(state => {
-        const updated = [...state.returnRequests, newReturn];
-        try {
-          localStorage.setItem(STORAGE_KEYS.returnRequests, JSON.stringify(updated));
-        } catch (e) {}
-        return { returnRequests: updated };
-      });
-      
-      return newReturn;
-    } catch (err) {
-      const errorMsg = err.message || 'Failed to create return request';
-      set({ error: errorMsg });
-      console.error('Error creating return request:', err);
-      throw err;
-    }
-  },
-
-  /**
-   * Update return request
-   */
-  updateReturnRequest: async (returnId, returnData) => {
-    try {
-      set({ error: null });
-      const updated = await api.put(`/returns/${returnId}`, returnData);
-      
-      set(state => {
-        const returnRequests = state.returnRequests.map(r => r.id === returnId ? updated : r);
-        try {
-          localStorage.setItem(STORAGE_KEYS.returnRequests, JSON.stringify(returnRequests));
-        } catch (e) {}
-        return { returnRequests };
-      });
-      
-      return updated;
-    } catch (err) {
-      const errorMsg = err.message || 'Failed to update return request';
-      set({ error: errorMsg });
-      console.error('Error updating return request:', err);
-      throw err;
-    }
-  },
-
-  /**
-   * Delete return request
-   */
-  deleteReturnRequest: async (returnId) => {
-    try {
-      set({ error: null });
-      await api.delete(`/returns/${returnId}`);
-      
-      set(state => {
-        const returnRequests = state.returnRequests.filter(r => r.id !== returnId);
-        try {
-          localStorage.setItem(STORAGE_KEYS.returnRequests, JSON.stringify(returnRequests));
-        } catch (e) {}
-        return { returnRequests };
-      });
-    } catch (err) {
-      const errorMsg = err.message || 'Failed to delete return request';
-      set({ error: errorMsg });
-      console.error('Error deleting return request:', err);
-      throw err;
-    }
-  },
-
-  /**
-   * Create complaint
-   */
-  createComplaint: async (complaintData) => {
-    try {
-      set({ error: null });
-      const newComplaint = await api.post('/complaints', complaintData);
-      
-      set(state => {
-        const updated = [...state.complaints, newComplaint];
-        try {
-          localStorage.setItem(STORAGE_KEYS.complaints, JSON.stringify(updated));
-        } catch (e) {}
-        return { complaints: updated };
-      });
-      
-      return newComplaint;
-    } catch (err) {
-      const errorMsg = err.message || 'Failed to create complaint';
-      set({ error: errorMsg });
-      console.error('Error creating complaint:', err);
-      throw err;
-    }
-  },
-
-
-
-  /**
-   * Update complaint
-   */
-  updateComplaint: async (complaintId, complaintData) => {
-    try {
-      set({ error: null });
-      const updated = await api.put(`/complaints/${complaintId}`, complaintData);
-      
-      set(state => {
-        const complaints = state.complaints.map(c => c.id === complaintId ? updated : c);
-        try {
-          localStorage.setItem(STORAGE_KEYS.complaints, JSON.stringify(complaints));
-        } catch (e) {}
-        return { complaints };
-      });
-      
-      return updated;
-    } catch (err) {
-      const errorMsg = err.message || 'Failed to update complaint';
-      set({ error: errorMsg });
-      console.error('Error updating complaint:', err);
-      throw err;
-    }
-  },
-
-  /**
-   * Add complaint (offline/online)
-   */
-  addComplaint: (data) => {
-    const newTicket = {
-      id: `TKT-${Date.now()}`,
-      ...data,
-      status: 'OPEN',
-      date: new Date().toLocaleDateString('vi-VN')
-    };
     set(state => {
       const complaints = [newTicket, ...state.complaints];
       try {
@@ -761,25 +590,26 @@ export const useSalesStore = create((set, get) => ({
       return { complaints };
     });
 
-    api.post('/complaints', newTicket).catch(err => console.warn('[SalesStore] Complaint sync notice:', err.message));
     return newTicket;
   },
 
   /**
-   * Update complaint status
+   * Update complaint status — awaits the real PUT /complaints/:id and only
+   * applies the change locally on confirmed server success.
    */
-  updateComplaintStatus: (id, status, assignedTo = null, resolution = '') => {
-    set(state => {
-      const complaints = state.complaints.map(c => 
-        c.id === id ? { ...c, status, assignedTo: assignedTo || c.assignedTo, resolution } : c
-      );
-      try {
-        localStorage.setItem(STORAGE_KEYS.complaints, JSON.stringify(complaints));
-      } catch (e) {}
-      return { complaints };
-    });
+  updateComplaintStatus: async (id, status, assignedTo = null, resolution = '') => {
+    const res = await api.put(`/complaints/${id}`, { status, assignedTo, resolution });
+    const updated = res?.data;
+    if (!updated) throw new Error(res?.message || 'Không thể cập nhật khiếu nại.');
 
-    api.put(`/complaints/${id}`, { status, assignedTo, resolution }).catch(err => console.warn('[SalesStore] Complaint status sync notice:', err.message));
+    set(state => ({
+      complaints: state.complaints.map(c => (c.id === id ? updated : c))
+    }));
+    try {
+      localStorage.setItem(STORAGE_KEYS.complaints, JSON.stringify(get().complaints));
+    } catch (e) {}
+
+    return updated;
   },
 
   /**
@@ -855,7 +685,7 @@ export const useSalesStore = create((set, get) => ({
    * Get total sales amount
    */
   getTotalSalesAmount: () => {
-    return get().orders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
+    return get().orders.reduce((sum, o) => sum + (Number(o.totalAmount) || 0), 0);
   },
 
   /**

@@ -48,6 +48,7 @@ export default function Accountant() {
     setSearch('');
   };
 
+  const orders = useSalesStore(state => state.orders) || [];
   const ledger = useFinanceStore(state => state.ledger) || [];
   const purchaseOrders = useFinanceStore(state => state.purchaseOrders) || [];
   const addLedgerEntry = useFinanceStore(state => state.addLedgerEntry);
@@ -114,16 +115,13 @@ export default function Accountant() {
   };
 
   // Financial Metric Calculations
-  const totalRevenue = (ledger || [])
-    .filter(tx => tx && tx.type === 'INCOME')
-    .reduce((sum, tx) => sum + (Number(tx.amount || 0) || 0), 0);
-
-  const totalExpense = (ledger || [])
-    .filter(tx => tx && (tx.type === 'EXPENSE' || tx.type === 'EXPENSE_PAYROLL' || tx.type === 'EXPENSE_PO' || tx.type === 'EXPENSE_REFUND'))
-    .reduce((sum, tx) => sum + (Number(tx.amount || 0) || 0), 0);
-
-  const netProfit = totalRevenue - totalExpense;
-  const cashBalance = 450000000 + netProfit; // Base capital + Net profit
+  // Doanh thu = tổng Order.totalAmount thật, KHÔNG lấy từ bút toán INCOME trên sổ
+  // cái — hiện chưa có luồng backend nào tự ghi INCOME cho đơn hàng bán ra, nên
+  // dùng ledger làm nguồn doanh thu sẽ luôn ra gần 0 trừ khi Kế Toán tự tay nhập
+  // "Thêm Phiếu Thu". Đơn đã HỦY/giao thất bại không tính là doanh thu.
+  const totalRevenue = (orders || [])
+    .filter(o => o && !['CANCELLED', 'FAILED_DELIVERY'].includes(o.status))
+    .reduce((sum, o) => sum + (Number(o.totalAmount) || 0), 0);
 
   const effectivePOs = allPOs.length > 0 ? allPOs : purchaseOrders;
   const unpaidPOs = effectivePOs.filter(po => po && isPoAwaitingAccounting(po));
@@ -136,43 +134,107 @@ export default function Accountant() {
     ? payrolls.reduce((sum, p) => sum + (Number(p.netSalary || 0) || 0), 0)
     : employees.reduce((s, e) => s + (Number(e.salary || e.baseSalary || 8500000) || 8500000), 0);
 
+  // Giá vốn hàng bán (COGS) = tổng số tiền hóa đơn NCC thật (VendorBill.amountTotal,
+  // đã điều chỉnh theo tỷ lệ nghiệm thu QC) trên các đơn mua đã nhập kho — KHÔNG
+  // phải "số PO chưa thanh toán" như trước đây. Trước đây dùng unpaidPOAmount cho
+  // COGS khiến lợi nhuận sai hẳn bản chất: nếu NCC đã được trả hết, COGS hiện = 0
+  // dù hàng vẫn có giá vốn thật; ngược lại một đơn lớn chưa trả sẽ đội COGS ảo lên
+  // dù hàng chưa chắc đã bán ra.
+  const cogsAmount = effectivePOs
+    .flatMap(po => po.bills || [])
+    .reduce((sum, bill) => sum + (Number(bill.amountTotal || 0) || 0), 0);
+
+  // Chi phí vận hành = các bút toán chi thủ công thật (Thêm Phiếu Thu/Chi) — nhận
+  // diện qua việc không có referenceId (mọi bút toán hệ thống tự ghi — thanh toán
+  // NCC, chi lương, hoàn tiền — đều luôn có referenceId). Trước đây là số hardcode
+  // "5.000.000 ₫" cố định, không phản ánh chi phí thật.
+  const operatingExpense = (ledger || [])
+    .filter(tx => tx && tx.type === 'EXPENSE' && !tx.referenceId)
+    .reduce((sum, tx) => sum + (Number(tx.amount || 0) || 0), 0);
+
+  // Tiền hoàn cho khách (REFUND) cũng là một khoản chi thật, phải trừ vào lợi nhuận.
+  const refundAmount = (ledger || [])
+    .filter(tx => tx && tx.type === 'REFUND')
+    .reduce((sum, tx) => sum + (Number(tx.amount || 0) || 0), 0);
+
+  // Tổng chi phí = đúng bằng tổng 4 dòng chi trong P&L bên dưới — không tính lại
+  // riêng từ ledger nữa để tránh 2 nơi ra 2 con số khác nhau cho cùng 1 khái niệm.
+  const totalExpense = cogsAmount + totalPayrollFund + operatingExpense + refundAmount;
+
+  const netProfit = totalRevenue - totalExpense;
+  // Không có module vốn chủ sở hữu/số dư đầu kỳ thật trong hệ thống — không bịa
+  // "vốn góp ban đầu". Số dư lũy kế chỉ phản ánh đúng lợi nhuận ròng tích lũy.
+  const cashBalance = netProfit;
+
   const stats = [
     { label: 'Tổng Doanh Thu Bán Hàng', value: fmt(totalRevenue), change: 'Bao gồm POS & Website Online', icon: <ArrowUpRight size={20} />, color: '#16a34a', bg: '#f0fdf4' },
     { label: 'Tổng Chi Phí Hoạt Động', value: fmt(totalExpense), change: 'Giá vốn, lương & mua linh kiện', icon: <ArrowDownLeft size={20} />, color: '#ef4444', bg: '#fef2f2' },
     { label: 'Lợi Nhuận Ròng (Net Profit)', value: fmt(netProfit), change: netProfit >= 0 ? 'Tỷ suất lợi nhuận dương' : 'Cần tối ưu chi phí', icon: <DollarSign size={20} />, color: netProfit >= 0 ? '#16a34a' : '#ef4444', bg: netProfit >= 0 ? '#f0fdf4' : '#fef2f2' },
-    { label: 'Tiền Mặt Tồn Quỹ & Ngân Hàng', value: fmt(cashBalance), change: 'Thanh khoản sẵn sàng chi trả', icon: <CreditCard size={20} />, color: '#2563eb', bg: '#eff6ff' },
+    { label: 'Lợi Nhuận Ròng Lũy Kế', value: fmt(cashBalance), change: 'Chưa gồm vốn góp ban đầu (không có module vốn chủ sở hữu)', icon: <CreditCard size={20} />, color: '#2563eb', bg: '#eff6ff' },
     { label: 'Đơn PO Chờ Thanh Toán NCC', value: `${unpaidPOs.length} đơn (${fmt(unpaidPOAmount)})`, change: 'Cần giải ngân cho Nhà Cung Cấp', icon: <ShoppingBag size={20} />, color: '#f59e0b', bg: '#fffbeb' },
     { label: 'Quỹ Lương Chờ Chi Trả', value: fmt(totalPayrollFund), change: 'Dự toán kỳ lương tháng hiện tại', icon: <Users size={20} />, color: '#8b5cf6', bg: '#f5f3ff' }
   ];
 
   // Chart 1: Income vs Expense Doughnut
   const cashFlowChartData = {
-    labels: ['Doanh Thu Bán Hàng', 'Chi Mua Hàng PO', 'Chi Lương Nhân Sự', 'Chi Phí Vận Hành Khác'],
+    labels: ['Doanh Thu Bán Hàng', 'Giá Vốn Hàng Bán (NCC)', 'Chi Lương Nhân Sự', 'Chi Phí Vận Hành Khác'],
     datasets: [
       {
         data: [
           Math.max(1, totalRevenue),
-          Math.max(1, unpaidPOAmount),
+          Math.max(1, cogsAmount),
           Math.max(1, totalPayrollFund),
-          5000000
+          Math.max(1, operatingExpense)
         ],
         backgroundColor: ['#16a34a', '#f59e0b', '#8b5cf6', '#ef4444']
       }
     ]
   };
 
-  // Chart 2: Monthly Revenue & Expense Bar
+  // Chart 2: Monthly Revenue & Expense Bar — real monthly buckets from actual Order
+  // dates (revenue) and Ledger EXPENSE/REFUND dates (expense) for the last 8 calendar
+  // months. A month with no real activity shows 0, never an invented figure.
+  const monthlyFinanceBuckets = useMemo(() => {
+    const now = new Date();
+    const buckets = [];
+    for (let i = 7; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      buckets.push({ key: `${d.getFullYear()}-${d.getMonth()}`, label: `T${d.getMonth() + 1}${i === 0 ? ' (Hiện tại)' : ''}`, revenue: 0, expense: 0 });
+    }
+    const bucketIndex = {};
+    buckets.forEach((b, idx) => { bucketIndex[b.key] = idx; });
+
+    (orders || []).forEach(o => {
+      if (!o || ['CANCELLED', 'FAILED_DELIVERY'].includes(o.status)) return;
+      const raw = o.date || o.createdAt;
+      const d = raw ? new Date(raw) : null;
+      if (!d || isNaN(d.getTime())) return;
+      const idx = bucketIndex[`${d.getFullYear()}-${d.getMonth()}`];
+      if (idx !== undefined) buckets[idx].revenue += (Number(o.totalAmount) || 0);
+    });
+
+    (ledger || []).forEach(tx => {
+      if (!tx || (tx.type !== 'EXPENSE' && tx.type !== 'REFUND')) return;
+      const d = tx.date ? new Date(tx.date) : null;
+      if (!d || isNaN(d.getTime())) return;
+      const idx = bucketIndex[`${d.getFullYear()}-${d.getMonth()}`];
+      if (idx !== undefined) buckets[idx].expense += (Number(tx.amount) || 0);
+    });
+
+    return buckets;
+  }, [orders, ledger]);
+
   const monthlyFinanceData = {
-    labels: ['T1', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'T8 (Hiện tại)'],
+    labels: monthlyFinanceBuckets.map(b => b.label),
     datasets: [
       {
         label: 'Doanh Thu (Triệu VNĐ)',
-        data: [120, 145, 130, 180, 210, 195, 240, Math.round(totalRevenue / 1000000) || 280],
+        data: monthlyFinanceBuckets.map(b => Number((b.revenue / 1000000).toFixed(1))),
         backgroundColor: '#16a34a'
       },
       {
         label: 'Chi Phí (Triệu VNĐ)',
-        data: [90, 105, 95, 130, 150, 140, 170, Math.round(totalExpense / 1000000) || 190],
+        data: monthlyFinanceBuckets.map(b => Number((b.expense / 1000000).toFixed(1))),
         backgroundColor: '#ef4444'
       }
     ]
@@ -348,13 +410,15 @@ export default function Accountant() {
         note: refundNote.trim() || `Kế toán đã giải ngân chuyển khoản ${fmt(finalAmount)} thành công qua Napas247`
       };
 
-      if (typeof updateReturnStatus === 'function') {
-        try {
-          await updateReturnStatus(refundModalItem.orderId || refundModalItem.id, 'REFUNDED', extraRefundData);
-        } catch (apiErr) {
-          console.warn('Lỗi gọi updateReturnStatus:', apiErr);
-        }
+      // KHÔNG được nuốt lỗi ở đây — hoàn tiền là hành động tài chính, nếu
+      // updateReturnStatus (PATCH /orders/returns/:id/refund thật) thất bại,
+      // phải dừng lại và báo lỗi thật, chứ không được tiếp tục hiện "thành
+      // công" như thể tiền đã hoàn và sổ cái đã ghi trong khi thực tế thì
+      // chưa — lỗi này trước đây bị try/catch nội bộ nuốt mất.
+      if (typeof updateReturnStatus !== 'function') {
+        throw new Error('Chức năng cập nhật trạng thái hoàn tiền không khả dụng.');
       }
+      await updateReturnStatus(refundModalItem.orderId || refundModalItem.id, 'REFUNDED', extraRefundData);
 
       // Sync local list
       let localList = [];
@@ -1225,29 +1289,34 @@ export default function Accountant() {
             </p>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', fontSize: '0.85rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.75rem', backgroundColor: '#f0fdf4', borderRadius: '6px', border: '1px solid #bbf7d0' }}>
-                <strong style={{ color: '#16a34a' }}>1. DOANH THU THUẦN TỪ BÁN HÀNG & DỊCH VỤ:</strong>
-                <strong style={{ color: '#16a34a', fontSize: '1rem' }}>{fmt(totalRevenue)}</strong>
+              <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'baseline', gap: '0.5rem', padding: '0.75rem', backgroundColor: '#f0fdf4', borderRadius: '6px', border: '1px solid #bbf7d0' }}>
+                <strong style={{ color: '#16a34a', flex: '1 1 260px', minWidth: 0 }}>1. DOANH THU THUẦN TỪ BÁN HÀNG & DỊCH VỤ:</strong>
+                <strong style={{ color: '#16a34a', fontSize: '1rem', whiteSpace: 'nowrap' }}>{fmt(totalRevenue)}</strong>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.75rem', backgroundColor: '#fef2f2', borderRadius: '6px', border: '1px solid #fecaca' }}>
-                <strong style={{ color: '#dc2626' }}>2. GIÁ VỐN HÀNG BÁN & MUA LINH KIỆN (COGS):</strong>
-                <strong style={{ color: '#dc2626', fontSize: '1rem' }}>- {fmt(unpaidPOAmount)}</strong>
+              <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'baseline', gap: '0.5rem', padding: '0.75rem', backgroundColor: '#fef2f2', borderRadius: '6px', border: '1px solid #fecaca' }}>
+                <strong style={{ color: '#dc2626', flex: '1 1 260px', minWidth: 0 }}>2. GIÁ VỐN HÀNG BÁN & MUA LINH KIỆN (COGS):</strong>
+                <strong style={{ color: '#dc2626', fontSize: '1rem', whiteSpace: 'nowrap' }}>- {fmt(cogsAmount)}</strong>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.75rem', backgroundColor: '#fef2f2', borderRadius: '6px', border: '1px solid #fecaca' }}>
-                <strong style={{ color: '#dc2626' }}>3. CHI PHÍ LƯƠNG NHÂN VIÊN & HOA HỒNG:</strong>
-                <strong style={{ color: '#dc2626', fontSize: '1rem' }}>- {fmt(totalPayrollFund)}</strong>
+              <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'baseline', gap: '0.5rem', padding: '0.75rem', backgroundColor: '#fef2f2', borderRadius: '6px', border: '1px solid #fecaca' }}>
+                <strong style={{ color: '#dc2626', flex: '1 1 260px', minWidth: 0 }}>3. CHI PHÍ LƯƠNG NHÂN VIÊN & HOA HỒNG:</strong>
+                <strong style={{ color: '#dc2626', fontSize: '1rem', whiteSpace: 'nowrap' }}>- {fmt(totalPayrollFund)}</strong>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.75rem', backgroundColor: '#fef2f2', borderRadius: '6px', border: '1px solid #fecaca' }}>
-                <strong style={{ color: '#dc2626' }}>4. CHI PHÍ VẬN HÀNH, ĐIỆN NƯỚC, MẶT BẰNG:</strong>
-                <strong style={{ color: '#dc2626', fontSize: '1rem' }}>- 5.000.000 ₫</strong>
+              <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'baseline', gap: '0.5rem', padding: '0.75rem', backgroundColor: '#fef2f2', borderRadius: '6px', border: '1px solid #fecaca' }}>
+                <strong style={{ color: '#dc2626', flex: '1 1 260px', minWidth: 0 }}>4. CHI PHÍ VẬN HÀNH (Phiếu Chi Thủ Công):</strong>
+                <strong style={{ color: '#dc2626', fontSize: '1rem', whiteSpace: 'nowrap' }}>- {fmt(operatingExpense)}</strong>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '1rem', backgroundColor: '#eff6ff', borderRadius: '8px', border: '2px solid #3b82f6', marginTop: '0.5rem' }}>
-                <strong style={{ color: '#1d4ed8', fontSize: '1.05rem' }}>5. LỢI NHUẬN RÒNG TRƯỚC THUẾ (NET PROFIT):</strong>
-                <strong style={{ color: '#1d4ed8', fontSize: '1.15rem' }}>{fmt(netProfit)}</strong>
+              <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'baseline', gap: '0.5rem', padding: '0.75rem', backgroundColor: '#fef2f2', borderRadius: '6px', border: '1px solid #fecaca' }}>
+                <strong style={{ color: '#dc2626', flex: '1 1 260px', minWidth: 0 }}>5. CHI HOÀN TIỀN KHÁCH HÀNG (REFUND):</strong>
+                <strong style={{ color: '#dc2626', fontSize: '1rem', whiteSpace: 'nowrap' }}>- {fmt(refundAmount)}</strong>
+              </div>
+
+              <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'baseline', gap: '0.5rem', padding: '1rem', backgroundColor: '#eff6ff', borderRadius: '8px', border: '2px solid #3b82f6', marginTop: '0.5rem' }}>
+                <strong style={{ color: '#1d4ed8', fontSize: '1.05rem', flex: '1 1 260px', minWidth: 0 }}>6. LỢI NHUẬN RÒNG TRƯỚC THUẾ (NET PROFIT):</strong>
+                <strong style={{ color: '#1d4ed8', fontSize: '1.15rem', whiteSpace: 'nowrap' }}>{fmt(netProfit)}</strong>
               </div>
             </div>
           </div>

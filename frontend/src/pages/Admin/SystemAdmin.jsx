@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { api } from '../../services/api';
 import { 
   Settings, Shield, Users, Database, Plus, X, Eye, EyeOff, Search, 
   CheckCircle, XCircle, AlertCircle, Key, Lock, Edit, Trash2, 
@@ -315,8 +316,13 @@ export default function SystemAdmin() {
   };
 
   const handleResetPassword = async (emp) => {
-    if (await confirm(`Xác nhận ĐẶT LẠI MẬT KHẨU cho tài khoản "${emp.username}" về mật khẩu mặc định "123456"?`, { danger: true })) {
+    if (!(await confirm(`Xác nhận ĐẶT LẠI MẬT KHẨU cho tài khoản "${emp.username}" về mật khẩu mặc định "123456"?`, { danger: true }))) return;
+    try {
+      const res = await api.patch(`/hr/employees/${emp.id}/reset-password`);
+      if (!res?.success) throw new Error(res?.message || 'Không thể đặt lại mật khẩu.');
       notify(`Mật khẩu của tài khoản "${emp.username}" đã được đặt lại thành công về: 123456`, 'success');
+    } catch (err) {
+      notify(`Đặt lại mật khẩu thất bại: ${err.message || 'lỗi kết nối máy chủ'}.`, 'error');
     }
   };
 
@@ -620,10 +626,17 @@ export default function SystemAdmin() {
                         </button>
                         <button
                           onClick={async () => {
-                            if (await confirm(`Xác nhận xóa tài khoản "${emp.fullname}"?`, { danger: true })) {
-                              if (typeof deleteEmployee === 'function') deleteEmployee(emp.id);
+                            if (await confirm(`Vô hiệu hóa tài khoản "${emp.fullname}"? Tài khoản sẽ không đăng nhập được nữa, lịch sử chấm công/lương/nghỉ phép vẫn được giữ nguyên.`, { danger: true })) {
+                              if (typeof deleteEmployee !== 'function') return;
+                              try {
+                                await deleteEmployee(emp.id);
+                                notify(`Đã vô hiệu hóa tài khoản "${emp.fullname}".`, 'success');
+                              } catch (err) {
+                                notify(`Không thể vô hiệu hóa: ${err.message || 'lỗi kết nối máy chủ'}.`, 'error');
+                              }
                             }
                           }}
+                          title="Vô hiệu hóa tài khoản (không xóa lịch sử)"
                           style={{ backgroundColor: '#ffffff', color: '#ef4444', border: '1px solid #fca5a5', borderRadius: '4px', padding: '0.3rem 0.5rem', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}
                         >
                           <Trash2 size={12} />
@@ -1584,19 +1597,25 @@ export default function SystemAdmin() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    if (typeof updateEmployee === 'function') {
-                      updateEmployee(editingEmp.id, { 
-                        fullname: editingEmp.fullname, 
-                        role: editingEmp.role, 
+                  onClick={async () => {
+                    if (typeof updateEmployee !== 'function') return;
+                    try {
+                      // Backend (PUT /hr/employees/:id) reads `fullName`/`baseSalary` —
+                      // this previously sent `fullname`/`salary`, so name and salary
+                      // edits silently never persisted while role/department did.
+                      await updateEmployee(editingEmp.id, {
+                        fullName: editingEmp.fullname,
+                        role: editingEmp.role,
                         department: editingEmp.department,
                         deliveryRegion: editingEmp.deliveryRegion,
                         phone: editingEmp.phone,
-                        salary: editingEmp.salary 
+                        baseSalary: editingEmp.salary
                       });
+                      setEditingEmp(null);
+                      notify('Cập nhật thông tin nhân viên thành công.', 'success');
+                    } catch (err) {
+                      notify(`Cập nhật thất bại: ${err.message || 'lỗi kết nối máy chủ'}.`, 'error');
                     }
-                    setEditingEmp(null);
-                    notify('Cập nhật thông tin nhân viên thành công.', 'success');
                   }}
                   style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.45rem 1.1rem', fontSize: '0.8rem', fontWeight: 800, cursor: 'pointer' }}
                 >

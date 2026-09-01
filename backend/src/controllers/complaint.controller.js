@@ -41,20 +41,15 @@ const createComplaint = async (req, res, next) => {
       throw error;
     }
 
-    // Complaint has no dedicated orderId column — fold the reference into the
-    // description text instead of silently dropping it, without a migration.
-    const fullDescription = orderId
-      ? `[Đơn hàng liên quan: ${orderId}] ${description}`
-      : description;
-
     const complaint = await prisma.complaint.create({
       data: {
         customerId: req.user?.role === 'CUSTOMER' ? req.user.id : null,
+        orderId: orderId || null,
         customerName: String(customerName).trim(),
         phone: phone || null,
         email: email || null,
         subject: String(finalSubject).trim(),
-        description: fullDescription,
+        description,
         priority: ['LOW', 'MEDIUM', 'HIGH', 'URGENT'].includes(String(priority).toUpperCase()) ? String(priority).toUpperCase() : 'MEDIUM',
         status: 'OPEN',
         resolutionNote: evidenceUrl ? `Minh chứng: ${evidenceUrl}` : null

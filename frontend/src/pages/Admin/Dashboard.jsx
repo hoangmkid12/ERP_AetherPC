@@ -600,13 +600,18 @@ export default function Dashboard() {
     return (assemblyJobs || []).filter(j => isDateInFilter(j.createdAt || j.date, dateFilterPeriod, customStartDate, customEndDate));
   }, [assemblyJobs, dateFilterPeriod, customStartDate, customEndDate]);
 
-  // Key Calculations
-  const totalRevenueVal = filteredOrders.reduce((sum, item) => sum + (item.totalAmount || 0), 0);
-  const estimatedCOGS = totalRevenueVal * 0.72; // ~72% COGS
-  const grossProfit = totalRevenueVal - estimatedCOGS;
+  // Key Calculations — derived entirely from real data (Order/PurchaseOrder-VendorBill/Payroll/Ledger),
+  // no invented multipliers or hardcoded fallbacks. CANCELLED/FAILED_DELIVERY orders never count as revenue.
+  const revenueOrders = filteredOrders.filter(o => !['CANCELLED', 'FAILED_DELIVERY'].includes(o.status));
+  const totalRevenueVal = revenueOrders.reduce((sum, item) => sum + (Number(item.totalAmount) || 0), 0);
+  const cogsAmount = purchaseOrders.flatMap(po => po.bills || []).reduce((sum, bill) => sum + (Number(bill.amountTotal || 0) || 0), 0);
+  const grossProfit = totalRevenueVal - cogsAmount;
+  const grossMarginPct = totalRevenueVal > 0 ? (grossProfit / totalRevenueVal) * 100 : 0;
   const totalInventoryAsset = inventory.reduce((sum, item) => sum + (Number(item.stock || item.stockQuantity || 0) * Number(item.price || item.unitCost || 0)), 0);
-  const totalPayrollCost = payrolls.reduce((sum, p) => sum + (p.netSalary || p.totalSalary || 0), 0) || 45800000;
-  const netIncome = grossProfit - totalPayrollCost - 15000000; // Subtract salary & overhead
+  const totalPayrollCost = payrolls.reduce((sum, p) => sum + (Number(p.netSalary || p.totalSalary || 0) || 0), 0);
+  const operatingExpense = (generalLedger || []).filter(tx => tx && tx.type === 'EXPENSE' && !tx.referenceId).reduce((sum, tx) => sum + (Number(tx.amount || 0) || 0), 0);
+  const refundAmount = (generalLedger || []).filter(tx => tx && tx.type === 'REFUND').reduce((sum, tx) => sum + (Number(tx.amount || 0) || 0), 0);
+  const netIncome = totalRevenueVal - cogsAmount - totalPayrollCost - operatingExpense - refundAmount;
 
   const lowStockCount = inventory.filter(item => Number(item.stock || item.stockQuantity || 0) <= Number(item.threshold || 5)).length;
   const readyToShipCount = filteredOrders.filter(o => o.status === 'READY_TO_SHIP').length;
@@ -622,9 +627,9 @@ export default function Dashboard() {
   // 6 Balanced Executive KPI Cards
   const stats = [
     { label: 'Tổng Doanh Thu', value: formatPrice(totalRevenueVal), change: 'Cả trực tuyến & tại quầy', icon: <DollarSign size={20} />, color: '#16a34a', bg: '#f0fdf4' },
-    { label: 'Lợi Nhuận Gộp (Est)', value: formatPrice(grossProfit), change: 'Tỷ suất lợi nhuận ~28%', icon: <TrendingUp size={20} />, color: '#2563eb', bg: '#eff6ff' },
+    { label: 'Lợi Nhuận Gộp', value: formatPrice(grossProfit), change: `Tỷ suất lợi nhuận ${grossMarginPct.toFixed(1)}%`, icon: <TrendingUp size={20} />, color: '#2563eb', bg: '#eff6ff' },
     { label: 'Giá Trị Tồn Kho', value: formatPrice(totalInventoryAsset), change: `${inventory.length} mã linh kiện lưu kho`, icon: <Package size={20} />, color: '#8b5cf6', bg: '#f5f3ff' },
-    { label: 'Quỹ Lương Nhân Sự', value: formatPrice(totalPayrollCost), change: `${employees.length || 15} nhân sự toàn công ty`, icon: <Users size={20} />, color: '#0ea5e9', bg: '#f0f9ff' },
+    { label: 'Quỹ Lương Nhân Sự', value: formatPrice(totalPayrollCost), change: `${employees.length} nhân sự toàn công ty`, icon: <Users size={20} />, color: '#0ea5e9', bg: '#f0f9ff' },
     { label: 'Cảnh Báo Tồn Kho Thấp', value: `${lowStockCount} linh kiện`, change: 'Cần duyệt thêm RFQ/PO', icon: <AlertTriangle size={20} />, color: '#d97706', bg: '#fffbeb' },
     { label: 'Chờ CEO Phê Duyệt', value: `${totalPendingCeoApprovals} nhiệm vụ`, change: 'PO, Bảng lương, Nghỉ phép', icon: <Bell size={20} />, color: '#ef4444', bg: '#fef2f2' }
   ];
@@ -633,7 +638,7 @@ export default function Dashboard() {
   const salesByDate = {};
   [...filteredOrders].reverse().forEach(order => {
     const d = order.date || '19/06';
-    salesByDate[d] = (salesByDate[d] || 0) + (order.totalAmount || 0);
+    salesByDate[d] = (salesByDate[d] || 0) + (Number(order.totalAmount) || 0);
   });
   const rawLabels = Object.keys(salesByDate);
   const rawData = Object.values(salesByDate).map(val => val / 1000000);
@@ -685,18 +690,50 @@ export default function Dashboard() {
     ]
   };
 
-  // Cashflow In vs Out Data
+  // Cashflow In vs Out Data — real monthly buckets from actual Order dates (inflow) and
+  // Ledger EXPENSE/REFUND entry dates (outflow) for the last 5 calendar months. No filler data:
+  // a month with no real activity shows 0, not an invented figure.
+  const monthlyCashflowBuckets = useMemo(() => {
+    const now = new Date();
+    const buckets = [];
+    for (let i = 4; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      buckets.push({ key: `${d.getFullYear()}-${d.getMonth()}`, label: `Tháng ${d.getMonth() + 1}${i === 0 ? ' (Hiện tại)' : ''}`, inflow: 0, outflow: 0 });
+    }
+    const bucketIndex = {};
+    buckets.forEach((b, idx) => { bucketIndex[b.key] = idx; });
+
+    orders.forEach(o => {
+      if (!o || ['CANCELLED', 'FAILED_DELIVERY'].includes(o.status)) return;
+      const raw = o.date || o.createdAt;
+      const d = raw ? new Date(raw) : null;
+      if (!d || isNaN(d.getTime())) return;
+      const idx = bucketIndex[`${d.getFullYear()}-${d.getMonth()}`];
+      if (idx !== undefined) buckets[idx].inflow += (Number(o.totalAmount) || 0);
+    });
+
+    (generalLedger || []).forEach(tx => {
+      if (!tx || (tx.type !== 'EXPENSE' && tx.type !== 'REFUND')) return;
+      const d = tx.date ? new Date(tx.date) : null;
+      if (!d || isNaN(d.getTime())) return;
+      const idx = bucketIndex[`${d.getFullYear()}-${d.getMonth()}`];
+      if (idx !== undefined) buckets[idx].outflow += (Number(tx.amount) || 0);
+    });
+
+    return buckets;
+  }, [orders, generalLedger]);
+
   const cashflowData = {
-    labels: ['Tháng 3', 'Tháng 4', 'Tháng 5', 'Tháng 6', 'Tháng 7 (Hiện tại)'],
+    labels: monthlyCashflowBuckets.map(b => b.label),
     datasets: [
       {
-        label: 'Dòng Tiền Thu (Inflow)',
-        data: [120, 145, 138, 185, 210],
+        label: 'Dòng Tiền Thu (Inflow, Triệu VNĐ)',
+        data: monthlyCashflowBuckets.map(b => Number((b.inflow / 1000000).toFixed(1))),
         backgroundColor: '#16a34a'
       },
       {
-        label: 'Dòng Tiền Chi (Outflow)',
-        data: [95, 110, 105, 140, 160],
+        label: 'Dòng Tiền Chi (Outflow, Triệu VNĐ)',
+        data: monthlyCashflowBuckets.map(b => Number((b.outflow / 1000000).toFixed(1))),
         backgroundColor: '#ef4444'
       }
     ]
@@ -1220,34 +1257,39 @@ export default function Dashboard() {
             </h3>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', fontSize: '0.82rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '0.4rem', borderBottom: '1px solid #f1f5f9' }}>
-                <span style={{ fontWeight: 700, color: '#0f172a' }}>(+) Tổng Doanh Thu Bán Hàng:</span>
-                <strong style={{ color: '#16a34a' }}>{formatPrice(totalRevenueVal)}</strong>
+              <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'baseline', gap: '0.4rem', paddingBottom: '0.4rem', borderBottom: '1px solid #f1f5f9' }}>
+                <span style={{ fontWeight: 700, color: '#0f172a', flex: '1 1 220px', minWidth: 0 }}>(+) Tổng Doanh Thu Bán Hàng:</span>
+                <strong style={{ color: '#16a34a', whiteSpace: 'nowrap' }}>{formatPrice(totalRevenueVal)}</strong>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '0.4rem', borderBottom: '1px solid #f1f5f9' }}>
-                <span style={{ color: '#ef4444' }}>(-) Giá Vốn Hàng Bán (COGS):</span>
-                <strong style={{ color: '#ef4444' }}>{formatPrice(estimatedCOGS)}</strong>
+              <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'baseline', gap: '0.4rem', paddingBottom: '0.4rem', borderBottom: '1px solid #f1f5f9' }}>
+                <span style={{ color: '#ef4444', flex: '1 1 220px', minWidth: 0 }}>(-) Giá Vốn Hàng Bán (COGS):</span>
+                <strong style={{ color: '#ef4444', whiteSpace: 'nowrap' }}>{formatPrice(cogsAmount)}</strong>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.4rem 0.6rem', backgroundColor: '#f0fdf4', borderRadius: '4px' }}>
-                <span style={{ fontWeight: 800, color: '#15803d' }}>(=) Lợi Nhuận Gộp (Gross Margin ~28%):</span>
-                <strong style={{ color: '#15803d', fontSize: '0.9rem' }}>{formatPrice(grossProfit)}</strong>
+              <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'baseline', gap: '0.4rem', padding: '0.4rem 0.6rem', backgroundColor: '#f0fdf4', borderRadius: '4px' }}>
+                <span style={{ fontWeight: 800, color: '#15803d', flex: '1 1 220px', minWidth: 0 }}>(=) Lợi Nhuận Gộp (Gross Margin {grossMarginPct.toFixed(1)}%):</span>
+                <strong style={{ color: '#15803d', fontSize: '0.9rem', whiteSpace: 'nowrap' }}>{formatPrice(grossProfit)}</strong>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '0.4rem', borderBottom: '1px solid #f1f5f9' }}>
-                <span style={{ color: '#64748b' }}>(-) Chi Phí Lương & Thưởng Nhân Sự:</span>
-                <span style={{ color: '#64748b' }}>{formatPrice(totalPayrollCost)}</span>
+              <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'baseline', gap: '0.4rem', paddingBottom: '0.4rem', borderBottom: '1px solid #f1f5f9' }}>
+                <span style={{ color: '#64748b', flex: '1 1 220px', minWidth: 0 }}>(-) Chi Phí Lương & Thưởng Nhân Sự:</span>
+                <span style={{ color: '#64748b', whiteSpace: 'nowrap' }}>{formatPrice(totalPayrollCost)}</span>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '0.4rem', borderBottom: '1px solid #f1f5f9' }}>
-                <span style={{ color: '#64748b' }}>(-) Chi Phí Mặt Bằng & Vận Hành Khác:</span>
-                <span style={{ color: '#64748b' }}>{formatPrice(15000000)}</span>
+              <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'baseline', gap: '0.4rem', paddingBottom: '0.4rem', borderBottom: '1px solid #f1f5f9' }}>
+                <span style={{ color: '#64748b', flex: '1 1 220px', minWidth: 0 }}>(-) Chi Phí Vận Hành (Phiếu Chi Thủ Công):</span>
+                <span style={{ color: '#64748b', whiteSpace: 'nowrap' }}>{formatPrice(operatingExpense)}</span>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.6rem', backgroundColor: '#eff6ff', borderRadius: '6px', border: '1px solid #bfdbfe', marginTop: '0.5rem' }}>
-                <span style={{ fontWeight: 800, color: '#1d4ed8' }}>(=) Lợi Nhuận Thuần Trước Thuế (Net Income):</span>
-                <strong style={{ color: '#1d4ed8', fontSize: '1.05rem' }}>{formatPrice(netIncome > 0 ? netIncome : 42500000)}</strong>
+              <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'baseline', gap: '0.4rem', paddingBottom: '0.4rem', borderBottom: '1px solid #f1f5f9' }}>
+                <span style={{ color: '#64748b', flex: '1 1 220px', minWidth: 0 }}>(-) Chi Hoàn Tiền Khách Hàng (Refund):</span>
+                <span style={{ color: '#64748b', whiteSpace: 'nowrap' }}>{formatPrice(refundAmount)}</span>
+              </div>
+
+              <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'baseline', gap: '0.4rem', padding: '0.6rem', backgroundColor: netIncome >= 0 ? '#eff6ff' : '#fef2f2', borderRadius: '6px', border: `1px solid ${netIncome >= 0 ? '#bfdbfe' : '#fecaca'}`, marginTop: '0.5rem' }}>
+                <span style={{ fontWeight: 800, color: netIncome >= 0 ? '#1d4ed8' : '#dc2626', flex: '1 1 220px', minWidth: 0 }}>(=) Lợi Nhuận Thuần Trước Thuế (Net Income):</span>
+                <strong style={{ color: netIncome >= 0 ? '#1d4ed8' : '#dc2626', fontSize: '1.05rem', whiteSpace: 'nowrap' }}>{formatPrice(netIncome)}</strong>
               </div>
             </div>
           </div>

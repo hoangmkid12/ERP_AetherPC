@@ -645,7 +645,8 @@ const registerPayment = async (req, res, next) => {
 
     const payment = await prisma.$transaction(async (tx) => {
       const bill = await tx.vendorBill.findUnique({
-        where: { id: parseInt(billId) }
+        where: { id: parseInt(billId) },
+        include: { supplier: true, po: true }
       });
       if (!bill) throw new Error(`Vendor Bill not found: ${billId}`);
       if (bill.status === 'PAID') throw new Error('Bill is already fully paid.');
@@ -679,6 +680,18 @@ const registerPayment = async (req, res, next) => {
           amountPaid: newAmountPaid,
           amountDue: newAmountDue,
           status: newAmountDue <= 0 ? 'PAID' : 'POSTED'
+        }
+      });
+
+      // Ghi Sổ Cái thật (LedgerEntry: EXPENSE) — trước đây thanh toán NCC không
+      // hề chạm tới Sổ Cái, khiến báo cáo P&L tính thiếu hẳn giá vốn hàng bán
+      // thật đã trả cho NCC.
+      await tx.ledgerEntry.create({
+        data: {
+          type: 'EXPENSE',
+          amount: payAmount,
+          description: `Chi trả NCC ${bill.supplier?.name || bill.supplierCode} — Hóa đơn ${bill.billNumber}${bill.po ? ` (PO ${bill.po.poNumber})` : ''}`,
+          referenceId: `VENDORBILL-${bill.id}`
         }
       });
 
