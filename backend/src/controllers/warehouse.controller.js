@@ -270,25 +270,90 @@ const getStockMovements = async (req, res, next) => {
 // GET /api/v1/warehouse/inventory
 const getInventory = async (req, res, next) => {
   try {
-    const inventoryData = await prisma.inventory.findMany({
-      include: {
-        product: {
-          select: {
-            productId: true,
-            name: true,
-            sku: true,
-            price: true,
-            stockQuantity: true,
-            primaryImage: true
-          }
+    const [inventoryData, supplierLinks] = await Promise.all([
+      prisma.inventory.findMany({
+        include: {
+          product: {
+            select: {
+              productId: true,
+              name: true,
+              sku: true,
+              price: true,
+              stockQuantity: true,
+              primaryImage: true,
+              available: true,
+              status: true,
+              // The Kho product-list filter buckets by category (CPU/VGA/RAM/...) —
+              // without this the frontend had no category to filter on and fell
+              // back to a single hardcoded bucket, silently breaking every
+              // category filter except "Tất cả".
+              category: { select: { name: true, slug: true } },
+              // Preferred/default distributor for this SKU (see Product.defaultSupplierCode) —
+              // derived at seed time from suppliers.json's real supplied_brands list. Used as
+              // the fallback below when the product has no actual completed-PO history yet.
+              defaultSupplier: { select: { name: true } }
+            }
+          },
+          warehouse: { select: { id: true, name: true } },
+          location: true
         },
-        warehouse: { select: { id: true, name: true } },
-        location: true
-      },
-      orderBy: { updatedAt: 'desc' }
-    });
+        orderBy: { updatedAt: 'desc' }
+      }),
+      // Real observed purchase history takes priority over the catalog default below —
+      // the most recent fulfilled PO for a product is a stronger signal than its
+      // brand's generic default distributor.
+      prisma.purchaseOrderItem.findMany({
+        where: { po: { status: { in: ['RECEIVED', 'DONE', 'COMPLETED'] } } },
+        select: { productId: true, po: { select: { updatedAt: true, supplier: { select: { name: true } } } } }
+      })
+    ]);
 
-    res.json({ success: true, data: inventoryData });
+    const supplierByProduct = new Map();
+    for (const link of [...supplierLinks].sort((a, b) => new Date(b.po.updatedAt) - new Date(a.po.updatedAt))) {
+      if (!supplierByProduct.has(link.productId)) {
+        supplierByProduct.set(link.productId, link.po.supplier.name);
+      }
+    }
+
+    // There are 2 real warehouses (Kho Tổng TP.HCM + Kho Chi Nhánh Hà Nội), so every
+    // product has 2 separate Inventory rows. The Kho product-list is a catalog view —
+    // one row per SKU with its company-wide total — not a per-warehouse ledger, so
+    // returning inventoryData as-is silently duplicated every product with only a
+    // fractional stock count in each row. Aggregate to one row per product instead.
+    const byProduct = new Map();
+    for (const row of inventoryData) {
+      let agg = byProduct.get(row.productId);
+      if (!agg) {
+        agg = {
+          id: row.productId,
+          productId: row.productId,
+          product: row.product,
+          quantityOnHand: 0,
+          reorderPoint: row.reorderPoint,
+          locations: [],
+          updatedAt: row.updatedAt
+        };
+        byProduct.set(row.productId, agg);
+      }
+      agg.quantityOnHand += row.quantityOnHand;
+      if (row.location) {
+        agg.locations.push({
+          warehouseId: row.warehouseId,
+          warehouseName: row.warehouse?.name || null,
+          zone: row.location.zone,
+          shelf: row.location.shelf,
+          bin: row.location.bin
+        });
+      }
+      if (row.updatedAt > agg.updatedAt) agg.updatedAt = row.updatedAt;
+    }
+
+    const data = [...byProduct.values()].map(agg => ({
+      ...agg,
+      supplierName: supplierByProduct.get(agg.productId) || agg.product?.defaultSupplier?.name || null
+    }));
+
+    res.json({ success: true, data });
   } catch (err) {
     next(err);
   }

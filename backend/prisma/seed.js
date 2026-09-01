@@ -227,6 +227,37 @@ async function main() {
     }
   });
 
+  // 4b. Backfill Product.defaultSupplierCode from suppliers.json's real supplied_brands
+  // list — this is the only source the Kho product-list "Nhà cung cấp" filter has for
+  // products that were never actually bought through a real PO. A brand not covered by
+  // any supplier's supplied_brands list is left null rather than guessed.
+  console.log('Linking products to default suppliers (from supplied_brands)...');
+  {
+    const brandSupplierCandidates = new Map(); // normalized brand name -> [{ code, suppliedCount }]
+    for (const s of suppliers) {
+      for (const brandName of s.supplied_brands || []) {
+        const key = brandName.trim().toLowerCase();
+        if (!brandSupplierCandidates.has(key)) brandSupplierCandidates.set(key, []);
+        brandSupplierCandidates.get(key).push({ code: s.code, suppliedCount: s.supplied_brands.length });
+      }
+    }
+    // Prefer the brand's own dedicated VN distributor (supplies exactly this one brand)
+    // over a general distributor that also happens to carry it; among general
+    // distributors, prefer the more specialized one, then break ties by code.
+    const pickSupplierCode = (candidates) => {
+      if (!candidates || candidates.length === 0) return null;
+      const dedicated = candidates.find(c => c.suppliedCount === 1);
+      if (dedicated) return dedicated.code;
+      return [...candidates].sort((a, b) => a.suppliedCount - b.suppliedCount || a.code.localeCompare(b.code))[0].code;
+    };
+
+    for (const [bName, bId] of brandMap.entries()) {
+      const code = pickSupplierCode(brandSupplierCandidates.get(bName.trim().toLowerCase()));
+      if (!code) continue;
+      await prisma.product.updateMany({ where: { brandId: bId }, data: { defaultSupplierCode: code } });
+    }
+  }
+
   // 5. Customers & Addresses
   console.log('Seeding Customers...');
   for (const c of customers) {

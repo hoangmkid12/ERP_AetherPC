@@ -50,6 +50,10 @@ model Product {
   name            String           @db.VarChar(255)
   categoryId      Int              @map("category_id")
   brandId         Int              @map("brand_id")
+  // Preferred/default distributor Purchasing restocks this SKU from, derived at seed
+  // time from suppliers.json's real supplied_brands list (falls back to null when no
+  // seeded supplier actually carries the product's brand — never guessed).
+  defaultSupplierCode String?      @map("default_supplier_code") @db.VarChar(50)
   productType     String?          @map("product_type") @db.VarChar(100)
   descriptionText String?          @map("description_text")
   price           Decimal          @default(0.00) @db.Decimal(15, 2)
@@ -70,6 +74,7 @@ model Product {
 
   category        Category         @relation(fields: [categoryId], references: [id])
   brand           Brand            @relation(fields: [brandId], references: [id])
+  defaultSupplier Supplier?        @relation(fields: [defaultSupplierCode], references: [code])
   variants        ProductVariant[]
   images          ProductImage[]
   reviews         ProductReview[]
@@ -85,6 +90,7 @@ model Product {
   @@index([brandId, categoryId]) // For category + brand filters
   @@index([price]) // For price range filters
   @@index([status]) // Filter by product status
+  @@index([defaultSupplierCode]) // For Kho product-list "Nhà cung cấp" filter
   @@index([available]) // Filter available products
   @@index([stockQuantity]) // Find out-of-stock items
   @@map("products")
@@ -376,6 +382,7 @@ model Supplier {
   contacts         SupplierContact[]
   evaluations      SupplierEvaluation[]
   purchaseOrders   PurchaseOrder[]
+  defaultForProducts Product[]
   bills            VendorBill[]
 
   @@index([name])

@@ -843,6 +843,28 @@ export default function Purchasing() {
     return getStatusLabel(PO_STATUS, status);
   };
 
+  // Real happy-path pipeline for a PO (RFQ -> RFQ_SENT -> QUOTED -> PO ->
+  // CONFIRMED_BY_SUPPLIER -> QA -> RECEIVED -> DONE), matching the exact
+  // transitions enforced in purchase.controller.js (allowedTransitions /
+  // allowedTransitionsByRole). Used to render a step-by-step progress bar
+  // instead of making the user infer position from the raw status text.
+  const PO_PIPELINE_STEPS = [
+    { key: 'RFQ', label: 'Khởi Tạo YCBG' },
+    { key: 'RFQ_SENT', label: 'Gửi NCC Báo Giá' },
+    { key: 'QUOTED', label: 'Chờ CEO Duyệt' },
+    { key: 'PO', label: 'Đã Duyệt (PO)' },
+    { key: 'CONFIRMED_BY_SUPPLIER', label: 'NCC Xác Nhận' },
+    { key: 'QA', label: 'Kiểm Định QC' },
+    { key: 'RECEIVED', label: 'Nhận Hàng (GRN)' },
+    { key: 'DONE', label: 'Hoàn Tất' }
+  ];
+  const PO_PIPELINE_STEP_INDEX = {
+    RFQ: 0, RFQ_SENT: 1, SENT: 1, QUOTED: 2, PO: 3, APPROVED: 3,
+    CONFIRMED_BY_SUPPLIER: 4,
+    QA_PASSED: 5, QA_PARTIAL: 5, QA_REJECTED: 5,
+    RECEIVED: 6, DONE: 7, COMPLETED: 7
+  };
+
   // Filtered orders list based on active tab & filters
   const filteredOrders = orders
     .filter(po => {
@@ -2512,6 +2534,51 @@ export default function Purchasing() {
               </button>
             </div>
 
+            {/* Status Pipeline Stepper — shows at a glance which stage the PO is
+                currently at, instead of making the user infer it from the raw
+                status text or the approval history log. */}
+            {selectedPO.status === 'CANCELLED' ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem 1rem', backgroundColor: '#fff1f2', border: '1px solid #fecdd3', borderRadius: '8px', marginBottom: '1.25rem', fontSize: '0.85rem', fontWeight: 800, color: '#be123c' }}>
+                <X size={16} /> Đơn Hàng Đã Bị Hủy
+              </div>
+            ) : (() => {
+              const currentIdx = PO_PIPELINE_STEP_INDEX[selectedPO.status];
+              if (currentIdx === undefined) return null;
+              const isRejected = selectedPO.status === 'QA_REJECTED';
+              return (
+                <div style={{ display: 'flex', alignItems: 'flex-start', marginBottom: '1.25rem', overflowX: 'auto', padding: '0.25rem 0' }}>
+                  {PO_PIPELINE_STEPS.map((step, idx) => {
+                    const isDone = idx < currentIdx;
+                    const isCurrent = idx === currentIdx;
+                    const dotColor = isCurrent && isRejected ? '#be123c' : (isDone || isCurrent) ? '#047857' : '#cbd5e1';
+                    const dotBg = isCurrent && isRejected ? '#fff1f2' : (isDone || isCurrent) ? '#ecfdf5' : '#f8fafc';
+                    return (
+                      <React.Fragment key={step.key}>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: '84px' }}>
+                          <div style={{
+                            width: '26px', height: '26px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            backgroundColor: dotBg, border: `2px solid ${dotColor}`, color: dotColor, fontSize: '0.72rem', fontWeight: 800
+                          }}>
+                            {isDone ? <Check size={13} /> : idx + 1}
+                          </div>
+                          <span style={{
+                            marginTop: '0.35rem', fontSize: '0.68rem', textAlign: 'center', lineHeight: 1.25,
+                            color: isCurrent ? dotColor : (isDone ? '#334155' : '#94a3b8'),
+                            fontWeight: isCurrent ? 800 : 600
+                          }}>
+                            {isCurrent && isRejected ? 'Từ Chối QC' : step.label}
+                          </span>
+                        </div>
+                        {idx < PO_PIPELINE_STEPS.length - 1 && (
+                          <div style={{ flex: 1, height: '2px', backgroundColor: idx < currentIdx ? '#047857' : '#e2e8f0', marginTop: '13px', minWidth: '16px' }} />
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
+                </div>
+              );
+            })()}
+
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', backgroundColor: '#f8fafc', padding: '1rem', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '1.25rem', fontSize: '0.83rem' }}>
               <div>
                 <span style={{ color: '#64748b', display: 'block', fontSize: '0.75rem' }}>Nhà Cung Cấp:</span>
@@ -2719,12 +2786,20 @@ export default function Purchasing() {
             })()}
 
             {/* Lịch Sử Duyệt (Approval History Timeline) — from PurchaseOrderStatusHistory,
-                recorded server-side on every real status transition (purchase.controller.js) */}
-            {Array.isArray(selectedPO.statusHistory) && selectedPO.statusHistory.length > 0 && (
+                recorded server-side on every real status transition (purchase.controller.js).
+                The initial "Khởi tạo YCBG/Hợp Đồng Khung" creation entry is skipped here — it
+                doesn't represent an approval decision, and current position in the workflow
+                is now shown by the pipeline stepper above instead. */}
+            {(() => {
+              const approvalEntries = (selectedPO.statusHistory || []).filter(h =>
+                h.note !== 'Khởi tạo Yêu Cầu Báo Giá (RFQ)' && h.note !== 'Khởi tạo Hợp Đồng Khung (Blanket PO)'
+              );
+              if (approvalEntries.length === 0) return null;
+              return (
               <div style={{ backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', padding: '1rem', marginBottom: '1.25rem' }}>
                 <h4 style={{ margin: '0 0 0.85rem 0', fontSize: '0.85rem', color: '#0f172a', fontWeight: 800 }}>Lịch Sử Duyệt</h4>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-                  {selectedPO.statusHistory.map((h, idx) => {
+                  {approvalEntries.map((h, idx) => {
                     const badge = getStatusBadge(h.status);
                     return (
                       <div key={h.id || idx} style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
@@ -2754,7 +2829,8 @@ export default function Purchasing() {
                   })}
                 </div>
               </div>
-            )}
+              );
+            })()}
 
             {/* Action Buttons Footer */}
             <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', borderTop: '1px solid #f1f5f9', paddingTop: '1rem', gap: '0.65rem' }}>

@@ -44,6 +44,28 @@ const STORAGE_KEYS = {
   serialNumbers: 'erp_serials',
 };
 
+// Category.slug (already a short English word, seeded from the scraper's
+// category_slug) -> the short canonical code the rest of the app already uses
+// (Warehouse.jsx's CAT_ALIASES/filter dropdown, the Add/Edit Product forms).
+// Keeps the Kho product-list "Phân Nhóm" column to one short English word
+// instead of the full bilingual category name (e.g. "GPU - Card màn hình"),
+// which was blowing out that column's width.
+const CATEGORY_SLUG_TO_CODE = {
+  cpu: 'CPU',
+  gpu: 'VGA',
+  ram: 'RAM',
+  ram_laptop: 'RAM',
+  ssd: 'STORAGE',
+  hdd: 'STORAGE',
+  mainboard: 'MAINBOARD',
+  case: 'CASE',
+  psu: 'PSU',
+  cooler: 'COOLER',
+  monitor: 'MONITOR',
+  keyboard: 'KEYBOARD',
+  mouse: 'MOUSE',
+};
+
 const loadFromLocalStorage = () => {
   const state = { ...INITIAL_STATE };
   try {
@@ -106,9 +128,44 @@ export const useInventoryStore = create((set, get) => ({
   getInventory: async () => {
     try {
       set({ error: null });
-      const data = await api.get('/inventory');
-      const inventory = Array.isArray(data) ? data : (data?.data || []);
-      
+      // The real backend route is /warehouse/inventory (see warehouse.routes.js) —
+      // plain /inventory doesn't exist and always 404'd, so this never actually
+      // synced with the DB. Every consumer of `inventory` (stock tables, GRN
+      // intake, low-stock checks) silently fell back to whatever was last cached
+      // in localStorage, which is why on-hand quantities looked frozen even after
+      // QA passed and the warehouse validated a receipt (which does correctly
+      // write Inventory.quantityOnHand / Product.stockQuantity server-side).
+      // The backend already aggregates each product's Inventory rows across every
+      // warehouse into one row (there are 2 real warehouses — HCM + Hà Nội — so
+      // without that every product would otherwise appear twice here, each copy
+      // showing only that warehouse's fractional stock count).
+      const data = await api.get('/warehouse/inventory');
+      const rawRows = Array.isArray(data) ? data : (data?.data || []);
+      // Flatten the backend's aggregated shape ({ productId, quantityOnHand,
+      // locations: [...], product: {...} }) into the flat InventoryItem shape (see
+      // typedef above) that the rest of the app reads directly off `.id` / `.name` / `.stock`.
+      const inventory = rawRows.map(row => ({
+        id: row.productId ?? row.product?.productId ?? row.id,
+        name: row.product?.name || row.name || 'Sản phẩm',
+        category: CATEGORY_SLUG_TO_CODE[row.product?.category?.slug] || row.category || 'STORAGE',
+        stock: row.quantityOnHand ?? row.product?.stockQuantity ?? 0,
+        threshold: row.reorderPoint ?? 5,
+        // Backend `supplierName`: the product's most recent fulfilled-PO supplier if it
+        // has real purchase history, else its catalog default distributor (derived from
+        // supplied_brands in suppliers.json). Genuinely blank only for the ~35% of
+        // seeded brands no supplier record claims to carry — not a fake placeholder.
+        supplier: row.supplierName || '',
+        // WarehouseLocation is zone/shelf/bin, and a product can hold stock in more
+        // than one warehouse — join every assigned shelf into one string, matching
+        // the literal 'Chưa xếp kệ' sentinel the location filter compares against.
+        location: Array.isArray(row.locations) && row.locations.length > 0
+          ? row.locations.map(l => `${l.zone}-${l.shelf}-${l.bin}`).join(', ')
+          : 'Chưa xếp kệ',
+        price: row.product?.price ?? row.price ?? 0,
+        available: row.product?.available ?? true,
+        status: row.product?.status || 'ACTIVE',
+      }));
+
       set({ inventory });
       try {
         localStorage.setItem(STORAGE_KEYS.inventory, JSON.stringify(inventory));

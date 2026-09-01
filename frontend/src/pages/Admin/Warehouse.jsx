@@ -1509,8 +1509,11 @@ export default function Warehouse() {
   const [showAddProduct, setShowAddProduct] = useState(false);
   const [newProdForm, setNewProdForm] = useState({ name: '', category: 'CPU', stock: '', price: '', supplier: 'Intel Vietnam', threshold: '5', location: 'ZONE-A/SHELF-01/BIN-01' });
 
-  // Edit Product Modal
+  // Edit Product Modal — opened either read-only (clicking the product name: "xem chi
+  // tiết") or editable (the Hành Động button, managers only: "chỉnh sửa"). Same modal,
+  // gated by this flag so the two entry points don't collide.
   const [editingProd, setEditingProd] = useState(null);
+  const [productViewOnly, setProductViewOnly] = useState(false);
 
   // RFQ Modal States
   const [lowStockRfqModalData, setLowStockRfqModalData] = useState(null);
@@ -1605,7 +1608,23 @@ export default function Warehouse() {
           api.get('/warehouse/stock-movements?limit=50')
         ]);
         if (receiptsRes?.success) apiReceipts = receiptsRes.data || [];
-        if (movementsRes?.success && movementsRes.data?.length > 0) setStockMovements(movementsRes.data);
+        if (movementsRes?.success && movementsRes.data?.length > 0) {
+          // Backend rows use referenceId/product.name/createdAt/createdBy —
+          // normalize to the flat {reference, productName, timestamp, actor}
+          // shape the history table/detail modal actually read, otherwise
+          // every real movement renders with blank product/date/reference.
+          const normalizedMovements = movementsRes.data.map(m => ({
+            id: m.id,
+            type: m.type,
+            reference: m.referenceId || m.reference || '—',
+            productName: m.product?.name || m.productName || m.productId || '—',
+            quantity: m.quantity,
+            timestamp: m.createdAt || m.timestamp,
+            actor: m.createdBy || m.actor || 'Thủ Kho',
+            note: m.note
+          }));
+          setStockMovements(normalizedMovements);
+        }
       } catch (e) {
         console.warn('API fallback:', e);
       }
@@ -1734,7 +1753,6 @@ export default function Warehouse() {
       }
 
       const targetItems = receipt.po?.items || receipt.items || [];
-      const updatedInventory = [...inventory];
       const newMovements = [...effectiveStockMovements];
 
       targetItems.forEach(item => {
@@ -1742,22 +1760,6 @@ export default function Warehouse() {
         if (qaLog && qaLog.passedQty !== undefined) {
           if (targetItems.length === 1) intakeQty = Number(qaLog.passedQty);
           else intakeQty = Math.round(intakeQty * (Number(qaLog.passedQty) / (Number(qaLog.totalQty) || 1)));
-        }
-
-        const invIdx = updatedInventory.findIndex(inv => inv.id === item.productId || inv.name === item.name || inv.name === item.productName);
-        if (invIdx !== -1) {
-          updatedInventory[invIdx].stock += intakeQty;
-        } else {
-          updatedInventory.push({
-            id: item.productId || Date.now(),
-            name: item.name || item.productName || 'Sản phẩm mới',
-            category: item.category || 'STORAGE',
-            stock: intakeQty,
-            price: item.unitCost || item.unitPrice || 1000000,
-            supplier: receipt.po?.supplier?.name || 'Nhà cung cấp',
-            threshold: 5,
-            location: 'ZONE-A/SHELF-01/BIN-01'
-          });
         }
 
         newMovements.unshift({
@@ -1772,7 +1774,13 @@ export default function Warehouse() {
         });
       });
 
-      setInventory(updatedInventory);
+      // Re-pull authoritative on-hand quantities from the DB (the backend
+      // transaction above already incremented Inventory.quantityOnHand /
+      // Product.stockQuantity) instead of hand-recomputing them client-side —
+      // that recompute used to key inventory rows by an id/name shape that
+      // never matched the real store data, so the table kept showing stale
+      // pre-intake numbers even though the receipt was validated successfully.
+      try { await useInventoryStore.getState().getInventory(); } catch (_) {}
       setStockMovements(newMovements);
 
       const updatedReceipts = receipts.map(r => r.id === receipt.id ? { ...r, status: 'DONE' } : r);
@@ -2074,7 +2082,7 @@ export default function Warehouse() {
   const handleEditProductSubmit = (e) => {
     if (e && e.preventDefault) e.preventDefault();
     if (!editingProd) return;
-    if (!isManager) {
+    if (!isManager || productViewOnly) {
       notify('Bạn không có quyền chỉnh sửa thông tin sản phẩm.', 'error');
       return;
     }
@@ -4303,17 +4311,17 @@ export default function Warehouse() {
 
           {/* Inventory Table */}
           <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', overflow: 'hidden' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.83rem' }}>
+            <table style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse', fontSize: '0.83rem' }}>
               <thead>
                 <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569' }}>
-                  <th style={{ padding: '0.75rem 1rem' }}>Tên Sản Phẩm</th>
-                  <th style={{ padding: '0.75rem 0.85rem', whiteSpace: 'nowrap' }}>Phân Nhóm</th>
-                  <th style={{ padding: '0.75rem 0.85rem', whiteSpace: 'nowrap' }}>Nhà Cung Cấp</th>
-                  <th style={{ padding: '0.75rem 0.85rem', textAlign: 'center', whiteSpace: 'nowrap' }}>Vị Trí Kệ</th>
-                  <th style={{ padding: '0.75rem 0.85rem', textAlign: 'center', whiteSpace: 'nowrap' }}>Tồn Hiện Tại</th>
-                  <th style={{ padding: '0.75rem 0.85rem', textAlign: 'center', whiteSpace: 'nowrap' }}>Trạng Thái</th>
-                  <th style={{ padding: '0.75rem 1rem', textAlign: 'right', whiteSpace: 'nowrap' }}>Đơn Giá</th>
-                  <th style={{ padding: '0.75rem 1rem', textAlign: 'center', whiteSpace: 'nowrap' }}>Hành Động</th>
+                  <th style={{ width: '23%', padding: '0.75rem 1rem' }}>Tên Sản Phẩm</th>
+                  <th style={{ width: '8%', padding: '0.75rem 0.85rem' }}>Phân Nhóm</th>
+                  <th style={{ width: '16%', padding: '0.75rem 0.85rem' }}>Nhà Cung Cấp</th>
+                  <th style={{ width: '13%', padding: '0.75rem 0.85rem', textAlign: 'center' }}>Vị Trí Kệ</th>
+                  <th style={{ width: '8%', padding: '0.75rem 0.85rem', textAlign: 'center', whiteSpace: 'nowrap' }}>Tồn Hiện Tại</th>
+                  <th style={{ width: '10%', padding: '0.75rem 0.85rem', textAlign: 'center', whiteSpace: 'nowrap' }}>Trạng Thái</th>
+                  <th style={{ width: '10%', padding: '0.75rem 1rem', textAlign: 'right', whiteSpace: 'nowrap' }}>Đơn Giá</th>
+                  <th style={{ width: '12%', padding: '0.75rem 1rem', textAlign: 'center', whiteSpace: 'nowrap' }}>Hành Động</th>
                 </tr>
               </thead>
               <tbody>
@@ -4332,10 +4340,16 @@ export default function Warehouse() {
 
                     return (
                       <tr key={p.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ padding: '0.75rem 1rem', fontWeight: 700, color: '#0f172a' }}>{p.name}</td>
-                        <td style={{ padding: '0.75rem 0.85rem', color: '#475569', fontWeight: 600, whiteSpace: 'nowrap' }}>{p.category}</td>
-                        <td style={{ padding: '0.75rem 0.85rem', color: '#64748b', whiteSpace: 'nowrap' }}>{p.supplier || 'Chưa rõ'}</td>
-                        <td style={{ padding: '0.75rem 0.85rem', textAlign: 'center', color: '#334155', whiteSpace: 'nowrap' }}>{p.location || 'Chưa xếp'}</td>
+                        <td
+                          title={`${p.name} — Nhấn để xem chi tiết`}
+                          onClick={() => { setEditingProd(p); setProductViewOnly(true); }}
+                          style={{ padding: '0.75rem 1rem', fontWeight: 700, color: '#2563eb', cursor: 'pointer', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                        >
+                          {p.name}
+                        </td>
+                        <td title={p.category} style={{ padding: '0.75rem 0.85rem', color: '#475569', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.category}</td>
+                        <td title={p.supplier || ''} style={{ padding: '0.75rem 0.85rem', color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.supplier || 'Chưa rõ'}</td>
+                        <td title={p.location || ''} style={{ padding: '0.75rem 0.85rem', textAlign: 'center', color: '#334155', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.location || 'Chưa xếp'}</td>
                         <td style={{ padding: '0.75rem 0.85rem', textAlign: 'center', fontWeight: 800, whiteSpace: 'nowrap', color: isOutOfStock ? '#dc2626' : (isLowStock ? '#d97706' : '#0f172a') }}>
                           {stockNum}
                         </td>
@@ -4384,16 +4398,18 @@ export default function Warehouse() {
                         <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 700, color: '#16a34a', whiteSpace: 'nowrap' }}>
                           {safeFormatPrice(p.price)}
                         </td>
-                        <td style={{ padding: '0.75rem 1rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                        <td style={{ padding: '0.75rem 0.5rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
                           <button
-                            onClick={() => setEditingProd(p)}
+                            onClick={() => { setEditingProd(p); setProductViewOnly(false); }}
                             style={{
+                              width: '100%',
+                              boxSizing: 'border-box',
                               backgroundColor: '#ffffff',
                               color: '#2563eb',
                               border: '1px solid #cbd5e1',
                               borderRadius: '4px',
-                              padding: '0.3rem 0.65rem',
-                              fontSize: '0.75rem',
+                              padding: '0.3rem 0.4rem',
+                              fontSize: '0.72rem',
                               fontWeight: 700,
                               cursor: 'pointer'
                             }}
@@ -4780,93 +4796,142 @@ export default function Warehouse() {
         </div>
       )}
 
-      {/* Enhanced Edit Product Modal */}
-      {editingProd && (
+      {/* Enhanced Edit Product Modal — read-only ("Xem Chi Tiết", opened from the
+          product name) unless the viewer is a manager AND explicitly chose to edit
+          (the Hành Động button, or the "Chỉnh Sửa" button inside the read-only view). */}
+      {editingProd && (() => {
+        const isReadOnlyView = !isManager || productViewOnly;
+        const closeModal = () => { setEditingProd(null); setProductViewOnly(false); };
+        const stockNum = Number(editingProd.stock) || 0;
+        const threshNum = Number(editingProd.threshold || 5);
+        const stockBadge = stockNum === 0
+          ? { label: 'Hết hàng', color: '#dc2626', bg: '#fef2f2', border: '#fecaca' }
+          : stockNum <= threshNum
+            ? { label: 'Cảnh báo tồn', color: '#b45309', bg: '#fffbeb', border: '#fde68a' }
+            : { label: 'Còn hàng', color: '#15803d', bg: '#f0fdf4', border: '#bbf7d0' };
+        // Plain label/value row for the simple read-only detail view — not a form
+        // field, just static text, so this reads as "product info" rather than an
+        // edit form with its inputs greyed out.
+        const infoRow = (label, value) => (
+          <div key={label}>
+            <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.03em', marginBottom: '0.3rem' }}>{label}</div>
+            <div style={{ fontSize: '0.92rem', fontWeight: 700, color: '#0f172a' }}>{value}</div>
+          </div>
+        );
+        return (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.65)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000, padding: '1rem' }}>
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', maxWidth: '640px', width: '100%', border: '1px solid #cbd5e1', overflow: 'hidden', boxShadow: '0 20px 40px rgba(0,0,0,0.2)' }}>
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', maxWidth: '560px', width: '100%', border: '1px solid #cbd5e1', overflow: 'hidden', boxShadow: '0 20px 40px rgba(0,0,0,0.2)' }}>
             <div style={{ padding: '1.25rem 1.5rem', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
-                <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#0f172a' }}>{isManager ? 'Chỉnh Sửa Thông Tin Sản Phẩm' : 'Chi Tiết Sản Phẩm (Chỉ Xem)'}</h3>
+                <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#0f172a' }}>{isReadOnlyView ? 'Thông Tin Sản Phẩm' : 'Chỉnh Sửa Thông Tin Sản Phẩm'}</h3>
                 <span style={{ fontSize: '0.78rem', color: '#64748b' }}>Mã định danh: <strong style={{ color: '#2563eb' }}>#{editingProd.id}</strong></span>
               </div>
-              <button onClick={() => setEditingProd(null)} style={{ background: 'none', border: '1px solid #cbd5e1', borderRadius: '4px', padding: '0.2rem 0.6rem', cursor: 'pointer', color: '#475569', fontWeight: 600 }}>Đóng</button>
+              <button onClick={closeModal} style={{ background: 'none', border: '1px solid #cbd5e1', borderRadius: '4px', padding: '0.2rem 0.6rem', cursor: 'pointer', color: '#475569', fontWeight: 600 }}>Đóng</button>
             </div>
-            <form onSubmit={handleEditProductSubmit} style={{ padding: '1.5rem' }}>
-              {!isManager && (
-                <div style={{ backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '8px', padding: '0.65rem 0.9rem', marginBottom: '1.1rem', display: 'flex', alignItems: 'center', gap: '0.6rem', fontSize: '0.78rem', color: '#1e40af', fontWeight: 600 }}>
-                  <AlertCircle size={15} style={{ flexShrink: 0 }} />
-                  Bạn chỉ có quyền xem — chỉ Quản Lý Kho mới được chỉnh sửa giá/tồn kho/vị trí.
-                </div>
-              )}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem', marginBottom: '1.5rem' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.35rem' }}>Tên Linh Kiện / Sản Phẩm *</label>
-                  <input type="text" required disabled={!isManager} value={editingProd.name || ''} onChange={(e) => setEditingProd({ ...editingProd, name: e.target.value })} style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.85rem', border: '1px solid #cbd5e1', borderRadius: '6px', backgroundColor: isManager ? '#ffffff' : '#f8fafc', color: isManager ? '#0f172a' : '#475569' }} />
-                </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+            {isReadOnlyView ? (
+              // Simple read-only detail card — plain text, no form controls.
+              <div style={{ padding: '1.5rem' }}>
+                <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0f172a', marginBottom: '1.1rem' }}>{editingProd.name}</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.1rem', marginBottom: '1.1rem' }}>
+                  {infoRow('Phân Nhóm', editingProd.category)}
+                  {infoRow('Nhà Cung Cấp', editingProd.supplier || 'Chưa rõ')}
+                  {infoRow('Vị Trí Kệ', editingProd.location || 'Chưa xếp kệ')}
+                  {infoRow('Đơn Giá Niêm Yết', safeFormatPrice(editingProd.price))}
+                  {infoRow('Ngưỡng An Toàn', `${threshNum} sản phẩm`)}
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.35rem' }}>Phân Nhóm Danh Mục</label>
-                    <select disabled={!isManager} value={editingProd.category || 'CPU'} onChange={(e) => setEditingProd({ ...editingProd, category: e.target.value })} style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px', backgroundColor: isManager ? '#ffffff' : '#f8fafc', color: isManager ? '#0f172a' : '#475569' }}>
-                      <option value="CPU">CPU</option>
-                      <option value="VGA">VGA</option>
-                      <option value="MAINBOARD">Mainboard</option>
-                      <option value="RAM">RAM</option>
-                      <option value="STORAGE">Storage</option>
-                      <option value="PSU">PSU</option>
-                      <option value="CASE">Case</option>
-                      <option value="COOLER">Tản nhiệt (Cooler)</option>
-                      <option value="MONITOR">Màn hình</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.35rem' }}>Nhà Cung Cấp</label>
-                    <select disabled={!isManager} value={editingProd.supplier || 'Intel Vietnam'} onChange={(e) => setEditingProd({ ...editingProd, supplier: e.target.value })} style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px', backgroundColor: isManager ? '#ffffff' : '#f8fafc', color: isManager ? '#0f172a' : '#475569' }}>
-                      {STANDARD_SUPPLIERS.map(s => (
-                        <option key={s} value={s}>{s}</option>
-                      ))}
-                    </select>
+                    <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.03em', marginBottom: '0.3rem' }}>Tồn Kho Hiện Tại</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <span style={{ fontSize: '0.92rem', fontWeight: 700, color: '#0f172a' }}>{stockNum} sản phẩm</span>
+                      <span style={{ fontSize: '0.68rem', fontWeight: 700, padding: '0.15rem 0.5rem', borderRadius: '10px', color: stockBadge.color, backgroundColor: stockBadge.bg, border: `1px solid ${stockBadge.border}` }}>{stockBadge.label}</span>
+                    </div>
                   </div>
                 </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.35rem' }}>Vị Trí Kệ Lưu Kho</label>
-                    <select disabled={!isManager} value={editingProd.location || 'ZONE-A/SHELF-01/BIN-01'} onChange={(e) => setEditingProd({ ...editingProd, location: e.target.value })} style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px', backgroundColor: isManager ? '#ffffff' : '#f8fafc', color: isManager ? '#0f172a' : '#475569' }}>
-                      <option value="Chưa xếp kệ">Chưa xếp kệ</option>
-                      {PREDEFINED_LOCATIONS.map(loc => (
-                        <option key={loc} value={loc}>{loc}</option>
-                      ))}
-                    </select>
+                {!isManager && (
+                  <div style={{ backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '8px', padding: '0.65rem 0.9rem', display: 'flex', alignItems: 'center', gap: '0.6rem', fontSize: '0.78rem', color: '#1e40af', fontWeight: 600 }}>
+                    <AlertCircle size={15} style={{ flexShrink: 0 }} />
+                    Chỉ Quản Lý Kho mới được chỉnh sửa giá/tồn kho/vị trí.
                   </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.35rem' }}>Đơn Giá Niêm Yết (VNĐ)</label>
-                    <input type="number" min="0" disabled={!isManager} value={editingProd.price !== undefined ? editingProd.price : 0} onChange={(e) => setEditingProd({ ...editingProd, price: parseFloat(e.target.value) || 0 })} style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.85rem', fontWeight: 700, color: isManager ? '#16a34a' : '#475569', border: '1px solid #cbd5e1', borderRadius: '6px', backgroundColor: isManager ? '#ffffff' : '#f8fafc' }} />
-                  </div>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.35rem' }}>Số Lượng Tồn Kho Thực Tế</label>
-                    <input type="number" required min="0" disabled={!isManager} value={editingProd.stock !== undefined ? editingProd.stock : 0} onChange={(e) => setEditingProd({ ...editingProd, stock: parseInt(e.target.value, 10) || 0 })} style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.85rem', fontWeight: 700, border: '1px solid #cbd5e1', borderRadius: '6px', backgroundColor: isManager ? '#ffffff' : '#f8fafc', color: isManager ? '#0f172a' : '#475569' }} />
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.35rem' }}>Ngưỡng An Toàn (Threshold)</label>
-                    <input type="number" min="1" disabled={!isManager} value={editingProd.threshold || 5} onChange={(e) => setEditingProd({ ...editingProd, threshold: parseInt(e.target.value, 10) || 5 })} style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.85rem', border: '1px solid #cbd5e1', borderRadius: '6px', backgroundColor: isManager ? '#ffffff' : '#f8fafc', color: isManager ? '#0f172a' : '#475569' }} />
-                  </div>
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', borderTop: '1px solid #e2e8f0', paddingTop: '1rem' }}>
-                <button type="button" onClick={() => setEditingProd(null)} style={{ padding: '0.5rem 1.15rem', fontSize: '0.82rem', fontWeight: 600, border: '1px solid #cbd5e1', borderRadius: '6px', background: '#ffffff', color: '#475569', cursor: 'pointer' }}>{isManager ? 'Hủy bỏ' : 'Đóng'}</button>
-                {isManager && (
-                  <button type="button" onClick={handleEditProductSubmit} style={{ padding: '0.5rem 1.35rem', fontSize: '0.82rem', border: 'none', borderRadius: '6px', background: '#2563eb', color: '#ffffff', fontWeight: 700, cursor: 'pointer' }}>Lưu Cập Nhật</button>
                 )}
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', borderTop: '1px solid #e2e8f0', paddingTop: '1rem', marginTop: '1.1rem' }}>
+                  <button type="button" onClick={closeModal} style={{ padding: '0.5rem 1.15rem', fontSize: '0.82rem', fontWeight: 600, border: '1px solid #cbd5e1', borderRadius: '6px', background: '#ffffff', color: '#475569', cursor: 'pointer' }}>Đóng</button>
+                  {isManager && (
+                    <button type="button" onClick={() => setProductViewOnly(false)} style={{ padding: '0.5rem 1.35rem', fontSize: '0.82rem', border: 'none', borderRadius: '6px', background: '#2563eb', color: '#ffffff', fontWeight: 700, cursor: 'pointer' }}>Chỉnh Sửa</button>
+                  )}
+                </div>
               </div>
-            </form>
+            ) : (
+              // Edit form — only reachable by a manager who explicitly chose to edit.
+              <form onSubmit={handleEditProductSubmit} style={{ padding: '1.5rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem', marginBottom: '1.5rem' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.35rem' }}>Tên Linh Kiện / Sản Phẩm *</label>
+                    <input type="text" required value={editingProd.name || ''} onChange={(e) => setEditingProd({ ...editingProd, name: e.target.value })} style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.85rem', border: '1px solid #cbd5e1', borderRadius: '6px', backgroundColor: '#ffffff', color: '#0f172a' }} />
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.35rem' }}>Phân Nhóm Danh Mục</label>
+                      <select value={editingProd.category || 'CPU'} onChange={(e) => setEditingProd({ ...editingProd, category: e.target.value })} style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px', backgroundColor: '#ffffff', color: '#0f172a' }}>
+                        <option value="CPU">CPU</option>
+                        <option value="VGA">VGA</option>
+                        <option value="MAINBOARD">Mainboard</option>
+                        <option value="RAM">RAM</option>
+                        <option value="STORAGE">Storage</option>
+                        <option value="PSU">PSU</option>
+                        <option value="CASE">Case</option>
+                        <option value="COOLER">Tản nhiệt (Cooler)</option>
+                        <option value="MONITOR">Màn hình</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.35rem' }}>Nhà Cung Cấp</label>
+                      <select value={editingProd.supplier || 'Intel Vietnam'} onChange={(e) => setEditingProd({ ...editingProd, supplier: e.target.value })} style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px', backgroundColor: '#ffffff', color: '#0f172a' }}>
+                        {STANDARD_SUPPLIERS.map(s => (
+                          <option key={s} value={s}>{s}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.35rem' }}>Vị Trí Kệ Lưu Kho</label>
+                      <select value={editingProd.location || 'ZONE-A/SHELF-01/BIN-01'} onChange={(e) => setEditingProd({ ...editingProd, location: e.target.value })} style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px', backgroundColor: '#ffffff', color: '#0f172a' }}>
+                        <option value="Chưa xếp kệ">Chưa xếp kệ</option>
+                        {PREDEFINED_LOCATIONS.map(loc => (
+                          <option key={loc} value={loc}>{loc}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.35rem' }}>Đơn Giá Niêm Yết (VNĐ)</label>
+                      <input type="number" min="0" value={editingProd.price !== undefined ? editingProd.price : 0} onChange={(e) => setEditingProd({ ...editingProd, price: parseFloat(e.target.value) || 0 })} style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.85rem', fontWeight: 700, color: '#16a34a', border: '1px solid #cbd5e1', borderRadius: '6px', backgroundColor: '#ffffff' }} />
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.35rem' }}>Số Lượng Tồn Kho Thực Tế</label>
+                      <input type="number" required min="0" value={editingProd.stock !== undefined ? editingProd.stock : 0} onChange={(e) => setEditingProd({ ...editingProd, stock: parseInt(e.target.value, 10) || 0 })} style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.85rem', fontWeight: 700, border: '1px solid #cbd5e1', borderRadius: '6px', backgroundColor: '#ffffff', color: '#0f172a' }} />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.35rem' }}>Ngưỡng An Toàn (Threshold)</label>
+                      <input type="number" min="1" value={editingProd.threshold || 5} onChange={(e) => setEditingProd({ ...editingProd, threshold: parseInt(e.target.value, 10) || 5 })} style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.85rem', border: '1px solid #cbd5e1', borderRadius: '6px', backgroundColor: '#ffffff', color: '#0f172a' }} />
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', borderTop: '1px solid #e2e8f0', paddingTop: '1rem' }}>
+                  <button type="button" onClick={closeModal} style={{ padding: '0.5rem 1.15rem', fontSize: '0.82rem', fontWeight: 600, border: '1px solid #cbd5e1', borderRadius: '6px', background: '#ffffff', color: '#475569', cursor: 'pointer' }}>Hủy bỏ</button>
+                  <button type="button" onClick={handleEditProductSubmit} style={{ padding: '0.5rem 1.35rem', fontSize: '0.82rem', border: 'none', borderRadius: '6px', background: '#2563eb', color: '#ffffff', fontWeight: 700, cursor: 'pointer' }}>Lưu Cập Nhật</button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* Order Detail Modal */}
       {selectedOrderForDetail && (
@@ -5377,17 +5442,20 @@ export default function Warehouse() {
                       }
 
                       // Lưu log điều chuyển kho
+                      const toLocationLabel = returnShelfLocation === 'SHELF_A1_RESTOCK' ? 'Kệ A1 (Tồn Kho Bán Mới)' : returnShelfLocation === 'SHELF_B3_OUTLET' ? 'Kệ B3 (Thanh Lý Outlet)' : returnShelfLocation === 'SHELF_C2_VENDOR' ? 'Kệ C2 (Chờ Gửi Hãng)' : 'Kệ D (Kho Lỗi Phế Phẩm)';
                       const newLog = {
                         id: `MOV-RET-${Date.now().toString().slice(-4)}`,
-                        type: isScrap ? 'SCRAP_INBOUND' : isVendor ? 'VENDOR_WARRANTY' : 'RETURN_RESTOCK',
-                        orderId: ordId,
+                        // History table/modal only render IN/OUT badges — a
+                        // return being shelved is physically an inbound
+                        // movement regardless of the RMA sub-reason, which
+                        // stays visible in the note instead.
+                        type: 'IN',
+                        reference: `RMA-${ordId}`,
                         productName: prodName,
                         quantity: 1,
-                        fromLocation: 'Khu Vực Tiếp Nhận Trả Hàng',
-                        toLocation: returnShelfLocation === 'SHELF_A1_RESTOCK' ? 'Kệ A1 (Tồn Kho Bán Mới)' : returnShelfLocation === 'SHELF_B3_OUTLET' ? 'Kệ B3 (Thanh Lý Outlet)' : returnShelfLocation === 'SHELF_C2_VENDOR' ? 'Kệ C2 (Chờ Gửi Hãng)' : 'Kệ D (Kho Lỗi Phế Phẩm)',
                         timestamp: new Date().toISOString(),
-                        performedBy: 'Thủ Kho (Lê Văn C)',
-                        note: returnProcessNote || 'Đã phân luồng vị trí kệ kho'
+                        actor: user?.fullname || 'Thủ Kho',
+                        note: `${returnProcessNote || 'Đã phân luồng vị trí kệ kho'} — Từ Khu Vực Tiếp Nhận Trả Hàng đến ${toLocationLabel} (${isScrap ? 'Phế phẩm' : isVendor ? 'Bảo hành hãng' : 'Nhập lại kho bán'})`
                       };
                       const updatedMovements = [newLog, ...stockMovements];
                       setStockMovements(updatedMovements);
