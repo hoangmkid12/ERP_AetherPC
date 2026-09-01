@@ -134,15 +134,18 @@ export default function Accountant() {
     ? payrolls.reduce((sum, p) => sum + (Number(p.netSalary || 0) || 0), 0)
     : employees.reduce((s, e) => s + (Number(e.salary || e.baseSalary || 8500000) || 8500000), 0);
 
-  // Giá vốn hàng bán (COGS) = tổng số tiền hóa đơn NCC thật (VendorBill.amountTotal,
-  // đã điều chỉnh theo tỷ lệ nghiệm thu QC) trên các đơn mua đã nhập kho — KHÔNG
-  // phải "số PO chưa thanh toán" như trước đây. Trước đây dùng unpaidPOAmount cho
-  // COGS khiến lợi nhuận sai hẳn bản chất: nếu NCC đã được trả hết, COGS hiện = 0
-  // dù hàng vẫn có giá vốn thật; ngược lại một đơn lớn chưa trả sẽ đội COGS ảo lên
-  // dù hàng chưa chắc đã bán ra.
-  const cogsAmount = effectivePOs
-    .flatMap(po => po.bills || [])
-    .reduce((sum, bill) => sum + (Number(bill.amountTotal || 0) || 0), 0);
+  // Giá vốn hàng bán (COGS) = tổng các bút toán COGS thật do backend tự ghi mỗi
+  // khi một đơn hàng thực sự xuất kho (referenceId `COGS-{orderId}`), tính theo
+  // giá bình quân gia quyền (Product.averageCost) tại thời điểm bán — xem
+  // orderApprovalService.js / order.controller.js. KHÔNG dùng tổng tiền mua NCC
+  // (VendorBill.amountTotal) như trước — đó là chi phí NHẬP hàng trong kỳ, không
+  // phải chi phí của phần hàng đã thực sự BÁN ra trong kỳ (mua 1000 SP, bán 10 SP
+  // vẫn chỉ tính giá vốn cho 10 SP đã bán). Đơn bị hủy/giao thất bại sẽ tự động bị
+  // xóa bút toán COGS tương ứng (xem updateOrderStatus), khớp với việc doanh thu
+  // của đơn đó cũng bị loại khỏi totalRevenue.
+  const cogsAmount = (ledger || [])
+    .filter(tx => tx && tx.type === 'EXPENSE' && typeof tx.referenceId === 'string' && tx.referenceId.startsWith('COGS-'))
+    .reduce((sum, tx) => sum + (Number(tx.amount || 0) || 0), 0);
 
   // Chi phí vận hành = các bút toán chi thủ công thật (Thêm Phiếu Thu/Chi) — nhận
   // diện qua việc không có referenceId (mọi bút toán hệ thống tự ghi — thanh toán
@@ -177,7 +180,7 @@ export default function Accountant() {
 
   // Chart 1: Income vs Expense Doughnut
   const cashFlowChartData = {
-    labels: ['Doanh Thu Bán Hàng', 'Giá Vốn Hàng Bán (NCC)', 'Chi Lương Nhân Sự', 'Chi Phí Vận Hành Khác'],
+    labels: ['Doanh Thu Bán Hàng', 'Giá Vốn Hàng Bán (COGS)', 'Chi Lương Nhân Sự', 'Chi Phí Vận Hành Khác'],
     datasets: [
       {
         data: [
@@ -1295,7 +1298,7 @@ export default function Accountant() {
               </div>
 
               <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'baseline', gap: '0.5rem', padding: '0.75rem', backgroundColor: '#fef2f2', borderRadius: '6px', border: '1px solid #fecaca' }}>
-                <strong style={{ color: '#dc2626', flex: '1 1 260px', minWidth: 0 }}>2. GIÁ VỐN HÀNG BÁN & MUA LINH KIỆN (COGS):</strong>
+                <strong style={{ color: '#dc2626', flex: '1 1 260px', minWidth: 0 }}>2. GIÁ VỐN HÀNG BÁN (COGS):</strong>
                 <strong style={{ color: '#dc2626', fontSize: '1rem', whiteSpace: 'nowrap' }}>- {fmt(cogsAmount)}</strong>
               </div>
 

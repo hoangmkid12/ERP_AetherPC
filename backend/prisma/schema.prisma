@@ -57,6 +57,11 @@ model Product {
   productType     String?          @map("product_type") @db.VarChar(100)
   descriptionText String?          @map("description_text")
   price           Decimal          @default(0.00) @db.Decimal(15, 2)
+  // Running weighted-average unit cost ("bình quân gia quyền") — blended on every
+  // GRN intake from the PO's real unitCost (see utils/inventoryCosting.js), and
+  // consumed at sale time to record actual COGS instead of listing price or total
+  // NCC purchase spend.
+  averageCost     Decimal          @default(0.00) @map("average_cost") @db.Decimal(15, 2)
   originalPrice   Decimal          @default(0.00) @map("original_price") @db.Decimal(15, 2)
   discountPercent Decimal?         @default(0.00) @map("discount_percent") @db.Decimal(5, 2)
   currency        String?          @default("VND") @db.VarChar(10)

@@ -1,4 +1,5 @@
 const prisma = require('../config/database');
+const { computeBlendedAverageCost } = require('../utils/inventoryCosting');
 
 // GET /api/v1/warehouse/receipts
 // Lấy danh sách phiếu nhận hàng (GoodsReceipt) kèm thông tin PO, items, product
@@ -100,6 +101,9 @@ const getReceiptById = async (req, res, next) => {
 const validateReceipt = async (req, res, next) => {
   try {
     const { id } = req.params;
+    // { [productId]: string[] } — one Serial Number per unit being received for
+    // that line. Required for every category (see utils/serialAllocation.js).
+    const serials = req.body?.serials || {};
     const receivedBy = req.user ? req.user.email || req.user.code || 'Warehouse Staff' : 'Warehouse Staff';
 
     const updatedReceipt = await prisma.$transaction(async (tx) => {
@@ -149,6 +153,19 @@ const validateReceipt = async (req, res, next) => {
         const intakeQty = po.status === 'QA_PARTIAL' ? Math.round(item.quantity * passRatio) : item.quantity;
         if (intakeQty <= 0) continue;
 
+        // Serial Number bắt buộc cho mọi linh kiện nhập kho.
+        const itemSerials = Array.isArray(serials[item.productId]) ? serials[item.productId].map(s => String(s).trim()).filter(Boolean) : [];
+        if (itemSerials.length !== intakeQty) {
+          const error = new Error(`Sản phẩm ${item.productId}: cần quét đủ ${intakeQty} Serial Number, hiện có ${itemSerials.length}.`);
+          error.statusCode = 400;
+          throw error;
+        }
+        if (new Set(itemSerials).size !== itemSerials.length) {
+          const error = new Error(`Sản phẩm ${item.productId}: danh sách Serial Number có mã bị trùng lặp.`);
+          error.statusCode = 400;
+          throw error;
+        }
+
         const inventory = await tx.inventory.findFirst({
           where: { productId: item.productId, warehouseId: receipt.receivedWarehouseId }
         });
@@ -185,11 +202,35 @@ const validateReceipt = async (req, res, next) => {
           }
         });
 
-        // Update product stock quantity
+        // Blend this intake's real PO unit cost into the product's running
+        // weighted-average cost (VAS "bình quân gia quyền") before applying the
+        // increment — this is what lets a sale later record real COGS instead of
+        // total NCC purchase spend being mistaken for cost of goods sold.
+        const currentProduct = await tx.product.findUnique({
+          where: { productId: item.productId },
+          select: { stockQuantity: true, averageCost: true }
+        });
+        const newAverageCost = computeBlendedAverageCost(
+          currentProduct?.stockQuantity || 0,
+          Number(currentProduct?.averageCost || 0),
+          intakeQty,
+          Number(item.unitCost) || 0
+        );
+
         await tx.product.update({
           where: { productId: item.productId },
-          data: { stockQuantity: { increment: intakeQty } }
+          data: { stockQuantity: { increment: intakeQty }, averageCost: newAverageCost }
         });
+
+        try {
+          await tx.serialNumber.createMany({
+            data: itemSerials.map(serial => ({ serial, productId: item.productId, status: 'AVAILABLE' }))
+          });
+        } catch (e) {
+          const error = new Error(`Sản phẩm ${item.productId}: một trong các Serial Number đã tồn tại trong hệ thống (trùng với lô hàng khác).`);
+          error.statusCode = 409;
+          throw error;
+        }
       }
 
       await tx.purchaseOrder.update({
@@ -364,7 +405,7 @@ const getInventory = async (req, res, next) => {
 // này ở frontend chỉ ghi localStorage, không có route nào chạm tới CSDL thật.
 const adjustInventory = async (req, res, next) => {
   try {
-    const { productId, quantity, warehouseId, location, reason, note, refCode } = req.body;
+    const { productId, quantity, warehouseId, location, reason, note, refCode, serials } = req.body;
     const qty = parseInt(quantity, 10);
     const whId = parseInt(warehouseId, 10) || 1;
     const actor = req.user?.fullname || req.user?.email || req.user?.code || 'Thủ Kho';
@@ -373,11 +414,31 @@ const adjustInventory = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'Cần chọn sản phẩm và số lượng nhập là số nguyên dương.' });
     }
 
+    // Serial Number bắt buộc cho mọi lượt nhập kho, kể cả nhập trực tiếp/kiểm kê
+    // ngoài PO — nếu không, số serial khả dụng sẽ lệch dần khỏi stockQuantity thật.
+    const itemSerials = Array.isArray(serials) ? serials.map(s => String(s).trim()).filter(Boolean) : [];
+    if (itemSerials.length !== qty) {
+      return res.status(400).json({ success: false, message: `Cần quét đủ ${qty} Serial Number, hiện có ${itemSerials.length}.` });
+    }
+    if (new Set(itemSerials).size !== itemSerials.length) {
+      return res.status(400).json({ success: false, message: 'Danh sách Serial Number có mã bị trùng lặp.' });
+    }
+
     const result = await prisma.$transaction(async (tx) => {
       const product = await tx.product.findUnique({ where: { productId: String(productId) } });
       if (!product) {
         const err = new Error(`Không tìm thấy sản phẩm với mã: ${productId}`);
         err.statusCode = 404;
+        throw err;
+      }
+
+      try {
+        await tx.serialNumber.createMany({
+          data: itemSerials.map(serial => ({ serial, productId: product.productId, status: 'AVAILABLE' }))
+        });
+      } catch (e) {
+        const err = new Error('Một trong các Serial Number đã tồn tại trong hệ thống.');
+        err.statusCode = 409;
         throw err;
       }
 

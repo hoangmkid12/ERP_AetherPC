@@ -1109,7 +1109,7 @@ function RfqAlertModal({ rfqModalData, setRfqModalData, sendSystemNotification, 
 }
 
 // ──── Sub-Component: Receipt Detail Modal ────
-function ReceiptDetailModal({ selectedReceipt, onClose, purchaseOrders = [], handleValidateReceipt, submitting, formatPrice }) {
+function ReceiptDetailModal({ selectedReceipt, onClose, purchaseOrders = [], onRequestValidate, submitting, formatPrice }) {
   if (!selectedReceipt) return null;
 
   const safeFormatPrice = (val) => formatPrice ? formatPrice(val) : (val || 0).toLocaleString('vi-VN') + ' VNĐ';
@@ -1180,7 +1180,7 @@ function ReceiptDetailModal({ selectedReceipt, onClose, purchaseOrders = [], han
             <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
               {selectedReceipt.status === 'READY' && (
                 <button
-                  onClick={() => handleValidateReceipt(selectedReceipt, poStatus)}
+                  onClick={() => onRequestValidate(selectedReceipt, poStatus, itemsList)}
                   disabled={submitting || !canValidate}
                   style={{ padding: '0.6rem 1.4rem', borderRadius: '6px', fontWeight: 800, fontSize: '0.88rem', backgroundColor: canValidate ? '#2563eb' : '#94a3b8', color: '#ffffff', border: 'none', cursor: canValidate ? 'pointer' : 'not-allowed' }}
                 >
@@ -1388,6 +1388,96 @@ function ReceiptDetailModal({ selectedReceipt, onClose, purchaseOrders = [], han
   );
 }
 
+// Collects one Serial Number per unit being received, per line item, before a GRN
+// intake can be confirmed — the backend (validateReceipt) rejects the request with
+// a 400 if any line's serial count doesn't exactly match its intake quantity.
+function SerialEntryModal({ target, onClose, onConfirm, submitting }) {
+  const items = target.items || [];
+
+  const [rawByProduct, setRawByProduct] = useState(() => {
+    const initial = {};
+    items.forEach(it => { initial[it.productId] = ''; });
+    return initial;
+  });
+
+  const parseSerials = (raw) => (raw || '')
+    .split(/[\n,]/)
+    .map(s => s.trim())
+    .filter(Boolean);
+
+  const parsedByProduct = {};
+  items.forEach(it => { parsedByProduct[it.productId] = parseSerials(rawByProduct[it.productId]); });
+
+  const allSerialsFlat = Object.values(parsedByProduct).flat();
+  const hasGlobalDuplicate = new Set(allSerialsFlat).size !== allSerialsFlat.length;
+
+  const allValid = items.length > 0 && items.every(it => {
+    const need = parseInt(it.quantity) || 0;
+    return parsedByProduct[it.productId].length === need;
+  }) && !hasGlobalDuplicate;
+
+  const genSerialsFor = (item) => {
+    const need = parseInt(item.quantity) || 0;
+    const stamp = Date.now().toString(36).toUpperCase();
+    const list = Array.from({ length: need }, (_, i) => `SN-${item.productId}-${stamp}-${String(i + 1).padStart(3, '0')}`);
+    setRawByProduct(prev => ({ ...prev, [item.productId]: list.join('\n') }));
+  };
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.7)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10001, padding: '1rem' }}>
+      <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', maxWidth: '640px', width: '100%', maxHeight: '88vh', border: '1px solid #cbd5e1', overflow: 'hidden', boxShadow: '0 20px 40px rgba(0,0,0,0.25)', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ padding: '1.1rem 1.5rem', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+          <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#0f172a' }}>Quét / Nhập Serial Number</h3>
+          <p style={{ margin: '0.3rem 0 0 0', fontSize: '0.8rem', color: '#64748b' }}>
+            Mỗi đơn vị nhập kho phải có 1 Serial Number riêng để truy vết bảo hành — mỗi dòng textarea là 1 mã (hoặc dán danh sách cách nhau bằng dấu phẩy).
+          </p>
+        </div>
+
+        <div style={{ padding: '1.25rem 1.5rem', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          {items.map(item => {
+            const need = parseInt(item.quantity) || 0;
+            const got = parsedByProduct[item.productId]?.length || 0;
+            const ok = got === need;
+            return (
+              <div key={item.productId} style={{ border: `1px solid ${ok ? '#bbf7d0' : '#e2e8f0'}`, borderRadius: '8px', padding: '0.85rem 1rem', backgroundColor: ok ? '#f0fdf4' : '#f8fafc' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', gap: '0.75rem' }}>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name || item.productName}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: ok ? '#15803d' : '#b45309' }}>{got}/{need} mã</span>
+                    <button type="button" onClick={() => genSerialsFor(item)} style={{ fontSize: '0.72rem', fontWeight: 700, padding: '0.25rem 0.55rem', borderRadius: '4px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#2563eb', cursor: 'pointer' }}>Tự Sinh Mã</button>
+                  </div>
+                </div>
+                <textarea
+                  value={rawByProduct[item.productId] || ''}
+                  onChange={(e) => setRawByProduct(prev => ({ ...prev, [item.productId]: e.target.value }))}
+                  placeholder={`Nhập ${need} Serial Number, mỗi dòng 1 mã...`}
+                  rows={Math.min(6, Math.max(2, need))}
+                  style={{ width: '100%', boxSizing: 'border-box', padding: '0.5rem 0.65rem', fontSize: '0.8rem', fontFamily: 'monospace', border: '1px solid #cbd5e1', borderRadius: '6px', resize: 'vertical' }}
+                />
+              </div>
+            );
+          })}
+          {hasGlobalDuplicate && (
+            <div style={{ fontSize: '0.78rem', color: '#dc2626', fontWeight: 700 }}>Có Serial Number bị trùng lặp giữa các dòng — vui lòng kiểm tra lại.</div>
+          )}
+        </div>
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', borderTop: '1px solid #e2e8f0', padding: '1rem 1.5rem' }}>
+          <button type="button" onClick={onClose} disabled={submitting} style={{ padding: '0.5rem 1.15rem', fontSize: '0.82rem', fontWeight: 600, border: '1px solid #cbd5e1', borderRadius: '6px', background: '#ffffff', color: '#475569', cursor: 'pointer' }}>Hủy</button>
+          <button
+            type="button"
+            disabled={!allValid || submitting}
+            onClick={() => onConfirm(parsedByProduct)}
+            style={{ padding: '0.5rem 1.35rem', fontSize: '0.82rem', border: 'none', borderRadius: '6px', background: allValid ? '#2563eb' : '#94a3b8', color: '#ffffff', fontWeight: 700, cursor: allValid && !submitting ? 'pointer' : 'not-allowed' }}
+          >
+            {submitting ? 'Đang xử lý...' : 'Xác Nhận Nhập Kho'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ──── MAIN WAREHOUSE COMPONENT ────
 export default function Warehouse() {
   const navigate = useNavigate();
@@ -1452,6 +1542,7 @@ export default function Warehouse() {
   const [receiptsLoading, setReceiptsLoading] = useState(false);
   const [receiptsError, setReceiptsError] = useState(null);
   const [selectedReceipt, setSelectedReceipt] = useState(null);
+  const [serialEntryTarget, setSerialEntryTarget] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
   // Pack & Scan Modal
@@ -1504,6 +1595,7 @@ export default function Warehouse() {
   const [directRef, setDirectRef] = useState('');
   const [directLocation, setDirectLocation] = useState('ZONE-A/SHELF-01/BIN-01');
   const [directNote, setDirectNote] = useState('');
+  const [directSerials, setDirectSerials] = useState('');
 
   // Add Product Modal
   const [showAddProduct, setShowAddProduct] = useState(false);
@@ -1715,7 +1807,7 @@ export default function Warehouse() {
   }, []);
 
   // Validate receipt intake
-  const handleValidateReceipt = async (receipt, currentPoStatus) => {
+  const handleValidateReceipt = async (receipt, currentPoStatus, serialsMap) => {
     const poNum = receipt.po?.poNumber || receipt.poId || receipt.receiptNumber?.replace('GRN-', '');
     let qaLog = null;
     try {
@@ -1735,7 +1827,8 @@ export default function Warehouse() {
       let apiError = null;
       try {
         const res = await api.post(`/warehouse/receipts/${receipt.id}/validate`, {
-          warehouseId: receipt.warehouseId || 1
+          warehouseId: receipt.warehouseId || 1,
+          serials: serialsMap || {}
         });
         if (!res?.success) apiError = new Error(res?.message || 'Máy chủ từ chối xác nhận nhập kho.');
       } catch (e) {
@@ -2122,6 +2215,16 @@ export default function Warehouse() {
       return;
     }
 
+    const parsedSerials = directSerials.split(/[\n,]/).map(s => s.trim()).filter(Boolean);
+    if (parsedSerials.length !== qtyNum) {
+      notify(`Cần nhập đủ ${qtyNum} Serial Number (mỗi dòng 1 mã) — hiện có ${parsedSerials.length}.`, 'error');
+      return;
+    }
+    if (new Set(parsedSerials).size !== parsedSerials.length) {
+      notify('Danh sách Serial Number có mã bị trùng lặp.', 'error');
+      return;
+    }
+
     const selectedInv = inventory.find(i => String(i.id) === String(directProduct) || i.name === directProduct);
     const prodName = selectedInv ? selectedInv.name : directProduct;
     const refCode = directRef.trim() || ('DIR-' + Date.now().toString().slice(-6));
@@ -2138,7 +2241,8 @@ export default function Warehouse() {
         location: directLocation,
         reason: directReason,
         note: directNote,
-        refCode
+        refCode,
+        serials: parsedSerials
       });
 
       const updatedInventory = inventory.map(item => {
@@ -2169,6 +2273,7 @@ export default function Warehouse() {
       setDirectQty('');
       setDirectNote('');
       setDirectRef('');
+      setDirectSerials('');
       notify(`Đã hoàn tất nhập kho trực tiếp ${qtyNum} SP ${prodName} (Mã chứng từ: ${refCode}).`, 'success');
     } catch (err) {
       notify(err.message || 'Không thể ghi nhận nhập kho trực tiếp lên máy chủ. Vui lòng thử lại.', 'error');
@@ -3487,6 +3592,19 @@ export default function Warehouse() {
                 />
               </div>
 
+              <div style={{ marginBottom: '1.25rem' }}>
+                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.35rem' }}>
+                  Serial Number ({directSerials.split(/[\n,]/).map(s => s.trim()).filter(Boolean).length}/{parseInt(directQty, 10) || 0} mã) *
+                </label>
+                <textarea
+                  rows={3}
+                  placeholder="Mỗi dòng 1 Serial Number, số dòng phải khớp đúng số lượng nhập..."
+                  value={directSerials}
+                  onChange={(e) => setDirectSerials(e.target.value)}
+                  style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.8rem', fontFamily: 'monospace', border: '1px solid #cbd5e1', borderRadius: '6px' }}
+                />
+              </div>
+
               <button
                 type="submit"
                 style={{
@@ -4715,9 +4833,23 @@ export default function Warehouse() {
           selectedReceipt={selectedReceipt}
           onClose={() => setSelectedReceipt(null)}
           purchaseOrders={purchaseOrders}
-          handleValidateReceipt={handleValidateReceipt}
+          onRequestValidate={(receipt, poStatus, items) => setSerialEntryTarget({ receipt, poStatus, items })}
           submitting={submitting}
           formatPrice={safeFormatPrice}
+        />
+      )}
+
+      {/* Serial Number Entry — required before any GRN intake can be confirmed
+          (see backend validateReceipt: rejects with 400 if counts don't match). */}
+      {serialEntryTarget && (
+        <SerialEntryModal
+          target={serialEntryTarget}
+          onClose={() => setSerialEntryTarget(null)}
+          submitting={submitting}
+          onConfirm={async (serialsMap) => {
+            await handleValidateReceipt(serialEntryTarget.receipt, serialEntryTarget.poStatus, serialsMap);
+            setSerialEntryTarget(null);
+          }}
         />
       )}
 

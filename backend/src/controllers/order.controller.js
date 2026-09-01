@@ -1,5 +1,6 @@
 const prisma = require('../config/database');
 const { sendOrderConfirmationEmail, sendOrderStatusUpdateEmail } = require('../services/emailService');
+const { claimAvailableSerials } = require('../utils/serialAllocation');
 
 const LOYALTY_VND_PER_POINT = 10000; // 10.000 VNĐ = 1 điểm
 
@@ -165,9 +166,15 @@ const createOrder = async (req, res, next) => {
 
       // Nếu đơn đủ hàng & được tự động duyệt CONFIRMED -> Trừ tồn kho & ghi log xuất kho
       if (initialStatus === 'CONFIRMED') {
+        let totalCogs = 0;
         for (const cartItem of items) {
           const itemProdId = String(cartItem.productId);
           const qty = parseInt(cartItem.quantity);
+
+          const productBeforeUpdate = await tx.product.findUnique({
+            where: { productId: itemProdId },
+            select: { averageCost: true }
+          });
 
           // 1. Trừ số lượng sản phẩm (Product stockQuantity)
           // Atomic conditional decrement prevents two concurrent checkouts
@@ -181,6 +188,11 @@ const createOrder = async (req, res, next) => {
             error.statusCode = 409;
             throw error;
           }
+
+          // 1b. Bắt buộc gán Serial Number cho từng đơn vị xuất kho.
+          await claimAvailableSerials(tx, itemProdId, qty, ordCode);
+
+          totalCogs += Number(productBeforeUpdate?.averageCost || 0) * qty;
 
           // 2. Trừ tồn kho vật lý tại kho chính (Warehouse 1)
           const inventory = await tx.inventory.findFirst({
@@ -209,6 +221,19 @@ const createOrder = async (req, res, next) => {
               quantity: qty,
               referenceId: ordCode,
               note: `Xuất kho tự động cho Đơn Hàng ${ordCode}`
+            }
+          });
+        }
+
+        // Giá vốn hàng bán (COGS) thực tế theo giá bình quân gia quyền — ghi Sổ
+        // Cái để P&L đối chiếu đúng doanh thu với giá vốn thật của đơn này.
+        if (totalCogs > 0) {
+          await tx.ledgerEntry.create({
+            data: {
+              type: 'EXPENSE',
+              amount: totalCogs,
+              description: `Giá vốn hàng bán (COGS) — Đơn Hàng ${ordCode}`,
+              referenceId: `COGS-${ordCode}`
             }
           });
         }
@@ -435,7 +460,13 @@ const updateOrderStatus = async (req, res, next) => {
           // (đơn tạo sẵn ở CONFIRMED đã được tích lúc tạo, xem createOrder).
           await adjustLoyaltyForOrder(tx, existingOrder.customerId, existingOrder.totalAmount, 'add');
 
+          let totalCogs = 0;
           for (const item of existingOrder.items) {
+            const productBeforeUpdate = await tx.product.findUnique({
+              where: { productId: item.productId },
+              select: { averageCost: true }
+            });
+
             // Trừ số lượng tồn sản phẩm
             const productUpdate = await tx.product.updateMany({
               where: { productId: item.productId, available: true, stockQuantity: { gte: item.quantity } },
@@ -446,6 +477,11 @@ const updateOrderStatus = async (req, res, next) => {
               error.statusCode = 409;
               throw error;
             }
+
+            // Bắt buộc gán Serial Number cho từng đơn vị xuất kho.
+            await claimAvailableSerials(tx, item.productId, item.quantity, id);
+
+            totalCogs += Number(productBeforeUpdate?.averageCost || 0) * item.quantity;
 
             // Trừ tồn kho vật lý tại kho chính (Warehouse 1)
             const inventory = await tx.inventory.findFirst({
@@ -474,6 +510,17 @@ const updateOrderStatus = async (req, res, next) => {
                 quantity: item.quantity,
                 referenceId: id,
                 note: `Xuất kho khi duyệt Đơn Hàng ${id}`
+              }
+            });
+          }
+
+          if (totalCogs > 0) {
+            await tx.ledgerEntry.create({
+              data: {
+                type: 'EXPENSE',
+                amount: totalCogs,
+                description: `Giá vốn hàng bán (COGS) — Đơn Hàng ${id}`,
+                referenceId: `COGS-${id}`
               }
             });
           }
@@ -549,6 +596,20 @@ const updateOrderStatus = async (req, res, next) => {
               }
             });
           }
+
+          // Trả lại các Serial Number đã gán cho đơn này về trạng thái khả dụng —
+          // nếu không, serial sẽ mắc kẹt ở USED mãi mãi dù hàng đã quay lại kho,
+          // khiến số serial khả dụng lệch dần so với Product.stockQuantity thật.
+          await tx.serialNumber.updateMany({
+            where: { orderId: id, status: 'USED' },
+            data: { status: 'AVAILABLE', orderId: null }
+          });
+
+          // Xóa bút toán COGS gắn với đơn này — doanh thu của đơn CANCELLED/
+          // FAILED_DELIVERY đã bị loại khỏi P&L (Accountant.jsx lọc theo
+          // Order.status), nên giá vốn tương ứng cũng phải bị loại theo để
+          // không còn khoản chi mồ côi không có doanh thu đối ứng.
+          await tx.ledgerEntry.deleteMany({ where: { referenceId: `COGS-${id}` } });
         }
       }
 

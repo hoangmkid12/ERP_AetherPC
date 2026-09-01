@@ -1,6 +1,7 @@
 require('dotenv').config();
 const IORedis = require('ioredis');
 const { PrismaClient } = require('@prisma/client');
+const { approveOrderIfReady } = require('./orderApprovalService');
 
 const prisma = new PrismaClient();
 const redisUrl = process.env.REDIS_URL || 'redis://127.0.0.1:6379';
@@ -41,40 +42,23 @@ async function handlePayload(payload) {
   }
 
   try {
-    // idempotent DB checks
     const dbOrder = await prisma.order.findUnique({ where: { orderId } });
     if (!dbOrder) {
       console.warn('Order not found in DB, skipping processing:', orderId);
       return;
     }
-
-    const alreadyProcessed = (dbOrder.paymentStatus === 'PAID' || (dbOrder.status && dbOrder.status !== 'PENDING'));
-    if (alreadyProcessed) {
+    if (dbOrder.status !== 'PENDING') {
       console.log('Order already processed, skipping:', orderId);
       return;
     }
 
-    // Simulate processing
-    await new Promise((r) => setTimeout(r, 1000));
-
-    const updated = await prisma.order.updateMany({
-      where: { orderId, OR: [{ paymentStatus: null }, { paymentStatus: 'PENDING' }, { paymentStatus: '' }] },
-      data: { paymentStatus: 'PAID', status: 'CONFIRMED', confirmedAt: new Date() },
-    });
-
-    if (updated.count === 0) {
-      console.log('No update performed (order may have changed), orderId=', orderId);
-    } else {
-      console.log('Order processed and updated in DB:', orderId);
-    }
-
-    // Write history
-    try {
-      await prisma.orderStatusHistory.create({ data: { orderId, status: 'CONFIRMED', note: 'Processed by simplified queue worker' } });
-    } catch (e) {
-      console.warn('Failed to write status history', e.message);
-    }
-
+    // Real approval logic (stock check, atomic decrement, StockMovement, loyalty
+    // points) shared with orderScheduler.js — this used to be a fake sleep() that
+    // blindly marked the order CONFIRMED (and paymentStatus PAID) with no stock
+    // check at all, so a real order with insufficient stock would have been
+    // wrongly confirmed and oversold instead of falling back to AWAITING_STOCK.
+    const result = await prisma.$transaction((tx) => approveOrderIfReady(tx, orderId, { noteSuffix: ' (hàng đợi Redis)' }));
+    console.log(result ? `Order ${orderId} processed to status ${result.status}` : `Order ${orderId} no longer PENDING, skipped`);
   } finally {
     await releaseLock(lockKey, token).catch(() => {});
   }

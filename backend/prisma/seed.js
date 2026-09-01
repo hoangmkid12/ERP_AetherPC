@@ -616,6 +616,17 @@ async function main() {
         reorderPoint: 5
       }
     });
+
+    // Product.stockQuantity is the denormalized total every order/checkout path
+    // actually reads/decrements — it must equal the sum of the Inventory rows
+    // just created above. Previously this loop generated an independent random
+    // stockTotal for Inventory while Product kept whatever the scraper's raw
+    // stock_quantity happened to be (usually 0), so ~80% of the catalog showed
+    // as out-of-stock to checkout despite the warehouse holding real units.
+    await prisma.product.update({
+      where: { productId: p.product_id },
+      data: { stockQuantity: stockTotal }
+    });
   }
 
   // 10. Attendances & Payrolls
