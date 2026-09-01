@@ -200,7 +200,9 @@ model Order {
   totalAmount    Decimal             @map("total_amount") @db.Decimal(15, 2)
   paymentMethod  String              @map("payment_method") @db.VarChar(30)
   paymentStatus  String?             @default("PENDING") @map("payment_status") @db.VarChar(20)
-  status         String?             @default("PENDING") @db.VarChar(20)
+  // VarChar(30), not 20 — RETURNING_TO_WAREHOUSE (22 chars) is a real value
+  // set by createReturnRequest and previously overflowed VarChar(20).
+  status         String?             @default("PENDING") @db.VarChar(30)
   notes          String?
   shippingAddress String             @map("shipping_address")
   shippingCity   String              @map("shipping_city") @db.VarChar(100)
@@ -260,7 +262,7 @@ model OrderItem {
 model OrderStatusHistory {
   id        Int      @id @default(autoincrement())
   orderId   String   @map("order_id") @db.VarChar(50)
-  status    String   @db.VarChar(20)
+  status    String   @db.VarChar(30)
   note      String?
   changedBy String?  @map("changed_by") @db.VarChar(100)
   timestamp DateTime @default(now()) @db.Timestamptz()
@@ -423,17 +425,50 @@ model PurchaseOrder {
   createdAt            DateTime            @default(now()) @map("created_at") @db.Timestamptz()
   updatedAt            DateTime            @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
 
+  // Hợp đồng khung (blanket PO): đánh dấu 1 PO làm khung có hạn mức + hiệu lực,
+  // các đơn "release" thực tế được tạo ra sau đó tham chiếu ngược lại qua blanketRefId.
+  isBlanket            Boolean             @default(false) @map("is_blanket")
+  blanketCapAmount     Decimal?            @map("blanket_cap_amount") @db.Decimal(15, 2)
+  blanketValidUntil    DateTime?           @map("blanket_valid_until") @db.Date
+  blanketRefId         Int?                @map("blanket_ref_id")
+
   supplier             Supplier            @relation(fields: [supplierCode], references: [code])
   items                PurchaseOrderItem[]
   receipts             GoodsReceipt[]
   bills                VendorBill[]
   statusHistory        PurchaseOrderStatusHistory[]
+  blanketRef           PurchaseOrder?      @relation("BlanketReleases", fields: [blanketRefId], references: [id])
+  releases             PurchaseOrder[]     @relation("BlanketReleases")
 
   @@index([supplierCode])
   @@index([status])
   @@index([createdAt])
   @@index([expectedDeliveryDate])
+  @@index([blanketRefId])
   @@map("purchase_orders")
+}
+
+// Lệnh lắp ráp PC (assembly job, 5-bước checklist). `orderId` là tham chiếu
+// mềm tới Order.orderId — KHÔNG dùng khóa ngoại cứng vì nhân viên lắp ráp
+// được phép tạo lệnh thủ công không gắn với đơn hàng thật nào (build demo/
+// build nội bộ). jobCode dùng làm khóa chính luôn để tránh phải ánh xạ 2 id.
+model AssemblyJob {
+  jobCode          String    @id @db.VarChar(30)
+  orderId          String?   @map("order_id") @db.VarChar(50)
+  customerName     String    @map("customer_name") @db.VarChar(150)
+  status           String    @default("PENDING") @db.VarChar(20) // PENDING, ASSEMBLING, COMPLETED, CANCELLED
+  components       Json
+  checklist        Json      @default("{}")
+  componentSerials Json      @default("{}") @map("component_serials")
+  createdBy        String?   @map("created_by") @db.VarChar(150)
+  completedBy      String?   @map("completed_by") @db.VarChar(150)
+  completedAt      DateTime? @map("completed_at") @db.Timestamptz()
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt        DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  @@index([orderId])
+  @@index([status])
+  @@map("assembly_jobs")
 }
 
 model PurchaseOrderStatusHistory {
@@ -658,7 +693,9 @@ model Payroll {
   bonuses    Decimal?  @default(0.00) @db.Decimal(15, 2)
   deductions Decimal?  @default(0.00) @db.Decimal(15, 2)
   netSalary  Decimal   @map("net_salary") @db.Decimal(15, 2)
-  status     String?   @default("UNPAID") @db.VarChar(20)
+  // VarChar(30), not 20 — SUBMITTED_TO_ACCOUNTING (24 ký tự) là giá trị thật,
+  // từng bị cắt xén giống lỗi Order.status đã sửa trước đó trong dự án này.
+  status     String?   @default("UNPAID") @db.VarChar(30)
   paidAt     DateTime? @map("paid_at") @db.Timestamptz()
   createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz()
 
@@ -733,7 +770,7 @@ model ReturnRequest {
   customerId          String?   @map("customer_id") @db.VarChar(50)
   type                String    @default("EXCHANGE") @db.VarChar(30) // EXCHANGE, REFUND, WARRANTY
   reason              String
-  status              String    @default("PENDING") @db.VarChar(30) // PENDING, RETURN_APPROVED, RETURNING_TO_WAREHOUSE, DELIVERED_TO_WAREHOUSE, QC_PASSED, QC_REJECTED, RESTOCKED, REFUNDED, COMPLETED, REJECTED
+  status              String    @default("PENDING") @db.VarChar(30) // PENDING, RETURN_APPROVED, RETURNING_TO_WAREHOUSE, DELIVERED_TO_WAREHOUSE, QC_PASSED, QC_REJECTED, RESTOCKED, EXCHANGED, VENDOR_WARRANTY, INSPECTED_SCRAP, REFUNDED, COMPLETED, REJECTED — set by confirmReturnWarehouse (order.controller.js) based on the warehouse's chosen shelfLocation
   address             String?
   customerName        String?   @map("customer_name") @db.VarChar(150)
   phone               String?   @db.VarChar(20)

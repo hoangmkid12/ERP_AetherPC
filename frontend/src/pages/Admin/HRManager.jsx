@@ -132,6 +132,11 @@ export default function HRManager() {
     return log ? log.status : 'UNMARKED';
   };
 
+  const handleMarkAttendance = (empId, dateStr, status) => {
+    if (typeof updateAttendanceLog !== 'function') return;
+    updateAttendanceLog(empId, dateStr, status).catch(err => notify(err.message || 'Không thể lưu chấm công.', 'error'));
+  };
+
   const attendanceForSelectedDate = useMemo(() => {
     const present = employees.filter(e => getEmployeeStatusForDate(e.id, selectedDate) === 'PRESENT').length;
     const late = employees.filter(e => getEmployeeStatusForDate(e.id, selectedDate) === 'LATE').length;
@@ -248,11 +253,19 @@ export default function HRManager() {
     notify('Đã tạo hồ sơ nhân viên mới thành công.', 'success');
   };
 
-  const handleSubmitPayrollToCEO = () => {
-    if (typeof submitPayrolls === 'function') {
-      submitPayrolls(calculatedPayrolls);
+  const [submittingPayroll, setSubmittingPayroll] = useState(false);
+  const handleSubmitPayrollToCEO = async () => {
+    if (typeof submitPayrolls !== 'function') return;
+    const period = new Date().toISOString().slice(0, 7); // "YYYY-MM"
+    setSubmittingPayroll(true);
+    try {
+      await submitPayrolls(period);
+      notify(`Đã lập bảng lương kỳ ${period} và gửi lên Ban Giám Đốc (CEO) để phê duyệt.`, 'success');
+    } catch (err) {
+      notify(`Không thể lập bảng lương: ${err.message || 'lỗi kết nối máy chủ'}.`, 'error');
+    } finally {
+      setSubmittingPayroll(false);
     }
-    notify('Đã gửi bảng tổng hợp lương tháng lên Ban Giám Đốc (CEO) để phê duyệt.', 'success');
   };
 
   return (
@@ -301,22 +314,23 @@ export default function HRManager() {
         {activeTab === 'payroll' && (
           <button
             onClick={handleSubmitPayrollToCEO}
+            disabled={submittingPayroll}
             style={{
-              backgroundColor: '#16a34a',
+              backgroundColor: submittingPayroll ? '#9ca3af' : '#16a34a',
               color: '#ffffff',
               border: 'none',
               borderRadius: '6px',
               padding: '0.45rem 1.1rem',
               fontSize: '0.8rem',
               fontWeight: 800,
-              cursor: 'pointer',
+              cursor: submittingPayroll ? 'default' : 'pointer',
               display: 'flex',
               alignItems: 'center',
               gap: '0.35rem'
             }}
           >
             <Send size={15} />
-            <span>Trình CEO Phê Duyệt Lương</span>
+            <span>{submittingPayroll ? 'Đang xử lý...' : 'Trình CEO Phê Duyệt Lương'}</span>
           </button>
         )}
       </div>
@@ -532,19 +546,19 @@ export default function HRManager() {
                       <td style={{ padding: '0.65rem 0.85rem', textAlign: 'center' }}>
                         <div style={{ display: 'flex', justifyContent: 'center', gap: '0.35rem' }}>
                           <button
-                            onClick={() => updateAttendanceLog(emp.id, selectedDate, 'PRESENT')}
+                            onClick={() => handleMarkAttendance(emp.id, selectedDate, 'PRESENT')}
                             style={{ backgroundColor: '#16a34a', color: '#ffffff', border: 'none', borderRadius: '4px', padding: '0.3rem 0.6rem', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}
                           >
                             Có Mặt
                           </button>
                           <button
-                            onClick={() => updateAttendanceLog(emp.id, selectedDate, 'LATE')}
+                            onClick={() => handleMarkAttendance(emp.id, selectedDate, 'LATE')}
                             style={{ backgroundColor: '#f59e0b', color: '#ffffff', border: 'none', borderRadius: '4px', padding: '0.3rem 0.6rem', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}
                           >
                             Đi Muộn
                           </button>
                           <button
-                            onClick={() => updateAttendanceLog(emp.id, selectedDate, 'ABSENT')}
+                            onClick={() => handleMarkAttendance(emp.id, selectedDate, 'ABSENT')}
                             style={{ backgroundColor: '#ef4444', color: '#ffffff', border: 'none', borderRadius: '4px', padding: '0.3rem 0.6rem', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}
                           >
                             Vắng
@@ -713,8 +727,9 @@ export default function HRManager() {
                         <div style={{ display: 'flex', justifyContent: 'center', gap: '0.35rem' }}>
                           <button
                             onClick={() => {
-                              approveLeaveRequest(lv.id);
-                              notify('Đã duyệt đơn xin nghỉ phép.', 'success');
+                              approveLeaveRequest(lv.id)
+                                .then(() => notify('Đã duyệt đơn xin nghỉ phép.', 'success'))
+                                .catch(err => notify(err.message || 'Không thể duyệt đơn nghỉ phép.', 'error'));
                             }}
                             style={{ backgroundColor: '#16a34a', color: '#ffffff', border: 'none', borderRadius: '4px', padding: '0.3rem 0.65rem', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer' }}
                           >
@@ -722,8 +737,9 @@ export default function HRManager() {
                           </button>
                           <button
                             onClick={() => {
-                              rejectLeaveRequest(lv.id);
-                              notify('✕ Đã từ chối đơn nghỉ phép.', 'info');
+                              rejectLeaveRequest(lv.id)
+                                .then(() => notify('✕ Đã từ chối đơn nghỉ phép.', 'info'))
+                                .catch(err => notify(err.message || 'Không thể từ chối đơn nghỉ phép.', 'error'));
                             }}
                             style={{ backgroundColor: '#ef4444', color: '#ffffff', border: 'none', borderRadius: '4px', padding: '0.3rem 0.65rem', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}
                           >
@@ -759,9 +775,10 @@ export default function HRManager() {
 
             <button
               onClick={handleSubmitPayrollToCEO}
-              style={{ backgroundColor: '#16a34a', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.45rem 1.1rem', fontSize: '0.8rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+              disabled={submittingPayroll}
+              style={{ backgroundColor: submittingPayroll ? '#9ca3af' : '#16a34a', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.45rem 1.1rem', fontSize: '0.8rem', fontWeight: 800, cursor: submittingPayroll ? 'default' : 'pointer', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
             >
-              <Send size={15} /> Gửi Bảng Lương Trình CEO
+              <Send size={15} /> {submittingPayroll ? 'Đang xử lý...' : 'Gửi Bảng Lương Trình CEO'}
             </button>
           </div>
 

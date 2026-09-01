@@ -99,81 +99,78 @@ export const useUtilityStore = create((set, get) => ({
   },
 
   /**
-   * Update an assembly job (supports status, checklist, and component serials)
+   * Update an assembly job (supports status, checklist, and component serials).
+   * Awaits the real API call and only applies the change locally on confirmed
+   * server success — the server is the one enforcing the QA-checklist/serial
+   * gate before allowing COMPLETED, and (for a job linked to a real order)
+   * cascades the real Order.status forward. A caller that needs to react to
+   * failure (e.g. completeAssembly) should await the returned promise; the
+   * many lightweight call sites (toggle a checkbox, start a job) intentionally
+   * don't await — a dropped network blip there just leaves the checkbox
+   * unsynced until the next successful save, which is low-stakes.
    */
-  updateAssemblyJob: (jobId, statusOrData, checklist = null, componentSerials = null) => {
+  updateAssemblyJob: async (jobId, statusOrData, checklist = null, componentSerials = null) => {
     let status = typeof statusOrData === 'string' ? statusOrData : statusOrData?.status;
     let chk = checklist || (typeof statusOrData === 'object' ? statusOrData?.checklist : null);
     let serials = componentSerials || (typeof statusOrData === 'object' ? statusOrData?.componentSerials : null);
 
+    const res = await api.put(`/assembly-jobs/${jobId}`, { status, checklist: chk, componentSerials: serials });
+    const savedJob = res?.data;
+    if (!savedJob) throw new Error(res?.message || 'Không thể lưu lệnh lắp ráp.');
+
     set(state => {
-      const assemblyJobs = state.assemblyJobs.map(job => {
-        if (job.id === jobId) {
-          return { 
-            ...job, 
-            status: status || job.status, 
-            checklist: chk || job.checklist, 
-            componentSerials: serials || job.componentSerials || {}
-          };
-        }
-        return job;
-      });
+      const assemblyJobs = state.assemblyJobs.map(job => (job.id === jobId ? savedJob : job));
       try {
         localStorage.setItem(STORAGE_KEYS.assemblyJobs, JSON.stringify(assemblyJobs));
       } catch (e) {}
       return { assemblyJobs };
     });
 
-    if (status === 'COMPLETED') {
-      const job = get().assemblyJobs.find(j => j.id === jobId);
-      if (job && job.orderId) {
-        try {
-          const salesState = useSalesStore.getState();
-          const updatedOrders = (salesState.orders || []).map(o => {
-            if (o.orderId === job.orderId) {
-              return { ...o, status: 'CONFIRMED' };
-            }
-            return o;
-          });
-          useSalesStore.setState({ orders: updatedOrders });
-          localStorage.setItem('erp_orders', JSON.stringify(updatedOrders));
-        } catch (_) {}
-      }
+    // The backend already advanced the real Order when it completed the job —
+    // refresh the sales store's cache from the server instead of guessing.
+    if (savedJob.status === 'COMPLETED' && savedJob.orderId) {
+      try {
+        const salesState = useSalesStore.getState();
+        if (typeof salesState.fetchOrders === 'function') await salesState.fetchOrders();
+        else if (typeof salesState.getOrders === 'function') await salesState.getOrders();
+      } catch (_) {}
     }
 
-    api.put(`/assembly-jobs/${jobId}`, { status, checklist: chk, componentSerials: serials }).catch(() => {});
+    return savedJob;
   },
 
   /**
    * Create Assembly Job — supports manual job creation from Assembly.jsx
    * (which already builds a full job object with its own id/checklist) as
-   * well as auto-creation from just an orderId. Respects any id/status/
-   * checklist/componentSerials the caller supplies and only generates
-   * defaults for whatever is missing, so a job never ends up under a
-   * different id than the one the UI just switched to.
+   * well as auto-creation from just an orderId. Awaits the real API call and
+   * returns the server-assigned job (real jobCode as `id`) — the caller must
+   * use that returned job's id, not invent its own, since the server is the
+   * source of truth for ids now.
    */
-  createAssemblyJob: (orderIdOrData, customerName = '', components = []) => {
+  createAssemblyJob: async (orderIdOrData, customerName = '', components = []) => {
     const jobInput = (typeof orderIdOrData === 'object' && orderIdOrData !== null)
       ? orderIdOrData
       : { orderId: orderIdOrData, customer: customerName, components };
 
-    const finalOrderId = jobInput.orderId || `MANUAL-${Date.now()}`;
+    const finalOrderId = jobInput.orderId || null;
     const finalCust = jobInput.customer || jobInput.customerName || 'Khách hàng';
     const finalComps = jobInput.components || [];
 
-    const jobExists = get().assemblyJobs.some(j => j.orderId === finalOrderId);
-    if (jobExists) return null;
+    if (finalOrderId) {
+      const jobExists = get().assemblyJobs.some(j => j.orderId === finalOrderId);
+      if (jobExists) return null;
+    }
 
-    const newJob = {
-      id: jobInput.id || `JOB-${Date.now().toString().slice(-6)}`,
+    const res = await api.post('/assembly-jobs', {
       orderId: finalOrderId,
-      customer: finalCust,
-      date: jobInput.date || new Date().toLocaleDateString('vi-VN'),
-      status: jobInput.status || 'PENDING',
+      customerName: finalCust,
       components: finalComps,
+      status: jobInput.status || 'PENDING',
       checklist: jobInput.checklist || { biosPost: false, osInstall: false, stressTest: false, qcSeal: false },
       componentSerials: jobInput.componentSerials || {}
-    };
+    });
+    const newJob = res?.data;
+    if (!newJob) throw new Error(res?.message || 'Không thể tạo lệnh lắp ráp.');
 
     set(state => {
       const assemblyJobs = [newJob, ...state.assemblyJobs];
@@ -183,7 +180,6 @@ export const useUtilityStore = create((set, get) => ({
       return { assemblyJobs };
     });
 
-    api.post('/assembly-jobs', newJob).catch(() => {});
     return newJob;
   },
 

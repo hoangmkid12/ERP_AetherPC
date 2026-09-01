@@ -42,9 +42,18 @@ export const AuthProvider = ({ children }) => {
       const lowerUser = cleanUser.toLowerCase();
 
       // 1. Employee / staff / supplier login
+      // Only pass `email` when the user actually typed one — the backend
+      // already derives a `{code}@kltn-erp.vn` guess from `username` itself
+      // and also matches employeeCode/supplier code directly. Guessing an
+      // email here and always sending it made the backend's `email ||
+      // username` priority pick the guess over the real identifier for
+      // every account whose real email doesn't follow that pattern (e.g.
+      // supplier accounts like SUP-FPT, whose real email is a company
+      // address, not sup-fpt@kltn-erp.vn) — login failed with a wrong-looking
+      // "Invalid credentials" no matter how correct the typed code/password was.
       try {
         const response = await api.post('/auth/employee/login', {
-          email: cleanUser.includes('@') ? cleanUser : `${lowerUser}@kltn-erp.vn`,
+          ...(cleanUser.includes('@') ? { email: cleanUser } : {}),
           username: cleanUser,
           password
         });
@@ -126,21 +135,6 @@ export const AuthProvider = ({ children }) => {
     api.post('/auth/logout').catch(() => {});
   };
 
-  const hasPermission = (permissionKey) => {
-    if (!user) return false;
-    if (user.role === 'ADMIN') return true;
-    try {
-      const matrix = JSON.parse(localStorage.getItem('erp_rbac_matrix') || '[]');
-      const roleItem = matrix.find(r => r.role === user.role || (['QC', 'QA', 'QUALITY_CONTROL'].includes(user.role) && r.role.includes('QC')));
-      if (roleItem && typeof roleItem[permissionKey] !== 'undefined') {
-        return Boolean(roleItem[permissionKey]);
-      }
-    } catch (e) {
-      // fallback
-    }
-    return true;
-  };
-
   const value = {
     user,
     loading,
@@ -148,7 +142,6 @@ export const AuthProvider = ({ children }) => {
     register,
     logout,
     updateUser,
-    hasPermission,
     isAuthenticated: !!user,
     isCEO: user?.role === 'CEO',
     isSales: user?.role === 'SALES',

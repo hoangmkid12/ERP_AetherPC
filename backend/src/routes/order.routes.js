@@ -16,6 +16,7 @@ const {
 } = require('../controllers/order.controller');
 const { authMiddleware } = require('../middlewares/auth.middleware');
 const { getEmailLogs } = require('../services/emailService');
+const { QC_ROLES } = require('../constants/roles');
 
 // @route   POST /api/v1/orders
 // @desc    Tạo đơn hàng mới (Khách hàng)
@@ -28,7 +29,7 @@ router.get('/', authMiddleware(['CUSTOMER', 'DELIVERY', 'SALES', 'SALES_MANAGER'
 
 // @route   PATCH /api/v1/orders/:id/status
 // @desc    Cập nhật trạng thái đơn hàng (Nhân viên Sale / Kho / Delivery / Admin)
-router.patch('/:id/status', authMiddleware(['SALES', 'SALES_MANAGER', 'CEO', 'ADMIN', 'CSKH', 'DELIVERY']), updateOrderStatus);
+router.patch('/:id/status', authMiddleware(['SALES', 'SALES_MANAGER', 'WAREHOUSE', 'WAREHOUSE_MANAGER', 'CEO', 'ADMIN', 'CSKH', 'DELIVERY']), updateOrderStatus);
 
 // @route   PATCH /api/v1/orders/:id/details
 // @desc    Khách hàng tự cập nhật thông tin đơn hàng PENDING
@@ -40,7 +41,7 @@ router.post('/:id/return', authMiddleware(['CUSTOMER', 'CSKH', 'SALES_MANAGER', 
 
 // @route   GET /api/v1/orders/returns
 // @desc    Lấy danh sách các đơn đổi trả (Shipper / QC / Kho / Kế toán / CSKH)
-router.get('/returns', authMiddleware(['SALES', 'SALES_MANAGER', 'CEO', 'ADMIN', 'CSKH', 'WAREHOUSE', 'WAREHOUSE_MANAGER', 'ACCOUNTANT', 'DELIVERY']), getReturnRequests);
+router.get('/returns', authMiddleware(['SALES', 'SALES_MANAGER', 'CEO', 'ADMIN', 'CSKH', 'WAREHOUSE', 'WAREHOUSE_MANAGER', 'ACCOUNTANT', 'DELIVERY', ...QC_ROLES]), getReturnRequests);
 
 // @route   PATCH /api/v1/orders/returns/:id/pickup
 // @desc    Shipper xác nhận đã lấy hàng thu hồi tại nhà khách
@@ -52,7 +53,7 @@ router.patch('/returns/:id/deliver-warehouse', authMiddleware(['DELIVERY', 'CEO'
 
 // @route   PATCH /api/v1/orders/returns/:id/qc-inspect
 // @desc    QC kiểm định chất lượng hàng hoàn trả (Duyệt Hoàn Tiền / Từ Chối)
-router.patch('/returns/:id/qc-inspect', authMiddleware(['QC', 'WAREHOUSE', 'WAREHOUSE_MANAGER', 'CEO', 'ADMIN']), qcInspectReturn);
+router.patch('/returns/:id/qc-inspect', authMiddleware([...QC_ROLES, 'WAREHOUSE', 'WAREHOUSE_MANAGER', 'CEO', 'ADMIN']), qcInspectReturn);
 
 // @route   PATCH /api/v1/orders/returns/:id/restock
 // @desc    Thủ kho xác nhận nhập lại kho bán lẻ/cách ly

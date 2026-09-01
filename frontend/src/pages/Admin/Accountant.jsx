@@ -4,6 +4,7 @@ import { useFinanceStore, useHRStore, useSalesStore } from '../../stores';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../services/api';
 import { notify, confirm } from '../../context/NotificationContext';
+import { PO_STATUS, VENDOR_BILL_STATUS, getStatusInfo } from '../../utils/statusLabels';
 import { 
   DollarSign, ArrowUpRight, ArrowDownLeft, FileText, CheckCircle, ShoppingBag, 
   Search, PlusCircle, Download, X, Eye, Printer, Calendar, CreditCard, Users, 
@@ -49,7 +50,6 @@ export default function Accountant() {
 
   const ledger = useFinanceStore(state => state.ledger) || [];
   const purchaseOrders = useFinanceStore(state => state.purchaseOrders) || [];
-  const paySupplierPO = useFinanceStore(state => state.paySupplierPO);
   const addLedgerEntry = useFinanceStore(state => state.addLedgerEntry);
   const disbursePayroll = useFinanceStore(state => state.disbursePayroll);
   const disburseAllPayrolls = useFinanceStore(state => state.disburseAllPayrolls);
@@ -103,6 +103,16 @@ export default function Accountant() {
 
   const fmt = (price) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price || 0);
 
+  // A PO can only be billed once the warehouse has actually received the goods —
+  // matches the backend gate in createVendorBill (purchase.controller.js).
+  const isPoBillable = (po) => ['RECEIVED', 'DONE', 'COMPLETED'].includes(po?.status);
+  const getPoBill = (po) => (Array.isArray(po?.bills) && po.bills.length > 0 ? po.bills[0] : null);
+  const isPoAwaitingAccounting = (po) => {
+    if (!isPoBillable(po)) return false;
+    const bill = getPoBill(po);
+    return !bill || bill.status !== 'PAID';
+  };
+
   // Financial Metric Calculations
   const totalRevenue = (ledger || [])
     .filter(tx => tx && tx.type === 'INCOME')
@@ -116,8 +126,11 @@ export default function Accountant() {
   const cashBalance = 450000000 + netProfit; // Base capital + Net profit
 
   const effectivePOs = allPOs.length > 0 ? allPOs : purchaseOrders;
-  const unpaidPOs = effectivePOs.filter(po => po && po.paymentStatus !== 'PAID');
-  const unpaidPOAmount = unpaidPOs.reduce((sum, po) => sum + (Number(po.totalAmount || po.totalCost || 0) || 0), 0);
+  const unpaidPOs = effectivePOs.filter(po => po && isPoAwaitingAccounting(po));
+  const unpaidPOAmount = unpaidPOs.reduce((sum, po) => {
+    const bill = getPoBill(po);
+    return sum + (Number((bill ? bill.amountDue : po.totalAmount) || 0) || 0);
+  }, 0);
 
   const totalPayrollFund = payrolls.length > 0
     ? payrolls.reduce((sum, p) => sum + (Number(p.netSalary || 0) || 0), 0)
@@ -139,8 +152,8 @@ export default function Accountant() {
       {
         data: [
           Math.max(1, totalRevenue),
-          Math.max(1, unpaidPOAmount || 15000000),
-          Math.max(1, totalPayrollFund || 25000000),
+          Math.max(1, unpaidPOAmount),
+          Math.max(1, totalPayrollFund),
           5000000
         ],
         backgroundColor: ['#16a34a', '#f59e0b', '#8b5cf6', '#ef4444']
@@ -179,7 +192,8 @@ export default function Accountant() {
     });
   }, [ledger, search, typeFilter]);
 
-  const handleAddManualEntry = () => {
+  const [submittingManualEntry, setSubmittingManualEntry] = useState(false);
+  const handleAddManualEntry = async () => {
     if (!manualForm.amount || !manualForm.description) {
       notify('Vui lòng nhập số tiền và nội dung thu/chi!', 'error');
       return;
@@ -189,26 +203,70 @@ export default function Accountant() {
       notify('Số tiền không hợp lệ!', 'error');
       return;
     }
-    if (typeof addLedgerEntry === 'function') {
-      addLedgerEntry({
+    if (typeof addLedgerEntry !== 'function') return;
+    setSubmittingManualEntry(true);
+    try {
+      await addLedgerEntry({
         type: manualForm.type,
         amount: amt,
         description: manualForm.description,
         category: manualForm.category,
         date: new Date().toLocaleDateString('vi-VN')
       });
+      setManualForm({ type: 'EXPENSE', amount: '', category: 'Vận hành văn phòng', description: '' });
+      setShowManualModal(false);
+      notify('Đã thêm bút toán vào Sổ Cái thành công.', 'success');
+    } catch (err) {
+      notify(`Không thể ghi bút toán: ${err.message || 'lỗi kết nối máy chủ'}.`, 'error');
+    } finally {
+      setSubmittingManualEntry(false);
     }
-    setManualForm({ type: 'EXPENSE', amount: '', category: 'Vận hành văn phòng', description: '' });
-    setShowManualModal(false);
-    notify('Đã thêm bút toán vào Sổ Cái thành công.', 'success');
   };
 
-  const handlePayPO = async (poId, poAmount) => {
-    if (await confirm(`Xác nhận thanh toán ${fmt(poAmount)} cho Đơn Mua Hàng #${poId}?`)) {
-      if (typeof paySupplierPO === 'function') {
-        paySupplierPO(poId);
+  const [payingPOId, setPayingPOId] = useState(null);
+  const [disbursingPayrollId, setDisbursingPayrollId] = useState(null);
+
+  const handleCreateBill = async (po) => {
+    if (!(await confirm(`Xác nhận lập hóa đơn công nợ cho Đơn Mua Hàng ${po.poNumber || po.id}?\nSố tiền sẽ được đối chiếu theo tỷ lệ nghiệm thu QC (nếu có) trước khi chốt.`))) return;
+    setPayingPOId(po.id);
+    try {
+      const res = await api.post(`/purchasing/orders/${po.id}/bills`, {});
+      if (res?.success) {
+        const adj = res.qcAdjustment;
+        notify(
+          adj
+            ? `Đã lập hóa đơn ${res.data.billNumber} — điều chỉnh theo QC còn ${fmt(res.data.amountTotal)} (thay vì ${fmt(adj.originalAmount)}).`
+            : `Đã lập hóa đơn ${res.data.billNumber} cho ${fmt(res.data.amountTotal)}.`,
+          'success'
+        );
+        await fetchBackendPOs();
+      } else {
+        notify(res?.message || 'Không thể lập hóa đơn — máy chủ từ chối yêu cầu.', 'error');
       }
-      notify(`Đã giải ngân thanh toán thành công cho PO #${poId}. Bút toán đã được ghi nhận tự động vào Sổ Cái.`, 'success');
+    } catch (err) {
+      notify(`Lập hóa đơn thất bại: ${err.message || 'lỗi kết nối máy chủ'}.`, 'error');
+    } finally {
+      setPayingPOId(null);
+    }
+  };
+
+  const handleRegisterPayment = async (po) => {
+    const bill = getPoBill(po);
+    if (!bill) return;
+    if (!(await confirm(`Xác nhận chi trả ${fmt(bill.amountDue)} cho hóa đơn ${bill.billNumber} (NCC: ${po.supplier?.name || po.supplierCode})?`))) return;
+    setPayingPOId(po.id);
+    try {
+      const res = await api.post(`/purchasing/bills/${bill.id}/payments`, { paymentMethod: 'Bank Transfer' });
+      if (res?.success) {
+        notify(`Đã giải ngân thành công cho hóa đơn ${bill.billNumber}. Bút toán đã được ghi nhận vào Sổ Cái.`, 'success');
+        await fetchBackendPOs();
+      } else {
+        notify(res?.message || 'Không thể ghi nhận thanh toán — máy chủ từ chối yêu cầu.', 'error');
+      }
+    } catch (err) {
+      notify(`Thanh toán thất bại: ${err.message || 'lỗi kết nối máy chủ'}.`, 'error');
+    } finally {
+      setPayingPOId(null);
     }
   };
 
@@ -323,18 +381,10 @@ export default function Accountant() {
       }
       localStorage.setItem('erp_return_requests', JSON.stringify(updatedList));
 
-      // Thêm bút toán chi vào Sổ Cái Kế Toán
-      if (typeof addLedgerEntry === 'function') {
-        addLedgerEntry({
-          id: `TXN-REF-${Date.now().toString().slice(-4)}`,
-          type: 'EXPENSE',
-          amount: finalAmount,
-          category: 'Chi Hoàn Tiền Khách Hàng (RMA)',
-          description: `Chi hoàn tiền đơn #${refundModalItem.orderId} - Khách: ${refundModalItem.customerName} (Mã GD: ${txnCode})`,
-          referenceId: refundModalItem.orderId,
-          date: new Date().toLocaleDateString('vi-VN')
-        });
-      }
+      // Không tự thêm bút toán ở đây nữa — updateReturnStatus(..., 'REFUNDED', ...)
+      // ở trên đã gọi PATCH /orders/returns/:id/refund, và processRefund
+      // (order.controller.js) đã tự ghi 1 LedgerEntry REFUND thật ở backend rồi.
+      // Gọi thêm addLedgerEntry ở đây sẽ ghi trùng 2 lần cho cùng 1 lần hoàn tiền.
 
       notify(`Đã hoàn tiền và ghi sổ cái thành công. Số tiền: ${fmt(finalAmount)}. Người nhận: ${refundModalItem.customerName}. Mã GD: ${txnCode}. Bút toán chi phí đã được ghi nhận tự động vào Sổ Cái Kế Toán.`, 'success');
       setRefundModalItem(null);
@@ -347,12 +397,17 @@ export default function Accountant() {
     }
   };
 
+  const [disbursingAll, setDisbursingAll] = useState(false);
   const handleDisburseAll = async () => {
-    if (await confirm(`Xác nhận GIẢI NGÂN LƯƠNG TOÀN DOANH NGHIỆP (${fmt(totalPayrollFund)})? Tiền sẽ được trừ vào quỹ và ghi sổ cái.`, { danger: true })) {
-      if (typeof disburseAllPayrolls === 'function') {
-        disburseAllPayrolls();
-      }
-      notify('Đã giải ngân toàn bộ bảng lương tháng thành công.', 'success');
+    if (!(await confirm(`Xác nhận GIẢI NGÂN LƯƠNG TOÀN DOANH NGHIỆP (${fmt(totalPayrollFund)})? Tiền sẽ được trừ vào quỹ và ghi sổ cái.`, { danger: true }))) return;
+    if (typeof disburseAllPayrolls !== 'function') return;
+    setDisbursingAll(true);
+    try {
+      await disburseAllPayrolls();
+    } catch (err) {
+      notify(`Giải ngân thất bại: ${err.message || 'lỗi kết nối máy chủ'}.`, 'error');
+    } finally {
+      setDisbursingAll(false);
     }
   };
 
@@ -821,8 +876,8 @@ export default function Accountant() {
                 {unpaidPOs.slice(0, 2).map((po, pIdx) => (
                   <div key={po.id || pIdx} style={{ padding: '0.55rem 0.75rem', borderRadius: '6px', border: '1px solid #e2e8f0', backgroundColor: '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
-                      <strong style={{ fontSize: '0.8rem', color: '#0f172a' }}>PO #{po.id}</strong>
-                      <span style={{ fontSize: '0.7rem', color: '#64748b', display: 'block' }}>{fmt(po.totalAmount || po.totalCost)}</span>
+                      <strong style={{ fontSize: '0.8rem', color: '#0f172a' }}>{po.poNumber || `PO-${po.id}`}</strong>
+                      <span style={{ fontSize: '0.7rem', color: '#64748b', display: 'block' }}>{fmt((getPoBill(po)?.amountDue) ?? po.totalAmount)}</span>
                     </div>
                     <button
                       onClick={() => setTab('po_payments')}
@@ -975,7 +1030,7 @@ export default function Accountant() {
             <span>Danh Sách Đơn Mua Hàng Cần Thanh Toán Cho Nhà Cung Cấp</span>
           </h3>
           <p style={{ color: '#64748b', fontSize: '0.78rem', marginBottom: '1.25rem' }}>
-            Xác nhận chi tiền thanh toán cho các đơn PO đã nhập kho an toàn, tự động trừ quỹ và ghi sổ cái
+            Lập hóa đơn công nợ và ghi nhận thanh toán cho các đơn PO đã nhập kho — mọi thao tác đều gọi API thật, ghi trực tiếp vào cơ sở dữ liệu (VendorBill/VendorPayment), không phải dữ liệu giả lập.
           </p>
 
           <div style={{ overflowX: 'auto' }}>
@@ -985,45 +1040,61 @@ export default function Accountant() {
                   <th style={{ padding: '0.65rem 0.85rem' }}>Mã PO</th>
                   <th style={{ padding: '0.65rem 0.85rem' }}>Nhà Cung Cấp</th>
                   <th style={{ padding: '0.65rem 0.85rem' }}>Tình Trạng Kho</th>
-                  <th style={{ padding: '0.65rem 0.85rem', textAlign: 'right' }}>Tổng Tiền</th>
+                  <th style={{ padding: '0.65rem 0.85rem', textAlign: 'right' }}>Số Tiền Hóa Đơn</th>
                   <th style={{ padding: '0.65rem 0.85rem' }}>Thanh Toán</th>
                   <th style={{ padding: '0.65rem 0.85rem', textAlign: 'center' }}>Thao Tác Kế Toán</th>
                 </tr>
               </thead>
               <tbody>
-                {effectivePOs.map((po, pIdx) => {
-                  const isPaid = po.paymentStatus === 'PAID';
+                {effectivePOs.filter(isPoBillable).map((po, pIdx) => {
+                  const bill = getPoBill(po);
+                  const poStatusInfo = getStatusInfo(PO_STATUS, po.status);
+                  const billStatusInfo = bill ? getStatusInfo(VENDOR_BILL_STATUS, bill.status) : null;
+                  const isBusy = payingPOId === po.id;
+                  const displayAmount = bill ? bill.amountTotal : po.totalAmount;
+
                   return (
                     <tr key={po.id || pIdx} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                      <td style={{ padding: '0.65rem 0.85rem', fontWeight: 700, color: '#2563eb' }}>PO-{po.id}</td>
-                      <td style={{ padding: '0.65rem 0.85rem', fontWeight: 700, color: '#0f172a' }}>{po.supplierName || 'NCC ASUS Vietnam'}</td>
+                      <td style={{ padding: '0.65rem 0.85rem', fontWeight: 700, color: '#2563eb' }}>{po.poNumber || `PO-${po.id}`}</td>
+                      <td style={{ padding: '0.65rem 0.85rem', fontWeight: 700, color: '#0f172a' }}>{po.supplier?.name || po.supplierCode || 'Chưa rõ NCC'}</td>
                       <td style={{ padding: '0.65rem 0.85rem' }}>
-                        <span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 700, backgroundColor: '#f0fdf4', color: '#16a34a' }}>
-                          Đã nhập kho (GRN)
+                        <span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 700, backgroundColor: poStatusInfo.bg, color: poStatusInfo.color, border: `1px solid ${poStatusInfo.border}` }}>
+                          {poStatusInfo.label}
                         </span>
                       </td>
                       <td style={{ padding: '0.65rem 0.85rem', textAlign: 'right', fontWeight: 800, color: '#0f172a' }}>
-                        {fmt(po.totalAmount || po.totalCost || 18500000)}
+                        {fmt(displayAmount)}
+                        {bill && Number(bill.amountTotal) !== Number(po.totalAmount) && (
+                          <div style={{ fontSize: '0.68rem', color: '#b45309', fontWeight: 600 }}>Đã điều chỉnh theo QC (gốc {fmt(po.totalAmount)})</div>
+                        )}
                       </td>
                       <td style={{ padding: '0.65rem 0.85rem' }}>
-                        <span style={{
-                          padding: '2px 8px',
-                          borderRadius: '10px',
-                          fontSize: '0.7rem',
-                          fontWeight: 800,
-                          backgroundColor: isPaid ? '#f0fdf4' : '#fffbeb',
-                          color: isPaid ? '#16a34a' : '#d97706'
-                        }}>
-                          {isPaid ? 'Đã Thanh Toán' : 'Chờ Thanh Toán'}
-                        </span>
+                        {billStatusInfo ? (
+                          <span style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 800, backgroundColor: billStatusInfo.bg, color: billStatusInfo.color, border: `1px solid ${billStatusInfo.border}` }}>
+                            {billStatusInfo.label}{bill.amountDue > 0 ? ` — Còn nợ ${fmt(bill.amountDue)}` : ''}
+                          </span>
+                        ) : (
+                          <span style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 800, backgroundColor: '#f1f5f9', color: '#64748b' }}>
+                            Chưa Lập Hóa Đơn
+                          </span>
+                        )}
                       </td>
                       <td style={{ padding: '0.65rem 0.85rem', textAlign: 'center' }}>
-                        {!isPaid ? (
+                        {!bill ? (
                           <button
-                            onClick={() => handlePayPO(po.id, po.totalAmount || po.totalCost || 18500000)}
-                            style={{ backgroundColor: '#16a34a', color: '#ffffff', border: 'none', borderRadius: '4px', padding: '0.35rem 0.75rem', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer' }}
+                            onClick={() => handleCreateBill(po)}
+                            disabled={isBusy}
+                            style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '4px', padding: '0.35rem 0.75rem', fontSize: '0.75rem', fontWeight: 800, cursor: isBusy ? 'default' : 'pointer', opacity: isBusy ? 0.6 : 1 }}
                           >
-                            Chi Trả Ngay
+                            {isBusy ? 'Đang xử lý...' : 'Lập Hóa Đơn'}
+                          </button>
+                        ) : bill.status !== 'PAID' ? (
+                          <button
+                            onClick={() => handleRegisterPayment(po)}
+                            disabled={isBusy}
+                            style={{ backgroundColor: '#16a34a', color: '#ffffff', border: 'none', borderRadius: '4px', padding: '0.35rem 0.75rem', fontSize: '0.75rem', fontWeight: 800, cursor: isBusy ? 'default' : 'pointer', opacity: isBusy ? 0.6 : 1 }}
+                          >
+                            {isBusy ? 'Đang xử lý...' : 'Chi Trả Ngay'}
                           </button>
                         ) : (
                           <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Hoàn tất</span>
@@ -1032,6 +1103,13 @@ export default function Accountant() {
                     </tr>
                   );
                 })}
+                {effectivePOs.filter(isPoBillable).length === 0 && (
+                  <tr>
+                    <td colSpan={6} style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>
+                      Chưa có đơn mua hàng nào đã nhập kho cần lập hóa đơn/thanh toán.
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -1055,9 +1133,10 @@ export default function Accountant() {
 
             <button
               onClick={handleDisburseAll}
-              style={{ backgroundColor: '#16a34a', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.45rem 1.1rem', fontSize: '0.8rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+              disabled={disbursingAll}
+              style={{ backgroundColor: disbursingAll ? '#9ca3af' : '#16a34a', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.45rem 1.1rem', fontSize: '0.8rem', fontWeight: 800, cursor: disbursingAll ? 'default' : 'pointer', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
             >
-              <Send size={15} /> Chi Lương Toàn Doanh Nghiệp
+              <Send size={15} /> {disbursingAll ? 'Đang xử lý...' : 'Chi Lương Toàn Doanh Nghiệp'}
             </button>
           </div>
 
@@ -1070,33 +1149,59 @@ export default function Accountant() {
                   <th style={{ padding: '0.65rem 0.85rem', textAlign: 'right' }}>Lương Cứng</th>
                   <th style={{ padding: '0.65rem 0.85rem', textAlign: 'right' }}>Thưởng / Phạt</th>
                   <th style={{ padding: '0.65rem 0.85rem', textAlign: 'right' }}>Thực Nhận</th>
+                  <th style={{ padding: '0.65rem 0.85rem' }}>Trạng Thái</th>
                   <th style={{ padding: '0.65rem 0.85rem', textAlign: 'center' }}>Thao Tác</th>
                 </tr>
               </thead>
               <tbody>
-                {employees.map((emp, eIdx) => {
-                  const net = parseInt(emp.salary || emp.baseSalary || 8500000) + (emp.role === 'SALES' ? 1250000 : 0) - 50000;
+                {payrolls.map((p, pIdx) => {
+                  const isPaid = p.status === 'PAID';
+                  const isReady = p.status === 'APPROVED_BY_CEO' || p.status === 'SUBMITTED_TO_ACCOUNTING';
+                  const isBusy = disbursingPayrollId === p.id;
+                  const netAdjust = (parseFloat(p.bonuses) || 0) - (parseFloat(p.deductions) || 0);
                   return (
-                    <tr key={emp.id || eIdx} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                      <td style={{ padding: '0.65rem 0.85rem', fontWeight: 700, color: '#0f172a' }}>{emp.fullname}</td>
-                      <td style={{ padding: '0.65rem 0.85rem', color: '#64748b' }}>{emp.role}</td>
-                      <td style={{ padding: '0.65rem 0.85rem', textAlign: 'right', color: '#475569' }}>{fmt(emp.salary || emp.baseSalary)}</td>
-                      <td style={{ padding: '0.65rem 0.85rem', textAlign: 'right', color: '#16a34a' }}>+1.200.000 ₫</td>
-                      <td style={{ padding: '0.65rem 0.85rem', textAlign: 'right', fontWeight: 800, color: '#0f172a' }}>{fmt(net)}</td>
+                    <tr key={p.id || pIdx} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                      <td style={{ padding: '0.65rem 0.85rem', fontWeight: 700, color: '#0f172a' }}>{p.empName}</td>
+                      <td style={{ padding: '0.65rem 0.85rem', color: '#64748b' }}>{p.employee?.role}</td>
+                      <td style={{ padding: '0.65rem 0.85rem', textAlign: 'right', color: '#475569' }}>{fmt(p.salary)}</td>
+                      <td style={{ padding: '0.65rem 0.85rem', textAlign: 'right', color: netAdjust >= 0 ? '#16a34a' : '#dc2626' }}>{netAdjust >= 0 ? '+' : ''}{fmt(netAdjust)}</td>
+                      <td style={{ padding: '0.65rem 0.85rem', textAlign: 'right', fontWeight: 800, color: '#0f172a' }}>{fmt(p.netAmount)}</td>
+                      <td style={{ padding: '0.65rem 0.85rem', fontSize: '0.72rem', color: isPaid ? '#16a34a' : isReady ? '#2563eb' : '#b45309' }}>
+                        {isPaid ? 'Đã Chi Trả' : isReady ? 'Sẵn Sàng Chi Trả' : p.status}
+                      </td>
                       <td style={{ padding: '0.65rem 0.85rem', textAlign: 'center' }}>
-                        <button
-                          onClick={() => {
-                            if (typeof disbursePayroll === 'function') disbursePayroll(emp.id);
-                            notify(`Đã chuyển khoản lương ${fmt(net)} cho ${emp.fullname}.`, 'success');
-                          }}
-                          style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '4px', padding: '0.3rem 0.65rem', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}
-                        >
-                          Chi Lương
-                        </button>
+                        {isPaid ? (
+                          <span style={{ fontSize: '0.72rem', color: '#64748b' }}>Hoàn tất</span>
+                        ) : (
+                          <button
+                            disabled={!isReady || isBusy}
+                            onClick={async () => {
+                              setDisbursingPayrollId(p.id);
+                              try {
+                                await disbursePayroll(p.id);
+                              } catch (err) {
+                                notify(`Chi lương thất bại: ${err.message || 'lỗi kết nối máy chủ'}.`, 'error');
+                              } finally {
+                                setDisbursingPayrollId(null);
+                              }
+                            }}
+                            title={!isReady ? 'Cần CEO duyệt trước khi chi trả' : undefined}
+                            style={{ backgroundColor: (!isReady || isBusy) ? '#9ca3af' : '#2563eb', color: '#ffffff', border: 'none', borderRadius: '4px', padding: '0.3rem 0.65rem', fontSize: '0.72rem', fontWeight: 700, cursor: (!isReady || isBusy) ? 'default' : 'pointer' }}
+                          >
+                            {isBusy ? 'Đang xử lý...' : 'Chi Lương'}
+                          </button>
+                        )}
                       </td>
                     </tr>
                   );
                 })}
+                {payrolls.length === 0 && (
+                  <tr>
+                    <td colSpan={7} style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>
+                      Chưa có bảng lương nào — HR cần lập bảng lương kỳ hiện tại trước.
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -1127,7 +1232,7 @@ export default function Accountant() {
 
               <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.75rem', backgroundColor: '#fef2f2', borderRadius: '6px', border: '1px solid #fecaca' }}>
                 <strong style={{ color: '#dc2626' }}>2. GIÁ VỐN HÀNG BÁN & MUA LINH KIỆN (COGS):</strong>
-                <strong style={{ color: '#dc2626', fontSize: '1rem' }}>- {fmt(unpaidPOAmount || 18500000)}</strong>
+                <strong style={{ color: '#dc2626', fontSize: '1rem' }}>- {fmt(unpaidPOAmount)}</strong>
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.75rem', backgroundColor: '#fef2f2', borderRadius: '6px', border: '1px solid #fecaca' }}>
@@ -1241,9 +1346,10 @@ export default function Accountant() {
                 <button
                   type="button"
                   onClick={handleAddManualEntry}
-                  style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.45rem 1.1rem', fontSize: '0.8rem', fontWeight: 800, cursor: 'pointer' }}
+                  disabled={submittingManualEntry}
+                  style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.45rem 1.1rem', fontSize: '0.8rem', fontWeight: 800, cursor: submittingManualEntry ? 'default' : 'pointer', opacity: submittingManualEntry ? 0.7 : 1 }}
                 >
-                  Ghi Sổ Cái
+                  {submittingManualEntry ? 'Đang lưu...' : 'Ghi Sổ Cái'}
                 </button>
               </div>
             </div>

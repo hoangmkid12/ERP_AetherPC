@@ -24,14 +24,14 @@ import { useHRStore, useSalesStore, useInventoryStore, useFinanceStore } from '.
 import { DELIVERY_REGIONS } from '../../utils/deliveryRegions';
 import { notify, confirm } from '../../context/NotificationContext';
 import { AUDIT_LOG_STATUS, getStatusLabel } from '../../utils/statusLabels';
-import { 
-  ERP_SYSTEM_MODULES, 
-  ERP_ROLES, 
-  ROLE_RELEVANT_MODULES,
-  OPERATIONAL_PERMISSIONS, 
+import {
+  ERP_SYSTEM_MODULES,
+  ERP_ROLES,
+  getRoleRelevantModules,
+  OPERATIONAL_PERMISSIONS,
   DEFAULT_OPERATIONAL_MATRIX,
-  getOperationalRbac, 
-  saveOperationalRbac 
+  getOperationalRbac,
+  saveOperationalRbac
 } from '../../utils/rbacEngine';
 
 // Register ChartJS modules
@@ -647,7 +647,7 @@ export default function SystemAdmin() {
         const rolePerms = rbacMatrix[selectedRbacRole] || {};
         const isAdminRole = selectedRbacRole === 'ADMIN';
 
-        const relevantModuleIds = ROLE_RELEVANT_MODULES[selectedRbacRole] || [];
+        const relevantModuleIds = getRoleRelevantModules(selectedRbacRole);
         const displayedModules = (showOnlyRelevant && !isAdminRole && relevantModuleIds.length > 0)
           ? ERP_SYSTEM_MODULES.filter(m => relevantModuleIds.includes(m.id))
           : ERP_SYSTEM_MODULES;

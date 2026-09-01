@@ -93,19 +93,21 @@ export const useFinanceStore = create((set, get) => ({
   },
 
   /**
-   * Fetch all purchase orders from API
+   * Fetch all purchase orders from API — the real P2P purchasing backend
+   * lives at /purchasing/orders (purchase.routes.js); this store previously
+   * called a nonexistent /purchase-orders and always 404'd silently.
    */
   getPurchaseOrders: async () => {
     try {
       set({ error: null });
-      const data = await api.get('/purchase-orders');
+      const data = await api.get('/purchasing/orders');
       const purchaseOrders = Array.isArray(data) ? data : (data?.data || []);
-      
+
       set({ purchaseOrders });
       try {
         localStorage.setItem(STORAGE_KEYS.purchaseOrders, JSON.stringify(purchaseOrders));
       } catch (e) {}
-      
+
       return purchaseOrders;
     } catch (err) {
       const errorMsg = err.message || 'Failed to fetch purchase orders';
@@ -189,58 +191,6 @@ export const useFinanceStore = create((set, get) => ({
   },
 
   /**
-   * Create a purchase order
-   */
-  createPurchaseOrder: async (poData) => {
-    try {
-      set({ error: null });
-      const newPO = await api.post('/purchase-orders', poData);
-      
-      set(state => {
-        const updated = [...state.purchaseOrders, newPO];
-        try {
-          localStorage.setItem(STORAGE_KEYS.purchaseOrders, JSON.stringify(updated));
-        } catch (e) {}
-        return { purchaseOrders: updated };
-      });
-      
-      return newPO;
-    } catch (err) {
-      const errorMsg = err.message || 'Failed to create purchase order';
-      set({ error: errorMsg });
-      console.error('Error creating purchase order:', err);
-      throw err;
-    }
-  },
-
-  /**
-   * Update a purchase order
-   */
-  updatePurchaseOrder: async (poId, poData) => {
-    try {
-      set({ error: null });
-      const updated = await api.put(`/purchase-orders/${poId}`, poData);
-      
-      set(state => {
-        const purchaseOrders = state.purchaseOrders.map(po => 
-          (po.id === poId || po.poNumber === poId) ? updated : po
-        );
-        try {
-          localStorage.setItem(STORAGE_KEYS.purchaseOrders, JSON.stringify(purchaseOrders));
-        } catch (e) {}
-        return { purchaseOrders };
-      });
-      
-      return updated;
-    } catch (err) {
-      const errorMsg = err.message || 'Failed to update purchase order';
-      set({ error: errorMsg });
-      console.error('Error updating purchase order:', err);
-      throw err;
-    }
-  },
-
-  /**
    * Update Purchase Order Status (offline/online)
    */
   updatePurchaseOrderStatus: (poId, newStatus, extraData = null) => {
@@ -281,50 +231,18 @@ export const useFinanceStore = create((set, get) => ({
   },
 
   /**
-   * Pay Supplier PO (finance)
+   * Add Manual Ledger Entry — awaits the real POST /ledger and only applies
+   * the entry locally on confirmed server success (throws on failure so the
+   * caller can show a real error instead of a fabricated "saved" state).
+   * LedgerEntry has no `category` column, so it's folded into the
+   * description text rather than silently dropped.
    */
-  paySupplierPO: (poId) => {
-    const po = get().purchaseOrders.find(p => p.id === poId || p.poNumber === poId);
-    if (!po) return;
-    const dateStr = new Date().toLocaleDateString('vi-VN');
-
-    set(state => {
-      const updatedPOs = state.purchaseOrders.map(p => {
-        if (p.id === poId || p.poNumber === poId) {
-          return { ...p, status: 'PAID' };
-        }
-        return p;
-      });
-
-      const realCost = po.totalAmount || (po.quantity || 0) * (po.unitPrice || po.unitCost || 0);
-      const newTx = {
-        id: `TXN-${Math.floor(100000 + Math.random() * 900000)}`,
-        type: 'EXPENSE',
-        amount: realCost,
-        date: dateStr,
-        description: `Thanh toán NCC: ${po.supplier?.name || po.supplierCode || ''} — ${po.poNumber || po.id}`
-      };
-      const nextLedger = [newTx, ...state.ledger];
-
-      try {
-        localStorage.setItem(STORAGE_KEYS.purchaseOrders, JSON.stringify(updatedPOs));
-        localStorage.setItem(STORAGE_KEYS.ledger, JSON.stringify(nextLedger));
-      } catch (e) {}
-
-      return { purchaseOrders: updatedPOs, ledger: nextLedger };
-    });
-  },
-
-  /**
-   * Add Manual Ledger Entry
-   */
-  addLedgerEntry: (typeOrEntry, amount, description, date = null, category = 'Vận hành văn phòng') => {
+  addLedgerEntry: async (typeOrEntry, amount, description, date = null, category = 'Vận hành văn phòng') => {
     let entryType = 'EXPENSE';
     let entryAmount = 0;
     let entryDesc = '';
     let entryDate = date || new Date().toLocaleDateString('vi-VN');
     let entryCat = category;
-    let customId = null;
     let referenceId = null;
 
     if (typeof typeOrEntry === 'object' && typeOrEntry !== null) {
@@ -333,7 +251,6 @@ export const useFinanceStore = create((set, get) => ({
       entryDesc = typeOrEntry.description || '';
       entryDate = typeOrEntry.date || new Date().toLocaleDateString('vi-VN');
       entryCat = typeOrEntry.category || category;
-      customId = typeOrEntry.id;
       referenceId = typeOrEntry.referenceId;
     } else {
       entryType = String(typeOrEntry || 'EXPENSE').toUpperCase();
@@ -343,16 +260,16 @@ export const useFinanceStore = create((set, get) => ({
       entryCat = category;
     }
 
-    const newTxId = customId || `TXN-${Math.floor(100000 + Math.random() * 900000)}`;
-    const newTx = {
-      id: newTxId,
+    const fullDescription = entryCat ? `[${entryCat}] ${entryDesc}` : entryDesc;
+    const res = await api.post('/ledger', {
       type: entryType,
       amount: entryAmount,
+      description: fullDescription,
       date: entryDate,
-      description: entryDesc,
-      category: entryCat,
       ...(referenceId ? { referenceId } : {})
-    };
+    });
+    const newTx = res?.data;
+    if (!newTx) throw new Error(res?.message || 'Không thể ghi bút toán vào Sổ Cái.');
 
     set(state => {
       const nextLedger = [newTx, ...(state.ledger || [])];
@@ -362,93 +279,36 @@ export const useFinanceStore = create((set, get) => ({
       return { ledger: nextLedger };
     });
 
-    api.post('/ledger', newTx).catch(() => {});
     return newTx;
   },
 
   /**
    * Disburse single employee payroll
    */
-  disbursePayroll: (empId) => {
-    const hrState = useHRStore.getState();
-    const payrolls = hrState.payrolls || [];
-    const payrollItem = payrolls.find(p => p.empId === empId);
-    if (!payrollItem) return;
+  disbursePayroll: async (payrollId) => {
+    const res = await api.post(`/hr/payrolls/${payrollId}/disburse`);
+    if (!res?.success) throw new Error(res?.message || 'Không thể giải ngân bảng lương.');
 
-    const dateStr = new Date().toLocaleDateString('vi-VN');
-    const empName = payrollItem.name || payrollItem.empName || `Nhân viên #${payrollItem.empId}`;
+    // Backend already wrote the real Payroll status + LedgerEntry — refresh
+    // both caches from the server instead of guessing the new state locally.
+    await Promise.allSettled([get().getLedger(), useHRStore.getState().getPayrolls()]);
 
-    set(state => {
-      const newTxId = `TXN-${Math.floor(100000 + Math.random() * 900000)}`;
-      const newTx = {
-        id: newTxId,
-        type: 'EXPENSE',
-        amount: payrollItem.netSalary || payrollItem.netAmount || 0,
-        date: dateStr,
-        description: `Chi trả lương thực nhận nhân viên ${empName} (Công hưởng lương: ${payrollItem.presentDays || 26}/26 ngày)`
-      };
-      const nextLedger = [newTx, ...state.ledger];
-      try { localStorage.setItem(STORAGE_KEYS.ledger, JSON.stringify(nextLedger)); } catch (e) {}
-      return { ledger: nextLedger };
-    });
-
-    const nextPayrolls = payrolls.map(p => {
-      if (p.empId === empId) {
-        return { ...p, status: 'PAID', disbursedDate: dateStr };
-      }
-      return p;
-    });
-    const updatedEmployees = (hrState.employees || []).map(e => e.id === empId ? { ...e, salaryPaid: true } : e);
-    useHRStore.setState({ payrolls: nextPayrolls, employees: updatedEmployees });
-    try {
-      localStorage.setItem('erp_payrolls', JSON.stringify(nextPayrolls));
-      localStorage.setItem('erp_employees', JSON.stringify(updatedEmployees));
-    } catch (e) {}
-
-    notify(`Đã giải ngân thành công ${new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(payrollItem.netSalary || payrollItem.netAmount || 0)} cho nhân viên ${empName}.`, 'success');
+    const empName = res.data?.empName || `Nhân viên #${res.data?.empId}`;
+    notify(`Đã giải ngân thành công ${new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(res.data?.netAmount || 0)} cho nhân viên ${empName}.`, 'success');
+    return res.data;
   },
 
   /**
    * Disburse all approved payrolls
    */
-  disburseAllPayrolls: () => {
-    const hrState = useHRStore.getState();
-    const payrolls = hrState.payrolls || [];
-    const eligiblePayrolls = payrolls.filter(p => p.status === 'APPROVED_BY_CEO' || p.status === 'SUBMITTED_TO_ACCOUNTING');
-    if (eligiblePayrolls.length === 0) {
-      notify('Không có bảng lương nào đang chờ giải ngân.', 'error');
-      return;
-    }
+  disburseAllPayrolls: async () => {
+    const res = await api.post('/hr/payrolls/disburse-all');
+    if (!res?.success) throw new Error(res?.message || 'Không có bảng lương nào đang chờ giải ngân.');
 
-    const dateStr = new Date().toLocaleDateString('vi-VN');
-    const newTxs = eligiblePayrolls.map(p => {
-      const empName = p.name || p.empName || `Nhân viên #${p.empId}`;
-      return {
-        id: `TXN-${Math.floor(100000 + Math.random() * 900000)}`,
-        type: 'EXPENSE',
-        amount: p.netSalary || p.netAmount || 0,
-        date: dateStr,
-        description: `Chi trả lương thực nhận nhân viên ${empName} (Công hưởng lương: ${p.presentDays || 26}/26 ngày)`
-      };
-    });
+    await Promise.allSettled([get().getLedger(), useHRStore.getState().getPayrolls()]);
 
-    set(state => {
-      const nextLedger = [...newTxs, ...state.ledger];
-      try { localStorage.setItem(STORAGE_KEYS.ledger, JSON.stringify(nextLedger)); } catch (e) {}
-      return { ledger: nextLedger };
-    });
-
-    const eligibleIds = eligiblePayrolls.map(p => p.empId);
-    const nextPayrolls = payrolls.map(p => {
-      if (eligibleIds.includes(p.empId)) {
-        return { ...p, status: 'PAID', disbursedDate: dateStr };
-      }
-      return p;
-    });
-    useHRStore.setState({ payrolls: nextPayrolls });
-    try { localStorage.setItem('erp_payrolls', JSON.stringify(nextPayrolls)); } catch (e) {}
-
-    notify(`Kế toán đã giải ngân chi trả lương thành công cho ${eligiblePayrolls.length} nhân viên.`, 'success');
+    notify(`Kế toán đã giải ngân chi trả lương thành công cho ${res.data?.count || 0} nhân viên.`, 'success');
+    return res.data;
   },
 
   /**

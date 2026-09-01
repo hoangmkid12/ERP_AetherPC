@@ -909,7 +909,7 @@ const qcInspectReturn = async (req, res, next) => {
 const confirmReturnWarehouse = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { isSellable = true, shelfLocation, shelfNote, note, type } = req.body;
+    const { shelfLocation, shelfNote, note, type } = req.body;
     const changedBy = req.user?.fullname || req.user?.name || 'Thủ kho';
 
     const order = await prisma.$transaction(async (tx) => {
@@ -929,8 +929,12 @@ const confirmReturnWarehouse = async (req, res, next) => {
       const effectiveType = type || returnReq?.type || 'REFUND';
       const isExchange = effectiveType === 'EXCHANGE';
 
-      // 1. Tăng tồn kho sản phẩm nếu hàng còn mới/nguyên tem (Kệ A1, Kệ B3)
-      if (['SHELF_A1_RESTOCK', 'SHELF_B3_OUTLET'].includes(shelfLocation) || isSellable) {
+      // 1. Chỉ tăng tồn kho khi hàng thật sự vào kệ bán được (Kệ A1/B3) —
+      // trước đây `isSellable` mặc định `true` nên hàng gửi hãng bảo hành
+      // (SHELF_C2_VENDOR) hoặc phế phẩm (SHELF_D_SCRAP) vẫn vô tình được
+      // cộng vào tồn kho bán, dù chưa hề rời khỏi kho về mặt vật lý để bán.
+      const isSellableShelf = ['SHELF_A1_RESTOCK', 'SHELF_B3_OUTLET'].includes(shelfLocation);
+      if (isSellableShelf) {
         for (const item of existingOrder.items) {
           await tx.product.update({
             where: { productId: item.productId },
@@ -1011,7 +1015,17 @@ const confirmReturnWarehouse = async (req, res, next) => {
         }
       }
 
-      const targetStatus = isExchange ? 'EXCHANGED' : 'RESTOCKED';
+      // Trước đây hàm này chỉ tính được 2 kết quả (EXCHANGED/RESTOCKED) dù
+      // Kho thực tế có 4 lựa chọn kệ (bán mới, outlet, gửi hãng, phế phẩm) —
+      // 2 lựa chọn còn lại rơi vào 'RESTOCKED' sai nghĩa dù hàng không hề
+      // được nhập lại kho bán.
+      const targetStatus = shelfLocation === 'SHELF_D_SCRAP'
+        ? 'INSPECTED_SCRAP'
+        : shelfLocation === 'SHELF_C2_VENDOR'
+          ? 'VENDOR_WARRANTY'
+          : isExchange
+            ? 'EXCHANGED'
+            : 'RESTOCKED';
 
       // 3. Cập nhật ReturnRequest
       if (returnReq) {
@@ -1034,13 +1048,21 @@ const confirmReturnWarehouse = async (req, res, next) => {
         data: { status: targetStatus }
       });
 
+      const historyNote = note || (
+        targetStatus === 'INSPECTED_SCRAP'
+          ? `Kho đã xếp kiện hàng vào khu phế phẩm (${shelfLocation}). Không nhập lại tồn kho bán.`
+          : targetStatus === 'VENDOR_WARRANTY'
+            ? `Kho đã xếp kiện hàng vào khu chờ gửi hãng bảo hành (${shelfLocation}). Không nhập lại tồn kho bán.`
+            : isExchange
+              ? `Kho đã nhập kiện hàng cũ vào ${shelfLocation || 'kệ kho'}. Đã tự động tạo Đơn Đổi Mới #${replacementOrderId} chuyển Kho xuất hàng cho khách.`
+              : `Kho đã nhập kiện hàng vào ${shelfLocation || 'kệ kho'}. Đã lập Phiếu đề nghị chuyển Kế toán giải ngân hoàn tiền Napas247.`
+      );
+
       await tx.orderStatusHistory.create({
         data: {
           orderId: existingOrder.orderId,
           status: targetStatus,
-          note: note || (isExchange
-            ? `Kho đã nhập kiện hàng cũ vào ${shelfLocation || 'kệ kho'}. Đã tự động tạo Đơn Đổi Mới #${replacementOrderId} chuyển Kho xuất hàng cho khách.`
-            : `Kho đã nhập kiện hàng vào ${shelfLocation || 'kệ kho'}. Đã lập Phiếu đề nghị chuyển Kế toán giải ngân hoàn tiền Napas247.`),
+          note: historyNote,
           changedBy
         }
       });
@@ -1048,13 +1070,15 @@ const confirmReturnWarehouse = async (req, res, next) => {
       return { ...updatedOrder, replacementOrderId };
     });
 
-    res.json({
-      success: true,
-      message: order.replacementOrderId 
-        ? `Đã nhập kho thành công kiện hàng cũ và tự động khởi tạo Đơn Đổi Mới #${order.replacementOrderId}!`
-        : 'Kho đã xác nhận nhập lại kho thành công! Đã chuyển Phiếu Đề Nghị Chi sang Kế toán giải ngân.',
-      data: order
-    });
+    const resultMessage = order.replacementOrderId
+      ? `Đã nhập kho kiện hàng cũ và tự động khởi tạo Đơn Đổi Mới #${order.replacementOrderId}.`
+      : order.status === 'INSPECTED_SCRAP'
+        ? 'Đã ghi nhận kiện hàng vào khu phế phẩm. Không cộng vào tồn kho bán.'
+        : order.status === 'VENDOR_WARRANTY'
+          ? 'Đã ghi nhận kiện hàng chuyển gửi hãng bảo hành. Không cộng vào tồn kho bán.'
+          : 'Kho đã xác nhận nhập lại kho thành công. Đã chuyển Phiếu Đề Nghị Chi sang Kế toán giải ngân.';
+
+    res.json({ success: true, message: resultMessage, data: order });
   } catch (err) {
     next(err);
   }

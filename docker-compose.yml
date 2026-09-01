@@ -18,7 +18,22 @@ services:
       timeout: 5s
       retries: 5
 
-  # 2. Backend Service (Express Node.js)
+  # 2. Redis Service — cần cho hàng đợi xử lý đơn hàng (orderQueue.js/
+  # orderWorker.js dùng ioredis qua REDIS_URL). Trước đây không có service này
+  # trong compose stack nên `npm run queue:worker` không thể chạy khi deploy.
+  redis:
+    image: redis:7-alpine
+    container_name: kltn_redis
+    restart: always
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # 3. Backend Service (Express Node.js)
   backend:
     build:
       context: ./backend
@@ -33,6 +48,7 @@ services:
     # Ghi đè DATABASE_URL để kết nối tới DB container thay vì localhost của host machine
     environment:
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/kltn_erp?schema=public
+      - REDIS_URL=redis://redis:6379
       - NODE_ENV=development
     volumes:
       - ./backend:/app
@@ -41,6 +57,35 @@ services:
       - ./scraper:/scraper
     depends_on:
       db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # 4. Order Queue Worker — tiến trình xử lý nền riêng biệt (KHÔNG phải bản
+  # sao của backend service ở trên): backend/src/app.js không import
+  # orderQueue.js nên API chính không phụ thuộc Redis, nhưng bất kỳ đơn hàng
+  # nào được đẩy vào hàng đợi (nếu tính năng này được bật) sẽ không có gì xử
+  # lý nếu thiếu service này. An toàn để tắt (comment lại) nếu chưa dùng.
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: kltn_order_worker
+    restart: always
+    command: npm run queue:worker
+    env_file:
+      - ./backend/.env
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/kltn_erp?schema=public
+      - REDIS_URL=redis://redis:6379
+      - NODE_ENV=development
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
 
   # 3. Frontend Service (Vite React)

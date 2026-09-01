@@ -1,12 +1,69 @@
 const prisma = require('../config/database');
+const { normalizeQcRole } = require('../constants/roles');
 
 // GET /api/v1/purchasing/suppliers
 const getSuppliers = async (req, res, next) => {
   try {
     const suppliers = await prisma.supplier.findMany({
-      orderBy: { name: 'asc' }
+      orderBy: { name: 'asc' },
+      include: {
+        evaluations: { orderBy: { evaluatedAt: 'desc' } }
+      }
     });
     res.json({ success: true, data: suppliers });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// POST /api/v1/purchasing/suppliers/:code/evaluations
+// Điểm nhập trên thang 0-10 nhưng cột DB là numeric(3,2) nên giá trị lưu tối đa
+// là 9.99 — validate rõ để không bao giờ chạm lỗi tràn số ở tầng Postgres.
+const createSupplierEvaluation = async (req, res, next) => {
+  try {
+    const { code } = req.params;
+    const { period, qualityScore, deliveryScore, priceScore } = req.body;
+
+    const supplier = await prisma.supplier.findUnique({ where: { code } });
+    if (!supplier) {
+      const error = new Error('Không tìm thấy nhà cung cấp.');
+      error.statusCode = 404;
+      throw error;
+    }
+
+    if (!period || !String(period).trim()) {
+      const error = new Error('Vui lòng nhập kỳ đánh giá (VD: 2026-Q3).');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const scores = { qualityScore, deliveryScore, priceScore };
+    for (const [key, val] of Object.entries(scores)) {
+      const num = Number(val);
+      if (val === undefined || val === null || val === '' || Number.isNaN(num) || num < 0 || num > 9.99) {
+        const error = new Error(`Điểm "${key}" phải là số từ 0 đến 9.99 (thang 0-10, giới hạn 2 chữ số thập phân).`);
+        error.statusCode = 400;
+        throw error;
+      }
+    }
+
+    const q = Number(qualityScore);
+    const d = Number(deliveryScore);
+    const p = Number(priceScore);
+    const overallScore = Math.round(((q + d + p) / 3) * 100) / 100;
+
+    const evaluation = await prisma.supplierEvaluation.create({
+      data: {
+        supplierCode: code,
+        period: String(period).trim(),
+        qualityScore: q,
+        deliveryScore: d,
+        priceScore: p,
+        overallScore
+      }
+    });
+
+    res.status(201).json({ success: true, data: evaluation });
   } catch (err) {
     next(err);
   }
@@ -62,6 +119,12 @@ const getPurchaseOrders = async (req, res, next) => {
         },
         statusHistory: {
           orderBy: { timestamp: 'asc' }
+        },
+        releases: {
+          select: { id: true, poNumber: true, totalAmount: true, status: true, createdAt: true }
+        },
+        blanketRef: {
+          select: { id: true, poNumber: true, blanketCapAmount: true, blanketValidUntil: true }
         }
       },
       orderBy: { createdAt: 'desc' }
@@ -75,7 +138,7 @@ const getPurchaseOrders = async (req, res, next) => {
 // POST /api/v1/purchasing/orders
 const createPurchaseOrder = async (req, res, next) => {
   try {
-    const { supplierCode, expectedDeliveryDate, items } = req.body;
+    const { supplierCode, expectedDeliveryDate, items, isBlanket, blanketCapAmount, blanketValidUntil, blanketRefId } = req.body;
     const createdBy = req.user ? req.user.email || req.user.code || 'Staff' : 'Staff';
 
     if (!supplierCode || !items || items.length === 0) {
@@ -89,6 +152,32 @@ const createPurchaseOrder = async (req, res, next) => {
       });
       if (!supplier) {
         throw new Error(`Supplier not found: ${supplierCode}`);
+      }
+
+      // 1b. If this order is being released against an existing blanket (hợp đồng
+      // khung) PO, verify the blanket is still valid and the release won't push
+      // total consumption past its cap before creating anything.
+      let blanket = null;
+      if (blanketRefId) {
+        blanket = await tx.purchaseOrder.findUnique({
+          where: { id: parseInt(blanketRefId) },
+          include: { releases: true }
+        });
+        if (!blanket || !blanket.isBlanket) {
+          const error = new Error('Không tìm thấy hợp đồng khung tương ứng.');
+          error.statusCode = 404;
+          throw error;
+        }
+        if (blanket.supplierCode !== supplierCode) {
+          const error = new Error('Hợp đồng khung này thuộc về một nhà cung cấp khác.');
+          error.statusCode = 400;
+          throw error;
+        }
+        if (blanket.blanketValidUntil && new Date(blanket.blanketValidUntil) < new Date()) {
+          const error = new Error(`Hợp đồng khung đã hết hiệu lực từ ${new Date(blanket.blanketValidUntil).toLocaleDateString('vi-VN')}.`);
+          error.statusCode = 409;
+          throw error;
+        }
       }
 
       // 2. Generate poNumber (PO-YYYYMMDD-XXXX)
@@ -135,6 +224,22 @@ const createPurchaseOrder = async (req, res, next) => {
         });
       }
 
+      // 3b. A release against a blanket PO must not push cumulative spend past
+      // the blanket's cap. Checked against real item totals, not a guess.
+      if (blanket && blanket.blanketCapAmount) {
+        const usedSoFar = blanket.releases.reduce((sum, r) => sum + (parseFloat(r.totalAmount) || 0), 0);
+        const cap = parseFloat(blanket.blanketCapAmount);
+        if (usedSoFar + totalAmount > cap) {
+          const remaining = Math.max(0, cap - usedSoFar);
+          const error = new Error(
+            `Đơn mua này (${totalAmount.toLocaleString('vi-VN')}đ) vượt hạn mức còn lại của hợp đồng khung ` +
+            `(đã dùng ${usedSoFar.toLocaleString('vi-VN')}đ / ${cap.toLocaleString('vi-VN')}đ, còn lại ${remaining.toLocaleString('vi-VN')}đ).`
+          );
+          error.statusCode = 409;
+          throw error;
+        }
+      }
+
       // 4. Create the purchase order (Standard Odoo starts with RFQ)
       const po = await tx.purchaseOrder.create({
         data: {
@@ -144,6 +249,10 @@ const createPurchaseOrder = async (req, res, next) => {
           totalAmount,
           expectedDeliveryDate: expectedDeliveryDate ? new Date(expectedDeliveryDate) : null,
           createdBy,
+          isBlanket: !!isBlanket,
+          blanketCapAmount: isBlanket && blanketCapAmount ? parseFloat(blanketCapAmount) : null,
+          blanketValidUntil: isBlanket && blanketValidUntil ? new Date(blanketValidUntil) : null,
+          blanketRefId: blanket ? blanket.id : null,
           items: {
             create: itemsData
           }
@@ -162,7 +271,11 @@ const createPurchaseOrder = async (req, res, next) => {
         data: {
           poId: po.id,
           status: 'RFQ',
-          note: 'Khởi tạo Yêu Cầu Báo Giá (RFQ)',
+          note: isBlanket
+            ? 'Khởi tạo Hợp Đồng Khung (Blanket PO)'
+            : blanket
+              ? `Tạo đơn mua theo hợp đồng khung ${blanket.poNumber}`
+              : 'Khởi tạo Yêu Cầu Báo Giá (RFQ)',
           changedBy: req.user?.email || req.user?.code || req.user?.name || null,
           changedByRole: req.user?.role || null
         }
@@ -246,10 +359,11 @@ const updatePurchaseOrderStatus = async (req, res, next) => {
             RFQ_SENT: ['CANCELLED'],
             QUOTED: ['CANCELLED']
           },
-          QC: { CONFIRMED_BY_SUPPLIER: ['QA_PASSED', 'QA_PARTIAL', 'QA_REJECTED'] },
-          QA: { CONFIRMED_BY_SUPPLIER: ['QA_PASSED', 'QA_PARTIAL', 'QA_REJECTED'] }
+          // QC/QA/QUALITY_CONTROL đều được chuẩn hoá về 'QC' qua normalizeQcRole
+          // trước khi tra bảng này (xem constants/roles.js).
+          QC: { CONFIRMED_BY_SUPPLIER: ['QA_PASSED', 'QA_PARTIAL', 'QA_REJECTED'] }
         };
-        const permitted = allowedTransitionsByRole[userRole];
+        const permitted = allowedTransitionsByRole[normalizeQcRole(userRole)];
         if (!permitted || !permitted[po.status]?.includes(status)) {
           const error = new Error('Trạng thái đơn hàng không hợp lệ cho vai trò hiện tại.');
           error.statusCode = 403;
@@ -257,10 +371,13 @@ const updatePurchaseOrderStatus = async (req, res, next) => {
         }
       }
 
-      // Check restriction: ONLY CEO (or ADMIN) can approve QUOTED -> PO
+      // Duyệt QUOTED -> PO: chỉ CEO/ADMIN được quyền phát hành PO chính thức,
+      // bất kể giá trị đơn — CEO cần nắm được mọi đơn mua hàng, không đặt hạn mức.
       if (status === 'PO' && po.status === 'QUOTED') {
         if (userRole !== 'CEO' && userRole !== 'ADMIN') {
-          throw new Error('Chỉ CEO (Ban Giám Đốc) mới có quyền duyệt báo giá mua hàng.');
+          const error = new Error('Chỉ CEO (Ban Giám Đốc) mới có quyền duyệt báo giá thành PO chính thức.');
+          error.statusCode = 403;
+          throw error;
         }
       }
 
@@ -412,7 +529,7 @@ const createVendorBill = async (req, res, next) => {
   try {
     const { id } = req.params; // poId
 
-    const bill = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx) => {
       const po = await tx.purchaseOrder.findUnique({
         where: { id: parseInt(id) },
         include: { supplier: true }
@@ -428,23 +545,75 @@ const createVendorBill = async (req, res, next) => {
       const dateStr = new Date().toISOString().slice(2, 10).replace(/-/g, '');
       const billNumber = `BILL/${dateStr}/${Math.floor(1000 + Math.random() * 9000)}`;
 
+      // Đối chiếu tỷ lệ nghiệm thu QC trước khi chốt số tiền hóa đơn. QcInspection
+      // ghi theo receipt (tổng số lượng), không theo từng dòng hàng, nên đây chỉ là
+      // đối chiếu ở mức TỶ LỆ TỔNG — không thể chính xác tuyệt đối theo từng SKU.
+      // Nếu chưa có nghiệm thu nào gắn với PO (PO cũ/luồng đơn giản), giữ nguyên
+      // hành vi cũ để không phá luồng hiện có.
+      const receipts = await tx.goodsReceipt.findMany({
+        where: { poId: po.id },
+        include: { qcInspections: true }
+      });
+      const inspections = receipts.flatMap(r => r.qcInspections);
+      const totalPassed = inspections.reduce((sum, i) => sum + (i.passedQuantity || 0), 0);
+      const totalDefective = inspections.reduce((sum, i) => sum + (i.defectiveQuantity || 0), 0);
+      const totalInspected = totalPassed + totalDefective;
+
+      const originalAmount = parseFloat(po.totalAmount) || 0;
+      let amountTotal = originalAmount;
+      let acceptRatio = null;
+      if (totalInspected > 0) {
+        acceptRatio = totalPassed / totalInspected;
+        if (acceptRatio < 1) {
+          amountTotal = Math.round(originalAmount * acceptRatio);
+        }
+      }
+
       const newBill = await tx.vendorBill.create({
         data: {
           poId: po.id,
           supplierCode: po.supplierCode,
           billNumber,
-          status: 'POSTED',
-          amountTotal: po.totalAmount,
-          amountDue: po.totalAmount,
+          // A fully-rejected QC ratio (0 units passed) can legitimately zero out
+          // amountTotal — that bill owes nothing and must start PAID, or it sits
+          // "unpaid" forever and blocks checkAndUpdatePoCompletion indefinitely.
+          status: amountTotal <= 0 ? 'PAID' : 'POSTED',
+          amountTotal,
+          amountDue: amountTotal,
           amountPaid: 0,
           billDate: new Date(),
           dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days from now
         }
       });
-      return newBill;
+
+      if (amountTotal <= 0) {
+        await checkAndUpdatePoCompletion(tx, po.id);
+      }
+
+      if (acceptRatio !== null && acceptRatio < 1) {
+        await tx.purchaseOrderStatusHistory.create({
+          data: {
+            poId: po.id,
+            status: po.status,
+            note: `Đối chiếu QC: tỷ lệ nghiệm thu đạt ${(acceptRatio * 100).toFixed(1)}% (${totalPassed}/${totalInspected}) — điều chỉnh hóa đơn ${billNumber} từ ${originalAmount.toLocaleString('vi-VN')}đ xuống ${amountTotal.toLocaleString('vi-VN')}đ.`,
+            changedBy: req.user?.email || req.user?.code,
+            changedByRole: req.user?.role
+          }
+        });
+      }
+
+      return { bill: newBill, originalAmount, acceptRatio };
     });
 
-    res.status(201).json({ success: true, message: 'Vendor Bill created successfully', data: bill });
+    const { bill: newBill, originalAmount, acceptRatio } = result;
+    res.status(201).json({
+      success: true,
+      message: 'Vendor Bill created successfully',
+      data: newBill,
+      qcAdjustment: acceptRatio !== null && acceptRatio < 1
+        ? { acceptRatio, originalAmount, adjustedAmount: parseFloat(newBill.amountTotal) }
+        : null
+    });
   } catch (err) {
     next(err);
   }
@@ -637,6 +806,7 @@ const validateReceipt = async (req, res, next) => {
 
 module.exports = {
   getSuppliers,
+  createSupplierEvaluation,
   getPurchasingProducts,
   getPurchaseOrders,
   createPurchaseOrder,

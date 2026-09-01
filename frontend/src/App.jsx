@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
 import { NotificationProvider } from './context/NotificationContext';
 import { initializeAllStores } from './stores';
+import { getRolesForModule } from './utils/rbacEngine';
 
 // Storefront Components
 import Header from './components/Layout/Header';
@@ -35,7 +36,6 @@ import HRManager from './pages/Admin/HRManager';
 import Accountant from './pages/Admin/Accountant';
 import Purchasing from './pages/Admin/Purchasing';
 import SystemAdmin from './pages/Admin/SystemAdmin';
-import MyPayroll from './pages/Admin/MyPayroll';
 import SupplierPortal from './pages/SupplierPortal';
 import CustomerService from './pages/Admin/CustomerService';
 import Delivery from './pages/Admin/Delivery';
@@ -199,76 +199,71 @@ export default function App() {
                   <Route index element={<AdminIndexRedirect />} />
                   
                   <Route path="dashboard" element={
-                    <ProtectedRoute allowedRoles={['CEO', 'ADMIN']}>
+                    <ProtectedRoute allowedRoles={getRolesForModule('dashboard')}>
                       <Dashboard />
                     </ProtectedRoute>
                   } />
-                  
+
                   <Route path="sales" element={
-                    <ProtectedRoute allowedRoles={['CEO', 'SALES', 'SALES_MANAGER', 'ADMIN']}>
+                    <ProtectedRoute allowedRoles={getRolesForModule('sales')}>
                       <SalesPOS />
                     </ProtectedRoute>
                   } />
-                  
+
                   <Route path="warehouse" element={
-                    <ProtectedRoute allowedRoles={['CEO', 'WAREHOUSE', 'WAREHOUSE_MANAGER', 'SALES_MANAGER', 'SALES', 'ADMIN']}>
+                    <ProtectedRoute allowedRoles={getRolesForModule('warehouse')}>
                       <Warehouse />
                     </ProtectedRoute>
                   } />
-                  
+
                   <Route path="assembly" element={
-                    <ProtectedRoute allowedRoles={['ASSEMBLY', 'CEO', 'ADMIN']}>
+                    <ProtectedRoute allowedRoles={getRolesForModule('assembly')}>
                       <Assembly />
                     </ProtectedRoute>
                   } />
 
                   <Route path="hr" element={
-                    <ProtectedRoute allowedRoles={['CEO', 'HR', 'ADMIN', 'ACCOUNTANT']}>
+                    <ProtectedRoute allowedRoles={getRolesForModule('hr')}>
                       <HRManager />
                     </ProtectedRoute>
                   } />
 
                   <Route path="accounting" element={
-                    <ProtectedRoute allowedRoles={['CEO', 'ACCOUNTANT', 'ADMIN']}>
+                    <ProtectedRoute allowedRoles={getRolesForModule('accounting')}>
                       <Accountant />
                     </ProtectedRoute>
                   } />
 
                   <Route path="purchasing" element={
-                    <ProtectedRoute allowedRoles={['CEO', 'PURCHASING', 'WAREHOUSE_MANAGER', 'ADMIN']}>
+                    <ProtectedRoute allowedRoles={getRolesForModule('purchasing')}>
                       <Purchasing />
                     </ProtectedRoute>
                   } />
 
                   <Route path="quality-control" element={
-                    <ProtectedRoute allowedRoles={['QC', 'QA', 'QUALITY_CONTROL', 'CEO', 'ADMIN', 'WAREHOUSE', 'WAREHOUSE_MANAGER', 'PURCHASING']}>
+                    <ProtectedRoute allowedRoles={getRolesForModule('quality-control')}>
                       <QualityControl />
                     </ProtectedRoute>
                   } />
 
                   <Route path="system" element={
-                    <ProtectedRoute allowedRoles={['ADMIN']}>
+                    <ProtectedRoute allowedRoles={getRolesForModule('system')}>
                       <SystemAdmin />
                     </ProtectedRoute>
                   } />
 
                   <Route path="cskh" element={
-                    <ProtectedRoute allowedRoles={['CSKH', 'ADMIN', 'SALES_MANAGER', 'CEO']}>
+                    <ProtectedRoute allowedRoles={getRolesForModule('cskh')}>
                       <CustomerService />
                     </ProtectedRoute>
                   } />
 
                   <Route path="delivery" element={
-                    <ProtectedRoute allowedRoles={['DELIVERY', 'WAREHOUSE', 'WAREHOUSE_MANAGER', 'SALES_MANAGER', 'ADMIN', 'CEO']}>
+                    <ProtectedRoute allowedRoles={getRolesForModule('delivery')}>
                       <Delivery />
                     </ProtectedRoute>
                   } />
 
-                  <Route path="my-payroll" element={
-                    <ProtectedRoute allowedRoles={['CEO', 'SALES', 'SALES_MANAGER', 'WAREHOUSE', 'WAREHOUSE_MANAGER', 'ASSEMBLY', 'HR', 'ACCOUNTANT', 'PURCHASING', 'ADMIN', 'CSKH', 'DELIVERY', 'QC', 'QA', 'QUALITY_CONTROL']}>
-                      <MyPayroll />
-                    </ProtectedRoute>
-                  } />
                 </Route>
 
                 {/* Supplier Portal Layout Routes */}

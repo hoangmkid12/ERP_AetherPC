@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { usePermission } from '../../hooks/usePermission';
 import { useInventoryStore, useSalesStore, useFinanceStore } from '../../stores';
 import { notify, promptText } from '../../context/NotificationContext';
-import { PO_STATUS, getStatusInfo, getStatusLabel } from '../../utils/statusLabels';
+import { PO_STATUS, VENDOR_BILL_STATUS, getStatusInfo, getStatusLabel } from '../../utils/statusLabels';
 import { api } from '../../services/api';
 import ActorNotificationBar from '../../components/ActorNotificationBar';
 import { 
@@ -124,8 +124,13 @@ export default function Purchasing() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showCompareModal, setShowCompareModal] = useState(false);
   const [selectedPO, setSelectedPO] = useState(null); // for viewing details
-  const [viewMode, setViewMode] = useState('PO'); // 'PO', 'RECEIPT', 'BILL'
   const [selectedGroupKey, setSelectedGroupKey] = useState(null); // key of the rfq-group to compare
+
+  // Supplier evaluation modal
+  const [evalTargetSupplier, setEvalTargetSupplier] = useState(null); // supplier code, or null when closed
+  const [evalForm, setEvalForm] = useState({ period: '', qualityScore: '', deliveryScore: '', priceScore: '' });
+  const [evalSubmitting, setEvalSubmitting] = useState(false);
+  const [evalError, setEvalError] = useState(null);
 
   // Build groups of RFQs that share the same set of product IDs (same batch from multi-supplier RFQ)
   const rfqGroups = (() => {
@@ -152,6 +157,12 @@ export default function Purchasing() {
   const [isMultiSupplierRFQ, setIsMultiSupplierRFQ] = useState(false);
   const [expectedDeliveryDate, setExpectedDeliveryDate] = useState('');
   const [poItems, setPoItems] = useState([]);
+
+  // Hợp đồng khung (blanket PO) — single-supplier RFQ only
+  const [poIsBlanket, setPoIsBlanket] = useState(false);
+  const [poBlanketCap, setPoBlanketCap] = useState('');
+  const [poBlanketValidUntil, setPoBlanketValidUntil] = useState('');
+  const [poBlanketRefId, setPoBlanketRefId] = useState(null); // set when creating a release against an existing blanket
   
   // Add item form state
   const [selectedProduct, setSelectedProduct] = useState('');
@@ -203,12 +214,18 @@ export default function Purchasing() {
     const product = effectiveCatalog.find(p => String(p.id) === String(backorderItem.productId));
     const supp = product?.supplier || 'Intel Vietnam';
     const suppObj = suppliers.find(s => s.name === supp || s.code === supp);
-    
+
     setSelectedSupplier(suppObj ? suppObj.code : (suppliers[0]?.code || 's1'));
     setSelectedSuppliersList([suppObj ? suppObj.code : (suppliers[0]?.code || 's1'), '']);
     setIsMultiSupplierRFQ(false);
     setExpectedDeliveryDate(new Date(Date.now() + 86400000 * 3).toISOString().split('T')[0]);
-    
+    // Reset blanket-PO state — a stale link from a previous "Tạo Đơn Mua Lặp
+    // Lại" flow must never silently attach this unrelated RFQ to that blanket.
+    setPoIsBlanket(false);
+    setPoBlanketCap('');
+    setPoBlanketValidUntil('');
+    setPoBlanketRefId(null);
+
     const estCost = product?.price ? Math.round(Number(product.price) * 0.8) : 1500000;
     setPoItems([{
       productId: String(backorderItem.productId),
@@ -226,7 +243,36 @@ export default function Purchasing() {
     setIsMultiSupplierRFQ(false);
     setExpectedDeliveryDate('');
     setPoItems([]);
+    setPoIsBlanket(false);
+    setPoBlanketCap('');
+    setPoBlanketValidUntil('');
+    setPoBlanketRefId(null);
     try { window.history.replaceState({}, document.title); } catch (_) {}
+    setShowCreateModal(true);
+  };
+
+  // Pre-fills the create-RFQ form with the same supplier + items/prices as an
+  // existing PO, for "mua đúng linh kiện từ đúng NCC quen thuộc" without
+  // retyping the whole RFQ. Works on any PO; if the source PO is itself a
+  // blanket agreement, the new order becomes a release against it so the
+  // cap/expiry enforcement on the backend applies.
+  const handleDuplicatePO = (po) => {
+    if (!po) return;
+    setSelectedSupplier(po.supplierCode || po.supplier?.code || '');
+    setSelectedSuppliersList([po.supplierCode || po.supplier?.code || '', '']);
+    setIsMultiSupplierRFQ(false);
+    setExpectedDeliveryDate('');
+    setPoItems((po.items || []).map(item => ({
+      productId: String(item.productId || item.product?.productId || ''),
+      productName: item.product?.name || item.productName || item.name,
+      quantity: item.quantity,
+      unitCost: parseFloat(item.unitCost) || 0
+    })));
+    setPoIsBlanket(false);
+    setPoBlanketCap('');
+    setPoBlanketValidUntil('');
+    setPoBlanketRefId(po.isBlanket ? po.id : null);
+    setSelectedPO(null);
     setShowCreateModal(true);
   };
 
@@ -259,69 +305,37 @@ export default function Purchasing() {
     's8': 'GIGABYTE Vietnam Official'
   };
 
-  const DEFAULT_SUPPLIERS_BY_CORE_ID = {
-    '1': 'Samsung Vina Electronics Co., Ltd',
-    '0001': 'Samsung Vina Electronics Co., Ltd',
-    '2': 'ASUS Vietnam Distribution',
-    '0002': 'ASUS Vietnam Distribution',
-    '3': 'Mai Hoàng Distribution',
-    '0003': 'Mai Hoàng Distribution',
-    '4': 'Công ty Cổ phần Đầu tư Công nghệ Anh Ngọc',
-    '0004': 'Công ty Cổ phần Đầu tư Công nghệ Anh Ngọc',
-    '5': 'MSI Vietnam Official',
-    '0005': 'MSI Vietnam Official',
-    '6': 'GIGABYTE Vietnam Official',
-    '0006': 'GIGABYTE Vietnam Official',
-    '7': 'Intel Vietnam Authorized Distributor',
-    '0007': 'Intel Vietnam Authorized Distributor',
-    '8': 'AMD Southeast Asia Pte Ltd (VN Representative)',
-    '0008': 'AMD Southeast Asia Pte Ltd (VN Representative)'
+  // Real average of SupplierEvaluation.overallScore (0-9.99 scale, displayed as
+  // "/10" since evaluators score on a 0-10 scale but the DB column caps at 9.99).
+  // Returns null when the supplier has never been evaluated — callers must show
+  // "Chưa đánh giá" rather than inventing a placeholder number.
+  const getSupplierAvgScore = (sup) => {
+    const evals = sup?.evaluations;
+    if (!Array.isArray(evals) || evals.length === 0) return null;
+    const sum = evals.reduce((acc, e) => acc + (parseFloat(e.overallScore) || 0), 0);
+    return Math.round((sum / evals.length) * 10) / 10;
   };
 
+  // Only ever derive a supplier name from real relation data (the PO's own
+  // supplier object/code) — never guess it from PO-number digits or item-name
+  // keywords. A guessed name that happens to be wrong reads as authoritative
+  // and risks Purchasing acting on the wrong vendor.
   const getSupplierName = (po) => {
-    if (!po) return 'Nhà Cung Cấp Uy Tín';
-    
-    // 1. Direct supplier object or string
+    if (!po) return 'Chưa xác định NCC';
+
     if (po.supplier?.name && po.supplier.name !== 'Chưa rõ') return po.supplier.name;
     if (typeof po.supplierName === 'string' && po.supplierName.trim() && po.supplierName !== 'Chưa rõ') return po.supplierName;
     if (typeof po.supplier === 'string' && po.supplier.trim() && po.supplier !== 'Chưa rõ') {
       return SUPPLIER_NAME_MAP[po.supplier] || po.supplier;
     }
 
-    // 2. Check supplierCode
     const code = po.supplierCode || po.supplier?.code;
     if (code && SUPPLIER_NAME_MAP[code]) {
       return SUPPLIER_NAME_MAP[code];
     }
     if (code && code !== 'Chưa rõ') return code;
 
-    // 3. Fallback by Core ID (e.g. RFQ-2026-0007 -> 7 -> Intel, RFQ-2026-0008 -> 8 -> AMD)
-    const coreId = getPoCoreId(po);
-    if (coreId && DEFAULT_SUPPLIERS_BY_CORE_ID[coreId]) {
-      return DEFAULT_SUPPLIERS_BY_CORE_ID[coreId];
-    }
-
-    // 4. Fallback by items inspection
-    if (Array.isArray(po.items) && po.items.length > 0) {
-      const firstItemName = (po.items[0].productName || po.items[0].name || '').toLowerCase();
-      if (firstItemName.includes('intel') || firstItemName.includes('i5') || firstItemName.includes('i7') || firstItemName.includes('i9')) {
-        return 'Intel Vietnam Authorized Distributor';
-      }
-      if (firstItemName.includes('amd') || firstItemName.includes('ryzen')) {
-        return 'AMD Southeast Asia Pte Ltd (VN Representative)';
-      }
-      if (firstItemName.includes('asus')) {
-        return 'ASUS Vietnam Distribution';
-      }
-      if (firstItemName.includes('msi')) {
-        return 'MSI Vietnam Official';
-      }
-      if (firstItemName.includes('samsung')) {
-        return 'Samsung Vina Electronics Co., Ltd';
-      }
-    }
-
-    return 'Nhà Cung Cấp Chính Thức';
+    return 'Chưa xác định NCC';
   };
 
   // Canonical Core PO identifier extractor
@@ -402,17 +416,19 @@ export default function Purchasing() {
       // copy at an *earlier* stage incorrectly win the merge below and show the wrong
       // status. CANCELLED is intentionally the highest weight: it's a terminal state that
       // can happen at any stage, and once set should always win over an older cached status.
+      // Only backend-reachable statuses (purchase.controller.js validStatuses)
+      // get a weight — a stale cached PO carrying an old fabricated status
+      // (DRAFT_RFQ/AWAITING_SUPPLIER_QUOTE/QUOTED_PENDING_CEO/CONFIRMED were
+      // never real PurchaseOrder.status values) now just falls to weight 0
+      // and loses to any real status instead of being treated as a
+      // legitimate, possibly-higher-priority pipeline stage.
       const STATUS_WEIGHT = {
-        'DRAFT_RFQ': 5,
         'RFQ': 10,
         'RFQ_SENT': 20,
         'SENT': 20,
-        'AWAITING_SUPPLIER_QUOTE': 20,
         'QUOTED': 30,
-        'QUOTED_PENDING_CEO': 35,
         'PO': 40,
         'APPROVED': 40,
-        'CONFIRMED': 40,
         'CONFIRMED_BY_SUPPLIER': 50,
         'PENDING_QA': 55,
         'QA_PASSED': 60,
@@ -541,6 +557,11 @@ export default function Purchasing() {
 
   const handleOpenRFQForProduct = (prod, customQty) => {
     setShowCreateModal(true);
+    // Reset blanket-PO state — see handleCreateRfqForBackorder for why.
+    setPoIsBlanket(false);
+    setPoBlanketCap('');
+    setPoBlanketValidUntil('');
+    setPoBlanketRefId(null);
     if (prod) {
       const prodId = String(prod.productId || prod.id || '');
       setProductSearchQuery(prod.name || '');
@@ -670,6 +691,7 @@ export default function Purchasing() {
       if (isMultiSupplierRFQ) {
         const validSuppliers = selectedSuppliersList.filter(Boolean);
         const createdPOs = [];
+        let failedCount = 0;
         for (const supCode of validSuppliers) {
           const supplierObj = suppliers.find(s => s.code === supCode);
           const payload = {
@@ -688,30 +710,27 @@ export default function Purchasing() {
           try {
             const res = await api.post('/purchasing/orders', payload);
             if (res?.data) createdPOs.push(res.data);
+            else failedCount++;
           } catch (apiErr) {
-            console.warn('API error, falling back to local PO creation', apiErr);
-            const fallbackPO = {
-              id: `PO-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-              poNumber: `RFQ-${new Date().getFullYear()}-${String(orders.length + createdPOs.length + 1).padStart(4, '0')}`,
-              supplierCode: supCode,
-              supplier: supplierObj || { code: supCode, name: supCode },
-              createdBy: user?.fullname || user?.username || 'purchasing@kltn-erp.vn',
-              expectedDeliveryDate,
-              totalAmount: 0,
-              status: 'RFQ',
-              items: payload.items,
-              createdAt: new Date().toISOString()
-            };
-            createdPOs.push(fallbackPO);
+            // Do NOT fabricate a local PO here — a fake RFQ that the
+            // supplier never received but that claims "sent successfully"
+            // is worse than just reporting the failure and letting
+            // Purchasing retry for that one supplier.
+            console.warn('RFQ creation failed for supplier', supCode, apiErr);
+            failedCount++;
           }
         }
 
         if (createdPOs.length > 0) {
-          const updated = [...createdPOs, ...orders];
-          setOrders(updated);
-          try { localStorage.setItem('erp_pos', JSON.stringify(updated)); } catch (_) {}
+          await fetchData();
           setShowCreateModal(false);
-          notify(`Đã khởi tạo thành công ${createdPOs.length} Yêu Cầu Báo Giá (RFQ) gửi tới các Nhà Cung Cấp!`, 'success');
+        }
+        if (failedCount === 0 && createdPOs.length > 0) {
+          notify(`Đã khởi tạo thành công ${createdPOs.length} Yêu Cầu Báo Giá (RFQ) gửi tới các Nhà Cung Cấp.`, 'success');
+        } else if (createdPOs.length > 0) {
+          notify(`Đã gửi ${createdPOs.length}/${validSuppliers.length} RFQ thành công. ${failedCount} NCC còn lại gửi thất bại — vui lòng thử lại riêng cho các NCC đó.`, 'warning');
+        } else {
+          notify('Không thể tạo RFQ — máy chủ từ chối yêu cầu. Vui lòng thử lại.', 'error');
         }
       } else {
         const supplierObj = suppliers.find(s => s.code === selectedSupplier);
@@ -724,7 +743,13 @@ export default function Purchasing() {
             productName: item.productName || item.name,
             quantity: parseInt(item.quantity, 10),
             unitCost: parseFloat(item.unitCost || 0)
-          }))
+          })),
+          ...(poIsBlanket ? {
+            isBlanket: true,
+            blanketCapAmount: poBlanketCap ? parseFloat(poBlanketCap) : null,
+            blanketValidUntil: poBlanketValidUntil || null
+          } : {}),
+          ...(poBlanketRefId ? { blanketRefId: poBlanketRefId } : {})
         };
 
         try {
@@ -732,27 +757,21 @@ export default function Purchasing() {
           if (res?.success) {
             await fetchData();
             setShowCreateModal(false);
-            notify('Tạo Yêu Cầu Báo Giá (RFQ) thành công!', 'success');
+            notify(
+              poIsBlanket
+                ? 'Tạo Hợp Đồng Khung thành công.'
+                : poBlanketRefId
+                  ? 'Tạo đơn mua theo hợp đồng khung thành công.'
+                  : 'Tạo Yêu Cầu Báo Giá (RFQ) thành công.',
+              'success'
+            );
+          } else {
+            notify(res?.message || 'Không thể tạo RFQ — máy chủ từ chối yêu cầu.', 'error');
           }
         } catch (apiErr) {
-          console.warn('Fallback local creation:', apiErr);
-          const fallbackPO = {
-            id: `PO-${Date.now()}`,
-            poNumber: `RFQ-${new Date().getFullYear()}-${String(orders.length + 1).padStart(4, '0')}`,
-            supplierCode: selectedSupplier,
-            supplier: supplierObj || { code: selectedSupplier, name: selectedSupplier },
-            createdBy: user?.fullname || user?.username || 'purchasing@kltn-erp.vn',
-            expectedDeliveryDate,
-            totalAmount: 0,
-            status: 'RFQ',
-            items: payload.items,
-            createdAt: new Date().toISOString()
-          };
-          const updated = [fallbackPO, ...orders];
-          setOrders(updated);
-          try { localStorage.setItem('erp_pos', JSON.stringify(updated)); } catch (_) {}
-          setShowCreateModal(false);
-          notify('Tạo Yêu Cầu Báo Giá (RFQ) thành công!', 'success');
+          // Same principle as above: report the real failure instead of
+          // claiming success for an RFQ the supplier will never see.
+          notify(`Chưa gửi được RFQ lên máy chủ (${apiErr.message || 'lỗi kết nối'}). Vui lòng thử lại.`, 'error');
         }
       }
     } catch (err) {
@@ -761,13 +780,13 @@ export default function Purchasing() {
     setSubmitting(false);
   };
 
-  const handleUpdateStatus = async (poId, newStatus) => {
+  const handleUpdateStatus = async (poId, newStatus, extra = {}) => {
     setSubmitting(true);
     let apiSucceeded = false;
     let apiErrorMessage = '';
     try {
       try {
-        const res = await api.patch(`/purchasing/orders/${poId}/status`, { status: newStatus });
+        const res = await api.patch(`/purchasing/orders/${poId}/status`, { status: newStatus, ...extra });
         apiSucceeded = !!(res && res.success);
       } catch (err) {
         apiErrorMessage = err.message || 'Lỗi kết nối máy chủ';
@@ -892,13 +911,47 @@ export default function Purchasing() {
   const rfqDraftCount = orders.filter(po => po.status === 'RFQ').length;
   const rfqSentCount = orders.filter(po => po.status === 'RFQ_SENT').length;
   const rfqQuotedCount = orders.filter(po => po.status === 'QUOTED').length;
-  const poConfirmedCount = orders.filter(po => ['PO', 'SENT', 'RECEIVED', 'DONE'].includes(po.status)).length;
-  const pendingReceiptCount = orders.filter(po => po.status === 'PO' || po.status === 'SENT').length;
+  // Every PO the backend actually issues (status !== RFQ/RFQ_SENT/QUOTED/
+  // CANCELLED) routes through CONFIRMED_BY_SUPPLIER → QA_PASSED/QA_PARTIAL
+  // before ever reaching RECEIVED/DONE — excluding those stages from the
+  // "in-flight PO" aggregates undercounted the bulk of real active orders.
+  const ISSUED_PO_STATUSES = ['PO', 'SENT', 'CONFIRMED_BY_SUPPLIER', 'PENDING_QA', 'QA_PASSED', 'QA_PARTIAL', 'RECEIVED', 'DONE', 'COMPLETED'];
+  const poConfirmedCount = orders.filter(po => ISSUED_PO_STATUSES.includes(po.status)).length;
+  const pendingReceiptCount = orders.filter(po => ['PO', 'SENT', 'CONFIRMED_BY_SUPPLIER', 'PENDING_QA', 'QA_PASSED', 'QA_PARTIAL'].includes(po.status)).length;
   const totalSpent = orders
-    .filter(po => ['PO', 'SENT', 'RECEIVED', 'DONE'].includes(po.status))
+    .filter(po => ISSUED_PO_STATUSES.includes(po.status))
     .reduce((sum, po) => sum + parseFloat(po.totalAmount || 0), 0);
 
   const availableSupplierOptions = [...new Set(orders.map(o => o.supplier?.name || o.supplierCode).filter(Boolean))].sort();
+
+  // Real on-time-delivery rate: among POs that both have a committed
+  // expectedDeliveryDate and an actual goods receipt, % received on or
+  // before that date. Previously this card was a hardcoded "100% Đạt
+  // Chuẩn" string with no relation to any actual PO.
+  const onTimeEligible = orders.filter(po => po.expectedDeliveryDate && (po.receipts || []).some(r => r.receivedDate));
+  const onTimeRate = onTimeEligible.length > 0
+    ? Math.round((onTimeEligible.filter(po => {
+        const receivedAt = new Date((po.receipts.find(r => r.receivedDate) || {}).receivedDate);
+        return receivedAt <= new Date(po.expectedDeliveryDate);
+      }).length / onTimeEligible.length) * 100)
+    : null;
+
+  // Real average RFQ->Quote turnaround from statusHistory timestamps.
+  // Previously this card was a hardcoded "1.5 - 2.0 Ngày" string.
+  const quoteTurnaroundDays = (() => {
+    const samples = [];
+    for (const po of orders) {
+      const hist = po.statusHistory || [];
+      const sentAt = hist.find(h => h.status === 'RFQ_SENT')?.timestamp;
+      const quotedAt = hist.find(h => h.status === 'QUOTED')?.timestamp;
+      if (sentAt && quotedAt) {
+        const days = (new Date(quotedAt) - new Date(sentAt)) / 86400000;
+        if (days >= 0) samples.push(days);
+      }
+    }
+    if (samples.length === 0) return null;
+    return (samples.reduce((s, d) => s + d, 0) / samples.length);
+  })();
 
   return (
     <div style={{ backgroundColor: '#f8fafc', minHeight: '100vh', padding: '1.5rem 2rem', maxWidth: '1400px', margin: '0 auto', fontFamily: 'Inter, sans-serif' }}>
@@ -1146,7 +1199,7 @@ export default function Purchasing() {
                   onClick={() => { setSelectedGroupKey(rfqGroups[0]?.key || null); setShowCompareModal(true); }}
                   style={{ backgroundColor: '#ffffff', color: '#2563eb', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.45rem 0.9rem', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer' }}
                 >
-                  So Sánh Giá NCC
+                  So Sánh Báo Giá
                 </button>
               </div>
             </div>
@@ -1258,8 +1311,11 @@ export default function Purchasing() {
               ) : (
                 <>
                   <option value="PO">Đơn mua hàng (PO)</option>
-                  <option value="APPROVED">Đã phê duyệt (PO)</option>
-                  <option value="SENT">Đã gửi PO</option>
+                  <option value="CONFIRMED_BY_SUPPLIER">NCC đã xác nhận</option>
+                  <option value="PENDING_QA">Chờ nghiệm thu QC</option>
+                  <option value="QA_PASSED">QC đạt chuẩn</option>
+                  <option value="QA_PARTIAL">QC đạt một phần</option>
+                  <option value="QA_REJECTED">QC từ chối</option>
                   <option value="RECEIVED">Đã nhận hàng</option>
                   <option value="DONE">Hoàn tất</option>
                   <option value="CANCELLED">Đã hủy</option>
@@ -1391,21 +1447,40 @@ export default function Purchasing() {
                           </span>
                         </td>
                         <td style={{ padding: '0.75rem 1rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
-                          <button
-                            onClick={() => { setSelectedPO(po); setViewMode('PO'); }}
-                            style={{
-                              backgroundColor: '#ffffff',
-                              color: '#2563eb',
-                              border: '1px solid #cbd5e1',
-                              borderRadius: '4px',
-                              padding: '0.3rem 0.65rem',
-                              fontSize: '0.75rem',
-                              fontWeight: 700,
-                              cursor: 'pointer'
-                            }}
-                          >
-                            Chi Tiết
-                          </button>
+                          <div style={{ display: 'inline-flex', gap: '0.4rem' }}>
+                            {po.status === 'QUOTED' && isCeoApprover && (
+                              <button
+                                onClick={() => handleUpdateStatus(po.id, 'PO')}
+                                style={{
+                                  backgroundColor: '#10b981',
+                                  color: '#ffffff',
+                                  border: 'none',
+                                  borderRadius: '4px',
+                                  padding: '0.3rem 0.65rem',
+                                  fontSize: '0.75rem',
+                                  fontWeight: 700,
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                Duyệt
+                              </button>
+                            )}
+                            <button
+                              onClick={() => setSelectedPO(po)}
+                              style={{
+                                backgroundColor: '#ffffff',
+                                color: '#2563eb',
+                                border: '1px solid #cbd5e1',
+                                borderRadius: '4px',
+                                padding: '0.3rem 0.65rem',
+                                fontSize: '0.75rem',
+                                fontWeight: 700,
+                                cursor: 'pointer'
+                              }}
+                            >
+                              Chi Tiết
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -1452,6 +1527,7 @@ export default function Purchasing() {
                 // Auto-detect distributed categories from catalog
                 const distributedProds = effectiveCatalog.filter(p => p.supplier && sup.name && p.supplier.toLowerCase().includes(sup.name.toLowerCase()));
                 const distributedCats = [...new Set(distributedProds.map(p => p.category || getCategoryUpper(p)).filter(Boolean))];
+                const avgScore = getSupplierAvgScore(sup);
 
                 return (
                   <div key={sup.code || idx} style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
@@ -1466,8 +1542,12 @@ export default function Purchasing() {
                             <span style={{ fontSize: '0.72rem', color: '#64748b' }}>Mã: {sup.code || `SUP-${idx+1}`}</span>
                           </div>
                         </div>
-                        <span style={{ backgroundColor: '#fef3c7', color: '#b45309', padding: '2px 8px', borderRadius: '10px', fontSize: '0.72rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '2px' }}>
-                          <Star size={12} fill="#b45309" /> {sup.rating || '4.8'}
+                        <span
+                          title={avgScore === null ? 'Chưa có đánh giá nào cho NCC này' : `Điểm trung bình từ ${sup.evaluations.length} lần đánh giá`}
+                          style={{ backgroundColor: avgScore === null ? '#f1f5f9' : '#fef3c7', color: avgScore === null ? '#64748b' : '#b45309', padding: '2px 8px', borderRadius: '10px', fontSize: '0.72rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '2px', whiteSpace: 'nowrap' }}
+                        >
+                          <Star size={12} fill={avgScore === null ? 'none' : '#b45309'} />
+                          {avgScore === null ? 'Chưa đánh giá' : `${avgScore}/10`}
                         </span>
                       </div>
 
@@ -1524,6 +1604,10 @@ export default function Purchasing() {
                         <button
                           onClick={() => {
                             setSelectedSupplier(sup.code);
+                            setPoIsBlanket(false);
+                            setPoBlanketCap('');
+                            setPoBlanketValidUntil('');
+                            setPoBlanketRefId(null);
                             setShowCreateModal(true);
                           }}
                           style={{
@@ -1566,6 +1650,34 @@ export default function Purchasing() {
                         >
                           <span>Xem Đơn ({supOrders.length})</span>
                         </button>
+
+                        {(isPurchasing || isCEO || isAdmin) && (
+                          <button
+                            onClick={() => {
+                              setEvalError(null);
+                              setEvalForm({ period: '', qualityScore: '', deliveryScore: '', priceScore: '' });
+                              setEvalTargetSupplier(sup.code);
+                            }}
+                            style={{
+                              gridColumn: '1 / -1',
+                              backgroundColor: '#fffbeb',
+                              color: '#b45309',
+                              border: '1px solid #fde68a',
+                              borderRadius: '6px',
+                              padding: '0.45rem',
+                              fontSize: '0.75rem',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '0.3rem'
+                            }}
+                          >
+                            <Star size={13} />
+                            <span>Đánh Giá NCC</span>
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1944,15 +2056,15 @@ export default function Purchasing() {
 
               <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1rem' }}>
                 <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700, display: 'block' }}>Tỷ Lệ Giao Đúng Hạn</span>
-                <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#10b981', marginTop: '0.25rem' }}>
-                  100% Đạt Chuẩn
+                <div style={{ fontSize: '1.4rem', fontWeight: 800, color: onTimeRate === null ? '#94a3b8' : onTimeRate >= 80 ? '#10b981' : '#d97706', marginTop: '0.25rem' }}>
+                  {onTimeRate === null ? 'Chưa đủ dữ liệu' : `${onTimeRate}% Đúng Hạn`}
                 </div>
               </div>
 
               <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1rem' }}>
                 <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700, display: 'block' }}>Thời Gian Báo Giá TB</span>
-                <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#d97706', marginTop: '0.25rem' }}>
-                  1.5 - 2.0 Ngày
+                <div style={{ fontSize: '1.4rem', fontWeight: 800, color: quoteTurnaroundDays === null ? '#94a3b8' : '#d97706', marginTop: '0.25rem' }}>
+                  {quoteTurnaroundDays === null ? 'Chưa đủ dữ liệu' : `${quoteTurnaroundDays.toFixed(1)} Ngày`}
                 </div>
               </div>
             </div>
@@ -2114,6 +2226,77 @@ export default function Purchasing() {
                   style={{ width: '18px', height: '18px', cursor: 'pointer' }}
                 />
               </div>
+
+              {/* Blanket PO (Hợp Đồng Khung) — chỉ áp dụng cho RFQ 1 NCC */}
+              {!isMultiSupplierRFQ && poBlanketRefId ? (() => {
+                const blanketPo = orders.find(o => o.id === poBlanketRefId);
+                const cap = parseFloat(blanketPo?.blanketCapAmount) || 0;
+                const used = (blanketPo?.releases || []).reduce((sum, r) => sum + (parseFloat(r.totalAmount) || 0), 0);
+                const pct = cap > 0 ? Math.min(100, Math.round((used / cap) * 100)) : 0;
+                return (
+                  <div style={{ backgroundColor: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px', padding: '0.85rem 1rem', marginBottom: '1.25rem' }}>
+                    <strong style={{ fontSize: '0.85rem', color: '#92400e', display: 'block', marginBottom: '0.3rem' }}>
+                      Đang tạo đơn theo Hợp Đồng Khung {blanketPo?.poNumber || `#${poBlanketRefId}`}
+                    </strong>
+                    {cap > 0 && (
+                      <>
+                        <div style={{ height: '6px', backgroundColor: '#fef3c7', borderRadius: '3px', overflow: 'hidden', marginBottom: '0.3rem' }}>
+                          <div style={{ height: '100%', width: `${pct}%`, backgroundColor: '#d97706' }} />
+                        </div>
+                        <span style={{ fontSize: '0.72rem', color: '#b45309' }}>Đã dùng {formatCurrency(used)} / {formatCurrency(cap)} ({pct}%)</span>
+                      </>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setPoBlanketRefId(null)}
+                      style={{ display: 'block', marginTop: '0.4rem', background: 'none', border: 'none', color: '#b45309', fontSize: '0.72rem', textDecoration: 'underline', cursor: 'pointer', padding: 0 }}
+                    >
+                      Bỏ liên kết hợp đồng khung
+                    </button>
+                  </div>
+                );
+              })() : null}
+
+              {!isMultiSupplierRFQ && !poBlanketRefId && (
+                <div style={{ backgroundColor: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px', padding: '0.85rem 1rem', marginBottom: '1.25rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div>
+                      <strong style={{ fontSize: '0.85rem', color: '#92400e', display: 'block' }}>Đây Là Hợp Đồng Khung (Blanket PO)</strong>
+                      <span style={{ fontSize: '0.75rem', color: '#b45309' }}>Đặt hạn mức tổng + thời hạn để tạo nhiều đơn mua lặp lại từ hợp đồng này sau này</span>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={poIsBlanket}
+                      onChange={(e) => setPoIsBlanket(e.target.checked)}
+                      style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                    />
+                  </div>
+                  {poIsBlanket && (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginTop: '0.85rem' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#92400e', marginBottom: '0.25rem' }}>Hạn Mức Tổng (đ)</label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={poBlanketCap}
+                          onChange={(e) => setPoBlanketCap(e.target.value)}
+                          placeholder="VD: 200000000"
+                          style={{ width: '100%', height: '36px', padding: '0 0.65rem', fontSize: '0.83rem', border: '1px solid #fde68a', borderRadius: '6px', boxSizing: 'border-box' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#92400e', marginBottom: '0.25rem' }}>Hiệu Lực Đến Ngày</label>
+                        <input
+                          type="date"
+                          value={poBlanketValidUntil}
+                          onChange={(e) => setPoBlanketValidUntil(e.target.value)}
+                          style={{ width: '100%', height: '36px', padding: '0 0.65rem', fontSize: '0.83rem', border: '1px solid #fde68a', borderRadius: '6px', boxSizing: 'border-box' }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Supplier Selection */}
               {isMultiSupplierRFQ ? (
@@ -2346,6 +2529,31 @@ export default function Purchasing() {
                 <span style={{ color: '#64748b', display: 'block', fontSize: '0.75rem' }}>Hạn Giao Hàng:</span>
                 <strong style={{ color: '#0f172a' }}>{formatDate(selectedPO.expectedDeliveryDate)}</strong>
               </div>
+              <div>
+                <span style={{ color: '#64748b', display: 'block', fontSize: '0.75rem' }}>Công Nợ / Thanh Toán NCC:</span>
+                {(() => {
+                  const bill = (selectedPO.bills || [])[0];
+                  if (!bill) {
+                    return <strong style={{ color: '#94a3b8' }}>Chưa có hóa đơn từ Kế Toán</strong>;
+                  }
+                  const info = getStatusInfo(VENDOR_BILL_STATUS, bill.status);
+                  const poTotal = parseFloat(selectedPO.totalAmount) || 0;
+                  const billTotal = parseFloat(bill.amountTotal) || 0;
+                  const isAdjusted = poTotal > 0 && Math.abs(billTotal - poTotal) >= 1;
+                  return (
+                    <>
+                      <strong style={{ color: info.color }}>
+                        {info.label}{bill.amountDue > 0 ? ` — Còn nợ ${formatCurrency(bill.amountDue)}` : ''}
+                      </strong>
+                      {isAdjusted && (
+                        <div style={{ marginTop: '0.3rem', fontSize: '0.72rem', color: '#b45309', backgroundColor: '#fffbeb', border: '1px solid #fde68a', borderRadius: '4px', padding: '0.35rem 0.5rem' }}>
+                          Đã điều chỉnh theo tỷ lệ nghiệm thu QC: {((billTotal / poTotal) * 100).toFixed(1)}% — chênh lệch {formatCurrency(poTotal - billTotal)} so với PO gốc ({formatCurrency(poTotal)}).
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
+              </div>
             </div>
 
             {/* Items Table */}
@@ -2406,7 +2614,43 @@ export default function Purchasing() {
                   {formatCurrency(selectedPO.totalAmount)}
                 </strong>
               </div>
+              {selectedPO.blanketRefId && selectedPO.blanketRef && (
+                <span style={{ fontSize: '0.75rem', color: '#b45309', marginTop: '0.25rem' }}>
+                  Đơn mua theo Hợp Đồng Khung {selectedPO.blanketRef.poNumber}
+                </span>
+              )}
             </div>
+
+            {selectedPO.isBlanket && (() => {
+              const cap = parseFloat(selectedPO.blanketCapAmount) || 0;
+              const used = (selectedPO.releases || []).reduce((sum, r) => sum + (parseFloat(r.totalAmount) || 0), 0);
+              const pct = cap > 0 ? Math.min(100, Math.round((used / cap) * 100)) : 0;
+              const expired = selectedPO.blanketValidUntil && new Date(selectedPO.blanketValidUntil) < new Date();
+              return (
+                <div style={{ backgroundColor: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px', padding: '0.85rem 1rem', marginBottom: '1.25rem' }}>
+                  <strong style={{ fontSize: '0.85rem', color: '#92400e', display: 'block', marginBottom: '0.3rem' }}>
+                    Hợp Đồng Khung {expired && <span style={{ color: '#b91c1c' }}>(Đã hết hiệu lực)</span>}
+                  </strong>
+                  {cap > 0 ? (
+                    <>
+                      <div style={{ height: '6px', backgroundColor: '#fef3c7', borderRadius: '3px', overflow: 'hidden', marginBottom: '0.3rem' }}>
+                        <div style={{ height: '100%', width: `${pct}%`, backgroundColor: '#d97706' }} />
+                      </div>
+                      <span style={{ fontSize: '0.72rem', color: '#b45309' }}>
+                        Đã dùng {formatCurrency(used)} / {formatCurrency(cap)} ({pct}%) qua {(selectedPO.releases || []).length} đơn mua
+                      </span>
+                    </>
+                  ) : (
+                    <span style={{ fontSize: '0.72rem', color: '#b45309' }}>Không giới hạn hạn mức — đã tạo {(selectedPO.releases || []).length} đơn mua từ hợp đồng này.</span>
+                  )}
+                  {selectedPO.blanketValidUntil && (
+                    <div style={{ fontSize: '0.72rem', color: '#b45309', marginTop: '0.2rem' }}>
+                      Hiệu lực đến: {formatDate(selectedPO.blanketValidUntil)}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* QC/QA Inspection Report — read from the receipts the backend now returns
                 nested with their QcInspection records (see purchase.controller.js). */}
@@ -2521,6 +2765,16 @@ export default function Purchasing() {
                 Đóng
               </button>
 
+              {(isPurchasing || isCEO || isAdmin) && (
+                <button
+                  onClick={() => handleDuplicatePO(selectedPO)}
+                  title="Tạo đơn mua mới với cùng NCC và toàn bộ linh kiện/đơn giá của đơn này"
+                  style={{ backgroundColor: '#ffffff', color: '#2563eb', border: '1px solid #bfdbfe', borderRadius: '6px', padding: '0.5rem 1rem', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
+                >
+                  Tạo Đơn Mua Lặp Lại Từ Đơn Này
+                </button>
+              )}
+
               {selectedPO.status === 'RFQ' && (
                 <button
                   onClick={() => handleUpdateStatus(selectedPO.id, 'RFQ_SENT')}
@@ -2536,29 +2790,45 @@ export default function Purchasing() {
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
                       <button
                         onClick={async () => {
-                          const reason = await promptText('Nhập lý do từ chối / yêu cầu đàm phán lại:', 'Giá chào thầu cao hơn ngân sách dự kiến');
+                          // The backend only allows QUOTED to move to PO or
+                          // CANCELLED — there is no "send back for renegotiation"
+                          // transition. The old version of this button only
+                          // rewrote local state back to RFQ, which the next
+                          // fetchData() silently reverted (the API still had it
+                          // at QUOTED), so the CEO's "rejection" never actually
+                          // took effect. Cancelling for real and letting
+                          // Purchasing create a fresh RFQ is the only backend-
+                          // supported equivalent.
+                          const reason = await promptText('Nhập lý do hủy báo giá này (NCC sẽ cần gửi báo giá mới qua một RFQ khác):', 'Giá chào thầu cao hơn ngân sách dự kiến');
                           if (reason !== null) {
-                            try {
-                              const updatedPOs = orders.map(o => o.id === selectedPO.id ? { ...o, status: 'RFQ', cancelReason: reason } : o);
-                              setOrders(updatedPOs);
-                              localStorage.setItem('erp_pos', JSON.stringify(updatedPOs));
-                              notify('Đã từ chối báo giá và chuyển lại cho Nhân Viên Mua Hàng đàm phán!', 'success');
-                              setSelectedPO(null);
-                            } catch (e) {
-                              notify('Lỗi: ' + e.message, 'error');
-                            }
+                            await handleUpdateStatus(selectedPO.id, 'CANCELLED', { reason });
                           }
                         }}
                         style={{ backgroundColor: '#fee2e2', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '6px', padding: '0.5rem 1.1rem', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
                       >
-                        Từ Chối & Yêu Cầu Đàm Phán Lại
+                        Hủy Báo Giá Này
                       </button>
-                      <button
-                        onClick={() => handleUpdateStatus(selectedPO.id, 'PO')}
-                        style={{ backgroundColor: '#10b981', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.5rem 1.1rem', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
-                      >
-                        CEO Phê Duyệt → Phát Hành PO
-                      </button>
+                      {(() => {
+                        const items = selectedPO.items || [];
+                        const hasMissingPrice = items.length === 0 || items.some(it => !(parseFloat(it.unitCost) > 0));
+                        const totalInvalid = !(parseFloat(selectedPO.totalAmount) > 0);
+                        const blocked = hasMissingPrice || totalInvalid;
+                        return (
+                          <button
+                            onClick={() => !blocked && handleUpdateStatus(selectedPO.id, 'PO')}
+                            disabled={blocked}
+                            title={blocked ? 'Không thể duyệt: còn linh kiện chưa có đơn giá hoặc tổng tiền bằng 0' : undefined}
+                            style={{
+                              backgroundColor: blocked ? '#9ca3af' : '#10b981',
+                              color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.5rem 1.1rem',
+                              fontSize: '0.82rem', fontWeight: 700, cursor: blocked ? 'not-allowed' : 'pointer',
+                              opacity: blocked ? 0.75 : 1
+                            }}
+                          >
+                            {blocked ? 'Thiếu Đơn Giá — Không Thể Duyệt' : 'CEO Phê Duyệt → Phát Hành PO'}
+                          </button>
+                        );
+                      })()}
                     </div>
                   ) : (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -2581,6 +2851,108 @@ export default function Purchasing() {
       )}
 
       {/* ================= MODAL SO SÁNH BÁO GIÁ TOÀN DIỆN ================= */}
+      {evalTargetSupplier && (() => {
+        const targetSup = suppliers.find(s => s.code === evalTargetSupplier);
+        const scoreField = (label, key) => (
+          <div style={{ marginBottom: '0.85rem' }}>
+            <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#334155', marginBottom: '0.3rem' }}>{label} <span style={{ color: '#94a3b8', fontWeight: 500 }}>(0 - 9.9)</span></label>
+            <input
+              type="number"
+              min="0"
+              max="9.9"
+              step="0.1"
+              value={evalForm[key]}
+              onChange={(e) => setEvalForm(f => ({ ...f, [key]: e.target.value }))}
+              style={{ width: '100%', height: '38px', padding: '0 0.75rem', fontSize: '0.85rem', border: '1px solid #cbd5e1', borderRadius: '6px', boxSizing: 'border-box' }}
+            />
+          </div>
+        );
+
+        const handleSubmitEvaluation = async () => {
+          setEvalError(null);
+          const q = parseFloat(evalForm.qualityScore);
+          const d = parseFloat(evalForm.deliveryScore);
+          const p = parseFloat(evalForm.priceScore);
+          if (!evalForm.period.trim()) {
+            setEvalError('Vui lòng nhập kỳ đánh giá (VD: 2026-Q3).');
+            return;
+          }
+          if ([q, d, p].some(v => Number.isNaN(v) || v < 0 || v > 9.9)) {
+            setEvalError('Cả 3 điểm phải là số từ 0 đến 9.9.');
+            return;
+          }
+          setEvalSubmitting(true);
+          try {
+            await api.post(`/purchasing/suppliers/${evalTargetSupplier}/evaluations`, {
+              period: evalForm.period.trim(),
+              qualityScore: q,
+              deliveryScore: d,
+              priceScore: p
+            });
+            await fetchData();
+            setEvalTargetSupplier(null);
+          } catch (err) {
+            setEvalError(err.message || 'Không thể lưu đánh giá. Vui lòng thử lại.');
+          } finally {
+            setEvalSubmitting(false);
+          }
+        };
+
+        return (
+          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(6px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '1.5rem' }}>
+            <div style={{ width: '100%', maxWidth: '420px', padding: '1.75rem', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.25rem' }}>
+                <div>
+                  <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>Đánh Giá Nhà Cung Cấp</h3>
+                  <p style={{ fontSize: '0.8rem', color: '#64748b', margin: '0.2rem 0 0' }}>{targetSup?.name || evalTargetSupplier}</p>
+                </div>
+                <button onClick={() => setEvalTargetSupplier(null)} style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#475569', cursor: 'pointer', padding: '0.35rem', borderRadius: '6px', display: 'flex' }}>
+                  <X size={16} />
+                </button>
+              </div>
+
+              <div style={{ marginBottom: '0.85rem' }}>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#334155', marginBottom: '0.3rem' }}>Kỳ Đánh Giá</label>
+                <input
+                  type="text"
+                  placeholder="VD: 2026-Q3"
+                  value={evalForm.period}
+                  onChange={(e) => setEvalForm(f => ({ ...f, period: e.target.value }))}
+                  style={{ width: '100%', height: '38px', padding: '0 0.75rem', fontSize: '0.85rem', border: '1px solid #cbd5e1', borderRadius: '6px', boxSizing: 'border-box' }}
+                />
+              </div>
+
+              {scoreField('Điểm Chất Lượng', 'qualityScore')}
+              {scoreField('Điểm Giao Hàng', 'deliveryScore')}
+              {scoreField('Điểm Giá Cả', 'priceScore')}
+
+              {evalError && (
+                <div style={{ backgroundColor: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', borderRadius: '6px', padding: '0.6rem 0.75rem', fontSize: '0.8rem', marginBottom: '0.85rem' }}>
+                  {evalError}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: '0.6rem' }}>
+                <button
+                  onClick={() => setEvalTargetSupplier(null)}
+                  disabled={evalSubmitting}
+                  style={{ flex: 1, backgroundColor: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.6rem', fontSize: '0.83rem', fontWeight: 700, cursor: 'pointer' }}
+                >
+                  Hủy
+                </button>
+                <button
+                  onClick={handleSubmitEvaluation}
+                  disabled={evalSubmitting}
+                  style={{ flex: 1, backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.6rem', fontSize: '0.83rem', fontWeight: 700, cursor: evalSubmitting ? 'default' : 'pointer', opacity: evalSubmitting ? 0.7 : 1 }}
+                >
+                  {evalSubmitting ? 'Đang lưu...' : 'Lưu Đánh Giá'}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {showCompareModal && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(6px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '1.5rem' }}>
           <div style={{ width: '100%', maxWidth: '950px', maxHeight: '90vh', overflowY: 'auto', padding: '2rem', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
@@ -2618,6 +2990,8 @@ export default function Purchasing() {
                       {group.list.map((po, pIdx) => {
                         const isCheapest = group.list.every(other => (parseFloat(other.totalAmount) || Infinity) >= (parseFloat(po.totalAmount) || Infinity));
                         const isQuoted = po.status === 'QUOTED';
+                        const poSupplier = suppliers.find(s => s.code === (po.supplierCode || po.supplier?.code));
+                        const poAvgScore = getSupplierAvgScore(poSupplier);
 
                         return (
                           <div key={pIdx} style={{
@@ -2636,35 +3010,55 @@ export default function Purchasing() {
                             <h4 style={{ margin: '0 0 0.35rem', fontSize: '0.95rem', fontWeight: 800, color: '#0f172a' }}>
                               {getSupplierName(po)}
                             </h4>
-                            <div style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.75rem' }}>
+                            <div style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.4rem' }}>
                               Mã: {formatPurchaseReference(po)}
+                            </div>
+                            <div style={{ fontSize: '0.75rem', color: poAvgScore === null ? '#94a3b8' : '#b45309', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '3px', fontWeight: 700 }}>
+                              <Star size={12} fill={poAvgScore === null ? 'none' : '#b45309'} />
+                              {poAvgScore === null ? 'NCC chưa được đánh giá' : `Điểm đánh giá NCC: ${poAvgScore}/10`}
                             </div>
 
                             <div style={{ fontSize: '1.2rem', fontWeight: 800, color: po.totalAmount > 0 ? '#16a34a' : '#d97706', marginBottom: '0.75rem' }}>
                               {po.totalAmount > 0 ? formatCurrency(po.totalAmount) : 'Chờ NCC báo giá'}
                             </div>
 
-                            {isQuoted && (isCEO || isAdmin) && (
-                              <button
-                                onClick={async () => {
-                                  await handleUpdateStatus(po.id, 'PO');
-                                  setShowCompareModal(false);
-                                }}
-                                style={{
-                                  width: '100%',
-                                  backgroundColor: '#10b981',
-                                  color: '#ffffff',
-                                  border: 'none',
-                                  borderRadius: '6px',
-                                  padding: '0.45rem',
-                                  fontSize: '0.78rem',
-                                  fontWeight: 700,
-                                  cursor: 'pointer'
-                                }}
-                              >
-                                Chốt Duyệt Đơn Này (Tạo PO)
-                              </button>
-                            )}
+                            {isQuoted && isCeoApprover && (() => {
+                              const poItems = po.items || [];
+                              const blocked = poItems.length === 0 || poItems.some(it => !(parseFloat(it.unitCost) > 0)) || !(parseFloat(po.totalAmount) > 0);
+                              return (
+                                <button
+                                  onClick={async () => {
+                                    if (blocked) return;
+                                    await handleUpdateStatus(po.id, 'PO');
+                                    // Approving one supplier's quote makes every other
+                                    // quote in the same comparison group moot — cancel
+                                    // them so they stop inflating "Chờ CEO duyệt" counts
+                                    // forever with a decision that's already been made.
+                                    const losers = group.list.filter(other => other.id !== po.id && other.status === 'QUOTED');
+                                    for (const loser of losers) {
+                                      await handleUpdateStatus(loser.id, 'CANCELLED', { reason: `Đã chọn báo giá của ${getSupplierName(po)} trong cùng đợt so sánh.` });
+                                    }
+                                    setShowCompareModal(false);
+                                  }}
+                                  disabled={blocked}
+                                  title={blocked ? 'Còn linh kiện chưa có đơn giá' : undefined}
+                                  style={{
+                                    width: '100%',
+                                    backgroundColor: blocked ? '#9ca3af' : '#10b981',
+                                    color: '#ffffff',
+                                    border: 'none',
+                                    borderRadius: '6px',
+                                    padding: '0.45rem',
+                                    fontSize: '0.78rem',
+                                    fontWeight: 700,
+                                    cursor: blocked ? 'not-allowed' : 'pointer',
+                                    opacity: blocked ? 0.75 : 1
+                                  }}
+                                >
+                                  {blocked ? 'Thiếu Đơn Giá' : 'Chốt Duyệt Đơn Này (Tạo PO)'}
+                                </button>
+                              );
+                            })()}
                           </div>
                         );
                       })}

@@ -319,227 +319,26 @@ export const useHRStore = create((set, get) => ({
   },
 
   /**
-   * Create an attendance log
+   * Mark attendance for 1 employee/1 day — awaits the real upsert endpoint
+   * (POST /hr/attendance) and only applies the change locally on confirmed
+   * server success. Throws on failure so the caller (HRManager.jsx) can show
+   * a real error instead of a checkbox that silently never persisted.
    */
-  createAttendanceLog: async (logData) => {
-    try {
-      set({ error: null });
-      const newLog = await api.post('/attendance', logData);
-      
-      set(state => {
-        const updated = [...state.attendanceLogs, newLog];
-        try {
-          localStorage.setItem(STORAGE_KEYS.attendanceLogs, JSON.stringify(updated));
-        } catch (e) {}
-        return { attendanceLogs: updated };
-      });
-      
-      return newLog;
-    } catch (err) {
-      const errorMsg = err.message || 'Failed to create attendance log';
-      set({ error: errorMsg });
-      console.error('Error creating attendance log:', err);
-      throw err;
-    }
-  },
+  updateAttendanceLogSync: async (empId, dateStr, status) => {
+    const res = await api.post('/hr/attendance', { empId, date: dateStr, status });
+    const savedLog = res?.data;
+    if (!savedLog) throw new Error(res?.message || 'Không thể lưu chấm công.');
 
-  /**
-   * Update attendance log
-   */
-  updateAttendanceLog: async (logId, logData) => {
-    try {
-      set({ error: null });
-      const updated = await api.put(`/attendance/${logId}`, logData);
-      
-      set(state => {
-        const attendanceLogs = state.attendanceLogs.map(l => l.id === logId ? updated : l);
-        try {
-          localStorage.setItem(STORAGE_KEYS.attendanceLogs, JSON.stringify(attendanceLogs));
-        } catch (e) {}
-        return { attendanceLogs };
-      });
-      
-      return updated;
-    } catch (err) {
-      const errorMsg = err.message || 'Failed to update attendance log';
-      set({ error: errorMsg });
-      console.error('Error updating attendance log:', err);
-      throw err;
-    }
-  },
-
-  /**
-   * Create a leave request
-   */
-  createLeaveRequest: async (leaveData) => {
-    try {
-      set({ error: null });
-      const newLeave = await api.post('/leaves', leaveData);
-      
-      set(state => {
-        const updated = [...state.leaveRequests, newLeave];
-        try {
-          localStorage.setItem(STORAGE_KEYS.leaveRequests, JSON.stringify(updated));
-        } catch (e) {}
-        return { leaveRequests: updated };
-      });
-      
-      return newLeave;
-    } catch (err) {
-      const errorMsg = err.message || 'Failed to create leave request';
-      set({ error: errorMsg });
-      console.error('Error creating leave request:', err);
-      throw err;
-    }
-  },
-
-  /**
-   * Update a leave request
-   */
-  updateLeaveRequest: async (leaveId, leaveData) => {
-    try {
-      set({ error: null });
-      const updated = await api.put(`/leaves/${leaveId}`, leaveData);
-      
-      set(state => {
-        const leaveRequests = state.leaveRequests.map(l => l.id === leaveId ? updated : l);
-        try {
-          localStorage.setItem(STORAGE_KEYS.leaveRequests, JSON.stringify(leaveRequests));
-        } catch (e) {}
-        return { leaveRequests };
-      });
-      
-      return updated;
-    } catch (err) {
-      const errorMsg = err.message || 'Failed to update leave request';
-      set({ error: errorMsg });
-      console.error('Error updating leave request:', err);
-      throw err;
-    }
-  },
-
-  /**
-   * Delete a leave request
-   */
-  deleteLeaveRequest: async (leaveId) => {
-    try {
-      set({ error: null });
-      await api.delete(`/leaves/${leaveId}`);
-      
-      set(state => {
-        const leaveRequests = state.leaveRequests.filter(l => l.id !== leaveId);
-        try {
-          localStorage.setItem(STORAGE_KEYS.leaveRequests, JSON.stringify(leaveRequests));
-        } catch (e) {}
-        return { leaveRequests };
-      });
-    } catch (err) {
-      const errorMsg = err.message || 'Failed to delete leave request';
-      set({ error: errorMsg });
-      console.error('Error deleting leave request:', err);
-      throw err;
-    }
-  },
-
-  /**
-   * Create a payroll
-   */
-  createPayroll: async (payrollData) => {
-    try {
-      set({ error: null });
-      const newPayroll = await api.post('/payrolls', payrollData);
-      
-      set(state => {
-        const updated = [...state.payrolls, newPayroll];
-        try {
-          localStorage.setItem(STORAGE_KEYS.payrolls, JSON.stringify(updated));
-        } catch (e) {}
-        return { payrolls: updated };
-      });
-      
-      return newPayroll;
-    } catch (err) {
-      const errorMsg = err.message || 'Failed to create payroll';
-      set({ error: errorMsg });
-      console.error('Error creating payroll:', err);
-      throw err;
-    }
-  },
-
-  /**
-   * Update a payroll
-   */
-  updatePayroll: async (payrollId, payrollData) => {
-    try {
-      set({ error: null });
-      const updated = await api.put(`/payrolls/${payrollId}`, payrollData);
-      
-      set(state => {
-        const payrolls = state.payrolls.map(p => p.id === payrollId ? updated : p);
-        try {
-          localStorage.setItem(STORAGE_KEYS.payrolls, JSON.stringify(payrolls));
-        } catch (e) {}
-        return { payrolls };
-      });
-      
-      return updated;
-    } catch (err) {
-      const errorMsg = err.message || 'Failed to update payroll';
-      set({ error: errorMsg });
-      console.error('Error updating payroll:', err);
-      throw err;
-    }
-  },
-
-  /**
-   * Delete a payroll
-   */
-  deletePayroll: async (payrollId) => {
-    try {
-      set({ error: null });
-      await api.delete(`/payrolls/${payrollId}`);
-      
-      set(state => {
-        const payrolls = state.payrolls.filter(p => p.id !== payrollId);
-        try {
-          localStorage.setItem(STORAGE_KEYS.payrolls, JSON.stringify(payrolls));
-        } catch (e) {}
-        return { payrolls };
-      });
-    } catch (err) {
-      const errorMsg = err.message || 'Failed to delete payroll';
-      set({ error: errorMsg });
-      console.error('Error deleting payroll:', err);
-      throw err;
-    }
-  },
-
-  /**
-   * Update attendance log sync
-   */
-  updateAttendanceLogSync: (empId, dateStr, status) => {
     set(state => {
       const existingIndex = state.attendanceLogs.findIndex(log => log.empId === empId && log.date === dateStr);
-      let nextLogs = [];
-      if (existingIndex !== -1) {
-        nextLogs = state.attendanceLogs.map((log, index) => 
-          index === existingIndex ? { ...log, status } : log
-        );
-      } else {
-        const newLog = {
-          id: `ATT-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`,
-          empId,
-          date: dateStr,
-          status
-        };
-        nextLogs = [newLog, ...state.attendanceLogs];
-      }
+      const nextLogs = existingIndex !== -1
+        ? state.attendanceLogs.map((log, index) => (index === existingIndex ? savedLog : log))
+        : [savedLog, ...state.attendanceLogs];
 
       const todayStr = new Date().toLocaleDateString('vi-VN');
-      let updatedEmployees = state.employees;
-      if (dateStr === todayStr) {
-        updatedEmployees = state.employees.map(emp => emp.id === empId ? { ...emp, attendance: status } : emp);
-      }
+      const updatedEmployees = dateStr === todayStr
+        ? state.employees.map(emp => (emp.id === empId ? { ...emp, attendance: status } : emp))
+        : state.employees;
 
       try {
         localStorage.setItem(STORAGE_KEYS.attendanceLogs, JSON.stringify(nextLogs));
@@ -548,53 +347,59 @@ export const useHRStore = create((set, get) => ({
 
       return { attendanceLogs: nextLogs, employees: updatedEmployees };
     });
+
+    return savedLog;
   },
 
   /**
-   * Approve leave request
+   * Approve leave request — real endpoint is PATCH /hr/leaves/:id/approve,
+   * not the PUT /leaves/:id this used to call (a path that never existed).
    */
-  approveLeaveRequest: (id) => {
-    set(state => {
-      const leaveRequests = state.leaveRequests.map(r => r.id === id ? { ...r, status: 'APPROVED' } : r);
-      try { localStorage.setItem(STORAGE_KEYS.leaveRequests, JSON.stringify(leaveRequests)); } catch (e) {}
-      return { leaveRequests };
-    });
-    api.put(`/leaves/${id}`, { status: 'APPROVED' }).catch(() => {});
+  approveLeaveRequest: async (id) => {
+    const res = await api.patch(`/hr/leaves/${id}/approve`);
+    const updated = res?.data;
+    if (!updated) throw new Error(res?.message || 'Không thể duyệt đơn nghỉ phép.');
+    set(state => ({ leaveRequests: state.leaveRequests.map(r => (r.id === id ? { ...r, ...updated } : r)) }));
+    try {
+      localStorage.setItem(STORAGE_KEYS.leaveRequests, JSON.stringify(get().leaveRequests));
+    } catch (e) {}
+    return updated;
   },
 
   /**
-   * Reject leave request
+   * Reject leave request — real endpoint is PATCH /hr/leaves/:id/reject.
    */
-  rejectLeaveRequest: (id, reason = '') => {
-    set(state => {
-      const leaveRequests = state.leaveRequests.map(r => r.id === id ? { ...r, status: 'REJECTED', rejectReason: reason } : r);
-      try { localStorage.setItem(STORAGE_KEYS.leaveRequests, JSON.stringify(leaveRequests)); } catch (e) {}
-      return { leaveRequests };
-    });
-    api.put(`/leaves/${id}`, { status: 'REJECTED', rejectReason: reason }).catch(() => {});
+  rejectLeaveRequest: async (id, reason = '') => {
+    const res = await api.patch(`/hr/leaves/${id}/reject`, { reason });
+    const updated = res?.data;
+    if (!updated) throw new Error(res?.message || 'Không thể từ chối đơn nghỉ phép.');
+    set(state => ({ leaveRequests: state.leaveRequests.map(r => (r.id === id ? { ...r, ...updated, rejectReason: reason } : r)) }));
+    try {
+      localStorage.setItem(STORAGE_KEYS.leaveRequests, JSON.stringify(get().leaveRequests));
+    } catch (e) {}
+    return updated;
   },
 
   /**
-   * Submit payrolls
+   * Lập bảng lương kỳ mới — server tự tính lương cho toàn bộ nhân viên ACTIVE
+   * theo đúng công thức đã hiển thị ở tab "Bảng Lương" (hoa hồng SALES, thưởng
+   * ASSEMBLY, khấu trừ cố định) — không còn gửi nguyên mảng tính sẵn ở client.
    */
-  submitPayrolls: (payrollList) => {
-    set(state => {
-      try { localStorage.setItem(STORAGE_KEYS.payrolls, JSON.stringify(payrollList)); } catch (e) {}
-      return { payrolls: payrollList };
-    });
-    api.post('/payrolls', payrollList).catch(() => {});
+  submitPayrolls: async (period) => {
+    const res = await api.post('/hr/payrolls', { period });
+    if (!res?.success) throw new Error(res?.message || 'Không thể lập bảng lương.');
+    await get().getPayrolls();
+    return res.data;
   },
 
   /**
-   * Approve payroll by CEO
+   * Approve payroll by CEO — real endpoint is PATCH /hr/payrolls/approve-ceo.
    */
-  approvePayrollByCEO: () => {
-    set(state => {
-      const nextPayrolls = state.payrolls.map(p => ({ ...p, status: 'APPROVED_BY_CEO' }));
-      try { localStorage.setItem(STORAGE_KEYS.payrolls, JSON.stringify(nextPayrolls)); } catch (e) {}
-      return { payrolls: nextPayrolls };
-    });
-    notify('CEO đã phê duyệt bảng lương tháng này thành công. Đã gửi lệnh chi cho Kế toán giải ngân.', 'success');
+  approvePayrollByCEO: async (period) => {
+    const res = await api.patch('/hr/payrolls/approve-ceo', period ? { period } : {});
+    if (!res?.success) throw new Error(res?.message || 'Không thể duyệt bảng lương.');
+    await get().getPayrolls();
+    return res.data;
   },
 
   /**

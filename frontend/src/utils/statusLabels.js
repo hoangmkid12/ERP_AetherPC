@@ -71,7 +71,7 @@ export const PO_STATUS = {
   CANCELLED: { label: 'Đã Hủy', color: '#be123c', bg: '#fff1f2', border: '#fecdd3' }
 };
 
-// ─── ReturnRequest.status (đổi/trả/RMA, 10 giá trị) ───
+// ─── ReturnRequest.status (đổi/trả/RMA, 13 giá trị) ───
 export const RETURN_STATUS = {
   PENDING: { label: 'Chờ Xử Lý', color: '#b45309', bg: '#fffbeb', border: '#fde68a' },
   RETURN_APPROVED: { label: 'Đồng Ý Thu Hồi (Giao Shipper)', color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe' },
@@ -80,6 +80,9 @@ export const RETURN_STATUS = {
   QC_PASSED: { label: 'QC Thẩm Định Đạt', color: '#047857', bg: '#ecfdf5', border: '#a7f3d0' },
   QC_REJECTED: { label: 'QC Từ Chối', color: '#be123c', bg: '#fff1f2', border: '#fecdd3' },
   RESTOCKED: { label: 'Đã Nhập Lại Kho', color: '#047857', bg: '#ecfdf5', border: '#a7f3d0' },
+  EXCHANGED: { label: 'Đã Đổi Mới 1-1', color: '#6d28d9', bg: '#f5f3ff', border: '#ddd6fe' },
+  VENDOR_WARRANTY: { label: 'Đã Chuyển Gửi Hãng Bảo Hành', color: '#c2410c', bg: '#fff7ed', border: '#fed7aa' },
+  INSPECTED_SCRAP: { label: 'Phế Phẩm / Kho Lỗi', color: '#be123c', bg: '#fff1f2', border: '#fecdd3' },
   REFUNDED: { label: 'Đã Hoàn Tiền', color: '#047857', bg: '#ecfdf5', border: '#a7f3d0' },
   COMPLETED: { label: 'Hoàn Tất', color: '#047857', bg: '#ecfdf5', border: '#a7f3d0' },
   REJECTED: { label: 'Đã Từ Chối', color: '#be123c', bg: '#fff1f2', border: '#fecdd3' }

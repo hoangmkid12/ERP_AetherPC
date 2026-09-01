@@ -580,7 +580,10 @@ export const useSalesStore = create((set, get) => ({
         await api.patch(`/orders/returns/${targetApiId}/deliver-warehouse`, extraObj);
       } else if (status === 'QC_PASSED' || status === 'REJECTED') {
         await api.patch(`/orders/returns/${targetApiId}/qc-inspect`, extraObj);
-      } else if (status === 'RESTOCKED' || status === 'EXCHANGED') {
+      } else if (['RESTOCKED', 'EXCHANGED', 'VENDOR_WARRANTY', 'INSPECTED_SCRAP'].includes(status)) {
+        // Backend infers the real outcome (restock / exchange / send-to-
+        // vendor / scrap) from `shelfLocation` in the body, not from this
+        // status value itself — see confirmReturnWarehouse.
         await api.patch(`/orders/returns/${targetApiId}/restock`, extraObj);
       } else if (status === 'REFUNDED') {
         await api.patch(`/orders/returns/${targetApiId}/refund`, extraObj);

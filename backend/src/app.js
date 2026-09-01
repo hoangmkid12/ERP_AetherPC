@@ -55,15 +55,18 @@ app.get('/status', (req, res) => {
 
 // Routes API V1
 app.use('/api/v1', apiLimiter);
-app.use('/api/v1/auth', authLimiter, require('./routes/auth.routes'));
+app.use('/api/v1/auth', require('./routes/auth.routes')(authLimiter));
 app.use('/api/v1/products', require('./routes/product.routes'));
 app.use('/api/v1/orders', require('./routes/order.routes'));
 app.use('/api/v1/chat', require('./routes/chat.routes'));
 app.use('/api/v1/purchasing', require('./routes/purchase.routes'));
 app.use('/api/v1/warehouse', require('./routes/warehouse.routes'));
+app.use('/api/v1/assembly-jobs', require('./routes/assembly.routes'));
 app.use('/api/v1/hr', require('./routes/hr.routes'));
 app.use('/api/v1/employees', require('./routes/hr.routes'));
 app.use('/api/v1/customers', require('./routes/customer.routes'));
+app.use('/api/v1/ledger', require('./routes/ledger.routes'));
+app.use('/api/v1/complaints', require('./routes/complaint.routes'));
 
 // Global Error Handler Middleware
 app.use(errorMiddleware);

@@ -196,7 +196,8 @@ export default function Assembly() {
     const targetJob = jobs.find(j => j.id === jobId);
     if (targetJob) {
       const nextChecklist = { ...(targetJob.checklist || {}), [key]: !targetJob.checklist?.[key] };
-      updateAssemblyJob(jobId, targetJob.status, nextChecklist, targetJob.componentSerials);
+      updateAssemblyJob(jobId, targetJob.status, nextChecklist, targetJob.componentSerials)
+        .catch(err => notify(err.message || 'Không thể lưu checklist.', 'error'));
     }
   };
 
@@ -207,8 +208,9 @@ export default function Assembly() {
     }
     const targetJob = jobs.find(j => j.id === jobId);
     if (targetJob) {
-      updateAssemblyJob(jobId, 'ASSEMBLING', targetJob.checklist, targetJob.componentSerials);
-      notify(`Đã tiếp nhận lệnh lắp ráp #${jobId}! Hãy tiến hành chọn mã Serial linh kiện.`, 'success');
+      updateAssemblyJob(jobId, 'ASSEMBLING', targetJob.checklist, targetJob.componentSerials)
+        .then(() => notify(`Đã tiếp nhận lệnh lắp ráp #${jobId}! Hãy tiến hành chọn mã Serial linh kiện.`, 'success'))
+        .catch(err => notify(err.message || 'Không thể bắt đầu lắp ráp.', 'error'));
     }
   };
 
@@ -220,11 +222,12 @@ export default function Assembly() {
       const available = getAvailableSerialsForCategory(comp.category);
       autoSerials[comp.category] = available[0] || `SN-${comp.category}-2026-001`;
     });
-    updateAssemblyJob(job.id, job.status, job.checklist, autoSerials);
-    notify('Đã tự động gán đầy đủ mã Serial Number (S/N) hợp lệ từ kho cho tất cả linh kiện.', 'success');
+    updateAssemblyJob(job.id, job.status, job.checklist, autoSerials)
+      .then(() => notify('Đã tự động gán mã Serial Number (S/N) tạm cho tất cả linh kiện — có thể sửa lại thủ công.', 'success'))
+      .catch(err => notify(err.message || 'Không thể gán Serial Number.', 'error'));
   };
 
-  const completeAssembly = (jobId) => {
+  const completeAssembly = async (jobId) => {
     if (isCancelled) {
       notify('Không thể nghiệm thu: Đơn hàng này đã bị HỦY!', 'error');
       return;
@@ -232,7 +235,9 @@ export default function Assembly() {
     const jobToCheck = jobs.find(j => j.id === jobId);
     if (!jobToCheck) return;
 
-    // Verify exactly the 4 standard QA keys
+    // Client-side pre-check so the user gets instant feedback — the server
+    // (assembly.controller.js) re-validates the exact same rule and is the
+    // one that actually decides whether COMPLETED is accepted.
     const REQUIRED_CHECKLIST_KEYS = ['biosPost', 'osInstall', 'stressTest', 'qcSeal'];
     const allDone = REQUIRED_CHECKLIST_KEYS.every(k => !!jobToCheck.checklist?.[k]);
     if (!allDone) {
@@ -254,12 +259,17 @@ export default function Assembly() {
       qcSeal: true
     };
 
-    updateAssemblyJob(jobId, 'COMPLETED', finalChecklist, currentSerials);
-    notify(`Đã hoàn tất lắp ráp và nghiệm thu! Đơn hàng ${jobToCheck.orderId || jobId} đã được chuyển sang trạng thái "Chờ Xuất Kho" (Kho sẽ bàn giao xuất hàng).`, 'success');
+    try {
+      await updateAssemblyJob(jobId, 'COMPLETED', finalChecklist, currentSerials);
+      notify(`Đã hoàn tất lắp ráp và nghiệm thu! Đơn hàng ${jobToCheck.orderId || jobId} đã được chuyển sang trạng thái "Sẵn Sàng Giao" (Kho sẽ bàn giao xuất hàng).`, 'success');
+    } catch (err) {
+      notify(`Nghiệm thu thất bại: ${err.message || 'lỗi kết nối máy chủ'}.`, 'error');
+    }
   };
 
   // Create Manual Job
-  const handleCreateJob = (e) => {
+  const [creatingJob, setCreatingJob] = useState(false);
+  const handleCreateJob = async (e) => {
     e.preventDefault();
     if (!newJobCustomer.trim()) {
       notify('Vui lòng nhập tên khách hàng hoặc mục đích lệnh lắp ráp.', 'error');
@@ -271,29 +281,27 @@ export default function Assembly() {
       return;
     }
 
-    const newJob = {
-      id: `ASM-${Date.now().toString().slice(-6)}`,
-      orderId: newJobOrderId || `ORD-MANUAL-${Date.now().toString().slice(-4)}`,
-      customer: newJobCustomer,
-      components: validComponents,
-      date: new Date().toLocaleDateString('vi-VN'),
-      status: 'PENDING',
-      checklist: {
-        biosPost: false,
-        osInstall: false,
-        stressTest: false,
-        qcSeal: false
-      },
-      componentSerials: {}
-    };
-
-    if (typeof createAssemblyJob === 'function') {
-      createAssemblyJob(newJob);
+    if (typeof createAssemblyJob !== 'function') return;
+    setCreatingJob(true);
+    try {
+      const newJob = await createAssemblyJob({
+        orderId: newJobOrderId || null,
+        customerName: newJobCustomer,
+        components: validComponents
+      });
+      if (!newJob) {
+        notify(`Đơn hàng ${newJobOrderId} đã có lệnh lắp ráp — không tạo trùng.`, 'error');
+        return;
+      }
+      setShowCreateModal(false);
+      setActiveJobId(newJob.id);
+      setTab('jobs');
+      notify(`Đã khởi tạo thành công Lệnh Lắp Ráp #${newJob.id}!`, 'success');
+    } catch (err) {
+      notify(`Không thể tạo lệnh lắp ráp: ${err.message || 'lỗi kết nối máy chủ'}.`, 'error');
+    } finally {
+      setCreatingJob(false);
     }
-    setShowCreateModal(false);
-    setActiveJobId(newJob.id);
-    setTab('jobs');
-    notify(`Đã khởi tạo thành công Lệnh Lắp Ráp #${newJob.id}!`, 'success');
   };
 
   // Status Badge Helper
@@ -723,7 +731,8 @@ export default function Assembly() {
                                 value={assignedSN}
                                 onChange={(e) => {
                                   const nextSerials = { ...(activeJob.componentSerials || {}), [comp.category]: e.target.value };
-                                  updateAssemblyJob(activeJob.id, activeJob.status, activeJob.checklist, nextSerials);
+                                  updateAssemblyJob(activeJob.id, activeJob.status, activeJob.checklist, nextSerials)
+                                    .catch(err => notify(err.message || 'Không thể lưu Serial Number.', 'error'));
                                 }}
                                 style={{
                                   width: '100%',
@@ -767,7 +776,8 @@ export default function Assembly() {
                     <button
                       onClick={() => {
                         const fullQA = { biosPost: true, osInstall: true, stressTest: true, qcSeal: true };
-                        updateAssemblyJob(activeJob.id, activeJob.status, fullQA, activeJob.componentSerials);
+                        updateAssemblyJob(activeJob.id, activeJob.status, fullQA, activeJob.componentSerials)
+                          .catch(err => notify(err.message || 'Không thể lưu checklist.', 'error'));
                       }}
                       style={{
                         backgroundColor: '#f0fdf4',

@@ -55,6 +55,7 @@ export const OPERATIONAL_PERMISSIONS = [
   { id: 'purchasing_approve_po', moduleId: 'purchasing', name: 'Ký duyệt Báo Giá / Đơn PO (Ban Giám Đốc)', desc: 'CEO phê duyệt chính thức bảng chào giá để phát hành đơn mua hàng PO' },
   { id: 'purchasing_issue_po', moduleId: 'purchasing', name: 'Phát hành & gửi Đơn Mua Hàng (PO) tới NCC', desc: 'Ký hợp đồng và gửi đơn PO chính thức yêu cầu nhà cung cấp giao hàng' },
   { id: 'purchasing_manage_suppliers', moduleId: 'purchasing', name: 'Quản lý danh bạ & đánh giá Nhà Cung Cấp', desc: 'Thêm mới thông tin NCC, thời hạn thanh toán và chấm điểm chất lượng' },
+  { id: 'purchasing_view_orders', moduleId: 'purchasing', name: 'Tra cứu đơn mua hàng & nhà cung cấp', desc: 'Xem danh sách PO, báo giá và hồ sơ NCC mà không thao tác tạo/duyệt' },
 
   // 4. Phân Hệ Kiểm Định Chất Lượng (QA/QC)
   { id: 'qc_inspect_inbound', moduleId: 'quality-control', name: 'Tiến hành nghiệm thu lô hàng PO tại Dock nhập', desc: 'Kiểm tra ngoại quan, test seal niêm phong, quét Serial và ký biên bản QA_PASSED/REJECTED' },
@@ -65,10 +66,12 @@ export const OPERATIONAL_PERMISSIONS = [
   // 5. Phân Hệ Lắp Ráp Máy Tính (Assembly)
   { id: 'assembly_build_pc', moduleId: 'assembly', name: 'Thực hiện quy trình lắp ráp phần cứng PC 4 bước', desc: 'Nhận linh kiện từ kho, lắp ráp main/chip/card và đi dây thùng máy' },
   { id: 'assembly_benchmark_stamp', moduleId: 'assembly', name: 'Chạy stress test benchmark & dán tem bảo hành', desc: 'Kiểm thử độ ổn định nhiệt độ, hiệu năng và dán tem niêm phong trước khi giao' },
+  { id: 'assembly_view_dashboard', moduleId: 'assembly', name: 'Xem tổng quan tiến độ lắp ráp & nghiệm thu', desc: 'Theo dõi số lệnh đang chờ, đang lắp ráp và đã hoàn tất mà không trực tiếp thao tác' },
 
   // 6. Phân Hệ Giao Hàng & Thu Tiền COD
   { id: 'delivery_execute_route', moduleId: 'delivery', name: 'Nhận tuyến giao, chụp ảnh POD & thu tiền mặt COD', desc: 'Tài xế nhận hàng, cập nhật tiến độ giao, tải ảnh bằng chứng giao hàng và thu tiền' },
   { id: 'delivery_pickup_rma', moduleId: 'delivery', name: 'Thu hồi linh kiện bảo hành RMA từ khách về kho', desc: 'Đến tận nơi thu hồi hàng lỗi từ khách hàng theo phiếu yêu cầu' },
+  { id: 'delivery_view_dashboard', moduleId: 'delivery', name: 'Xem tổng quan tuyến giao & trạng thái COD', desc: 'Theo dõi tiến độ giao hàng toàn đội xe mà không trực tiếp thao tác từng đơn' },
 
   // 7. Phân Hệ Kế Toán & Tài Chính
   { id: 'accounting_pay_po', moduleId: 'accounting', name: 'Chi trả tiền hàng cho Nhà Cung Cấp theo đơn PO', desc: 'Đối soát hóa đơn và thực hiện lệnh chuyển khoản thanh toán cho NCC' },
@@ -90,34 +93,16 @@ export const OPERATIONAL_PERMISSIONS = [
   { id: 'system_admin_full', moduleId: 'system', name: 'Toàn quyền cấu hình hệ thống, tài khoản & sao lưu', desc: 'Quản lý phân quyền RBAC, kiểm soát bảo mật và sao lưu dữ liệu' }
 ];
 
-// Phân hệ liên quan mặc định của từng Actor
-export const ROLE_RELEVANT_MODULES = {
-  ADMIN: ['dashboard', 'sales', 'warehouse', 'purchasing', 'quality-control', 'assembly', 'delivery', 'accounting', 'cskh', 'hr', 'system'],
-  CEO: ['dashboard', 'sales', 'purchasing', 'accounting', 'hr'],
-  SALES_MANAGER: ['sales', 'cskh', 'warehouse', 'delivery'],
-  SALES: ['sales', 'warehouse', 'cskh'],
-  WAREHOUSE_MANAGER: ['warehouse', 'delivery', 'quality-control', 'purchasing'],
-  WAREHOUSE: ['warehouse', 'delivery'],
-  PURCHASING: ['purchasing', 'warehouse', 'quality-control'],
-  QC: ['quality-control', 'warehouse'],
-  QA: ['quality-control', 'warehouse'],
-  ASSEMBLY: ['assembly', 'warehouse'],
-  DELIVERY: ['delivery', 'warehouse'],
-  ACCOUNTANT: ['accounting', 'dashboard', 'sales', 'purchasing', 'hr'],
-  CSKH: ['cskh', 'sales', 'quality-control'],
-  HR: ['hr', 'dashboard']
-};
-
 // Ma trận quyền hạn nghiệp vụ mặc định chuẩn hóa theo đúng vai trò thực tế
 export const DEFAULT_OPERATIONAL_MATRIX = {
   ADMIN: {
     // Admin có toàn bộ quyền
     sales_pos_checkout: true, sales_approve_discount: true, sales_cancel_order: true, sales_manage_promotions: true, sales_view_orders: true,
     warehouse_pack_scan: true, warehouse_dispatch_shipper: true, warehouse_stock_intake: true, warehouse_create_pr: true, warehouse_approve_pr: true, warehouse_manage_locations: true, warehouse_audit_adjust: true, warehouse_view_inventory: true,
-    purchasing_create_rfq: true, purchasing_compare_quotes: true, purchasing_approve_po: true, purchasing_issue_po: true, purchasing_manage_suppliers: true,
+    purchasing_create_rfq: true, purchasing_compare_quotes: true, purchasing_approve_po: true, purchasing_issue_po: true, purchasing_manage_suppliers: true, purchasing_view_orders: true,
     qc_inspect_inbound: true, qc_inspect_rma: true, qc_inspect_restock: true, qc_view_logs: true,
-    assembly_build_pc: true, assembly_benchmark_stamp: true,
-    delivery_execute_route: true, delivery_pickup_rma: true,
+    assembly_build_pc: true, assembly_benchmark_stamp: true, assembly_view_dashboard: true,
+    delivery_execute_route: true, delivery_pickup_rma: true, delivery_view_dashboard: true,
     accounting_pay_po: true, accounting_settle_cod: true, accounting_disburse_payroll: true, accounting_manage_invoices: true,
     cskh_handle_tickets: true, cskh_approve_exchange: true,
     hr_manage_employees: true, hr_prepare_payroll: true, hr_approve_payroll_ceo: true,
@@ -130,7 +115,14 @@ export const DEFAULT_OPERATIONAL_MATRIX = {
     purchasing_approve_po: true,
     hr_approve_payroll_ceo: true,
     accounting_manage_invoices: true,
-    warehouse_view_inventory: true
+    warehouse_view_inventory: true,
+    // CEO được cấp quyền ở mọi route these 4 module (App.jsx allowedRoles) và
+    // luôn bypass authMiddleware backend — trước đây ma trận này thiếu nên
+    // sidebar không hiện link dù CEO truy cập trực tiếp bằng URL vẫn vào được.
+    qc_view_logs: true,
+    cskh_approve_exchange: true,
+    delivery_view_dashboard: true,
+    assembly_view_dashboard: true
   },
   SALES_MANAGER: {
     sales_view_orders: true,
@@ -140,13 +132,18 @@ export const DEFAULT_OPERATIONAL_MATRIX = {
     sales_manage_promotions: true,
     cskh_handle_tickets: true,
     cskh_approve_exchange: true,
-    warehouse_view_inventory: true
+    warehouse_view_inventory: true,
+    // order.routes.js PATCH /:id/status (dùng để cập nhật trạng thái giao
+    // hàng) cấp quyền thật cho SALES_MANAGER — giữ quyền xem trang Giao Hàng.
+    delivery_view_dashboard: true
   },
   SALES: {
     sales_pos_checkout: true,
     sales_view_orders: true,
-    warehouse_view_inventory: true,
-    cskh_handle_tickets: true
+    warehouse_view_inventory: true
+    // cskh_handle_tickets: KHÔNG cấp — backend chat.routes.js (POST /cskh/reply,
+    // GET /cskh/sessions) chỉ nhận SALES_MANAGER, không nhận SALES thường; cấp
+    // ở đây trước đây khiến sidebar hiện link CSKH nhưng bấm vào là bị chặn.
   },
   WAREHOUSE_MANAGER: {
     warehouse_view_inventory: true,
@@ -154,13 +151,25 @@ export const DEFAULT_OPERATIONAL_MATRIX = {
     warehouse_approve_pr: true,
     warehouse_manage_locations: true,
     warehouse_audit_adjust: true,
-    qc_view_logs: true
+    qc_view_logs: true,
+    // purchase.routes.js cấp GET /suppliers, /products, /orders cho
+    // WAREHOUSE_MANAGER thật — trước đây matrix thiếu nên sidebar không hiện
+    // link Mua Hàng dù route/backend đều đã cho phép.
+    purchasing_view_orders: true,
+    delivery_view_dashboard: true
   },
   WAREHOUSE: {
     warehouse_view_inventory: true,
     warehouse_pack_scan: true,
     warehouse_stock_intake: true,
-    warehouse_create_pr: true
+    warehouse_create_pr: true,
+    // order.routes.js PATCH /returns/:id/qc-inspect cấp quyền thật cho
+    // WAREHOUSE (không chỉ QC) — trước đây matrix thiếu nên sidebar không
+    // hiện link Kiểm Định Chất Lượng dù route/backend đã cho phép.
+    qc_inspect_restock: true,
+    // order.routes.js PATCH /:id/status (dùng cho "Xác Nhận Xuất Kho" & bàn
+    // giao shipper) cấp quyền thật cho WAREHOUSE — giữ quyền xem trang Giao Hàng.
+    delivery_view_dashboard: true
   },
   PURCHASING: {
     purchasing_create_rfq: true,
@@ -170,14 +179,10 @@ export const DEFAULT_OPERATIONAL_MATRIX = {
     warehouse_view_inventory: true,
     qc_view_logs: true
   },
+  // QA và QUALITY_CONTROL được chuẩn hoá về khóa 'QC' qua normalizeRoleForRbac
+  // trước khi tra ma trận này — không khai lặp lại 2 khối giống hệt nhau nữa
+  // (nguồn gốc của lỗi QUALITY_CONTROL "mồ côi" đã sửa ở backend trước đó).
   QC: {
-    qc_inspect_inbound: true,
-    qc_inspect_rma: true,
-    qc_inspect_restock: true,
-    qc_view_logs: true,
-    warehouse_view_inventory: true
-  },
-  QA: {
     qc_inspect_inbound: true,
     qc_inspect_rma: true,
     qc_inspect_restock: true,
@@ -186,32 +191,40 @@ export const DEFAULT_OPERATIONAL_MATRIX = {
   },
   ASSEMBLY: {
     assembly_build_pc: true,
-    assembly_benchmark_stamp: true,
-    warehouse_view_inventory: true
+    assembly_benchmark_stamp: true
+    // warehouse_view_inventory: KHÔNG cấp — warehouse.routes.js không cấp
+    // ASSEMBLY ở bất kỳ route nào; trước đây sidebar hiện link Kho cho nhân
+    // viên lắp ráp nhưng bấm vào là bị chặn.
   },
   DELIVERY: {
     delivery_execute_route: true,
-    delivery_pickup_rma: true,
-    warehouse_view_inventory: true
+    delivery_pickup_rma: true
+    // warehouse_view_inventory: KHÔNG cấp — warehouse.routes.js không cấp
+    // DELIVERY ở bất kỳ route nào (receipts/inventory/stock-movements); trước
+    // đây sidebar hiện link Kho cho Shipper nhưng bấm vào là bị chặn.
   },
   ACCOUNTANT: {
     accounting_pay_po: true,
     accounting_settle_cod: true,
     accounting_disburse_payroll: true,
     accounting_manage_invoices: true,
-    dashboard_view_kpi: true,
     sales_view_orders: true
+    // dashboard_view_kpi: KHÔNG cấp — App.jsx '/admin/dashboard' chỉ cho
+    // CEO/ADMIN, và Accounting.jsx (module 'accounting') đã có sẵn đúng các
+    // chỉ số P&L/doanh thu/chi phí này ở tầng kế toán, không cần trang riêng.
   },
   CSKH: {
     cskh_handle_tickets: true,
     cskh_approve_exchange: true,
-    sales_view_orders: true,
-    qc_view_logs: true
+    sales_view_orders: true
+    // qc_view_logs: KHÔNG cấp — không route QC nào (warehouse/purchase/order)
+    // cấp quyền cho CSKH; trước đây sidebar hiện link QC nhưng bấm vào bị chặn.
   },
   HR: {
     hr_manage_employees: true,
-    hr_prepare_payroll: true,
-    dashboard_view_kpi: true
+    hr_prepare_payroll: true
+    // dashboard_view_kpi: KHÔNG cấp — cùng lý do với ACCOUNTANT ở trên, và
+    // không thuộc phạm vi nghiệp vụ nhân sự.
   }
 };
 
@@ -235,9 +248,16 @@ export const saveOperationalRbac = (newMatrix) => {
   } catch (e) {}
 };
 
+// QC, QA và QUALITY_CONTROL là 3 giá trị role tương đương cho cùng 1 chức
+// năng kiểm định chất lượng (khớp với QC_ROLES phía backend, constants/roles.js).
+// Trước đây ma trận này khai 2 khối 'QC'/'QA' giống hệt nhau và 'QUALITY_CONTROL'
+// không có khối nào — chuẩn hoá về 1 khóa 'QC' duy nhất để tránh lặp/bỏ sót.
+export const QC_EQUIVALENT_ROLES = ['QC', 'QA', 'QUALITY_CONTROL'];
+const normalizeRoleForRbac = (roleCode) => (QC_EQUIVALENT_ROLES.includes(roleCode) ? 'QC' : roleCode);
+
 export const canDo = (userRole, operationId) => {
   if (!userRole) return false;
-  const roleCode = String(userRole).toUpperCase();
+  const roleCode = normalizeRoleForRbac(String(userRole).toUpperCase());
   if (roleCode === 'ADMIN') return true;
 
   const matrix = getOperationalRbac();
@@ -250,7 +270,7 @@ export const canDo = (userRole, operationId) => {
 // Compatibility adapter for module-level check
 export const hasPermission = (userRole, moduleName, actionType = 'read') => {
   if (!userRole) return false;
-  const roleCode = String(userRole).toUpperCase();
+  const roleCode = normalizeRoleForRbac(String(userRole).toUpperCase());
   if (roleCode === 'ADMIN') return true;
 
   const matrix = getOperationalRbac();
@@ -274,4 +294,30 @@ export const hasPermission = (userRole, moduleName, actionType = 'read') => {
 };
 
 export const getActiveRbacMatrix = () => getOperationalRbac();
+
+// Single source of truth for "which roles can enter module X" — derived live
+// from the same matrix that drives the sidebar (`hasPermission`), instead of
+// a second hand-maintained role→module list. App.jsx's route guards call this
+// directly so a route's access and its sidebar visibility can never drift
+// apart again (previously: allowedRoles in App.jsx, DEFAULT_OPERATIONAL_MATRIX
+// here, and ROLE_RELEVANT_MODULES below were 3 separate lists edited by hand).
+export const getRolesForModule = (moduleId) => {
+  const canonicalMatches = ERP_ROLES.map(r => r.code).filter(roleCode => hasPermission(roleCode, moduleId, 'read'));
+  const expanded = new Set();
+  canonicalMatches.forEach(roleCode => {
+    // ERP_ROLES only lists the canonical 'QC' entry — expand it back into all
+    // 3 real role values a user's session can actually carry, so a real
+    // QUALITY_CONTROL/QA employee isn't silently excluded from the route.
+    if (roleCode === 'QC') QC_EQUIVALENT_ROLES.forEach(r => expanded.add(r));
+    else expanded.add(roleCode);
+  });
+  return Array.from(expanded);
+};
+
+// Replaces the old hand-maintained ROLE_RELEVANT_MODULES object (a 3rd list
+// that drifted out of sync with the matrix above) — derives "modules relevant
+// to this role" the same way `getRolesForModule` derives the reverse, so the
+// two can never disagree.
+export const getRoleRelevantModules = (roleCode) =>
+  ERP_SYSTEM_MODULES.filter(m => hasPermission(roleCode, m.id, 'read')).map(m => m.id);
 export const saveRbacMatrix = (m) => saveOperationalRbac(m);

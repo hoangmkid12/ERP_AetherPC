@@ -1578,9 +1578,10 @@ export default function Warehouse() {
   }, []);
 
   // Ensure default sample movements if stockMovements is empty
-  const effectiveStockMovements = stockMovements && stockMovements.length > 0
-    ? stockMovements
-    : DEFAULT_SAMPLE_MOVEMENTS;
+  const usingSampleMovements = !(stockMovements && stockMovements.length > 0);
+  const effectiveStockMovements = usingSampleMovements
+    ? DEFAULT_SAMPLE_MOVEMENTS
+    : stockMovements;
 
   // Sync receipts & PO status
   const fetchReceipts = async (silent = false) => {
@@ -1712,14 +1713,24 @@ export default function Warehouse() {
 
     setSubmitting(true);
     try {
-      let resultSuccess = false;
+      let apiError = null;
       try {
         const res = await api.post(`/warehouse/receipts/${receipt.id}/validate`, {
           warehouseId: receipt.warehouseId || 1
         });
-        if (res?.success) resultSuccess = true;
+        if (!res?.success) apiError = new Error(res?.message || 'Máy chủ từ chối xác nhận nhập kho.');
       } catch (e) {
-        console.warn('API error, using local fallback:', e);
+        apiError = e;
+      }
+
+      // The backend independently re-checks the QC/QA gate (409 if not
+      // actually passed) — trust that result. Applying the local inventory
+      // bump / "success" toast regardless of what the server said would let
+      // the UI report stock received that was never actually recorded.
+      if (apiError) {
+        notify(apiError.message || `Không thể xác nhận nhập kho phiếu ${receipt.receiptNumber}. Vui lòng thử lại.`, 'error');
+        setSubmitting(false);
+        return;
       }
 
       const targetItems = receipt.po?.items || receipt.items || [];
@@ -1813,15 +1824,40 @@ export default function Warehouse() {
   };
 
   // Handle Confirm and Send RFQ to Purchasing
-  const handleConfirmSendBackorderRfq = (e) => {
+  const handleConfirmSendBackorderRfq = async (e) => {
     if (e && e.preventDefault) e.preventDefault();
     if (!backorderRfqData) return;
 
     const { order, orderId, productId, productName, suggestedQty, supplier, unitPrice, reason, neededQty } = backorderRfqData;
     const finalQty = Number(suggestedQty) || 5;
     const totalAmount = finalQty * Number(unitPrice || 1500000);
-    const poNumber = `RFQ-BO-${Date.now().toString().slice(-6)}`;
-    const suppCode = supplier.includes('Samsung') ? 's1' : supplier.includes('Mai Hoàng') ? 's2' : supplier.includes('Intel') ? 's3' : supplier.includes('ASUS') ? 's4' : 's5';
+    // Map the guessed brand/supplier name to a real Supplier.code — the old
+    // 's1'..'s5' placeholders never matched any actual row, so this RFQ was
+    // structurally unable to reach the real backend regardless of anything
+    // else. This mapping is still a best-effort guess for pre-filling the
+    // form; Purchasing can change the supplier before actually sending it.
+    const brandCodeMap = [
+      [/asus/i, 'SUP-ASUS-VN'], [/msi/i, 'SUP-MSI-VN'], [/samsung/i, 'SUP-SAMSUNG-VN'],
+      [/intel/i, 'SUP-INTEL-VN'], [/amd/i, 'SUP-AMD-VN'], [/kingston/i, 'SUP-KINGSTON-VN'],
+      [/corsair/i, 'SUP-CORSAIR-VN'], [/gigabyte/i, 'SUP-GIGABYTE-VN'], [/lg\b/i, 'SUP-LG-VN']
+    ];
+    const suppCode = (brandCodeMap.find(([re]) => re.test(supplier || '')) || [null, 'SUP-MAIHOANG'])[1];
+
+    let poNumber = `RFQ-BO-${Date.now().toString().slice(-6)}`;
+    let apiSucceeded = false;
+    try {
+      const res = await api.post('/purchasing/orders', {
+        supplierCode: suppCode,
+        expectedDeliveryDate: new Date(Date.now() + 86400000 * 3).toISOString().split('T')[0],
+        items: [{ productId: String(productId), quantity: finalQty, unitCost: unitPrice }]
+      });
+      if (res?.success && res?.data?.poNumber) {
+        poNumber = res.data.poNumber;
+        apiSucceeded = true;
+      }
+    } catch (apiErr) {
+      console.warn('Backorder RFQ API error, saving locally only:', apiErr);
+    }
 
     const newPO = {
       id: poNumber,
@@ -1891,10 +1927,14 @@ export default function Warehouse() {
     }
 
     if (typeof addNotification === 'function') {
-      addNotification({
+      addNotification(apiSucceeded ? {
         type: 'success',
-        title: 'Đã gửi Đề Xuất Mua Hàng (RFQ)!',
+        title: 'Đã gửi Đề Xuất Mua Hàng (RFQ)',
         message: `Mã phiếu: ${poNumber}. Đã chuyển yêu cầu mua ${finalQty} cái "${productName}" sang bộ phận Mua Hàng.`
+      } : {
+        type: 'warning',
+        title: 'Chưa gửi được lên máy chủ',
+        message: `Đề xuất mua "${productName}" chỉ mới lưu tạm trên trình duyệt này — Phòng Mua Hàng CHƯA thấy được. Vui lòng thử lại hoặc báo Phòng Mua Hàng tạo RFQ thủ công.`
       });
     }
 
@@ -1903,32 +1943,37 @@ export default function Warehouse() {
   };
 
   // Handle Fulfill Backorder
-  const handleFulfillBackorder = (order) => {
-    const updatedOrders = orders.map(o => {
-      if (o.id === order.id || o.orderId === order.orderId) {
-        return {
-          ...o,
-          status: 'CONFIRMED',
-          note: `Đã đủ tồn kho linh kiện, sẵn sàng đóng gói xuất kho.`
-        };
-      }
-      return o;
-    });
-
-    setOrders(updatedOrders);
+  const handleFulfillBackorder = async (order) => {
+    const ordId = order.orderId || order.id;
+    // Route through the real store action (which calls the backend's atomic,
+    // race-condition-safe stock deduction — the same mechanism already used
+    // for normal order confirmation) instead of only flipping local state.
+    // Previously this never touched the server at all, so nothing actually
+    // reserved the stock: two backorders both needing the last unit could
+    // each show "Đã Đủ Hàng" and both get confirmed here.
     try {
-      localStorage.setItem('erp_orders', JSON.stringify(updatedOrders));
-    } catch (_) {}
+      await updateOrderStatus(ordId, 'CONFIRMED', 'Đã đủ tồn kho linh kiện, sẵn sàng đóng gói xuất kho.');
 
-    if (typeof addNotification === 'function') {
-      addNotification({
-        type: 'success',
-        title: 'Đã xác nhận xuất kho!',
-        message: `Đơn hàng #${order.orderId || order.id} đã chuyển sang trạng thái Sẵn Sàng Đóng Gói (CONFIRMED).`
-      });
+      if (typeof addNotification === 'function') {
+        addNotification({
+          type: 'success',
+          title: 'Đã xác nhận xuất kho',
+          message: `Đơn hàng #${ordId} đã chuyển sang trạng thái Sẵn Sàng Đóng Gói (CONFIRMED).`
+        });
+      }
+      notify(`Đã xác nhận đơn hàng #${ordId} đủ điều kiện xuất kho. Đơn đã được chuyển sang danh sách Đóng gói & Giao hàng.`, 'success');
+    } catch (err) {
+      // api.js's fetch wrapper throws a plain Error carrying the server's
+      // JSON `message` string — there's no numeric status code on it — so
+      // detect the stock-conflict case by matching the backend's own wording.
+      const isStockConflict = /tồn kho không đủ|không đủ tồn/i.test(err?.message || '');
+      notify(
+        isStockConflict
+          ? `Không thể xác nhận đơn #${ordId}: tồn kho vừa được đơn khác lấy hết trong lúc bạn xử lý. Đơn vẫn ở trạng thái Chờ Hàng.`
+          : `Không thể xác nhận đơn #${ordId}: ${err?.message || 'lỗi kết nối máy chủ'}.`,
+        'error'
+      );
     }
-
-    notify(`Đã xác nhận đơn hàng #${order.orderId || order.id} đủ điều kiện xuất kho! Đơn đã được chuyển sang danh sách Đóng gói & Giao hàng.`, 'success');
   };
 
   // Shipper assignment
@@ -2029,6 +2074,10 @@ export default function Warehouse() {
   const handleEditProductSubmit = (e) => {
     if (e && e.preventDefault) e.preventDefault();
     if (!editingProd) return;
+    if (!isManager) {
+      notify('Bạn không có quyền chỉnh sửa thông tin sản phẩm.', 'error');
+      return;
+    }
 
     const targetId = editingProd.id;
     const fieldsToUpdate = {
@@ -2053,8 +2102,12 @@ export default function Warehouse() {
   };
 
   // Direct Intake Submit
-  const handleDirectIntakeSubmit = (e) => {
+  const handleDirectIntakeSubmit = async (e) => {
     e.preventDefault();
+    if (!canStockIntake) {
+      notify('Bạn không có quyền nhập kho trực tiếp.', 'error');
+      return;
+    }
     const qtyNum = parseInt(directQty, 10);
     if (!directProduct || isNaN(qtyNum) || qtyNum <= 0) {
       notify('Vui lòng chọn sản phẩm và nhập số lượng nhập kho hợp lệ (lớn hơn 0)!', 'error');
@@ -2065,37 +2118,55 @@ export default function Warehouse() {
     const prodName = selectedInv ? selectedInv.name : directProduct;
     const refCode = directRef.trim() || ('DIR-' + Date.now().toString().slice(-6));
 
-    const updatedInventory = inventory.map(item => {
-      if (String(item.id) === String(directProduct) || item.name === directProduct) {
-        return {
-          ...item,
-          stock: item.stock + qtyNum,
-          location: directLocation || item.location,
-          supplier: directSupplier || item.supplier
-        };
-      }
-      return item;
-    });
+    setSubmitting(true);
+    try {
+      // Ghi vào CSDL thật trước — trước đây hàm này chỉ sửa state cục bộ và
+      // localStorage, không hề gọi API nào, nên "nhập kho" ở tab này chưa
+      // từng thật sự cộng vào tồn kho chung của hệ thống.
+      await api.post('/warehouse/inventory/adjust', {
+        productId: directProduct,
+        quantity: qtyNum,
+        warehouseId: 1,
+        location: directLocation,
+        reason: directReason,
+        note: directNote,
+        refCode
+      });
 
-    setInventory(updatedInventory);
+      const updatedInventory = inventory.map(item => {
+        if (String(item.id) === String(directProduct) || item.name === directProduct) {
+          return {
+            ...item,
+            stock: item.stock + qtyNum,
+            location: directLocation || item.location,
+            supplier: directSupplier || item.supplier
+          };
+        }
+        return item;
+      });
+      setInventory(updatedInventory);
 
-    const newMov = {
-      id: 'MOV-' + Date.now(),
-      type: 'IN',
-      reference: refCode,
-      productName: prodName,
-      quantity: qtyNum,
-      timestamp: new Date().toISOString(),
-      actor: user?.fullname || 'Thủ Kho',
-      note: `Nhập trực tiếp / Kiểm kê (${directReason}). Ghi chú: ${directNote || 'N/A'}`
-    };
+      const newMov = {
+        id: 'MOV-' + Date.now(),
+        type: 'IN',
+        reference: refCode,
+        productName: prodName,
+        quantity: qtyNum,
+        timestamp: new Date().toISOString(),
+        actor: user?.fullname || 'Thủ Kho',
+        note: `Nhập trực tiếp / Kiểm kê (${directReason}). Ghi chú: ${directNote || 'N/A'}`
+      };
+      setStockMovements(prev => [newMov, ...prev]);
 
-    setStockMovements(prev => [newMov, ...prev]);
-
-    setDirectQty('');
-    setDirectNote('');
-    setDirectRef('');
-    notify(`Đã hoàn tất nhập kho trực tiếp ${qtyNum} SP ${prodName} (Mã chiếu: ${refCode})!`, 'success');
+      setDirectQty('');
+      setDirectNote('');
+      setDirectRef('');
+      notify(`Đã hoàn tất nhập kho trực tiếp ${qtyNum} SP ${prodName} (Mã chứng từ: ${refCode}).`, 'success');
+    } catch (err) {
+      notify(err.message || 'Không thể ghi nhận nhập kho trực tiếp lên máy chủ. Vui lòng thử lại.', 'error');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   // Filter calculations — in warehouse context we show all products except truly discontinued
@@ -2103,10 +2174,15 @@ export default function Warehouse() {
   const activeInventory = inventory.filter(item => item.status !== 'DISCONTINUED');
   const outOfStockItems = activeInventory.filter(item => Number(item.stock) === 0);
   const lowStockItems = activeInventory.filter(item => Number(item.stock) > 0 && Number(item.stock) <= Number(item.threshold || 5));
-  const effectiveReceipts = (receipts && receipts.length > 0) ? receipts : DEFAULT_SAMPLE_RECEIPTS;
-  const effectiveReturnRequests = (returnRequests && returnRequests.length > 0) ? returnRequests : DEFAULT_SAMPLE_RETURNS;
+  const usingSampleReceipts = !(receipts && receipts.length > 0);
+  const effectiveReceipts = usingSampleReceipts ? DEFAULT_SAMPLE_RECEIPTS : receipts;
+  const usingSampleReturns = !(returnRequests && returnRequests.length > 0);
+  const effectiveReturnRequests = usingSampleReturns ? DEFAULT_SAMPLE_RETURNS : returnRequests;
   const readyReceipts = effectiveReceipts.filter(r => r.status === 'READY');
-  const pendingDeliveriesCount = orders.filter(o => o.status === 'CONFIRMED' || o.status === 'READY_TO_SHIP').length;
+  // Shared with the Delivery tab's default "PENDING" filter (below) so the
+  // Overview KPI card always matches the count the linked tab actually shows.
+  const PENDING_DELIVERY_STATUSES = ['CONFIRMED', 'READY_TO_SHIP', 'PACKED', 'PENDING', 'PROCESSING', 'AWAITING_SHIP'];
+  const pendingDeliveriesCount = orders.filter(o => PENDING_DELIVERY_STATUSES.includes(o.status)).length;
 
   const CAT_ALIASES = {
     'CPU': ['CPU', 'PROCESSOR', 'BỘ XỬ LÝ'],
@@ -2201,10 +2277,55 @@ export default function Warehouse() {
     return { text: info.label, bg: info.bg, color: info.color, border: info.border };
   };
 
+  // Single source of truth for a return/RMA item's display state — badge
+  // label/color, action-button text/color, and whether warehouse may act on
+  // it right now. Used by the returns table (badge + action button cells)
+  // and the return-processing modal, so all three can never drift out of
+  // sync the way three separate copies of this branching previously could.
+  const getReturnStatusDisplay = (status) => {
+    const st = status || 'PENDING';
+    const qcApproved = ['QC_PASSED', 'VENDOR_WARRANTY'].includes(st);
+    const alreadyShelved = ['RESTOCKED', 'EXCHANGED', 'EXCHANGE_NEW', 'INSPECTED_SCRAP'].includes(st);
+    const isVendor = st === 'VENDOR_WARRANTY';
+    const isScrap = st === 'INSPECTED_SCRAP';
+    const isReject = ['REJECTED', 'REJECT_RMA'].includes(st);
+    const isExchanged = ['EXCHANGE_NEW', 'EXCHANGED'].includes(st);
+    const isRestockedDone = st === 'RESTOCKED' || (alreadyShelved && !isVendor && !isScrap && !isExchanged);
+
+    let label = 'Chờ QC Kiểm Định';
+    let bg = '#fef3c7', color = '#b45309', border = '#fde68a';
+    let actionText = 'Chờ QC (chưa thể xử lý)';
+    let actionColor = '#94a3b8';
+
+    if (isRestockedDone) {
+      label = 'Đã Nhập Lại Kho'; bg = '#dcfce7'; color = '#15803d'; border = '#bbf7d0';
+      actionText = 'Xem vị trí kệ'; actionColor = '#16a34a';
+    } else if (isExchanged) {
+      label = 'Đã Duyệt Đổi Mới'; bg = '#ede9fe'; color = '#6d28d9'; border = '#ddd6fe';
+      actionText = 'Xem đổi mới'; actionColor = '#7c3aed';
+    } else if (isVendor) {
+      label = 'Chuyển Gửi Hãng BH'; bg = '#ffedd5'; color = '#c2410c'; border = '#fed7aa';
+      actionText = qcApproved ? 'Xử Lý Gửi Hãng' : 'Chi tiết gửi hãng'; actionColor = '#d97706';
+    } else if (isScrap) {
+      label = 'Phế Phẩm / Kho Lỗi'; bg = '#ffe4e6'; color = '#be123c'; border = '#fecdd3';
+      actionText = 'Xem kho lỗi'; actionColor = '#e11d48';
+    } else if (isReject) {
+      label = 'Từ Chối Bảo Hành'; bg = '#fee2e2'; color = '#dc2626'; border = '#fca5a5';
+      actionText = 'Xem lý do'; actionColor = '#64748b';
+    } else if (qcApproved) {
+      // QC_PASSED and not yet shelved: this is the one state where warehouse
+      // actually has something to do.
+      actionText = 'Xử Lý Nhập Kho'; actionColor = '#2563eb';
+    }
+
+    const hasQcDecision = qcApproved || alreadyShelved || isReject;
+    return { label, bg, color, border, actionText, actionColor, qcApproved, alreadyShelved, hasQcDecision, canShelveNow: qcApproved && !alreadyShelved };
+  };
+
   const filteredDeliveriesList = orders.filter(o => {
     const matchSearch = !deliverySearch.trim() || String(o.orderId || o.id).toLowerCase().includes(deliverySearch.toLowerCase()) || (o.customerName && o.customerName.toLowerCase().includes(deliverySearch.toLowerCase()));
     const matchStatus = deliveryFilter === 'ALL' ||
-      (deliveryFilter === 'PENDING' && ['CONFIRMED', 'READY_TO_SHIP', 'PACKED', 'PENDING', 'PROCESSING', 'AWAITING_SHIP'].includes(o.status)) ||
+      (deliveryFilter === 'PENDING' && PENDING_DELIVERY_STATUSES.includes(o.status)) ||
       (deliveryFilter === 'SHIPPED' && ['SHIPPED', 'OUT_FOR_DELIVERY', 'ASSIGNED'].includes(o.status)) ||
       (deliveryFilter === 'DELIVERED' && ['DELIVERED', 'COMPLETED'].includes(o.status));
     return matchSearch && matchStatus;
@@ -2287,6 +2408,13 @@ export default function Warehouse() {
               Tổng Quan Tồn Kho
             </h2>
           </div>
+
+          {(usingSampleReceipts || usingSampleReturns || usingSampleMovements) && (
+            <div style={{ backgroundColor: '#fef9c3', border: '1px solid #fde047', borderRadius: '8px', padding: '0.65rem 0.9rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.6rem', fontSize: '0.8rem', color: '#854d0e', fontWeight: 600 }}>
+              <AlertCircle size={16} style={{ flexShrink: 0 }} />
+              Một số số liệu bên dưới là <strong>dữ liệu minh họa</strong> (chưa có phiếu nhập kho/trả hàng/lịch sử thật nào trong hệ thống).
+            </div>
+          )}
 
           {/* Cards Grid */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.25rem' }}>
@@ -2560,7 +2688,7 @@ export default function Warehouse() {
                 });
 
                 if (resolvedCount > 0) {
-                  notify(`Đã tìm thấy ${resolvedCount} đơn hàng đã có đủ tồn kho trong hệ thống. Bạn có thể nhấn nút "Xác Nhận Xuất Kho" để tiến hành xuất hàng.`, 'success');
+                  notify(`Đã tìm thấy ${resolvedCount} đơn hàng đã có đủ tồn kho trong hệ thống. Bạn có thể nhấn nút "Đóng Gói Ngay" để tiếp tục xử lý.`, 'success');
                 } else {
                   notify(`Đang có ${totalAwaiting} đơn chờ hàng. Các sản phẩm này hiện vẫn chưa đủ tồn kho. Vui lòng bấm "Đề Xuất Mua Hàng" để gửi yêu cầu cho phòng Mua Hàng.`, 'info');
                 }
@@ -2632,12 +2760,12 @@ export default function Warehouse() {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.83rem' }}>
               <thead>
                 <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569' }}>
-                  <th style={{ padding: '0.75rem 1rem', width: '130px' }}>Mã Đơn Hàng</th>
-                  <th style={{ padding: '0.75rem 1rem', width: '150px' }}>Khách Hàng</th>
-                  <th style={{ padding: '0.75rem 1rem' }}>Tình Trạng Linh Kiện & Tồn Kho</th>
-                  <th style={{ padding: '0.75rem 1rem', textAlign: 'right', width: '120px' }}>Tổng Tiền</th>
-                  <th style={{ padding: '0.75rem 1rem', textAlign: 'center', width: '140px' }}>Trạng Thái</th>
-                  <th style={{ padding: '0.75rem 1rem', textAlign: 'center', width: '180px' }}>Thao Tác</th>
+                  <th style={{ padding: '0.75rem 1rem', width: '13%' }}>Mã Đơn Hàng</th>
+                  <th style={{ padding: '0.75rem 1rem', width: '15%' }}>Khách Hàng</th>
+                  <th style={{ padding: '0.75rem 1rem', width: '34%' }}>Tình Trạng Linh Kiện & Tồn Kho</th>
+                  <th style={{ padding: '0.75rem 1rem', textAlign: 'right', width: '12%' }}>Tổng Tiền</th>
+                  <th style={{ padding: '0.75rem 1rem', textAlign: 'center', width: '13%' }}>Trạng Thái</th>
+                  <th style={{ padding: '0.75rem 1rem', textAlign: 'center', width: '13%' }}>Thao Tác</th>
                 </tr>
               </thead>
               <tbody>
@@ -2709,16 +2837,16 @@ export default function Warehouse() {
                                   border: `1px solid ${it.isOutOfStock ? '#fecaca' : '#e2e8f0'}`
                                 }}
                               >
-                                <div style={{ flex: 1, minWidth: 0, paddingRight: '0.75rem' }}>
-                                  <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.82rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                <div style={{ flex: '1 1 auto', minWidth: 0, paddingRight: '0.75rem' }}>
+                                  <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.82rem', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', lineHeight: '1.3' }}>
                                     {it.name || it.productName || 'Linh Kiện Máy Tính'}
                                   </div>
                                   <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '0.1rem' }}>
-                                    Số lượng yêu cầu: <strong>{it.neededQty}</strong> | Tồn kho hiện tại: <strong>{it.currentStock}</strong>
+                                    Yêu cầu: <strong>{it.neededQty}</strong> · Tồn kho: <strong>{it.currentStock}</strong>
                                   </div>
                                 </div>
 
-                                <div>
+                                <div style={{ flexShrink: 0 }}>
                                   {it.isOutOfStock ? (
                                     <span style={{
                                       padding: '2px 8px',
@@ -2727,7 +2855,8 @@ export default function Warehouse() {
                                       fontWeight: 800,
                                       backgroundColor: '#fee2e2',
                                       color: '#b91c1c',
-                                      border: '1px solid #fca5a5'
+                                      border: '1px solid #fca5a5',
+                                      whiteSpace: 'nowrap'
                                     }}>
                                       Thiếu {it.shortage} SP
                                     </span>
@@ -2739,7 +2868,8 @@ export default function Warehouse() {
                                       fontWeight: 700,
                                       backgroundColor: '#f1f5f9',
                                       color: '#475569',
-                                      border: '1px solid #cbd5e1'
+                                      border: '1px solid #cbd5e1',
+                                      whiteSpace: 'nowrap'
                                     }}>
                                       Đủ hàng
                                     </span>
@@ -2751,12 +2881,12 @@ export default function Warehouse() {
                         </td>
 
                         {/* Total Amount */}
-                        <td style={{ padding: '1rem', textAlign: 'right', verticalAlign: 'top', fontWeight: 800, color: '#0f172a', fontSize: '0.88rem' }}>
+                        <td style={{ padding: '1rem', textAlign: 'right', verticalAlign: 'middle', fontWeight: 800, color: '#0f172a', fontSize: '0.88rem' }}>
                           {safeFormatPrice(order.totalAmount)}
                         </td>
 
                         {/* Stock Status Badge */}
-                        <td style={{ padding: '1rem', textAlign: 'center', verticalAlign: 'top' }}>
+                        <td style={{ padding: '1rem', textAlign: 'center', verticalAlign: 'middle' }}>
                           {allFulfilled ? (
                             <span style={{
                               padding: '4px 10px',
@@ -2787,41 +2917,45 @@ export default function Warehouse() {
                         </td>
 
                         {/* Actions Column */}
-                        <td style={{ padding: '1rem', textAlign: 'center', verticalAlign: 'top' }}>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                        <td style={{ padding: '1rem', textAlign: 'center', verticalAlign: 'middle' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', maxWidth: '150px', margin: '0 auto' }}>
                             {allFulfilled ? (
                               <button
                                 onClick={() => handleFulfillBackorder(order)}
+                                title="Chuyển đơn sang khâu đóng gói"
                                 style={{
                                   backgroundColor: '#16a34a',
                                   color: '#ffffff',
                                   border: 'none',
                                   borderRadius: '5px',
-                                  padding: '0.45rem 0.75rem',
+                                  padding: '0.45rem 0.5rem',
                                   fontSize: '0.78rem',
                                   fontWeight: 700,
                                   cursor: 'pointer',
-                                  width: '100%'
+                                  width: '100%',
+                                  whiteSpace: 'nowrap'
                                 }}
                               >
-                                Xác Nhận Xuất Kho
+                                Đóng Gói Ngay
                               </button>
                             ) : (
                               <button
                                 onClick={() => handleOpenBackorderRfqModal(order, missingItems[0] || orderItems[0])}
+                                title="Đề xuất Phòng Mua Hàng tạo yêu cầu báo giá (RFQ)"
                                 style={{
                                   backgroundColor: '#2563eb',
                                   color: '#ffffff',
                                   border: 'none',
                                   borderRadius: '5px',
-                                  padding: '0.45rem 0.75rem',
+                                  padding: '0.45rem 0.5rem',
                                   fontSize: '0.78rem',
                                   fontWeight: 700,
                                   cursor: 'pointer',
-                                  width: '100%'
+                                  width: '100%',
+                                  whiteSpace: 'nowrap'
                                 }}
                               >
-                                Đề Xuất Mua Hàng (RFQ)
+                                Đề Xuất RFQ
                               </button>
                             )}
 
@@ -2832,11 +2966,12 @@ export default function Warehouse() {
                                 color: '#475569',
                                 border: '1px solid #cbd5e1',
                                 borderRadius: '5px',
-                                padding: '0.4rem 0.75rem',
+                                padding: '0.4rem 0.5rem',
                                 fontSize: '0.75rem',
                                 fontWeight: 600,
                                 cursor: 'pointer',
-                                width: '100%'
+                                width: '100%',
+                                whiteSpace: 'nowrap'
                               }}
                             >
                               Xem Chi Tiết
@@ -2864,6 +2999,13 @@ export default function Warehouse() {
               Tiếp nhận lô hàng từ Nhà cung cấp sau khi đã nghiệm thu QA/QC
             </p>
           </div>
+
+          {usingSampleReceipts && (
+            <div style={{ backgroundColor: '#fef9c3', border: '1px solid #fde047', borderRadius: '8px', padding: '0.65rem 0.9rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.6rem', fontSize: '0.8rem', color: '#854d0e', fontWeight: 600 }}>
+              <AlertCircle size={16} style={{ flexShrink: 0 }} />
+              Chưa có phiếu nhập kho thật nào — danh sách bên dưới là <strong>dữ liệu minh họa</strong>.
+            </div>
+          )}
 
           {/* Filter bar */}
           <div style={{ backgroundColor: '#ffffff', padding: '1rem', borderRadius: '8px', border: '1px solid #cbd5e1', marginBottom: '1.25rem', display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
@@ -3253,7 +3395,14 @@ export default function Warehouse() {
             </p>
           </div>
 
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.5rem' }}>
+          {!canStockIntake && (
+            <div style={{ backgroundColor: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px', padding: '0.75rem 1rem', marginBottom: '1.25rem', fontSize: '0.82rem', color: '#92400e', fontWeight: 600 }}>
+              Bạn không có quyền nhập kho trực tiếp — chỉ Quản Lý Kho / CEO / Quản Trị mới thực hiện được thao tác này.
+            </div>
+          )}
+
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.5rem', opacity: canStockIntake ? 1 : 0.6 }}>
+            <fieldset disabled={!canStockIntake} style={{ border: 'none', padding: 0, margin: 0 }}>
             <form onSubmit={handleDirectIntakeSubmit}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.25rem', marginBottom: '1.25rem' }}>
                 <div>
@@ -3346,6 +3495,7 @@ export default function Warehouse() {
                 Xác Nhận Nhập Kho Trực Tiếp
               </button>
             </form>
+            </fieldset>
           </div>
         </div>
       )}
@@ -3458,6 +3608,12 @@ export default function Warehouse() {
               <p style={{ fontSize: '0.82rem', color: '#64748b', margin: '0.25rem 0 0 0' }}>
                 Tiếp nhận linh kiện trả về từ khách hàng, kiểm định lỗi kỹ thuật, phân luồng lưu trữ kệ kho (A1/B3/C2/D) và chuyển tiếp hoàn tiền hoặc đổi mới.
               </p>
+              {usingSampleReturns && (
+                <div style={{ backgroundColor: '#fef9c3', border: '1px solid #fde047', borderRadius: '8px', padding: '0.5rem 0.8rem', marginTop: '0.6rem', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.76rem', color: '#854d0e', fontWeight: 600 }}>
+                  <AlertCircle size={14} style={{ flexShrink: 0 }} />
+                  Chưa có hồ sơ trả hàng thật nào — danh sách bên dưới là dữ liệu minh họa.
+                </div>
+              )}
             </div>
 
             <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
@@ -3916,51 +4072,20 @@ export default function Warehouse() {
                         {/* Trạng thái chi tiết */}
                         <td style={{ padding: '0.85rem 1rem', textAlign: 'center', verticalAlign: 'middle' }}>
                           {(() => {
-                            let label = 'Chờ QC Kiểm Định';
-                            let bg = '#fef3c7';
-                            let color = '#b45309';
-                            let border = '#fde68a';
-
-                            if (['QC_PASSED', 'RESTOCKED', 'APPROVED'].includes(st)) {
-                              label = 'Đã Nhập Lại Kho';
-                              bg = '#dcfce7';
-                              color = '#15803d';
-                              border = '#bbf7d0';
-                            } else if (st === 'EXCHANGE_NEW' || st === 'EXCHANGED') {
-                              label = 'Đã Duyệt Đổi Mới';
-                              bg = '#ede9fe';
-                              color = '#6d28d9';
-                              border = '#ddd6fe';
-                            } else if (st === 'VENDOR_WARRANTY') {
-                              label = 'Chuyển Gửi Hãng BH';
-                              bg = '#ffedd5';
-                              color = '#c2410c';
-                              border = '#fed7aa';
-                            } else if (st === 'INSPECTED_SCRAP') {
-                              label = 'Phế Phẩm / Kho Lỗi';
-                              bg = '#ffe4e6';
-                              color = '#be123c';
-                              border = '#fecdd3';
-                            } else if (['REJECTED', 'REJECT_RMA'].includes(st)) {
-                              label = 'Từ Chối Bảo Hành';
-                              bg = '#fee2e2';
-                              color = '#dc2626';
-                              border = '#fca5a5';
-                            }
-
+                            const rsd = getReturnStatusDisplay(st);
                             return (
                               <span style={{
                                 padding: '4px 10px',
                                 borderRadius: '6px',
                                 fontSize: '0.74rem',
                                 fontWeight: 800,
-                                backgroundColor: bg,
-                                color: color,
-                                border: `1px solid ${border}`,
+                                backgroundColor: rsd.bg,
+                                color: rsd.color,
+                                border: `1px solid ${rsd.border}`,
                                 display: 'inline-block',
                                 whiteSpace: 'nowrap'
                               }}>
-                                {label}
+                                {rsd.label}
                               </span>
                             );
                           })()}
@@ -3974,56 +4099,38 @@ export default function Warehouse() {
                         {/* Hành động */}
                         <td style={{ padding: '0.85rem 1rem', textAlign: 'center', verticalAlign: 'middle' }}>
                           {(() => {
-                            let btnText = 'Xử lý nhập kho';
-                            let btnBg = '#2563eb';
-
-                            if (['QC_PASSED', 'RESTOCKED', 'APPROVED'].includes(st)) {
-                              btnText = 'Xem vị trí kệ';
-                              btnBg = '#16a34a';
-                            } else if (st === 'VENDOR_WARRANTY') {
-                              btnText = 'Chi tiết gửi hãng';
-                              btnBg = '#d97706';
-                            } else if (st === 'INSPECTED_SCRAP') {
-                              btnText = 'Xem kho lỗi';
-                              btnBg = '#e11d48';
-                            } else if (st === 'EXCHANGE_NEW' || st === 'EXCHANGED') {
-                              btnText = 'Xem đổi mới';
-                              btnBg = '#7c3aed';
-                            } else if (['REJECTED', 'REJECT_RMA'].includes(st)) {
-                              btnText = 'Xem lý do';
-                              btnBg = '#64748b';
-                            }
-
+                            const rsd = getReturnStatusDisplay(st);
                             return (
                               <button
                                 onClick={() => {
                                   setSelectedReturnProcessing(item);
                                   setReturnShelfLocation(
                                     item.shelfLocation || (
-                                      ['QC_PASSED', 'RESTOCKED', 'APPROVED'].includes(item.status) ? 'SHELF_A1_RESTOCK' :
-                                      (item.status === 'EXCHANGE_NEW' || item.status === 'EXCHANGED') ? 'SHELF_A1_RESTOCK' :
                                       item.status === 'VENDOR_WARRANTY' ? 'SHELF_C2_VENDOR' :
                                       item.status === 'INSPECTED_SCRAP' ? 'SHELF_D_SCRAP' : 'SHELF_A1_RESTOCK'
                                     )
                                   );
                                   setReturnProcessNote(item.shelfNote || item.resolution || item.reason || 'Đã phân luồng vị trí kệ kho');
                                 }}
+                                disabled={!rsd.hasQcDecision}
+                                title={!rsd.hasQcDecision ? 'Chưa qua kiểm định QC' : undefined}
                                 style={{
-                                  backgroundColor: btnBg,
+                                  backgroundColor: rsd.actionColor,
                                   color: '#ffffff',
                                   border: 'none',
                                   borderRadius: '6px',
                                   padding: '0.45rem 0.9rem',
                                   fontSize: '0.78rem',
                                   fontWeight: 800,
-                                  cursor: 'pointer',
+                                  cursor: !rsd.hasQcDecision ? 'not-allowed' : 'pointer',
+                                  opacity: !rsd.hasQcDecision ? 0.6 : 1,
                                   display: 'inline-block',
                                   minWidth: '120px',
                                   textAlign: 'center',
                                   boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
                                 }}
                               >
-                                {btnText}
+                                {rsd.actionText}
                               </button>
                             );
                           })()}
@@ -4319,6 +4426,13 @@ export default function Warehouse() {
               Nhật ký xuất nhập kho hai chiều ghi nhận tất cả biến động linh kiện (Nhấn vào bất kỳ dòng nào để xem chi tiết)
             </p>
           </div>
+
+          {usingSampleMovements && (
+            <div style={{ backgroundColor: '#fef9c3', border: '1px solid #fde047', borderRadius: '8px', padding: '0.65rem 0.9rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.6rem', fontSize: '0.8rem', color: '#854d0e', fontWeight: 600 }}>
+              <AlertCircle size={16} style={{ flexShrink: 0 }} />
+              Chưa có lịch sử điều chuyển kho thật nào — danh sách bên dưới là <strong>dữ liệu minh họa</strong>.
+            </div>
+          )}
 
           {/* Filter Toolbar */}
           <div style={{ backgroundColor: '#ffffff', padding: '1rem', borderRadius: '8px', border: '1px solid #cbd5e1', marginBottom: '1.25rem', display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
@@ -4672,22 +4786,28 @@ export default function Warehouse() {
           <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', maxWidth: '640px', width: '100%', border: '1px solid #cbd5e1', overflow: 'hidden', boxShadow: '0 20px 40px rgba(0,0,0,0.2)' }}>
             <div style={{ padding: '1.25rem 1.5rem', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
-                <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#0f172a' }}>Chỉnh Sửa Thông Tin Sản Phẩm</h3>
+                <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#0f172a' }}>{isManager ? 'Chỉnh Sửa Thông Tin Sản Phẩm' : 'Chi Tiết Sản Phẩm (Chỉ Xem)'}</h3>
                 <span style={{ fontSize: '0.78rem', color: '#64748b' }}>Mã định danh: <strong style={{ color: '#2563eb' }}>#{editingProd.id}</strong></span>
               </div>
               <button onClick={() => setEditingProd(null)} style={{ background: 'none', border: '1px solid #cbd5e1', borderRadius: '4px', padding: '0.2rem 0.6rem', cursor: 'pointer', color: '#475569', fontWeight: 600 }}>Đóng</button>
             </div>
             <form onSubmit={handleEditProductSubmit} style={{ padding: '1.5rem' }}>
+              {!isManager && (
+                <div style={{ backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '8px', padding: '0.65rem 0.9rem', marginBottom: '1.1rem', display: 'flex', alignItems: 'center', gap: '0.6rem', fontSize: '0.78rem', color: '#1e40af', fontWeight: 600 }}>
+                  <AlertCircle size={15} style={{ flexShrink: 0 }} />
+                  Bạn chỉ có quyền xem — chỉ Quản Lý Kho mới được chỉnh sửa giá/tồn kho/vị trí.
+                </div>
+              )}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem', marginBottom: '1.5rem' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.35rem' }}>Tên Linh Kiện / Sản Phẩm *</label>
-                  <input type="text" required value={editingProd.name || ''} onChange={(e) => setEditingProd({ ...editingProd, name: e.target.value })} style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.85rem', border: '1px solid #cbd5e1', borderRadius: '6px' }} />
+                  <input type="text" required disabled={!isManager} value={editingProd.name || ''} onChange={(e) => setEditingProd({ ...editingProd, name: e.target.value })} style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.85rem', border: '1px solid #cbd5e1', borderRadius: '6px', backgroundColor: isManager ? '#ffffff' : '#f8fafc', color: isManager ? '#0f172a' : '#475569' }} />
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                   <div>
                     <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.35rem' }}>Phân Nhóm Danh Mục</label>
-                    <select value={editingProd.category || 'CPU'} onChange={(e) => setEditingProd({ ...editingProd, category: e.target.value })} style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px' }}>
+                    <select disabled={!isManager} value={editingProd.category || 'CPU'} onChange={(e) => setEditingProd({ ...editingProd, category: e.target.value })} style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px', backgroundColor: isManager ? '#ffffff' : '#f8fafc', color: isManager ? '#0f172a' : '#475569' }}>
                       <option value="CPU">CPU</option>
                       <option value="VGA">VGA</option>
                       <option value="MAINBOARD">Mainboard</option>
@@ -4701,7 +4821,7 @@ export default function Warehouse() {
                   </div>
                   <div>
                     <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.35rem' }}>Nhà Cung Cấp</label>
-                    <select value={editingProd.supplier || 'Intel Vietnam'} onChange={(e) => setEditingProd({ ...editingProd, supplier: e.target.value })} style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px' }}>
+                    <select disabled={!isManager} value={editingProd.supplier || 'Intel Vietnam'} onChange={(e) => setEditingProd({ ...editingProd, supplier: e.target.value })} style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px', backgroundColor: isManager ? '#ffffff' : '#f8fafc', color: isManager ? '#0f172a' : '#475569' }}>
                       {STANDARD_SUPPLIERS.map(s => (
                         <option key={s} value={s}>{s}</option>
                       ))}
@@ -4712,7 +4832,7 @@ export default function Warehouse() {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                   <div>
                     <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.35rem' }}>Vị Trí Kệ Lưu Kho</label>
-                    <select value={editingProd.location || 'ZONE-A/SHELF-01/BIN-01'} onChange={(e) => setEditingProd({ ...editingProd, location: e.target.value })} style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px' }}>
+                    <select disabled={!isManager} value={editingProd.location || 'ZONE-A/SHELF-01/BIN-01'} onChange={(e) => setEditingProd({ ...editingProd, location: e.target.value })} style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px', backgroundColor: isManager ? '#ffffff' : '#f8fafc', color: isManager ? '#0f172a' : '#475569' }}>
                       <option value="Chưa xếp kệ">Chưa xếp kệ</option>
                       {PREDEFINED_LOCATIONS.map(loc => (
                         <option key={loc} value={loc}>{loc}</option>
@@ -4721,25 +4841,27 @@ export default function Warehouse() {
                   </div>
                   <div>
                     <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.35rem' }}>Đơn Giá Niêm Yết (VNĐ)</label>
-                    <input type="number" min="0" value={editingProd.price !== undefined ? editingProd.price : 0} onChange={(e) => setEditingProd({ ...editingProd, price: parseFloat(e.target.value) || 0 })} style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.85rem', fontWeight: 700, color: '#16a34a', border: '1px solid #cbd5e1', borderRadius: '6px' }} />
+                    <input type="number" min="0" disabled={!isManager} value={editingProd.price !== undefined ? editingProd.price : 0} onChange={(e) => setEditingProd({ ...editingProd, price: parseFloat(e.target.value) || 0 })} style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.85rem', fontWeight: 700, color: isManager ? '#16a34a' : '#475569', border: '1px solid #cbd5e1', borderRadius: '6px', backgroundColor: isManager ? '#ffffff' : '#f8fafc' }} />
                   </div>
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                   <div>
                     <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.35rem' }}>Số Lượng Tồn Kho Thực Tế</label>
-                    <input type="number" required min="0" value={editingProd.stock !== undefined ? editingProd.stock : 0} onChange={(e) => setEditingProd({ ...editingProd, stock: parseInt(e.target.value, 10) || 0 })} style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.85rem', fontWeight: 700, border: '1px solid #cbd5e1', borderRadius: '6px' }} />
+                    <input type="number" required min="0" disabled={!isManager} value={editingProd.stock !== undefined ? editingProd.stock : 0} onChange={(e) => setEditingProd({ ...editingProd, stock: parseInt(e.target.value, 10) || 0 })} style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.85rem', fontWeight: 700, border: '1px solid #cbd5e1', borderRadius: '6px', backgroundColor: isManager ? '#ffffff' : '#f8fafc', color: isManager ? '#0f172a' : '#475569' }} />
                   </div>
                   <div>
                     <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.35rem' }}>Ngưỡng An Toàn (Threshold)</label>
-                    <input type="number" min="1" value={editingProd.threshold || 5} onChange={(e) => setEditingProd({ ...editingProd, threshold: parseInt(e.target.value, 10) || 5 })} style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.85rem', border: '1px solid #cbd5e1', borderRadius: '6px' }} />
+                    <input type="number" min="1" disabled={!isManager} value={editingProd.threshold || 5} onChange={(e) => setEditingProd({ ...editingProd, threshold: parseInt(e.target.value, 10) || 5 })} style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.85rem', border: '1px solid #cbd5e1', borderRadius: '6px', backgroundColor: isManager ? '#ffffff' : '#f8fafc', color: isManager ? '#0f172a' : '#475569' }} />
                   </div>
                 </div>
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', borderTop: '1px solid #e2e8f0', paddingTop: '1rem' }}>
-                <button type="button" onClick={() => setEditingProd(null)} style={{ padding: '0.5rem 1.15rem', fontSize: '0.82rem', fontWeight: 600, border: '1px solid #cbd5e1', borderRadius: '6px', background: '#ffffff', color: '#475569', cursor: 'pointer' }}>Hủy bỏ</button>
-                <button type="button" onClick={handleEditProductSubmit} style={{ padding: '0.5rem 1.35rem', fontSize: '0.82rem', border: 'none', borderRadius: '6px', background: '#2563eb', color: '#ffffff', fontWeight: 700, cursor: 'pointer' }}>Lưu Cập Nhật</button>
+                <button type="button" onClick={() => setEditingProd(null)} style={{ padding: '0.5rem 1.15rem', fontSize: '0.82rem', fontWeight: 600, border: '1px solid #cbd5e1', borderRadius: '6px', background: '#ffffff', color: '#475569', cursor: 'pointer' }}>{isManager ? 'Hủy bỏ' : 'Đóng'}</button>
+                {isManager && (
+                  <button type="button" onClick={handleEditProductSubmit} style={{ padding: '0.5rem 1.35rem', fontSize: '0.82rem', border: 'none', borderRadius: '6px', background: '#2563eb', color: '#ffffff', fontWeight: 700, cursor: 'pointer' }}>Lưu Cập Nhật</button>
+                )}
               </div>
             </form>
           </div>
@@ -4902,10 +5024,20 @@ export default function Warehouse() {
         const rmaNum = item.rmaNumber || item.code || (item.id ? `RET-${String(item.id).padStart(3, '0')}` : 'RET-001');
         const ordId = item.orderId || item.orderNumber || 'N/A';
         const st = item.status || 'PENDING';
-        const isPassed = ['QC_PASSED', 'RESTOCKED', 'APPROVED'].includes(st);
+        // Warehouse may only shelve/scrap a return AFTER QC has actually
+        // rendered a decision (QC_PASSED / VENDOR_WARRANTY) — never before,
+        // and never a second time once already shelved (RESTOCKED/EXCHANGED/
+        // INSPECTED_SCRAP), which would double-count inventory. Same helper
+        // the returns table uses for its badge/action column, so this modal
+        // can never disagree with what the table just showed.
+        const rsd = getReturnStatusDisplay(st);
+        const isPassed = st === 'RESTOCKED' || (rsd.alreadyShelved && st !== 'EXCHANGE_NEW' && st !== 'EXCHANGED' && st !== 'INSPECTED_SCRAP');
         const isVendor = st === 'VENDOR_WARRANTY';
         const isScrap = st === 'INSPECTED_SCRAP';
         const isReject = ['REJECTED', 'REJECT_RMA'].includes(st);
+        const qcApproved = rsd.qcApproved;
+        const alreadyShelved = rsd.alreadyShelved;
+        const canShelveNow = rsd.canShelveNow;
 
         let badgeLabel = 'Chờ QC Thẩm Định';
         if (isPassed) badgeLabel = 'Đã Nhập Lại Kho';
@@ -5049,7 +5181,25 @@ export default function Warehouse() {
                 )}
               </div>
 
-              {/* Phân Luồng Kệ Kho Form */}
+              {!canShelveNow && !alreadyShelved && (
+                <div style={{ backgroundColor: '#fffbeb', border: '1px solid #fde68a', borderRadius: '10px', padding: '0.9rem 1rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.7rem' }}>
+                  <AlertCircle size={22} style={{ color: '#b45309', flexShrink: 0 }} />
+                  <div style={{ fontSize: '0.8rem', color: '#92400e', fontWeight: 600 }}>
+                    Kiện hàng này chưa qua kiểm định QC — chưa thể nhập kệ hay thanh lý. Vui lòng chờ bộ phận QA/QC hoàn tất thẩm định trước.
+                  </div>
+                </div>
+              )}
+              {alreadyShelved && (
+                <div style={{ backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px', padding: '0.9rem 1rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.7rem' }}>
+                  <CheckCircle size={22} style={{ color: '#15803d', flexShrink: 0 }} />
+                  <div style={{ fontSize: '0.8rem', color: '#166534', fontWeight: 600 }}>
+                    Kiện hàng này đã được xử lý và nhập kệ xong{item.shelfLocation ? ` (${item.shelfLocation})` : ''}.
+                  </div>
+                </div>
+              )}
+
+              {/* Phân Luồng Kệ Kho Form — chỉ hiện khi QC đã duyệt và chưa xử lý */}
+              {canShelveNow && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.25rem' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 750, color: '#1e293b', marginBottom: '0.45rem' }}>
@@ -5101,6 +5251,7 @@ export default function Warehouse() {
                   />
                 </div>
               </div>
+              )}
 
               {/* Actions */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #e2e8f0', paddingTop: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
@@ -5153,12 +5304,35 @@ export default function Warehouse() {
                   >
                     Đóng
                   </button>
+                  {canShelveNow && (
                   <button
                     type="button"
-                    onClick={() => {
+                    onClick={async () => {
                       const isScrap = returnShelfLocation === 'SHELF_D_SCRAP';
                       const isVendor = returnShelfLocation === 'SHELF_C2_VENDOR';
-                      const targetStatus = isScrap ? 'INSPECTED_SCRAP' : isVendor ? 'VENDOR_WARRANTY' : 'RESTOCKED';
+                      const targetStatus = isScrap ? 'INSPECTED_SCRAP' : isVendor ? 'VENDOR_WARRANTY' : (isExchange ? 'EXCHANGED' : 'RESTOCKED');
+
+                      // Gọi backend TRƯỚC — confirmReturnWarehouse tự tính đúng
+                      // kết quả (nhập kệ bán / đổi mới / gửi hãng / phế phẩm)
+                      // từ shelfLocation, và chỉ cộng tồn kho khi hàng thật sự
+                      // vào kệ bán được. Chỉ cập nhật state cục bộ sau khi API
+                      // xác nhận — trước đây hàm này luôn "thành công" trên
+                      // UI dù request có tới được server hay không.
+                      if (typeof updateReturnStatus !== 'function') {
+                        notify('Không thể xử lý: thiếu chức năng cập nhật trạng thái.', 'error');
+                        return;
+                      }
+                      try {
+                        await updateReturnStatus(item.id || item.orderId, targetStatus, {
+                          shelfLocation: returnShelfLocation,
+                          type: isExchange ? 'EXCHANGE' : 'REFUND',
+                          shelfNote: returnProcessNote || 'Đã phân luồng vị trí kệ kho',
+                          note: returnProcessNote || `Kho đã xếp vào ${returnShelfLocation} (${targetStatus})`
+                        });
+                      } catch (err) {
+                        notify(err?.message || 'Không thể xác nhận xử lý trên máy chủ. Vui lòng thử lại.', 'error');
+                        return;
+                      }
 
                       // Lấy base list từ returnRequests hoặc effectiveReturnRequests
                       const baseList = (returnRequests && returnRequests.length > 0) ? [...returnRequests] : [...effectiveReturnRequests];
@@ -5181,19 +5355,13 @@ export default function Warehouse() {
                         return r;
                       });
 
-                      if (typeof updateReturnStatus === 'function') {
-                        updateReturnStatus(item.id || item.orderId, targetStatus, {
-                          isSellable: !isScrap,
-                          note: returnProcessNote || `Kho đã xếp vào ${returnShelfLocation} (${targetStatus})`
-                        });
-                      }
-
                       if (typeof setReturnRequests === 'function') {
                         setReturnRequests(updated);
                       }
                       localStorage.setItem('erp_return_requests', JSON.stringify(updated));
 
-                      // Tự động tăng tồn kho nếu nhập kho bán mới hoặc outlet
+                      // Tự động tăng tồn kho hiển thị cục bộ nếu nhập kho bán mới hoặc outlet
+                      // (khớp với logic backend: chỉ 2 kệ này mới thật sự cộng tồn kho bán)
                       if (['SHELF_A1_RESTOCK', 'SHELF_B3_OUTLET'].includes(returnShelfLocation)) {
                         const pName = prodName;
                         if (pName && Array.isArray(inventory) && typeof setInventory === 'function') {
@@ -5227,7 +5395,7 @@ export default function Warehouse() {
 
                       if (typeof sendSystemNotification === 'function') {
                         sendSystemNotification({
-                          title: isExchange 
+                          title: isExchange
                             ? `[ĐƠN ĐỔI MỚI 1-1] RMA ${rmaNum}`
                             : `[PHIẾU ĐỀ NGHỊ HOÀN TIỀN] RMA ${rmaNum}`,
                           content: isExchange
@@ -5240,20 +5408,34 @@ export default function Warehouse() {
 
                       const formattedRefundVal = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(refundVal);
 
-                      if (isExchange) {
+                      if (isScrap) {
+                        notify(`Đã ghi nhận kiện hàng vào ${newLog.toLocation}. Không cộng vào tồn kho bán.`, 'success');
+                      } else if (isVendor) {
+                        notify(`Đã ghi nhận kiện hàng chuyển gửi hãng bảo hành tại ${newLog.toLocation}. Không cộng vào tồn kho bán.`, 'success');
+                      } else if (isExchange) {
                         notify(`Đã nhập kho kiện hàng cũ vào ${newLog.toLocation}. Đơn hàng đổi mới (bù trừ 100%) đã được tạo và chuyển sang danh sách Hoạt Động / Lệnh Giao Hàng để Kho đóng gói và bàn giao Shipper.`, 'success');
                       } else if (item.type === 'REFUND' || refundVal > 0) {
                         notify(`Đã nhập kho kiện hàng vào ${newLog.toLocation}. Phiếu Đề Nghị Chi Hoàn Tiền (${formattedRefundVal}) đã được lập và chuyển sang Phòng Kế Toán giải ngân qua Napas247.`, 'success');
                       } else {
-                        notify(`Đã phân luồng kiện hàng vào ${newLog.toLocation} và cập nhật trạng thái thành công!`, 'success');
+                        notify(`Đã phân luồng kiện hàng vào ${newLog.toLocation} và cập nhật trạng thái thành công.`, 'success');
                       }
 
                       setSelectedReturnProcessing(null);
                     }}
-                    style={{ backgroundColor: isExchange ? '#2563eb' : '#16a34a', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.5rem 1.15rem', fontSize: '0.8rem', fontWeight: 800, cursor: 'pointer' }}
+                    style={{
+                      backgroundColor: returnShelfLocation === 'SHELF_D_SCRAP' ? '#be123c' : returnShelfLocation === 'SHELF_C2_VENDOR' ? '#c2410c' : isExchange ? '#2563eb' : '#16a34a',
+                      color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.5rem 1.15rem', fontSize: '0.8rem', fontWeight: 800, cursor: 'pointer'
+                    }}
                   >
-                    {isExchange ? 'Xác Nhận Nhập Kệ & Khởi Tạo Đơn Đổi Mới' : 'Xác Nhận Nhập Kệ & Lập Phiếu Cho Kế Toán'}
+                    {returnShelfLocation === 'SHELF_D_SCRAP'
+                      ? 'Xác Nhận Nhập Kệ & Chuyển Phế Phẩm'
+                      : returnShelfLocation === 'SHELF_C2_VENDOR'
+                        ? 'Xác Nhận Nhập Kệ & Chuyển Gửi Hãng BH'
+                        : isExchange
+                          ? 'Xác Nhận Nhập Kệ & Khởi Tạo Đơn Đổi Mới'
+                          : 'Xác Nhận Nhập Kệ & Lập Phiếu Cho Kế Toán'}
                   </button>
+                  )}
                 </div>
               </div>
 

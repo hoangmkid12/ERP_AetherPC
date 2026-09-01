@@ -294,10 +294,75 @@ const getInventory = async (req, res, next) => {
   }
 };
 
+// POST /api/v1/warehouse/inventory/adjust
+// Nhập kho trực tiếp / kiểm kê bổ sung — không qua đơn mua PO. Trước đây tab
+// này ở frontend chỉ ghi localStorage, không có route nào chạm tới CSDL thật.
+const adjustInventory = async (req, res, next) => {
+  try {
+    const { productId, quantity, warehouseId, location, reason, note, refCode } = req.body;
+    const qty = parseInt(quantity, 10);
+    const whId = parseInt(warehouseId, 10) || 1;
+    const actor = req.user?.fullname || req.user?.email || req.user?.code || 'Thủ Kho';
+
+    if (!productId || !Number.isInteger(qty) || qty <= 0) {
+      return res.status(400).json({ success: false, message: 'Cần chọn sản phẩm và số lượng nhập là số nguyên dương.' });
+    }
+
+    const result = await prisma.$transaction(async (tx) => {
+      const product = await tx.product.findUnique({ where: { productId: String(productId) } });
+      if (!product) {
+        const err = new Error(`Không tìm thấy sản phẩm với mã: ${productId}`);
+        err.statusCode = 404;
+        throw err;
+      }
+
+      const updatedProduct = await tx.product.update({
+        where: { productId: product.productId },
+        data: { stockQuantity: { increment: qty } }
+      });
+
+      const existingInventory = await tx.inventory.findFirst({
+        where: { productId: product.productId, warehouseId: whId }
+      });
+
+      const inventoryRow = existingInventory
+        ? await tx.inventory.update({
+            where: { id: existingInventory.id },
+            data: { quantityOnHand: { increment: qty } }
+          })
+        : await tx.inventory.create({
+            data: { productId: product.productId, warehouseId: whId, quantityOnHand: qty }
+          });
+
+      const movement = await tx.stockMovement.create({
+        data: {
+          productId: product.productId,
+          toWarehouseId: whId,
+          type: 'IN',
+          quantity: qty,
+          referenceId: refCode || `DIR-${Date.now().toString().slice(-8)}`,
+          note: `Nhập trực tiếp / Kiểm kê (${reason || 'DIRECT_PURCHASE'})${location ? ` — Vị trí: ${location}` : ''}. ${note || ''}`.trim(),
+          createdBy: actor
+        }
+      });
+
+      return { product: updatedProduct, inventory: inventoryRow, movement };
+    });
+
+    res.json({ success: true, message: 'Đã ghi nhận nhập kho trực tiếp thành công.', data: result });
+  } catch (err) {
+    if (err.statusCode) {
+      return res.status(err.statusCode).json({ success: false, message: err.message });
+    }
+    next(err);
+  }
+};
+
 module.exports = {
   getReceipts,
   getReceiptById,
   validateReceipt,
   getStockMovements,
-  getInventory
+  getInventory,
+  adjustInventory
 };

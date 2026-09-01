@@ -308,7 +308,13 @@ async function main() {
     { id: 12, code: 'purchasing', name: 'Nhân Viên Mua Hàng', email: 'purchasing@kltn-erp.vn', dept: 'Purchasing', role: 'PURCHASING', salary: 12000000 },
     { id: 13, code: 'assembly', name: 'Phạm Văn D (Kỹ Thuật)', email: 'assembly@kltn-erp.vn', dept: 'Assembly', role: 'ASSEMBLY', salary: 11000000 },
     { id: 14, code: 'hr', name: 'Nguyễn Nhân Sự (HR)', email: 'hr@kltn-erp.vn', dept: 'HRM', role: 'HR', salary: 18000000 },
-    { id: 15, code: 'accounting', name: 'Trần Kế Toán (Kế Toán)', email: 'accounting@kltn-erp.vn', dept: 'Finance', role: 'ACCOUNTANT', salary: 18000000 }
+    { id: 15, code: 'accounting', name: 'Trần Kế Toán (Kế Toán)', email: 'accounting@kltn-erp.vn', dept: 'Finance', role: 'ACCOUNTANT', salary: 18000000 },
+    // The storefront login screen's quick-login list also offers these three
+    // roles (Login.jsx DEMO_ACCOUNTS) — they must exist here or those buttons
+    // always fail with "Invalid credentials" since there's no matching account.
+    { id: 16, code: 'qc', name: 'Đặng Văn Kiểm (QA/QC)', email: 'qc@kltn-erp.vn', dept: 'Quality Control', role: 'QC', salary: 13000000 },
+    { id: 17, code: 'cskh', name: 'Võ Thị Chăm (CSKH)', email: 'cskh@kltn-erp.vn', dept: 'Customer Service', role: 'CSKH', salary: 11000000 },
+    { id: 18, code: 'delivery', name: 'Bùi Văn Giao (Shipper)', email: 'delivery@kltn-erp.vn', dept: 'Delivery', role: 'DELIVERY', salary: 9000000, deliveryRegion: 'ALL' }
   ];
   for (const emp of employeesData) {
     await prisma.employee.create({
@@ -320,6 +326,7 @@ async function main() {
         passwordHash: pwHash,
         department: emp.dept,
         role: emp.role,
+        deliveryRegion: emp.deliveryRegion || null,
         baseSalary: emp.salary,
         status: 'ACTIVE'
       }

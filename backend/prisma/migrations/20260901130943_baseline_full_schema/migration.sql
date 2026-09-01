@@ -1,3 +1,6 @@
+-- CreateSchema
+CREATE SCHEMA IF NOT EXISTS "public";
+
 -- CreateTable
 CREATE TABLE "categories" (
     "id" SERIAL NOT NULL,
@@ -146,7 +149,7 @@ CREATE TABLE "orders" (
     "total_amount" DECIMAL(15,2) NOT NULL,
     "payment_method" VARCHAR(30) NOT NULL,
     "payment_status" VARCHAR(20) DEFAULT 'PENDING',
-    "status" VARCHAR(20) DEFAULT 'PENDING',
+    "status" VARCHAR(30) DEFAULT 'PENDING',
     "notes" TEXT,
     "shipping_address" TEXT NOT NULL,
     "shipping_city" VARCHAR(100) NOT NULL,
@@ -155,6 +158,17 @@ CREATE TABLE "orders" (
     "shipped_at" TIMESTAMPTZ,
     "delivered_at" TIMESTAMPTZ,
     "cancelled_at" TIMESTAMPTZ,
+    "assigned_shipper_id" INTEGER,
+    "delivery_region" VARCHAR(100),
+    "proof_photo" TEXT,
+    "receiver_note" TEXT,
+    "fail_reason" TEXT,
+    "fail_note" TEXT,
+    "actual_payment_method" VARCHAR(30),
+    "bank_ref_code" VARCHAR(100),
+    "payment_proof_photo" TEXT,
+    "received_by_type" VARCHAR(30) DEFAULT 'DIRECT_CUSTOMER',
+    "receiver_name_actual" VARCHAR(150),
 
     CONSTRAINT "orders_pkey" PRIMARY KEY ("order_id")
 );
@@ -178,7 +192,7 @@ CREATE TABLE "order_items" (
 CREATE TABLE "order_status_history" (
     "id" SERIAL NOT NULL,
     "order_id" VARCHAR(50) NOT NULL,
-    "status" VARCHAR(20) NOT NULL,
+    "status" VARCHAR(30) NOT NULL,
     "note" TEXT,
     "changed_by" VARCHAR(100),
     "timestamp" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -299,15 +313,50 @@ CREATE TABLE "purchase_orders" (
     "id" SERIAL NOT NULL,
     "po_number" VARCHAR(50) NOT NULL,
     "supplier_code" VARCHAR(50) NOT NULL,
-    "status" VARCHAR(20) DEFAULT 'RFQ',
+    "status" VARCHAR(30) DEFAULT 'RFQ',
     "total_amount" DECIMAL(15,2) NOT NULL DEFAULT 0.00,
     "expected_delivery_date" DATE,
     "cancel_reason" TEXT,
     "created_by" VARCHAR(100),
     "created_at" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "is_blanket" BOOLEAN NOT NULL DEFAULT false,
+    "blanket_cap_amount" DECIMAL(15,2),
+    "blanket_valid_until" DATE,
+    "blanket_ref_id" INTEGER,
 
     CONSTRAINT "purchase_orders_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "assembly_jobs" (
+    "jobCode" VARCHAR(30) NOT NULL,
+    "order_id" VARCHAR(50),
+    "customer_name" VARCHAR(150) NOT NULL,
+    "status" VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+    "components" JSONB NOT NULL,
+    "checklist" JSONB NOT NULL DEFAULT '{}',
+    "component_serials" JSONB NOT NULL DEFAULT '{}',
+    "created_by" VARCHAR(150),
+    "completed_by" VARCHAR(150),
+    "completed_at" TIMESTAMPTZ,
+    "created_at" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "assembly_jobs_pkey" PRIMARY KEY ("jobCode")
+);
+
+-- CreateTable
+CREATE TABLE "purchase_order_status_history" (
+    "id" SERIAL NOT NULL,
+    "po_id" INTEGER NOT NULL,
+    "status" VARCHAR(30) NOT NULL,
+    "note" TEXT,
+    "changed_by" VARCHAR(150),
+    "changed_by_role" VARCHAR(50),
+    "timestamp" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "purchase_order_status_history_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -398,6 +447,8 @@ CREATE TABLE "employees" (
     "password_hash" VARCHAR(255) NOT NULL,
     "department" VARCHAR(100) NOT NULL,
     "role" VARCHAR(50) NOT NULL,
+    "delivery_region" VARCHAR(100),
+    "phone" VARCHAR(20),
     "base_salary" DECIMAL(15,2) NOT NULL,
     "status" VARCHAR(20) DEFAULT 'ACTIVE',
     "created_at" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -471,7 +522,7 @@ CREATE TABLE "payrolls" (
     "bonuses" DECIMAL(15,2) DEFAULT 0.00,
     "deductions" DECIMAL(15,2) DEFAULT 0.00,
     "net_salary" DECIMAL(15,2) NOT NULL,
-    "status" VARCHAR(20) DEFAULT 'UNPAID',
+    "status" VARCHAR(30) DEFAULT 'UNPAID',
     "paid_at" TIMESTAMPTZ,
     "created_at" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
@@ -503,6 +554,108 @@ CREATE TABLE "chat_messages" (
     "sender_name" VARCHAR(255),
 
     CONSTRAINT "chat_messages_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "serial_numbers" (
+    "id" SERIAL NOT NULL,
+    "serial" VARCHAR(100) NOT NULL,
+    "product_id" VARCHAR(50) NOT NULL,
+    "status" VARCHAR(20) NOT NULL DEFAULT 'AVAILABLE',
+    "order_id" VARCHAR(50),
+    "warranty_months" INTEGER DEFAULT 36,
+    "created_at" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "serial_numbers_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "return_requests" (
+    "id" TEXT NOT NULL,
+    "order_id" VARCHAR(50) NOT NULL,
+    "customer_id" VARCHAR(50),
+    "type" VARCHAR(30) NOT NULL DEFAULT 'EXCHANGE',
+    "reason" TEXT NOT NULL,
+    "status" VARCHAR(30) NOT NULL DEFAULT 'PENDING',
+    "address" TEXT,
+    "customer_name" VARCHAR(150),
+    "phone" VARCHAR(20),
+    "note" TEXT,
+    "evidence_url" TEXT,
+    "refund_amount" DECIMAL(15,2),
+    "bank_name" VARCHAR(100),
+    "bank_account_no" VARCHAR(50),
+    "bank_account_name" VARCHAR(150),
+    "refund_txn_code" VARCHAR(100),
+    "refund_proof_photo" TEXT,
+    "refunded_at" TIMESTAMPTZ,
+    "refunded_by_id" INTEGER,
+    "pickup_shipper_id" VARCHAR(50),
+    "pickup_proof_photo" TEXT,
+    "picked_up_at" TIMESTAMPTZ,
+    "delivered_warehouse_at" TIMESTAMPTZ,
+    "qc_decision" VARCHAR(50),
+    "qc_defect_type" VARCHAR(50),
+    "qc_notes" TEXT,
+    "qc_proof_photo" TEXT,
+    "qc_inspector_id" INTEGER,
+    "qc_inspected_at" TIMESTAMPTZ,
+    "shelf_location" VARCHAR(50),
+    "shelf_note" TEXT,
+    "replacement_order_id" VARCHAR(50),
+    "restocked_at" TIMESTAMPTZ,
+    "restocked_by_id" INTEGER,
+    "created_at" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "return_requests_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "complaints" (
+    "id" TEXT NOT NULL,
+    "customer_id" VARCHAR(50),
+    "customer_name" VARCHAR(150) NOT NULL,
+    "phone" VARCHAR(20),
+    "email" VARCHAR(100),
+    "subject" VARCHAR(255) NOT NULL,
+    "description" TEXT NOT NULL,
+    "priority" VARCHAR(20) NOT NULL DEFAULT 'MEDIUM',
+    "status" VARCHAR(20) NOT NULL DEFAULT 'OPEN',
+    "assigned_to_id" INTEGER,
+    "resolution_note" TEXT,
+    "created_at" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "complaints_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "qc_inspections" (
+    "id" SERIAL NOT NULL,
+    "receipt_id" INTEGER,
+    "inspector_id" INTEGER,
+    "sample_rate" INTEGER NOT NULL DEFAULT 100,
+    "passed_quantity" INTEGER NOT NULL DEFAULT 0,
+    "defective_quantity" INTEGER NOT NULL DEFAULT 0,
+    "status" VARCHAR(20) NOT NULL DEFAULT 'PASSED',
+    "notes" TEXT,
+    "inspected_at" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "qc_inspections_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "ledger_entries" (
+    "id" TEXT NOT NULL,
+    "type" VARCHAR(30) NOT NULL,
+    "amount" DECIMAL(15,2) NOT NULL,
+    "description" TEXT NOT NULL,
+    "reference_id" VARCHAR(50),
+    "date" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "created_at" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "ledger_entries_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateIndex
@@ -572,6 +725,9 @@ CREATE INDEX "orders_payment_status_idx" ON "orders"("payment_status");
 CREATE INDEX "orders_created_at_idx" ON "orders"("created_at");
 
 -- CreateIndex
+CREATE INDEX "orders_assigned_shipper_id_idx" ON "orders"("assigned_shipper_id");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "warehouses_name_key" ON "warehouses"("name");
 
 -- CreateIndex
@@ -618,6 +774,18 @@ CREATE INDEX "purchase_orders_created_at_idx" ON "purchase_orders"("created_at")
 
 -- CreateIndex
 CREATE INDEX "purchase_orders_expected_delivery_date_idx" ON "purchase_orders"("expected_delivery_date");
+
+-- CreateIndex
+CREATE INDEX "purchase_orders_blanket_ref_id_idx" ON "purchase_orders"("blanket_ref_id");
+
+-- CreateIndex
+CREATE INDEX "assembly_jobs_order_id_idx" ON "assembly_jobs"("order_id");
+
+-- CreateIndex
+CREATE INDEX "assembly_jobs_status_idx" ON "assembly_jobs"("status");
+
+-- CreateIndex
+CREATE INDEX "purchase_order_status_history_po_id_idx" ON "purchase_order_status_history"("po_id");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "goods_receipts_receipt_number_key" ON "goods_receipts"("receipt_number");
@@ -673,6 +841,48 @@ CREATE INDEX "chat_messages_session_id_idx" ON "chat_messages"("session_id");
 -- CreateIndex
 CREATE INDEX "chat_messages_timestamp_idx" ON "chat_messages"("timestamp");
 
+-- CreateIndex
+CREATE UNIQUE INDEX "serial_numbers_serial_key" ON "serial_numbers"("serial");
+
+-- CreateIndex
+CREATE INDEX "serial_numbers_product_id_idx" ON "serial_numbers"("product_id");
+
+-- CreateIndex
+CREATE INDEX "serial_numbers_order_id_idx" ON "serial_numbers"("order_id");
+
+-- CreateIndex
+CREATE INDEX "serial_numbers_status_idx" ON "serial_numbers"("status");
+
+-- CreateIndex
+CREATE INDEX "return_requests_order_id_idx" ON "return_requests"("order_id");
+
+-- CreateIndex
+CREATE INDEX "return_requests_customer_id_idx" ON "return_requests"("customer_id");
+
+-- CreateIndex
+CREATE INDEX "return_requests_status_idx" ON "return_requests"("status");
+
+-- CreateIndex
+CREATE INDEX "complaints_customer_id_idx" ON "complaints"("customer_id");
+
+-- CreateIndex
+CREATE INDEX "complaints_status_idx" ON "complaints"("status");
+
+-- CreateIndex
+CREATE INDEX "complaints_priority_idx" ON "complaints"("priority");
+
+-- CreateIndex
+CREATE INDEX "qc_inspections_receipt_id_idx" ON "qc_inspections"("receipt_id");
+
+-- CreateIndex
+CREATE INDEX "qc_inspections_status_idx" ON "qc_inspections"("status");
+
+-- CreateIndex
+CREATE INDEX "ledger_entries_type_idx" ON "ledger_entries"("type");
+
+-- CreateIndex
+CREATE INDEX "ledger_entries_date_idx" ON "ledger_entries"("date");
+
 -- AddForeignKey
 ALTER TABLE "categories" ADD CONSTRAINT "categories_parent_id_fkey" FOREIGN KEY ("parent_id") REFERENCES "categories"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
@@ -699,6 +909,9 @@ ALTER TABLE "product_reviews" ADD CONSTRAINT "product_reviews_customer_id_fkey" 
 
 -- AddForeignKey
 ALTER TABLE "orders" ADD CONSTRAINT "orders_customer_id_fkey" FOREIGN KEY ("customer_id") REFERENCES "customers"("customer_id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "orders" ADD CONSTRAINT "orders_assigned_shipper_id_fkey" FOREIGN KEY ("assigned_shipper_id") REFERENCES "employees"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "order_items" ADD CONSTRAINT "order_items_order_id_fkey" FOREIGN KEY ("order_id") REFERENCES "orders"("order_id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -741,6 +954,12 @@ ALTER TABLE "supplier_evaluations" ADD CONSTRAINT "supplier_evaluations_supplier
 
 -- AddForeignKey
 ALTER TABLE "purchase_orders" ADD CONSTRAINT "purchase_orders_supplier_code_fkey" FOREIGN KEY ("supplier_code") REFERENCES "suppliers"("code") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "purchase_orders" ADD CONSTRAINT "purchase_orders_blanket_ref_id_fkey" FOREIGN KEY ("blanket_ref_id") REFERENCES "purchase_orders"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "purchase_order_status_history" ADD CONSTRAINT "purchase_order_status_history_po_id_fkey" FOREIGN KEY ("po_id") REFERENCES "purchase_orders"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "purchase_order_items" ADD CONSTRAINT "purchase_order_items_po_id_fkey" FOREIGN KEY ("po_id") REFERENCES "purchase_orders"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -795,3 +1014,28 @@ ALTER TABLE "payrolls" ADD CONSTRAINT "payrolls_employee_id_fkey" FOREIGN KEY ("
 
 -- AddForeignKey
 ALTER TABLE "chat_messages" ADD CONSTRAINT "chat_messages_session_id_fkey" FOREIGN KEY ("session_id") REFERENCES "chat_sessions"("session_id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "serial_numbers" ADD CONSTRAINT "serial_numbers_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "products"("product_id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "serial_numbers" ADD CONSTRAINT "serial_numbers_order_id_fkey" FOREIGN KEY ("order_id") REFERENCES "orders"("order_id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "return_requests" ADD CONSTRAINT "return_requests_order_id_fkey" FOREIGN KEY ("order_id") REFERENCES "orders"("order_id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "return_requests" ADD CONSTRAINT "return_requests_customer_id_fkey" FOREIGN KEY ("customer_id") REFERENCES "customers"("customer_id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "complaints" ADD CONSTRAINT "complaints_customer_id_fkey" FOREIGN KEY ("customer_id") REFERENCES "customers"("customer_id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "complaints" ADD CONSTRAINT "complaints_assigned_to_id_fkey" FOREIGN KEY ("assigned_to_id") REFERENCES "employees"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "qc_inspections" ADD CONSTRAINT "qc_inspections_receipt_id_fkey" FOREIGN KEY ("receipt_id") REFERENCES "goods_receipts"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "qc_inspections" ADD CONSTRAINT "qc_inspections_inspector_id_fkey" FOREIGN KEY ("inspector_id") REFERENCES "employees"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+

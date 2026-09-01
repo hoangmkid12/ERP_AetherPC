@@ -1131,8 +1131,13 @@ export default function Dashboard() {
                 ) : (
                   <button
                     onClick={async () => {
-                      if (await confirm('Xác nhận PHÊ DUYỆT bảng lương tháng này của doanh nghiệp? Lệnh chi sẽ chuyển sang Kế Toán.')) {
-                        if (typeof approvePayrollByCEO === 'function') approvePayrollByCEO();
+                      if (!(await confirm('Xác nhận PHÊ DUYỆT bảng lương tháng này của doanh nghiệp? Lệnh chi sẽ chuyển sang Kế Toán.'))) return;
+                      if (typeof approvePayrollByCEO !== 'function') return;
+                      try {
+                        await approvePayrollByCEO();
+                        notify('Đã phê duyệt bảng lương thành công.', 'success');
+                      } catch (err) {
+                        notify(`Phê duyệt thất bại: ${err.message || 'lỗi kết nối máy chủ'}.`, 'error');
                       }
                     }}
                     style={{ backgroundColor: '#16a34a', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.5rem 1.1rem', fontSize: '0.82rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
