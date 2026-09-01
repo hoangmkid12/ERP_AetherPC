@@ -170,12 +170,16 @@ async function main() {
 
   // 4. Suppliers
   console.log('Seeding Suppliers...');
+  // mock password "123456" — shared by every demo supplier account so the
+  // quick-login list in the storefront login screen actually works.
+  const supplierPwHash = "$2a$10$IyfWpe/v6d3OiOESKMx74eJNfiLnHx0T2oPH.isjyKrGgqXVHFRSG";
   for (const s of suppliers) {
     await prisma.supplier.create({
       data: {
         code: s.code,
         name: s.name,
         email: s.email,
+        passwordHash: supplierPwHash,
         phone: s.phone,
         address: s.address,
         paymentTerms: s.payment_terms || 'NET 30',
