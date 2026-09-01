@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useHRStore, useUtilityStore } from '../../stores';
 import { useAuth } from '../../context/AuthContext';
 import { DELIVERY_REGIONS } from '../../utils/deliveryRegions';
+import { notify } from '../../context/NotificationContext';
 import { 
   Users, UserPlus, CheckCircle, Clock, XCircle, DollarSign, CalendarCheck, 
   Key, Eye, EyeOff, Search, FileEdit, Award, Sparkles, Check, X, Calendar, 
@@ -216,6 +217,7 @@ export default function HRManager() {
       const netSalary = baseSalary + commission + assemblyBonus - penalty;
       return {
         id: emp.id || idx + 1,
+        empId: emp.id,
         fullname: emp.fullname,
         username: emp.username,
         role: emp.role,
@@ -232,7 +234,7 @@ export default function HRManager() {
 
   const handleAddEmployee = () => {
     if (!newEmpForm.fullname || !newEmpForm.username || !newEmpForm.salary) {
-      alert('Vui lòng điền đầy đủ họ tên, username và lương cơ bản!');
+      notify('Vui lòng điền đầy đủ họ tên, username và lương cơ bản!', 'error');
       return;
     }
     const regionToSave = newEmpForm.role === 'DELIVERY' ? newEmpForm.deliveryRegion : null;
@@ -242,14 +244,14 @@ export default function HRManager() {
     }
     setNewEmpForm({ fullname: '', username: '', role: 'SALES', department: 'Kinh Doanh', deliveryRegion: 'HCM_KV1', phone: '', salary: '8500000' });
     setShowAddEmpModal(false);
-    alert('✅ Đã tạo hồ sơ nhân viên mới thành công!');
+    notify('✅ Đã tạo hồ sơ nhân viên mới thành công!', 'success');
   };
 
   const handleSubmitPayrollToCEO = () => {
     if (typeof submitPayrolls === 'function') {
-      submitPayrolls();
+      submitPayrolls(calculatedPayrolls);
     }
-    alert('📤 Đã gửi bảng tổng hợp lương tháng lên Ban Giám Đốc (CEO) để phê duyệt!');
+    notify('📤 Đã gửi bảng tổng hợp lương tháng lên Ban Giám Đốc (CEO) để phê duyệt!', 'success');
   };
 
   return (
@@ -703,7 +705,7 @@ export default function HRManager() {
                           <button
                             onClick={() => {
                               approveLeaveRequest(lv.id);
-                              alert('✅ Đã duyệt đơn xin nghỉ phép!');
+                              notify('✅ Đã duyệt đơn xin nghỉ phép!', 'success');
                             }}
                             style={{ backgroundColor: '#16a34a', color: '#ffffff', border: 'none', borderRadius: '4px', padding: '0.3rem 0.65rem', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer' }}
                           >
@@ -712,7 +714,7 @@ export default function HRManager() {
                           <button
                             onClick={() => {
                               rejectLeaveRequest(lv.id);
-                              alert('✕ Đã từ chối đơn nghỉ phép.');
+                              notify('✕ Đã từ chối đơn nghỉ phép.', 'info');
                             }}
                             style={{ backgroundColor: '#ef4444', color: '#ffffff', border: 'none', borderRadius: '4px', padding: '0.3rem 0.65rem', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}
                           >

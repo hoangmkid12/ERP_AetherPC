@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { usePermission } from '../../hooks/usePermission';
 import { useInventoryStore, useSalesStore, useFinanceStore } from '../../stores';
+import { notify, promptText } from '../../context/NotificationContext';
 import { api } from '../../services/api';
 import ActorNotificationBar from '../../components/ActorNotificationBar';
 import { 
@@ -83,14 +84,12 @@ export default function Purchasing() {
   const erpProducts = useInventoryStore(state => state.products) || [];
   const erpOrders = useSalesStore(state => state.orders) || [];
   const erpPurchaseOrders = useFinanceStore(state => state.purchaseOrders) || [];
-  const erpSuppliers = useFinanceStore(state => state.suppliers) || [];
   const erpContext = useMemo(() => ({
     inventory: erpInventory,
     products: erpProducts,
     orders: erpOrders,
-    purchaseOrders: erpPurchaseOrders,
-    suppliers: erpSuppliers
-  }), [erpInventory, erpProducts, erpOrders, erpPurchaseOrders, erpSuppliers]);
+    purchaseOrders: erpPurchaseOrders
+  }), [erpInventory, erpProducts, erpOrders, erpPurchaseOrders]);
   
   // Data State
   const [orders, setOrders] = useState([]);
@@ -470,7 +469,7 @@ export default function Purchasing() {
       if (suppliersRes?.success && Array.isArray(suppliersRes.data) && suppliersRes.data.length > 0) {
         finalSuppliers = suppliersRes.data;
       } else {
-        finalSuppliers = erpContext.suppliers || [
+        finalSuppliers = [
           { code: 's1', name: 'Samsung Vina Electronics', phone: '028 3821 1111', email: 'b2b.vn@samsung.com', address: 'Quận 1, TP.HCM', rating: 4.9 },
           { code: 's2', name: 'Mai Hoàng Distribution', phone: '024 3537 7109', email: 'sales@maihoang.com.vn', address: 'Đống Đa, Hà Nội', rating: 4.8 },
           { code: 's3', name: 'Intel Vietnam', phone: '028 3825 2000', email: 'support.vietnam@intel.com', address: 'Quận 9, TP.HCM', rating: 5.0 },
@@ -607,7 +606,7 @@ export default function Purchasing() {
     const prod = effectiveCatalog.find(p => String(p.productId || p.id) === String(selectedProduct));
     if (!prod) return;
     if (poItems.some(item => String(item.productId) === String(selectedProduct))) {
-      alert('Sản phẩm này đã được thêm vào danh sách.');
+      notify('Sản phẩm này đã được thêm vào danh sách.', 'error');
       return;
     }
     const qty = parseInt(quantity, 10) || 1;
@@ -641,18 +640,18 @@ export default function Purchasing() {
     if (isMultiSupplierRFQ) {
       const validSuppliers = selectedSuppliersList.filter(Boolean);
       if (validSuppliers.length < 2) {
-        alert('Vui lòng chọn ít nhất 2 Nhà Cung Cấp để gửi Yêu Cầu Báo Giá đồng thời.');
+        notify('Vui lòng chọn ít nhất 2 Nhà Cung Cấp để gửi Yêu Cầu Báo Giá đồng thời.', 'error');
         return;
       }
     } else {
       if (!selectedSupplier) {
-        alert('Vui lòng chọn Nhà Cung Cấp.');
+        notify('Vui lòng chọn Nhà Cung Cấp.', 'error');
         return;
       }
     }
 
     if (poItems.length === 0) {
-      alert('Vui lòng thêm ít nhất một sản phẩm vào đơn.');
+      notify('Vui lòng thêm ít nhất một sản phẩm vào đơn.', 'error');
       return;
     }
 
@@ -702,7 +701,7 @@ export default function Purchasing() {
           setOrders(updated);
           try { localStorage.setItem('erp_pos', JSON.stringify(updated)); } catch (_) {}
           setShowCreateModal(false);
-          alert(`Đã khởi tạo thành công ${createdPOs.length} Yêu Cầu Báo Giá (RFQ) gửi tới các Nhà Cung Cấp!`);
+          notify(`Đã khởi tạo thành công ${createdPOs.length} Yêu Cầu Báo Giá (RFQ) gửi tới các Nhà Cung Cấp!`, 'success');
         }
       } else {
         const supplierObj = suppliers.find(s => s.code === selectedSupplier);
@@ -723,7 +722,7 @@ export default function Purchasing() {
           if (res?.success) {
             await fetchData();
             setShowCreateModal(false);
-            alert('Tạo Yêu Cầu Báo Giá (RFQ) thành công!');
+            notify('Tạo Yêu Cầu Báo Giá (RFQ) thành công!', 'success');
           }
         } catch (apiErr) {
           console.warn('Fallback local creation:', apiErr);
@@ -743,11 +742,11 @@ export default function Purchasing() {
           setOrders(updated);
           try { localStorage.setItem('erp_pos', JSON.stringify(updated)); } catch (_) {}
           setShowCreateModal(false);
-          alert('Tạo Yêu Cầu Báo Giá (RFQ) thành công!');
+          notify('Tạo Yêu Cầu Báo Giá (RFQ) thành công!', 'success');
         }
       }
     } catch (err) {
-      alert('Lỗi tạo đơn: ' + err.message);
+      notify('Lỗi tạo đơn: ' + err.message, 'error');
     }
     setSubmitting(false);
   };
@@ -792,21 +791,16 @@ export default function Purchasing() {
         localStorage.setItem('erp_pos', JSON.stringify(updatedPOs));
       } catch (_) {}
 
-      // Update in ERPContext
-      if (typeof erpContext.updatePurchaseOrderStatus === 'function') {
-        erpContext.updatePurchaseOrderStatus(poId, newStatus, { approvedAt: new Date().toISOString(), status: newStatus });
-      }
-
       window.dispatchEvent(new Event('erp-po-updated'));
       if (apiSucceeded) {
-        alert(`Đơn hàng đã được chuyển trạng thái sang: ${getStatusText(newStatus)}`);
+        notify(`Đơn hàng đã được chuyển trạng thái sang: ${getStatusText(newStatus)}`, 'success');
       } else {
-        alert(`⚠️ Máy chủ chưa ghi nhận được thay đổi trạng thái này (${apiErrorMessage}). Đơn hàng có thể hiện lại trạng thái cũ sau khi tải lại trang — vui lòng thử lại.`);
+        notify(`⚠️ Máy chủ chưa ghi nhận được thay đổi trạng thái này (${apiErrorMessage}). Đơn hàng có thể hiện lại trạng thái cũ sau khi tải lại trang — vui lòng thử lại.`, 'error');
       }
       await fetchData();
       setSelectedPO(null);
     } catch (err) {
-      alert('Lỗi: ' + err.message);
+      notify('Lỗi: ' + err.message, 'error');
     }
     setSubmitting(false);
   };
@@ -2554,16 +2548,16 @@ export default function Purchasing() {
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
                       <button
                         onClick={async () => {
-                          const reason = prompt('Nhập lý do từ chối / yêu cầu đàm phán lại:', 'Giá chào thầu cao hơn ngân sách dự kiến');
+                          const reason = await promptText('Nhập lý do từ chối / yêu cầu đàm phán lại:', 'Giá chào thầu cao hơn ngân sách dự kiến');
                           if (reason !== null) {
                             try {
                               const updatedPOs = orders.map(o => o.id === selectedPO.id ? { ...o, status: 'RFQ', cancelReason: reason } : o);
                               setOrders(updatedPOs);
                               localStorage.setItem('erp_pos', JSON.stringify(updatedPOs));
-                              alert('Đã từ chối báo giá và chuyển lại cho Nhân Viên Mua Hàng đàm phán!');
+                              notify('Đã từ chối báo giá và chuyển lại cho Nhân Viên Mua Hàng đàm phán!', 'success');
                               setSelectedPO(null);
                             } catch (e) {
-                              alert('Lỗi: ' + e.message);
+                              notify('Lỗi: ' + e.message, 'error');
                             }
                           }
                         }}

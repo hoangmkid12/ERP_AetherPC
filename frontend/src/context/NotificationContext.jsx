@@ -1,9 +1,24 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { X, CheckCircle, AlertCircle, Info } from 'lucide-react';
+import ConfirmDialog from '../components/ConfirmDialog';
 
 const NotificationContext = createContext();
 
 export const useNotification = () => useContext(NotificationContext);
+
+// Module-level refs so `notify`/`confirm` can be called from ANYWHERE —
+// including Zustand store actions, which run outside React and can't use
+// the useNotification() hook. NotificationProvider keeps these pointed at
+// its live addNotification/confirm implementations on every render. This
+// mirrors how real toast libraries (react-hot-toast, sonner) expose a
+// plain `toast()` function alongside their hook.
+let notifyRef = (msg) => console.warn('[Notify] NotificationProvider chưa sẵn sàng:', msg);
+let confirmRef = (msg) => Promise.resolve(window.confirm(msg));
+let promptRef = (msg, def) => Promise.resolve(window.prompt(msg, def));
+
+export const notify = (messageOrObj, type, link) => notifyRef(messageOrObj, type, link);
+export const confirm = (message, options) => confirmRef(message, options);
+export const promptText = (message, defaultValue = '') => promptRef(message, defaultValue);
 
 export const NotificationProvider = ({ children }) => {
   const [notifications, setNotifications] = useState(() => {
@@ -66,11 +81,42 @@ export const NotificationProvider = ({ children }) => {
     setNotifications([]);
   };
 
+  // Promise-based confirm()/promptText() dialog, replacing window.confirm()
+  // and window.prompt() with the app's own styled modal (ConfirmDialog.jsx
+  // renders either a yes/no dialog or one with a text input based on
+  // options.showInput).
+  const [confirmState, setConfirmState] = useState(null);
+
+  const confirmFn = (message, options = {}) => {
+    return new Promise((resolve) => {
+      setConfirmState({ message, options, resolve });
+    });
+  };
+
+  const promptFn = (message, defaultValue = '') => {
+    return new Promise((resolve) => {
+      setConfirmState({ message, options: { showInput: true, inputDefaultValue: defaultValue }, resolve });
+    });
+  };
+
+  const resolveConfirm = (result) => {
+    confirmState?.resolve(result);
+    setConfirmState(null);
+  };
+
+  // Keep the module-level refs pointed at this provider instance's live
+  // implementations so notify()/confirm()/promptText() work from anywhere.
+  notifyRef = addNotification;
+  confirmRef = confirmFn;
+  promptRef = promptFn;
+
   return (
     <NotificationContext.Provider value={{
       notifications,
       unreadCount: notifications.filter(n => !n.read).length,
       addNotification,
+      confirm: confirmFn,
+      promptText: promptFn,
       markAsRead,
       markAllAsRead,
       clearAllNotifications
@@ -126,6 +172,19 @@ export const NotificationProvider = ({ children }) => {
           to { transform: translateX(0); opacity: 1; }
         }
       `}</style>
+
+      <ConfirmDialog
+        open={!!confirmState}
+        message={confirmState?.message}
+        confirmLabel={confirmState?.options?.confirmLabel}
+        cancelLabel={confirmState?.options?.cancelLabel}
+        danger={confirmState?.options?.danger}
+        showInput={confirmState?.options?.showInput}
+        inputDefaultValue={confirmState?.options?.inputDefaultValue}
+        inputPlaceholder={confirmState?.options?.inputPlaceholder}
+        onConfirm={(inputValue) => resolveConfirm(confirmState?.options?.showInput ? inputValue : true)}
+        onCancel={() => resolveConfirm(confirmState?.options?.showInput ? null : false)}
+      />
     </NotificationContext.Provider>
   );
 };

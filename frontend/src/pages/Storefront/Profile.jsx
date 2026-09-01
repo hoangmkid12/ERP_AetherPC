@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { MapPin, Plus, User, X } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { notify, confirm } from '../../context/NotificationContext';
 import { api } from '../../services/api';
 
 const TEXT = {
@@ -88,9 +89,9 @@ export default function Profile() {
         gender: profileForm.gender
       });
       setEditingProfile(false);
-      alert('✅ Cập nhật thông tin hồ sơ thành công!');
+      notify('✅ Cập nhật thông tin hồ sơ thành công!', 'success');
     } catch (error) {
-      alert(error.message || 'Không thể cập nhật hồ sơ.');
+      notify(error.message || 'Không thể cập nhật hồ sơ.', 'error');
     }
   };
 
@@ -103,18 +104,18 @@ export default function Profile() {
       setShowAddressModal(false);
       await loadAddresses();
     } catch (error) {
-      alert(error.message || 'Không thể lưu địa chỉ.');
+      notify(error.message || 'Không thể lưu địa chỉ.', 'error');
     }
   };
 
   // Delete address
   const deleteAddress = async (id) => {
-    if (!window.confirm('Bạn có chắc muốn xóa địa chỉ này?')) return;
+    if (!(await confirm('Bạn có chắc muốn xóa địa chỉ này?', { danger: true }))) return;
     try {
       await api.delete(`/customers/addresses/${id}`);
       await loadAddresses();
     } catch (error) {
-      alert(error.message || 'Không thể xóa địa chỉ.');
+      notify(error.message || 'Không thể xóa địa chỉ.', 'error');
     }
   };
 
@@ -124,7 +125,7 @@ export default function Profile() {
       await api.patch(`/customers/addresses/${id}/default`);
       await loadAddresses();
     } catch (error) {
-      alert(error.message || 'Không thể đặt địa chỉ mặc định.');
+      notify(error.message || 'Không thể đặt địa chỉ mặc định.', 'error');
     }
   };
 

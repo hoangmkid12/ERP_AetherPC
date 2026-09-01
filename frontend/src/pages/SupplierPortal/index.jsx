@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { notify, confirm } from '../../context/NotificationContext';
 import { useFinanceStore } from '../../stores';
 import { api } from '../../services/api';
 import { 
@@ -180,12 +181,12 @@ export default function SupplierPortal() {
   // Supplier confirms PO after CEO approval & schedules delivery date
   const handleSupplierConfirmDelivery = async (po) => {
     if (!deliveryDateInput) {
-      alert('Vui lòng chọn Ngày hẹn giao hàng.');
+      notify('Vui lòng chọn Ngày hẹn giao hàng.', 'error');
       return;
     }
 
     const poId = po.id || po.poNumber;
-    if (!window.confirm(`Xác nhận đơn hàng ${po.poNumber || poId} và hẹn ngày giao hàng là ${deliveryDateInput} gửi cho Bên Mua Hàng?`)) {
+    if (!(await confirm(`Xác nhận đơn hàng ${po.poNumber || poId} và hẹn ngày giao hàng là ${deliveryDateInput} gửi cho Bên Mua Hàng?`))) {
       return;
     }
 
@@ -234,13 +235,13 @@ export default function SupplierPortal() {
       });
 
       if (res && res.success) {
-        alert(`🎉 Đã xác nhận đơn hàng ${po.poNumber || poId} thành công!\n\n• Ngày hẹn giao hàng: ${deliveryDateInput}\n• Thông tin đã gửi lại cho Bên Mua Hàng & Kho để sẵn sàng nhập hàng.`);
+        notify(`🎉 Đã xác nhận đơn hàng ${po.poNumber || poId} thành công!\n\n• Ngày hẹn giao hàng: ${deliveryDateInput}\n• Thông tin đã gửi lại cho Bên Mua Hàng & Kho để sẵn sàng nhập hàng.`, 'success');
       } else {
-        alert(`⚠️ CHƯA GỬI ĐƯỢC XÁC NHẬN GIAO HÀNG LÊN MÁY CHỦ!\n\n• Đơn: ${po.poNumber || poId}\n• Xác nhận chỉ lưu tạm trên trình duyệt này. Vui lòng thử lại.`);
+        notify(`⚠️ CHƯA GỬI ĐƯỢC XÁC NHẬN GIAO HÀNG LÊN MÁY CHỦ!\n\n• Đơn: ${po.poNumber || poId}\n• Xác nhận chỉ lưu tạm trên trình duyệt này. Vui lòng thử lại.`, 'error');
       }
     } catch (e) {
       console.warn('API update failed:', e);
-      alert(`⚠️ CHƯA GỬI ĐƯỢC XÁC NHẬN GIAO HÀNG LÊN MÁY CHỦ!\n\n• Đơn: ${po.poNumber || poId}\n• Lỗi: ${e.message || 'Lỗi kết nối máy chủ'}\n\nXác nhận chỉ lưu tạm trên trình duyệt này. Vui lòng thử lại.`);
+      notify(`⚠️ CHƯA GỬI ĐƯỢC XÁC NHẬN GIAO HÀNG LÊN MÁY CHỦ!\n\n• Đơn: ${po.poNumber || poId}\n• Lỗi: ${e.message || 'Lỗi kết nối máy chủ'}\n\nXác nhận chỉ lưu tạm trên trình duyệt này. Vui lòng thử lại.`, 'error');
     }
     setSubmitting(false);
   };
@@ -313,7 +314,7 @@ export default function SupplierPortal() {
     if (!po) return;
     const total = getQuotedTotal(po);
     if (total <= 0) {
-      alert('Vui lòng nhập đơn giá cho các sản phẩm trước khi gửi báo giá.');
+      notify('Vui lòng nhập đơn giá cho các sản phẩm trước khi gửi báo giá.', 'error');
       return;
     }
 
@@ -322,12 +323,12 @@ export default function SupplierPortal() {
       return !(parseFloat(priceInputs[key]) > 0);
     });
     if (hasMissingPrice) {
-      alert('Vui lòng nhập đơn giá lớn hơn 0 cho tất cả sản phẩm trong yêu cầu báo giá.');
+      notify('Vui lòng nhập đơn giá lớn hơn 0 cho tất cả sản phẩm trong yêu cầu báo giá.', 'error');
       return;
     }
 
     const poId = po.id || po.poNumber;
-    if (!window.confirm(`Xác nhận gửi báo giá cho đơn #${po.poNumber || poId} với tổng chi phí ${formatPrice(total)} gửi tới Bên Mua Hàng & CEO duyệt?`)) {
+    if (!(await confirm(`Xác nhận gửi báo giá cho đơn #${po.poNumber || poId} với tổng chi phí ${formatPrice(total)} gửi tới Bên Mua Hàng & CEO duyệt?`))) {
       return;
     }
 
@@ -418,10 +419,10 @@ export default function SupplierPortal() {
       // looks fine, but the backend (the source of truth CEO's approval reads from) never
       // received it. Report what actually happened instead.
       if (apiSucceeded) {
-        alert(`🎉 Đã gửi Báo Giá cho đơn #${po.poNumber || poId} thành công!\n\n• Tổng giá trị: ${formatPrice(total)}\n• Trạng thái: ĐÃ BÁO GIÁ (Chờ CEO duyệt)`);
+        notify(`🎉 Đã gửi Báo Giá cho đơn #${po.poNumber || poId} thành công!\n\n• Tổng giá trị: ${formatPrice(total)}\n• Trạng thái: ĐÃ BÁO GIÁ (Chờ CEO duyệt)`, 'success');
       } else {
         console.error('Quote submission rejected by server. poId:', poId, 'itemPrices:', itemPrices, 'error:', apiErrorMessage);
-        alert(`⚠️ CHƯA GỬI ĐƯỢC BÁO GIÁ LÊN MÁY CHỦ!\n\n• Đơn: #${po.poNumber || poId}\n• Lỗi: ${apiErrorMessage}\n\nBáo giá chỉ lưu tạm trên trình duyệt này — CEO sẽ KHÔNG thấy được để duyệt. Vui lòng thử lại hoặc liên hệ quản trị viên.`);
+        notify(`⚠️ CHƯA GỬI ĐƯỢC BÁO GIÁ LÊN MÁY CHỦ!\n\n• Đơn: #${po.poNumber || poId}\n• Lỗi: ${apiErrorMessage}\n\nBáo giá chỉ lưu tạm trên trình duyệt này — CEO sẽ KHÔNG thấy được để duyệt. Vui lòng thử lại hoặc liên hệ quản trị viên.`, 'error');
       }
     } catch (e) {
       console.warn('Quote update failed:', e);
@@ -484,14 +485,14 @@ export default function SupplierPortal() {
       setSelectedPO(null);
       setCancelReason('');
       if (apiSucceeded) {
-        alert(`🔴 Đã gửi thông báo TỪ CHỐI BÁO GIÁ cho đơn #${poNum} tới Bên Mua Hàng!\n\nLý do: "${finalReason}"`);
+        notify(`🔴 Đã gửi thông báo TỪ CHỐI BÁO GIÁ cho đơn #${poNum} tới Bên Mua Hàng!\n\nLý do: "${finalReason}"`, 'success');
       } else {
-        alert(`⚠️ CHƯA GỬI ĐƯỢC THÔNG BÁO TỪ CHỐI LÊN MÁY CHỦ!\n\n• Đơn: #${poNum}\n• Lỗi: ${apiErrorMessage}\n\nVui lòng thử lại.`);
+        notify(`⚠️ CHƯA GỬI ĐƯỢC THÔNG BÁO TỪ CHỐI LÊN MÁY CHỦ!\n\n• Đơn: #${poNum}\n• Lỗi: ${apiErrorMessage}\n\nVui lòng thử lại.`, 'error');
       }
       await fetchData();
     } catch (e) {
       console.warn('Reject PO failed:', e);
-      alert('Lỗi khi từ chối đơn hàng: ' + (e.message || 'Chưa rõ nguyên nhân'));
+      notify('Lỗi khi từ chối đơn hàng: ' + (e.message || 'Chưa rõ nguyên nhân'), 'error');
     } finally {
       setSubmitting(false);
     }

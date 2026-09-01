@@ -396,7 +396,7 @@ export const useSalesStore = create((set, get) => ({
   /**
    * Claim order for delivery
    */
-  claimOrderForDelivery: (orderId, shipperUser) => {
+  claimOrderForDelivery: async (orderId, shipperUser) => {
     const orders = get().orders;
     const targetOrder = orders.find(o => o.orderId === orderId || String(o.id) === String(orderId));
     if (!targetOrder) {
@@ -416,12 +416,16 @@ export const useSalesStore = create((set, get) => ({
     const nowStr = new Date().toLocaleDateString('vi-VN') + ' ' + new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
     const noteText = `Đã lấy hàng & đang vận chuyển giao – Shipper: ${shipperName} (${nowStr})`;
 
-    get().updateOrderStatus(orderId, 'SHIPPED', noteText, {
-      assignedShipperId: shipperId,
-      assignedShipperName: shipperName,
-      assignedAt: new Date().toISOString(),
-      assignmentMethod: 'SELF_CLAIM'
-    });
+    try {
+      await get().updateOrderStatus(orderId, 'SHIPPED', noteText, {
+        assignedShipperId: shipperId,
+        assignedShipperName: shipperName,
+        assignedAt: new Date().toISOString(),
+        assignmentMethod: 'SELF_CLAIM'
+      });
+    } catch (err) {
+      return { success: false, message: `Không thể nhận đơn hàng ${orderId}: ${err.message}` };
+    }
 
     return { success: true, message: `✅ Đã nhận đơn hàng ${orderId} thành công!` };
   },

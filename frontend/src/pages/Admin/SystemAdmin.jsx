@@ -22,6 +22,7 @@ import {
 } from 'chart.js';
 import { useHRStore, useSalesStore, useInventoryStore, useFinanceStore } from '../../stores';
 import { DELIVERY_REGIONS } from '../../utils/deliveryRegions';
+import { notify, confirm } from '../../context/NotificationContext';
 import { 
   ERP_SYSTEM_MODULES, 
   ERP_ROLES, 
@@ -189,17 +190,17 @@ export default function SystemAdmin() {
     saveOperationalRbac(rbacMatrix);
     setSavedRbacMatrix(rbacMatrix);
     setShowSaveConfirmModal(false);
-    alert('Đã lưu và áp dụng cấu hình phân quyền nghiệp vụ mới thành công!');
+    notify('Đã lưu và áp dụng cấu hình phân quyền nghiệp vụ mới thành công!', 'success');
   };
 
-  const handleDiscardChanges = () => {
-    if (window.confirm('Hủy bỏ toàn bộ các thay đổi chưa lưu và khôi phục về cấu hình đã lưu gần nhất?')) {
+  const handleDiscardChanges = async () => {
+    if (await confirm('Hủy bỏ toàn bộ các thay đổi chưa lưu và khôi phục về cấu hình đã lưu gần nhất?', { danger: true })) {
       setRbacMatrix(savedRbacMatrix);
     }
   };
 
-  const handleResetDefaultRbac = () => {
-    if (window.confirm('Khôi phục phân quyền nghiệp vụ của toàn bộ hệ thống về mặc định tiêu chuẩn? Bạn cần bấm "Lưu Phân Quyền" và xác nhận để áp dụng.')) {
+  const handleResetDefaultRbac = async () => {
+    if (await confirm('Khôi phục phân quyền nghiệp vụ của toàn bộ hệ thống về mặc định tiêu chuẩn? Bạn cần bấm "Lưu Phân Quyền" và xác nhận để áp dụng.', { danger: true })) {
       setRbacMatrix(DEFAULT_OPERATIONAL_MATRIX);
     }
   };
@@ -295,11 +296,11 @@ export default function SystemAdmin() {
 
   const handleAddEmployee = () => {
     if (!form.fullname || !form.username || !form.salary) {
-      alert('Vui lòng điền đầy đủ họ tên, username và lương cơ bản.');
+      notify('Vui lòng điền đầy đủ họ tên, username và lương cơ bản.', 'error');
       return;
     }
     if (parseInt(form.salary) < 1000000) {
-      alert('Lương cơ bản phải từ 1.000.000 VNĐ trở lên.');
+      notify('Lương cơ bản phải từ 1.000.000 VNĐ trở lên.', 'error');
       return;
     }
     const regionToSave = form.role === 'DELIVERY' ? form.deliveryRegion : null;
@@ -309,12 +310,12 @@ export default function SystemAdmin() {
     }
     setForm({ fullname: '', username: '', role: 'SALES', department: 'Kinh Doanh', deliveryRegion: 'HCM_KV1', phone: '', salary: '8500000', password: '' });
     setShowAdd(false);
-    alert(`✅ Tài khoản nhân viên "${form.fullname}" (${form.username}) đã được tạo thành công!\nMật khẩu mặc định: 123456`);
+    notify(`✅ Tài khoản nhân viên "${form.fullname}" (${form.username}) đã được tạo thành công!\nMật khẩu mặc định: 123456`, 'success');
   };
 
-  const handleResetPassword = (emp) => {
-    if (window.confirm(`Xác nhận ĐẶT LẠI MẬT KHẨU cho tài khoản "${emp.username}" về mật khẩu mặc định "123456"?`)) {
-      alert(`🔑 Mật khẩu của tài khoản "${emp.username}" đã được đặt lại thành công về: 123456`);
+  const handleResetPassword = async (emp) => {
+    if (await confirm(`Xác nhận ĐẶT LẠI MẬT KHẨU cho tài khoản "${emp.username}" về mật khẩu mặc định "123456"?`, { danger: true })) {
+      notify(`🔑 Mật khẩu của tài khoản "${emp.username}" đã được đặt lại thành công về: 123456`, 'success');
     }
   };
 
@@ -335,7 +336,7 @@ export default function SystemAdmin() {
     document.body.appendChild(downloadAnchor);
     downloadAnchor.click();
     downloadAnchor.remove();
-    alert('📥 Đã xuất và tải xuống file sao lưu dữ liệu toàn hệ thống ERP thành công!');
+    notify('📥 Đã xuất và tải xuống file sao lưu dữ liệu toàn hệ thống ERP thành công!', 'success');
   };
 
   return (
@@ -617,8 +618,8 @@ export default function SystemAdmin() {
                           <Edit size={12} /> Sửa
                         </button>
                         <button
-                          onClick={() => {
-                            if (window.confirm(`Xác nhận xóa tài khoản "${emp.fullname}"?`)) {
+                          onClick={async () => {
+                            if (await confirm(`Xác nhận xóa tài khoản "${emp.fullname}"?`, { danger: true })) {
                               if (typeof deleteEmployee === 'function') deleteEmployee(emp.id);
                             }
                           }}
@@ -1247,7 +1248,7 @@ export default function SystemAdmin() {
               </div>
 
               <button
-                onClick={() => alert('✅ Đã lưu cấu hình thông tin doanh nghiệp thành công!')}
+                onClick={() => notify('✅ Đã lưu cấu hình thông tin doanh nghiệp thành công!', 'success')}
                 style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.5rem', fontSize: '0.8rem', fontWeight: 800, cursor: 'pointer', marginTop: '0.5rem' }}
               >
                 Lưu Cấu Hình Doanh Nghiệp
@@ -1326,7 +1327,7 @@ export default function SystemAdmin() {
                   <Download size={15} /> Tải Về File Sao Lưu (Backup JSON)
                 </button>
                 <button
-                  onClick={() => alert('📤 Chức năng Phục Hồi Dữ Liệu: Hãy chọn file backup .json để ghi đè dữ liệu.')}
+                  onClick={() => notify('📤 Chức năng Phục Hồi Dữ Liệu: Hãy chọn file backup .json để ghi đè dữ liệu.', 'info')}
                   style={{ backgroundColor: '#ffffff', color: '#2563eb', border: '1px solid #bfdbfe', borderRadius: '6px', padding: '0.5rem 1rem', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
                 >
                   <Upload size={15} /> Khôi Phục Dữ Liệu (Restore)
@@ -1594,7 +1595,7 @@ export default function SystemAdmin() {
                       });
                     }
                     setEditingEmp(null);
-                    alert('✅ Cập nhật thông tin nhân viên thành công!');
+                    notify('✅ Cập nhật thông tin nhân viên thành công!', 'success');
                   }}
                   style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.45rem 1.1rem', fontSize: '0.8rem', fontWeight: 800, cursor: 'pointer' }}
                 >

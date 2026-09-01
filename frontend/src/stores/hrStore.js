@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { api } from '../services/api';
+import { notify } from '../context/NotificationContext';
 
 /**
  * @typedef {Object} Employee
@@ -514,31 +515,6 @@ export const useHRStore = create((set, get) => ({
   },
 
   /**
-   * Add new employee
-   */
-  addEmployee: (fullname, username, role, salary, department = 'Kinh Doanh') => {
-    const employees = get().employees;
-    const newEmpId = employees.length > 0 ? Math.max(...employees.map(e => e.id || 0)) + 1 : 1;
-    const newEmp = {
-      id: newEmpId,
-      fullname,
-      username,
-      role,
-      department,
-      salary: parseInt(salary, 10) || 12000000,
-      attendance: 'PRESENT',
-      salaryPaid: false
-    };
-    set(state => {
-      const updated = [...state.employees, newEmp];
-      try { localStorage.setItem(STORAGE_KEYS.employees, JSON.stringify(updated)); } catch (e) {}
-      return { employees: updated };
-    });
-    api.post('/employees', newEmp).catch(err => console.warn('[HRStore] Employee sync notice:', err.message));
-    return newEmp;
-  },
-
-  /**
    * Update attendance log sync
    */
   updateAttendanceLogSync: (empId, dateStr, status) => {
@@ -618,7 +594,7 @@ export const useHRStore = create((set, get) => ({
       try { localStorage.setItem(STORAGE_KEYS.payrolls, JSON.stringify(nextPayrolls)); } catch (e) {}
       return { payrolls: nextPayrolls };
     });
-    alert('✅ CEO đã phê duyệt bảng lương tháng này thành công! Đã gửi lệnh chi cho Kế toán giải ngân.');
+    notify('✅ CEO đã phê duyệt bảng lương tháng này thành công! Đã gửi lệnh chi cho Kế toán giải ngân.', 'success');
   },
 
   /**

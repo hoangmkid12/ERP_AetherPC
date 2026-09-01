@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import { useFinanceStore, useUtilityStore, useSalesStore, useInventoryStore } from '../../stores';
 import { useAuth } from '../../context/AuthContext';
 import { usePermission } from '../../hooks/usePermission';
+import { notify } from '../../context/NotificationContext';
 import { api } from '../../services/api';
 import { Bar, Doughnut } from 'react-chartjs-2';
 import { 
@@ -2713,7 +2714,7 @@ export default function QualityControl() {
                       setDetailRMA(null);
                       const log = qaLogs.find(l => l.rmaId === rmaId || l.poNumber === orderId);
                       if (log) setViewingLog(log);
-                      else alert(`Phiếu ${rmaId} đã hoàn tất: ${detailRMA.resolution || 'Đã đóng'}`);
+                      else notify(`Phiếu ${rmaId} đã hoàn tất: ${detailRMA.resolution || 'Đã đóng'}`, 'info');
                     }}
                     style={{
                       backgroundColor: '#eff6ff',

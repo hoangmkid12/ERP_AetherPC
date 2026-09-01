@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useCart } from '../../context/CartContext';
+import { notify } from '../../context/NotificationContext';
 import { api } from '../../services/api';
 import { Search, ShoppingCart, Eye, ArrowRight, Zap, Clock, ChevronLeft, ChevronRight, Star, Cpu, Gamepad2, Database, Layers, HardDrive, Box, Wind, Shield, Truck, Wrench, CreditCard, Calendar, Monitor, Keyboard, Mouse, Flame, TrendingUp, Filter, X, RotateCcw, SlidersHorizontal, Check, Sparkles, Trophy, Tag, ThumbsUp, Award } from 'lucide-react';
 import BrandLogo from '../../components/BrandLogo';
@@ -2530,11 +2531,11 @@ export default function Home() {
               onAddCart={(p) => {
                 const inStock = (Number(p.stockQuantity) > 0 || Number(p.stock) > 0) && !p.isPreorder;
                 if (!inStock) {
-                  alert('Sản phẩm này hiện đang trong diện ĐẶT TRƯỚC, vui lòng liên hệ CSKH để được hỗ trợ!');
+                  notify('Sản phẩm này hiện đang trong diện ĐẶT TRƯỚC, vui lòng liên hệ CSKH để được hỗ trợ!', 'error');
                   return;
                 }
                 addToCart(p, 1);
-                alert(`✅ Đã thêm ${p.name} vào giỏ hàng!`);
+                notify(`✅ Đã thêm ${p.name} vào giỏ hàng!`, 'success');
               }} 
               onClose={() => setShowCompareModal(false)} 
               initialProduct={initialCompareProduct}

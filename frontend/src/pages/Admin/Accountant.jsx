@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useFinanceStore, useHRStore, useSalesStore } from '../../stores';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../services/api';
+import { notify, confirm } from '../../context/NotificationContext';
 import { 
   DollarSign, ArrowUpRight, ArrowDownLeft, FileText, CheckCircle, ShoppingBag, 
   Search, PlusCircle, Download, X, Eye, Printer, Calendar, CreditCard, Users, 
@@ -56,7 +57,6 @@ export default function Accountant() {
   const payrolls = useHRStore(state => state.payrolls) || [];
   const returnRequests = useSalesStore(state => state.returnRequests) || [];
   const updateReturnStatus = useSalesStore(state => state.updateReturnStatus);
-  const setReturnRequests = useSalesStore(state => state.setReturnRequests);
   const getReturnRequests = useSalesStore(state => state.getReturnRequests);
 
   const [allPOs, setAllPOs] = useState([]);
@@ -119,7 +119,9 @@ export default function Accountant() {
   const unpaidPOs = effectivePOs.filter(po => po && po.paymentStatus !== 'PAID');
   const unpaidPOAmount = unpaidPOs.reduce((sum, po) => sum + (Number(po.totalAmount || po.totalCost || 0) || 0), 0);
 
-  const totalPayrollFund = payrolls.reduce((sum, p) => sum + (Number(p.totalAmount || 0) || 0), 0) || (employees.reduce((s, e) => s + (Number(e.salary || e.baseSalary || 8500000) || 8500000), 0));
+  const totalPayrollFund = payrolls.length > 0
+    ? payrolls.reduce((sum, p) => sum + (Number(p.netSalary || 0) || 0), 0)
+    : employees.reduce((s, e) => s + (Number(e.salary || e.baseSalary || 8500000) || 8500000), 0);
 
   const stats = [
     { label: 'Tổng Doanh Thu Bán Hàng', value: fmt(totalRevenue), change: 'Bao gồm POS & Website Online', icon: <ArrowUpRight size={20} />, color: '#16a34a', bg: '#f0fdf4' },
@@ -179,12 +181,12 @@ export default function Accountant() {
 
   const handleAddManualEntry = () => {
     if (!manualForm.amount || !manualForm.description) {
-      alert('Vui lòng nhập số tiền và nội dung thu/chi!');
+      notify('Vui lòng nhập số tiền và nội dung thu/chi!', 'error');
       return;
     }
     const amt = parseInt(manualForm.amount, 10);
     if (isNaN(amt) || amt <= 0) {
-      alert('Số tiền không hợp lệ!');
+      notify('Số tiền không hợp lệ!', 'error');
       return;
     }
     if (typeof addLedgerEntry === 'function') {
@@ -198,15 +200,15 @@ export default function Accountant() {
     }
     setManualForm({ type: 'EXPENSE', amount: '', category: 'Vận hành văn phòng', description: '' });
     setShowManualModal(false);
-    alert('✅ Đã thêm bút toán vào Sổ Cái thành công!');
+    notify('✅ Đã thêm bút toán vào Sổ Cái thành công!', 'success');
   };
 
-  const handlePayPO = (poId, poAmount) => {
-    if (window.confirm(`Xác nhận thanh toán ${fmt(poAmount)} cho Đơn Mua Hàng #${poId}?`)) {
+  const handlePayPO = async (poId, poAmount) => {
+    if (await confirm(`Xác nhận thanh toán ${fmt(poAmount)} cho Đơn Mua Hàng #${poId}?`)) {
       if (typeof paySupplierPO === 'function') {
         paySupplierPO(poId);
       }
-      alert(`✅ Đã giải ngân thanh toán thành công cho PO #${poId}! Bút toán đã được ghi nhận tự động vào Sổ Cái.`);
+      notify(`✅ Đã giải ngân thanh toán thành công cho PO #${poId}! Bút toán đã được ghi nhận tự động vào Sổ Cái.`, 'success');
     }
   };
 
@@ -321,10 +323,6 @@ export default function Accountant() {
       }
       localStorage.setItem('erp_return_requests', JSON.stringify(updatedList));
 
-      if (typeof setReturnRequests === 'function') {
-        setReturnRequests(updatedList);
-      }
-
       // Thêm bút toán chi vào Sổ Cái Kế Toán
       if (typeof addLedgerEntry === 'function') {
         addLedgerEntry({
@@ -338,23 +336,23 @@ export default function Accountant() {
         });
       }
 
-      alert(`✅ ĐÃ HOÀN TIỀN VÀ GHI SỔ CÁI THÀNH CÔNG!\n\n• Số tiền: ${fmt(finalAmount)}\n• Người nhận: ${refundModalItem.customerName}\n• Mã GD: ${txnCode}\n• Bút toán chi phí đã được ghi nhận tự động vào Sổ Cái Kế Toán.`);
+      notify(`✅ ĐÃ HOÀN TIỀN VÀ GHI SỔ CÁI THÀNH CÔNG!\n\n• Số tiền: ${fmt(finalAmount)}\n• Người nhận: ${refundModalItem.customerName}\n• Mã GD: ${txnCode}\n• Bút toán chi phí đã được ghi nhận tự động vào Sổ Cái Kế Toán.`, 'success');
       setRefundModalItem(null);
       setRefundTxnCode('');
       setRefundNote('');
       setRefundProofPhoto('');
     } catch (err) {
       console.error('Lỗi khi xác nhận hoàn tiền:', err);
-      alert('Có lỗi xảy ra: ' + (err.message || 'Vui lòng thử lại!'));
+      notify('Có lỗi xảy ra: ' + (err.message || 'Vui lòng thử lại!'), 'error');
     }
   };
 
-  const handleDisburseAll = () => {
-    if (window.confirm(`Xác nhận GIẢI NGÂN LƯƠNG TOÀN DOANH NGHIỆP (${fmt(totalPayrollFund)})? Tiền sẽ được trừ vào quỹ và ghi sổ cái.`)) {
+  const handleDisburseAll = async () => {
+    if (await confirm(`Xác nhận GIẢI NGÂN LƯƠNG TOÀN DOANH NGHIỆP (${fmt(totalPayrollFund)})? Tiền sẽ được trừ vào quỹ và ghi sổ cái.`, { danger: true })) {
       if (typeof disburseAllPayrolls === 'function') {
         disburseAllPayrolls();
       }
-      alert('✅ Đã giải ngân toàn bộ bảng lương tháng thành công!');
+      notify('✅ Đã giải ngân toàn bộ bảng lương tháng thành công!', 'success');
     }
   };
 
@@ -1089,7 +1087,7 @@ export default function Accountant() {
                         <button
                           onClick={() => {
                             if (typeof disbursePayroll === 'function') disbursePayroll(emp.id);
-                            alert(`✅ Đã chuyển khoản lương ${fmt(net)} cho ${emp.fullname}!`);
+                            notify(`✅ Đã chuyển khoản lương ${fmt(net)} cho ${emp.fullname}!`, 'success');
                           }}
                           style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '4px', padding: '0.3rem 0.65rem', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}
                         >

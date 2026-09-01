@@ -98,6 +98,7 @@ export default function News() {
 
   const featured = ARTICLES.find(a => a.featured);
   const rest = filtered.filter(a => !a.featured);
+  const heroVisible = Boolean(featured && (activeCategory === 'all' || activeCategory === featured.category) && !search);
 
   return (
     <div style={{ paddingBottom: '4rem' }}>
@@ -165,7 +166,7 @@ export default function News() {
         </div>
 
         {/* Featured Article */}
-        {featured && (activeCategory === 'all' || activeCategory === featured.category) && !search && (
+        {heroVisible && (
           <Link to={`/news/${featured.id}`} style={{ display: 'block', textDecoration: 'none', marginBottom: '2.5rem' }}>
             <div style={{
               borderRadius: 'var(--radius-2xl)', overflow: 'hidden',
@@ -214,7 +215,7 @@ export default function News() {
           </div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1.5rem' }}>
-            {(activeCategory === 'all' && !search ? rest : filtered).map((article) => (
+            {(heroVisible ? rest : filtered).map((article) => (
               <Link to={`/news/${article.id}`} key={article.id} className="news-card" style={{ textDecoration: 'none' }}>
                 <img src={article.image} alt={article.title} className="news-card-img" />
                 <div className="news-card-body">

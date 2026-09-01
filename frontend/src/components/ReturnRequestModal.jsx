@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, RefreshCw, DollarSign, Camera, AlertTriangle, Building, CreditCard, User, Upload } from 'lucide-react';
 import { useSalesStore } from '../stores';
+import { notify } from '../context/NotificationContext';
 
 export default function ReturnRequestModal({ show, onClose, order }) {
   const addReturnRequest = useSalesStore(state => state.addReturnRequest);
@@ -75,7 +76,7 @@ export default function ReturnRequestModal({ show, onClose, order }) {
 
     try {
       await addReturnRequest(reqData);
-      alert('Đã gửi Yêu cầu Hoàn trả / Hoàn tiền thành công! Shipper và CSKH sẽ liên hệ thu hồi hàng.');
+      notify('Đã gửi Yêu cầu Hoàn trả / Hoàn tiền thành công! Shipper và CSKH sẽ liên hệ thu hồi hàng.', 'success');
       setIsSubmitting(false);
       onClose(true);
     } catch (err) {

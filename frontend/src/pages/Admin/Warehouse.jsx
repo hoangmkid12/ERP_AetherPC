@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useInventoryStore, useSalesStore, useFinanceStore, useUtilityStore, useHRStore } from '../../stores';
 import { useAuth } from '../../context/AuthContext';
 import { usePermission } from '../../hooks/usePermission';
-import { useNotification } from '../../context/NotificationContext';
+import { useNotification, notify, promptText } from '../../context/NotificationContext';
 import { DELIVERY_REGIONS, detectDeliveryRegion } from '../../utils/deliveryRegions';
 import { api } from '../../services/api';
 import { Package, CheckCircle, X, AlertCircle, Truck, RotateCcw, Sparkles, RefreshCw, Box } from 'lucide-react';
@@ -893,7 +893,7 @@ function RfqAlertModal({ rfqModalData, setRfqModalData, sendSystemNotification, 
   const handleConfirm = () => {
     const finalQty = Number(qty);
     if (!finalQty || finalQty <= 0) {
-      alert('Vui lòng nhập số lượng đề xuất hợp lệ (lớn hơn 0).');
+      notify('Vui lòng nhập số lượng đề xuất hợp lệ (lớn hơn 0).', 'error');
       return;
     }
 
@@ -932,13 +932,14 @@ function RfqAlertModal({ rfqModalData, setRfqModalData, sendSystemNotification, 
 
     setRfqModalData(null);
 
-    alert(
+    notify(
       `GỬI CẢNH BÁO RFQ THÀNH CÔNG!\n\n` +
       `• Linh kiện: ${item.name}\n` +
       `• Số lượng đề xuất mua: ${finalQty} sản phẩm\n` +
       `• Ghi chú / Lý do: ${reason}\n` +
       `• Đơn vị tiếp nhận: Bộ phận Mua Hàng & Ban Giám Đốc\n\n` +
-      `Cảnh báo Yêu cầu Báo giá đã được ghi nhận trực tiếp vào Lịch sử và Quả chuông Thông báo Hệ thống!`
+      `Cảnh báo Yêu cầu Báo giá đã được ghi nhận trực tiếp vào Lịch sử và Quả chuông Thông báo Hệ thống!`,
+      'success'
     );
   };
 
@@ -1705,7 +1706,7 @@ export default function Warehouse() {
     const effectiveStatus = qaLog?.status || currentPoStatus || receipt.po?.status;
 
     if (!['QA_PASSED', 'QA_PARTIAL'].includes(effectiveStatus) && receipt.status !== 'READY') {
-      alert(`Lô hàng #${poNum} chưa hoàn tất nghiệm thu QA/QC! Vui lòng chờ bộ phận QA kiểm định chất lượng.`);
+      notify(`Lô hàng #${poNum} chưa hoàn tất nghiệm thu QA/QC! Vui lòng chờ bộ phận QA kiểm định chất lượng.`, 'error');
       return;
     }
 
@@ -1778,7 +1779,7 @@ export default function Warehouse() {
 
       setSelectedReceipt(null);
     } catch (err) {
-      alert('Không thể xác nhận nhập kho!');
+      notify('Không thể xác nhận nhập kho!', 'error');
     } finally {
       setSubmitting(false);
     }
@@ -1927,7 +1928,7 @@ export default function Warehouse() {
       });
     }
 
-    alert(`Đã xác nhận đơn hàng #${order.orderId || order.id} đủ điều kiện xuất kho! Đơn đã được chuyển sang danh sách Đóng gói & Giao hàng.`);
+    notify(`Đã xác nhận đơn hàng #${order.orderId || order.id} đủ điều kiện xuất kho! Đơn đã được chuyển sang danh sách Đóng gói & Giao hàng.`, 'success');
   };
 
   // Shipper assignment
@@ -1955,11 +1956,6 @@ export default function Warehouse() {
     });
 
     setOrderToAssign(null);
-  };
-
-  // Pack & scan complete - called when user confirms packing
-  const handlePackAndScanComplete = (order) => {
-    setOrderToAssign(order);
   };
 
   // Called from PackAndScanModal when user clicks Xác Nhận Đóng Gói
@@ -2001,7 +1997,7 @@ export default function Warehouse() {
   const handleAddProductSubmit = (e) => {
     e.preventDefault();
     if (!newProdForm.name.trim() || !newProdForm.stock) {
-      alert('Vui lòng nhập tên sản phẩm và số lượng tồn kho!');
+      notify('Vui lòng nhập tên sản phẩm và số lượng tồn kho!', 'error');
       return;
     }
 
@@ -2026,7 +2022,7 @@ export default function Warehouse() {
 
     setShowAddProduct(false);
     setNewProdForm({ name: '', category: 'CPU', stock: '', price: '', supplier: 'Intel Vietnam', threshold: '5', location: 'ZONE-A/SHELF-01/BIN-01' });
-    alert(`Đã thêm sản phẩm ${newProd.name} vào sổ kho thành công!`);
+    notify(`Đã thêm sản phẩm ${newProd.name} vào sổ kho thành công!`, 'success');
   };
 
   // Edit Product Submit
@@ -2053,7 +2049,7 @@ export default function Warehouse() {
 
     const savedId = editingProd.id;
     setEditingProd(null);
-    alert(`Đã cập nhật thành công thông tin sản phẩm #${savedId}!`);
+    notify(`Đã cập nhật thành công thông tin sản phẩm #${savedId}!`, 'success');
   };
 
   // Direct Intake Submit
@@ -2061,7 +2057,7 @@ export default function Warehouse() {
     e.preventDefault();
     const qtyNum = parseInt(directQty, 10);
     if (!directProduct || isNaN(qtyNum) || qtyNum <= 0) {
-      alert('Vui lòng chọn sản phẩm và nhập số lượng nhập kho hợp lệ (lớn hơn 0)!');
+      notify('Vui lòng chọn sản phẩm và nhập số lượng nhập kho hợp lệ (lớn hơn 0)!', 'error');
       return;
     }
 
@@ -2099,7 +2095,7 @@ export default function Warehouse() {
     setDirectQty('');
     setDirectNote('');
     setDirectRef('');
-    alert(`Đã hoàn tất nhập kho trực tiếp ${qtyNum} SP ${prodName} (Mã chiếu: ${refCode})!`);
+    notify(`Đã hoàn tất nhập kho trực tiếp ${qtyNum} SP ${prodName} (Mã chiếu: ${refCode})!`, 'success');
   };
 
   // Filter calculations — in warehouse context we show all products except truly discontinued
@@ -2553,7 +2549,7 @@ export default function Warehouse() {
               onClick={() => {
                 const totalAwaiting = backorderOrders.length;
                 if (totalAwaiting === 0) {
-                  alert('Hiện tại không có đơn hàng nào đang chờ nhập hàng.');
+                  notify('Hiện tại không có đơn hàng nào đang chờ nhập hàng.', 'info');
                   return;
                 }
                 let resolvedCount = 0;
@@ -2567,9 +2563,9 @@ export default function Warehouse() {
                 });
 
                 if (resolvedCount > 0) {
-                  alert(`Đã tìm thấy ${resolvedCount} đơn hàng đã có đủ tồn kho trong hệ thống. Bạn có thể nhấn nút "Xác Nhận Xuất Kho" để tiến hành xuất hàng.`);
+                  notify(`Đã tìm thấy ${resolvedCount} đơn hàng đã có đủ tồn kho trong hệ thống. Bạn có thể nhấn nút "Xác Nhận Xuất Kho" để tiến hành xuất hàng.`, 'success');
                 } else {
-                  alert(`Đang có ${totalAwaiting} đơn chờ hàng. Các sản phẩm này hiện vẫn chưa đủ tồn kho. Vui lòng bấm "Đề Xuất Mua Hàng" để gửi yêu cầu cho phòng Mua Hàng.`);
+                  notify(`Đang có ${totalAwaiting} đơn chờ hàng. Các sản phẩm này hiện vẫn chưa đủ tồn kho. Vui lòng bấm "Đề Xuất Mua Hàng" để gửi yêu cầu cho phòng Mua Hàng.`, 'info');
                 }
               }}
               style={{
@@ -4465,10 +4461,10 @@ export default function Warehouse() {
             </div>
             <button
               type="button"
-              onClick={() => {
-                const name = prompt('Nhập tên danh mục linh kiện mới (ví dụ: NETWORKING, PERIPHERALS...):');
+              onClick={async () => {
+                const name = await promptText('Nhập tên danh mục linh kiện mới (ví dụ: NETWORKING, PERIPHERALS...):');
                 if (name && name.trim()) {
-                  alert(`Đã thêm danh mục quy chuẩn ${name.trim().toUpperCase()} vào hệ thống!`);
+                  notify(`Đã thêm danh mục quy chuẩn ${name.trim().toUpperCase()} vào hệ thống!`, 'success');
                 }
               }}
               style={{
@@ -4612,16 +4608,6 @@ export default function Warehouse() {
           setOrders={setOrders}
         />
       )}
-
-      {/* Pack & Scan Modal */}
-      {packScanOrder && (
-        <PackAndScanModal
-          order={packScanOrder}
-          onClose={() => setPackScanOrder(null)}
-          onComplete={handlePackAndScanComplete}
-        />
-      )}
-
 
 
       {/* RFQ History Modal */}
@@ -5259,13 +5245,11 @@ export default function Warehouse() {
                       const formattedRefundVal = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(refundVal);
 
                       if (isExchange) {
-                        alert(`✅ ĐÃ NHẬP KHO THÀNH CÔNG KIỆN HÀNG CŨ!\n\n• Vị trí lưu trữ: ${newLog.toLocation}\n• Hệ thống đã tự động kích hoạt ĐƠN HÀNG ĐỔI MỚI (0đ bù trừ 100%) và chuyển sang danh sách "Hoạt Động / Lệnh Giao Hàng" để Kho đóng gói & bàn giao Shipper.`);
+                        notify(`✅ ĐÃ NHẬP KHO THÀNH CÔNG KIỆN HÀNG CŨ!\n\n• Vị trí lưu trữ: ${newLog.toLocation}\n• Hệ thống đã tự động kích hoạt ĐƠN HÀNG ĐỔI MỚI (0đ bù trừ 100%) và chuyển sang danh sách "Hoạt Động / Lệnh Giao Hàng" để Kho đóng gói & bàn giao Shipper.`, 'success');
                       } else if (item.type === 'REFUND' || refundVal > 0) {
-                        alert(`✅ Đã nhập kho thành công kiện hàng vào ${newLog.toLocation}!\n\nHệ thống đã tự động lập Phiếu Đề Nghị Chi Hoàn Tiền (${formattedRefundVal}) và chuyển sang Phòng Kế toán giải ngân qua Napas247.`);
+                        notify(`✅ Đã nhập kho thành công kiện hàng vào ${newLog.toLocation}!\n\nHệ thống đã tự động lập Phiếu Đề Nghị Chi Hoàn Tiền (${formattedRefundVal}) và chuyển sang Phòng Kế toán giải ngân qua Napas247.`, 'success');
                       } else {
-                        if (typeof addNotification === 'function') {
-                          addNotification(`Đã phân luồng kiện hàng vào ${newLog.toLocation} và cập nhật trạng thái thành công!`, 'success');
-                        }
+                        notify(`Đã phân luồng kiện hàng vào ${newLog.toLocation} và cập nhật trạng thái thành công!`, 'success');
                       }
 
                       setSelectedReturnProcessing(null);

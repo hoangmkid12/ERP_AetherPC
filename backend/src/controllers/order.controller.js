@@ -1,6 +1,45 @@
 const prisma = require('../config/database');
 const { sendOrderConfirmationEmail, sendOrderStatusUpdateEmail } = require('../services/emailService');
 
+const LOYALTY_VND_PER_POINT = 10000; // 10.000 VNĐ = 1 điểm
+
+const tierForPoints = (points) => {
+  if (points >= 10000) return 'PLATINUM';
+  if (points >= 5000) return 'GOLD';
+  if (points >= 1000) return 'SILVER';
+  return 'BRONZE';
+};
+
+/**
+ * Cộng ('add') hoặc trừ ('subtract') điểm thành viên tương ứng với giá trị
+ * đơn hàng, và tự động điều chỉnh hạng thành viên theo tổng điểm mới. Dùng
+ * chung cho mọi nơi đơn hàng thực sự được xác nhận (CONFIRMED) hoặc bị huỷ
+ * sau khi đã xác nhận, để điểm/tier luôn khớp với trạng thái đơn hàng thật.
+ */
+const adjustLoyaltyForOrder = async (tx, customerId, totalAmount, direction) => {
+  if (!customerId || customerId === 'WALK-IN') return;
+  const points = Math.floor(parseFloat(totalAmount || 0) / LOYALTY_VND_PER_POINT);
+  if (points === 0) return;
+  const delta = direction === 'add' ? points : -points;
+
+  let updatedCustomer = await tx.customer.update({
+    where: { customerId },
+    data: { loyaltyPoints: { increment: delta } }
+  });
+
+  if (updatedCustomer.loyaltyPoints < 0) {
+    updatedCustomer = await tx.customer.update({
+      where: { customerId },
+      data: { loyaltyPoints: 0 }
+    });
+  }
+
+  const nextTier = tierForPoints(updatedCustomer.loyaltyPoints);
+  if (nextTier !== updatedCustomer.tier) {
+    await tx.customer.update({ where: { customerId }, data: { tier: nextTier } });
+  }
+};
+
 /**
  * 1. KHÁCH HÀNG TẠO ĐƠN HÀNG MỚI (Storefront Checkout - M_KHDH)
  */
@@ -175,31 +214,14 @@ const createOrder = async (req, res, next) => {
         }
       }
 
-      // Tích lũy điểm thành viên (10.000 VNĐ = 1 điểm)
+      // Tích lũy điểm thành viên (10.000 VNĐ = 1 điểm) — chỉ khi đơn được
+      // xác nhận ngay lúc tạo; đơn PENDING/AWAITING_STOCK sẽ được cộng điểm
+      // sau, khi thực sự chuyển sang CONFIRMED (xem updateOrderStatus).
       const pointsEarned = initialStatus === 'CONFIRMED'
-        ? Math.floor(parseFloat(totalAmount) / 10000)
+        ? Math.floor(parseFloat(totalAmount) / LOYALTY_VND_PER_POINT)
         : 0;
-      const updatedCustomer = await tx.customer.update({
-        where: { customerId },
-        data: {
-          loyaltyPoints: {
-            increment: pointsEarned
-          }
-        }
-      });
-
-      // Tự động nâng hạng thành viên nếu đủ điểm
-      let nextTier = 'BRONZE';
-      const totalPoints = updatedCustomer.loyaltyPoints;
-      if (totalPoints >= 10000) nextTier = 'PLATINUM';
-      else if (totalPoints >= 5000) nextTier = 'GOLD';
-      else if (totalPoints >= 1000) nextTier = 'SILVER';
-
-      if (nextTier !== updatedCustomer.tier) {
-        await tx.customer.update({
-          where: { customerId },
-          data: { tier: nextTier }
-        });
+      if (initialStatus === 'CONFIRMED') {
+        await adjustLoyaltyForOrder(tx, customerId, totalAmount, 'add');
       }
 
       // Ghi nhật ký lịch sử trạng thái đơn hàng (OrderStatusHistory) bằng Tiếng Việt
@@ -285,8 +307,20 @@ const getCustomerOrders = async (req, res, next) => {
       };
     }
 
+    // Pagination is opt-in: pass ?page=&limit= to get a page back. Omit both
+    // and the endpoint keeps returning the full list, unchanged, since most
+    // admin pages currently expect the entire dataset for client-side
+    // filtering — forcing a default page size here would silently truncate
+    // their data.
+    const pageNum = req.query.page ? Math.max(1, parseInt(req.query.page, 10) || 1) : null;
+    const limitNum = req.query.limit ? Math.max(1, Math.min(200, parseInt(req.query.limit, 10) || 50)) : null;
+    const isPaginated = Boolean(pageNum && limitNum);
+
+    const totalCount = isPaginated ? await prisma.order.count({ where: whereClause }) : null;
+
     const orders = await prisma.order.findMany({
       where: whereClause,
+      ...(isPaginated ? { skip: (pageNum - 1) * limitNum, take: limitNum } : {}),
       include: {
         customer: {
           select: {
@@ -330,7 +364,8 @@ const getCustomerOrders = async (req, res, next) => {
 
     res.json({
       success: true,
-      data: formattedOrders
+      data: formattedOrders,
+      ...(isPaginated ? { pagination: { page: pageNum, limit: limitNum, total: totalCount, totalPages: Math.ceil(totalCount / limitNum) } } : {})
     });
   } catch (err) {
     next(err);
@@ -375,7 +410,7 @@ const updateOrderStatus = async (req, res, next) => {
     const order = await prisma.$transaction(async (tx) => {
       const existingOrder = await tx.order.findUnique({
         where: { orderId: id },
-        include: { items: true }
+        include: { items: true, customer: true }
       });
 
       if (!existingOrder) {
@@ -395,6 +430,11 @@ const updateOrderStatus = async (req, res, next) => {
         });
 
         if (!existingMovement) {
+          // Đơn chuyển từ trạng thái chờ sang đã duyệt lần đầu tiên — đây là
+          // lúc đơn thực sự được "xác nhận", nên tích điểm thành viên ở đây
+          // (đơn tạo sẵn ở CONFIRMED đã được tích lúc tạo, xem createOrder).
+          await adjustLoyaltyForOrder(tx, existingOrder.customerId, existingOrder.totalAmount, 'add');
+
           for (const item of existingOrder.items) {
             // Trừ số lượng tồn sản phẩm
             const productUpdate = await tx.product.updateMany({
@@ -460,6 +500,13 @@ const updateOrderStatus = async (req, res, next) => {
         });
 
         if (existingOutMovement && !existingInMovement) {
+          // Đơn từng được duyệt (đã trừ kho -> đã tích điểm) và giờ bị huỷ
+          // hẳn -> trừ lại điểm đã tích. Giao thất bại (FAILED_DELIVERY)
+          // không phải huỷ đơn (có thể giao lại), nên không trừ điểm ở đây.
+          if (status === 'CANCELLED') {
+            await adjustLoyaltyForOrder(tx, existingOrder.customerId, existingOrder.totalAmount, 'subtract');
+          }
+
           for (const item of existingOrder.items) {
             // Cộng trả số lượng tồn sản phẩm
             await tx.product.update({
@@ -508,7 +555,7 @@ const updateOrderStatus = async (req, res, next) => {
       // Cập nhật trạng thái đơn hàng & thông tin POD giao vận
       const actualPayMethod = req.body.actualPaymentMethod || (existingOrder.paymentMethod === 'COD' ? 'CASH' : 'PREPAID');
       const receivedType = req.body.receivedByType || 'DIRECT_CUSTOMER';
-      const receiverName = req.body.receiverNameActual || (receivedType === 'DIRECT_CUSTOMER' ? (existingOrder.customerName || 'Khách hàng') : 'Người nhận thay');
+      const receiverName = req.body.receiverNameActual || (receivedType === 'DIRECT_CUSTOMER' ? (existingOrder.customer?.name || 'Khách hàng') : 'Người nhận thay');
 
       const updatedOrder = await tx.order.update({
         where: { orderId: id },
@@ -629,7 +676,8 @@ const createReturnRequest = async (req, res, next) => {
       where: {
         orderId: id,
         ...(req.user?.role === 'CUSTOMER' ? { customerId } : {})
-      }
+      },
+      include: { customer: true }
     });
 
     if (!order) {
@@ -645,8 +693,8 @@ const createReturnRequest = async (req, res, next) => {
       data: {
         orderId: order.orderId,
         customerId: order.customerId,
-        customerName: customerName || order.customerName,
-        phone: phone || order.phone,
+        customerName: customerName || order.customer?.name,
+        phone: phone || order.customer?.phone,
         address: address || order.shippingAddress,
         type: actualType,
         reason: reason || 'Khách hàng yêu cầu hoàn trả',
@@ -866,7 +914,7 @@ const confirmReturnWarehouse = async (req, res, next) => {
 
     const order = await prisma.$transaction(async (tx) => {
       const existingOrder = await tx.order.findFirst({
-        where: { OR: [{ orderId: id }, { id: !isNaN(Number(id)) ? Number(id) : undefined }] },
+        where: { orderId: id },
         include: { items: true, customer: true }
       });
 
@@ -1022,12 +1070,7 @@ const processRefund = async (req, res, next) => {
     const changedBy = req.user?.fullname || req.user?.name || 'Kế toán viên';
 
     let order = await prisma.order.findFirst({
-      where: {
-        OR: [
-          { orderId: id },
-          { id: !isNaN(Number(id)) ? Number(id) : undefined }
-        ].filter(Boolean)
-      },
+      where: { orderId: id },
       include: { customer: true }
     });
 
@@ -1035,10 +1078,10 @@ const processRefund = async (req, res, next) => {
       const retReq = await prisma.returnRequest.findFirst({
         where: {
           OR: [
-            { id: !isNaN(Number(id)) ? Number(id) : undefined },
+            { id },
             { rmaNumber: id },
             { rmaNumber: `RET-${id}` }
-          ].filter(Boolean)
+          ]
         },
         include: { order: { include: { customer: true } } }
       });
@@ -1063,6 +1106,10 @@ const processRefund = async (req, res, next) => {
 
     if (!order) {
       return res.status(404).json({ success: false, message: 'Không tìm thấy đơn hàng tương ứng với mã yêu cầu hoàn tiền' });
+    }
+
+    if (order.paymentStatus === 'REFUNDED') {
+      return res.status(400).json({ success: false, message: 'Đơn hàng này đã được hoàn tiền trước đó' });
     }
 
     const finalAmount = parseFloat(refundAmount || order.totalAmount || 0);
@@ -1094,7 +1141,7 @@ const processRefund = async (req, res, next) => {
         data: {
           type: 'REFUND',
           amount: finalAmount,
-          description: `Chi hoàn tiền đơn hàng #${order.orderId} - Khách: ${order.customerName} (${refundTxnCode ? `Mã GD: ${refundTxnCode}` : 'Chuyển khoản'})`,
+          description: `Chi hoàn tiền đơn hàng #${order.orderId} - Khách: ${order.customer?.name || 'Khách hàng'} (${refundTxnCode ? `Mã GD: ${refundTxnCode}` : 'Chuyển khoản'})`,
           referenceId: order.orderId,
           date: new Date()
         }
@@ -1246,5 +1293,6 @@ module.exports = {
   confirmReturnWarehouse,
   processRefund,
   getReturnRequests,
-  updateOrderDetails
+  updateOrderDetails,
+  adjustLoyaltyForOrder
 };

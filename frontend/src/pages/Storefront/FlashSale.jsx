@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useInventoryStore } from "../../stores";
 import { useCart } from "../../context/CartContext";
+import { notify } from "../../context/NotificationContext";
 import {
   Zap, ChevronRight, Star, TrendingUp, Package,
   Percent, Timer, X, Search, SlidersHorizontal,
@@ -67,6 +68,11 @@ function FlashProductCard({ p, onAddCart }) {
   const handleAdd = (e) => {
     e.preventDefault(); e.stopPropagation();
     if (isSoldOut) return;
+    const inStock = (Number(p.stockQuantity) > 0 || Number(p.stock) > 0) && !p.isPreorder;
+    if (!inStock) {
+      notify('Sản phẩm này hiện đang trong diện ĐẶT TRƯỚC, vui lòng liên hệ CSKH để được hỗ trợ!', 'error');
+      return;
+    }
     onAddCart(p, 1);
     setAdded(true);
     setTimeout(() => setAdded(false), 1800);

@@ -103,12 +103,25 @@ const validateReceipt = async (req, res, next) => {
     const receivedBy = req.user ? req.user.email || req.user.code || 'Warehouse Staff' : 'Warehouse Staff';
 
     const updatedReceipt = await prisma.$transaction(async (tx) => {
+      // Atomically claim this receipt first: the conditional updateMany
+      // takes a row lock, so a concurrent duplicate request (double-click,
+      // or the sibling /purchasing/receipts/:id/validate route hitting the
+      // same receipt) can never both pass this gate and double-count stock.
+      const claim = await tx.goodsReceipt.updateMany({
+        where: { id: parseInt(id), status: { not: 'DONE' } },
+        data: { status: 'DONE', receivedBy, receivedDate: new Date() }
+      });
+      if (claim.count !== 1) {
+        const error = new Error('Phiếu nhập kho không tồn tại hoặc đã được xác nhận trước đó.');
+        error.statusCode = 409;
+        throw error;
+      }
+
       const receipt = await tx.goodsReceipt.findUnique({
         where: { id: parseInt(id) },
         include: { po: { include: { items: true, supplier: true } } }
       });
       if (!receipt) throw new Error(`Receipt not found: ${id}`);
-      if (receipt.status === 'DONE') throw new Error('Receipt is already validated.');
 
       const po = receipt.po;
       if (!['QA_PASSED', 'QA_PARTIAL'].includes(po.status)) {
@@ -150,7 +163,8 @@ const validateReceipt = async (req, res, next) => {
             data: {
               productId: item.productId,
               warehouseId: receipt.receivedWarehouseId,
-              locationId: 1,
+              // locationId is optional — leave unassigned rather than
+              // hardcoding a WarehouseLocation id that may not exist.
               quantityOnHand: intakeQty,
               quantityReserved: 0,
               reorderPoint: 5
@@ -178,25 +192,6 @@ const validateReceipt = async (req, res, next) => {
         });
       }
 
-      // Update receipt status to DONE
-      const updated = await tx.goodsReceipt.update({
-        where: { id: receipt.id },
-        data: {
-          status: 'DONE',
-          receivedBy,
-          receivedDate: new Date()
-        },
-        include: {
-          po: {
-            include: {
-              supplier: true,
-              items: { include: { product: true } }
-            }
-          },
-          warehouse: true
-        }
-      });
-
       await tx.purchaseOrder.update({
         where: { id: po.id },
         data: { status: 'RECEIVED' }
@@ -216,7 +211,18 @@ const validateReceipt = async (req, res, next) => {
         });
       }
 
-      return updated;
+      return tx.goodsReceipt.findUnique({
+        where: { id: receipt.id },
+        include: {
+          po: {
+            include: {
+              supplier: true,
+              items: { include: { product: true } }
+            }
+          },
+          warehouse: true
+        }
+      });
     });
 
     res.json({

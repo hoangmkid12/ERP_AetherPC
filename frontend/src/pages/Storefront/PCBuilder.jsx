@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useCart } from '../../context/CartContext';
+import { notify } from '../../context/NotificationContext';
 import { api } from '../../services/api';
 import {
   Cpu, Trash2, ShieldCheck, ShieldAlert, ShoppingCart, HelpCircle, Sparkles,
@@ -442,13 +443,14 @@ export default function PCBuilder() {
       .join('\n');
     
     if (!list) {
-      alert('Vui lòng chọn ít nhất một linh kiện trước khi sao chép!');
+      notify('Vui lòng chọn ít nhất một linh kiện trước khi sao chép!', 'error');
       return;
     }
 
     const text = `CẤU HÌNH PC - AETHERPC\n---------------------\n${list}\n---------------------\nTỔNG CỘNG: ${formatPrice(calculateTotalPrice())}\nLink build: ${window.location.href}`;
-    navigator.clipboard.writeText(text);
-    alert('Đã sao chép cấu hình máy tính vào clipboard thành công!');
+    navigator.clipboard.writeText(text)
+      .then(() => notify('Đã sao chép cấu hình máy tính vào clipboard thành công!', 'success'))
+      .catch(() => notify('Không thể sao chép vào clipboard — trình duyệt đã chặn quyền truy cập.', 'error'));
   };
 
   const handlePrintBuild = () => {
@@ -461,29 +463,35 @@ export default function PCBuilder() {
         addToCart(item, 1, { pc_build_bundle: 'custom_pc' });
       }
     });
-    alert('Đã thêm toàn bộ linh kiện của cấu hình vào giỏ hàng thành công!');
+    notify('Đã thêm toàn bộ linh kiện của cấu hình vào giỏ hàng thành công!', 'success');
   };
 
   // Dynamic AI PC Build selector based on client needs & Knowledge Base Engine
   const generateAIBuild = (usage, budgetLimit, brandPref, customPrompt = '') => {
     setIsAnalyzingAI(true);
     setTimeout(() => {
-      const activeProducts = products.length > 0 ? products : FALLBACK_PRODUCTS;
-      const result = runAIOptimizer({
-        promptText: customPrompt || customPromptText,
-        budgetInput: budgetLimit || aiBudget,
-        workloadInput: usage || aiUsage,
-        brandInput: brandPref || aiBrand,
-        gpuBrandInput: aiGpuBrand,
-        mfgBrandInput: aiMfgBrand,
-        availableProducts: activeProducts
-      });
+      try {
+        const activeProducts = products.length > 0 ? products : FALLBACK_PRODUCTS;
+        const result = runAIOptimizer({
+          promptText: customPrompt || customPromptText,
+          budgetInput: budgetLimit || aiBudget,
+          workloadInput: usage || aiUsage,
+          brandInput: brandPref || aiBrand,
+          gpuBrandInput: aiGpuBrand,
+          mfgBrandInput: aiMfgBrand,
+          availableProducts: activeProducts
+        });
 
-      if (result && result.build) {
-        setSelectedParts(result.build);
-        setAiReport(result);
+        if (result && result.build) {
+          setSelectedParts(result.build);
+          setAiReport(result);
+        }
+      } catch (err) {
+        console.error('AI build error:', err);
+        notify('Không thể phân tích cấu hình lúc này, vui lòng thử lại.', 'error');
+      } finally {
+        setIsAnalyzingAI(false);
       }
-      setIsAnalyzingAI(false);
     }, 350);
   };
 

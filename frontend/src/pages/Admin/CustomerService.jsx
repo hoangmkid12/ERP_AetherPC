@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useSalesStore } from '../../stores';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../services/api';
+import { notify, confirm, promptText } from '../../context/NotificationContext';
 import {
   HeadphonesIcon, AlertCircle, MessageSquare, RefreshCw, CheckCircle,
   Clock, X, Plus, User, Phone, Mail, Filter, Search, 
@@ -714,8 +715,8 @@ export default function CustomerService() {
                       {ret.status === 'PENDING' ? (
                         <div style={{ display: 'flex', justifyContent: 'center', gap: '0.35rem' }}>
                           <button
-                            onClick={() => {
-                              if (window.confirm(`Xác nhận ĐỒNG Ý THU HỒI đơn RMA #${ret.id} và giao Shipper đến lấy?`)) {
+                            onClick={async () => {
+                              if (await confirm(`Xác nhận ĐỒNG Ý THU HỒI đơn RMA #${ret.id} và giao Shipper đến lấy?`)) {
                                 updateReturnStatus(ret.id, 'RETURN_APPROVED', 'CSKH đã duyệt yêu cầu thu hồi hàng');
                               }
                             }}
@@ -724,8 +725,8 @@ export default function CustomerService() {
                             ✓ Duyệt Thu Hồi
                           </button>
                           <button
-                            onClick={() => {
-                              const reason = prompt('Nhập lý do từ chối yêu cầu đổi trả:');
+                            onClick={async () => {
+                              const reason = await promptText('Nhập lý do từ chối yêu cầu đổi trả:');
                               if (reason) updateReturnStatus(ret.id, 'REJECTED', reason);
                             }}
                             style={{ backgroundColor: '#ef4444', color: '#ffffff', border: 'none', borderRadius: '4px', padding: '0.3rem 0.65rem', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}
@@ -886,14 +887,14 @@ export default function CustomerService() {
                   type="button"
                   onClick={() => {
                     if (!newTicketForm.customerName || !newTicketForm.phone || !newTicketForm.title) {
-                      alert('Vui lòng điền họ tên khách, SĐT và tiêu đề!');
+                      notify('Vui lòng điền họ tên khách, SĐT và tiêu đề!', 'error');
                       return;
                     }
                     if (typeof addComplaint === 'function') {
                       addComplaint({ ...newTicketForm, status: 'OPEN', date: new Date().toISOString() });
                     }
                     setShowAddTicket(false);
-                    alert('✅ Đã tạo Ticket khiếu nại thành công!');
+                    notify('✅ Đã tạo Ticket khiếu nại thành công!', 'success');
                   }}
                   style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.45rem 1.1rem', fontSize: '0.8rem', fontWeight: 800, cursor: 'pointer' }}
                 >
@@ -936,9 +937,9 @@ export default function CustomerService() {
                 <button
                   type="button"
                   onClick={() => {
-                    updateComplaintStatus(selectedTicket.id, 'IN_PROGRESS', resolution);
+                    updateComplaintStatus(selectedTicket.id, 'IN_PROGRESS', null, resolution);
                     setSelectedTicket(null);
-                    alert('Đã chuyển trạng thái sang ĐANG XỬ LÝ');
+                    notify('Đã chuyển trạng thái sang ĐANG XỬ LÝ', 'info');
                   }}
                   style={{ backgroundColor: '#f59e0b', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.45rem 0.85rem', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer' }}
                 >
@@ -947,9 +948,9 @@ export default function CustomerService() {
                 <button
                   type="button"
                   onClick={() => {
-                    updateComplaintStatus(selectedTicket.id, 'RESOLVED', resolution || 'Đã giải quyết thỏa đáng');
+                    updateComplaintStatus(selectedTicket.id, 'RESOLVED', null, resolution || 'Đã giải quyết thỏa đáng');
                     setSelectedTicket(null);
-                    alert('✅ Đã đóng Ticket thành công!');
+                    notify('✅ Đã đóng Ticket thành công!', 'success');
                   }}
                   style={{ backgroundColor: '#16a34a', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.45rem 1.1rem', fontSize: '0.8rem', fontWeight: 800, cursor: 'pointer' }}
                 >
@@ -1033,12 +1034,12 @@ export default function CustomerService() {
                   <>
                     <button
                       type="button"
-                      onClick={() => {
-                        const reason = prompt('Nhập lý do từ chối yêu cầu đổi trả:');
+                      onClick={async () => {
+                        const reason = await promptText('Nhập lý do từ chối yêu cầu đổi trả:');
                         if (reason) {
                           updateReturnStatus(selectedReturnDetail.id, 'REJECTED', reason);
                           setSelectedReturnDetail(null);
-                          alert('Đã từ chối yêu cầu đổi trả.');
+                          notify('Đã từ chối yêu cầu đổi trả.', 'info');
                         }
                       }}
                       style={{ backgroundColor: '#ef4444', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.5rem 1rem', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}
@@ -1050,7 +1051,7 @@ export default function CustomerService() {
                       onClick={() => {
                         updateReturnStatus(selectedReturnDetail.id, 'RETURN_APPROVED', 'CSKH đã duyệt yêu cầu thu hồi hàng');
                         setSelectedReturnDetail(null);
-                        alert('✅ Đã duyệt yêu cầu thu hồi hàng thành công! Đã điều phối cho Shipper đến nhà khách lấy.');
+                        notify('✅ Đã duyệt yêu cầu thu hồi hàng thành công! Đã điều phối cho Shipper đến nhà khách lấy.', 'success');
                       }}
                       style={{ backgroundColor: '#16a34a', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.5rem 1.25rem', fontSize: '0.8rem', fontWeight: 800, cursor: 'pointer' }}
                     >

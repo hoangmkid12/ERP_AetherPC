@@ -99,31 +99,6 @@ export const useUtilityStore = create((set, get) => ({
   },
 
   /**
-   * Create an assembly job
-   */
-  createAssemblyJob: async (jobData) => {
-    try {
-      set({ error: null });
-      const newJob = await api.post('/assembly-jobs', jobData);
-      
-      set(state => {
-        const updated = [...state.assemblyJobs, newJob];
-        try {
-          localStorage.setItem(STORAGE_KEYS.assemblyJobs, JSON.stringify(updated));
-        } catch (e) {}
-        return { assemblyJobs: updated };
-      });
-      
-      return newJob;
-    } catch (err) {
-      const errorMsg = err.message || 'Failed to create assembly job';
-      set({ error: errorMsg });
-      console.error('Error creating assembly job:', err);
-      throw err;
-    }
-  },
-
-  /**
    * Update an assembly job (supports status, checklist, and component serials)
    */
   updateAssemblyJob: (jobId, statusOrData, checklist = null, componentSerials = null) => {
@@ -170,35 +145,34 @@ export const useUtilityStore = create((set, get) => ({
   },
 
   /**
-   * Create Assembly Job (supports manual job creation)
+   * Create Assembly Job — supports manual job creation from Assembly.jsx
+   * (which already builds a full job object with its own id/checklist) as
+   * well as auto-creation from just an orderId. Respects any id/status/
+   * checklist/componentSerials the caller supplies and only generates
+   * defaults for whatever is missing, so a job never ends up under a
+   * different id than the one the UI just switched to.
    */
   createAssemblyJob: (orderIdOrData, customerName = '', components = []) => {
-    let finalOrderId = '';
-    let finalCust = '';
-    let finalComps = [];
+    const jobInput = (typeof orderIdOrData === 'object' && orderIdOrData !== null)
+      ? orderIdOrData
+      : { orderId: orderIdOrData, customer: customerName, components };
 
-    if (typeof orderIdOrData === 'object' && orderIdOrData !== null) {
-      finalOrderId = orderIdOrData.orderId || `MANUAL-${Date.now()}`;
-      finalCust = orderIdOrData.customer || orderIdOrData.customerName || 'Khách hàng';
-      finalComps = orderIdOrData.components || [];
-    } else {
-      finalOrderId = orderIdOrData || `MANUAL-${Date.now()}`;
-      finalCust = customerName || 'Khách hàng';
-      finalComps = components || [];
-    }
+    const finalOrderId = jobInput.orderId || `MANUAL-${Date.now()}`;
+    const finalCust = jobInput.customer || jobInput.customerName || 'Khách hàng';
+    const finalComps = jobInput.components || [];
 
     const jobExists = get().assemblyJobs.some(j => j.orderId === finalOrderId);
     if (jobExists) return null;
 
-    const dateStr = new Date().toLocaleDateString('vi-VN');
     const newJob = {
-      id: `JOB-${Math.floor(900 + Math.random() * 99)}`,
+      id: jobInput.id || `JOB-${Date.now().toString().slice(-6)}`,
       orderId: finalOrderId,
       customer: finalCust,
-      date: dateStr,
-      status: 'PENDING',
+      date: jobInput.date || new Date().toLocaleDateString('vi-VN'),
+      status: jobInput.status || 'PENDING',
       components: finalComps,
-      checklist: { socketCheck: false, thermalPaste: false, cableRouting: false, biosBoot: false, stressTest: false }
+      checklist: jobInput.checklist || { biosPost: false, osInstall: false, stressTest: false, qcSeal: false },
+      componentSerials: jobInput.componentSerials || {}
     };
 
     set(state => {

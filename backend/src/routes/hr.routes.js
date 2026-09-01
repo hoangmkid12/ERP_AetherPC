@@ -84,11 +84,23 @@ router.patch('/leaves/:id/reject', authMiddleware(['HR', 'CEO', 'ADMIN']), async
 // GET /api/v1/hr/employees – danh sách nhân viên (HR/CEO/Admin)
 router.get('/employees', authMiddleware(['HR', 'CEO', 'ADMIN']), async (req, res, next) => {
   try {
+    // Pagination is opt-in via ?page=&limit= — omit both to keep getting the
+    // full list, since HR/Dashboard pages currently expect it all at once.
+    const pageNum = req.query.page ? Math.max(1, parseInt(req.query.page, 10) || 1) : null;
+    const limitNum = req.query.limit ? Math.max(1, Math.min(200, parseInt(req.query.limit, 10) || 50)) : null;
+    const isPaginated = Boolean(pageNum && limitNum);
+
+    const totalCount = isPaginated ? await prisma.employee.count() : null;
     const employees = await prisma.employee.findMany({
       select: { id: true, employeeCode: true, fullName: true, email: true, department: true, role: true, deliveryRegion: true, phone: true, baseSalary: true, status: true, createdAt: true },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
+      ...(isPaginated ? { skip: (pageNum - 1) * limitNum, take: limitNum } : {})
     });
-    res.json({ success: true, data: employees });
+    res.json({
+      success: true,
+      data: employees,
+      ...(isPaginated ? { pagination: { page: pageNum, limit: limitNum, total: totalCount, totalPages: Math.ceil(totalCount / limitNum) } } : {})
+    });
   } catch (err) { next(err); }
 });
 

@@ -103,11 +103,14 @@ const handleWSMessage = async (ws, data) => {
 
       const session = await addMessage(sessionId, 'staff', text, 'Staff');
 
+      // Only staff (need the full session list) and the customer this
+      // session belongs to should receive this — never every connected
+      // client, or one customer's chat would leak into another's.
       broadcast({
         type: 'UPDATE_SESSIONS',
         sessions: [session],
         newMsg: { sender: 'staff', text, time, sessionId }
-      });
+      }, client => client._isStaff || client._sessionId === sessionId);
     }
     else if (type === 'DELETE_SESSION') {
       const { sessionId } = payload || {};
@@ -169,7 +172,7 @@ const addCustomerMessage = async ({ sessionId, text, customerName, time }) => {
       type: 'UPDATE_SESSIONS',
       sessions: [session],
       newMsg: { sender: 'customer', text, time: time || new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }), sessionId: session.sessionId }
-    });
+    }, client => client._isStaff || client._sessionId === session.sessionId);
 
     return session;
   } catch (err) {
@@ -188,7 +191,7 @@ const addStaffMessage = async ({ sessionId, text, time }) => {
       type: 'UPDATE_SESSIONS',
       sessions: [session],
       newMsg: { sender: 'staff', text, time: time || new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }), sessionId }
-    });
+    }, client => client._isStaff || client._sessionId === sessionId);
 
     return session;
   } catch (err) {

@@ -3,7 +3,7 @@ import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import { useInventoryStore, useSalesStore } from '../../stores';
 import { useAuth } from '../../context/AuthContext';
 import { usePermission } from '../../hooks/usePermission';
-import { useNotification } from '../../context/NotificationContext';
+import { useNotification, notify } from '../../context/NotificationContext';
 import ActorNotificationBar from '../../components/ActorNotificationBar';
 import { 
   Search, ShoppingCart, Plus, Minus, Trash2, Printer, FileText,
@@ -159,7 +159,7 @@ export default function SalesPOS() {
   const handleAddToCart = (product) => {
     const stockQty = Number(product.stock !== undefined ? product.stock : (product.stockQuantity !== undefined ? product.stockQuantity : 0));
     if (stockQty <= 0) {
-      alert(`Sản phẩm "${product.name}" hiện đã hết hàng trong kho!`);
+      notify(`Sản phẩm "${product.name}" hiện đã hết hàng trong kho!`, 'error');
       return;
     }
 
@@ -167,7 +167,7 @@ export default function SalesPOS() {
       const existing = prev.find(item => String(item.product.id || item.product.productId) === String(product.id || product.productId));
       if (existing) {
         if (existing.quantity >= stockQty) {
-          alert(`Tồn kho chỉ còn ${stockQty} sản phẩm, không thể thêm vượt quá!`);
+          notify(`Tồn kho chỉ còn ${stockQty} sản phẩm, không thể thêm vượt quá!`, 'error');
           return prev;
         }
         return prev.map(item => String(item.product.id || item.product.productId) === String(product.id || product.productId) ? { ...item, quantity: item.quantity + 1 } : item);
@@ -183,7 +183,7 @@ export default function SalesPOS() {
         const stockQty = Number(item.product.stock !== undefined ? item.product.stock : (item.product.stockQuantity !== undefined ? item.product.stockQuantity : 999));
         if (newQty <= 0) return null;
         if (newQty > stockQty) {
-          alert(`Tồn kho chỉ còn ${stockQty} chiếc!`);
+          notify(`Tồn kho chỉ còn ${stockQty} chiếc!`, 'error');
           return item;
         }
         return { ...item, quantity: newQty };
@@ -209,7 +209,7 @@ export default function SalesPOS() {
   // Checkout POS Order
   const handleCheckoutPOS = async () => {
     if (posCart.length === 0) {
-      alert('Giỏ hàng POS đang trống!');
+      notify('Giỏ hàng POS đang trống!', 'error');
       return;
     }
 
@@ -389,7 +389,7 @@ export default function SalesPOS() {
       if (selectedDetailOrder && (selectedDetailOrder.orderId === orderId || selectedDetailOrder.id === orderId)) {
         setSelectedDetailOrder(prev => ({ ...prev, status: newStatus }));
       }
-      alert(`Đơn hàng #${orderId} đã được cập nhật sang trạng thái: ${getStatusBadge(newStatus).text}`);
+      notify(`Đơn hàng #${orderId} đã được cập nhật sang trạng thái: ${getStatusBadge(newStatus).text}`, 'success');
     }
   };
 
@@ -903,7 +903,7 @@ export default function SalesPOS() {
                     onChange={(e) => {
                       const num = Math.max(0, parseInt(e.target.value, 10) || 0);
                       if (num > 10 && !canApproveSales) {
-                        alert('⚠️ Quyền hạn: Mức chiết khấu vượt quá 10% yêu cầu Quản Lý Bán Hàng (sales_manager) hoặc Ban Giám Đốc (CEO) phê duyệt!');
+                        notify('⚠️ Quyền hạn: Mức chiết khấu vượt quá 10% yêu cầu Quản Lý Bán Hàng (sales_manager) hoặc Ban Giám Đốc (CEO) phê duyệt!', 'error');
                         setPosDiscountPercent(10);
                         return;
                       }
@@ -1263,7 +1263,7 @@ export default function SalesPOS() {
                   onClick={() => {
                     setPosDiscountPercent(promo.type === 'PERCENT' ? promo.discount : 5);
                     setTab('pos');
-                    alert(`Đã áp dụng mã "${promo.code}" vào Quầy POS!`);
+                    notify(`Đã áp dụng mã "${promo.code}" vào Quầy POS!`, 'success');
                   }}
                   style={{
                     width: '100%',

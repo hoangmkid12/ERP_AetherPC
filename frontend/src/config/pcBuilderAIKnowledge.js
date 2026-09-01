@@ -214,8 +214,8 @@ export const runAIOptimizer = ({ promptText, budgetInput, workloadInput, brandIn
 
   // 1. Pick CPU based on Brand preference & target price
   let cpuFilter = () => true;
-  if (finalBrand === 'intel') cpuFilter = p => p.brand.toUpperCase().includes('INTEL');
-  if (finalBrand === 'amd') cpuFilter = p => p.brand.toUpperCase().includes('AMD');
+  if (finalBrand === 'intel') cpuFilter = p => (p.brand || '').toUpperCase().includes('INTEL');
+  if (finalBrand === 'amd') cpuFilter = p => (p.brand || '').toUpperCase().includes('AMD');
   const selectedCPU = findBestFit(cpuList, targetCPU, cpuFilter);
 
   const cpuSocket = selectedCPU?.specs?.socket;

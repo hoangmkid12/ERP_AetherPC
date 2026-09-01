@@ -206,9 +206,16 @@ module.exports = { getProducts, getProductById, getAIRecommendations, getProduct
 // Admin Product CRUD
 // ======================
 
+const slugifyHandle = (text) => (text || '')
+  .toLowerCase()
+  .normalize('NFD')
+  .replace(/[̀-ͯ]/g, '')
+  .replace(/[^a-z0-9]+/g, '-')
+  .replace(/(^-|-$)/g, '');
+
 const createProduct = async (req, res, next) => {
   try {
-    const { name, category, stockQuantity, price, supplier, sku, description } = req.body;
+    const { name, category, brand, stockQuantity, price, sku, description, descriptionText } = req.body;
     if (!name) return res.status(400).json({ success: false, message: 'Tên sản phẩm là bắt buộc' });
 
     // Find or create category slug
@@ -219,15 +226,28 @@ const createProduct = async (req, res, next) => {
       });
     }
 
+    // Find or create brand by name
+    const brandName = brand || 'Khác';
+    let brandRecord = await prisma.brand.findFirst({ where: { name: brandName } });
+    if (!brandRecord) {
+      brandRecord = await prisma.brand.create({ data: { name: brandName } });
+    }
+
+    const productId = `PROD-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
+    const handle = `${slugifyHandle(name)}-${Date.now()}`;
+
     const newProduct = await prisma.product.create({
       data: {
+        productId,
+        handle,
         sku: sku || `SKU-${Date.now()}`,
         name,
         categoryId: categoryRecord.id,
+        brandId: brandRecord.id,
         price: parseFloat(price) || 0,
         originalPrice: parseFloat(price) || 0,
         stockQuantity: parseInt(stockQuantity) || 0,
-        description: description || '',
+        descriptionText: descriptionText || description || '',
         available: true
       }
     });

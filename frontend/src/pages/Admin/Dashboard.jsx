@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useSalesStore, useInventoryStore, useHRStore, useFinanceStore, useUtilityStore } from '../../stores';
 import { api } from '../../services/api';
+import { notify, confirm } from '../../context/NotificationContext';
 import { Bar, Doughnut, Line } from 'react-chartjs-2';
 import { 
   Chart as ChartJS, 
@@ -495,7 +496,7 @@ export default function Dashboard() {
     const targetCore = getPoCoreId(poNumber || poId);
     const displayNum = formatPurchaseReference({ id: poId, poNumber, status: 'PO' });
 
-    if (!window.confirm(`Duyệt báo giá đơn hàng ${displayNum}? Đơn hàng sẽ trở thành PO chính thức và phát hành phiếu nhận kho.`)) return;
+    if (!(await confirm(`Duyệt báo giá đơn hàng ${displayNum}? Đơn hàng sẽ trở thành PO chính thức và phát hành phiếu nhận kho.`))) return;
     
     // 1. Optimistically remove from state immediately
     setQuotedOrders(prev => prev.filter(q => 
@@ -569,12 +570,12 @@ export default function Dashboard() {
       // server (the source of truth for the API-backed refetch) still had the old status.
       window.dispatchEvent(new Event('erp-po-updated'));
       if (apiSucceeded) {
-        alert(`✅ ĐÃ DUYỆT BÁO GIÁ THÀNH CÔNG!\n\n• Mã đơn PO chính thức: ${displayNum}\n• Trạng thái: Đã phê duyệt (Đã chuyển sang Tab Đơn Mua Hàng PO & sẵn sàng nhận hàng)`);
+        notify(`✅ ĐÃ DUYỆT BÁO GIÁ THÀNH CÔNG!\n\n• Mã đơn PO chính thức: ${displayNum}\n• Trạng thái: Đã phê duyệt (Đã chuyển sang Tab Đơn Mua Hàng PO & sẵn sàng nhận hàng)`, 'success');
       } else {
-        alert(`⚠️ CHƯA DUYỆT ĐƯỢC TRÊN MÁY CHỦ!\n\n• Mã đơn: ${displayNum}\n• Lỗi: ${apiErrorMessage}\n\nĐơn hàng có thể sẽ hiện lại trong danh sách chờ duyệt sau khi tải lại trang, vì máy chủ chưa ghi nhận thay đổi này. Vui lòng thử lại hoặc liên hệ quản trị viên nếu lỗi lặp lại.`);
+        notify(`⚠️ CHƯA DUYỆT ĐƯỢC TRÊN MÁY CHỦ!\n\n• Mã đơn: ${displayNum}\n• Lỗi: ${apiErrorMessage}\n\nĐơn hàng có thể sẽ hiện lại trong danh sách chờ duyệt sau khi tải lại trang, vì máy chủ chưa ghi nhận thay đổi này. Vui lòng thử lại hoặc liên hệ quản trị viên nếu lỗi lặp lại.`, 'error');
       }
     } catch (e) {
-      alert('Lỗi duyệt PO: ' + e.message);
+      notify('Lỗi duyệt PO: ' + e.message, 'error');
     }
   };
 
@@ -1121,10 +1122,9 @@ export default function Dashboard() {
                   </span>
                 ) : (
                   <button
-                    onClick={() => {
-                      if (window.confirm('Xác nhận PHÊ DUYỆT bảng lương tháng này của doanh nghiệp? Lệnh chi sẽ chuyển sang Kế Toán.')) {
+                    onClick={async () => {
+                      if (await confirm('Xác nhận PHÊ DUYỆT bảng lương tháng này của doanh nghiệp? Lệnh chi sẽ chuyển sang Kế Toán.')) {
                         if (typeof approvePayrollByCEO === 'function') approvePayrollByCEO();
-                        alert('✅ Đã phê duyệt bảng lương tháng thành công!');
                       }
                     }}
                     style={{ backgroundColor: '#16a34a', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.5rem 1.1rem', fontSize: '0.82rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
@@ -1168,7 +1168,7 @@ export default function Dashboard() {
                       <button
                         onClick={() => {
                           if (typeof approveLeaveRequest === 'function') approveLeaveRequest(lr.id);
-                          alert('Đã duyệt đơn nghỉ phép!');
+                          notify('Đã duyệt đơn nghỉ phép!', 'success');
                         }}
                         style={{ backgroundColor: '#16a34a', color: '#ffffff', border: 'none', borderRadius: '4px', padding: '0.3rem 0.65rem', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}
                       >
@@ -1177,7 +1177,7 @@ export default function Dashboard() {
                       <button
                         onClick={() => {
                           if (typeof rejectLeaveRequest === 'function') rejectLeaveRequest(lr.id);
-                          alert('Đã từ chối đơn nghỉ phép.');
+                          notify('Đã từ chối đơn nghỉ phép.', 'info');
                         }}
                         style={{ backgroundColor: '#ffffff', color: '#ef4444', border: '1px solid #fca5a5', borderRadius: '4px', padding: '0.3rem 0.65rem', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}
                       >

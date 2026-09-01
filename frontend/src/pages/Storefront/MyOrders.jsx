@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSalesStore, useUtilityStore, useInventoryStore } from '../../stores';
 import { useAuth } from '../../context/AuthContext';
-import { useNotification } from '../../context/NotificationContext';
+import { useNotification, notify, confirm } from '../../context/NotificationContext';
 import { Search, Package, Clock, ShieldCheck, CheckCircle2, ChevronRight, HelpCircle, RefreshCw, X, AlertCircle, Sparkles, Eye, Upload, CheckCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { api } from '../../services/api';
@@ -14,7 +14,6 @@ export default function MyOrders() {
   const updateOrderStatus = useSalesStore(state => state.updateOrderStatus);
   const updateOrderDetails = useSalesStore(state => state.updateOrderDetails);
   const updateReturnStatus = useSalesStore(state => state.updateReturnStatus);
-  const setReturnRequests = useSalesStore(state => state.setReturnRequests);
   const addComplaint = useSalesStore(state => state.addComplaint);
   const complaints = useSalesStore(state => state.complaints) || [];
   const assemblyJobs = useUtilityStore(state => state.assemblyJobs) || [];
@@ -53,7 +52,7 @@ export default function MyOrders() {
 
   const handleCustomerConfirmRefundReceived = async (returnItem) => {
     if (!returnItem) return;
-    if (window.confirm('Xác nhận bạn đã nhận được đủ 100% số tiền hoàn vào tài khoản ngân hàng?')) {
+    if (await confirm('Xác nhận bạn đã nhận được đủ 100% số tiền hoàn vào tài khoản ngân hàng?')) {
       const confirmedData = {
         customerConfirmedRefund: true,
         customerConfirmedAt: new Date().toISOString()
@@ -75,14 +74,9 @@ export default function MyOrders() {
           return r;
         });
         localStorage.setItem('erp_return_requests', JSON.stringify(updatedList));
-        if (typeof setReturnRequests === 'function') setReturnRequests(updatedList);
       } catch (_) {}
 
-      if (addNotification) {
-        addNotification('🎉 Cảm ơn bạn đã xác nhận đã nhận đủ tiền hoàn 100%!', 'success');
-      } else {
-        alert('🎉 Cảm ơn bạn đã xác nhận đã nhận đủ tiền hoàn 100%!');
-      }
+      notify('🎉 Cảm ơn bạn đã xác nhận đã nhận đủ tiền hoàn 100%!', 'success');
     }
   };
 

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { notify } from '../../context/NotificationContext';
 import { ArrowRight, Clock, Zap, Tag, Copy, CheckCircle } from 'lucide-react';
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
@@ -114,9 +115,12 @@ function CountdownDisplay({ hours }) {
 function CouponCard({ coupon }) {
   const [copied, setCopied] = useState(false);
   const handleCopy = () => {
-    navigator.clipboard.writeText(coupon.code);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    navigator.clipboard.writeText(coupon.code)
+      .then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      })
+      .catch(() => notify('Không thể sao chép mã — trình duyệt đã chặn quyền truy cập clipboard.', 'error'));
   };
   return (
     <div style={{

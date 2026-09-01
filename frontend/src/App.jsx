@@ -263,6 +263,12 @@ export default function App() {
                       <Delivery />
                     </ProtectedRoute>
                   } />
+
+                  <Route path="my-payroll" element={
+                    <ProtectedRoute allowedRoles={['CEO', 'SALES', 'SALES_MANAGER', 'WAREHOUSE', 'WAREHOUSE_MANAGER', 'ASSEMBLY', 'HR', 'ACCOUNTANT', 'PURCHASING', 'ADMIN', 'CSKH', 'DELIVERY', 'QC', 'QA', 'QUALITY_CONTROL']}>
+                      <MyPayroll />
+                    </ProtectedRoute>
+                  } />
                 </Route>
 
                 {/* Supplier Portal Layout Routes */}

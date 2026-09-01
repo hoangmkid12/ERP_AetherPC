@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { api } from '../services/api';
+import { notify } from '../context/NotificationContext';
 import { useHRStore } from './hrStore';
 
 /**
@@ -404,7 +405,7 @@ export const useFinanceStore = create((set, get) => ({
       localStorage.setItem('erp_employees', JSON.stringify(updatedEmployees));
     } catch (e) {}
 
-    alert(`💸 Đã giải ngân thành công ${new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(payrollItem.netSalary || payrollItem.netAmount || 0)} cho nhân viên ${empName}!`);
+    notify(`💸 Đã giải ngân thành công ${new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(payrollItem.netSalary || payrollItem.netAmount || 0)} cho nhân viên ${empName}!`, 'success');
   },
 
   /**
@@ -415,7 +416,7 @@ export const useFinanceStore = create((set, get) => ({
     const payrolls = hrState.payrolls || [];
     const eligiblePayrolls = payrolls.filter(p => p.status === 'APPROVED_BY_CEO' || p.status === 'SUBMITTED_TO_ACCOUNTING');
     if (eligiblePayrolls.length === 0) {
-      alert('⚠️ Không có bảng lương nào đang chờ giải ngân!');
+      notify('⚠️ Không có bảng lương nào đang chờ giải ngân!', 'error');
       return;
     }
 
@@ -447,7 +448,7 @@ export const useFinanceStore = create((set, get) => ({
     useHRStore.setState({ payrolls: nextPayrolls });
     try { localStorage.setItem('erp_payrolls', JSON.stringify(nextPayrolls)); } catch (e) {}
 
-    alert(`✅ Kế toán đã giải ngân chi trả lương thành công cho ${eligiblePayrolls.length} nhân viên!`);
+    notify(`✅ Kế toán đã giải ngân chi trả lương thành công cho ${eligiblePayrolls.length} nhân viên!`, 'success');
   },
 
   /**

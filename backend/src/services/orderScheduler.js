@@ -1,4 +1,5 @@
 const prisma = require('../config/database');
+const { adjustLoyaltyForOrder } = require('../controllers/order.controller');
 
 const checkAndApprovePendingOrders = async () => {
   try {
@@ -48,74 +49,85 @@ const checkAndApprovePendingOrders = async () => {
             }
           }
 
-          const targetStatus = hasShortage ? 'AWAITING_STOCK' : 'CONFIRMED';
-          const historyNote = hasShortage
-            ? `Hệ thống tự động chuyển Chờ hàng sau 5h (Thiếu tồn kho cho: ${shortageItems.join(', ')}).`
-            : `Hệ thống tự động duyệt sau 5h chờ (Đủ tồn kho). Tự động trừ kho.`;
+          if (hasShortage) {
+            await tx.order.update({
+              where: { orderId: freshOrder.orderId },
+              data: { status: 'AWAITING_STOCK' }
+            });
+            await tx.orderStatusHistory.create({
+              data: {
+                orderId: freshOrder.orderId,
+                status: 'AWAITING_STOCK',
+                note: `Hệ thống tự động chuyển Chờ hàng sau 5h (Thiếu tồn kho cho: ${shortageItems.join(', ')}).`,
+                changedBy: 'Hệ thống'
+              }
+            });
+            console.log(`[OrderScheduler] Auto-processed order ${freshOrder.orderId} to status AWAITING_STOCK`);
+            return;
+          }
 
-          // If in stock, deduct stock
-          if (!hasShortage) {
-            for (const item of freshOrder.items) {
-              // 1. Deduct Product stock
-              await tx.product.update({
-                where: { productId: item.productId },
+          // Đủ tồn kho lúc kiểm tra ở trên — trừ ATOMIC-CONDITIONAL từng item
+          // (cùng pattern với order.controller.js) để tránh race-condition với
+          // checkout/duyệt đơn khác diễn ra song song. Nếu bất kỳ item nào bị
+          // giành mất tồn kho ngay trước khi trừ, ném lỗi để Prisma tự rollback
+          // toàn bộ transaction này — đơn giữ nguyên PENDING, lượt quét kế tiếp
+          // sẽ xử lý lại (rơi vào catch (orderError) bên dưới).
+          for (const item of freshOrder.items) {
+            const productUpdate = await tx.product.updateMany({
+              where: { productId: item.productId, available: true, stockQuantity: { gte: item.quantity } },
+              data: { stockQuantity: { decrement: item.quantity } }
+            });
+            if (productUpdate.count !== 1) {
+              throw new Error(`Tồn kho không đủ cho sản phẩm ${item.productId} (race với giao dịch khác) — giữ nguyên PENDING`);
+            }
+
+            const inventory = await tx.inventory.findFirst({
+              where: {
+                productId: item.productId,
+                warehouseId: 1
+              }
+            });
+
+            if (inventory) {
+              await tx.inventory.update({
+                where: { id: inventory.id },
                 data: {
-                  stockQuantity: {
+                  quantityOnHand: {
                     decrement: item.quantity
                   }
                 }
               });
-
-              // 2. Deduct Inventory stock for warehouse 1
-              const inventory = await tx.inventory.findFirst({
-                where: {
-                  productId: item.productId,
-                  warehouseId: 1
-                }
-              });
-
-              if (inventory) {
-                await tx.inventory.update({
-                  where: { id: inventory.id },
-                  data: {
-                    quantityOnHand: {
-                      decrement: item.quantity
-                    }
-                  }
-                });
-              }
-
-              // 3. Log Stock Movement
-              await tx.stockMovement.create({
-                data: {
-                  productId: item.productId,
-                  fromWarehouseId: 1,
-                  type: 'OUT',
-                  quantity: item.quantity,
-                  referenceId: freshOrder.orderId,
-                  note: `Xuất kho tự động sau 5h duyệt cho Đơn Hàng ${freshOrder.orderId}`
-                }
-              });
             }
+
+            await tx.stockMovement.create({
+              data: {
+                productId: item.productId,
+                fromWarehouseId: 1,
+                type: 'OUT',
+                quantity: item.quantity,
+                referenceId: freshOrder.orderId,
+                note: `Xuất kho tự động sau 5h duyệt cho Đơn Hàng ${freshOrder.orderId}`
+              }
+            });
           }
 
-          // Update order status
+          await adjustLoyaltyForOrder(tx, freshOrder.customerId, freshOrder.totalAmount, 'add');
+
           await tx.order.update({
             where: { orderId: freshOrder.orderId },
-            data: { status: targetStatus }
+            data: { status: 'CONFIRMED' }
           });
 
-          // Write history log
           await tx.orderStatusHistory.create({
             data: {
               orderId: freshOrder.orderId,
-              status: targetStatus,
-              note: historyNote,
+              status: 'CONFIRMED',
+              note: `Hệ thống tự động duyệt sau 5h chờ (Đủ tồn kho). Tự động trừ kho & tích điểm thành viên.`,
               changedBy: 'Hệ thống'
             }
           });
 
-          console.log(`[OrderScheduler] Auto-processed order ${freshOrder.orderId} to status ${targetStatus}`);
+          console.log(`[OrderScheduler] Auto-processed order ${freshOrder.orderId} to status CONFIRMED`);
         });
       } catch (orderError) {
         console.error(`[OrderScheduler] Failed to process order ${order.orderId}:`, orderError.message);

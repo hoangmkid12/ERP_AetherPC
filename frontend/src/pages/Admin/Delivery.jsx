@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useSalesStore } from '../../stores';
 import { useAuth } from '../../context/AuthContext';
-import { useNotification } from '../../context/NotificationContext';
+import { useNotification, notify } from '../../context/NotificationContext';
 import { api } from '../../services/api';
 import { DELIVERY_REGIONS, detectDeliveryRegion } from '../../utils/deliveryRegions';
 import ActorNotificationBar from '../../components/ActorNotificationBar';
@@ -642,10 +642,14 @@ export default function Delivery() {
     });
   }, [myDeliveryOrders, search, regionFilter, paymentFilter, incidentFilter, dateFilterPeriod, customStartDate, customEndDate, sortOrder, activeTab, userIdStr, isManagerOrAdmin, user]);
 
-  const handleClaimOrder = (orderId) => {
+  const handleClaimOrder = async (orderId) => {
     if (typeof claimOrderForDelivery === 'function') {
-      claimOrderForDelivery(orderId, user);
-      addNotification(`🚚 Đã nhận đơn hàng #${orderId}! Đơn đã chuyển sang tab "Đang Giao & Minh Chứng".`, 'success', '/admin/delivery?tab=active');
+      const result = await claimOrderForDelivery(orderId, user);
+      if (result?.success) {
+        addNotification(`🚚 Đã nhận đơn hàng #${orderId}! Đơn đã chuyển sang tab "Đang Giao & Minh Chứng".`, 'success', '/admin/delivery?tab=active');
+      } else {
+        addNotification(result?.message || `Không thể nhận đơn hàng #${orderId}.`, 'error');
+      }
     } else {
       updateOrderStatus(orderId, 'SHIPPED');
       addNotification(`🚚 Đã nhận đơn hàng #${orderId}!`, 'success', '/admin/delivery?tab=active');
@@ -2007,7 +2011,7 @@ export default function Delivery() {
                                 type="button"
                                 onClick={async () => {
                                   if (!isManagerOrAdmin && matchedOrder && !isShipperMatched(matchedOrder)) {
-                                    alert(`⚠️ Chỉ Shipper đã trực tiếp giao đơn #${ret.orderId} (${matchedOrder.assignedShipperName || matchedOrder.assignedShipper}) mới có quyền thu hồi đơn này!`);
+                                    notify(`⚠️ Chỉ Shipper đã trực tiếp giao đơn #${ret.orderId} (${matchedOrder.assignedShipperName || matchedOrder.assignedShipper}) mới có quyền thu hồi đơn này!`, 'error');
                                     return;
                                   }
                                   await updateReturnStatus(ret.id, 'RETURNING_TO_WAREHOUSE', { note: `Shipper ${user?.fullname || user?.username} đã lấy hàng tại nhà khách` });
@@ -2024,7 +2028,7 @@ export default function Delivery() {
                                 type="button"
                                 onClick={async () => {
                                   if (!isManagerOrAdmin && matchedOrder && !isShipperMatched(matchedOrder)) {
-                                    alert(`⚠️ Chỉ Shipper đã trực tiếp giao đơn #${ret.orderId} mới có quyền bàn giao kiện hàng về kho!`);
+                                    notify(`⚠️ Chỉ Shipper đã trực tiếp giao đơn #${ret.orderId} mới có quyền bàn giao kiện hàng về kho!`, 'error');
                                     return;
                                   }
                                   await updateReturnStatus(ret.id, 'DELIVERED_TO_WAREHOUSE', { note: `Shipper ${user?.fullname || user?.username} đã bàn giao kiện hàng về kho cho QC` });

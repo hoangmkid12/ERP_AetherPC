@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useHRStore, useFinanceStore, useUtilityStore } from '../../stores';
+import { useHRStore, useUtilityStore } from '../../stores';
 import { useAuth } from '../../context/AuthContext';
 import { DollarSign, Calendar, Clipboard, TrendingUp, CheckCircle, Clock, XCircle, FileText, AlertCircle, Award, Printer, ShieldCheck, User } from 'lucide-react';
 
@@ -9,7 +9,6 @@ export default function MyPayroll() {
   const leaveRequests = useHRStore(state => state.leaveRequests) || [];
   const payrolls = useHRStore(state => state.payrolls) || [];
   const employees = useHRStore(state => state.employees) || [];
-  const ledger = useFinanceStore(state => state.ledger) || [];
   const assemblyJobs = useUtilityStore(state => state.assemblyJobs) || [];
 
   const [showPayslipModal, setShowPayslipModal] = useState(false);
@@ -29,7 +28,6 @@ export default function MyPayroll() {
   const storedPayroll = payrolls.find(p => p && String(p.empId) === String(user?.id));
 
   // Fallback calculation if payroll not yet submitted
-  const totalRevenue = ledger.filter(tx => tx && tx.type === 'INCOME').reduce((sum, tx) => sum + tx.amount, 0);
   const completedAssemblyCount = assemblyJobs.filter(j => j && j.status === 'COMPLETED').length;
 
   const empLogs = attendanceLogs.filter(l => l && String(l.empId) === String(user?.id));
@@ -41,7 +39,9 @@ export default function MyPayroll() {
   const empDetails = employees.find(e => e.id === user?.id || e.username === user?.username) || {};
   const baseSalary = empDetails.baseSalary || user.baseSalary || 10000000;
 
-  const salesBonus = user?.role === 'SALES' ? Math.round(totalRevenue * 0.01) : 0;
+  // Cùng hằng số hoa hồng cố định với bảng lương chính thức (HRManager.jsx)
+  // — tránh 2 công thức khác nhau cho cùng một khoản hoa hồng.
+  const salesBonus = user?.role === 'SALES' ? 1250000 : 0;
   const assemblyBonus = user?.role === 'ASSEMBLY' ? completedAssemblyCount * 150000 : 0;
   const totalBonus = salesBonus + assemblyBonus;
   const lateFine = lateDays * 50000;

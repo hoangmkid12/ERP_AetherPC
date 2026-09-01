@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useUtilityStore, useInventoryStore, useSalesStore } from '../../stores';
 import { useAuth } from '../../context/AuthContext';
+import { notify } from '../../context/NotificationContext';
 import { 
   Wrench, Play, CheckCircle2, ShieldCheck, ClipboardList, Plus, AlertCircle, 
   Truck, XCircle, Search, Cpu, HardDrive, Zap, Layers, Check, X, Printer,
@@ -188,7 +189,7 @@ export default function Assembly() {
   // Checklist Actions
   const toggleChecklist = (jobId, key) => {
     if (isCancelled) {
-      alert('Không thể thao tác: Đơn hàng này đã bị HỦY!');
+      notify('Không thể thao tác: Đơn hàng này đã bị HỦY!', 'error');
       return;
     }
     const targetJob = jobs.find(j => j.id === jobId);
@@ -200,13 +201,13 @@ export default function Assembly() {
 
   const startAssembly = (jobId) => {
     if (isCancelled) {
-      alert('Không thể bắt đầu: Đơn hàng này đã bị HỦY!');
+      notify('Không thể bắt đầu: Đơn hàng này đã bị HỦY!', 'error');
       return;
     }
     const targetJob = jobs.find(j => j.id === jobId);
     if (targetJob) {
       updateAssemblyJob(jobId, 'ASSEMBLING', targetJob.checklist, targetJob.componentSerials);
-      alert(`Đã tiếp nhận lệnh lắp ráp #${jobId}! Hãy tiến hành chọn mã Serial linh kiện.`);
+      notify(`Đã tiếp nhận lệnh lắp ráp #${jobId}! Hãy tiến hành chọn mã Serial linh kiện.`, 'success');
     }
   };
 
@@ -219,12 +220,12 @@ export default function Assembly() {
       autoSerials[comp.category] = available[0] || `SN-${comp.category}-2026-001`;
     });
     updateAssemblyJob(job.id, job.status, job.checklist, autoSerials);
-    alert('⚡ Đã tự động gán đầy đủ mã Serial Number (S/N) hợp lệ từ kho cho tất cả linh kiện!');
+    notify('⚡ Đã tự động gán đầy đủ mã Serial Number (S/N) hợp lệ từ kho cho tất cả linh kiện!', 'success');
   };
 
   const completeAssembly = (jobId) => {
     if (isCancelled) {
-      alert('Không thể nghiệm thu: Đơn hàng này đã bị HỦY!');
+      notify('Không thể nghiệm thu: Đơn hàng này đã bị HỦY!', 'error');
       return;
     }
     const jobToCheck = jobs.find(j => j.id === jobId);
@@ -234,14 +235,14 @@ export default function Assembly() {
     const REQUIRED_CHECKLIST_KEYS = ['biosPost', 'osInstall', 'stressTest', 'qcSeal'];
     const allDone = REQUIRED_CHECKLIST_KEYS.every(k => !!jobToCheck.checklist?.[k]);
     if (!allDone) {
-      alert('Cảnh báo: Vui lòng tích chọn đầy đủ 4 đầu mục kiểm thử chất lượng QA trước khi nghiệm thu xuất xưởng!');
+      notify('Cảnh báo: Vui lòng tích chọn đầy đủ 4 đầu mục kiểm thử chất lượng QA trước khi nghiệm thu xuất xưởng!', 'error');
       return;
     }
 
     const currentSerials = { ...(jobToCheck.componentSerials || {}) };
     const serialsAssigned = (jobToCheck.components || []).every(comp => !!currentSerials[comp.category]);
     if (!serialsAssigned) {
-      alert('Cảnh báo: Vui lòng chọn đầy đủ mã Serial Number (S/N) cho tất cả linh kiện trước khi nghiệm thu xuất xưởng!');
+      notify('Cảnh báo: Vui lòng chọn đầy đủ mã Serial Number (S/N) cho tất cả linh kiện trước khi nghiệm thu xuất xưởng!', 'error');
       return;
     }
 
@@ -253,19 +254,19 @@ export default function Assembly() {
     };
 
     updateAssemblyJob(jobId, 'COMPLETED', finalChecklist, currentSerials);
-    alert(`Đã hoàn tất lắp ráp và nghiệm thu! Đơn hàng ${jobToCheck.orderId || jobId} đã được chuyển sang trạng thái "Chờ Xuất Kho" (Kho sẽ bàn giao xuất hàng).`);
+    notify(`Đã hoàn tất lắp ráp và nghiệm thu! Đơn hàng ${jobToCheck.orderId || jobId} đã được chuyển sang trạng thái "Chờ Xuất Kho" (Kho sẽ bàn giao xuất hàng).`, 'success');
   };
 
   // Create Manual Job
   const handleCreateJob = (e) => {
     e.preventDefault();
     if (!newJobCustomer.trim()) {
-      alert('Vui lòng nhập tên khách hàng hoặc mục đích lệnh lắp ráp.');
+      notify('Vui lòng nhập tên khách hàng hoặc mục đích lệnh lắp ráp.', 'error');
       return;
     }
     const validComponents = newJobComponents.filter(c => c.name && c.name.trim());
     if (validComponents.length === 0) {
-      alert('Vui lòng điền ít nhất 1 linh kiện cần lắp ráp.');
+      notify('Vui lòng điền ít nhất 1 linh kiện cần lắp ráp.', 'error');
       return;
     }
 
@@ -291,7 +292,7 @@ export default function Assembly() {
     setShowCreateModal(false);
     setActiveJobId(newJob.id);
     setTab('jobs');
-    alert(`Đã khởi tạo thành công Lệnh Lắp Ráp #${newJob.id}!`);
+    notify(`Đã khởi tạo thành công Lệnh Lắp Ráp #${newJob.id}!`, 'success');
   };
 
   // Status Badge Helper

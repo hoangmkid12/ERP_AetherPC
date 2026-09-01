@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useCart } from '../../context/CartContext';
+import { notify } from '../../context/NotificationContext';
 import { api } from '../../services/api';
 import { 
   Cpu, Gamepad2, Database, Layers, HardDrive, Zap, Box, Wind, Monitor, Keyboard, Mouse,
@@ -135,7 +136,7 @@ export default function Products() {
   const handleAddToCart = (p) => {
     const isPreorder = (!p.stockQuantity || p.stockQuantity <= 0) && (!p.stock || p.stock <= 0);
     if (isPreorder || p.isPreorder) {
-      alert('Sản phẩm này hiện đang trong trạng thái ĐẶT TRƯỚC (Hết hàng sẵn tại kho). Vui lòng liên hệ CSKH / Hotline để được hỗ trợ đặt giữ hàng!');
+      notify('Sản phẩm này hiện đang trong trạng thái ĐẶT TRƯỚC (Hết hàng sẵn tại kho). Vui lòng liên hệ CSKH / Hotline để được hỗ trợ đặt giữ hàng!', 'error');
       return;
     }
     addToCart(p, 1);

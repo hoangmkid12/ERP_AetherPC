@@ -15,6 +15,12 @@ const getJWTSecret = () => {
   return secret;
 };
 
+// Deliberately decoupled from NODE_ENV: a first deploy often runs in
+// production mode over plain HTTP before a domain/TLS is in place, and a
+// Secure cookie set over HTTP is silently dropped by the browser, locking
+// everyone out. Operators must explicitly opt in once TLS is confirmed.
+const isCookieSecure = () => process.env.COOKIE_SECURE === 'true';
+
 const loginCustomer = async (req, res, next) => {
   try {
     const { email, username, password } = req.body;
@@ -46,7 +52,7 @@ const loginCustomer = async (req, res, next) => {
     // Set HTTP-Only secure cookie
     res.cookie('authToken', token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: isCookieSecure(),
       sameSite: 'strict',
       maxAge: 7 * 24 * 60 * 60 * 1000
     });
@@ -113,7 +119,7 @@ const registerCustomer = async (req, res, next) => {
     // Set HTTP-Only secure cookie
     res.cookie('authToken', token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: isCookieSecure(),
       sameSite: 'strict',
       maxAge: 7 * 24 * 60 * 60 * 1000
     });
@@ -213,7 +219,7 @@ const loginEmployee = async (req, res, next) => {
     // Set HTTP-Only secure cookie
     res.cookie('authToken', token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: isCookieSecure(),
       sameSite: 'strict',
       maxAge: 1 * 24 * 60 * 60 * 1000
     });
@@ -345,6 +351,29 @@ const updateProfile = async (req, res, next) => {
           role: 'CUSTOMER'
         }
       });
+    } else if (req.user.role === 'SUPPLIER') {
+      const updatedSupplier = await prisma.supplier.update({
+        where: { code: req.user.id },
+        data: {
+          ...(name !== undefined ? { name } : {}),
+          ...(email ? { email } : {}),
+          ...(phone !== undefined ? { phone } : {}),
+          ...(address !== undefined ? { address } : {})
+        }
+      });
+      return res.json({
+        success: true,
+        user: {
+          id: updatedSupplier.code,
+          code: updatedSupplier.code,
+          name: updatedSupplier.name,
+          fullname: updatedSupplier.name,
+          email: updatedSupplier.email,
+          department: 'SUPPLY',
+          role: 'SUPPLIER',
+          phone: updatedSupplier.phone || null
+        }
+      });
     } else {
       const employeeId = parseInt(req.user.id);
       if (!Number.isInteger(employeeId)) {
@@ -398,6 +427,24 @@ const changePassword = async (req, res, next) => {
       const newHash = await bcrypt.hash(newPassword, salt);
       await prisma.customer.update({
         where: { customerId: req.user.id },
+        data: { passwordHash: newHash }
+      });
+      return res.json({ success: true, message: 'Đổi mật khẩu thành công!' });
+    } else if (req.user.role === 'SUPPLIER') {
+      const supplier = await prisma.supplier.findUnique({
+        where: { code: req.user.id }
+      });
+      if (!supplier) {
+        return res.status(404).json({ success: false, message: 'Không tìm thấy tài khoản nhà cung cấp' });
+      }
+      const isMatch = await bcrypt.compare(currentPassword, supplier.passwordHash);
+      if (!isMatch) {
+        return res.status(400).json({ success: false, message: 'Mật khẩu hiện tại không chính xác' });
+      }
+      const salt = await bcrypt.genSalt(10);
+      const newHash = await bcrypt.hash(newPassword, salt);
+      await prisma.supplier.update({
+        where: { code: req.user.id },
         data: { passwordHash: newHash }
       });
       return res.json({ success: true, message: 'Đổi mật khẩu thành công!' });

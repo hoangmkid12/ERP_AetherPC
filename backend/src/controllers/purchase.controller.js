@@ -268,7 +268,7 @@ const updatePurchaseOrderStatus = async (req, res, next) => {
       if (['QUOTED', 'PO', 'CONFIRMED_BY_SUPPLIER'].includes(status) && itemPrices && itemPrices.length > 0) {
         let newTotal = 0;
         for (const priceInfo of itemPrices) {
-          const item = po.items.find(i => i.id === priceInfo.itemId);
+          const item = po.items.find(i => String(i.id) === String(priceInfo.itemId));
           if (item && priceInfo.unitCost > 0) {
             const totalCost = parseFloat(priceInfo.unitCost) * item.quantity;
             await tx.purchaseOrderItem.update({
@@ -482,6 +482,16 @@ const registerPayment = async (req, res, next) => {
       if (bill.status === 'PAID') throw new Error('Bill is already fully paid.');
 
       const payAmount = amount ? parseFloat(amount) : parseFloat(bill.amountDue);
+      if (!(payAmount > 0)) {
+        const error = new Error('Số tiền thanh toán phải lớn hơn 0.');
+        error.statusCode = 400;
+        throw error;
+      }
+      if (payAmount > parseFloat(bill.amountDue)) {
+        const error = new Error(`Số tiền thanh toán (${payAmount}) vượt quá công nợ còn lại (${bill.amountDue}).`);
+        error.statusCode = 400;
+        throw error;
+      }
 
       const newPayment = await tx.vendorPayment.create({
         data: {
@@ -522,12 +532,25 @@ const validateReceipt = async (req, res, next) => {
     const receivedBy = req.user ? req.user.email || req.user.code || 'Warehouse Staff' : 'Warehouse Staff';
 
     const updatedReceipt = await prisma.$transaction(async (tx) => {
+      // Atomically claim this receipt first: the conditional updateMany
+      // takes a row lock, so a concurrent duplicate request (double-click,
+      // or the sibling /warehouse/receipts/:id/validate route hitting the
+      // same receipt) can never both pass this gate and double-count stock.
+      const claim = await tx.goodsReceipt.updateMany({
+        where: { id: parseInt(receiptId), status: { not: 'DONE' } },
+        data: { status: 'DONE', receivedBy, receivedDate: new Date() }
+      });
+      if (claim.count !== 1) {
+        const error = new Error('Phiếu nhập kho không tồn tại hoặc đã được xác nhận trước đó.');
+        error.statusCode = 409;
+        throw error;
+      }
+
       const receipt = await tx.goodsReceipt.findUnique({
         where: { id: parseInt(receiptId) },
         include: { po: { include: { items: true } } }
       });
       if (!receipt) throw new Error(`Receipt not found: ${receiptId}`);
-      if (receipt.status === 'DONE') throw new Error('Receipt is already validated.');
 
       const po = receipt.po;
       if (!['QA_PASSED', 'QA_PARTIAL'].includes(po.status)) {
@@ -569,7 +592,8 @@ const validateReceipt = async (req, res, next) => {
             data: {
               productId: item.productId,
               warehouseId: receipt.receivedWarehouseId,
-              locationId: 1, // default
+              // locationId is optional — leave unassigned rather than
+              // hardcoding a WarehouseLocation id that may not exist.
               quantityOnHand: intakeQty,
               quantityReserved: 0,
               reorderPoint: 5
@@ -594,16 +618,6 @@ const validateReceipt = async (req, res, next) => {
         });
       }
 
-      // Update receipt status
-      const updated = await tx.goodsReceipt.update({
-        where: { id: receipt.id },
-        data: {
-          status: 'DONE',
-          receivedBy,
-          receivedDate: new Date()
-        }
-      });
-
       await tx.purchaseOrder.update({
         where: { id: po.id },
         data: { status: 'RECEIVED' }
@@ -612,7 +626,7 @@ const validateReceipt = async (req, res, next) => {
       // Check if PO is completed
       await checkAndUpdatePoCompletion(tx, po.id);
 
-      return updated;
+      return tx.goodsReceipt.findUnique({ where: { id: receipt.id } });
     });
 
     res.json({ success: true, message: 'Goods receipt validated successfully', data: updatedReceipt });

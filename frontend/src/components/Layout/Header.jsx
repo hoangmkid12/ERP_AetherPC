@@ -1,8 +1,9 @@
-import React, { useState, useRef, useEffect } from 'react';
+﻿import React, { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useCart } from '../../context/CartContext';
-import { useNotification } from '../../context/NotificationContext';
+import { useNotification, notify } from '../../context/NotificationContext';
+import { api } from '../../services/api';
 import {
   ShoppingBag, Cpu, LogIn, LogOut, LayoutDashboard,
   ChevronDown, Tag, Newspaper, Building2, Users,
@@ -44,7 +45,7 @@ const NAV_ITEMS = [
 ];
 
 export default function Header() {
-  const { user, logout, isAuthenticated, updateUser } = useAuth();
+  const { user, logout, isAuthenticated } = useAuth();
   const { cartCount, wishlist, toggleWishlist, addToCart } = useCart();
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotification();
   const navigate = useNavigate();
@@ -53,14 +54,7 @@ export default function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [wishlistOpen, setWishlistOpen] = useState(false);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
-  const [profileModalOpen, setProfileModalOpen] = useState(false);
   const [passwordModalOpen, setPasswordModalOpen] = useState(false);
-  const [isEditingProfile, setIsEditingProfile] = useState(false);
-  const [editName, setEditName] = useState('');
-  const [editEmail, setEditEmail] = useState('');
-  const [editPhone, setEditPhone] = useState('');
-  const [editAddress, setEditAddress] = useState('');
-  const [editCity, setEditCity] = useState('');
   const [notificationOpen, setNotificationOpen] = useState(false);
   const dropdownRef = useRef(null);
   const notificationRef = useRef(null);
@@ -110,41 +104,6 @@ export default function Header() {
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
-
-  const handleOpenProfile = () => {
-    setEditName(user?.fullname || user?.name || '');
-    setEditEmail(user?.email || '');
-    setEditPhone(user?.phone || '');
-    setEditAddress(user?.address || '');
-    setEditCity(user?.city || '');
-    setIsEditingProfile(false);
-    setProfileModalOpen(true);
-  };
-
-  const handleSaveProfile = async (e) => {
-    e.preventDefault();
-    if (!editName.trim()) {
-      alert('Họ tên không được để trống!');
-      return;
-    }
-    if (!editEmail.trim()) {
-      alert('Email không được để trống!');
-      return;
-    }
-    try {
-      await updateUser({
-        name: editName,
-        email: editEmail,
-        phone: editPhone,
-        address: editAddress,
-        city: editCity
-      });
-      alert('Cập nhật thông tin thành công!');
-      setIsEditingProfile(false);
-    } catch (err) {
-      alert('Có lỗi xảy ra khi cập nhật thông tin: ' + err.message);
-    }
-  };
 
   return (
     <>
@@ -1000,11 +959,11 @@ export default function Header() {
                         onClick={() => {
                           const inStock = (Number(item.stockQuantity) > 0 || Number(item.stock) > 0) && !item.isPreorder;
                           if (!inStock) {
-                            alert('Sản phẩm này hiện đang trong diện ĐẶT TRƯỚC, vui lòng liên hệ CSKH để được hỗ trợ!');
+                            notify('Sản phẩm này hiện đang trong diện ĐẶT TRƯỚC, vui lòng liên hệ CSKH để được hỗ trợ!', 'error');
                             return;
                           }
                           addToCart(item, 1);
-                          alert(`✅ Đã thêm ${item.name} vào giỏ hàng!`);
+                          notify(`✅ Đã thêm ${item.name} vào giỏ hàng!`, 'success');
                         }}
                         style={{
                           background: '#eff6ff', border: '1px solid #bfdbfe',
@@ -1063,211 +1022,6 @@ export default function Header() {
         </div>
       )}
 
-      {/* Profile Info / Edit Modal */}
-      {profileModalOpen && (
-        <div style={{
-          position: 'fixed',
-          top: 0, left: 0, right: 0, bottom: 0,
-          backgroundColor: 'rgba(15, 23, 42, 0.55)',
-          backdropFilter: 'blur(6px)',
-          zIndex: 1100,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '1.5rem',
-        }}
-          onClick={() => setProfileModalOpen(false)}
-        >
-          <div style={{
-            width: '100%',
-            maxWidth: '520px',
-            backgroundColor: '#ffffff',
-            border: '1px solid #cbd5e1',
-            borderRadius: '20px',
-            padding: '2rem',
-            color: '#0f172a',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '1.25rem',
-            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-            animation: 'fadeIn 0.25s ease-out'
-          }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Modal Header */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '1rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', color: '#2563eb' }}>
-                <Users size={22} color="#2563eb" />
-                <h3 style={{ fontSize: '1.25rem', margin: 0, fontWeight: 800, color: '#0f172a', fontFamily: 'var(--font-title)' }}>
-                  {isEditingProfile ? 'Chỉnh Sửa Thông Tin Cá Nhân' : 'Thông Tin Cá Nhân'}
-                </h3>
-              </div>
-              <button 
-                onClick={() => setProfileModalOpen(false)}
-                style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: '0.25rem', borderRadius: '6px' }}
-                title="Đóng"
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            {/* Modal Body */}
-            {isEditingProfile ? (
-              <form onSubmit={handleSaveProfile} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                  <label style={{ fontSize: '0.82rem', fontWeight: 700, color: '#334155' }}>
-                    Họ và Tên <span style={{ color: '#ef4444' }}>*</span>
-                  </label>
-                  <input 
-                    type="text" 
-                    value={editName} 
-                    onChange={(e) => setEditName(e.target.value)} 
-                    required 
-                    placeholder="Nhập họ và tên..."
-                    style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '10px', border: '1.5px solid #cbd5e1', fontSize: '0.9rem', color: '#0f172a', backgroundColor: '#ffffff', outline: 'none', boxSizing: 'border-box' }}
-                  />
-                </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                  <label style={{ fontSize: '0.82rem', fontWeight: 700, color: '#334155' }}>
-                    Địa chỉ Email <span style={{ color: '#ef4444' }}>*</span>
-                  </label>
-                  <input 
-                    type="email" 
-                    value={editEmail} 
-                    onChange={(e) => setEditEmail(e.target.value)} 
-                    required 
-                    placeholder="example@domain.com"
-                    style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '10px', border: '1.5px solid #cbd5e1', fontSize: '0.9rem', color: '#0f172a', backgroundColor: '#ffffff', outline: 'none', boxSizing: 'border-box' }}
-                  />
-                </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                  <label style={{ fontSize: '0.82rem', fontWeight: 700, color: '#334155' }}>Số điện thoại liên hệ</label>
-                  <input 
-                    type="tel" 
-                    value={editPhone} 
-                    onChange={(e) => setEditPhone(e.target.value)} 
-                    placeholder="Nhập số điện thoại..."
-                    style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '10px', border: '1.5px solid #cbd5e1', fontSize: '0.9rem', color: '#0f172a', backgroundColor: '#ffffff', outline: 'none', boxSizing: 'border-box' }}
-                  />
-                </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                  <label style={{ fontSize: '0.82rem', fontWeight: 700, color: '#334155' }}>Tỉnh / Thành phố</label>
-                  <select 
-                    value={editCity} 
-                    onChange={(e) => setEditCity(e.target.value)}
-                    style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '10px', border: '1.5px solid #cbd5e1', fontSize: '0.9rem', color: '#0f172a', backgroundColor: '#ffffff', outline: 'none', boxSizing: 'border-box' }}
-                  >
-                    <option value="">-- Chọn Tỉnh / Thành phố --</option>
-                    {['TP. Hồ Chí Minh', 'TP. Hà Nội', 'TP. Đà Nẵng', 'TP. Hải Phòng', 'TP. Cần Thơ', 'An Giang', 'Bà Rịa - Vũng Tàu', 'Bắc Giang', 'Bắc Ninh', 'Bến Tre', 'Bình Định', 'Bình Dương', 'Bình Thuận', 'Cà Mau', 'Đắk Lắk', 'Đồng Nai', 'Đồng Tháp', 'Gia Lai', 'Hải Dương', 'Khánh Hòa', 'Kiên Giang', 'Lâm Đồng', 'Long An', 'Nam Định', 'Nghệ An', 'Ninh Bình', 'Phú Thọ', 'Quảng Nam', 'Quảng Ngãi', 'Quảng Ninh', 'Thái Bình', 'Thái Nguyên', 'Thanh Hóa', 'Thừa Thiên Huế', 'Tiền Giang', 'Vĩnh Long', 'Vĩnh Phúc'].map((prov, i) => (
-                      <option key={i} value={prov}>{prov}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                  <label style={{ fontSize: '0.82rem', fontWeight: 700, color: '#334155' }}>Địa chỉ nhà (Số nhà, Đường, Phường/Xã, Quận/Huyện...)</label>
-                  <input 
-                    type="text" 
-                    value={editAddress} 
-                    onChange={(e) => setEditAddress(e.target.value)} 
-                    placeholder="Ví dụ: 123 Nguyễn Văn Cừ, Phường 4, Quận 5..."
-                    style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '10px', border: '1.5px solid #cbd5e1', fontSize: '0.9rem', color: '#0f172a', backgroundColor: '#ffffff', outline: 'none', boxSizing: 'border-box' }}
-                  />
-                </div>
-
-                {/* Modal Footer (Editing mode) */}
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', borderTop: '1px solid #e2e8f0', paddingTop: '1.25rem', marginTop: '0.5rem' }}>
-                  <button 
-                    type="button"
-                    onClick={() => setIsEditingProfile(false)}
-                    style={{ padding: '0.6rem 1.4rem', borderRadius: '10px', border: '1px solid #cbd5e1', backgroundColor: '#f1f5f9', color: '#0f172a', fontWeight: 700, fontSize: '0.875rem', cursor: 'pointer' }}
-                  >
-                    Hủy
-                  </button>
-                  <button 
-                    type="submit"
-                    style={{ padding: '0.6rem 1.4rem', borderRadius: '10px', border: 'none', backgroundColor: '#2563eb', color: '#ffffff', fontWeight: 700, fontSize: '0.875rem', cursor: 'pointer', boxShadow: '0 4px 12px rgba(37,99,235,0.25)' }}
-                  >
-                    Lưu Thông Tin
-                  </button>
-                </div>
-              </form>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 2fr', gap: '0.5rem', alignItems: 'center' }}>
-                  <span style={{ color: '#475569', fontSize: '0.88rem', fontWeight: 600 }}>Họ và Tên:</span>
-                  <strong style={{ color: '#0f172a', fontSize: '0.95rem', fontWeight: 800 }}>{user?.fullname || user?.name || 'N/A'}</strong>
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 2fr', gap: '0.5rem', alignItems: 'center' }}>
-                  <span style={{ color: '#475569', fontSize: '0.88rem', fontWeight: 600 }}>Địa chỉ Email:</span>
-                  <span style={{ color: '#0f172a', fontSize: '0.92rem', fontWeight: 500 }}>{user?.email || 'N/A'}</span>
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 2fr', gap: '0.5rem', alignItems: 'center' }}>
-                  <span style={{ color: '#475569', fontSize: '0.88rem', fontWeight: 600 }}>Số điện thoại:</span>
-                  <span style={{ color: '#0f172a', fontSize: '0.92rem', fontWeight: 600 }}>{user?.phone || 'Chưa cung cấp'}</span>
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 2fr', gap: '0.5rem', alignItems: 'center' }}>
-                  <span style={{ color: '#475569', fontSize: '0.88rem', fontWeight: 600 }}>Địa chỉ:</span>
-                  <span style={{ color: '#0f172a', fontSize: '0.92rem' }}>{user?.address || 'Chưa cung cấp'}</span>
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 2fr', gap: '0.5rem', alignItems: 'center' }}>
-                  <span style={{ color: '#475569', fontSize: '0.88rem', fontWeight: 600 }}>Tỉnh/Thành phố:</span>
-                  <span style={{ color: '#0f172a', fontSize: '0.92rem' }}>{user?.city || 'Chưa cung cấp'}</span>
-                </div>
-
-                {user?.role === 'CUSTOMER' && (
-                  <>
-                    <div style={{ height: '1px', backgroundColor: '#e2e8f0', margin: '0.5rem 0' }} />
-                    <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 2fr', gap: '0.5rem', alignItems: 'center' }}>
-                      <span style={{ color: '#475569', fontSize: '0.88rem', fontWeight: 600 }}>Hạng thành viên:</span>
-                      <div style={{ 
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '0.35rem',
-                        backgroundColor: user.tier?.toUpperCase() === 'SILVER' ? '#e2e8f0' : '#fef3c7',
-                        color: getTierColor(user.tier), 
-                        fontWeight: 900,
-                        fontSize: '0.88rem',
-                        padding: '4px 10px',
-                        borderRadius: '8px',
-                        width: 'fit-content',
-                        border: user.tier?.toUpperCase() === 'SILVER' ? '1px solid #cbd5e1' : '1px solid #fde68a'
-                      }}>
-                        <Star size={14} fill={getTierColor(user?.tier)} color={getTierColor(user?.tier)} />
-                        {getTierDisplay(user?.tier)}
-                      </div>
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 2fr', gap: '0.5rem', alignItems: 'center' }}>
-                      <span style={{ color: '#475569', fontSize: '0.88rem', fontWeight: 600 }}>Điểm tích lũy:</span>
-                      <span style={{ fontSize: '1rem', fontWeight: 800, color: '#16a34a' }}>{user?.loyaltyPoints || 0}đ</span>
-                    </div>
-                  </>
-                )}
-
-                {/* Modal Footer (Viewing mode) */}
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', borderTop: '1px solid #e2e8f0', paddingTop: '1.25rem', marginTop: '0.5rem' }}>
-                  <button 
-                    onClick={() => setProfileModalOpen(false)}
-                    style={{ padding: '0.6rem 1.4rem', borderRadius: '10px', border: '1px solid #cbd5e1', backgroundColor: '#f1f5f9', color: '#0f172a', fontWeight: 700, fontSize: '0.875rem', cursor: 'pointer' }}
-                  >
-                    Đóng
-                  </button>
-                  <button 
-                    onClick={() => setIsEditingProfile(true)}
-                    style={{ padding: '0.6rem 1.4rem', borderRadius: '10px', border: 'none', backgroundColor: '#2563eb', color: '#ffffff', fontWeight: 700, fontSize: '0.875rem', cursor: 'pointer', boxShadow: '0 4px 12px rgba(37,99,235,0.25)' }}
-                  >
-                    Chỉnh Sửa
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
       {/* Password Modal */}
       {passwordModalOpen && (
         <div style={{
@@ -1322,15 +1076,17 @@ export default function Header() {
               const confirmPassword = e.target.confirmPassword.value;
 
               if (newPassword !== confirmPassword) {
-                alert('Mật khẩu mới và mật khẩu xác nhận không khớp!');
+                notify('Mật khẩu mới và mật khẩu xác nhận không khớp!', 'error');
                 return;
               }
 
               try {
-                alert('Đổi mật khẩu thành công!');
+                await api.put('/auth/change-password', { currentPassword, newPassword });
+                notify('Đổi mật khẩu thành công!', 'success');
                 setPasswordModalOpen(false);
+                e.target.reset();
               } catch (err) {
-                alert('Có lỗi xảy ra: ' + err.message);
+                notify('Có lỗi xảy ra: ' + err.message, 'error');
               }
             }}
               style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}

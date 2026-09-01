@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useCart } from '../../context/CartContext';
 import { useAuth } from '../../context/AuthContext';
 import { useSalesStore } from '../../stores';
-import { useNotification } from '../../context/NotificationContext';
+import { useNotification, confirm } from '../../context/NotificationContext';
 import { 
   ShoppingCart, ShoppingBag, Trash2, ArrowLeft, CreditCard, Sparkles, 
   MapPin, User, Phone, Lock, LogIn, UserPlus, CheckCircle, 
@@ -305,7 +305,7 @@ export default function Cart() {
     setSelectedKeys(newSelected);
   };
 
-  const handleDeleteSelected = () => {
+  const handleDeleteSelected = async () => {
     const keysToRemove = validCartItems
       .map(getItemKey)
       .filter((key) => key && selectedKeys[key]);
@@ -315,7 +315,7 @@ export default function Cart() {
       return;
     }
 
-    if (window.confirm(`Bạn có chắc chắn muốn xóa ${keysToRemove.length} sản phẩm đã chọn khỏi giỏ hàng?`)) {
+    if (await confirm(`Bạn có chắc chắn muốn xóa ${keysToRemove.length} sản phẩm đã chọn khỏi giỏ hàng?`, { danger: true })) {
       removeSelectedFromCart(keysToRemove);
     }
   };

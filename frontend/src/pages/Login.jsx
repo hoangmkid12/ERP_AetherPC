@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { notify } from '../context/NotificationContext';
 import { 
   LogIn, Key, User as UserIcon, AlertTriangle, UserPlus, 
   ArrowLeft, ShieldAlert
@@ -88,7 +89,7 @@ export default function Login() {
           name: name.trim(),
           phone: phoneTrim
         });
-        alert('Đăng ký tài khoản khách hàng thành công!');
+        notify('Đăng ký tài khoản khách hàng thành công!', 'success');
         navigate('/');
       } else {
         setLoading(true);

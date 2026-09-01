@@ -257,6 +257,13 @@ export default function Sidebar() {
       label: 'Quản Trị Hệ Thống & Phân Quyền',
       icon: <Settings size={18} />,
       visible: canRead('system') || isAdmin
+    },
+    {
+      id: 'my-payroll',
+      path: '/admin/my-payroll',
+      label: 'Lương Của Tôi',
+      icon: <User size={18} />,
+      visible: true
     }
   ];
 
