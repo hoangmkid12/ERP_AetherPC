@@ -248,7 +248,7 @@ export default function Careers() {
         }}>
           <div className="container">
             <span className="badge badge-success" style={{ marginBottom: '1.25rem', fontSize: '0.8rem', padding: '0.4rem 1rem' }}>
-              👥 Đang Tuyển Dụng
+              Đang Tuyển Dụng
             </span>
             <h1 style={{
               fontSize: 'clamp(1.75rem, 4vw, 2.75rem)', fontWeight: 900,

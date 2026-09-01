@@ -409,7 +409,7 @@ export const useSalesStore = create((set, get) => ({
     if (targetOrder.assignedShipperId && String(targetOrder.assignedShipperId) !== String(shipperId)) {
       return {
         success: false,
-        message: `⚠️ Đơn hàng ${orderId} đã được Shipper "${targetOrder.assignedShipperName || targetOrder.assignedShipperId}" nhận trước đó!`
+        message: `Đơn hàng ${orderId} đã được Shipper "${targetOrder.assignedShipperName || targetOrder.assignedShipperId}" nhận trước đó.`
       };
     }
 
@@ -427,7 +427,7 @@ export const useSalesStore = create((set, get) => ({
       return { success: false, message: `Không thể nhận đơn hàng ${orderId}: ${err.message}` };
     }
 
-    return { success: true, message: `✅ Đã nhận đơn hàng ${orderId} thành công!` };
+    return { success: true, message: `Đã nhận đơn hàng ${orderId} thành công.` };
   },
 
   /**

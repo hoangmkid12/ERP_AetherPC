@@ -594,7 +594,7 @@ export const useHRStore = create((set, get) => ({
       try { localStorage.setItem(STORAGE_KEYS.payrolls, JSON.stringify(nextPayrolls)); } catch (e) {}
       return { payrolls: nextPayrolls };
     });
-    notify('✅ CEO đã phê duyệt bảng lương tháng này thành công! Đã gửi lệnh chi cho Kế toán giải ngân.', 'success');
+    notify('CEO đã phê duyệt bảng lương tháng này thành công. Đã gửi lệnh chi cho Kế toán giải ngân.', 'success');
   },
 
   /**

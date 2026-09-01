@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useHRStore, useUtilityStore } from '../../stores';
 import { useAuth } from '../../context/AuthContext';
 import { DELIVERY_REGIONS } from '../../utils/deliveryRegions';
+import { ATTENDANCE_STATUS, LEAVE_STATUS, getStatusInfo, getStatusLabel } from '../../utils/statusLabels';
 import { notify } from '../../context/NotificationContext';
 import { 
   Users, UserPlus, CheckCircle, Clock, XCircle, DollarSign, CalendarCheck, 
@@ -244,14 +245,14 @@ export default function HRManager() {
     }
     setNewEmpForm({ fullname: '', username: '', role: 'SALES', department: 'Kinh Doanh', deliveryRegion: 'HCM_KV1', phone: '', salary: '8500000' });
     setShowAddEmpModal(false);
-    notify('✅ Đã tạo hồ sơ nhân viên mới thành công!', 'success');
+    notify('Đã tạo hồ sơ nhân viên mới thành công.', 'success');
   };
 
   const handleSubmitPayrollToCEO = () => {
     if (typeof submitPayrolls === 'function') {
       submitPayrolls(calculatedPayrolls);
     }
-    notify('📤 Đã gửi bảng tổng hợp lương tháng lên Ban Giám Đốc (CEO) để phê duyệt!', 'success');
+    notify('Đã gửi bảng tổng hợp lương tháng lên Ban Giám Đốc (CEO) để phê duyệt.', 'success');
   };
 
   return (
@@ -477,7 +478,7 @@ export default function HRManager() {
                 ✓ Có mặt: {presentCount}
               </span>
               <span style={{ fontSize: '0.75rem', backgroundColor: '#fffbeb', color: '#d97706', border: '1px solid #fde68a', padding: '4px 8px', borderRadius: '4px', fontWeight: 700 }}>
-                ⏱️ Đi muộn: {lateCount}
+                Đi muộn: {lateCount}
               </span>
               <span style={{ fontSize: '0.75rem', backgroundColor: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca', padding: '4px 8px', borderRadius: '4px', fontWeight: 700 }}>
                 ✕ Vắng mặt: {absentCount}
@@ -510,16 +511,23 @@ export default function HRManager() {
                         <span style={{ color: '#64748b', fontSize: '0.75rem', marginLeft: '0.4rem' }}>({emp.department || 'Kinh Doanh'})</span>
                       </td>
                       <td style={{ padding: '0.65rem 0.85rem' }}>
-                        <span style={{
-                          padding: '3px 10px',
-                          borderRadius: '12px',
-                          fontSize: '0.72rem',
-                          fontWeight: 800,
-                          backgroundColor: currentStatus === 'PRESENT' ? '#f0fdf4' : currentStatus === 'LATE' ? '#fffbeb' : currentStatus === 'ABSENT' ? '#fef2f2' : '#f1f5f9',
-                          color: currentStatus === 'PRESENT' ? '#16a34a' : currentStatus === 'LATE' ? '#d97706' : currentStatus === 'ABSENT' ? '#dc2626' : '#64748b'
-                        }}>
-                          {currentStatus === 'PRESENT' ? '✓ Có mặt' : currentStatus === 'LATE' ? '⏱️ Đi muộn' : currentStatus === 'ABSENT' ? '✕ Vắng mặt' : 'Chưa chấm'}
-                        </span>
+                        {/* 'Chưa chấm' không phải trạng thái backend thật (PRESENT/LATE/ABSENT) — là suy diễn phía client khi chưa có dữ liệu chấm công, nên không đưa vào dictionary chung. */}
+                        {['PRESENT', 'LATE', 'ABSENT'].includes(currentStatus) ? (
+                          <span style={{
+                            padding: '3px 10px',
+                            borderRadius: '12px',
+                            fontSize: '0.72rem',
+                            fontWeight: 800,
+                            backgroundColor: getStatusInfo(ATTENDANCE_STATUS, currentStatus).bg,
+                            color: getStatusInfo(ATTENDANCE_STATUS, currentStatus).color
+                          }}>
+                            {getStatusLabel(ATTENDANCE_STATUS, currentStatus)}
+                          </span>
+                        ) : (
+                          <span style={{ padding: '3px 10px', borderRadius: '12px', fontSize: '0.72rem', fontWeight: 800, backgroundColor: '#f1f5f9', color: '#64748b' }}>
+                            Chưa chấm
+                          </span>
+                        )}
                       </td>
                       <td style={{ padding: '0.65rem 0.85rem', textAlign: 'center' }}>
                         <div style={{ display: 'flex', justifyContent: 'center', gap: '0.35rem' }}>
@@ -621,7 +629,7 @@ export default function HRManager() {
                             color: '#1d4ed8',
                             border: '1px solid #bfdbfe'
                           }}>
-                            📍 {DELIVERY_REGIONS.find(r => r.code === emp.deliveryRegion)?.shortName || emp.deliveryRegion}
+                            {DELIVERY_REGIONS.find(r => r.code === emp.deliveryRegion)?.shortName || emp.deliveryRegion}
                           </span>
                         )}
                       </div>
@@ -688,15 +696,16 @@ export default function HRManager() {
                     <td style={{ padding: '0.65rem 0.85rem', color: '#475569' }}>{lv.startDate || '18/08/2026'} → {lv.endDate || '19/08/2026'}</td>
                     <td style={{ padding: '0.65rem 0.85rem', color: '#64748b' }}>"{lv.reason || 'Có việc gia đình'}"</td>
                     <td style={{ padding: '0.65rem 0.85rem' }}>
+                      {/* Bất kỳ trạng thái nào khác APPROVED/REJECTED (kể cả PENDING_CEO) đều coi là "Chờ Duyệt" — giữ đúng hành vi gốc trước khi có dictionary chung. */}
                       <span style={{
                         padding: '2px 8px',
                         borderRadius: '10px',
                         fontSize: '0.7rem',
                         fontWeight: 800,
-                        backgroundColor: lv.status === 'APPROVED' ? '#f0fdf4' : lv.status === 'REJECTED' ? '#fef2f2' : '#fffbeb',
-                        color: lv.status === 'APPROVED' ? '#16a34a' : lv.status === 'REJECTED' ? '#dc2626' : '#d97706'
+                        backgroundColor: getStatusInfo(LEAVE_STATUS, ['APPROVED', 'REJECTED'].includes(lv.status) ? lv.status : 'PENDING').bg,
+                        color: getStatusInfo(LEAVE_STATUS, ['APPROVED', 'REJECTED'].includes(lv.status) ? lv.status : 'PENDING').color
                       }}>
-                        {lv.status === 'APPROVED' ? 'Đã duyệt' : lv.status === 'REJECTED' ? 'Từ chối' : 'Chờ duyệt'}
+                        {getStatusLabel(LEAVE_STATUS, ['APPROVED', 'REJECTED'].includes(lv.status) ? lv.status : 'PENDING')}
                       </span>
                     </td>
                     <td style={{ padding: '0.65rem 0.85rem', textAlign: 'center' }}>
@@ -705,7 +714,7 @@ export default function HRManager() {
                           <button
                             onClick={() => {
                               approveLeaveRequest(lv.id);
-                              notify('✅ Đã duyệt đơn xin nghỉ phép!', 'success');
+                              notify('Đã duyệt đơn xin nghỉ phép.', 'success');
                             }}
                             style={{ backgroundColor: '#16a34a', color: '#ffffff', border: 'none', borderRadius: '4px', padding: '0.3rem 0.65rem', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer' }}
                           >
@@ -788,7 +797,7 @@ export default function HRManager() {
                     </td>
                     <td style={{ padding: '0.65rem 0.85rem', textAlign: 'center' }}>
                       <span style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 800, backgroundColor: '#f1f5f9', color: '#475569' }}>
-                        Dự thảo (Draft)
+                        Dự Thảo
                       </span>
                     </td>
                   </tr>
@@ -883,7 +892,7 @@ export default function HRManager() {
 
                   <div style={{ backgroundColor: '#eff6ff', padding: '0.75rem', borderRadius: '8px', border: '1.5px solid #bfdbfe' }}>
                     <label style={{ display: 'block', fontWeight: 800, color: '#1e40af', marginBottom: '0.35rem' }}>
-                      📍 Khu Vực Giao Hàng Đảm Nhiệm (Delivery Region) *
+                      Khu Vực Giao Hàng Đảm Nhiệm (Delivery Region) *
                     </label>
                     <select
                       value={newEmpForm.deliveryRegion || 'HCM_KV1'}

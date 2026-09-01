@@ -221,7 +221,7 @@ export default function Chatbot() {
   const [cskhMessages, setCskhMessages] = useState([
     {
       sender: 'cskh',
-      text: 'Xin chào! 🎧 Bạn đang kết nối trực tiếp với Chuyên viên CSKH AetherPC (Trực tuyến 24/7). Hãy gửi thắc mắc của bạn, nhân viên CSKH sẵn sàng phản hồi bạn ngay lập tức theo thời gian thực!',
+      text: 'Xin chào! Bạn đang kết nối trực tiếp với Chuyên viên CSKH AetherPC (Trực tuyến 24/7). Hãy gửi thắc mắc của bạn, nhân viên CSKH sẽ phản hồi trong thời gian sớm nhất.',
       time: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
     }
   ]);
@@ -246,7 +246,7 @@ export default function Chatbot() {
     });
     setMessages(prev => [...prev, {
       sender: 'bot',
-      text: `Dạ rồi ạ! Tôi đã thêm toàn bộ **${count} linh kiện** trong cấu hình (~${formatPrice(total)}) vào giỏ hàng của bạn thành công! 🛒✨ Hãy mở giỏ hàng để tiến hành chốt đơn nhé.`,
+      text: `Đã thêm toàn bộ **${count} linh kiện** trong cấu hình (~${formatPrice(total)}) vào giỏ hàng của bạn. Hãy mở giỏ hàng để tiến hành chốt đơn.`,
       time: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
     }]);
   };
@@ -312,7 +312,7 @@ export default function Chatbot() {
     setCskhMessages([
       {
         sender: 'cskh',
-        text: `Xin chào ${custName.replace(' (Khách Hàng)', '')}! 🎧 Bạn đang kết nối trực tiếp với Chuyên viên CSKH AetherPC (Trực tuyến 24/7). Hãy gửi thắc mắc của bạn, nhân viên CSKH sẵn sàng phản hồi bạn ngay lập tức theo thời gian thực!`,
+        text: `Xin chào ${custName.replace(' (Khách Hàng)', '')}! Bạn đang kết nối trực tiếp với Chuyên viên CSKH AetherPC (Trực tuyến 24/7). Hãy gửi thắc mắc của bạn, nhân viên CSKH sẽ phản hồi trong thời gian sớm nhất.`,
         time: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
       }
     ]);
@@ -346,7 +346,7 @@ export default function Chatbot() {
                 setCskhMessages([
                   {
                     sender: 'cskh',
-                    text: `Xin chào ${custName.replace(' (Khách Hàng)', '')}! 🎧 Bạn đang kết nối trực tiếp với Chuyên viên CSKH AetherPC (Trực tuyến 24/7). Hãy gửi thắc mắc của bạn, nhân viên CSKH sẵn sàng phản hồi bạn ngay lập tức theo thời gian thực!`,
+                    text: `Xin chào ${custName.replace(' (Khách Hàng)', '')}! Bạn đang kết nối trực tiếp với Chuyên viên CSKH AetherPC (Trực tuyến 24/7). Hãy gửi thắc mắc của bạn, nhân viên CSKH sẽ phản hồi trong thời gian sớm nhất.`,
                     time: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
                   }
                 ]);
@@ -490,7 +490,7 @@ export default function Chatbot() {
         setTimeout(() => {
           setMessages(prev => [...prev, {
             sender: 'bot',
-            text: `Dạ, Trợ lý AI đã tự động phân tích và thiết kế cấu hình PC tối ưu nhất cho mức ngân sách **${formatPrice(extractedBudget)}** (~${formatPrice(totalPrice)}).\n\nBạn có thể xem danh sách từng linh kiện bên dưới và nhấn **"Thêm Toàn Bộ Vào Giỏ Hàng"** để chốt đơn ngay nhé! 🛒✨`,
+            text: `Trợ lý AI đã tự động phân tích và thiết kế cấu hình PC tối ưu nhất cho mức ngân sách **${formatPrice(extractedBudget)}** (~${formatPrice(totalPrice)}).\n\nBạn có thể xem danh sách từng linh kiện bên dưới và nhấn **"Thêm Toàn Bộ Vào Giỏ Hàng"** để chốt đơn.`,
             time: botTime,
             layout: 'build_recommendation',
             buildData: recommendedBuild,
@@ -545,7 +545,7 @@ export default function Chatbot() {
       } else {
         const reply = {
           sender: 'bot',
-          text: 'Dạ, tôi đã tiếp nhận thắc mắc của bạn! Bạn có thể xem thêm danh mục sản phẩm trên website hoặc bấm **"Gặp NV CSKH"** để trò chuyện trực tiếp với chuyên viên CSKH AetherPC nhé! 😊',
+          text: 'Tôi đã tiếp nhận thắc mắc của bạn. Bạn có thể xem thêm danh mục sản phẩm trên website hoặc bấm **"Gặp NV CSKH"** để trò chuyện trực tiếp với chuyên viên CSKH AetherPC.',
           time: botTime
         };
         setMessages(prev => [...prev, reply]);
@@ -633,7 +633,7 @@ export default function Chatbot() {
 
         setMessages(prev => [...prev, {
           sender: 'bot',
-          text: `Chúc mừng! 🎉 Trợ lý AI đã thiết kế xong cấu hình máy tính tối ưu nhất cho bạn (~${formatPrice(totalPrice)}).\n\nBạn có thể xem danh sách từng linh kiện bên dưới và nhấn **"Thêm Toàn Bộ Vào Giỏ Hàng"** để chốt đơn ngay nhé! 🛒✨`,
+          text: `Trợ lý AI đã thiết kế xong cấu hình máy tính tối ưu nhất cho bạn (~${formatPrice(totalPrice)}).\n\nBạn có thể xem danh sách từng linh kiện bên dưới và nhấn **"Thêm Toàn Bộ Vào Giỏ Hàng"** để chốt đơn.`,
           time: botTime,
           layout: 'build_recommendation',
           buildData: recommendedBuild,
@@ -718,7 +718,7 @@ export default function Chatbot() {
                   {chatMode === 'ai' ? 'Trợ lý AI AetherPC' : 'CSKH AetherPC'}
                 </h4>
                 <div style={{ fontSize: '0.72rem', color: '#dbeafe', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {chatMode === 'ai' ? 'Hỗ trợ tự động 24/7' : '🟢 Sẵn sàng chat live'}
+                  {chatMode === 'ai' ? 'Hỗ trợ tự động 24/7' : 'Sẵn sàng chat live'}
                 </div>
               </div>
             </div>
@@ -736,7 +736,7 @@ export default function Chatbot() {
                     transition: 'all 0.15s'
                   }}
                 >
-                  🤖 AI
+                  AI
                 </button>
                 <button
                   onClick={() => setChatMode('cskh')}
@@ -748,7 +748,7 @@ export default function Chatbot() {
                     transition: 'all 0.15s'
                   }}
                 >
-                  🎧 CSKH
+                  CSKH
                 </button>
               </div>
 
@@ -808,10 +808,10 @@ export default function Chatbot() {
                   {msg.layout === 'quiz_usage' && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '0.75rem' }}>
                       {[
-                        { label: '🎮 Chơi Game', val: 'gaming' },
-                        { label: '🎨 Đồ Hoạ & Thiết Kế', val: 'graphics' },
-                        { label: '💻 Lập Trình & AI', val: 'ai' },
-                        { label: '💼 Học Tập & Văn Phòng', val: 'office' }
+                        { label: 'Chơi Game', val: 'gaming' },
+                        { label: 'Đồ Hoạ & Thiết Kế', val: 'graphics' },
+                        { label: 'Lập Trình & AI', val: 'ai' },
+                        { label: 'Học Tập & Văn Phòng', val: 'office' }
                       ].map((item, idx) => (
                         <button
                           key={idx}
@@ -855,9 +855,9 @@ export default function Chatbot() {
                   {msg.layout === 'quiz_brand' && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '0.75rem' }}>
                       {[
-                        { label: 'Intel 🔵 (Hiệu năng ổn định)', val: 'intel' },
-                        { label: 'AMD / Ryzen 🔴 (Đa nhiệm mạnh mẽ)', val: 'amd' },
-                        { label: 'Hãng nào cũng được 🌐', val: 'all' }
+                        { label: 'Intel (Hiệu năng ổn định)', val: 'intel' },
+                        { label: 'AMD / Ryzen (Đa nhiệm mạnh mẽ)', val: 'amd' },
+                        { label: 'Hãng nào cũng được', val: 'all' }
                       ].map((item, idx) => (
                         <button
                           key={idx}
@@ -933,7 +933,7 @@ export default function Chatbot() {
                                   addToCart(p, 1);
                                   setMessages(prev => [...prev, {
                                     sender: 'bot',
-                                    text: `Dạ rồi ạ! Tôi đã thêm sản phẩm **${p.name}** (~${formatPrice(p.price)}) vào giỏ hàng cho bạn thành công! 🛒✨`,
+                                    text: `Đã thêm sản phẩm **${p.name}** (~${formatPrice(p.price)}) vào giỏ hàng cho bạn.`,
                                     time: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
                                   }]);
                                 }}
@@ -1038,7 +1038,7 @@ export default function Chatbot() {
             {isTyping && (
               <div style={{ alignSelf: 'flex-start', maxWidth: '85%' }}>
                 <div style={{ padding: '0.6rem 0.85rem', borderRadius: '12px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', color: '#64748b', fontSize: '0.8rem', fontWeight: 700 }}>
-                  💬 Đang phản hồi...
+                  Đang phản hồi...
                 </div>
               </div>
             )}
@@ -1057,10 +1057,10 @@ export default function Chatbot() {
             flexShrink: 0
           }}>
             {[
-              { label: '🎧 Gặp NV CSKH', action: () => setChatMode('cskh') },
-              { label: '⚡ Tư vấn PC', action: () => handleSend('Tư vấn nhu cầu') },
-              { label: '📦 Chính sách bảo hành', action: () => handleSend('Chính sách bảo hành và đổi trả như thế nào?') },
-              { label: '💳 Trả góp', action: () => handleSend('Cửa hàng có hỗ trợ mua trả góp không?') }
+              { label: 'Gặp NV CSKH', action: () => setChatMode('cskh') },
+              { label: 'Tư vấn PC', action: () => handleSend('Tư vấn nhu cầu') },
+              { label: 'Chính sách bảo hành', action: () => handleSend('Chính sách bảo hành và đổi trả như thế nào?') },
+              { label: 'Trả góp', action: () => handleSend('Cửa hàng có hỗ trợ mua trả góp không?') }
             ].map((p, idx) => (
               <button
                 key={idx}

@@ -40,15 +40,15 @@ ChartJS.register(
 );
 
 const DEFECT_LABELS = {
-  PACKAGE_DAMAGED: '📦 Móp hộp outer / Rách seal niêm phong',
-  ELECTRICAL_POWER_FAIL: '⚡ Lỗi nguồn / Không lên điện / Lỗi mạch',
-  SERIAL_WARRANTY_MISSING: '🏷️ Thiếu tem bảo hành / Sai mã Serial',
-  SPEC_MISMATCH: '⚙️ Trầy xước / Sai thông số kỹ thuật',
-  COUNTERFEIT_FAKE: '🚫 Hàng không chính hãng / Lỗi phụ kiện',
-  DOA_FACTORY_DEFECT: '💥 Lỗi phần cứng do Nhà Sản Xuất (DOA - Không POST / Lỗi chip)',
-  USER_PHYSICAL_DAMAGE: '⚠️ Hư hỏng do người dùng (Cong socket CPU / Rơi vỡ / Vào nước)',
-  NORMAL_RESTOCK: '✨ Hàng nguyên seal / Khách đổi ý (Đủ điều kiện nhập kho lại)',
-  NONE: '✅ Đạt tiêu chuẩn hoàn hảo'
+  PACKAGE_DAMAGED: 'Móp hộp outer / Rách seal niêm phong',
+  ELECTRICAL_POWER_FAIL: 'Lỗi nguồn / Không lên điện / Lỗi mạch',
+  SERIAL_WARRANTY_MISSING: 'Thiếu tem bảo hành / Sai mã Serial',
+  SPEC_MISMATCH: 'Trầy xước / Sai thông số kỹ thuật',
+  COUNTERFEIT_FAKE: 'Hàng không chính hãng / Lỗi phụ kiện',
+  DOA_FACTORY_DEFECT: 'Lỗi phần cứng do Nhà Sản Xuất (DOA - Không POST / Lỗi chip)',
+  USER_PHYSICAL_DAMAGE: 'Hư hỏng do người dùng (Cong socket CPU / Rơi vỡ / Vào nước)',
+  NORMAL_RESTOCK: 'Hàng nguyên seal / Khách đổi ý (Đủ điều kiện nhập kho lại)',
+  NONE: 'Đạt tiêu chuẩn hoàn hảo'
 };
 
 export default function QualityControl() {
@@ -238,18 +238,30 @@ export default function QualityControl() {
     let storedQaLogs = [];
     try { storedQaLogs = JSON.parse(localStorage.getItem('erp_qa_inspection_logs') || '[]'); } catch (_) { storedQaLogs = qaLogs; }
 
+    // Only let cache/context entries introduce a BRAND NEW row when the real API
+    // genuinely returned nothing — once it has data, it's authoritative on which
+    // POs exist. Otherwise stale localStorage (possibly holding ad-hoc demo status
+    // values that were never real backend statuses) would resurrect phantom PO rows
+    // alongside the real ones.
     const allPool = [...list];
-    [...localOrders, ...purchaseOrders].forEach(po => {
-      const exists = allPool.find(c => String(c.poNumber) === String(po.poNumber) || String(c.id) === String(po.id));
-      if (!exists) {
-        allPool.push(po);
-      }
-    });
+    if (list.length === 0) {
+      [...localOrders, ...purchaseOrders].forEach(po => {
+        const exists = allPool.find(c => String(c.poNumber) === String(po.poNumber) || String(c.id) === String(po.id));
+        if (!exists) {
+          allPool.push(po);
+        }
+      });
+    }
 
     const finalCombined = allPool.map(po => {
       const targetPoNum = po.poNumber || po.id;
       const localMatch = localOrders.find(l => String(l.poNumber) === String(targetPoNum) || String(l.id) === String(po.id));
-      let merged = localMatch ? { ...po, ...localMatch } : po;
+      // When the real API returned data, `po` here is guaranteed to be a real
+      // backend order (see the `list.length === 0` gate above) — never let a
+      // stale/unrecognized local-cache status overwrite its real status.
+      let merged = localMatch
+        ? { ...po, ...localMatch, status: list.length > 0 ? po.status : (localMatch.status || po.status) }
+        : po;
       
       const log = storedQaLogs.find(l => String(l.poNumber) === String(targetPoNum) || String(l.poNumber) === String(po.id) || String(l.id) === String(po.id));
       if (log && log.status) {
@@ -583,7 +595,7 @@ export default function QualityControl() {
       statusKey = 'QC_PASSED';
       resolutionText = `Đã duyệt Đổi mới 1-1 (DOA lỗi NSX). QC: ${inspectorName}`;
       if (reissueSealNeeded) {
-        resolutionText += ` [🏷️ ĐÃ CẤP LẠI TEM BẢO HÀNH MỚI]`;
+        resolutionText += ` [ĐÃ CẤP LẠI TEM BẢO HÀNH MỚI]`;
       }
     } else if (rmaDecision === 'VENDOR_WARRANTY') {
       statusKey = 'VENDOR_WARRANTY';
@@ -1094,15 +1106,15 @@ export default function QualityControl() {
                         </td>
                         <td style={{ padding: '0.65rem 0.85rem', textAlign: 'center' }}>
                           <span style={{
-                            backgroundColor: isPending ? '#fffbeb' : po.status === 'QA_PASSED' ? '#f0fdf4' : '#fff7ed',
-                            color: isPending ? '#b45309' : po.status === 'QA_PASSED' ? '#15803d' : '#c2410c',
-                            border: `1px solid ${isPending ? '#fde68a' : po.status === 'QA_PASSED' ? '#bbf7d0' : '#fed7aa'}`,
+                            backgroundColor: isPending ? '#fffbeb' : po.status === 'QA_PASSED' ? '#f0fdf4' : po.status === 'QA_REJECTED' ? '#fef2f2' : '#fff7ed',
+                            color: isPending ? '#b45309' : po.status === 'QA_PASSED' ? '#15803d' : po.status === 'QA_REJECTED' ? '#dc2626' : '#c2410c',
+                            border: `1px solid ${isPending ? '#fde68a' : po.status === 'QA_PASSED' ? '#bbf7d0' : po.status === 'QA_REJECTED' ? '#fecaca' : '#fed7aa'}`,
                             padding: '2px 8px',
                             borderRadius: '10px',
                             fontSize: '0.72rem',
                             fontWeight: 700
                           }}>
-                            {isPending ? 'CHỜ NGHIỆM THU' : po.status === 'QA_PASSED' ? 'CHO NHẬP KHO 100%' : 'NHẬP 1 PHẦN'}
+                            {isPending ? 'CHỜ NGHIỆM THU' : po.status === 'QA_PASSED' ? 'CHO NHẬP KHO 100%' : po.status === 'QA_REJECTED' ? 'TỪ CHỐI QC' : 'NHẬP 1 PHẦN'}
                           </span>
                         </td>
                         <td style={{ padding: '0.65rem 0.85rem', textAlign: 'center' }}>
@@ -1116,7 +1128,7 @@ export default function QualityControl() {
                               </button>
                             ) : (
                               <span style={{ fontSize: '0.74rem', color: '#b45309', fontWeight: 600, backgroundColor: '#fef3c7', padding: '0.3rem 0.6rem', borderRadius: '4px', border: '1px solid #fde68a' }}>
-                                ⏳ Chờ QA/QC kiểm định
+                                Chờ QA/QC kiểm định
                               </span>
                             )
                           ) : (
@@ -1276,7 +1288,7 @@ export default function QualityControl() {
                   gap: '0.35rem'
                 }}
               >
-                <span>📋 Tất Cả Nguồn Hàng Trả Về</span>
+                <span>Tất Cả Nguồn Hàng Trả Về</span>
                 <span style={{ backgroundColor: rmaSourceFilter === 'ALL' ? '#2563eb' : '#f1f5f9', color: rmaSourceFilter === 'ALL' ? '#ffffff' : '#64748b', padding: '1px 6px', borderRadius: '10px', fontSize: '0.7rem' }}>
                   {filteredFailed.length + filteredRma.length}
                 </span>
@@ -1298,7 +1310,7 @@ export default function QualityControl() {
                   gap: '0.35rem'
                 }}
               >
-                <span>📦 Hàng Bom / Giao Thất Bại Hoàn Về</span>
+                <span>Hàng Bom / Giao Thất Bại Hoàn Về</span>
                 <span style={{ backgroundColor: rmaSourceFilter === 'FAILED_DELIVERY' ? '#ea580c' : '#f1f5f9', color: rmaSourceFilter === 'FAILED_DELIVERY' ? '#ffffff' : '#64748b', padding: '1px 6px', borderRadius: '10px', fontSize: '0.7rem' }}>
                   {filteredFailed.length}
                 </span>
@@ -1320,7 +1332,7 @@ export default function QualityControl() {
                   gap: '0.35rem'
                 }}
               >
-                <span>🔄 Khách Hàng Yêu Cầu Đổi Trả RMA</span>
+                <span>Khách Hàng Yêu Cầu Đổi Trả RMA</span>
                 <span style={{ backgroundColor: rmaSourceFilter === 'CUSTOMER_RMA' ? '#8b5cf6' : '#f1f5f9', color: rmaSourceFilter === 'CUSTOMER_RMA' ? '#ffffff' : '#64748b', padding: '1px 6px', borderRadius: '10px', fontSize: '0.7rem' }}>
                   {filteredRma.length}
                 </span>
@@ -1375,7 +1387,7 @@ export default function QualityControl() {
                             color: '#c2410c',
                             border: '1px solid #fdba74'
                           }}>
-                            📦 HÀNG BOM / HỦY GIAO HOÀN
+                            HÀNG BOM / HỦY GIAO HOÀN
                           </span>
                           <span style={{
                             padding: '2px 8px',
@@ -1386,19 +1398,19 @@ export default function QualityControl() {
                             color: '#92400e',
                             border: '1px solid #fde68a'
                           }}>
-                            ⏳ Chờ kiểm tra tem seal & nhập kho
+                            Chờ kiểm tra tem seal & nhập kho
                           </span>
                         </div>
 
                         <div style={{ fontSize: '0.82rem', color: '#0f172a', fontWeight: 600 }}>
-                          📦 <strong>Linh kiện trong kiện:</strong> {itemNames}
+                          <strong>Linh kiện trong kiện:</strong> {itemNames}
                         </div>
 
                         <div style={{ fontSize: '0.76rem', color: '#475569', display: 'flex', flexWrap: 'wrap', gap: '0.85rem' }}>
-                          <span>👤 Khách hàng: <strong>{ord.customerName}</strong> ({ord.phone})</span>
-                          <span>📍 Địa chỉ: {ord.shippingAddress || 'TP.HCM'}</span>
+                          <span>Khách hàng: <strong>{ord.customerName}</strong> ({ord.phone})</span>
+                          <span>Địa chỉ: {ord.shippingAddress || 'TP.HCM'}</span>
                           <span style={{ color: '#dc2626', fontWeight: 700 }}>
-                            ⚠️ Lý do hoàn: {ord.returnReason || ord.failReason || 'Khách từ chối nhận hàng / Bom hàng'}
+                            Lý do hoàn: {ord.returnReason || ord.failReason || 'Khách từ chối nhận hàng / Bom hàng'}
                           </span>
                         </div>
                       </div>
@@ -1427,7 +1439,7 @@ export default function QualityControl() {
                           </button>
                         ) : (
                           <span style={{ fontSize: '0.74rem', color: '#15803d', fontWeight: 600, backgroundColor: '#f0fdf4', padding: '0.35rem 0.65rem', borderRadius: '4px', border: '1px solid #bbf7d0' }}>
-                            ⏳ Chờ QA/QC kiểm tra tem
+                            Chờ QA/QC kiểm tra tem
                           </span>
                         )}
 
@@ -1504,7 +1516,7 @@ export default function QualityControl() {
                             color: '#6d28d9',
                             border: '1px solid #ddd6fe'
                           }}>
-                            🔄 RMA ĐỔI TRẢ BẢO HÀNH
+                            RMA ĐỔI TRẢ BẢO HÀNH
                           </span>
                           <span style={{
                             padding: '2px 8px',
@@ -1515,13 +1527,13 @@ export default function QualityControl() {
                             color: isPending ? '#b45309' : isPassed ? '#15803d' : isVendor ? '#c2410c' : '#dc2626',
                             border: `1px solid ${isPending ? '#fde68a' : isPassed ? '#86efac' : isVendor ? '#fdba74' : '#fca5a5'}`
                           }}>
-                            {isPending ? '⏳ Chờ thẩm định' : isPassed ? '✅ Đã duyệt đổi mới' : isVendor ? '🚚 Gửi hãng BH' : '❌ Từ chối BH'}
+                            {isPending ? 'Chờ thẩm định' : isPassed ? 'Đã duyệt đổi mới' : isVendor ? 'Gửi hãng BH' : 'Từ chối BH'}
                           </span>
                         </div>
 
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', fontSize: '0.82rem' }}>
                           <span style={{ fontWeight: 700, color: '#0f172a' }}>
-                            📦 {productName}
+                            {productName}
                           </span>
                           <span style={{ fontSize: '0.72rem', backgroundColor: '#e2e8f0', color: '#334155', padding: '1px 5px', borderRadius: '4px', fontFamily: 'monospace', fontWeight: 700 }}>
                             {serialNum}
@@ -1557,7 +1569,7 @@ export default function QualityControl() {
                             </button>
                           ) : (
                             <span style={{ fontSize: '0.74rem', color: '#6d28d9', fontWeight: 600, backgroundColor: '#f5f3ff', padding: '0.35rem 0.65rem', borderRadius: '4px', border: '1px solid #ddd6fe' }}>
-                              ⏳ Chờ QA/QC thẩm định
+                              Chờ QA/QC thẩm định
                             </span>
                           )
                         )}
@@ -1673,7 +1685,7 @@ export default function QualityControl() {
                             color: isRma ? '#7c3aed' : '#1d4ed8',
                             border: `1px solid ${isRma ? '#ddd6fe' : '#bfdbfe'}`
                           }}>
-                            {isRma ? '🛡️ RMA ĐỔI TRẢ' : '📦 NHẬP KHO PO'}
+                            {isRma ? 'RMA ĐỔI TRẢ' : 'NHẬP KHO PO'}
                           </span>
                         </td>
                         <td style={{ padding: '0.65rem 0.85rem', fontWeight: 600 }}>
@@ -2032,7 +2044,7 @@ export default function QualityControl() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
                   <div>
                     <span style={{ color: '#64748b' }}>Linh kiện cần kiểm tra: </span>
-                    <strong style={{ color: '#0f172a', fontSize: '0.88rem' }}>📦 {getRmaProductName(selectedRMA)}</strong>
+                    <strong style={{ color: '#0f172a', fontSize: '0.88rem' }}>{getRmaProductName(selectedRMA)}</strong>
                   </div>
                   <div>
                     <span style={{ color: '#64748b' }}>Serial xuất bán: </span>
@@ -2159,22 +2171,22 @@ export default function QualityControl() {
                 }}>
                   {warrantySealStatus === 'INTACT' && (
                     <span style={{ color: '#15803d', fontWeight: 700 }}>
-                      🟢 <strong>Hợp Lệ Tuyệt Đối:</strong> Linh kiện chính hãng AetherPC xuất bán. Đầy đủ điều kiện đổi mới 1-1 hoặc nhập lại kho.
+                      <strong>Hợp Lệ Tuyệt Đối:</strong> Linh kiện chính hãng AetherPC xuất bán. Đầy đủ điều kiện đổi mới 1-1 hoặc nhập lại kho.
                     </span>
                   )}
                   {warrantySealStatus === 'SCRATCHED_FIRMWARE_OK' && (
                     <span style={{ color: '#b45309', fontWeight: 700 }}>
-                      🟡 <strong>Hợp Lệ Thứ Cấp:</strong> Xác thực thành công qua mã khắc Laser / Firmware ROM. <em>(Đã tự động bật cờ: In & Cấp lại tem bảo hành mới sau nghiệm thu)</em>.
+                      <strong>Hợp Lệ Thứ Cấp:</strong> Xác thực thành công qua mã khắc Laser / Firmware ROM. <em>(Đã tự động bật cờ: In & Cấp lại tem bảo hành mới sau nghiệm thu)</em>.
                     </span>
                   )}
                   {warrantySealStatus === 'SHOP_LOST_VENDOR_OK' && (
                     <span style={{ color: '#c2410c', fontWeight: 700 }}>
-                      🟠 <strong>Hợp Lệ Bảo Hành Hãng:</strong> Mất tem shop nhưng còn tem Hãng. Hệ thống tự động chuyển sang luồng <em>"Gửi Hãng Bảo Hành"</em>.
+                      <strong>Hợp Lệ Bảo Hành Hãng:</strong> Mất tem shop nhưng còn tem Hãng. Hệ thống tự động chuyển sang luồng <em>"Gửi Hãng Bảo Hành"</em>.
                     </span>
                   )}
                   {warrantySealStatus === 'LOST_UNIDENTIFIED' && (
                     <span style={{ color: '#dc2626', fontWeight: 700 }}>
-                      🔴 <strong>Không Đủ Điều Kiện:</strong> Mất toàn bộ tem & không thể xác thực nguồn gốc linh kiện. Đề xuất: <em>Từ chối bảo hành đổi trả miễn phí</em>.
+                      <strong>Không Đủ Điều Kiện:</strong> Mất toàn bộ tem & không thể xác thực nguồn gốc linh kiện. Đề xuất: <em>Từ chối bảo hành đổi trả miễn phí</em>.
                     </span>
                   )}
                 </div>
@@ -2229,10 +2241,10 @@ export default function QualityControl() {
                 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
                   {[
-                    { key: 'EXCHANGE_NEW', label: '✓ ĐỔI MỚI 1-1 NGAY', desc: 'Lỗi NSX / Tem hợp lệ trong 30 ngày (Xuất mới)', color: '#16a34a', bg: '#f0fdf4' },
-                    { key: 'VENDOR_WARRANTY', label: '🚚 GỬI HÃNG BẢO HÀNH', desc: 'Chuyển TTBH Hãng (ASUS, MSI, Giga...)', color: '#2563eb', bg: '#eff6ff' },
-                    { key: 'RESTOCK_WAREHOUSE', label: '✨ NHẬP LẠI KHO BÁN LẺ', desc: 'Hàng nguyên seal / Khách đổi ý (Hoàn tiền)', color: '#0284c7', bg: '#f0f9ff' },
-                    { key: 'REJECT_RMA', label: '✕ TỪ CHỐI ĐỔI TRẢ', desc: 'Mất tem / Vi phạm điều kiện / Hư hỏng do dùng', color: '#ef4444', bg: '#fef2f2' }
+                    { key: 'EXCHANGE_NEW', label: 'ĐỔI MỚI 1-1 NGAY', desc: 'Lỗi NSX / Tem hợp lệ trong 30 ngày (Xuất mới)', color: '#16a34a', bg: '#f0fdf4' },
+                    { key: 'VENDOR_WARRANTY', label: 'GỬI HÃNG BẢO HÀNH', desc: 'Chuyển TTBH Hãng (ASUS, MSI, Giga...)', color: '#2563eb', bg: '#eff6ff' },
+                    { key: 'RESTOCK_WAREHOUSE', label: 'NHẬP LẠI KHO BÁN LẺ', desc: 'Hàng nguyên seal / Khách đổi ý (Hoàn tiền)', color: '#0284c7', bg: '#f0f9ff' },
+                    { key: 'REJECT_RMA', label: 'TỪ CHỐI ĐỔI TRẢ', desc: 'Mất tem / Vi phạm điều kiện / Hư hỏng do dùng', color: '#ef4444', bg: '#fef2f2' }
                   ].map(d => {
                     const active = rmaDecision === d.key;
                     return (
@@ -2273,11 +2285,11 @@ export default function QualityControl() {
                   onChange={e => setRmaDefectType(e.target.value)}
                   style={{ width: '100%', padding: '0.5rem 0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem', color: '#0f172a' }}
                 >
-                  <option value="DOA_FACTORY_DEFECT">💥 Lỗi phần cứng do Nhà Sản Xuất (DOA - Lỗi mạch / Không POST)</option>
-                  <option value="USER_PHYSICAL_DAMAGE">⚠️ Hư hỏng do người dùng (Cong socket CPU / Rơi vỡ / Vào nước)</option>
-                  <option value="NORMAL_RESTOCK">✨ Hàng nguyên seal / Khách đổi ý (Đủ điều kiện nhập kho lại)</option>
-                  <option value="SERIAL_WARRANTY_MISSING">🏷️ Rách nát / Mất tem bảo hành / Không thể định danh</option>
-                  <option value="ELECTRICAL_POWER_FAIL">⚡ Chập nguồn / Sốc điện từ PSU kém chất lượng</option>
+                  <option value="DOA_FACTORY_DEFECT">Lỗi phần cứng do Nhà Sản Xuất (DOA - Lỗi mạch / Không POST)</option>
+                  <option value="USER_PHYSICAL_DAMAGE">Hư hỏng do người dùng (Cong socket CPU / Rơi vỡ / Vào nước)</option>
+                  <option value="NORMAL_RESTOCK">Hàng nguyên seal / Khách đổi ý (Đủ điều kiện nhập kho lại)</option>
+                  <option value="SERIAL_WARRANTY_MISSING">Rách nát / Mất tem bảo hành / Không thể định danh</option>
+                  <option value="ELECTRICAL_POWER_FAIL">Chập nguồn / Sốc điện từ PSU kém chất lượng</option>
                 </select>
               </div>
 
@@ -2285,7 +2297,7 @@ export default function QualityControl() {
               <div style={{ marginBottom: '1.25rem', padding: '0.85rem', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
                   <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                    <span>📷 Ảnh Chụp Minh Chứng Ngoại Quan & Tem Seal (Hiển thị cho Khách hàng):</span>
+                    <span>Ảnh Chụp Minh Chứng Ngoại Quan & Tem Seal (Hiển thị cho Khách hàng):</span>
                   </label>
                   {qcProofPhoto && (
                     <button
@@ -2293,7 +2305,7 @@ export default function QualityControl() {
                       onClick={() => setQcProofPhoto('')}
                       style={{ fontSize: '0.72rem', color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700 }}
                     >
-                      ✕ Xóa ảnh
+                      Xóa ảnh
                     </button>
                   )}
                 </div>
@@ -2306,7 +2318,7 @@ export default function QualityControl() {
                       style={{ width: '90px', height: '90px', objectFit: 'cover', borderRadius: '6px', border: '1px solid #cbd5e1' }}
                     />
                     <div>
-                      <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#16a34a' }}>✓ Đã có ảnh chụp minh chứng thẩm định</div>
+                      <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#16a34a' }}>Đã có ảnh chụp minh chứng thẩm định</div>
                       <p style={{ fontSize: '0.72rem', color: '#64748b', margin: '0.2rem 0 0' }}>
                         Ảnh này sẽ hiển thị trực tiếp trong mục "Chi Tiết Đơn Hàng" của Khách Hàng để khách yên tâm sản phẩm gửi đi nguyên vẹn.
                       </p>
@@ -2328,7 +2340,7 @@ export default function QualityControl() {
                         fontWeight: 700,
                         cursor: 'pointer'
                       }}>
-                        <span>📷 Tải Lên / Chụp Ảnh Thực Tế</span>
+                        <span>Tải Lên / Chụp Ảnh Thực Tế</span>
                         <input
                           type="file"
                           accept="image/*"
@@ -2503,7 +2515,7 @@ export default function QualityControl() {
                     </td>
                     <td style={{ padding: '0.6rem 0.75rem', textAlign: 'center' }}>
                       <span style={{ color: '#15803d', fontWeight: 700, fontSize: '0.75rem' }}>
-                        ✓ Seal nguyên vẹn & Đối soát Serial OK
+                        Seal nguyên vẹn & Đối soát Serial OK
                       </span>
                     </td>
                   </tr>
@@ -2604,14 +2616,14 @@ export default function QualityControl() {
                   fontSize: '0.78rem',
                   color: !detailRMA.status || detailRMA.status === 'PENDING' ? '#b45309' : detailRMA.status === 'QC_PASSED' || detailRMA.status === 'APPROVED' ? '#15803d' : detailRMA.status === 'VENDOR_WARRANTY' ? '#c2410c' : '#dc2626'
                 }}>
-                  {!detailRMA.status || detailRMA.status === 'PENDING' ? '⏳ CHỜ THẨM ĐỊNH KỸ THUẬT' : detailRMA.status === 'QC_PASSED' || detailRMA.status === 'APPROVED' ? '✅ ĐÃ DUYỆT ĐỔI MỚI / NHẬP KHO' : detailRMA.status === 'VENDOR_WARRANTY' ? '🚚 CHUYỂN GỬI HÃNG BẢO HÀNH' : '❌ TỪ CHỐI BẢO HÀNH'}
+                  {!detailRMA.status || detailRMA.status === 'PENDING' ? 'CHỜ THẨM ĐỊNH KỸ THUẬT' : detailRMA.status === 'QC_PASSED' || detailRMA.status === 'APPROVED' ? 'ĐÃ DUYỆT ĐỔI MỚI / NHẬP KHO' : detailRMA.status === 'VENDOR_WARRANTY' ? 'CHUYỂN GỬI HÃNG BẢO HÀNH' : 'TỪ CHỐI BẢO HÀNH'}
                 </span>
               </div>
 
               {/* Customer & Product Information */}
               <div style={{ backgroundColor: '#f8fafc', padding: '1rem', borderRadius: '8px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 <div style={{ fontWeight: 800, color: '#0f172a', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.35rem', marginBottom: '0.2rem' }}>
-                  📦 Thông Tin Sản Phẩm & Khách Hàng
+                  Thông Tin Sản Phẩm & Khách Hàng
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
                   <div>Khách Hàng: <strong style={{ color: '#0f172a' }}>{detailRMA.customerName || 'Khách vãng lai'}</strong></div>
@@ -2629,7 +2641,7 @@ export default function QualityControl() {
               {/* Customer Complaint Details */}
               <div style={{ backgroundColor: '#ffffff', padding: '1rem', borderRadius: '8px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                 <div style={{ fontWeight: 800, color: '#dc2626', borderBottom: '1px solid #f1f5f9', paddingBottom: '0.35rem', marginBottom: '0.2rem' }}>
-                  ⚠️ Phản Ánh Của Khách Hàng & Minh Chứng
+                  Phản Ánh Của Khách Hàng & Minh Chứng
                 </div>
                 <div>Lý Do Báo Lỗi: <strong style={{ color: '#dc2626' }}>"{detailRMA.reason || 'Sản phẩm có sự cố'}"</strong></div>
                 {detailRMA.description && (
@@ -2665,7 +2677,7 @@ export default function QualityControl() {
               {/* Inspection Resolution If Any */}
               {detailRMA.resolution && (
                 <div style={{ backgroundColor: '#f0fdf4', padding: '0.85rem 1rem', borderRadius: '8px', border: '1px solid #bbf7d0', color: '#15803d' }}>
-                  <div style={{ fontWeight: 800, marginBottom: '0.2rem' }}>📋 Kết Quả Nghiệm Thu Kỹ Thuật QC:</div>
+                  <div style={{ fontWeight: 800, marginBottom: '0.2rem' }}>Kết Quả Nghiệm Thu Kỹ Thuật QC:</div>
                   <div style={{ color: '#334155', fontWeight: 600 }}>{detailRMA.resolution}</div>
                 </div>
               )}
@@ -2801,7 +2813,7 @@ export default function QualityControl() {
                     Đơn Hàng: #{selectedRestockOrder.orderId || selectedRestockOrder.id}
                   </span>
                   <span style={{ backgroundColor: '#ffedd5', color: '#c2410c', padding: '2px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 800 }}>
-                    📦 HÀNG BOM / HỦY GIAO HOÀN
+                    HÀNG BOM / HỦY GIAO HOÀN
                   </span>
                 </div>
                 <div style={{ color: '#334155', marginBottom: '0.25rem' }}>
@@ -2821,7 +2833,7 @@ export default function QualityControl() {
                   {(selectedRestockOrder.items || []).map((it, idx) => (
                     <div key={idx} style={{ padding: '0.55rem 0.75rem', borderBottom: idx < (selectedRestockOrder.items.length - 1) ? '1px solid #f1f5f9' : 'none', backgroundColor: '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.8rem' }}>
                       <span style={{ fontWeight: 600, color: '#0f172a' }}>
-                        ⚙️ {it.name || it.productName || 'Linh kiện PC'}
+                        {it.name || it.productName || 'Linh kiện PC'}
                       </span>
                       <span style={{ fontWeight: 800, color: '#2563eb', backgroundColor: '#eff6ff', padding: '2px 6px', borderRadius: '4px' }}>
                         SL: {it.quantity || 1}
@@ -2834,7 +2846,7 @@ export default function QualityControl() {
               {/* Physical & Seal Inspection Checklist */}
               <div style={{ marginBottom: '1.15rem', backgroundColor: '#f8fafc', padding: '0.85rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                 <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 750, color: '#0f172a', marginBottom: '0.5rem' }}>
-                  📋 Checklist Kiểm Tra Tem Niêm Phong & Ngoại Quan (Bắt buộc):
+                  Checklist Kiểm Tra Tem Niêm Phong & Ngoại Quan (Bắt buộc):
                 </label>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', fontSize: '0.8rem', color: '#334155' }}>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer' }}>
@@ -2843,7 +2855,7 @@ export default function QualityControl() {
                       checked={restockChecklist.sealIntact}
                       onChange={e => setRestockChecklist(prev => ({ ...prev, sealIntact: e.target.checked }))}
                     />
-                    <span>🏷️ <strong>Tem seal niêm phong nguyên vẹn:</strong> Không có dấu hiệu bóc, rách hoặc cạy mở hộp.</span>
+                    <span><strong>Tem seal niêm phong nguyên vẹn:</strong> Không có dấu hiệu bóc, rách hoặc cạy mở hộp.</span>
                   </label>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer' }}>
                     <input
@@ -2851,7 +2863,7 @@ export default function QualityControl() {
                       checked={restockChecklist.boxUnopened}
                       onChange={e => setRestockChecklist(prev => ({ ...prev, boxUnopened: e.target.checked }))}
                     />
-                    <span>📦 <strong>Vỏ hộp không rách rưới / biến dạng:</strong> Ngoại quan hộp đạt tiêu chuẩn thẩm mỹ.</span>
+                    <span><strong>Vỏ hộp không rách rưới / biến dạng:</strong> Ngoại quan hộp đạt tiêu chuẩn thẩm mỹ.</span>
                   </label>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer' }}>
                     <input
@@ -2859,7 +2871,7 @@ export default function QualityControl() {
                       checked={restockChecklist.accessoriesComplete}
                       onChange={e => setRestockChecklist(prev => ({ ...prev, accessoriesComplete: e.target.checked }))}
                     />
-                    <span>🔌 <strong>Đầy đủ phụ kiện & sách hướng dẫn:</strong> Nguyên đai nguyên kiện như khi xuất kho.</span>
+                    <span><strong>Đầy đủ phụ kiện & sách hướng dẫn:</strong> Nguyên đai nguyên kiện như khi xuất kho.</span>
                   </label>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer' }}>
                     <input
@@ -2867,7 +2879,7 @@ export default function QualityControl() {
                       checked={restockChecklist.noWaterDrop}
                       onChange={e => setRestockChecklist(prev => ({ ...prev, noWaterDrop: e.target.checked }))}
                     />
-                    <span>💧 <strong>Không bị ngấm nước / ẩm mốc:</strong> Kiện hàng khô ráo hoàn toàn khi nhận về từ Shipper.</span>
+                    <span><strong>Không bị ngấm nước / ẩm mốc:</strong> Kiện hàng khô ráo hoàn toàn khi nhận về từ Shipper.</span>
                   </label>
                 </div>
               </div>
@@ -2875,7 +2887,7 @@ export default function QualityControl() {
               {/* QC Restock Decision */}
               <div style={{ marginBottom: '1.15rem' }}>
                 <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 750, color: '#0f172a', marginBottom: '0.45rem' }}>
-                  🎯 Quyết Định Xử Lý & Nhập Kho:
+                  Quyết Định Xử Lý & Nhập Kho:
                 </label>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                   <label style={{
@@ -2897,7 +2909,7 @@ export default function QualityControl() {
                       style={{ marginTop: '3px' }}
                     />
                     <div>
-                      <strong style={{ color: '#15803d', fontSize: '0.82rem' }}>✅ ĐẠT CHUẨN 100% → NHẬP LẠI KHO BÁN MỚI (RESTOCK NEW)</strong>
+                      <strong style={{ color: '#15803d', fontSize: '0.82rem' }}>ĐẠT CHUẨN 100% → NHẬP LẠI KHO BÁN MỚI (RESTOCK NEW)</strong>
                       <div style={{ fontSize: '0.74rem', color: '#4b5563' }}>Tem seal hoàn hảo. Tự động cộng lại số lượng vào Tồn Kho Bán Lẻ ERP ngay lập tức.</div>
                     </div>
                   </label>
@@ -2921,7 +2933,7 @@ export default function QualityControl() {
                       style={{ marginTop: '3px' }}
                     />
                     <div>
-                      <strong style={{ color: '#c2410c', fontSize: '0.82rem' }}>🟠 MÓP VỎ HỘP NHẸ → NHẬP KHO THANH LÝ / OPEN-BOX (OUTLET)</strong>
+                      <strong style={{ color: '#c2410c', fontSize: '0.82rem' }}>MÓP VỎ HỘP NHẸ → NHẬP KHO THANH LÝ / OPEN-BOX (OUTLET)</strong>
                       <div style={{ fontSize: '0.74rem', color: '#4b5563' }}>Linh kiện bên trong nguyên vẹn nhưng vỏ hộp trầy xước/móp nhẹ khi vận chuyển.</div>
                     </div>
                   </label>
@@ -2945,7 +2957,7 @@ export default function QualityControl() {
                       style={{ marginTop: '3px' }}
                     />
                     <div>
-                      <strong style={{ color: '#b91c1c', fontSize: '0.82rem' }}>❌ HƯ HỎNG / RÁCH SEAL DO VẬN CHUYỂN → LẬP BIÊN BẢN BỒI THƯỜNG</strong>
+                      <strong style={{ color: '#b91c1c', fontSize: '0.82rem' }}>HƯ HỎNG / RÁCH SEAL DO VẬN CHUYỂN → LẬP BIÊN BẢN BỒI THƯỜNG</strong>
                       <div style={{ fontSize: '0.74rem', color: '#4b5563' }}>Không nhập vào tồn bán mới. Chuyển vào Kho Chờ Xử Lý Bồi Thường với Đơn vị vận chuyển (Shipper/3PL).</div>
                     </div>
                   </label>
@@ -3064,7 +3076,7 @@ export default function QualityControl() {
                 color: '#c2410c',
                 border: '1px solid #fdba74'
               }}>
-                📦 ĐANG CHUYỂN HOÀN KHO
+                ĐANG CHUYỂN HOÀN KHO
               </span>
             </div>
 
@@ -3118,7 +3130,7 @@ export default function QualityControl() {
                     <span style={{ fontSize: '0.72rem', color: '#991b1b', fontWeight: 700 }}>Báo Lỗi Vận Chuyển</span>
                   </div>
                   <div style={{ fontSize: '0.76rem', color: '#7f1d1d', marginTop: '2px' }}>
-                    ⚠️ Lý do: <strong>{selectedHistoryOrder.failReason || selectedHistoryOrder.returnReason || 'Khách từ chối nhận hàng (Bom hàng / Đổi ý)'}</strong>
+                    Lý do: <strong>{selectedHistoryOrder.failReason || selectedHistoryOrder.returnReason || 'Khách từ chối nhận hàng (Bom hàng / Đổi ý)'}</strong>
                     {selectedHistoryOrder.failNote ? ` • Ghi chú: "${selectedHistoryOrder.failNote}"` : ''}
                   </div>
                 </div>

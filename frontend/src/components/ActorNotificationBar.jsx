@@ -84,9 +84,9 @@ export default function ActorNotificationBar() {
   if (isPurchasing) {
     bannerTitle = 'Trung Tâm Nhiệm Vụ Mua Hàng';
     bannerDesc = outOfStockCount > 0 
-      ? `🔴 CẢNH BÁO: Có ${outOfStockCount} linh kiện HẾT HÀNG và ${warningCount} linh kiện DƯỚI NGƯỠNG AN TOÀN (Tổng ${lowStockCount} SP cần nhập)!`
+      ? `Cảnh báo: Có ${outOfStockCount} linh kiện HẾT HÀNG và ${warningCount} linh kiện DƯỚI NGƯỠNG AN TOÀN (Tổng ${lowStockCount} SP cần nhập).`
       : warningCount > 0 
-        ? `⚡ Tồn kho: Có ${warningCount} linh kiện dưới ngưỡng tồn an toàn đề xuất lập Yêu Cầu Báo Giá.`
+        ? `Tồn kho: Có ${warningCount} linh kiện dưới ngưỡng tồn an toàn đề xuất lập Yêu Cầu Báo Giá.`
         : 'Tất cả linh kiện đều đang ở mức tồn kho an toàn!';
     actionText = 'Xem Danh Sách Mua Hàng';
     actionPath = '/admin/purchasing';
@@ -96,7 +96,7 @@ export default function ActorNotificationBar() {
   } else if (isWarehouse || isWarehouseManager) {
     bannerTitle = 'Trung Tâm Nhiệm Vụ Quản Lý Kho';
     bannerDesc = pendingReceipts > 0 || lowStockCount > 0
-      ? `📥 Có ${pendingReceipts} đơn nhận chờ nhập kho | Tồn kho thiếu: ${outOfStockCount} hết hàng, ${warningCount} dưới ngưỡng.`
+      ? `Có ${pendingReceipts} đơn nhận chờ nhập kho | Tồn kho thiếu: ${outOfStockCount} hết hàng, ${warningCount} dưới ngưỡng.`
       : 'Kho đang vận hành ổn định, không có đơn nhận hàng tồn đọng!';
     actionText = 'Quản Lý Kho Thực Tế';
     actionPath = '/admin/warehouse';
@@ -106,7 +106,7 @@ export default function ActorNotificationBar() {
   } else if (isAccountant) {
     bannerTitle = 'Trung Tâm Nhiệm Vụ Kế Toán Tài Chính';
     bannerDesc = pendingPayablePOs > 0
-      ? `💳 Có ${pendingPayablePOs} đơn mua hàng đã duyệt đang chờ Kế Toán giải ngân thanh toán NCC!`
+      ? `Có ${pendingPayablePOs} đơn mua hàng đã duyệt đang chờ Kế Toán giải ngân thanh toán NCC.`
       : 'Tất cả hóa đơn mua hàng và sổ cái doanh thu đã được đối soát đầy đủ!';
     actionText = 'Mở Sổ Cái & Thanh Toán';
     actionPath = '/admin/accounting';
@@ -116,7 +116,7 @@ export default function ActorNotificationBar() {
   } else if (isCEO || isAdmin) {
     bannerTitle = 'Trung Tâm Giám Sát Ban Giám Đốc';
     bannerDesc = pendingQuotedPOs > 0
-      ? `🔔 THÔNG BÁO: Có ${pendingQuotedPOs} đơn báo giá từ NCC đang chờ Ban Giám Đốc phê duyệt!`
+      ? `Có ${pendingQuotedPOs} đơn báo giá từ NCC đang chờ Ban Giám Đốc phê duyệt.`
       : `Hệ thống hoạt động ổn định. Tồn kho thiếu: ${outOfStockCount} hết hàng + ${warningCount} dưới ngưỡng (Tổng: ${lowStockCount} SP) | Đơn chờ xuất kho: ${pendingExportCount}`;
     actionText = 'Duyệt Báo Giá NCC';
     actionPath = '/admin/purchasing';
@@ -127,7 +127,7 @@ export default function ActorNotificationBar() {
     const pendingQaCount = (purchaseOrders || []).filter(po => ['CONFIRMED_BY_SUPPLIER', 'PO', 'APPROVED', 'PENDING_QA', 'SHIPPED', 'DELIVERED', 'RFQ_SENT', 'SENT'].includes(po.status)).length;
     bannerTitle = 'Trung Tâm Kiểm Định Chất Lượng QA/QC (Quality Control Task Center)';
     bannerDesc = pendingQaCount > 0
-      ? `🔬 Có ${pendingQaCount} lô hàng mới từ NCC giao tới, cần thực hiện nghiệm thu chất lượng!`
+      ? `Có ${pendingQaCount} lô hàng mới từ NCC giao tới, cần thực hiện nghiệm thu chất lượng.`
       : 'Tất cả các lô hàng nhập đã được kiểm định hoàn tất!';
     actionText = 'Kiểm Định Ngay';
     actionPath = '/admin/quality-control';
@@ -137,7 +137,7 @@ export default function ActorNotificationBar() {
   } else if (isSales || isSalesManager) {
     bannerTitle = 'Trung Tâm Nhiệm Vụ Bán Hàng & Đơn Hàng (Sales Task Center)';
     bannerDesc = pendingDeliveryOrders > 0
-      ? `🚚 Có ${pendingDeliveryOrders} đơn bán lẻ mới cần kiểm tra và bàn giao kho xuất hàng!`
+      ? `Có ${pendingDeliveryOrders} đơn bán lẻ mới cần kiểm tra và bàn giao kho xuất hàng.`
       : 'Tất cả đơn bán lẻ đã được xử lý hoàn tất!';
     actionText = 'Quản Lý Đơn Hàng';
     actionPath = '/admin/sales';
@@ -160,9 +160,9 @@ export default function ActorNotificationBar() {
 
     bannerTitle = 'Trung Tâm Nhiệm Vụ Giao Vận (Delivery Task Center)';
     bannerDesc = myAssignedOrders.length > 0
-      ? `🚚 THÔNG BÁO MỚI: Bạn có ${myAssignedOrders.length} đơn hàng mới đã được Thủ kho bàn giao, sẵn sàng xuất phát đi giao và thu tiền COD!`
+      ? `Bạn có ${myAssignedOrders.length} đơn hàng mới đã được Thủ kho bàn giao, sẵn sàng xuất phát đi giao và thu tiền COD.`
       : readyAtWarehouse.length > 0
-        ? `📦 Có ${readyAtWarehouse.length} đơn hàng đã đóng gói xong tại kho đang chờ Shipper nhận chuyến!`
+        ? `Có ${readyAtWarehouse.length} đơn hàng đã đóng gói xong tại kho đang chờ Shipper nhận chuyến.`
         : 'Hiện tại tất cả các chuyến giao hàng của bạn đã hoàn tất. Không có đơn tồn đọng!';
     actionText = 'Xem Chuyến Giao Ngay';
     actionPath = '/admin/delivery?tab=pending';
@@ -307,8 +307,8 @@ export default function ActorNotificationBar() {
                   style={{ height: '36px', fontSize: '0.82rem', padding: '0 0.75rem', width: '100%', borderRadius: '10px', backgroundColor: '#ffffff', border: '1px solid #cbd5e1', color: '#0f172a' }}
                 >
                   <option value="ALL">Tất cả trạng thái</option>
-                  <option value="OUT_OF_STOCK">🔴 Hết Hàng (0)</option>
-                  <option value="WARNING">⚡ Cảnh Báo Tồn Kho</option>
+                  <option value="OUT_OF_STOCK">Hết Hàng (0)</option>
+                  <option value="WARNING">Cảnh Báo Tồn Kho</option>
                 </select>
               </div>
 
@@ -343,7 +343,7 @@ export default function ActorNotificationBar() {
                   {filteredModalList.length === 0 ? (
                     <tr>
                       <td colSpan="5" style={{ textAlign: 'center', padding: '2.5rem', color: '#64748b' }}>
-                        🎉 Không tìm thấy linh kiện nào phù hợp với bộ lọc.
+                        Không tìm thấy linh kiện nào phù hợp với bộ lọc.
                       </td>
                     </tr>
                   ) : (
@@ -387,7 +387,7 @@ export default function ActorNotificationBar() {
                             }}
                           >
                             <Zap size={13} />
-                            <span>⚡ Tạo RFQ</span>
+                            <span>Tạo RFQ</span>
                           </button>
                         </td>
                       </tr>
@@ -400,7 +400,7 @@ export default function ActorNotificationBar() {
             {/* Footer */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1.25rem' }}>
               <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                Bấm <strong>"⚡ Tạo RFQ"</strong> để tự động khởi tạo phiếu báo giá mua hàng cho nhà cung cấp.
+                Bấm <strong>"Tạo RFQ"</strong> để tự động khởi tạo phiếu báo giá mua hàng cho nhà cung cấp.
               </span>
               <button onClick={() => setShowModal(false)} className="btn btn-secondary" style={{ borderRadius: '8px', padding: '0.45rem 1.25rem' }}>
                 Đóng

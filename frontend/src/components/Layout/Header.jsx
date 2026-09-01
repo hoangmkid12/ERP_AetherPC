@@ -963,7 +963,7 @@ export default function Header() {
                             return;
                           }
                           addToCart(item, 1);
-                          notify(`✅ Đã thêm ${item.name} vào giỏ hàng!`, 'success');
+                          notify(`Đã thêm ${item.name} vào giỏ hàng.`, 'success');
                         }}
                         style={{
                           background: '#eff6ff', border: '1px solid #bfdbfe',

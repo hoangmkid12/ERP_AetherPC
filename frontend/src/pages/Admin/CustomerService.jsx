@@ -4,6 +4,7 @@ import { useSalesStore } from '../../stores';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../services/api';
 import { notify, confirm, promptText } from '../../context/NotificationContext';
+import { COMPLAINT_STATUS, RETURN_STATUS, getStatusLabel, getStatusInfo } from '../../utils/statusLabels';
 import {
   HeadphonesIcon, AlertCircle, MessageSquare, RefreshCw, CheckCircle,
   Clock, X, Plus, User, Phone, Mail, Filter, Search, 
@@ -37,32 +38,6 @@ ChartJS.register(
 );
 
 const PRIORITY_COLORS = { HIGH: '#ef4444', MEDIUM: '#f59e0b', LOW: '#10b981' };
-const STATUS_LABELS = {
-  OPEN: 'Mới tiếp nhận', IN_PROGRESS: 'Đang xử lý', RESOLVED: 'Đã giải quyết', CLOSED: 'Đã đóng'
-};
-const STATUS_COLORS = {
-  OPEN: '#ef4444', IN_PROGRESS: '#f59e0b', RESOLVED: '#10b981', CLOSED: '#64748b'
-};
-
-const RETURN_STATUS_LABELS = {
-  PENDING: 'Chờ xử lý',
-  RETURN_APPROVED: 'Đồng ý thu hồi (Giao Shipper)',
-  RETURNING_TO_WAREHOUSE: 'Shipper đang lấy về kho',
-  QC_PASSED: 'QC Thẩm định Pass',
-  QC_FAILED: 'Từ chối (Lỗi người dùng)',
-  REFUND_COMPLETED: 'Đã hoàn tiền',
-  REJECTED: 'Đã từ chối'
-};
-
-const RETURN_STATUS_COLORS = {
-  PENDING: '#f59e0b',
-  RETURN_APPROVED: '#3b82f6',
-  RETURNING_TO_WAREHOUSE: '#6366f1',
-  QC_PASSED: '#10b981',
-  QC_FAILED: '#ef4444',
-  REFUND_COMPLETED: '#10b981',
-  REJECTED: '#ef4444'
-};
 
 export default function CustomerService() {
   const complaints = useSalesStore(state => state.complaints) || [];
@@ -193,7 +168,7 @@ export default function CustomerService() {
     { label: 'Tỷ Lệ Giải Quyết (SLA)', value: `${resolutionRate}%`, change: 'Mục tiêu chất lượng dịch vụ ≥ 95%', icon: <CheckCircle size={20} />, color: '#16a34a', bg: '#f0fdf4' },
     { label: 'Yêu Cầu Đổi Trả (RMA)', value: `${pendingRmaCount} yêu cầu`, change: 'Chờ CSKH thẩm định & duyệt thu hồi', icon: <RefreshCw size={20} />, color: '#8b5cf6', bg: '#f5f3ff' },
     { label: 'Phiên Chat Trực Tuyến', value: `${liveChatSessions.length} phiên`, change: 'Khách hàng đang online', icon: <MessageSquare size={20} />, color: '#0ea5e9', bg: '#f0f9ff' },
-    { label: 'Đánh Giá Dịch Vụ (CSAT)', value: '4.85 / 5.0 ⭐', change: '96.4% đánh giá rất hài lòng', icon: <Star size={20} />, color: '#eab308', bg: '#fefce8' }
+    { label: 'Đánh Giá Dịch Vụ (CSAT)', value: '4.85 / 5.0', change: '96.4% đánh giá rất hài lòng', icon: <Star size={20} />, color: '#eab308', bg: '#fefce8' }
   ];
 
   // Chart 1: Complaint Categories Doughnut
@@ -483,8 +458,8 @@ export default function CustomerService() {
                       </span>
                     </td>
                     <td style={{ padding: '0.65rem 0.85rem' }}>
-                      <span style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 800, backgroundColor: `${STATUS_COLORS[comp.status] || '#64748b'}15`, color: STATUS_COLORS[comp.status] || '#64748b' }}>
-                        {STATUS_LABELS[comp.status] || comp.status}
+                      <span style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 800, backgroundColor: `${getStatusInfo(COMPLAINT_STATUS, comp.status).color}15`, color: getStatusInfo(COMPLAINT_STATUS, comp.status).color }}>
+                        {getStatusLabel(COMPLAINT_STATUS, comp.status)}
                       </span>
                     </td>
                     <td style={{ padding: '0.65rem 0.85rem', textAlign: 'center' }}>
@@ -593,7 +568,7 @@ export default function CustomerService() {
                   onClick={() => handleSendStaffMessage(tmpl)}
                   style={{ backgroundColor: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '4px', padding: '0.25rem 0.55rem', fontSize: '0.7rem', color: '#475569', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
                 >
-                  ⚡ {tmpl}
+                  {tmpl}
                 </button>
               ))}
             </div>
@@ -707,8 +682,8 @@ export default function CustomerService() {
                       <div style={{ fontSize: '0.76rem', color: '#334155' }}>{ret.reason || 'Lỗi không lên màn hình'}</div>
                     </td>
                     <td style={{ padding: '0.65rem 0.85rem' }}>
-                      <span style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 800, backgroundColor: `${RETURN_STATUS_COLORS[ret.status] || '#64748b'}15`, color: RETURN_STATUS_COLORS[ret.status] || '#64748b' }}>
-                        {RETURN_STATUS_LABELS[ret.status] || ret.status}
+                      <span style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 800, backgroundColor: `${getStatusInfo(RETURN_STATUS, ret.status).color}15`, color: getStatusInfo(RETURN_STATUS, ret.status).color }}>
+                        {getStatusLabel(RETURN_STATUS, ret.status)}
                       </span>
                     </td>
                     <td style={{ padding: '0.65rem 0.85rem', textAlign: 'center' }}>
@@ -894,7 +869,7 @@ export default function CustomerService() {
                       addComplaint({ ...newTicketForm, status: 'OPEN', date: new Date().toISOString() });
                     }
                     setShowAddTicket(false);
-                    notify('✅ Đã tạo Ticket khiếu nại thành công!', 'success');
+                    notify('Đã tạo Ticket khiếu nại thành công.', 'success');
                   }}
                   style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.45rem 1.1rem', fontSize: '0.8rem', fontWeight: 800, cursor: 'pointer' }}
                 >
@@ -950,7 +925,7 @@ export default function CustomerService() {
                   onClick={() => {
                     updateComplaintStatus(selectedTicket.id, 'RESOLVED', null, resolution || 'Đã giải quyết thỏa đáng');
                     setSelectedTicket(null);
-                    notify('✅ Đã đóng Ticket thành công!', 'success');
+                    notify('Đã đóng Ticket thành công.', 'success');
                   }}
                   style={{ backgroundColor: '#16a34a', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.45rem 1.1rem', fontSize: '0.8rem', fontWeight: 800, cursor: 'pointer' }}
                 >
@@ -984,10 +959,10 @@ export default function CustomerService() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', fontSize: '0.82rem' }}>
               
               {/* Status Banner */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem 1rem', backgroundColor: `${RETURN_STATUS_COLORS[selectedReturnDetail.status] || '#64748b'}15`, borderRadius: '8px', border: `1px solid ${RETURN_STATUS_COLORS[selectedReturnDetail.status] || '#64748b'}30` }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem 1rem', backgroundColor: `${getStatusInfo(RETURN_STATUS, selectedReturnDetail.status).color}15`, borderRadius: '8px', border: `1px solid ${getStatusInfo(RETURN_STATUS, selectedReturnDetail.status).color}30` }}>
                 <span style={{ fontWeight: 700, color: '#0f172a' }}>Trạng Thái Thẩm Định:</span>
-                <span style={{ padding: '3px 10px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 800, backgroundColor: RETURN_STATUS_COLORS[selectedReturnDetail.status] || '#64748b', color: '#ffffff' }}>
-                  {RETURN_STATUS_LABELS[selectedReturnDetail.status] || selectedReturnDetail.status}
+                <span style={{ padding: '3px 10px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 800, backgroundColor: getStatusInfo(RETURN_STATUS, selectedReturnDetail.status).color, color: '#ffffff' }}>
+                  {getStatusLabel(RETURN_STATUS, selectedReturnDetail.status)}
                 </span>
               </div>
 
@@ -996,7 +971,7 @@ export default function CustomerService() {
                 <strong style={{ fontSize: '0.85rem', color: '#0f172a', marginBottom: '0.2rem' }}>Thông Tin Khách Hàng:</strong>
                 <div><strong>Họ và tên:</strong> {selectedReturnDetail.customerName}</div>
                 <div><strong>Số điện thoại:</strong> <a href={`tel:${selectedReturnDetail.phone}`} style={{ color: '#2563eb', fontWeight: 700 }}>{selectedReturnDetail.phone}</a></div>
-                <div><strong>Địa chỉ lấy hàng thu hồi:</strong> 📍 {selectedReturnDetail.address || 'Quận 1, TP. Hồ Chí Minh'}</div>
+                <div><strong>Địa chỉ lấy hàng thu hồi:</strong> {selectedReturnDetail.address || 'Quận 1, TP. Hồ Chí Minh'}</div>
               </div>
 
               {/* Defect Details */}
@@ -1051,7 +1026,7 @@ export default function CustomerService() {
                       onClick={() => {
                         updateReturnStatus(selectedReturnDetail.id, 'RETURN_APPROVED', 'CSKH đã duyệt yêu cầu thu hồi hàng');
                         setSelectedReturnDetail(null);
-                        notify('✅ Đã duyệt yêu cầu thu hồi hàng thành công! Đã điều phối cho Shipper đến nhà khách lấy.', 'success');
+                        notify('Đã duyệt yêu cầu thu hồi hàng thành công. Đã điều phối cho Shipper đến nhà khách lấy.', 'success');
                       }}
                       style={{ backgroundColor: '#16a34a', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.5rem 1.25rem', fontSize: '0.8rem', fontWeight: 800, cursor: 'pointer' }}
                     >

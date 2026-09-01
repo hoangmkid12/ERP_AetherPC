@@ -89,7 +89,7 @@ export default function Profile() {
         gender: profileForm.gender
       });
       setEditingProfile(false);
-      notify('✅ Cập nhật thông tin hồ sơ thành công!', 'success');
+      notify('Cập nhật thông tin hồ sơ thành công.', 'success');
     } catch (error) {
       notify(error.message || 'Không thể cập nhật hồ sơ.', 'error');
     }

@@ -23,6 +23,7 @@ import {
 import { useHRStore, useSalesStore, useInventoryStore, useFinanceStore } from '../../stores';
 import { DELIVERY_REGIONS } from '../../utils/deliveryRegions';
 import { notify, confirm } from '../../context/NotificationContext';
+import { AUDIT_LOG_STATUS, getStatusLabel } from '../../utils/statusLabels';
 import { 
   ERP_SYSTEM_MODULES, 
   ERP_ROLES, 
@@ -310,12 +311,12 @@ export default function SystemAdmin() {
     }
     setForm({ fullname: '', username: '', role: 'SALES', department: 'Kinh Doanh', deliveryRegion: 'HCM_KV1', phone: '', salary: '8500000', password: '' });
     setShowAdd(false);
-    notify(`✅ Tài khoản nhân viên "${form.fullname}" (${form.username}) đã được tạo thành công!\nMật khẩu mặc định: 123456`, 'success');
+    notify(`Tài khoản nhân viên "${form.fullname}" (${form.username}) đã được tạo thành công. Mật khẩu mặc định: 123456`, 'success');
   };
 
   const handleResetPassword = async (emp) => {
     if (await confirm(`Xác nhận ĐẶT LẠI MẬT KHẨU cho tài khoản "${emp.username}" về mật khẩu mặc định "123456"?`, { danger: true })) {
-      notify(`🔑 Mật khẩu của tài khoản "${emp.username}" đã được đặt lại thành công về: 123456`, 'success');
+      notify(`Mật khẩu của tài khoản "${emp.username}" đã được đặt lại thành công về: 123456`, 'success');
     }
   };
 
@@ -336,7 +337,7 @@ export default function SystemAdmin() {
     document.body.appendChild(downloadAnchor);
     downloadAnchor.click();
     downloadAnchor.remove();
-    notify('📥 Đã xuất và tải xuống file sao lưu dữ liệu toàn hệ thống ERP thành công!', 'success');
+    notify('Đã xuất và tải xuống file sao lưu dữ liệu toàn hệ thống ERP thành công.', 'success');
   };
 
   return (
@@ -595,7 +596,7 @@ export default function SystemAdmin() {
                             color: '#1d4ed8',
                             border: '1px solid #bfdbfe'
                           }}>
-                            📍 {DELIVERY_REGIONS.find(r => r.code === emp.deliveryRegion)?.shortName || emp.deliveryRegion}
+                            {DELIVERY_REGIONS.find(r => r.code === emp.deliveryRegion)?.shortName || emp.deliveryRegion}
                           </span>
                         )}
                       </div>
@@ -922,7 +923,7 @@ export default function SystemAdmin() {
                             color: isModuleActive ? '#15803d' : '#64748b',
                             border: isModuleActive ? '1px solid #bbf7d0' : '1px solid #cbd5e1'
                           }}>
-                            {isModuleActive ? '✓ Đang kích hoạt phân hệ' : 'Đã tắt phân hệ'}
+                            {isModuleActive ? 'Đang kích hoạt phân hệ' : 'Đã tắt phân hệ'}
                           </span>
 
                           {isModuleActive && !isAdminRole && (
@@ -1182,7 +1183,7 @@ export default function SystemAdmin() {
                         fontSize: '0.7rem',
                         fontWeight: 800
                       }}>
-                        {log.status}
+                        {getStatusLabel(AUDIT_LOG_STATUS, log.status)}
                       </span>
                     </td>
                   </tr>
@@ -1248,7 +1249,7 @@ export default function SystemAdmin() {
               </div>
 
               <button
-                onClick={() => notify('✅ Đã lưu cấu hình thông tin doanh nghiệp thành công!', 'success')}
+                onClick={() => notify('Đã lưu cấu hình thông tin doanh nghiệp thành công.', 'success')}
                 style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.5rem', fontSize: '0.8rem', fontWeight: 800, cursor: 'pointer', marginTop: '0.5rem' }}
               >
                 Lưu Cấu Hình Doanh Nghiệp
@@ -1327,7 +1328,7 @@ export default function SystemAdmin() {
                   <Download size={15} /> Tải Về File Sao Lưu (Backup JSON)
                 </button>
                 <button
-                  onClick={() => notify('📤 Chức năng Phục Hồi Dữ Liệu: Hãy chọn file backup .json để ghi đè dữ liệu.', 'info')}
+                  onClick={() => notify('Chức năng Phục Hồi Dữ Liệu: Hãy chọn file backup .json để ghi đè dữ liệu.', 'info')}
                   style={{ backgroundColor: '#ffffff', color: '#2563eb', border: '1px solid #bfdbfe', borderRadius: '6px', padding: '0.5rem 1rem', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
                 >
                   <Upload size={15} /> Khôi Phục Dữ Liệu (Restore)
@@ -1428,7 +1429,7 @@ export default function SystemAdmin() {
 
                   <div style={{ backgroundColor: '#eff6ff', padding: '0.75rem', borderRadius: '8px', border: '1.5px solid #bfdbfe' }}>
                     <label style={{ display: 'block', fontWeight: 800, color: '#1e40af', marginBottom: '0.35rem' }}>
-                      📍 Khu Vực Giao Hàng Đảm Nhiệm (Delivery Region) *
+                      Khu Vực Giao Hàng Đảm Nhiệm (Delivery Region) *
                     </label>
                     <select
                       value={form.deliveryRegion || 'HCM_KV1'}
@@ -1548,7 +1549,7 @@ export default function SystemAdmin() {
 
                   <div style={{ backgroundColor: '#eff6ff', padding: '0.75rem', borderRadius: '8px', border: '1.5px solid #bfdbfe' }}>
                     <label style={{ display: 'block', fontWeight: 800, color: '#1e40af', marginBottom: '0.35rem' }}>
-                      📍 Khu Vực Giao Hàng Đảm Nhiệm *
+                      Khu Vực Giao Hàng Đảm Nhiệm *
                     </label>
                     <select
                       value={editingEmp.deliveryRegion || 'HCM_KV1'}
@@ -1595,7 +1596,7 @@ export default function SystemAdmin() {
                       });
                     }
                     setEditingEmp(null);
-                    notify('✅ Cập nhật thông tin nhân viên thành công!', 'success');
+                    notify('Cập nhật thông tin nhân viên thành công.', 'success');
                   }}
                   style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.45rem 1.1rem', fontSize: '0.8rem', fontWeight: 800, cursor: 'pointer' }}
                 >

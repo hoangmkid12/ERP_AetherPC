@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useUtilityStore, useInventoryStore, useSalesStore } from '../../stores';
 import { useAuth } from '../../context/AuthContext';
 import { notify } from '../../context/NotificationContext';
+import { ASSEMBLY_STATUS, getStatusInfo } from '../../utils/statusLabels';
 import { 
   Wrench, Play, CheckCircle2, ShieldCheck, ClipboardList, Plus, AlertCircle, 
   Truck, XCircle, Search, Cpu, HardDrive, Zap, Layers, Check, X, Printer,
@@ -220,7 +221,7 @@ export default function Assembly() {
       autoSerials[comp.category] = available[0] || `SN-${comp.category}-2026-001`;
     });
     updateAssemblyJob(job.id, job.status, job.checklist, autoSerials);
-    notify('⚡ Đã tự động gán đầy đủ mã Serial Number (S/N) hợp lệ từ kho cho tất cả linh kiện!', 'success');
+    notify('Đã tự động gán đầy đủ mã Serial Number (S/N) hợp lệ từ kho cho tất cả linh kiện.', 'success');
   };
 
   const completeAssembly = (jobId) => {
@@ -297,18 +298,8 @@ export default function Assembly() {
 
   // Status Badge Helper
   const getJobStatusBadge = (status) => {
-    switch (status) {
-      case 'PENDING':
-        return { bg: '#fffbeb', color: '#b45309', border: '#fde68a', text: 'Chờ Tiếp Nhận' };
-      case 'ASSEMBLING':
-        return { bg: '#eff6ff', color: '#2563eb', border: '#bfdbfe', text: 'Đang Lắp Ráp' };
-      case 'COMPLETED':
-        return { bg: '#f0fdf4', color: '#16a34a', border: '#bbf7d0', text: 'Đã Hoàn Tất (Chờ Xuất Kho)' };
-      case 'CANCELLED':
-        return { bg: '#fef2f2', color: '#dc2626', border: '#fecaca', text: 'Đã Hủy' };
-      default:
-        return { bg: '#f8fafc', color: '#64748b', border: '#e2e8f0', text: status || 'Chưa rõ' };
-    }
+    const info = getStatusInfo(ASSEMBLY_STATUS, status);
+    return { bg: info.bg, color: info.color, border: info.border, text: info.label };
   };
 
   return (
@@ -700,7 +691,7 @@ export default function Assembly() {
                       }}
                     >
                       <Sparkles size={13} />
-                      <span>⚡ Tự Động Chọn S/N Cho Tất Cả</span>
+                      <span>Tự Động Chọn S/N Cho Tất Cả</span>
                     </button>
                   )}
                 </div>
@@ -793,7 +784,7 @@ export default function Assembly() {
                       }}
                     >
                       <Sparkles size={13} />
-                      <span>⚡ Đạt Tất Cả Tiêu Chuẩn (Pass All)</span>
+                      <span>Đạt Tất Cả Tiêu Chuẩn (Pass All)</span>
                     </button>
                   )}
                 </div>

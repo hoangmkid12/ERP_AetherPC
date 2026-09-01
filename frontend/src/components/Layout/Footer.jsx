@@ -205,7 +205,7 @@ export default function Footer() {
         }}>
           <div>
             <div style={{ fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.25rem', fontSize: '0.9rem' }}>
-              📧 Nhận thông báo khuyến mãi
+              Nhận thông báo khuyến mãi
             </div>
             <div style={{ fontSize: '0.8rem' }}>Đăng ký để nhận ưu đãi độc quyền mỗi tuần</div>
           </div>

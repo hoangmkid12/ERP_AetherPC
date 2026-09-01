@@ -5,6 +5,7 @@ import { useAuth } from '../../context/AuthContext';
 import { usePermission } from '../../hooks/usePermission';
 import { useNotification, notify, promptText } from '../../context/NotificationContext';
 import { DELIVERY_REGIONS, detectDeliveryRegion } from '../../utils/deliveryRegions';
+import { QC_STATUS, getStatusInfo } from '../../utils/statusLabels';
 import { api } from '../../services/api';
 import { Package, CheckCircle, X, AlertCircle, Truck, RotateCcw, Sparkles, RefreshCw, Box } from 'lucide-react';
 import ActorNotificationBar from '../../components/ActorNotificationBar';
@@ -545,23 +546,23 @@ function RegionalShipperModal({
     const isOverload = activeCount >= 5;
 
     let rankScore = 1; // 1: Online & Free, 2: Online & Delivering, 3: Online & Overload, 4: Offline
-    let statusText = '🟢 Sẵn Sàng (0 đơn)';
+    let statusText = 'Sẵn Sàng (0 đơn)';
     let badgeBg = '#dcfce7';
     let badgeColor = '#15803d';
 
     if (!isOnline) {
       rankScore = 4;
-      statusText = '⛔ Đã Tắt Nhận Đơn (Tạm nghỉ)';
+      statusText = 'Đã Tắt Nhận Đơn (Tạm nghỉ)';
       badgeBg = '#f1f5f9';
       badgeColor = '#64748b';
     } else if (isOverload) {
       rankScore = 3;
-      statusText = `🔴 Quá Tải Chuyến (${activeCount} đơn)`;
+      statusText = `Quá Tải Chuyến (${activeCount} đơn)`;
       badgeBg = '#fee2e2';
       badgeColor = '#dc2626';
     } else if (activeCount > 0) {
       rankScore = 2;
-      statusText = `🟡 Đang Giao ${activeCount} đơn`;
+      statusText = `Đang Giao ${activeCount} đơn`;
       badgeBg = '#fef3c7';
       badgeColor = '#b45309';
     }
@@ -701,7 +702,6 @@ function RegionalShipperModal({
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
               <div>
                 <div style={{ fontWeight: 800, fontSize: '0.85rem', color: '#1e40af', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                  <span>📍</span>
                   <span>Khu Vực Giao Hàng Phân Bổ:</span>
                 </div>
                 <div style={{ fontSize: '0.78rem', color: '#3b82f6', marginTop: '0.15rem' }}>
@@ -735,7 +735,6 @@ function RegionalShipperModal({
               gap: '0.4rem'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.78rem' }}>
-                <span style={{ fontSize: '1.05rem' }}>🤖</span>
                 <div>
                   <span style={{ color: '#64748b' }}>Đề xuất cân bằng tải khu vực:</span>{' '}
                   <strong style={{ color: '#0f172a' }}>{bestShipper.fullname}</strong>{' '}
@@ -753,7 +752,7 @@ function RegionalShipperModal({
                 borderRadius: '6px',
                 border: '1px solid #cbd5e1'
               }}>
-                {bestShipperWorkload?.isFree ? '⭐ ƯU TIÊN #1 (RẢNH RỖI)' : 'PHÙ HỢP TUYẾN'}
+                {bestShipperWorkload?.isFree ? 'ƯU TIÊN #1 (RẢNH RỖI)' : 'PHÙ HỢP TUYẾN'}
               </span>
             </div>
           )}
@@ -789,7 +788,7 @@ function RegionalShipperModal({
                   style={{ width: '100%', padding: '0.6rem 0.75rem', fontSize: '0.82rem', fontWeight: 600, border: '1.5px solid #2563eb', borderRadius: '6px', backgroundColor: '#ffffff', boxSizing: 'border-box' }}
                 >
                   {/* Regional matched Shippers sorted by best priority */}
-                  <optgroup label={`🟢 Shipper Khu Vực Này (${currentRegionObj.shortName})`}>
+                  <optgroup label={`Shipper Khu Vực Này (${currentRegionObj.shortName})`}>
                     {sortedRegionalShippers.length > 0 ? (
                       sortedRegionalShippers.map(s => {
                         const wl = getShipperWorkload(s);
@@ -810,7 +809,7 @@ function RegionalShipperModal({
 
                   {/* Other regional Shippers */}
                   {otherShippers.length > 0 && (
-                    <optgroup label="🟡 Shipper Các Khu Vực Khác (Điều Phối Chéo)">
+                    <optgroup label="Shipper Các Khu Vực Khác (Điều Phối Chéo)">
                       {otherShippers.map(s => {
                         const sReg = DELIVERY_REGIONS.find(r => r.code === s.deliveryRegion);
                         const wl = getShipperWorkload(s);
@@ -824,7 +823,7 @@ function RegionalShipperModal({
                   )}
 
                   {/* 3PL Partners */}
-                  <optgroup label="🚚 Đối Tác Vận Chuyển Liên Tỉnh (3PL Logistics)">
+                  <optgroup label="Đối Tác Vận Chuyển Liên Tỉnh (3PL Logistics)">
                     <option value="Đối Tác Giao Hàng Tiết Kiệm (GHTK Express)">Đối Tác Giao Hàng Tiết Kiệm (GHTK Express) [Khuyên dùng liên tỉnh]</option>
                     <option value="Đối Tác Giao Hàng Nhanh (GHN Express)">Đối Tác Giao Hàng Nhanh (GHN Express) [Lấy hàng 15-30p]</option>
                     <option value="Đối Tác Viettel Post">Đối Tác Viettel Post [Phủ 100% huyện xã]</option>
@@ -833,7 +832,7 @@ function RegionalShipperModal({
                 </select>
                 <div style={{ fontSize: '0.71rem', color: '#64748b', marginTop: '0.3rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.2rem' }}>
                   <span>✓ Gán trực tiếp vào app Shipper</span>
-                  <span style={{ color: '#059669', fontWeight: 600 }}>🟢 Rảnh • 🟡 Giao • 🔴 Bận • ⛔ Tắt</span>
+                  <span style={{ color: '#059669', fontWeight: 600 }}>Rảnh • Giao • Bận • Tắt</span>
                 </div>
               </div>
 
@@ -1325,12 +1324,8 @@ function ReceiptDetailModal({ selectedReceipt, onClose, purchaseOrders = [], han
             const notesDisplay = dbInspection?.notes || qaLog?.notes;
             const qcStatusRaw = dbInspection?.status
               || (qaLog?.status === 'QA_PASSED' ? 'PASSED' : qaLog?.status === 'QA_PARTIAL' ? 'CONDITIONAL' : qaLog?.status === 'QA_REJECTED' ? 'FAILED' : null);
-            const qcStatusMap = {
-              PASSED: { text: 'Đạt Chuẩn 100%', bg: '#dcfce7', color: '#15803d', border: '#bbf7d0' },
-              CONDITIONAL: { text: 'Nhập Một Phần', bg: '#ffedd5', color: '#c2410c', border: '#fed7aa' },
-              FAILED: { text: 'Từ Chối Lô Hàng', bg: '#fee2e2', color: '#dc2626', border: '#fecaca' }
-            };
-            const badge = qcStatusMap[qcStatusRaw];
+            const qcInfo = qcStatusRaw ? getStatusInfo(QC_STATUS, qcStatusRaw) : null;
+            const badge = qcInfo ? { text: qcInfo.label, bg: qcInfo.bg, color: qcInfo.color, border: qcInfo.border } : null;
 
             if (!inspectorName && !inspectedAt && passedQtyDisplay === undefined && !notesDisplay) return null;
 
@@ -1656,31 +1651,36 @@ export default function Warehouse() {
       };
 
       const combinedReceipts = [...syncedApiReceipts];
-      localPOs
-        .filter(po => ['CONFIRMED_BY_SUPPLIER', 'QA_PASSED', 'QA_PARTIAL', 'RECEIVED', 'DONE', 'COMPLETED'].includes(po.status))
-        .forEach(po => {
-          const poNumber = formatPurchaseReference(po);
-          const matchingLog = qaLogs.find(l => l.poNumber === poNumber || String(l.poNumber) === String(po.id));
-          const effectiveStatus = matchingLog?.status || po.status;
+      // Only let local-cache/store POs synthesize a brand-new GRN row when the real
+      // receipts API genuinely returned nothing — once it has data, it's authoritative
+      // on which receipts exist, so stale localStorage can't inject phantom GRNs.
+      if (apiReceipts.length === 0) {
+        localPOs
+          .filter(po => ['CONFIRMED_BY_SUPPLIER', 'QA_PASSED', 'QA_PARTIAL', 'RECEIVED', 'DONE', 'COMPLETED'].includes(po.status))
+          .forEach(po => {
+            const poNumber = formatPurchaseReference(po);
+            const matchingLog = qaLogs.find(l => l.poNumber === poNumber || String(l.poNumber) === String(po.id));
+            const effectiveStatus = matchingLog?.status || po.status;
 
-          if (!combinedReceipts.some(r => r.po?.poNumber === poNumber || r.receiptNumber === `GRN-${poNumber}` || r.id === `GRN-${poNumber}`)) {
-            const isCompleted = po.warehouseStatus === 'RECEIVED' || po.status === 'DONE' || po.status === 'COMPLETED';
-            combinedReceipts.push({
-              id: `GRN-${poNumber}`,
-              receiptNumber: `GRN-${poNumber}`,
-              status: isCompleted ? 'DONE' : 'READY',
-              poId: po.id,
-              poNumber: poNumber,
-              po: {
-                ...po,
+            if (!combinedReceipts.some(r => r.po?.poNumber === poNumber || r.receiptNumber === `GRN-${poNumber}` || r.id === `GRN-${poNumber}`)) {
+              const isCompleted = po.warehouseStatus === 'RECEIVED' || po.status === 'DONE' || po.status === 'COMPLETED';
+              combinedReceipts.push({
+                id: `GRN-${poNumber}`,
+                receiptNumber: `GRN-${poNumber}`,
+                status: isCompleted ? 'DONE' : 'READY',
+                poId: po.id,
                 poNumber: poNumber,
-                status: effectiveStatus
-              },
-              warehouse: { name: 'Kho Tổng' },
-              createdAt: po.createdAt || new Date().toISOString()
-            });
-          }
-        });
+                po: {
+                  ...po,
+                  poNumber: poNumber,
+                  status: effectiveStatus
+                },
+                warehouse: { name: 'Kho Tổng' },
+                createdAt: po.createdAt || new Date().toISOString()
+              });
+            }
+          });
+      }
 
       setReceipts(combinedReceipts);
     } catch (err) {
@@ -2176,11 +2176,6 @@ export default function Warehouse() {
 
   // QC/QA badge for a receipt row: prefers the real QcInspection record persisted by the
   // backend, falls back to the local QC log (offline/legacy entries), then to the PO status.
-  const QC_STATUS_BADGE_MAP = {
-    PASSED: { text: 'Đạt Chuẩn 100%', bg: '#dcfce7', color: '#15803d' },
-    CONDITIONAL: { text: 'Nhập Một Phần', bg: '#ffedd5', color: '#c2410c' },
-    FAILED: { text: 'Từ Chối Lô Hàng', bg: '#fee2e2', color: '#dc2626' }
-  };
   const mapPoStatusToQcStatus = (poStatus) => {
     if (poStatus === 'QA_PASSED') return 'PASSED';
     if (poStatus === 'QA_PARTIAL') return 'CONDITIONAL';
@@ -2201,7 +2196,9 @@ export default function Warehouse() {
     if (!statusKey) {
       statusKey = mapPoStatusToQcStatus(r.po?.status);
     }
-    return QC_STATUS_BADGE_MAP[statusKey] || { text: 'Chưa Kiểm Định', bg: '#f1f5f9', color: '#64748b' };
+    if (!statusKey) return { text: 'Chưa Kiểm Định', bg: '#f1f5f9', color: '#64748b' };
+    const info = getStatusInfo(QC_STATUS, statusKey);
+    return { text: info.label, bg: info.bg, color: info.color, border: info.border };
   };
 
   const filteredDeliveriesList = orders.filter(o => {
@@ -3136,7 +3133,7 @@ export default function Warehouse() {
                               ) : (
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                                   <span style={{ fontSize: '0.74rem', color: '#c2410c', fontWeight: 600, backgroundColor: '#fff7ed', padding: '0.35rem 0.65rem', borderRadius: '4px', border: '1px solid #fed7aa' }}>
-                                    ⏳ Chờ Thủ kho đóng gói
+                                    Chờ Thủ kho đóng gói
                                   </span>
                                   <button
                                     onClick={() => setSelectedOrderForDetail(o)}
@@ -3194,7 +3191,7 @@ export default function Warehouse() {
                               ) : (
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                                   <span style={{ fontSize: '0.74rem', color: '#6d28d9', fontWeight: 600, backgroundColor: '#f5f3ff', padding: '0.35rem 0.65rem', borderRadius: '4px', border: '1px solid #ddd6fe' }}>
-                                    ⏳ Chờ Quản lý phân công
+                                    Chờ Quản lý phân công
                                   </span>
                                   <button
                                     onClick={() => setSelectedOrderForDetail(o)}
@@ -3481,7 +3478,7 @@ export default function Warehouse() {
                   gap: '0.35rem'
                 }}
               >
-                <span>🔍 Màn Hình QC Thẩm Định</span>
+                <span>Màn Hình QC Thẩm Định</span>
               </button>
               <button
                 type="button"
@@ -3500,7 +3497,7 @@ export default function Warehouse() {
                   gap: '0.35rem'
                 }}
               >
-                <span>💰 Phòng Kế Toán (Hoàn Tiền)</span>
+                <span>Phòng Kế Toán (Hoàn Tiền)</span>
               </button>
             </div>
           </div>
@@ -3552,7 +3549,7 @@ export default function Warehouse() {
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#b45309', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                  <span>⏳ ĐANG XỬ LÝ (CHỜ NHẬP KHO)</span>
+                  <span>ĐANG XỬ LÝ (CHỜ NHẬP KHO)</span>
                 </span>
                 <span style={{ backgroundColor: '#fef3c7', color: '#b45309', border: '1px solid #fde68a', fontSize: '0.72rem', fontWeight: 800, padding: '2px 7px', borderRadius: '10px' }}>
                   Cần xử lý ngay
@@ -3581,7 +3578,7 @@ export default function Warehouse() {
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#15803d', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                  <span>✅ ĐÃ XỬ LÝ (ĐÃ VÀO KỆ LƯU TRỮ)</span>
+                  <span>ĐÃ XỬ LÝ (ĐÃ VÀO KỆ LƯU TRỮ)</span>
                 </span>
                 <span style={{ backgroundColor: '#dcfce7', color: '#15803d', border: '1px solid #bbf7d0', fontSize: '0.72rem', fontWeight: 800, padding: '2px 7px', borderRadius: '10px' }}>
                   Hoàn tất
@@ -3655,7 +3652,7 @@ export default function Warehouse() {
                   gap: '0.35rem'
                 }}
               >
-                <span>⏳ Đang Xử Lý</span>
+                <span>Đang Xử Lý</span>
                 <span style={{ fontSize: '0.72rem', padding: '1px 6px', borderRadius: '10px', backgroundColor: '#fef3c7', color: '#b45309', fontWeight: 800 }}>
                   {pendingReturnsList.length}
                 </span>
@@ -3679,7 +3676,7 @@ export default function Warehouse() {
                   gap: '0.35rem'
                 }}
               >
-                <span>✅ Đã Xử Lý</span>
+                <span>Đã Xử Lý</span>
                 <span style={{ fontSize: '0.72rem', padding: '1px 6px', borderRadius: '10px', backgroundColor: '#dcfce7', color: '#15803d', fontWeight: 800 }}>
                   {processedReturnsList.length}
                 </span>
@@ -3731,13 +3728,13 @@ export default function Warehouse() {
                   cursor: 'pointer'
                 }}
               >
-                <option value="ALL">🔍 Tất cả trạng thái kiểm định</option>
-                <option value="PENDING">⏳ Chờ QC Thẩm Định / Tiếp Nhận</option>
-                <option value="RESTOCKED">📦 Đã Nhập Lại Kho (Kệ A1/B3)</option>
-                <option value="EXCHANGE">🔄 Đã Duyệt Đổi Mới 1-1</option>
-                <option value="VENDOR">🚚 Chuyển Gửi Hãng BH (Kệ C2)</option>
-                <option value="SCRAP">🗑️ Phế Phẩm / Kho Lỗi (Kệ D)</option>
-                <option value="REJECTED">❌ Từ Chối Bảo Hành</option>
+                <option value="ALL">Tất cả trạng thái kiểm định</option>
+                <option value="PENDING">Chờ QC Thẩm Định / Tiếp Nhận</option>
+                <option value="RESTOCKED">Đã Nhập Lại Kho (Kệ A1/B3)</option>
+                <option value="EXCHANGE">Đã Duyệt Đổi Mới 1-1</option>
+                <option value="VENDOR">Chuyển Gửi Hãng BH (Kệ C2)</option>
+                <option value="SCRAP">Phế Phẩm / Kho Lỗi (Kệ D)</option>
+                <option value="REJECTED">Từ Chối Bảo Hành</option>
               </select>
 
               {(returnSearch || returnSpecificStatus !== 'ALL' || returnStatusTab !== 'ALL') && (
@@ -3784,7 +3781,7 @@ export default function Warehouse() {
                 {filteredReturnsList.length === 0 ? (
                   <tr>
                     <td colSpan={8} style={{ padding: '3.5rem 1rem', textAlign: 'center', color: '#64748b' }}>
-                      <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>📭</div>
+                      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '0.5rem', color: '#cbd5e1' }}><Box size={32} /></div>
                       <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#1e293b' }}>
                         Không tìm thấy hồ sơ RMA nào phù hợp với bộ lọc hiện tại
                       </div>
@@ -3911,7 +3908,6 @@ export default function Warehouse() {
                               border: '1px solid #fde68a',
                               whiteSpace: 'nowrap'
                             }}>
-                              <span>⏳</span>
                               <span>Đang Xử Lý</span>
                             </span>
                           )}
@@ -5008,7 +5004,7 @@ export default function Warehouse() {
                       style={{ width: '60px', height: '60px', objectFit: 'cover', borderRadius: '6px', border: '1px solid #c4b5fd' }}
                     />
                     <div>
-                      <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#6d28d9' }}>📷 Ảnh Thẩm Định Từ Kỹ Thuật QC (Tem Seal / Ngoại Quan)</div>
+                      <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#6d28d9' }}>Ảnh Thẩm Định Từ Kỹ Thuật QC (Tem Seal / Ngoại Quan)</div>
                       <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '2px' }}>
                         Kỹ thuật QC đã chụp ảnh xác nhận kiện hàng còn nguyên trạng khi tiếp nhận.
                       </div>
@@ -5245,9 +5241,9 @@ export default function Warehouse() {
                       const formattedRefundVal = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(refundVal);
 
                       if (isExchange) {
-                        notify(`✅ ĐÃ NHẬP KHO THÀNH CÔNG KIỆN HÀNG CŨ!\n\n• Vị trí lưu trữ: ${newLog.toLocation}\n• Hệ thống đã tự động kích hoạt ĐƠN HÀNG ĐỔI MỚI (0đ bù trừ 100%) và chuyển sang danh sách "Hoạt Động / Lệnh Giao Hàng" để Kho đóng gói & bàn giao Shipper.`, 'success');
+                        notify(`Đã nhập kho kiện hàng cũ vào ${newLog.toLocation}. Đơn hàng đổi mới (bù trừ 100%) đã được tạo và chuyển sang danh sách Hoạt Động / Lệnh Giao Hàng để Kho đóng gói và bàn giao Shipper.`, 'success');
                       } else if (item.type === 'REFUND' || refundVal > 0) {
-                        notify(`✅ Đã nhập kho thành công kiện hàng vào ${newLog.toLocation}!\n\nHệ thống đã tự động lập Phiếu Đề Nghị Chi Hoàn Tiền (${formattedRefundVal}) và chuyển sang Phòng Kế toán giải ngân qua Napas247.`, 'success');
+                        notify(`Đã nhập kho kiện hàng vào ${newLog.toLocation}. Phiếu Đề Nghị Chi Hoàn Tiền (${formattedRefundVal}) đã được lập và chuyển sang Phòng Kế Toán giải ngân qua Napas247.`, 'success');
                       } else {
                         notify(`Đã phân luồng kiện hàng vào ${newLog.toLocation} và cập nhật trạng thái thành công!`, 'success');
                       }

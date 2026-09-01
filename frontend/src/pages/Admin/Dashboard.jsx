@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useSalesStore, useInventoryStore, useHRStore, useFinanceStore, useUtilityStore } from '../../stores';
 import { api } from '../../services/api';
 import { notify, confirm } from '../../context/NotificationContext';
+import { PO_STATUS, ORDER_STATUS, getStatusLabel } from '../../utils/statusLabels';
 import { Bar, Doughnut, Line } from 'react-chartjs-2';
 import { 
   Chart as ChartJS, 
@@ -347,16 +348,22 @@ export default function Dashboard() {
 
       // Build a unified list. Priority for status is highest progress status.
       // Use a Map keyed by BOTH coreId AND raw id to prevent duplicates.
+      // `allowNew` gates whether a source may introduce a BRAND NEW order — only
+      // the real API response is, once it has actually returned data. Context/
+      // localStorage are cache/offline layers that may hold stale demo entries
+      // with ad-hoc status values that don't correspond to any real order; they
+      // can still enrich an order the API confirmed exists, but must not conjure
+      // phantom rows once the API is known to be authoritative.
       const mergedMap = new Map();
-      const addToMap = (item) => {
+      const addToMap = (item, allowNew = true) => {
         const coreKey = getPoCoreId(item);
         const rawId = String(item.id || '');
         const existingKey = mergedMap.has(coreKey) ? coreKey : (rawId && mergedMap.has(rawId) ? rawId : null);
         if (existingKey) {
           const old = mergedMap.get(existingKey);
           const finalStatus = getHighestStatus(old.status, item.status);
-          const merged = { 
-            ...old, 
+          const merged = {
+            ...old,
             ...item,
             status: finalStatus,
             supplier: item.supplier?.name ? item.supplier : (old.supplier?.name ? old.supplier : item.supplier || old.supplier),
@@ -366,17 +373,18 @@ export default function Dashboard() {
           };
           mergedMap.delete(existingKey);
           mergedMap.set(coreKey || rawId, merged);
-        } else {
+        } else if (allowNew) {
           mergedMap.set(coreKey || rawId, item);
         }
       };
 
+      const apiHasData = apiPOs.length > 0;
       // 1. API orders (base)
       apiPOs.forEach(o => addToMap(o));
-      // 2. Context orders (fill gaps)
-      (purchaseOrders || []).forEach(co => addToMap(co));
-      // 3. localStorage orders (overrides)
-      localPOs.forEach(lo => addToMap(lo));
+      // 2. Context orders (fill gaps, or populate fully if the API returned nothing)
+      (purchaseOrders || []).forEach(co => addToMap(co, !apiHasData));
+      // 3. localStorage orders (enrich existing orders only, never invent new ones once API succeeded)
+      localPOs.forEach(lo => addToMap(lo, !apiHasData));
 
       const combined = Array.from(mergedMap.values());
       const quoted = combined
@@ -570,9 +578,9 @@ export default function Dashboard() {
       // server (the source of truth for the API-backed refetch) still had the old status.
       window.dispatchEvent(new Event('erp-po-updated'));
       if (apiSucceeded) {
-        notify(`✅ ĐÃ DUYỆT BÁO GIÁ THÀNH CÔNG!\n\n• Mã đơn PO chính thức: ${displayNum}\n• Trạng thái: Đã phê duyệt (Đã chuyển sang Tab Đơn Mua Hàng PO & sẵn sàng nhận hàng)`, 'success');
+        notify(`Đã duyệt báo giá thành công. Mã đơn PO chính thức: ${displayNum}. Đơn đã chuyển sang tab Đơn Mua Hàng (PO) và sẵn sàng nhận hàng.`, 'success');
       } else {
-        notify(`⚠️ CHƯA DUYỆT ĐƯỢC TRÊN MÁY CHỦ!\n\n• Mã đơn: ${displayNum}\n• Lỗi: ${apiErrorMessage}\n\nĐơn hàng có thể sẽ hiện lại trong danh sách chờ duyệt sau khi tải lại trang, vì máy chủ chưa ghi nhận thay đổi này. Vui lòng thử lại hoặc liên hệ quản trị viên nếu lỗi lặp lại.`, 'error');
+        notify(`Chưa duyệt được trên máy chủ. Mã đơn: ${displayNum}. Lỗi: ${apiErrorMessage}. Đơn có thể hiện lại trong danh sách chờ duyệt sau khi tải lại trang do máy chủ chưa ghi nhận thay đổi. Vui lòng thử lại hoặc liên hệ quản trị viên nếu lỗi lặp lại.`, 'error');
       }
     } catch (e) {
       notify('Lỗi duyệt PO: ' + e.message, 'error');
@@ -984,7 +992,7 @@ export default function Dashboard() {
                         </td>
                         <td style={{ padding: '0.5rem 0.65rem', textAlign: 'center' }}>
                           <span style={{ backgroundColor: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', padding: '2px 8px', borderRadius: '10px', fontSize: '0.68rem', fontWeight: 700 }}>
-                            {o.status || 'Đang xử lý'}
+                            {getStatusLabel(ORDER_STATUS, o.status)}
                           </span>
                         </td>
                       </tr>
@@ -1418,7 +1426,7 @@ export default function Dashboard() {
                       <td style={{ padding: '0.4rem 0.5rem', textAlign: 'right', fontWeight: 700, color: '#16a34a' }}>{formatPrice(o.totalAmount)}</td>
                       <td style={{ padding: '0.4rem 0.5rem', textAlign: 'center' }}>
                         <span style={{ backgroundColor: '#eff6ff', color: '#2563eb', padding: '1px 6px', borderRadius: '8px', fontSize: '0.68rem', fontWeight: 700 }}>
-                          {o.status}
+                          {getStatusLabel(ORDER_STATUS, o.status)}
                         </span>
                       </td>
                     </tr>
@@ -1495,7 +1503,7 @@ export default function Dashboard() {
                       <div style={{ width: '7px', height: '7px', borderRadius: '50%', backgroundColor: '#2563eb', marginTop: '0.4rem', flexShrink: 0 }} />
                       <div style={{ flex: 1 }}>
                         <div>
-                          <strong style={{ color: '#0f172a' }}>{h.status}</strong>
+                          <strong style={{ color: '#0f172a' }}>{getStatusLabel(PO_STATUS, h.status)}</strong>
                           <span style={{ color: '#94a3b8' }}> — {h.changedBy || 'Hệ thống'}{h.changedByRole ? ` (${h.changedByRole})` : ''}</span>
                         </div>
                         <div style={{ color: '#94a3b8', fontSize: '0.72rem' }}>
@@ -1564,7 +1572,7 @@ export default function Dashboard() {
                     style={{ padding: '0.5rem 0.75rem', fontSize: '0.82rem', border: '1px solid #cbd5e1', borderRadius: '6px' }}
                   >
                     <option value="ALL">Tất cả trạng thái</option>
-                    {uniqueHistoryStatuses.map(s => <option key={s} value={s}>{s}</option>)}
+                    {uniqueHistoryStatuses.map(s => <option key={s} value={s}>{getStatusLabel(PO_STATUS, s)}</option>)}
                   </select>
                   <input
                     type="date"
@@ -1626,7 +1634,7 @@ export default function Dashboard() {
                               padding: '1px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 800,
                               backgroundColor: getHistoryStatusBadge(h.status).bg, color: getHistoryStatusBadge(h.status).color, border: `1px solid ${getHistoryStatusBadge(h.status).border}`
                             }}>
-                              {h.status}
+                              {getStatusLabel(PO_STATUS, h.status)}
                             </span>
                           </td>
                           <td style={{ padding: '0.6rem 0.75rem', color: '#334155' }}>

@@ -488,7 +488,7 @@ export default function Products() {
                                 gap: '0.25rem'
                               }}
                             >
-                              ⏳ Đặt Trước
+                              Đặt Trước
                             </button>
                           )}
 

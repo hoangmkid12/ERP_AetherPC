@@ -61,7 +61,7 @@ const AdminLayout = () => {
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', background: 'var(--bg-primary)' }}>
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', background: 'var(--bg-app)' }}>
         <div style={{ color: 'var(--text-muted)', fontSize: '0.95rem' }}>Đang tải...</div>
       </div>
     );
@@ -78,9 +78,9 @@ const AdminLayout = () => {
   }
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: 'var(--bg-primary)' }}>
+    <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: 'var(--bg-app)' }}>
       <Sidebar />
-      <main style={{ flex: 1, overflowY: 'auto', maxHeight: '100vh', minHeight: '100vh', backgroundColor: 'var(--bg-primary)' }}>
+      <main style={{ flex: 1, overflowY: 'auto', maxHeight: '100vh', minHeight: '100vh', backgroundColor: 'var(--bg-app)' }}>
         <Outlet />
       </main>
     </div>
@@ -93,7 +93,7 @@ const ProtectedRoute = ({ allowedRoles, children }) => {
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', background: 'var(--bg-primary)' }}>
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', background: 'var(--bg-app)' }}>
         <div style={{ color: 'var(--text-muted)', fontSize: '0.95rem' }}>Đang tải...</div>
       </div>
     );
@@ -274,7 +274,7 @@ export default function App() {
                 {/* Supplier Portal Layout Routes */}
                 <Route path="/supplier" element={
                   <ProtectedRoute allowedRoles={['SUPPLIER']}>
-                    <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: 'var(--bg-primary)' }}>
+                    <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: 'var(--bg-app)' }}>
                       <main style={{ flex: 1, padding: '2rem', overflowY: 'auto' }}>
                         <Outlet />
                       </main>

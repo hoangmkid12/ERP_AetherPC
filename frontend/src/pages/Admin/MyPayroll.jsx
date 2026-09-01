@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useHRStore, useUtilityStore } from '../../stores';
 import { useAuth } from '../../context/AuthContext';
+import { PAYROLL_STATUS, getStatusInfo, getStatusLabel } from '../../utils/statusLabels';
 import { DollarSign, Calendar, Clipboard, TrendingUp, CheckCircle, Clock, XCircle, FileText, AlertCircle, Award, Printer, ShieldCheck, User } from 'lucide-react';
 
 export default function MyPayroll() {
@@ -64,18 +65,12 @@ export default function MyPayroll() {
   };
 
   const getStatusBadge = (status) => {
-    switch (status) {
-      case 'DRAFT':
-        return <span style={{ backgroundColor: '#f1f5f9', color: '#475569', padding: '4px 12px', borderRadius: '20px', fontWeight: 800, fontSize: '0.78rem' }}>Dự Thảo (Live)</span>;
-      case 'SUBMITTED_TO_ACCOUNTING':
-        return <span style={{ backgroundColor: '#fef3c7', color: '#d97706', border: '1px solid #fde68a', padding: '4px 12px', borderRadius: '20px', fontWeight: 800, fontSize: '0.78rem' }}>Chờ Kế Toán Duyệt Chi</span>;
-      case 'DISBURSED':
-      case 'COMPLETED':
-      case 'PAID':
-        return <span style={{ backgroundColor: '#dcfce7', color: '#15803d', border: '1px solid #bbf7d0', padding: '4px 12px', borderRadius: '20px', fontWeight: 800, fontSize: '0.78rem' }}>Đã Chi Trả Lương</span>;
-      default:
-        return <span style={{ backgroundColor: '#f1f5f9', color: '#64748b', padding: '4px 12px', borderRadius: '20px', fontWeight: 700, fontSize: '0.78rem' }}>{status}</span>;
-    }
+    const info = getStatusInfo(PAYROLL_STATUS, status);
+    return (
+      <span style={{ backgroundColor: info.bg, color: info.color, border: `1px solid ${info.border}`, padding: '4px 12px', borderRadius: '20px', fontWeight: 800, fontSize: '0.78rem' }}>
+        {info.label}
+      </span>
+    );
   };
 
   return (
@@ -205,7 +200,7 @@ export default function MyPayroll() {
                 <div>Họ và tên: <strong style={{ color: '#0f172a' }}>{user.fullname || user.username}</strong></div>
                 <div>Phòng ban: <strong style={{ color: '#4f46e5' }}>{user.role}</strong></div>
                 <div>Mã nhân viên: <strong style={{ color: '#0f172a' }}>#{user.id}</strong></div>
-                <div>Trạng thái: <strong>{activePayroll.status === 'PAID' ? 'Đã Thanh Toán' : 'Chờ Giải Ngân'}</strong></div>
+                <div>Trạng thái: <strong>{getStatusLabel(PAYROLL_STATUS, activePayroll.status)}</strong></div>
               </div>
 
               <div style={{ border: '1px solid #e2e8f0', borderRadius: '10px', overflow: 'hidden' }}>

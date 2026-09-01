@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { usePermission } from '../../hooks/usePermission';
 import { useInventoryStore, useSalesStore, useFinanceStore } from '../../stores';
 import { notify, promptText } from '../../context/NotificationContext';
+import { PO_STATUS, getStatusInfo, getStatusLabel } from '../../utils/statusLabels';
 import { api } from '../../services/api';
 import ActorNotificationBar from '../../components/ActorNotificationBar';
 import { 
@@ -429,17 +430,25 @@ export default function Purchasing() {
         return w1 >= w2 ? s1 : s2;
       };
 
-      // Structured Merge via Dual Key Matching: API -> Context -> LocalStorage Overrides
+      // Structured Merge via Dual Key Matching: API -> Context -> LocalStorage Overrides.
+      // `allowNew` gates whether a source is trusted to introduce a BRAND NEW order —
+      // only the real API response is, once it has actually returned data. Context/
+      // localStorage are cache/offline layers that may contain stale demo entries with
+      // ad-hoc status values (e.g. leftover "PENDING"/"PAID" that were never real
+      // PurchaseOrder.status values) that don't correspond to any order the backend
+      // actually has; letting them create phantom rows was the bug here. They can still
+      // ENRICH an order the API already confirmed exists (existingKey match below), and
+      // still populate the whole list when the API genuinely returned nothing.
       const mergedMap = new Map();
-      const addToMap = (item) => {
+      const addToMap = (item, allowNew = true) => {
         const coreKey = getPoCoreId(item);
         const rawId = String(item.id || '');
         const existingKey = mergedMap.has(coreKey) ? coreKey : (rawId && mergedMap.has(rawId) ? rawId : null);
         if (existingKey) {
           const old = mergedMap.get(existingKey);
           const finalStatus = getHighestStatus(old.status, item.status);
-          const merged = { 
-            ...old, 
+          const merged = {
+            ...old,
             ...item,
             status: finalStatus,
             supplier: item.supplier?.name ? item.supplier : (old.supplier?.name ? old.supplier : item.supplier || old.supplier),
@@ -449,14 +458,15 @@ export default function Purchasing() {
           };
           mergedMap.delete(existingKey);
           mergedMap.set(coreKey || rawId, merged);
-        } else {
+        } else if (allowNew) {
           mergedMap.set(coreKey || rawId, item);
         }
       };
 
+      const apiHasData = apiOrders.length > 0;
       apiOrders.forEach(o => addToMap(o));
-      (erpContext.purchaseOrders || []).forEach(co => addToMap(co));
-      localOrders.forEach(lo => addToMap(lo));
+      (erpContext.purchaseOrders || []).forEach(co => addToMap(co, !apiHasData));
+      localOrders.forEach(lo => addToMap(lo, !apiHasData));
 
       const mergedOrders = Array.from(mergedMap.values());
       const formattedOrders = mergedOrders.map(o => ({
@@ -795,7 +805,7 @@ export default function Purchasing() {
       if (apiSucceeded) {
         notify(`Đơn hàng đã được chuyển trạng thái sang: ${getStatusText(newStatus)}`, 'success');
       } else {
-        notify(`⚠️ Máy chủ chưa ghi nhận được thay đổi trạng thái này (${apiErrorMessage}). Đơn hàng có thể hiện lại trạng thái cũ sau khi tải lại trang — vui lòng thử lại.`, 'error');
+        notify(`Máy chủ chưa ghi nhận được thay đổi trạng thái này (${apiErrorMessage}). Đơn hàng có thể hiện lại trạng thái cũ sau khi tải lại trang — vui lòng thử lại.`, 'error');
       }
       await fetchData();
       setSelectedPO(null);
@@ -806,34 +816,12 @@ export default function Purchasing() {
   };
 
   const getStatusBadge = (status) => {
-    const s = String(status || '').toUpperCase();
-    switch (s) {
-      case 'DRAFT': return { bg: '#f1f5f9', color: '#64748b', border: '#cbd5e1', text: 'Bản Nháp' };
-      case 'RFQ': return { bg: '#f1f5f9', color: '#475569', border: '#cbd5e1', text: 'Yêu Cầu Báo Giá' };
-      case 'RFQ_SENT': return { bg: '#eff6ff', color: '#2563eb', border: '#bfdbfe', text: 'Đã Gửi Báo Giá' };
-      case 'QUOTED': return { bg: '#fffbeb', color: '#d97706', border: '#fde68a', text: 'Chờ CEO Duyệt' };
-      case 'APPROVED': return { bg: '#f0fdf4', color: '#16a34a', border: '#bbf7d0', text: 'Đã Phê Duyệt' };
-      case 'APPROVED_BY_CEO': return { bg: '#f0fdf4', color: '#16a34a', border: '#bbf7d0', text: 'CEO Đã Duyệt' };
-      case 'PO': return { bg: '#f0fdf4', color: '#16a34a', border: '#bbf7d0', text: 'Đơn Mua Hàng (PO)' };
-      case 'CONFIRMED': return { bg: '#f0fdf4', color: '#15803d', border: '#bbf7d0', text: 'Đã Xác Nhận' };
-      case 'CONFIRMED_BY_SUPPLIER': return { bg: '#eff6ff', color: '#2563eb', border: '#bfdbfe', text: 'NCC Đã Nhận Đơn' };
-      case 'SENT': return { bg: '#f0fdf4', color: '#15803d', border: '#bbf7d0', text: 'Đã Gửi Đơn PO' };
-      case 'SHIPPED': return { bg: '#eff6ff', color: '#1d4ed8', border: '#93c5fd', text: 'Đang Vận Chuyển' };
-      case 'DELIVERED': return { bg: '#ecfdf5', color: '#047857', border: '#6ee7b7', text: 'Đã Giao Tới Kho' };
-      case 'PENDING_QA': return { bg: '#fffbeb', color: '#d97706', border: '#fde68a', text: 'Chờ Kiểm Tra QC' };
-      case 'QA_PASSED': return { bg: '#ecfdf5', color: '#059669', border: '#a7f3d0', text: 'Đạt Chuẩn QC' };
-      case 'QA_PARTIAL': return { bg: '#fff7ed', color: '#c2410c', border: '#fed7aa', text: 'QC: Nhập Một Phần' };
-      case 'QA_REJECTED': return { bg: '#fef2f2', color: '#dc2626', border: '#fecaca', text: 'Từ Chối QC' };
-      case 'RECEIVED': return { bg: '#ecfdf5', color: '#059669', border: '#a7f3d0', text: 'Đã Nhận Hàng' };
-      case 'DONE': return { bg: '#ecfdf5', color: '#047857', border: '#6ee7b7', text: 'Hoàn Tất' };
-      case 'COMPLETED': return { bg: '#ecfdf5', color: '#047857', border: '#6ee7b7', text: 'Hoàn Tất' };
-      case 'CANCELLED': return { bg: '#fef2f2', color: '#dc2626', border: '#fecaca', text: 'Đã Hủy' };
-      default: return { bg: '#f8fafc', color: '#64748b', border: '#e2e8f0', text: status || 'Chưa rõ' };
-    }
+    const info = getStatusInfo(PO_STATUS, status);
+    return { bg: info.bg, color: info.color, border: info.border, text: info.label };
   };
 
   const getStatusText = (status) => {
-    return getStatusBadge(status).text;
+    return getStatusLabel(PO_STATUS, status);
   };
 
   // Filtered orders list based on active tab & filters
@@ -2563,13 +2551,13 @@ export default function Purchasing() {
                         }}
                         style={{ backgroundColor: '#fee2e2', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '6px', padding: '0.5rem 1.1rem', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
                       >
-                        ❌ Từ Chối & Yêu Cầu Đàm Phán Lại
+                        Từ Chối & Yêu Cầu Đàm Phán Lại
                       </button>
                       <button
                         onClick={() => handleUpdateStatus(selectedPO.id, 'PO')}
                         style={{ backgroundColor: '#10b981', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.5rem 1.1rem', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
                       >
-                        ✅ CEO Phê Duyệt → Phát Hành PO
+                        CEO Phê Duyệt → Phát Hành PO
                       </button>
                     </div>
                   ) : (

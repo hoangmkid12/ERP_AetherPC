@@ -1045,7 +1045,7 @@ export default function Cart() {
 
                 <div style={{ backgroundColor: '#f8fafc', padding: '1.1rem', borderRadius: '12px', border: '1px solid #e2e8f0', marginBottom: '1.5rem', fontSize: '0.85rem', color: '#475569', lineHeight: 1.6 }}>
                   <p style={{ margin: 0, fontWeight: 600, color: '#0f172a' }}>
-                    💡 Quý khách đã thêm sản phẩm vào giỏ thành công!
+                    Quý khách đã thêm sản phẩm vào giỏ thành công.
                   </p>
                   <p style={{ margin: '0.4rem 0 0' }}>
                     Để hoàn tất thanh toán, tích điểm thành viên (chiết khấu đến 10%) và bảo hành đơn hàng, vui lòng đăng nhập tài khoản.

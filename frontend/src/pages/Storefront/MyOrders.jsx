@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useSalesStore, useUtilityStore, useInventoryStore } from '../../stores';
 import { useAuth } from '../../context/AuthContext';
 import { useNotification, notify, confirm } from '../../context/NotificationContext';
+import { COMPLAINT_STATUS, getStatusInfo, getStatusLabel } from '../../utils/statusLabels';
 import { Search, Package, Clock, ShieldCheck, CheckCircle2, ChevronRight, HelpCircle, RefreshCw, X, AlertCircle, Sparkles, Eye, Upload, CheckCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { api } from '../../services/api';
@@ -76,7 +77,7 @@ export default function MyOrders() {
         localStorage.setItem('erp_return_requests', JSON.stringify(updatedList));
       } catch (_) {}
 
-      notify('🎉 Cảm ơn bạn đã xác nhận đã nhận đủ tiền hoàn 100%!', 'success');
+      notify('Cảm ơn bạn đã xác nhận đã nhận đủ tiền hoàn 100%.', 'success');
     }
   };
 
@@ -249,34 +250,36 @@ export default function MyOrders() {
 
     if (isExcOrder) {
       if (['DELIVERED', 'COMPLETED'].includes(status)) {
-        return { text: '✓ Nhận đổi mới xong', color: '#16a34a', bg: '#dcfce7', border: '#bbf7d0' };
+        return { text: 'Nhận đổi mới xong', color: '#16a34a', bg: '#dcfce7', border: '#bbf7d0' };
       }
       if (['SHIPPED', 'OUT_FOR_DELIVERY'].includes(status)) {
-        return { text: '🚚 Đang giao đổi', color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe' };
+        return { text: 'Đang giao đổi', color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe' };
       }
-      return { text: '🔄 Đổi mới (0đ)', color: '#7c3aed', bg: '#f5f3ff', border: '#ddd6fe' };
+      return { text: 'Đổi mới (0đ)', color: '#7c3aed', bg: '#f5f3ff', border: '#ddd6fe' };
     }
 
     if (rma) {
       const isExchange = rma.type === 'EXCHANGE';
       if (rma.status === 'REFUNDED') {
-        return { text: '💰 Đã hoàn tiền 100%', color: '#16a34a', bg: '#dcfce7', border: '#bbf7d0' };
+        return { text: 'Đã hoàn tiền 100%', color: '#16a34a', bg: '#dcfce7', border: '#bbf7d0' };
       }
       if (rma.status === 'EXCHANGED') {
-        return { text: '🔄 Đã xuất đơn đổi mới', color: '#7c3aed', bg: '#f5f3ff', border: '#ddd6fe' };
+        return { text: 'Đã xuất đơn đổi mới', color: '#7c3aed', bg: '#f5f3ff', border: '#ddd6fe' };
       }
       if (rma.status === 'RESTOCKED' || rma.status === 'QC_PASSED') {
-        return { text: isExchange ? '🔄 Kho đã nhận hàng cũ' : '💰 Đang lập lệnh hoàn tiền', color: '#0284c7', bg: '#f0f9ff', border: '#bae6fd' };
+        return { text: isExchange ? 'Kho đã nhận hàng cũ' : 'Đang lập lệnh hoàn tiền', color: '#0284c7', bg: '#f0f9ff', border: '#bae6fd' };
       }
       if (rma.status === 'RETURNING_TO_WAREHOUSE' || rma.status === 'DELIVERED_TO_WAREHOUSE') {
-        return { text: isExchange ? '🔄 Đang thu hồi đổi' : '💰 Đang thu hồi trả hàng', color: '#ea580c', bg: '#fff7ed', border: '#fed7aa' };
+        return { text: isExchange ? 'Đang thu hồi đổi' : 'Đang thu hồi trả hàng', color: '#ea580c', bg: '#fff7ed', border: '#fed7aa' };
       }
-      return { text: isExchange ? '🔄 Yêu cầu đổi hàng' : '💰 Yêu cầu hoàn tiền', color: '#d97706', bg: '#fffbeb', border: '#fde68a' };
+      return { text: isExchange ? 'Yêu cầu đổi hàng' : 'Yêu cầu hoàn tiền', color: '#d97706', bg: '#fffbeb', border: '#fde68a' };
     }
 
     switch (status) {
       case 'PENDING':
         return { text: 'Chờ xác nhận', color: '#fbbf24', bg: 'rgba(251,191,36,0.1)', border: 'rgba(251,191,36,0.3)' };
+      case 'WAITING_PAYMENT':
+        return { text: 'Chờ thanh toán', color: '#fbbf24', bg: 'rgba(251,191,36,0.1)', border: 'rgba(251,191,36,0.3)' };
       case 'AWAITING_STOCK':
         return { text: 'Chờ hàng về', color: '#f97316', bg: 'rgba(249,115,22,0.1)', border: 'rgba(249,115,22,0.3)' };
       case 'CONFIRMED':
@@ -288,10 +291,15 @@ export default function MyOrders() {
       case 'SHIPPED':
         return { text: 'Đang giao hàng', color: '#3b82f6', bg: 'rgba(59,130,246,0.15)', border: 'rgba(59,130,246,0.3)' };
       case 'SHIPPING_FAILED':
+      case 'FAILED_DELIVERY':
         return { text: 'Giao thất bại', color: '#ef4444', bg: 'rgba(239,68,68,0.1)', border: 'rgba(239,68,68,0.3)' };
       case 'DELIVERED':
         return { text: 'Đã giao', color: '#10b981', bg: 'rgba(16,185,129,0.1)', border: 'rgba(16,185,129,0.3)' };
+      case 'COMPLETED':
+        return { text: 'Hoàn tất', color: '#10b981', bg: 'rgba(16,185,129,0.1)', border: 'rgba(16,185,129,0.3)' };
       case 'RETURN_REQUESTED':
+      case 'RETURN_APPROVED':
+      case 'RETURNING_TO_WAREHOUSE':
       case 'RETURNING':
       case 'RETURNED':
       case 'REFUNDED':
@@ -401,7 +409,7 @@ export default function MyOrders() {
 
           <div style={{ marginTop: '0.65rem', padding: '0.6rem 0.85rem', backgroundColor: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem', fontSize: '0.75rem' }}>
             <span style={{ color: '#6d28d9', fontWeight: 600 }}>
-              🔄 <strong>Đơn hàng Đổi mới 1-1 (0đ)</strong> — Sản phẩm mới đang được chuẩn bị để giao tận tay bạn.
+              <strong>Đơn hàng Đổi mới 1-1 (0đ)</strong> — Sản phẩm mới đang được chuẩn bị để giao tận tay bạn.
             </span>
             {order?.originalOrderId && (
               <span style={{ color: '#64748b' }}>
@@ -499,7 +507,7 @@ export default function MyOrders() {
 
           <div style={{ marginTop: '0.65rem', padding: '0.6rem 0.85rem', backgroundColor: isExchange ? '#eff6ff' : '#f0fdf4', border: `1px solid ${isExchange ? '#bfdbfe' : '#bbf7d0'}`, borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem', fontSize: '0.75rem' }}>
             <span style={{ color: isExchange ? '#1e40af' : '#15803d', fontWeight: 600 }}>
-              {isExchange ? '🔄 Tiến độ Đổi Mới 1-1 Sản Phẩm Lỗi NSX' : '💰 Tiến độ Trả Hàng & Hoàn Tiền 100% về STK'}
+              {isExchange ? 'Tiến độ Đổi Mới 1-1 Sản Phẩm Lỗi NSX' : 'Tiến độ Trả Hàng & Hoàn Tiền 100% về STK'}
             </span>
             <span style={{ color: '#64748b' }}>
               Trạng thái: <strong>{rmaStatus === 'REFUNDED' ? 'Đã hoàn tất chuyển tiền 100%' : (rmaStatus === 'EXCHANGED' || rmaStatus === 'RESTOCKED') ? 'Đã xuất Đơn Đổi Mới' : rmaStatus === 'DELIVERED_TO_WAREHOUSE' ? 'Đang thẩm định QC tại kho' : rmaStatus === 'RETURNING_TO_WAREHOUSE' ? 'Shipper đang thu hồi' : 'Chờ xử lý'}</strong>
@@ -688,7 +696,7 @@ export default function MyOrders() {
       {complaintSuccess && (
         <div style={{ maxWidth: '600px', margin: '0 auto 1.5rem', padding: '1rem 1.25rem', backgroundColor: '#ecfdf5', border: '1.5px solid #10b981', borderRadius: '12px', color: '#065f46', display: 'flex', alignItems: 'center', gap: '0.75rem', fontWeight: 700, boxShadow: '0 4px 12px rgba(16,185,129,0.15)' }}>
           <CheckCircle2 size={22} style={{ color: '#10b981', flexShrink: 0 }} />
-          <span>🎉 Đã gửi Ticket Khiếu nại & Hỗ trợ thành công! Bộ phận CSKH AetherPC sẽ tiếp nhận và liên hệ bạn trong thời gian sớm nhất.</span>
+          <span>Đã gửi Ticket Khiếu nại & Hỗ trợ thành công. Bộ phận CSKH AetherPC sẽ tiếp nhận và liên hệ bạn trong thời gian sớm nhất.</span>
         </div>
       )}
 
@@ -713,7 +721,7 @@ export default function MyOrders() {
 
         {/* Quick Suggestion Chips */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap', marginTop: '0.85rem', fontSize: '0.75rem', color: '#64748b' }}>
-          <span style={{ fontWeight: 600 }}>⚡ Gợi ý tra cứu nhanh:</span>
+          <span style={{ fontWeight: 600 }}>Gợi ý tra cứu nhanh:</span>
           {[
             { label: 'Tất cả đơn', val: '' },
             { label: '0901234567 (Hùng)', val: '0901234567' },
@@ -854,7 +862,7 @@ export default function MyOrders() {
                             {/* Exchange order badge */}
                             {(selectedOrder.type === 'EXCHANGE' || String(selectedOrder.orderId).startsWith('ORD-EXC-')) && (
                               <span style={{ fontSize: '0.72rem', fontWeight: 800, padding: '3px 8px', borderRadius: '6px', backgroundColor: '#f5f3ff', color: '#7c3aed', border: '1px solid #ddd6fe', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
-                                🔄 Đơn Hàng Đổi Mới 1-1
+                                Đơn Hàng Đổi Mới 1-1
                               </span>
                             )}
 
@@ -891,7 +899,7 @@ export default function MyOrders() {
                                   gap: '0.25rem' 
                                 }}
                               >
-                                <Sparkles size={12}/> 🧪 Tua nhanh 5h
+                                <Sparkles size={12}/> Tua nhanh 5h
                               </button>
                             )}
                           </div>
@@ -919,7 +927,7 @@ export default function MyOrders() {
                                     gap: '0.25rem'
                                   }}
                                 >
-                                  👈 Xem đơn gốc #{origId}
+                                  Xem đơn gốc #{origId}
                                 </button>
                               );
                             })()}
@@ -1262,7 +1270,7 @@ export default function MyOrders() {
                             onMouseEnter={e => e.currentTarget.style.background = 'rgba(234,179,8,0.2)'}
                             onMouseLeave={e => e.currentTarget.style.background = 'rgba(234,179,8,0.1)'}
                           >
-                            ✏️ Sửa thông tin
+                            Sửa thông tin
                           </button>
                         </div>
                       )}
@@ -1295,7 +1303,7 @@ export default function MyOrders() {
                           <RefreshCw size={17} style={{ color: '#7c3aed' }} /> Đơn Hàng Đổi Mới 1-1 (Bảo Hành 0đ)
                         </div>
                         <span style={{ fontSize: '0.75rem', fontWeight: 800, padding: '0.2rem 0.65rem', borderRadius: '20px', backgroundColor: '#ffffff', border: '1px solid #c4b5fd', color: '#7c3aed' }}>
-                          ✓ Bù Trừ Miễn Phí 100%
+                          Bù Trừ Miễn Phí 100%
                         </span>
                       </div>
                       <p style={{ fontSize: '0.82rem', color: '#4c1d95', margin: '0 0 0.75rem 0', lineHeight: 1.5 }}>
@@ -1319,7 +1327,7 @@ export default function MyOrders() {
                             gap: '0.35rem'
                           }}
                         >
-                          👈 Xem Tiến Độ Thu Hồi Tại Đơn Gốc #{origId}
+                          Xem Tiến Độ Thu Hồi Tại Đơn Gốc #{origId}
                         </button>
                       )}
                     </div>
@@ -1355,7 +1363,9 @@ export default function MyOrders() {
                   RETURNING_TO_WAREHOUSE:   { label: 'Shipper đang vận chuyển về kho', color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe' },
                   DELIVERED_TO_WAREHOUSE:   { label: 'Đã về kho - Kỹ thuật QC đang thẩm định', color: '#7c3aed', bg: '#f5f3ff', border: '#ddd6fe' },
                   QC_PASSED:                { label: 'QC thẩm định Đạt chuẩn - Chờ kho nhập kệ', color: '#059669', bg: '#ecfdf5', border: '#a7f3d0' },
-                  RESTOCKED:                { 
+                  QC_REJECTED:              { label: 'QC từ chối - Không đủ điều kiện đổi trả', color: '#ef4444', bg: '#fef2f2', border: '#fecaca' },
+                  COMPLETED:                { label: 'Đã hoàn tất', color: '#16a34a', bg: '#f0fdf4', border: '#86efac' },
+                  RESTOCKED:                {
                     label: isExchangeType ? 'Kho đã nhập hàng cũ - Đang xuất kho đơn đổi mới' : 'Kho đã nhập hàng - Chờ Kế toán hoàn tiền', 
                     color: '#0284c7', 
                     bg: '#f0f9ff', 
@@ -1391,7 +1401,7 @@ export default function MyOrders() {
                           <span>Kế Toán Đã Hoàn Tiền 100% (Phiếu #RMA-{existingReturn.id})</span>
                         </div>
                         <span style={{ fontSize: '0.76rem', fontWeight: 800, padding: '0.2rem 0.65rem', borderRadius: '12px', backgroundColor: '#dcfce7', border: '1px solid #86efac', color: '#15803d' }}>
-                          ✓ Napas247: {formatPrice(parseFloat(existingReturn.refundAmount || selectedOrder.totalAmount || 0))}
+                          Napas247: {formatPrice(parseFloat(existingReturn.refundAmount || selectedOrder.totalAmount || 0))}
                         </span>
                       </div>
 
@@ -1412,7 +1422,7 @@ export default function MyOrders() {
                               style={{ width: '90px', height: '65px', objectFit: 'cover', borderRadius: '6px', border: '1px solid #86efac', cursor: 'pointer', boxShadow: '0 2px 4px rgba(0,0,0,0.08)' }}
                             />
                             <span style={{ display: 'block', fontSize: '0.68rem', color: '#16a34a', fontWeight: 700, marginTop: '2px', cursor: 'pointer' }} onClick={() => window.open(existingReturn.refundProofPhoto || existingReturn.evidenceUrl, '_blank')}>
-                              🔍 Xem biên lai
+                              Xem biên lai
                             </span>
                           </div>
                         )}
@@ -1438,13 +1448,13 @@ export default function MyOrders() {
                             onClick={() => setViewRefundContactModal(existingReturn)}
                             style={{ backgroundColor: '#ffffff', color: '#1d4ed8', border: '1px solid #bfdbfe', borderRadius: '6px', padding: '2px 8px', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}
                           >
-                            📞 Hỗ trợ kế toán
+                            Hỗ trợ kế toán
                           </button>
                         </div>
                       ) : (
                         <div style={{ padding: '0.65rem 0.85rem', backgroundColor: '#ffffff', border: '1px dashed #86efac', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.3rem', fontSize: '0.76rem' }}>
-                            <span style={{ color: '#0f172a', fontWeight: 700 }}>💬 Bạn đã kiểm tra số dư và nhận được tiền hoàn chưa?</span>
+                            <span style={{ color: '#0f172a', fontWeight: 700 }}>Bạn đã kiểm tra số dư và nhận được tiền hoàn chưa?</span>
                             <span style={{ color: '#d97706', backgroundColor: '#fffbeb', border: '1px solid #fde68a', padding: '2px 6px', borderRadius: '4px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
                               <Clock size={12} /> Tự động đóng sau: {hoursRemaining}h {minutesRemaining}p
                             </span>
@@ -1471,7 +1481,7 @@ export default function MyOrders() {
                               }}
                             >
                               <CheckCircle2 size={15} />
-                              <span>✅ Tôi Đã Nhận Đủ Tiền</span>
+                              <span>Tôi Đã Nhận Đủ Tiền</span>
                             </button>
 
                             <button
@@ -1494,7 +1504,7 @@ export default function MyOrders() {
                               }}
                             >
                               <AlertCircle size={15} />
-                              <span>❌ Chưa Nhận Được Tiền (Hỗ Trợ)</span>
+                              <span>Chưa Nhận Được Tiền (Hỗ Trợ)</span>
                             </button>
                           </div>
                         </div>
@@ -1522,7 +1532,7 @@ export default function MyOrders() {
                       {existingReturn.qcProofPhoto && (
                         <div style={{ gridColumn: '1 / -1', marginTop: '0.35rem', padding: '0.65rem 0.85rem', backgroundColor: '#ffffff', border: '1px solid #ddd6fe', borderRadius: '8px' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontWeight: 800, color: '#6d28d9', fontSize: '0.78rem', marginBottom: '0.3rem' }}>
-                            📷 Ảnh Thẩm Định Kỹ Thuật QC:
+                            Ảnh Thẩm Định Kỹ Thuật QC:
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                             <img
@@ -1569,7 +1579,7 @@ export default function MyOrders() {
                                 gap: '0.3rem'
                               }}
                             >
-                              👉 Xem Chi Tiết Đơn Đổi Mới #{replacementId}
+                              Xem Chi Tiết Đơn Đổi Mới #{replacementId}
                             </button>
                           )}
                         </div>
@@ -1624,7 +1634,7 @@ export default function MyOrders() {
               className="btn btn-primary"
               style={{ fontSize: '0.78rem', padding: '0.4rem 0.85rem', borderRadius: '8px', backgroundColor: '#ef4444', border: 'none', fontWeight: 700 }}
             >
-              ➕ Gửi Ticket Mới
+              Gửi Ticket Mới
             </button>
           )}
         </div>
@@ -1652,8 +1662,9 @@ export default function MyOrders() {
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem', flexWrap: 'wrap', gap: '0.4rem' }}>
                     <strong style={{ color: '#2563eb', fontSize: '0.88rem' }}>{tkt.id}</strong>
-                    <span style={{ fontSize: '0.7rem', fontWeight: 800, padding: '2px 8px', borderRadius: '4px', backgroundColor: tkt.status === 'RESOLVED' ? '#dcfce7' : tkt.status === 'IN_PROGRESS' ? '#fef3c7' : '#fee2e2', color: tkt.status === 'RESOLVED' ? '#166534' : tkt.status === 'IN_PROGRESS' ? '#92400e' : '#991b1b' }}>
-                      {tkt.status === 'RESOLVED' ? '✓ Đã giải quyết' : tkt.status === 'IN_PROGRESS' ? '⏳ Đang xử lý' : '🔴 Mới gửi'}
+                    <span style={{ fontSize: '0.7rem', fontWeight: 800, padding: '2px 8px', borderRadius: '4px', backgroundColor: getStatusInfo(COMPLAINT_STATUS, tkt.status).bg, color: getStatusInfo(COMPLAINT_STATUS, tkt.status).color }}>
+                      {tkt.status === 'RESOLVED' ? '✓ ' : ''}
+                      {getStatusLabel(COMPLAINT_STATUS, tkt.status)}
                     </span>
                   </div>
 
@@ -1670,11 +1681,11 @@ export default function MyOrders() {
                 <div>
                   {tkt.resolution ? (
                     <div style={{ padding: '0.5rem 0.75rem', backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', color: '#166534', fontSize: '0.78rem', fontWeight: 600, marginBottom: '0.5rem' }}>
-                      ✓ CSKH Phản hồi ({tkt.assignedTo || 'Bộ phận CSKH'}): {tkt.resolution}
+                      CSKH Phản hồi ({tkt.assignedTo || 'Bộ phận CSKH'}): {tkt.resolution}
                     </div>
                   ) : (
                     <div style={{ fontSize: '0.75rem', color: '#92400e', fontStyle: 'italic', marginBottom: '0.5rem' }}>
-                      ⏳ Đang chờ CSKH xử lý phản hồi...
+                      Đang chờ CSKH xử lý phản hồi...
                     </div>
                   )}
 
@@ -1791,9 +1802,9 @@ export default function MyOrders() {
                   className="form-input"
                   style={{ width: '100%', borderRadius: '10px', backgroundColor: '#ffffff', color: '#0f172a', border: '1px solid #cbd5e1' }}
                 >
-                  <option value="HIGH">🔴 Khẩn cấp (Cần hỗ trợ ngay trong 30 phút)</option>
-                  <option value="MEDIUM">🟡 Trung bình (Xử lý trong ngày)</option>
-                  <option value="LOW">🟢 Thấp (Tư vấn bình thường)</option>
+                  <option value="HIGH">Khẩn cấp (Cần hỗ trợ ngay trong 30 phút)</option>
+                  <option value="MEDIUM">Trung bình (Xử lý trong ngày)</option>
+                  <option value="LOW">Thấp (Tư vấn bình thường)</option>
                 </select>
               </div>
 
@@ -1811,7 +1822,7 @@ export default function MyOrders() {
                   }} />
                   <button type="button" onClick={() => document.getElementById('complaintEvidenceInput')?.click()}
                     className="btn btn-secondary" style={{ fontSize: '0.75rem', padding: '0.4rem 0.8rem', borderRadius: '8px' }}>
-                    📷 Chọn ảnh từ máy
+                    Chọn ảnh từ máy
                   </button>
                   <input type="text" value={complaintForm.evidenceUrl || ''} onChange={e => setComplaintForm(p => ({ ...p, evidenceUrl: e.target.value }))}
                     placeholder="Hoặc dán URL ảnh minh chứng..." className="form-input" style={{ flex: 1, fontSize: '0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1' }} />
@@ -1828,7 +1839,7 @@ export default function MyOrders() {
               </div>
 
               <div style={{ fontSize: '0.75rem', color: '#64748b', padding: '0.65rem 0.85rem', backgroundColor: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
-                💡 Sau khi gửi ticket, Bộ phận CSKH AetherPC sẽ nhận được thông tin ngay lập tức trên hệ thống và xử lý hỗ trợ cho bạn.
+                Sau khi gửi ticket, Bộ phận CSKH AetherPC sẽ nhận được thông tin ngay lập tức trên hệ thống và xử lý hỗ trợ cho bạn.
               </div>
 
               <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
@@ -1849,8 +1860,9 @@ export default function MyOrders() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.75rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                 <strong style={{ fontSize: '1.1rem', color: '#2563eb' }}>{viewTicketDetail.id}</strong>
-                <span style={{ fontSize: '0.72rem', fontWeight: 800, padding: '2px 8px', borderRadius: '4px', backgroundColor: viewTicketDetail.status === 'RESOLVED' ? '#dcfce7' : viewTicketDetail.status === 'IN_PROGRESS' ? '#fef3c7' : '#fee2e2', color: viewTicketDetail.status === 'RESOLVED' ? '#166534' : viewTicketDetail.status === 'IN_PROGRESS' ? '#92400e' : '#991b1b' }}>
-                  {viewTicketDetail.status === 'RESOLVED' ? '✓ Đã giải quyết' : viewTicketDetail.status === 'IN_PROGRESS' ? '⏳ Đang xử lý' : '🔴 Mới tiếp nhận'}
+                <span style={{ fontSize: '0.72rem', fontWeight: 800, padding: '2px 8px', borderRadius: '4px', backgroundColor: getStatusInfo(COMPLAINT_STATUS, viewTicketDetail.status).bg, color: getStatusInfo(COMPLAINT_STATUS, viewTicketDetail.status).color }}>
+                  {viewTicketDetail.status === 'RESOLVED' ? '✓ ' : ''}
+                  {getStatusLabel(COMPLAINT_STATUS, viewTicketDetail.status)}
                 </span>
               </div>
               <button onClick={() => setViewTicketDetail(null)} style={{ background: '#f1f5f9', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -1880,7 +1892,7 @@ export default function MyOrders() {
 
               {viewTicketDetail.evidenceUrl && (
                 <div>
-                  <div style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 700, marginBottom: '0.3rem' }}>📷 Ảnh / Minh chứng đính kèm:</div>
+                  <div style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 700, marginBottom: '0.3rem' }}>Ảnh / Minh chứng đính kèm:</div>
                   <img src={viewTicketDetail.evidenceUrl} alt="Minh chứng sự cố"
                     style={{ width: '120px', height: '120px', objectFit: 'cover', borderRadius: '10px', border: '1px solid #cbd5e1', cursor: 'pointer' }}
                     onClick={() => window.open(viewTicketDetail.evidenceUrl, '_blank')}
@@ -1890,14 +1902,14 @@ export default function MyOrders() {
 
               {viewTicketDetail.resolution ? (
                 <div>
-                  <div style={{ fontSize: '0.78rem', color: '#16a34a', fontWeight: 800, marginBottom: '0.3rem' }}>✓ Kết quả / Hướng giải quyết từ CSKH:</div>
+                  <div style={{ fontSize: '0.78rem', color: '#16a34a', fontWeight: 800, marginBottom: '0.3rem' }}>Kết quả / Hướng giải quyết từ CSKH:</div>
                   <div style={{ padding: '0.85rem', backgroundColor: '#f0fdf4', borderRadius: '10px', color: '#166534', borderLeft: '4px solid #16a34a', fontWeight: 600, lineHeight: 1.5 }}>
                     {viewTicketDetail.resolution}
                   </div>
                 </div>
               ) : (
                 <div style={{ padding: '0.75rem 0.85rem', backgroundColor: '#fef3c7', borderRadius: '10px', color: '#92400e', fontSize: '0.8rem', fontWeight: 600, borderLeft: '4px solid #f59e0b' }}>
-                  ⏳ Yêu cầu của bạn đã được chuyển tới bộ phận Chăm sóc khách hàng và sẽ được xử lý sớm nhất.
+                  Yêu cầu của bạn đã được chuyển tới bộ phận Chăm sóc khách hàng và sẽ được xử lý sớm nhất.
                 </div>
               )}
             </div>
@@ -2182,14 +2194,14 @@ export default function MyOrders() {
             <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.1rem', fontSize: '0.82rem' }}>
               {/* Alert notice */}
               <div style={{ backgroundColor: '#fff7ed', border: '1px solid #fed7aa', borderRadius: '8px', padding: '0.85rem 1rem', color: '#9a3412', lineHeight: 1.5 }}>
-                <strong style={{ display: 'block', marginBottom: '0.2rem' }}>⚠️ Bạn chưa nhận được tiền trong tài khoản?</strong>
+                <strong style={{ display: 'block', marginBottom: '0.2rem' }}>Bạn chưa nhận được tiền trong tài khoản?</strong>
                 Lệnh chuyển khoản Napas247 thường nhận được ngay trong 1-5 phút. Tuy nhiên một số ngân hàng có thể bảo trì hoặc chậm tin nhắn SMS/App. Xin hãy kiểm tra lịch sử biến động số dư trên App Mobile Banking.
               </div>
 
               {/* Contact Channels */}
               <div style={{ backgroundColor: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '10px', padding: '1rem' }}>
                 <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', marginBottom: '0.6rem' }}>
-                  📞 Kênh Liên Hệ Trực Tiếp Phòng Kế Toán
+                  Kênh Liên Hệ Trực Tiếp Phòng Kế Toán
                 </div>
                 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
@@ -2210,7 +2222,7 @@ export default function MyOrders() {
                         fontSize: '0.75rem'
                       }}
                     >
-                      📞 Gọi Ngay
+                      Gọi Ngay
                     </a>
                   </div>
 
@@ -2232,7 +2244,7 @@ export default function MyOrders() {
                         fontSize: '0.75rem'
                       }}
                     >
-                      ✉️ Gửi Email
+                      Gửi Email
                     </a>
                   </div>
                 </div>
@@ -2240,7 +2252,7 @@ export default function MyOrders() {
 
               {/* Đối Soát Giao Dịch */}
               <div style={{ backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', padding: '0.85rem 1rem', fontSize: '0.78rem' }}>
-                <strong style={{ color: '#166534', display: 'block', marginBottom: '0.4rem' }}>📋 Thông Tin Đối Soát Napas247:</strong>
+                <strong style={{ color: '#166534', display: 'block', marginBottom: '0.4rem' }}>Thông Tin Đối Soát Napas247:</strong>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem', color: '#334155' }}>
                   <div>Mã GD Kế toán: <strong style={{ color: '#15803d', fontFamily: 'monospace' }}>{viewRefundContactModal.refundTxnCode || 'FT26082400912'}</strong></div>
                   <div>Số tiền: <strong style={{ color: '#15803d' }}>{new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(parseFloat(viewRefundContactModal.refundAmount || selectedOrder?.totalAmount || 0))}</strong></div>
@@ -2285,7 +2297,7 @@ export default function MyOrders() {
                   cursor: 'pointer'
                 }}
               >
-                📝 Gửi Ticket Khiếu Nại Cho Kế Toán
+                Gửi Ticket Khiếu Nại Cho Kế Toán
               </button>
             </div>
           </div>

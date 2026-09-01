@@ -528,7 +528,7 @@ export default function ProductDetail() {
                   {/* Preorder Notice Banner */}
                   {!inStock && (
                     <div style={{ padding: '0.75rem 1rem', backgroundColor: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px', color: '#b45309', fontSize: '0.82rem', lineHeight: '1.45' }}>
-                      ⏳ <strong>Sản Phẩm Đặt Trước:</strong> Mặt hàng này hiện đang tạm hết sẵn tại kho. Quý khách vui lòng liên hệ Hotline <strong style={{ color: '#d97706' }}>0912.888.999</strong> hoặc Live Chat CSKH để được hỗ trợ đặt giữ hàng!
+                      <strong>Sản Phẩm Đặt Trước:</strong> Mặt hàng này hiện đang tạm hết sẵn tại kho. Quý khách vui lòng liên hệ Hotline <strong style={{ color: '#d97706' }}>0912.888.999</strong> hoặc Live Chat CSKH để được hỗ trợ đặt giữ hàng.
                     </div>
                   )}
 
@@ -594,7 +594,7 @@ export default function ProductDetail() {
                           backgroundColor: '#f1f5f9', color: '#94a3b8', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem'
                         }}
                       >
-                        ⏳ Hàng Đặt Trước (Không Thể Mua Trực Tiếp)
+                        Hàng Đặt Trước (Không Thể Mua Trực Tiếp)
                       </button>
                     )}
                   </div>

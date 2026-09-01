@@ -6,7 +6,9 @@ import { notify } from "../../context/NotificationContext";
 import {
   Zap, ChevronRight, Star, TrendingUp, Package,
   Percent, Timer, X, Search, SlidersHorizontal,
-  ChevronDown, ShoppingCart, CheckCircle, Eye, ArrowRight
+  ChevronDown, ShoppingCart, CheckCircle, Eye, ArrowRight,
+  Cpu, Gamepad2, MemoryStick, HardDrive, Database, CircuitBoard,
+  Box, Snowflake, Flame, ShieldCheck, Truck
 } from "lucide-react";
 
 function useCountdown(target) {
@@ -26,16 +28,16 @@ const pad = (n) => String(n).padStart(2, "0");
 const SALE_END = Date.now() + 8 * 3600 * 1000 + 47 * 60 * 1000 + 33 * 1000;
 
 const CATEGORIES = [
-  { id: "ALL", label: "Tất Cả", icon: "🛒" },
-  { id: "CPU", label: "CPU", icon: "🖥️" },
-  { id: "VGA", label: "Card Màn Hình", icon: "🎮" },
-  { id: "RAM", label: "RAM", icon: "💾" },
-  { id: "SSD", label: "SSD", icon: "💿" },
-  { id: "HDD", label: "HDD", icon: "🗄️" },
-  { id: "MAINBOARD", label: "Mainboard", icon: "🔌" },
-  { id: "PSU", label: "Nguồn", icon: "⚡" },
-  { id: "CASE", label: "Thùng máy", icon: "📦" },
-  { id: "COOLING", label: "Tản Nhiệt", icon: "❄️" },
+  { id: "ALL", label: "Tất Cả", icon: ShoppingCart },
+  { id: "CPU", label: "CPU", icon: Cpu },
+  { id: "VGA", label: "Card Màn Hình", icon: Gamepad2 },
+  { id: "RAM", label: "RAM", icon: MemoryStick },
+  { id: "SSD", label: "SSD", icon: HardDrive },
+  { id: "HDD", label: "HDD", icon: Database },
+  { id: "MAINBOARD", label: "Mainboard", icon: CircuitBoard },
+  { id: "PSU", label: "Nguồn", icon: Zap },
+  { id: "CASE", label: "Thùng máy", icon: Box },
+  { id: "COOLING", label: "Tản Nhiệt", icon: Snowflake },
 ];
 
 const SORT_OPTIONS = [
@@ -86,7 +88,7 @@ function FlashProductCard({ p, onAddCart }) {
     >
       <div style={{ position: "absolute", top: 10, left: 10, display: "flex", flexDirection: "column", gap: 4, zIndex: 2 }}>
         {p.discountPercent > 0 && <span style={{ backgroundColor: "#dc2626", color: "#fff", fontSize: "0.68rem", fontWeight: 900, padding: "3px 8px", borderRadius: 6 }}>-{p.discountPercent}%</span>}
-        {isHot && !isSoldOut && <span style={{ backgroundColor: "#f97316", color: "#fff", fontSize: "0.63rem", fontWeight: 800, padding: "2px 7px", borderRadius: 5 }}>🔥 HOT</span>}
+        {isHot && !isSoldOut && <span style={{ backgroundColor: "#f97316", color: "#fff", fontSize: "0.63rem", fontWeight: 800, padding: "2px 7px", borderRadius: 5, display: "inline-flex", alignItems: "center", gap: "2px" }}><Flame size={10} fill="#fff" /> HOT</span>}
         {isSoldOut && <span style={{ backgroundColor: "#64748b", color: "#fff", fontSize: "0.63rem", fontWeight: 800, padding: "2px 7px", borderRadius: 5 }}>HẾT HÀNG</span>}
       </div>
       <div style={{ width: "100%", height: 170, display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: "#f8fafc", padding: "1rem", position: "relative" }}>
@@ -190,7 +192,7 @@ export default function FlashSale() {
                 </div>
                 <div>
                   <div style={{ fontSize:"0.7rem", color:"rgba(255,255,255,0.75)", fontWeight:700, textTransform:"uppercase", letterSpacing:"2px", marginBottom:2 }}>TechZone Store</div>
-                  <h1 style={{ fontSize:"2.4rem", fontWeight:900, color:"#ffffff", margin:0, letterSpacing:"-1.5px", textTransform:"uppercase", lineHeight:1 }}>⚡ Flash Sale</h1>
+                  <h1 style={{ fontSize:"2.4rem", fontWeight:900, color:"#ffffff", margin:0, letterSpacing:"-1.5px", textTransform:"uppercase", lineHeight:1, display:"flex", alignItems:"center", gap:"0.6rem" }}><Zap size={32} fill="#ffffff" /> Flash Sale</h1>
                 </div>
               </div>
               <p style={{ color:"rgba(255,255,255,0.88)", fontSize:"0.95rem", fontWeight:500, margin:"0 0 1.1rem" }}>Giảm giá sốc mỗi ngày — Số lượng có hạn, bán hết là dừng ngay!</p>
@@ -255,7 +257,7 @@ export default function FlashSale() {
               const active = activeCategory===cat.id;
               return (
                 <button key={cat.id} onClick={()=>{setActiveCategory(cat.id);setVisibleCount(20);}} style={{ padding:"0.4rem 0.85rem", borderRadius:99, border:active?"2px solid #dc2626":"1.5px solid #e2e8f0", backgroundColor:active?"#fef2f2":"#f8fafc", color:active?"#dc2626":"#475569", fontSize:"0.78rem", fontWeight:active?800:600, cursor:"pointer", transition:"all 0.15s", display:"flex", alignItems:"center", gap:"0.3rem", whiteSpace:"nowrap" }}>
-                  {cat.icon} {cat.label} <span style={{ backgroundColor:active?"#dc2626":"#e2e8f0", color:active?"#fff":"#64748b", fontSize:"0.65rem", fontWeight:800, padding:"0px 5px", borderRadius:99 }}>{count}</span>
+                  <cat.icon size={14} /> {cat.label} <span style={{ backgroundColor:active?"#dc2626":"#e2e8f0", color:active?"#fff":"#64748b", fontSize:"0.65rem", fontWeight:800, padding:"0px 5px", borderRadius:99 }}>{count}</span>
                 </button>
               );
             })}
@@ -287,13 +289,13 @@ export default function FlashSale() {
 
         <div style={{ marginTop:"3rem", display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(220px, 1fr))", gap:"1rem" }}>
           {[
-            { icon:"⚡", title:"Giá Flash Sale", desc:"Chỉ áp dụng trong thời gian đếm ngược, không gộp với khuyến mãi khác" },
-            { icon:"📦", title:"Số Lượng Có Hạn", desc:"Mỗi sản phẩm Flash Sale chỉ có một số lượng nhất định, bán hết là dừng" },
-            { icon:"🔒", title:"Bảo Hành Đầy Đủ", desc:"Sản phẩm Flash Sale vẫn được bảo hành chính hãng đầy đủ theo quy định" },
-            { icon:"🚚", title:"Giao Hàng Nhanh", desc:"Đơn Flash Sale được ưu tiên xử lý và giao hàng trong ngày" },
+            { icon:Zap, title:"Giá Flash Sale", desc:"Chỉ áp dụng trong thời gian đếm ngược, không gộp với khuyến mãi khác" },
+            { icon:Package, title:"Số Lượng Có Hạn", desc:"Mỗi sản phẩm Flash Sale chỉ có một số lượng nhất định, bán hết là dừng" },
+            { icon:ShieldCheck, title:"Bảo Hành Đầy Đủ", desc:"Sản phẩm Flash Sale vẫn được bảo hành chính hãng đầy đủ theo quy định" },
+            { icon:Truck, title:"Giao Hàng Nhanh", desc:"Đơn Flash Sale được ưu tiên xử lý và giao hàng trong ngày" },
           ].map((item, i) => (
             <div key={i} style={{ backgroundColor:"#fff", borderRadius:12, padding:"1.1rem", border:"1px solid #f1f5f9", boxShadow:"0 2px 8px rgba(0,0,0,0.04)", display:"flex", gap:"0.75rem", alignItems:"flex-start" }}>
-              <span style={{ fontSize:"1.5rem", lineHeight:1 }}>{item.icon}</span>
+              <span style={{ color:"#dc2626", flexShrink:0 }}><item.icon size={24} /></span>
               <div>
                 <div style={{ fontWeight:800, color:"#0f172a", fontSize:"0.85rem", marginBottom:"0.2rem" }}>{item.title}</div>
                 <div style={{ fontSize:"0.75rem", color:"#64748b", lineHeight:1.5 }}>{item.desc}</div>

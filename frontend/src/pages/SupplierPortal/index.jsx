@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { notify, confirm } from '../../context/NotificationContext';
+import { PO_STATUS, getStatusLabel } from '../../utils/statusLabels';
 import { useFinanceStore } from '../../stores';
 import { api } from '../../services/api';
 import { 
@@ -85,9 +86,15 @@ export default function SupplierPortal() {
           return apiPo;
         });
         
-        const contextPOs = latestLocalPOs.filter(po =>
-          !apiPOs.some(ap => ap.poNumber === po.poNumber || String(ap.id) === String(po.id))
-        );
+        // Only let stale localStorage/context POs introduce brand-new rows when the
+        // real API genuinely returned nothing — once it has data, it's authoritative
+        // on which POs exist, so old local-only entries (possibly carrying ad-hoc
+        // status values that were never real backend statuses) can't inject phantom orders.
+        const contextPOs = apiPOs.length === 0
+          ? latestLocalPOs.filter(po =>
+              !apiPOs.some(ap => ap.poNumber === po.poNumber || String(ap.id) === String(po.id))
+            )
+          : [];
         const formattedOrders = [...mergedPOs, ...contextPOs].map(po => ({
           ...po,
           poNumber: formatPurchaseReference(po)
@@ -161,6 +168,8 @@ export default function SupplierPortal() {
         return <span className="badge badge-warning" style={{ backgroundColor: 'rgba(245,158,11,0.15)', color: '#d97706', border: '1px solid #fde68a' }}>CEO Đã Duyệt (Chờ Xác Nhận & Hẹn Giao)</span>;
       case 'CONFIRMED_BY_SUPPLIER':
         return <span className="badge badge-success" style={{ backgroundColor: 'rgba(34,197,94,0.15)', color: '#16a34a', border: '1px solid #bbf7d0' }}>NCC Đã Xác Nhận & Hẹn Giao</span>;
+      case 'PENDING_QA':
+        return <span className="badge badge-warning" style={{ backgroundColor: 'rgba(245,158,11,0.15)', color: '#d97706', border: '1px solid #fde68a' }}>Chờ Kiểm Tra QC</span>;
       case 'QA_PASSED':
         return <span className="badge badge-success" style={{ backgroundColor: 'rgba(34,197,94,0.15)', color: '#15803d', border: '1px solid #86efac' }}>QA/QC Đạt — Chờ Kho Nhập</span>;
       case 'QA_PARTIAL':
@@ -174,7 +183,7 @@ export default function SupplierPortal() {
       case 'CANCELLED':
         return <span className="badge badge-danger" style={{ backgroundColor: 'rgba(239,68,68,0.15)', color: '#ef4444' }}>Đã Từ Chối / Hủy</span>;
       default:
-        return <span className="badge badge-secondary">{status || 'N/A'}</span>;
+        return <span className="badge badge-secondary">{getStatusLabel(PO_STATUS, status)}</span>;
     }
   };
 
@@ -235,13 +244,13 @@ export default function SupplierPortal() {
       });
 
       if (res && res.success) {
-        notify(`🎉 Đã xác nhận đơn hàng ${po.poNumber || poId} thành công!\n\n• Ngày hẹn giao hàng: ${deliveryDateInput}\n• Thông tin đã gửi lại cho Bên Mua Hàng & Kho để sẵn sàng nhập hàng.`, 'success');
+        notify(`Đã xác nhận đơn hàng ${po.poNumber || poId} thành công. Ngày hẹn giao hàng: ${deliveryDateInput}. Thông tin đã gửi lại cho Bên Mua Hàng & Kho để sẵn sàng nhập hàng.`, 'success');
       } else {
-        notify(`⚠️ CHƯA GỬI ĐƯỢC XÁC NHẬN GIAO HÀNG LÊN MÁY CHỦ!\n\n• Đơn: ${po.poNumber || poId}\n• Xác nhận chỉ lưu tạm trên trình duyệt này. Vui lòng thử lại.`, 'error');
+        notify(`Chưa gửi được xác nhận giao hàng lên máy chủ. Đơn: ${po.poNumber || poId}. Xác nhận chỉ lưu tạm trên trình duyệt này. Vui lòng thử lại.`, 'error');
       }
     } catch (e) {
       console.warn('API update failed:', e);
-      notify(`⚠️ CHƯA GỬI ĐƯỢC XÁC NHẬN GIAO HÀNG LÊN MÁY CHỦ!\n\n• Đơn: ${po.poNumber || poId}\n• Lỗi: ${e.message || 'Lỗi kết nối máy chủ'}\n\nXác nhận chỉ lưu tạm trên trình duyệt này. Vui lòng thử lại.`, 'error');
+      notify(`Chưa gửi được xác nhận giao hàng lên máy chủ. Đơn: ${po.poNumber || poId}. Lỗi: ${e.message || 'Lỗi kết nối máy chủ'}. Xác nhận chỉ lưu tạm trên trình duyệt này. Vui lòng thử lại.`, 'error');
     }
     setSubmitting(false);
   };
@@ -419,10 +428,10 @@ export default function SupplierPortal() {
       // looks fine, but the backend (the source of truth CEO's approval reads from) never
       // received it. Report what actually happened instead.
       if (apiSucceeded) {
-        notify(`🎉 Đã gửi Báo Giá cho đơn #${po.poNumber || poId} thành công!\n\n• Tổng giá trị: ${formatPrice(total)}\n• Trạng thái: ĐÃ BÁO GIÁ (Chờ CEO duyệt)`, 'success');
+        notify(`Đã gửi báo giá cho đơn #${po.poNumber || poId} thành công. Tổng giá trị: ${formatPrice(total)}. Trạng thái: Đã báo giá (chờ CEO duyệt).`, 'success');
       } else {
         console.error('Quote submission rejected by server. poId:', poId, 'itemPrices:', itemPrices, 'error:', apiErrorMessage);
-        notify(`⚠️ CHƯA GỬI ĐƯỢC BÁO GIÁ LÊN MÁY CHỦ!\n\n• Đơn: #${po.poNumber || poId}\n• Lỗi: ${apiErrorMessage}\n\nBáo giá chỉ lưu tạm trên trình duyệt này — CEO sẽ KHÔNG thấy được để duyệt. Vui lòng thử lại hoặc liên hệ quản trị viên.`, 'error');
+        notify(`Chưa gửi được báo giá lên máy chủ. Đơn: #${po.poNumber || poId}. Lỗi: ${apiErrorMessage}. Báo giá chỉ lưu tạm trên trình duyệt này — CEO sẽ không thấy được để duyệt. Vui lòng thử lại hoặc liên hệ quản trị viên.`, 'error');
       }
     } catch (e) {
       console.warn('Quote update failed:', e);
@@ -485,9 +494,9 @@ export default function SupplierPortal() {
       setSelectedPO(null);
       setCancelReason('');
       if (apiSucceeded) {
-        notify(`🔴 Đã gửi thông báo TỪ CHỐI BÁO GIÁ cho đơn #${poNum} tới Bên Mua Hàng!\n\nLý do: "${finalReason}"`, 'success');
+        notify(`Đã gửi thông báo từ chối báo giá cho đơn #${poNum} tới Bên Mua Hàng. Lý do: "${finalReason}"`, 'success');
       } else {
-        notify(`⚠️ CHƯA GỬI ĐƯỢC THÔNG BÁO TỪ CHỐI LÊN MÁY CHỦ!\n\n• Đơn: #${poNum}\n• Lỗi: ${apiErrorMessage}\n\nVui lòng thử lại.`, 'error');
+        notify(`Chưa gửi được thông báo từ chối lên máy chủ. Đơn: #${poNum}. Lỗi: ${apiErrorMessage}. Vui lòng thử lại.`, 'error');
       }
       await fetchData();
     } catch (e) {
@@ -871,23 +880,27 @@ export default function SupplierPortal() {
                         <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
                           {po.status === 'DONE' ? (
                             <span className="badge badge-success" style={{ backgroundColor: 'rgba(16,185,129,0.15)', color: 'var(--success)', padding: '0.35rem 0.75rem', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 700 }}>
-                              ✅ Đã Thanh Toán 100%
+                              Đã Thanh Toán 100%
                             </span>
                           ) : po.status === 'PO' ? (
                             <span className="badge badge-warning" style={{ backgroundColor: 'rgba(245,158,11,0.15)', color: '#fbbf24', padding: '0.35rem 0.75rem', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 700 }}>
-                              🚚 Đang Cung Cấp - Chờ Thanh Toán
+                              Đang Cung Cấp - Chờ Thanh Toán
                             </span>
                           ) : po.status === 'QUOTED' ? (
                             <span className="badge badge-info" style={{ backgroundColor: 'rgba(99,102,241,0.15)', color: '#818cf8', padding: '0.35rem 0.75rem', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 600 }}>
-                              ⏳ Chờ CEO Duyệt Báo Giá
+                              Chờ CEO Duyệt Báo Giá
                             </span>
                           ) : po.status === 'RFQ_SENT' ? (
                             <span className="badge badge-secondary" style={{ padding: '0.35rem 0.75rem', borderRadius: '12px', fontSize: '0.75rem' }}>
                               Chờ Nhập Báo Giá
                             </span>
-                          ) : (
+                          ) : po.status === 'CANCELLED' ? (
                             <span className="badge badge-danger" style={{ backgroundColor: 'rgba(239,68,68,0.15)', color: '#ef4444', padding: '0.35rem 0.75rem', borderRadius: '12px', fontSize: '0.75rem' }}>
                               Đã Hủy Đơn
+                            </span>
+                          ) : (
+                            <span className="badge badge-secondary" style={{ padding: '0.35rem 0.75rem', borderRadius: '12px', fontSize: '0.75rem' }}>
+                              {getStatusLabel(PO_STATUS, po.status)}
                             </span>
                           )}
                         </td>
@@ -957,7 +970,7 @@ export default function SupplierPortal() {
                 <AlertCircle size={20} style={{ color: '#d97706', flexShrink: 0, marginTop: '0.1rem' }} />
                 <div>
                   <div style={{ color: '#b45309', fontSize: '0.9rem', fontWeight: 700, marginBottom: '0.25rem' }}>
-                    {isQuotedMissingPrices(selectedPO) ? '⚠️ Đơn báo giá chưa ghi nhận được giá — Vui lòng nhập lại' : 'Phòng Mua Hàng yêu cầu báo giá'}
+                    {isQuotedMissingPrices(selectedPO) ? 'Đơn báo giá chưa ghi nhận được giá — Vui lòng nhập lại' : 'Phòng Mua Hàng yêu cầu báo giá'}
                   </div>
                   <div style={{ color: '#475569', fontSize: '0.85rem' }}>
                     Vui lòng nhập <strong>đơn giá</strong> cho từng sản phẩm bên dưới, rồi bấm <strong>"Gửi Báo Giá Cho CEO Duyệt"</strong> để tiến hành báo giá.
@@ -1095,7 +1108,7 @@ export default function SupplierPortal() {
                   <Truck size={22} color="#2563eb" style={{ flexShrink: 0, marginTop: '2px' }} />
                   <div>
                     <div style={{ color: '#1e40af', fontSize: '0.95rem', fontWeight: 800, marginBottom: '0.2rem' }}>
-                      🎉 CEO ĐÃ PHÊ DUYỆT PHIẾU MUA HÀNG NÀY!
+                      CEO ĐÃ PHÊ DUYỆT PHIẾU MUA HÀNG NÀY
                     </div>
                     <div style={{ color: '#334155', fontSize: '0.85rem', lineHeight: '1.45' }}>
                       Phòng Mua Hàng và CEO đã phê duyệt báo giá. Vui lòng <strong>xác nhận đơn hàng</strong> và <strong>hẹn ngày giao hàng</strong> gửi lại cho Bên Mua Hàng & Kho.
@@ -1106,7 +1119,7 @@ export default function SupplierPortal() {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', backgroundColor: '#ffffff', padding: '1rem', borderRadius: '10px', border: '1px solid #dbeafe' }}>
                   <div>
                     <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.35rem' }}>
-                      📅 Chọn Ngày Hẹn Giao Hàng <span style={{ color: '#dc2626' }}>*</span>
+                      Chọn Ngày Hẹn Giao Hàng <span style={{ color: '#dc2626' }}>*</span>
                     </label>
                     <input
                       type="date"
@@ -1120,7 +1133,7 @@ export default function SupplierPortal() {
 
                   <div>
                     <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.35rem' }}>
-                      📝 Ghi Chú / Cam Kết Giao Hàng Của NCC
+                      Ghi Chú / Cam Kết Giao Hàng Của NCC
                     </label>
                     <input
                       type="text"
@@ -1141,7 +1154,7 @@ export default function SupplierPortal() {
                 <CheckCircle size={22} color="#16a34a" style={{ flexShrink: 0 }} />
                 <div>
                   <div style={{ color: '#15803d', fontSize: '0.92rem', fontWeight: 800 }}>
-                    ✅ ĐÃ XÁC NHẬN ĐƠN HÀNG & HẸN NGÀY GIAO HÀNG
+                    ĐÃ XÁC NHẬN ĐƠN HÀNG & HẸN NGÀY GIAO HÀNG
                   </div>
                   <div style={{ color: '#334155', fontSize: '0.83rem', marginTop: '2px' }}>
                     Ngày hẹn giao: <strong style={{ color: '#16a34a' }}>{selectedPO.expectedDeliveryDate ? new Date(selectedPO.expectedDeliveryDate).toLocaleDateString('vi-VN') : deliveryDateInput || 'N/A'}</strong>
@@ -1157,7 +1170,7 @@ export default function SupplierPortal() {
                 <CheckCircle size={22} color="#16a34a" style={{ flexShrink: 0 }} />
                 <div>
                   <div style={{ color: '#15803d', fontSize: '0.95rem', fontWeight: 800 }}>
-                    🔬 KẾT QUẢ QA/QC: ĐẠT 100% TIÊU CHUẨN CHẤT LƯỢNG
+                    KẾT QUẢ QA/QC: ĐẠT 100% TIÊU CHUẨN CHẤT LƯỢNG
                   </div>
                   <div style={{ color: '#334155', fontSize: '0.84rem', marginTop: '2px' }}>
                     Chuyên viên kiểm định QA/QC đã nghiệm thu lô hàng đạt chuẩn và bàn giao Thủ kho thực hiện nhập kho thành công.
@@ -1174,18 +1187,18 @@ export default function SupplierPortal() {
               } catch (_) {}
 
               const DEFECT_LABELS = {
-                PACKAGE_DAMAGED: '📦 Móp hộp outer / Hỏng niêm phong đóng gói',
-                ELECTRICAL_POWER_FAIL: '⚡ Lỗi nguồn / Điện áp / Lỗi bo mạch không lên',
-                SERIAL_WARRANTY_MISSING: '🏷️ Thiếu tem bảo hành chính hãng / Sai Serial Number',
-                SPEC_MISMATCH: '⚙️ Trầy xước / Sai thông số kỹ thuật (Wrong Specs)',
-                COUNTERFEIT_FAKE: '🚫 Hàng nghi ngờ nhái / Không đúng mô tả',
-                NONE: '✅ Không có lỗi'
+                PACKAGE_DAMAGED: 'Móp hộp outer / Hỏng niêm phong đóng gói',
+                ELECTRICAL_POWER_FAIL: 'Lỗi nguồn / Điện áp / Lỗi bo mạch không lên',
+                SERIAL_WARRANTY_MISSING: 'Thiếu tem bảo hành chính hãng / Sai Serial Number',
+                SPEC_MISMATCH: 'Trầy xước / Sai thông số kỹ thuật (Wrong Specs)',
+                COUNTERFEIT_FAKE: 'Hàng nghi ngờ nhái / Không đúng mô tả',
+                NONE: 'Không có lỗi'
               };
 
               const total = log?.totalQty || selectedPO.items?.reduce((s, i) => s + (parseInt(i.quantity) || 1), 0) || selectedPO.quantity || 7;
               const passed = log ? Number(log.passedQty) : 6;
               const failed = log ? Number(log.failedQty) : 1;
-              const defectText = log?.defectCategory ? (DEFECT_LABELS[log.defectCategory] || log.defectCategory) : '📦 Móp hộp outer / Hỏng niêm phong đóng gói';
+              const defectText = log?.defectCategory ? (DEFECT_LABELS[log.defectCategory] || log.defectCategory) : 'Móp hộp outer / Hỏng niêm phong đóng gói';
               const notesText = log?.notes || selectedPO.supplierNote || 'Có 1 sản phẩm bị lỗi bao bì niêm phong, 6 sản phẩm đạt chất lượng.';
 
               return (
@@ -1193,7 +1206,7 @@ export default function SupplierPortal() {
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem', borderBottom: '1px dashed #fdba74', paddingBottom: '0.65rem' }}>
                     <div style={{ color: '#c2410c', fontSize: '0.98rem', fontWeight: 900, display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
                       <AlertCircle size={20} color="#ea580c" />
-                      🔬 KẾT QUẢ NGHIỆM THU QA/QC: NHẬP KHO MỘT PHẦN
+                      KẾT QUẢ NGHIỆM THU QA/QC: NHẬP KHO MỘT PHẦN
                     </div>
                     <span style={{ backgroundColor: '#ffedd5', color: '#c2410c', border: '1px solid #fed7aa', fontWeight: 800, fontSize: '0.78rem', padding: '4px 10px', borderRadius: '12px' }}>
                       TỶ LỆ ĐẠT: {Math.round((passed / total) * 100)}%
@@ -1207,11 +1220,11 @@ export default function SupplierPortal() {
                       <strong style={{ fontSize: '1.1rem', color: '#0f172a', fontWeight: 900 }}>{total} SP</strong>
                     </div>
                     <div style={{ backgroundColor: '#f0fdf4', padding: '0.6rem', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
-                      <span style={{ color: '#15803d', fontSize: '0.72rem', display: 'block', fontWeight: 700 }}>🟢 SỐ LƯỢNG ĐẠT (CHO NHẬP)</span>
+                      <span style={{ color: '#15803d', fontSize: '0.72rem', display: 'block', fontWeight: 700 }}>SỐ LƯỢNG ĐẠT (CHO NHẬP)</span>
                       <strong style={{ fontSize: '1.1rem', color: '#16a34a', fontWeight: 900 }}>{passed} SP</strong>
                     </div>
                     <div style={{ backgroundColor: '#fef2f2', padding: '0.6rem', borderRadius: '8px', border: '1px solid #fecaca' }}>
-                      <span style={{ color: '#dc2626', fontSize: '0.72rem', display: 'block', fontWeight: 700 }}>🔴 SỐ LƯỢNG LỖI (TRẢ LẠI NCC)</span>
+                      <span style={{ color: '#dc2626', fontSize: '0.72rem', display: 'block', fontWeight: 700 }}>SỐ LƯỢNG LỖI (TRẢ LẠI NCC)</span>
                       <strong style={{ fontSize: '1.1rem', color: '#dc2626', fontWeight: 900 }}>{failed} SP</strong>
                     </div>
                   </div>
@@ -1219,10 +1232,10 @@ export default function SupplierPortal() {
                   {/* Defect details & QA Notes */}
                   <div style={{ backgroundColor: '#ffffff', padding: '0.85rem 1rem', borderRadius: '10px', border: '1px solid #fed7aa', fontSize: '0.84rem' }}>
                     <div style={{ fontWeight: 800, color: '#9a3412', marginBottom: '0.35rem' }}>
-                      ⚠️ NGUYÊN NHÂN TRẢ LẠI: <span style={{ color: '#dc2626', fontWeight: 900 }}>{defectText}</span>
+                      NGUYÊN NHÂN TRẢ LẠI: <span style={{ color: '#dc2626', fontWeight: 900 }}>{defectText}</span>
                     </div>
                     <div style={{ color: '#475569', fontSize: '0.82rem', fontStyle: 'italic', backgroundColor: '#fff7ed', padding: '0.55rem 0.75rem', borderRadius: '6px', borderLeft: '3px solid #ea580c' }}>
-                      💬 Ghi chú từ Bộ phận QA/QC: "{notesText}"
+                      Ghi chú từ Bộ phận QA/QC: "{notesText}"
                     </div>
                   </div>
                 </div>
@@ -1234,7 +1247,7 @@ export default function SupplierPortal() {
                 <XCircle size={22} color="#dc2626" style={{ flexShrink: 0, marginTop: '2px' }} />
                 <div>
                   <div style={{ color: '#dc2626', fontSize: '0.95rem', fontWeight: 800 }}>
-                    ⚠️ KẾT QUẢ QA/QC: TỪ CHỐI CHẤT LƯỢNG & TẠO PHIẾU HOÀN TRẢ NCC
+                    KẾT QUẢ QA/QC: TỪ CHỐI CHẤT LƯỢNG & TẠO PHIẾU HOÀN TRẢ NCC
                   </div>
                   <div style={{ color: '#475569', fontSize: '0.84rem', marginTop: '3px', lineHeight: '1.45' }}>
                     Lô hàng không đạt tiêu chuẩn kỹ thuật hoặc bị hư hỏng. Bộ phận QA/QC đã lập biên bản hoàn trả.
@@ -1256,7 +1269,7 @@ export default function SupplierPortal() {
 
             {selectedPO.cancelReason && (
               <div style={{ padding: '0.75rem 1rem', backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', marginBottom: '1.5rem', fontSize: '0.85rem', color: '#dc2626' }}>
-                ⚠️ Lý do từ chối: <strong>{selectedPO.cancelReason}</strong>
+                Lý do từ chối: <strong>{selectedPO.cancelReason}</strong>
               </div>
             )}
 

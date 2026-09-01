@@ -200,7 +200,7 @@ export default function Accountant() {
     }
     setManualForm({ type: 'EXPENSE', amount: '', category: 'Vận hành văn phòng', description: '' });
     setShowManualModal(false);
-    notify('✅ Đã thêm bút toán vào Sổ Cái thành công!', 'success');
+    notify('Đã thêm bút toán vào Sổ Cái thành công.', 'success');
   };
 
   const handlePayPO = async (poId, poAmount) => {
@@ -208,7 +208,7 @@ export default function Accountant() {
       if (typeof paySupplierPO === 'function') {
         paySupplierPO(poId);
       }
-      notify(`✅ Đã giải ngân thanh toán thành công cho PO #${poId}! Bút toán đã được ghi nhận tự động vào Sổ Cái.`, 'success');
+      notify(`Đã giải ngân thanh toán thành công cho PO #${poId}. Bút toán đã được ghi nhận tự động vào Sổ Cái.`, 'success');
     }
   };
 
@@ -336,7 +336,7 @@ export default function Accountant() {
         });
       }
 
-      notify(`✅ ĐÃ HOÀN TIỀN VÀ GHI SỔ CÁI THÀNH CÔNG!\n\n• Số tiền: ${fmt(finalAmount)}\n• Người nhận: ${refundModalItem.customerName}\n• Mã GD: ${txnCode}\n• Bút toán chi phí đã được ghi nhận tự động vào Sổ Cái Kế Toán.`, 'success');
+      notify(`Đã hoàn tiền và ghi sổ cái thành công. Số tiền: ${fmt(finalAmount)}. Người nhận: ${refundModalItem.customerName}. Mã GD: ${txnCode}. Bút toán chi phí đã được ghi nhận tự động vào Sổ Cái Kế Toán.`, 'success');
       setRefundModalItem(null);
       setRefundTxnCode('');
       setRefundNote('');
@@ -352,7 +352,7 @@ export default function Accountant() {
       if (typeof disburseAllPayrolls === 'function') {
         disburseAllPayrolls();
       }
-      notify('✅ Đã giải ngân toàn bộ bảng lương tháng thành công!', 'success');
+      notify('Đã giải ngân toàn bộ bảng lương tháng thành công.', 'success');
     }
   };
 
@@ -522,8 +522,8 @@ export default function Accountant() {
                 <div style={{ display: 'inline-flex', backgroundColor: '#f1f5f9', padding: '3px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                   {[
                     { key: 'ALL', label: `Tất Cả (${refundReturnRequests.length})` },
-                    { key: 'PENDING', label: `⏳ Chờ Giải Ngân (${pendingRefunds.length})` },
-                    { key: 'REFUNDED', label: `✅ Đã Hoàn Tiền (${completedRefunds.length})` }
+                    { key: 'PENDING', label: `Chờ Giải Ngân (${pendingRefunds.length})` },
+                    { key: 'REFUNDED', label: `Đã Hoàn Tiền (${completedRefunds.length})` }
                   ].map(tab => {
                     const isSel = refundStatusFilter === tab.key;
                     return (
@@ -999,7 +999,7 @@ export default function Accountant() {
                       <td style={{ padding: '0.65rem 0.85rem', fontWeight: 700, color: '#0f172a' }}>{po.supplierName || 'NCC ASUS Vietnam'}</td>
                       <td style={{ padding: '0.65rem 0.85rem' }}>
                         <span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 700, backgroundColor: '#f0fdf4', color: '#16a34a' }}>
-                          ✓ Đã nhập kho (GRN)
+                          Đã nhập kho (GRN)
                         </span>
                       </td>
                       <td style={{ padding: '0.65rem 0.85rem', textAlign: 'right', fontWeight: 800, color: '#0f172a' }}>
@@ -1014,7 +1014,7 @@ export default function Accountant() {
                           backgroundColor: isPaid ? '#f0fdf4' : '#fffbeb',
                           color: isPaid ? '#16a34a' : '#d97706'
                         }}>
-                          {isPaid ? '✓ Đã Thanh Toán' : 'Chờ Thanh Toán'}
+                          {isPaid ? 'Đã Thanh Toán' : 'Chờ Thanh Toán'}
                         </span>
                       </td>
                       <td style={{ padding: '0.65rem 0.85rem', textAlign: 'center' }}>
@@ -1023,7 +1023,7 @@ export default function Accountant() {
                             onClick={() => handlePayPO(po.id, po.totalAmount || po.totalCost || 18500000)}
                             style={{ backgroundColor: '#16a34a', color: '#ffffff', border: 'none', borderRadius: '4px', padding: '0.35rem 0.75rem', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer' }}
                           >
-                            ✓ Chi Trả Ngay
+                            Chi Trả Ngay
                           </button>
                         ) : (
                           <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Hoàn tất</span>
@@ -1057,7 +1057,7 @@ export default function Accountant() {
               onClick={handleDisburseAll}
               style={{ backgroundColor: '#16a34a', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.45rem 1.1rem', fontSize: '0.8rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
             >
-              <Send size={15} /> ⚡ Chi Lương Toàn Doanh Nghiệp
+              <Send size={15} /> Chi Lương Toàn Doanh Nghiệp
             </button>
           </div>
 
@@ -1087,7 +1087,7 @@ export default function Accountant() {
                         <button
                           onClick={() => {
                             if (typeof disbursePayroll === 'function') disbursePayroll(emp.id);
-                            notify(`✅ Đã chuyển khoản lương ${fmt(net)} cho ${emp.fullname}!`, 'success');
+                            notify(`Đã chuyển khoản lương ${fmt(net)} cho ${emp.fullname}.`, 'success');
                           }}
                           style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '4px', padding: '0.3rem 0.65rem', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}
                         >
@@ -1335,9 +1335,9 @@ export default function Accountant() {
               <div style={{ padding: '0.65rem 0.85rem', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '0.75rem', color: '#334155' }}>
                 <div style={{ fontWeight: 700, color: '#0f172a', marginBottom: '0.3rem' }}>Xác Nhận Trách Nhiệm Các Bộ Phận:</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-                  <div>✓ <strong>Shipper:</strong> Đã tiếp nhận và bàn giao kiện hàng nguyên vẹn về kho.</div>
-                  <div>✓ <strong>Kỹ thuật QC:</strong> Đã kiểm định linh kiện đạt tiêu chuẩn chính sách đổi trả / bảo hành.</div>
-                  <div>✓ <strong>Thủ kho:</strong> Đã hoàn tất xếp hàng vào kệ kho lưu trữ và lập phiếu đề nghị chi.</div>
+                  <div><strong>Shipper:</strong> Đã tiếp nhận và bàn giao kiện hàng nguyên vẹn về kho.</div>
+                  <div><strong>Kỹ thuật QC:</strong> Đã kiểm định linh kiện đạt tiêu chuẩn chính sách đổi trả / bảo hành.</div>
+                  <div><strong>Thủ kho:</strong> Đã hoàn tất xếp hàng vào kệ kho lưu trữ và lập phiếu đề nghị chi.</div>
                 </div>
               </div>
 
@@ -1523,7 +1523,7 @@ export default function Accountant() {
                     }}
                     style={{ background: 'none', border: 'none', color: '#2563eb', fontSize: '0.74rem', fontWeight: 700, cursor: 'pointer', padding: 0 }}
                   >
-                    📸 Dùng Biên Lai Mẫu
+                    Dùng Biên Lai Mẫu
                   </button>
                 </div>
                 <input
@@ -1602,7 +1602,7 @@ export default function Accountant() {
                   Minh Chứng Chuyển Tiền Hoàn Đơn Hàng
                 </h3>
                 <div style={{ fontSize: '0.75rem', color: '#16a34a', fontWeight: 700, marginTop: '2px' }}>
-                  ✓ Đã xác thực giải ngân qua Napas247 & Ghi sổ cái
+                  Đã xác thực giải ngân qua Napas247 & Ghi sổ cái
                 </div>
               </div>
               <button onClick={() => setViewingRefundProof(null)} style={{ background: '#f1f5f9', border: 'none', padding: '0.4rem', borderRadius: '6px', cursor: 'pointer' }}><X size={18} /></button>

@@ -4,6 +4,7 @@ import { useInventoryStore, useSalesStore } from '../../stores';
 import { useAuth } from '../../context/AuthContext';
 import { usePermission } from '../../hooks/usePermission';
 import { useNotification, notify } from '../../context/NotificationContext';
+import { ORDER_STATUS, getStatusInfo } from '../../utils/statusLabels';
 import ActorNotificationBar from '../../components/ActorNotificationBar';
 import { 
   Search, ShoppingCart, Plus, Minus, Trash2, Printer, FileText,
@@ -292,31 +293,12 @@ export default function SalesPOS() {
     return filteredPosProducts.slice(start, start + POS_ITEMS_PER_PAGE);
   }, [filteredPosProducts, posPage]);
 
-  // Order status badge helper
+  // Order status badge helper — nguồn nhãn dùng chung toàn hệ thống, tránh
+  // mỗi trang tự định nghĩa lại (từng thiếu 10/19 trạng thái, rơi vào raw
+  // tiếng Anh khi gặp PACKED/AWAITING_STOCK/RETURNING_TO_WAREHOUSE...).
   const getStatusBadge = (status) => {
-    const s = String(status || '').toUpperCase();
-    switch (s) {
-      case 'PENDING':
-        return { bg: '#fff7ed', color: '#ea580c', border: '#ffedd5', text: 'Chờ Xác Nhận' };
-      case 'WAITING_PAYMENT':
-        return { bg: '#fef3c7', color: '#d97706', border: '#fde68a', text: 'Chờ Thanh Toán' };
-      case 'CONFIRMED':
-        return { bg: '#eff6ff', color: '#2563eb', border: '#bfdbfe', text: 'Đã Xác Nhận (Chờ Xuất Kho)' };
-      case 'PROCESSING':
-        return { bg: '#eff6ff', color: '#1d4ed8', border: '#93c5fd', text: 'Đang Chuẩn Bị Hàng' };
-      case 'READY_TO_SHIP':
-        return { bg: '#f0fdf4', color: '#15803d', border: '#bbf7d0', text: 'Kho Đã Đóng Gói (Chờ Giao)' };
-      case 'SHIPPED':
-        return { bg: '#eff6ff', color: '#2563eb', border: '#bfdbfe', text: 'Đang Vận Chuyển' };
-      case 'DELIVERED':
-      case 'DONE':
-      case 'COMPLETED':
-        return { bg: '#ecfdf5', color: '#047857', border: '#6ee7b7', text: 'Đã Giao Hoàn Tất' };
-      case 'CANCELLED':
-        return { bg: '#fef2f2', color: '#dc2626', border: '#fecaca', text: 'Đã Hủy Đơn' };
-      default:
-        return { bg: '#f8fafc', color: '#64748b', border: '#e2e8f0', text: status || 'Chưa rõ' };
-    }
+    const info = getStatusInfo(ORDER_STATUS, String(status || '').toUpperCase());
+    return { bg: info.bg, color: info.color, border: info.border, text: info.label };
   };
 
   // Filtered Orders for Tab 'orders'
@@ -903,7 +885,7 @@ export default function SalesPOS() {
                     onChange={(e) => {
                       const num = Math.max(0, parseInt(e.target.value, 10) || 0);
                       if (num > 10 && !canApproveSales) {
-                        notify('⚠️ Quyền hạn: Mức chiết khấu vượt quá 10% yêu cầu Quản Lý Bán Hàng (sales_manager) hoặc Ban Giám Đốc (CEO) phê duyệt!', 'error');
+                        notify('Quyền hạn: Mức chiết khấu vượt quá 10% yêu cầu Quản Lý Bán Hàng (sales_manager) hoặc Ban Giám Đốc (CEO) phê duyệt.', 'error');
                         setPosDiscountPercent(10);
                         return;
                       }
@@ -1561,7 +1543,7 @@ export default function SalesPOS() {
 
               {selectedDetailOrder.status === 'CONFIRMED' && (
                 <div style={{ fontSize: '0.82rem', color: '#166534', fontWeight: 600, backgroundColor: '#f0fdf4', padding: '0.45rem 0.85rem', borderRadius: '6px', border: '1px solid #bbf7d0' }}>
-                  📦 Đơn hàng đã chuyển sang Bộ phận Kho để Đóng gói & Bàn giao Shipper
+                  Đơn hàng đã chuyển sang Bộ phận Kho để Đóng gói & Bàn giao Shipper
                 </div>
               )}
             </div>

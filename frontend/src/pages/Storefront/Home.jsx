@@ -380,7 +380,7 @@ function FlashSaleBar({ products }) {
           </div>
           <div>
             <div style={{ fontFamily: 'var(--font-title)', fontWeight: 900, fontSize: '1.25rem', color: '#ffffff', letterSpacing: '0.5px', textTransform: 'uppercase' }}>
-              ⚡ Flash Sale Hôm Nay
+              Flash Sale Hôm Nay
             </div>
             <div style={{ fontSize: '0.78rem', color: 'rgba(255,255,255,0.8)', fontWeight: 500 }}>
               Giảm giá sốc — Số lượng có hạn, bán hết là dừng!
@@ -671,7 +671,7 @@ function ProductCard({ p, onAddCart, onCompare }) {
                 gap: '0.2rem'
               }}
             >
-              ⏳ Đặt Trước
+              <Clock size={13} /> Đặt Trước
             </button>
           )}
           <Link to={`/product/${p.id}`} className="btn btn-secondary" style={{ padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="Xem chi tiết">
@@ -919,7 +919,7 @@ function BestSellerCard({ p, onAddCart, onCompare }) {
                 gap: '0.2rem'
               }}
             >
-              ⏳ Đặt Trước
+              <Clock size={13} /> Đặt Trước
             </button>
           )}
           <Link to={`/product/${p.id}`} className="btn btn-secondary" style={{ padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="Xem chi tiết">
@@ -1332,7 +1332,7 @@ function ProductComparison({ products, onAddCart, onClose, initialProduct, clear
               flexShrink: 0
             }}>
               {recommendation.isSingle ? <Sparkles size={12} /> : <Trophy size={12} />}
-              {recommendation.isSingle ? 'AI Gợi Ý' : '💡 AI Khuyên Chọn'}
+              {recommendation.isSingle ? 'AI Gợi Ý' : 'AI Khuyên Chọn'}
             </div>
             <p style={{ margin: 0, fontSize: '0.8rem', color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} dangerouslySetInnerHTML={{
               __html: recommendation.reason.replace(/\*\*(.*?)\*\*/g, '<strong style="color: #15803d; font-weight: 700;">$1</strong>')
@@ -1381,7 +1381,7 @@ function ProductComparison({ products, onAddCart, onClose, initialProduct, clear
                   whiteSpace: 'nowrap'
                 }}
               >
-                ⏳ SP Khuyên Chọn (Đặt Trước)
+                SP Khuyên Chọn (Đặt Trước)
               </button>
             )
           ) : (
@@ -1614,7 +1614,7 @@ function ProductComparison({ products, onAddCart, onClose, initialProduct, clear
                               gap: '0.2rem'
                             }}
                           >
-                            🔍 Đổi
+                            Đổi
                           </button>
                           {((Number(p.stockQuantity) > 0 || Number(p.stock) > 0) && !p.isPreorder) ? (
                             <button
@@ -1658,7 +1658,7 @@ function ProductComparison({ products, onAddCart, onClose, initialProduct, clear
                                 gap: '0.2rem'
                               }}
                             >
-                              ⏳ Đặt Trước
+                              <Clock size={13} /> Đặt Trước
                             </button>
                           )}
                         </div>
@@ -1685,7 +1685,7 @@ function ProductComparison({ products, onAddCart, onClose, initialProduct, clear
                             gap: '0.3rem'
                           }}
                         >
-                          🔍 Chọn linh kiện {idx + 1}
+                          Chọn linh kiện {idx + 1}
                         </button>
                       </div>
                     )}
@@ -1786,7 +1786,7 @@ function ProductComparison({ products, onAddCart, onClose, initialProduct, clear
                   fontWeight: 700,
                   whiteSpace: 'nowrap'
                 }}>
-                  🏷️ Giá bán niêm yết
+                  Giá bán niêm yết
                 </td>
                 {compareList.map((p, idx) => {
                   const isCheapest = idx === bestPriceIdx;
@@ -1826,7 +1826,7 @@ function ProductComparison({ products, onAddCart, onClose, initialProduct, clear
                   fontWeight: 700,
                   whiteSpace: 'nowrap'
                 }}>
-                  📦 Trạng thái kho hàng
+                  Trạng thái kho hàng
                 </td>
                 {compareList.map((p, idx) => {
                   if (!p) return <td key={`status-${idx}`} style={{ padding: '0.9rem 1.25rem', fontSize: '0.8rem' }}>-</td>;
@@ -2535,7 +2535,7 @@ export default function Home() {
                   return;
                 }
                 addToCart(p, 1);
-                notify(`✅ Đã thêm ${p.name} vào giỏ hàng!`, 'success');
+                notify(`Đã thêm ${p.name} vào giỏ hàng.`, 'success');
               }} 
               onClose={() => setShowCompareModal(false)} 
               initialProduct={initialCompareProduct}

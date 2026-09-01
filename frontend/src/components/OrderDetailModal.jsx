@@ -1,30 +1,11 @@
 import React from 'react';
 import { X, Package, User, Phone, MapPin, CreditCard, Calendar, Tag, ShieldCheck, Mail } from 'lucide-react';
-
-const STATUS_CONFIG = {
-  PENDING:          { label: 'Chờ Xử Lý', color: '#d97706', bg: '#fef3c7', border: '#fde68a' },
-  WAITING_PAYMENT:  { label: 'Chờ Thanh Toán', color: '#d97706', bg: '#fef3c7', border: '#fde68a' },
-  CONFIRMED:        { label: 'Chờ Xuất Kho', color: '#4f46e5', bg: '#e0e7ff', border: '#c7d2fe' },
-  PACKED:           { label: 'Đã Đóng Gói', color: '#7c3aed', bg: '#ede9fe', border: '#ddd6fe' },
-  PROCESSING:       { label: 'Đang Xử Lý Kho', color: '#0284c7', bg: '#e0f2fe', border: '#bae6fd' },
-  AWAITING_STOCK:   { label: 'Chờ Nhập Hàng', color: '#b45309', bg: '#fef3c7', border: '#fde68a' },
-  READY_TO_SHIP:    { label: 'Chờ Shipper Lấy', color: '#16a34a', bg: '#dcfce7', border: '#bbf7d0' },
-  SHIPPED:          { label: 'Đang Giao Hàng', color: '#2563eb', bg: '#dbeafe', border: '#bfdbfe' },
-  DELIVERED:        { label: 'Đã Giao Hàng', color: '#15803d', bg: '#dcfce7', border: '#bbf7d0' },
-  COMPLETED:        { label: 'Hoàn Tất', color: '#16a34a', bg: '#dcfce7', border: '#bbf7d0' },
-  CANCELLED:        { label: 'Đã Hủy', color: '#dc2626', bg: '#fee2e2', border: '#fecaca' },
-  FAILED_DELIVERY:  { label: 'Giao Thất Bại', color: '#dc2626', bg: '#fee2e2', border: '#fecaca' }
-};
+import { ORDER_STATUS, getStatusInfo } from '../utils/statusLabels';
 
 export default function OrderDetailModal({ order, onClose }) {
   if (!order) return null;
 
-  const statusInfo = STATUS_CONFIG[order.status] || {
-    label: order.status,
-    color: '#475569',
-    bg: '#f1f5f9',
-    border: '#cbd5e1'
-  };
+  const statusInfo = getStatusInfo(ORDER_STATUS, order.status);
 
   const fmt = (amount) => {
     if (amount === null || amount === undefined || isNaN(amount)) return '0 đ';
@@ -298,7 +279,7 @@ export default function OrderDetailModal({ order, onClose }) {
                   </h4>
                 </div>
                 <span style={{ fontSize: '0.75rem', fontWeight: 800, backgroundColor: '#dcfce7', color: '#15803d', padding: '2px 8px', borderRadius: '6px', border: '1px solid #86efac' }}>
-                  ✓ ĐÃ GIAO THÀNH CÔNG
+                  ĐÃ GIAO THÀNH CÔNG
                 </span>
               </div>
 
@@ -307,8 +288,8 @@ export default function OrderDetailModal({ order, onClose }) {
                   <span style={{ color: '#475569', display: 'block', marginBottom: '0.15rem' }}>Người nhận thực tế:</span>
                   <strong style={{ color: '#0f172a' }}>
                     {order.receivedByType === 'REPRESENTATIVE'
-                      ? `👤 ${order.receiverNameActual || 'Người nhận thay'} (Nhận thay khách hàng)`
-                      : `👤 ${order.customerName || 'Khách hàng'} (Chính chủ nhận)`}
+                      ? `${order.receiverNameActual || 'Người nhận thay'} (Nhận thay khách hàng)`
+                      : `${order.customerName || 'Khách hàng'} (Chính chủ nhận)`}
                   </strong>
                 </div>
 
@@ -316,8 +297,8 @@ export default function OrderDetailModal({ order, onClose }) {
                   <span style={{ color: '#475569', display: 'block', marginBottom: '0.15rem' }}>Hình thức thanh toán thực tế:</span>
                   <strong style={{ color: order.actualPaymentMethod === 'BANK_TRANSFER' ? '#2563eb' : '#16a34a' }}>
                     {order.actualPaymentMethod === 'BANK_TRANSFER'
-                      ? `📱 Chuyển khoản VietQR ${order.bankRefCode ? `(Mã GD: ${order.bankRefCode})` : ''}`
-                      : (order.actualPaymentMethod === 'CASH' ? '💵 Tiền mặt khi giao (COD)' : '💳 Đã thanh toán Online trước')}
+                      ? `Chuyển khoản VietQR ${order.bankRefCode ? `(Mã GD: ${order.bankRefCode})` : ''}`
+                      : (order.actualPaymentMethod === 'CASH' ? 'Tiền mặt khi giao (COD)' : 'Đã thanh toán Online trước')}
                   </strong>
                 </div>
 
@@ -325,7 +306,7 @@ export default function OrderDetailModal({ order, onClose }) {
                   <div>
                     <span style={{ color: '#475569', display: 'block', marginBottom: '0.15rem' }}>Thời điểm hoàn tất:</span>
                     <strong style={{ color: '#0f172a' }}>
-                      ⏱️ {new Date(order.deliveredAt).toLocaleString('vi-VN')}
+                      {new Date(order.deliveredAt).toLocaleString('vi-VN')}
                     </strong>
                   </div>
                 )}
@@ -345,7 +326,7 @@ export default function OrderDetailModal({ order, onClose }) {
                 <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginTop: '0.4rem', paddingTop: '0.6rem', borderTop: '1px dashed #bbf7d0' }}>
                   {order.proofPhoto && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-                      <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#15803d' }}>📸 Ảnh chụp ký nhận POD:</span>
+                      <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#15803d' }}>Ảnh chụp ký nhận POD:</span>
                       <img
                         src={order.proofPhoto}
                         alt="Minh chứng POD"
@@ -356,7 +337,7 @@ export default function OrderDetailModal({ order, onClose }) {
 
                   {order.paymentProofPhoto && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-                      <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#2563eb' }}>🧾 Biên lai chuyển khoản:</span>
+                      <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#2563eb' }}>Biên lai chuyển khoản:</span>
                       <img
                         src={order.paymentProofPhoto}
                         alt="Biên lai chuyển khoản"

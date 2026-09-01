@@ -642,7 +642,7 @@ export default function PCBuilder() {
             }}
           >
             <HelpCircle size={16} />
-            <span>{showGuide ? '✕ Đóng Cẩm Nang Build PC' : '💡 Cẩm Nang Chọn Linh Kiện PC Siêu Chi Tiết (Click để xem)'}</span>
+            <span>{showGuide ? 'Đóng Cẩm Nang Build PC' : 'Cẩm Nang Chọn Linh Kiện PC Siêu Chi Tiết (Click để xem)'}</span>
           </button>
         </div>
 
@@ -659,14 +659,14 @@ export default function PCBuilder() {
             </div>
           </div>
           <span style={{ fontSize: '0.72rem', fontWeight: 800, backgroundColor: '#eff6ff', color: '#2563eb', padding: '0.3rem 0.75rem', borderRadius: '20px', border: '1px solid #bfdbfe' }}>
-            ⚡ Bộ Trí Thức AI v2.5
+            Bộ Trí Thức AI v2.5
           </span>
         </div>
 
         {/* Custom Natural Language Prompt Input */}
         <div style={{ backgroundColor: '#f8fafc', padding: '1rem', borderRadius: '14px', border: '1px solid #e2e8f0', marginBottom: '1.25rem' }}>
           <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 800, color: '#0f172a', marginBottom: '0.4rem' }}>
-            💬 Nhập yêu cầu cụ thể của bạn (AI tự động trích xuất Ngân sách, Nhu cầu & Tối ưu hóa linh kiện):
+            Nhập yêu cầu cụ thể của bạn (AI tự động trích xuất Ngân sách, Nhu cầu & Tối ưu hóa linh kiện):
           </label>
           <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.6rem' }}>
             <input
@@ -718,7 +718,7 @@ export default function PCBuilder() {
                   cursor: 'pointer', transition: 'all 0.15s'
                 }}
               >
-                ✨ {sample}
+                {sample}
               </button>
             ))}
           </div>
@@ -730,12 +730,12 @@ export default function PCBuilder() {
             <span style={{ fontSize: '0.875rem', fontWeight: 700, minWidth: '120px', color: '#334155' }}>Nhu cầu sử dụng:</span>
             <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap' }}>
               {[
-                { key: 'gaming', label: '🎮 Chơi Game & E-Sports' },
-                { key: 'graphics', label: '🎨 Đồ họa 3D & Render' },
-                { key: 'ai', label: '💻 Lập trình & AI' },
-                { key: 'STREAMING', label: '🎥 Livestream & Creator' },
-                { key: 'EMULATOR', label: '📱 Giả lập Multi-Nox' },
-                { key: 'office', label: '💼 Văn phòng & Học tập' }
+                { key: 'gaming', label: 'Chơi Game & E-Sports' },
+                { key: 'graphics', label: 'Đồ họa 3D & Render' },
+                { key: 'ai', label: 'Lập trình & AI' },
+                { key: 'STREAMING', label: 'Livestream & Creator' },
+                { key: 'EMULATOR', label: 'Giả lập Multi-Nox' },
+                { key: 'office', label: 'Văn phòng & Học tập' }
               ].map(opt => (
                 <button
                   key={opt.key}
@@ -762,7 +762,7 @@ export default function PCBuilder() {
           <div style={{ backgroundColor: '#f8fafc', padding: '0.85rem 1rem', borderRadius: '14px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
               <span style={{ fontSize: '0.875rem', fontWeight: 700, color: '#334155', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                💰 Ngân sách ước tính:
+                Ngân sách ước tính:
               </span>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <span style={{ fontSize: '0.95rem', fontWeight: 900, color: '#2563eb', backgroundColor: '#eff6ff', padding: '0.2rem 0.75rem', borderRadius: '20px', border: '1px solid #bfdbfe' }}>
@@ -991,7 +991,7 @@ export default function PCBuilder() {
               }}
             >
               <HelpCircle size={16} />
-              {showGuide ? 'Thu gọn hướng dẫn' : '📖 Hướng dẫn build PC cho người mới'}
+              {showGuide ? 'Thu gọn hướng dẫn' : 'Hướng dẫn build PC cho người mới'}
             </button>
           </div>
 
@@ -1003,16 +1003,16 @@ export default function PCBuilder() {
                   <Sparkles size={18} color="#16a34a" /> Báo Cáo Phân Tích &amp; Tối Ưu Linh Kiện Từ AI AetherPC
                 </div>
                 <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#15803d', backgroundColor: '#dcfce7', padding: '0.25rem 0.65rem', borderRadius: '20px', border: '1px solid #86efac' }}>
-                  ✓ 100% Tương Thích Linh Kiện
+                  100% Tương Thích Linh Kiện
                 </div>
               </div>
               <p style={{ fontSize: '0.83rem', color: '#166534', margin: '0 0 0.6rem 0', lineHeight: 1.6, whiteSpace: 'pre-line' }}>
                 {aiReport.aiExplanation}
               </p>
               <div style={{ display: 'flex', gap: '1.25rem', fontSize: '0.78rem', color: '#15803d', fontWeight: 700, flexWrap: 'wrap', borderTop: '1px solid #bbf7d0', paddingTop: '0.5rem' }}>
-                <span>⚡ Điện năng tiêu thụ: <strong>~{aiReport.estimatedTdp}W</strong></span>
-                <span>🔌 Nguồn khuyến nghị: <strong>{aiReport.requiredWatts}W+</strong></span>
-                <span>💰 Tổng chi phí dàn PC: <strong style={{ color: '#dc2626' }}>{Number(aiReport.totalPrice).toLocaleString('vi-VN')} đ</strong></span>
+                <span>Điện năng tiêu thụ: <strong>~{aiReport.estimatedTdp}W</strong></span>
+                <span>Nguồn khuyến nghị: <strong>{aiReport.requiredWatts}W+</strong></span>
+                <span>Tổng chi phí dàn PC: <strong style={{ color: '#dc2626' }}>{Number(aiReport.totalPrice).toLocaleString('vi-VN')} đ</strong></span>
               </div>
             </div>
           )}
@@ -1029,7 +1029,7 @@ export default function PCBuilder() {
               </div>
               <div>
                 <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: '#0f172a', margin: 0, fontFamily: 'var(--font-title)' }}>
-                  📖 Cẩm Nang Hướng Dẫn Chọn Linh Kiện PC Chi Tiết Từ A - Z
+                  Cẩm Nang Hướng Dẫn Chọn Linh Kiện PC Chi Tiết Từ A - Z
                 </h2>
                 <p style={{ fontSize: '0.875rem', color: '#64748b', margin: '0.25rem 0 0 0' }}>
                   Dành cho người chưa từng build máy tính: Hiểu rõ vai trò 8 linh kiện cốt lõi & nguyên tắc phối ghép chuẩn 100%.
@@ -1050,7 +1050,7 @@ export default function PCBuilder() {
                 cursor: 'pointer'
               }}
             >
-              ✕ Đóng Hướng Dẫn
+              Đóng Hướng Dẫn
             </button>
           </div>
 
@@ -1106,16 +1106,16 @@ export default function PCBuilder() {
                 </p>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
                   <div style={{ padding: '1rem', backgroundColor: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '10px' }}>
-                    <h4 style={{ color: '#2563eb', fontSize: '0.9rem', fontWeight: 800, marginBottom: '0.5rem' }}>🔷 Phân loại CPU Intel Core:</h4>
+                    <h4 style={{ color: '#2563eb', fontSize: '0.9rem', fontWeight: 800, marginBottom: '0.5rem' }}>Phân loại CPU Intel Core:</h4>
                     <ul style={{ fontSize: '0.825rem', color: '#475569', paddingLeft: '1.1rem', lineHeight: 1.6, margin: 0 }}>
                       <li><strong>Core i3:</strong> Phù hợp văn phòng, lướt web, học tập, chơi game eSports nhẹ (LOL, Valorant).</li>
-                      <li><strong>Core i5:</strong> 🌟 <em>Dòng CPU quốc dân</em> cân bằng nhất cho 90% nhu cầu chơi game mượt & đồ họa.</li>
+                      <li><strong>Core i5:</strong> <em>Dòng CPU quốc dân</em> cân bằng nhất cho 90% nhu cầu chơi game mượt & đồ họa.</li>
                       <li><strong>Core i7 / i9:</strong> Dành cho Game thủ hardcore, thiết kế 3D phức tạp, Render 4K, Live Stream nặng.</li>
                     </ul>
                   </div>
 
                   <div style={{ padding: '1rem', backgroundColor: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '10px' }}>
-                    <h4 style={{ color: '#dc2626', fontSize: '0.9rem', fontWeight: 800, marginBottom: '0.5rem' }}>🔴 Phân loại CPU AMD Ryzen:</h4>
+                    <h4 style={{ color: '#dc2626', fontSize: '0.9rem', fontWeight: 800, marginBottom: '0.5rem' }}>Phân loại CPU AMD Ryzen:</h4>
                     <ul style={{ fontSize: '0.825rem', color: '#475569', paddingLeft: '1.1rem', lineHeight: 1.6, margin: 0 }}>
                       <li><strong>Ryzen 5:</strong> Hiệu năng cực cao trên giá thành, đa nhiệm mượt và tiết kiệm điện năng.</li>
                       <li><strong>Ryzen 7 / 9:</strong> Bá chủ xử lý đa nhân, tối ưu cho lập trình, AI và dựng hình đồ họa nặng.</li>
@@ -1123,7 +1123,7 @@ export default function PCBuilder() {
                   </div>
                 </div>
                 <div style={{ padding: '0.75rem 1rem', backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '8px', color: '#1e40af', fontSize: '0.825rem', fontWeight: 600 }}>
-                  💡 Quy tắc khớp Socket: CPU Intel thế hệ 12/13/14 dùng Socket <strong>LGA1700</strong>, CPU Intel Core Ultra thế hệ mới dùng <strong>LGA1851</strong>, CPU AMD Ryzen 7000/9000 dùng <strong>AM5</strong>.
+                  Quy tắc khớp Socket: CPU Intel thế hệ 12/13/14 dùng Socket <strong>LGA1700</strong>, CPU Intel Core Ultra thế hệ mới dùng <strong>LGA1851</strong>, CPU AMD Ryzen 7000/9000 dùng <strong>AM5</strong>.
                 </div>
               </div>
             )}
@@ -1139,15 +1139,15 @@ export default function PCBuilder() {
                 </p>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.85rem', marginBottom: '1rem' }}>
                   <div style={{ padding: '0.85rem', backgroundColor: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '10px' }}>
-                    <strong style={{ color: '#0f172a', fontSize: '0.85rem', display: 'block', marginBottom: '4px' }}>📌 Dòng H / A (Ví dụ: H610, A520)</strong>
+                    <strong style={{ color: '#0f172a', fontSize: '0.85rem', display: 'block', marginBottom: '4px' }}>Dòng H / A (Ví dụ: H610, A520)</strong>
                     <span style={{ fontSize: '0.8rem', color: '#64748b' }}>Phù hợp CPU Core i3/i5 phổ thông. Giá rẻ, đủ các cổng kết nối cơ bản.</span>
                   </div>
                   <div style={{ padding: '0.85rem', backgroundColor: '#ffffff', border: '2px solid #16a34a', borderRadius: '10px' }}>
-                    <strong style={{ color: '#16a34a', fontSize: '0.85rem', display: 'block', marginBottom: '4px' }}>🌟 Dòng B (Ví dụ: B760, B650)</strong>
+                    <strong style={{ color: '#16a34a', fontSize: '0.85rem', display: 'block', marginBottom: '4px' }}>Dòng B (Ví dụ: B760, B650)</strong>
                     <span style={{ fontSize: '0.8rem', color: '#334155', fontWeight: 600 }}>Tốt nhất cho 80% người dùng. Tản nhiệt VRM ngon, hỗ trợ cắm nhiều SSD & RAM tốc độ cao.</span>
                   </div>
                   <div style={{ padding: '0.85rem', backgroundColor: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '10px' }}>
-                    <strong style={{ color: '#0f172a', fontSize: '0.85rem', display: 'block', marginBottom: '4px' }}>🔥 Dòng Z / X (Ví dụ: Z790, X670)</strong>
+                    <strong style={{ color: '#0f172a', fontSize: '0.85rem', display: 'block', marginBottom: '4px' }}>Dòng Z / X (Ví dụ: Z790, X670)</strong>
                     <span style={{ fontSize: '0.8rem', color: '#64748b' }}>Dành cho dàn máy cao cấp, hỗ trợ Ép Xung (Overclocking) các CPU dòng K.</span>
                   </div>
                 </div>
@@ -1165,15 +1165,15 @@ export default function PCBuilder() {
                 </p>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.85rem' }}>
                   <div style={{ padding: '0.85rem', backgroundColor: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '10px' }}>
-                    <strong style={{ color: '#d97706', fontSize: '0.85rem', display: 'block' }}>💻 16GB RAM (2x8GB)</strong>
+                    <strong style={{ color: '#d97706', fontSize: '0.85rem', display: 'block' }}>16GB RAM (2x8GB)</strong>
                     <span style={{ fontSize: '0.78rem', color: '#64748b' }}>Mức chuẩn tối thiểu cho mọi dàn PC chơi game mượt ở thời điểm hiện tại.</span>
                   </div>
                   <div style={{ padding: '0.85rem', backgroundColor: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '10px' }}>
-                    <strong style={{ color: '#16a34a', fontSize: '0.85rem', display: 'block' }}>🚀 32GB RAM (2x16GB)</strong>
+                    <strong style={{ color: '#16a34a', fontSize: '0.85rem', display: 'block' }}>32GB RAM (2x16GB)</strong>
                     <span style={{ fontSize: '0.78rem', color: '#64748b' }}>Khuyên dùng cho game thủ đồ họa 2K/4K, Photoshop, Premiere, AutoCAD.</span>
                   </div>
                   <div style={{ padding: '0.85rem', backgroundColor: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '10px' }}>
-                    <strong style={{ color: '#2563eb', fontSize: '0.85rem', display: 'block' }}>⚡ DDR4 vs DDR5</strong>
+                    <strong style={{ color: '#2563eb', fontSize: '0.85rem', display: 'block' }}>DDR4 vs DDR5</strong>
                     <span style={{ fontSize: '0.78rem', color: '#64748b' }}>DDR5 nhanh hơn 40% nhưng bắt buộc phải cắm trên Mainboard hỗ trợ chuẩn DDR5.</span>
                   </div>
                 </div>
@@ -1191,15 +1191,15 @@ export default function PCBuilder() {
                 </p>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.85rem' }}>
                   <div style={{ padding: '0.85rem', backgroundColor: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '10px' }}>
-                    <strong style={{ color: '#9333ea', fontSize: '0.85rem', display: 'block' }}>🎮 Game Full HD (1080p)</strong>
+                    <strong style={{ color: '#9333ea', fontSize: '0.85rem', display: 'block' }}>Game Full HD (1080p)</strong>
                     <span style={{ fontSize: '0.78rem', color: '#64748b' }}>Chọn <strong>NVIDIA RTX 4060 8GB</strong> hoặc <strong>RTX 3060</strong>.</span>
                   </div>
                   <div style={{ padding: '0.85rem', backgroundColor: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '10px' }}>
-                    <strong style={{ color: '#2563eb', fontSize: '0.85rem', display: 'block' }}>🎮 Game 2K & Đồ Họa 3D</strong>
+                    <strong style={{ color: '#2563eb', fontSize: '0.85rem', display: 'block' }}>Game 2K & Đồ Họa 3D</strong>
                     <span style={{ fontSize: '0.78rem', color: '#64748b' }}>Chọn <strong>NVIDIA RTX 4070 Super 12GB</strong>.</span>
                   </div>
                   <div style={{ padding: '0.85rem', backgroundColor: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '10px' }}>
-                    <strong style={{ color: '#dc2626', fontSize: '0.85rem', display: 'block' }}>🔥 Game 4K & AI Trí Tuệ Nhân Tạo</strong>
+                    <strong style={{ color: '#dc2626', fontSize: '0.85rem', display: 'block' }}>Game 4K & AI Trí Tuệ Nhân Tạo</strong>
                     <span style={{ fontSize: '0.78rem', color: '#64748b' }}>Chọn <strong>NVIDIA RTX 4080 / RTX 4090</strong>.</span>
                   </div>
                 </div>
@@ -1232,15 +1232,15 @@ export default function PCBuilder() {
                 </p>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem', fontSize: '0.8rem' }}>
                   <div style={{ padding: '0.75rem', backgroundColor: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '8px' }}>
-                    <strong style={{ color: '#2563eb', display: 'block' }}>⚡ 550W - 650W Bronze:</strong>
+                    <strong style={{ color: '#2563eb', display: 'block' }}>550W - 650W Bronze:</strong>
                     <span>Cho CPU i3/i5 + VGA RTX 3050 / 4060.</span>
                   </div>
                   <div style={{ padding: '0.75rem', backgroundColor: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '8px' }}>
-                    <strong style={{ color: '#16a34a', display: 'block' }}>⚡ 750W 80 Plus Gold:</strong>
+                    <strong style={{ color: '#16a34a', display: 'block' }}>750W 80 Plus Gold:</strong>
                     <span>Cho CPU i7 + VGA RTX 4070 Super.</span>
                   </div>
                   <div style={{ padding: '0.75rem', backgroundColor: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '8px' }}>
-                    <strong style={{ color: '#dc2626', display: 'block' }}>⚡ 850W - 1000W Gold/Platinum:</strong>
+                    <strong style={{ color: '#dc2626', display: 'block' }}>850W - 1000W Gold/Platinum:</strong>
                     <span>Cho CPU i9 + VGA RTX 4080 / 4090.</span>
                   </div>
                 </div>
@@ -1258,11 +1258,11 @@ export default function PCBuilder() {
                 </p>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem', fontSize: '0.825rem' }}>
                   <div style={{ padding: '0.85rem', backgroundColor: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '10px' }}>
-                    <strong style={{ color: '#0891b2', display: 'block', marginBottom: '4px' }}>❄️ Tản Nhiệt Khí (Air Cooling):</strong>
+                    <strong style={{ color: '#0891b2', display: 'block', marginBottom: '4px' }}>Tản Nhiệt Khí (Air Cooling):</strong>
                     <span style={{ color: '#64748b' }}>Giá từ 300k - 900k, lắp đặt bền bỉ không lo hỏng hóc. Rất tốt cho CPU Core i3, i5 và Ryzen 5.</span>
                   </div>
                   <div style={{ padding: '0.85rem', backgroundColor: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '10px' }}>
-                    <strong style={{ color: '#2563eb', display: 'block', marginBottom: '4px' }}>🌊 Tản Nhiệt Nước AIO (Liquid Cooling):</strong>
+                    <strong style={{ color: '#2563eb', display: 'block', marginBottom: '4px' }}>Tản Nhiệt Nước AIO (Liquid Cooling):</strong>
                     <span style={{ color: '#64748b' }}>Giá từ 1.2tr - 3tr, thẩm mỹ RGB cực đẹp, làm mát cực nhanh cho các CPU tỏa nhiều nhiệt như i7 / i9 dòng K.</span>
                   </div>
                 </div>
@@ -1407,7 +1407,7 @@ export default function PCBuilder() {
                 borderRadius: 'var(--radius-md)',
                 padding: '0.75rem 1rem'
               }}>
-                ✓ Tất cả linh kiện được chọn hiện tại hoàn toàn tương thích với nhau! Bạn có thể yên tâm đặt hàng.
+                Tất cả linh kiện được chọn hiện tại hoàn toàn tương thích với nhau. Bạn có thể yên tâm đặt hàng.
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
@@ -1655,17 +1655,17 @@ export default function PCBuilder() {
               const { CPU, MAINBOARD, RAM } = selectedParts;
               let reasonText = null;
               if (activeSlot === 'MAINBOARD' && CPU) {
-                reasonText = `✓ Đang đề xuất Bo mạch chủ Socket [${getSocket(CPU) || 'tương thích'}] trùng khớp 100% với CPU ${CPU.name}`;
+                reasonText = `Đang đề xuất Bo mạch chủ Socket [${getSocket(CPU) || 'tương thích'}] trùng khớp 100% với CPU ${CPU.name}`;
               } else if (activeSlot === 'CPU' && MAINBOARD) {
-                reasonText = `✓ Đang đề xuất CPU Socket [${getSocket(MAINBOARD) || 'tương thích'}] tương thích với Bo mạch chủ ${MAINBOARD.name}`;
+                reasonText = `Đang đề xuất CPU Socket [${getSocket(MAINBOARD) || 'tương thích'}] tương thích với Bo mạch chủ ${MAINBOARD.name}`;
               } else if (activeSlot === 'RAM' && MAINBOARD) {
-                reasonText = `✓ Đang đề xuất RAM chuẩn [${getRamType(MAINBOARD) || 'DDR4/DDR5'}] chân cắm Desktop DIMM cho Bo mạch chủ ${MAINBOARD.name}`;
+                reasonText = `Đang đề xuất RAM chuẩn [${getRamType(MAINBOARD) || 'DDR4/DDR5'}] chân cắm Desktop DIMM cho Bo mạch chủ ${MAINBOARD.name}`;
               } else if (activeSlot === 'COOLER' && CPU) {
-                reasonText = `✓ Đang đề xuất Tản nhiệt hỗ trợ chân gán Socket [${getSocket(CPU) || 'chuẩn'}] cho CPU ${CPU.name}`;
+                reasonText = `Đang đề xuất Tản nhiệt hỗ trợ chân gán Socket [${getSocket(CPU) || 'chuẩn'}] cho CPU ${CPU.name}`;
               } else if (activeSlot === 'PSU') {
                 const estTdp = getEstimatedTdp();
                 const recWatts = Math.ceil(estTdp * 1.25);
-                reasonText = `✓ Ước tính công suất hệ thống: ${estTdp}W. Đang ưu tiên Bộ nguồn từ ${recWatts}W trở lên để đảm bảo 25% dư tải an toàn.`;
+                reasonText = `Ước tính công suất hệ thống: ${estTdp}W. Đang ưu tiên Bộ nguồn từ ${recWatts}W trở lên để đảm bảo 25% dư tải an toàn.`;
               }
 
               if (!reasonText) return null;
@@ -1809,7 +1809,7 @@ export default function PCBuilder() {
                     >
                       {p.isCompatible && (
                         <span style={{ position: 'absolute', top: '8px', right: '8px', backgroundColor: '#16a34a', color: '#fff', fontSize: '0.65rem', fontWeight: 800, padding: '2px 6px', borderRadius: '4px' }}>
-                          ⭐ ĐỀ XUẤT TỐI ƯU
+                          ĐỀ XUẤT TỐI ƯU
                         </span>
                       )}
 
@@ -1838,7 +1838,7 @@ export default function PCBuilder() {
 
                       {p.compatReason && (
                         <div style={{ fontSize: '0.72rem', color: '#16a34a', fontWeight: 700, marginBottom: '0.4rem', backgroundColor: '#dcfce7', padding: '2px 6px', borderRadius: '4px', display: 'inline-block' }}>
-                          ✓ {p.compatReason}
+                          {p.compatReason}
                         </div>
                       )}
 

@@ -428,7 +428,7 @@ export default function Sidebar() {
       if (myAssignedOrders.length > 0) {
         list.push({
           id: 'NOTIF-DELIVERY-ASSIGNED',
-          title: `📦 Có ${myAssignedOrders.length} đơn hàng mới đã bàn giao cho bạn`,
+          title: `Có ${myAssignedOrders.length} đơn hàng mới đã bàn giao cho bạn`,
           desc: `Thủ kho đã hoàn tất đóng gói và bàn giao ${myAssignedOrders.length} kiện hàng. Bạn tiến hành xuất phát giao hàng và thu tiền COD.`,
           link: '/admin/delivery?tab=pending',
           badge: 'Giao Vận',
@@ -443,7 +443,7 @@ export default function Sidebar() {
       if (readyOrders.length > 0) {
         list.push({
           id: 'NOTIF-DELIVERY-READY',
-          title: `🚚 Có ${readyOrders.length} đơn hàng đóng gói xong chờ lấy tại kho`,
+          title: `Có ${readyOrders.length} đơn hàng đóng gói xong chờ lấy tại kho`,
           desc: `Kho đã niêm phong xong ${readyOrders.length} đơn. Shipper có thể đến kho nhận chuyến và đi giao.`,
           link: '/admin/delivery?tab=pending',
           badge: 'Kho Chờ Giao',
