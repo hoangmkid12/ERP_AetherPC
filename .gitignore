@@ -45,7 +45,6 @@ __pycache__/
 .ipynb_checkpoints/
 
 # Large generated data files
-database/seed.sql
 scraper/data/
 
 # Temp files

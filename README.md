@@ -387,7 +387,6 @@ ERP_AetherPC/
 │   │   └── services/         # Axios/Fetch API Client & helper utilities
 │   ├── .env.example          # Tệp cấu hình môi trường mẫu cho Frontend
 │   └── Dockerfile            # Cấu hình Docker build Frontend
-├── database/                 # SQL Schema chuẩn & script khởi tạo Seed DB
 ├── docs/                     # Tài liệu Khóa luận Tốt nghiệp IUH (.docx) & Sơ đồ UML/BPMN
 ├── scraper/                  # Python Scraper cào & làm sạch 1.580 linh kiện PC thực tế
 ├── scripts/                  # Scripts hỗ trợ xuất báo cáo luận văn IUH
