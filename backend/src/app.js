@@ -80,6 +80,7 @@ app.use('/api/v1/customers', require('./routes/customer.routes'));
 app.use('/api/v1/ledger', require('./routes/ledger.routes'));
 app.use('/api/v1/complaints', require('./routes/complaint.routes'));
 app.use('/api/v1/system', require('./routes/system.routes'));
+app.use('/api/v1/address', require('./routes/address.routes'));
 
 // Global Error Handler Middleware
 app.use(errorMiddleware);

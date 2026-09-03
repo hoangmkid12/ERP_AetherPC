@@ -368,13 +368,16 @@ export default function Cart() {
   const [couponError, setCouponError] = useState('');
   const [couponSuccess, setCouponSuccess] = useState('');
 
-  // Fetch live provinces from AddressKit API (General Statistics Office dataset)
+  // Fetch live provinces from AddressKit API (General Statistics Office dataset),
+  // proxied through our backend — the AddressKit host only allows CORS from
+  // http://localhost:3000, so calling it directly from the browser fails on
+  // any deployed domain (works in local dev, breaks in production).
   useEffect(() => {
-    fetch('https://production.cas.so/address-kit/latest/provinces')
-      .then(res => res.json())
-      .then(data => {
-        if (data?.provinces && Array.isArray(data.provinces) && data.provinces.length > 0) {
-          setApiProvinces(data.provinces);
+    api.get('/address/provinces')
+      .then(res => {
+        const provinces = res?.data?.provinces;
+        if (Array.isArray(provinces) && provinces.length > 0) {
+          setApiProvinces(provinces);
         }
       })
       .catch(err => console.warn('AddressKit API fetch error:', err));
@@ -407,6 +410,23 @@ export default function Cart() {
     return () => { active = false; };
   }, [user]);
 
+  // Fetch live communes for a given province name/code, proxied through our backend
+  const fetchCommunesForProvince = (provName) => {
+    const foundProv = apiProvinces.find(p => p.name === provName || p.code === provName);
+    if (foundProv?.code) {
+      setLoadingCommunes(true);
+      api.get(`/address/provinces/${foundProv.code}/communes`)
+        .then(res => {
+          const communes = res?.data?.communes;
+          if (Array.isArray(communes)) {
+            setApiCommunes(communes);
+          }
+        })
+        .catch(err => console.warn('AddressKit Communes fetch error:', err))
+        .finally(() => setLoadingCommunes(false));
+    }
+  };
+
   const useSavedAddress = (address) => {
     setSelectedSavedAddressId(address.id);
     setCustomerName(address.recipientName || customerName);
@@ -415,28 +435,16 @@ export default function Cart() {
     setSelectedProvince(address.city || '');
     setWard(address.ward || '');
     setSelectedDistrict(address.district || '');
+    setApiCommunes([]);
+    fetchCommunesForProvince(address.city || '');
   };
-  // Update district & fetch live communes when province changes
+  // Update ward & fetch live communes when province changes
   const handleProvinceChange = (val) => {
     const provName = typeof val === 'string' ? val : val?.target?.value;
     setSelectedProvince(provName);
     setWard('');
     setApiCommunes([]);
-
-    // Find province in AddressKit list
-    const foundProv = apiProvinces.find(p => p.name === provName || p.code === provName);
-    if (foundProv?.code) {
-      setLoadingCommunes(true);
-      fetch(`https://production.cas.so/address-kit/latest/provinces/${foundProv.code}/communes`)
-        .then(res => res.json())
-        .then(data => {
-          if (data?.communes && Array.isArray(data.communes)) {
-            setApiCommunes(data.communes);
-          }
-        })
-        .catch(err => console.warn('AddressKit Communes fetch error:', err))
-        .finally(() => setLoadingCommunes(false));
-    }
+    fetchCommunesForProvince(provName);
   };
 
   const handleCopy = (text, field) => {
