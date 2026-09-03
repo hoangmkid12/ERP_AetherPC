@@ -1,0 +1,51 @@
+name: CI
+
+# Repo has no test/lint scripts (see CLAUDE.md), so this isn't a classic
+# test-gated CI — it's a fast build-sanity check that catches the exact
+# breakages Railway's own build would otherwise catch ~2-3 minutes later
+# (broken imports, Prisma schema errors, Vite build failures), surfaced as a
+# commit status within about a minute instead. Runs alongside Railway's
+# auto-deploy (push-to-deploy), not in place of it.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend-build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    # prisma validate/generate only read the schema file — they never connect
+    # to this — but the CLI hard-errors if DATABASE_URL is completely unset
+    # (schema.prisma's datasource reads it via env()), so a placeholder is
+    # enough; no real Postgres needed in this job.
+    env:
+      DATABASE_URL: postgresql://user:password@localhost:5432/ci_placeholder
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - run: npx prisma validate
+      - run: npx prisma generate
+
+  frontend-build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run build
