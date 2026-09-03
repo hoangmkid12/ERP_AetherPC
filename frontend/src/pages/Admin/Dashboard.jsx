@@ -1449,12 +1449,12 @@ export default function Dashboard() {
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '400px', overflowY: 'auto' }}>
               {inventory.filter(it => Number(it.stock || it.stockQuantity || 0) <= Number(it.threshold || 5)).map((item, idx) => (
-                <div key={idx} style={{ padding: '0.65rem 0.85rem', borderRadius: '6px', border: '1px solid #fde68a', backgroundColor: '#fffbeb', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>
-                    <strong style={{ fontSize: '0.8rem', color: '#92400e', display: 'block' }}>{item.name}</strong>
-                    <span style={{ fontSize: '0.72rem', color: '#b45309' }}>Phân nhóm: {item.category} | Ngưỡng an toàn: {item.threshold || 5}</span>
+                <div key={idx} style={{ padding: '0.65rem 0.85rem', borderRadius: '6px', border: '1px solid #fde68a', backgroundColor: '#fffbeb', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem' }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <strong style={{ fontSize: '0.8rem', color: '#92400e', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name}</strong>
+                    <span style={{ fontSize: '0.72rem', color: '#b45309', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Phân nhóm: {item.category} | Ngưỡng an toàn: {item.threshold || 5}</span>
                   </div>
-                  <span style={{ backgroundColor: '#ef4444', color: '#ffffff', fontSize: '0.72rem', fontWeight: 800, padding: '2px 8px', borderRadius: '4px' }}>
+                  <span style={{ backgroundColor: '#ef4444', color: '#ffffff', fontSize: '0.72rem', fontWeight: 800, padding: '2px 8px', borderRadius: '4px', whiteSpace: 'nowrap', flexShrink: 0 }}>
                     Tồn: {item.stock || item.stockQuantity || 0} cái
                   </span>
                 </div>
