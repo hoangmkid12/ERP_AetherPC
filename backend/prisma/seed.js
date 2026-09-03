@@ -35,6 +35,7 @@ async function cleanDatabase() {
   await prisma.warehouseLocation.deleteMany();
   await prisma.warehouse.deleteMany();
   
+  await prisma.serialNumber.deleteMany();
   await prisma.orderPayment.deleteMany();
   await prisma.orderStatusHistory.deleteMany();
   await prisma.orderItem.deleteMany();
@@ -647,6 +648,22 @@ async function main() {
       where: { productId: p.product_id },
       data: { stockQuantity: stockTotal }
     });
+
+    // Real stock-out (createOrder → claimAvailableSerials) allocates against
+    // SerialNumber rows, not Product.stockQuantity/Inventory — those are just
+    // denormalized totals. Without a matching serial per seeded unit, every
+    // checkout fails with "Không đủ Serial Number khả dụng" despite the
+    // product showing in stock. Real units get their serial scanned in at
+    // GRN time (purchase/warehouse controllers); this backfills that for the
+    // initial catalog stock seeded above so demo checkouts actually work.
+    if (stockTotal > 0) {
+      const serials = Array.from({ length: stockTotal }, (_, i) => ({
+        serial: `SN-${p.product_id}-${String(i + 1).padStart(4, '0')}`,
+        productId: p.product_id,
+        status: 'AVAILABLE'
+      }));
+      await prisma.serialNumber.createMany({ data: serials });
+    }
   }
 
   // 10. Attendances & Payrolls
