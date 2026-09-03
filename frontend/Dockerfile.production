@@ -6,12 +6,13 @@ COPY . .
 RUN npm run build
 
 FROM nginx:1.27-alpine
-# Copy nginx template (uses ${PORT} placeholder)
+# Copy nginx template (uses ${PORT} and ${BACKEND_URL} placeholders)
 COPY nginx.production.conf /etc/nginx/templates/default.conf.template
 COPY --from=build /app/dist /usr/share/nginx/html
 # Railway sets PORT dynamically; default to 80 for local Docker
 ENV PORT=80
+# Backend URL for API proxy — set via Railway Variables
+ENV BACKEND_URL=http://localhost:5000
 EXPOSE 80
-# envsubst replaces ${PORT} in the template and writes the final config,
-# then starts nginx in the foreground
-CMD ["/bin/sh", "-c", "envsubst '${PORT}' < /etc/nginx/templates/default.conf.template > /etc/nginx/conf.d/default.conf && nginx -g 'daemon off;'"]
+# envsubst replaces ${PORT} and ${BACKEND_URL} in the template, then starts nginx
+CMD ["/bin/sh", "-c", "envsubst '${PORT} ${BACKEND_URL}' < /etc/nginx/templates/default.conf.template > /etc/nginx/conf.d/default.conf && nginx -g 'daemon off;'"]
