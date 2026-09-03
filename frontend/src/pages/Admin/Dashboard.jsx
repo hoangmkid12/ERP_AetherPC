@@ -1487,23 +1487,27 @@ export default function Dashboard() {
             </div>
 
             <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem' }}>
+              {/* tableLayout: fixed + % widths keep every column's width stable
+                  row-to-row — without it, one long customer name or order id
+                  widens that column for the whole table and squeezes the
+                  price/status columns unevenly. */}
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem', tableLayout: 'fixed' }}>
                 <thead>
                   <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', textAlign: 'left', color: '#64748b' }}>
-                    <th style={{ padding: '0.4rem 0.5rem' }}>Đơn</th>
-                    <th style={{ padding: '0.4rem 0.5rem' }}>Khách</th>
-                    <th style={{ padding: '0.4rem 0.5rem', textAlign: 'right' }}>Tổng Tiền</th>
-                    <th style={{ padding: '0.4rem 0.5rem', textAlign: 'center' }}>Trạng Thái</th>
+                    <th style={{ padding: '0.4rem 0.5rem', width: '22%' }}>Đơn</th>
+                    <th style={{ padding: '0.4rem 0.5rem', width: '32%' }}>Khách</th>
+                    <th style={{ padding: '0.4rem 0.5rem', textAlign: 'right', width: '24%' }}>Tổng Tiền</th>
+                    <th style={{ padding: '0.4rem 0.5rem', textAlign: 'center', width: '22%' }}>Trạng Thái</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredOrders.slice(0, 5).map(o => (
                     <tr key={o.orderId || o.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                      <td style={{ padding: '0.4rem 0.5rem', fontWeight: 700, color: '#2563eb' }}>#{o.orderId || o.id}</td>
-                      <td style={{ padding: '0.4rem 0.5rem', color: '#0f172a' }}>{o.customerName || o.customer || 'Khách lẻ'}</td>
-                      <td style={{ padding: '0.4rem 0.5rem', textAlign: 'right', fontWeight: 700, color: '#16a34a' }}>{formatPrice(o.totalAmount)}</td>
+                      <td style={{ padding: '0.4rem 0.5rem', fontWeight: 700, color: '#2563eb', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>#{o.orderId || o.id}</td>
+                      <td style={{ padding: '0.4rem 0.5rem', color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{o.customerName || o.customer || 'Khách lẻ'}</td>
+                      <td style={{ padding: '0.4rem 0.5rem', textAlign: 'right', fontWeight: 700, color: '#16a34a', whiteSpace: 'nowrap' }}>{formatPrice(o.totalAmount)}</td>
                       <td style={{ padding: '0.4rem 0.5rem', textAlign: 'center' }}>
-                        <span style={{ backgroundColor: '#eff6ff', color: '#2563eb', padding: '1px 6px', borderRadius: '8px', fontSize: '0.68rem', fontWeight: 700 }}>
+                        <span style={{ backgroundColor: '#eff6ff', color: '#2563eb', padding: '1px 6px', borderRadius: '8px', fontSize: '0.68rem', fontWeight: 700, display: 'inline-block', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', verticalAlign: 'middle' }}>
                           {getStatusLabel(ORDER_STATUS, o.status)}
                         </span>
                       </td>
