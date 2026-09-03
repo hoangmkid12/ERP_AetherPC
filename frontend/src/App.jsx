@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
@@ -6,40 +6,53 @@ import { NotificationProvider } from './context/NotificationContext';
 import { initializeAllStores } from './stores';
 import { getRolesForModule } from './utils/rbacEngine';
 
-// Storefront Components
+// Layout chrome loads eagerly (needed on first paint of every page).
+// Every actual page is lazy-loaded instead — the JS for e.g. SystemAdmin's
+// RBAC matrix or the POS screen no longer has to download+parse before the
+// public storefront or the login page can render at all.
 import Header from './components/Layout/Header';
 import Footer from './components/Layout/Footer';
 import Chatbot from './components/Layout/Chatbot';
-import Home from './pages/Storefront/Home';
-import PCBuilder from './pages/Storefront/PCBuilder';
-import Cart from './pages/Storefront/Cart';
-import MyOrders from './pages/Storefront/MyOrders';
-import Products from './pages/Storefront/Products';
-import ProductDetail from './pages/Storefront/ProductDetail';
-import Promotions from './pages/Storefront/Promotions';
-import News from './pages/Storefront/News';
-import NewsDetail from './pages/Storefront/NewsDetail';
-import About from './pages/Storefront/About';
-import Careers from './pages/Storefront/Careers';
-import MemberTier from './pages/Storefront/MemberTier';
-import FlashSale from './pages/Storefront/FlashSale';
-import Profile from './pages/Storefront/Profile';
-import Login from './pages/Login';
+import Sidebar from './components/Layout/Sidebar';
+
+// Storefront Components
+const Home = lazy(() => import('./pages/Storefront/Home'));
+const PCBuilder = lazy(() => import('./pages/Storefront/PCBuilder'));
+const Cart = lazy(() => import('./pages/Storefront/Cart'));
+const MyOrders = lazy(() => import('./pages/Storefront/MyOrders'));
+const Products = lazy(() => import('./pages/Storefront/Products'));
+const ProductDetail = lazy(() => import('./pages/Storefront/ProductDetail'));
+const Promotions = lazy(() => import('./pages/Storefront/Promotions'));
+const News = lazy(() => import('./pages/Storefront/News'));
+const NewsDetail = lazy(() => import('./pages/Storefront/NewsDetail'));
+const About = lazy(() => import('./pages/Storefront/About'));
+const Careers = lazy(() => import('./pages/Storefront/Careers'));
+const MemberTier = lazy(() => import('./pages/Storefront/MemberTier'));
+const FlashSale = lazy(() => import('./pages/Storefront/FlashSale'));
+const Profile = lazy(() => import('./pages/Storefront/Profile'));
+const Login = lazy(() => import('./pages/Login'));
 
 // Admin ERP Components
-import Sidebar from './components/Layout/Sidebar';
-import Dashboard from './pages/Admin/Dashboard';
-import SalesPOS from './pages/Admin/SalesPOS';
-import Warehouse from './pages/Admin/Warehouse';
-import Assembly from './pages/Admin/Assembly';
-import HRManager from './pages/Admin/HRManager';
-import Accountant from './pages/Admin/Accountant';
-import Purchasing from './pages/Admin/Purchasing';
-import SystemAdmin from './pages/Admin/SystemAdmin';
-import SupplierPortal from './pages/SupplierPortal';
-import CustomerService from './pages/Admin/CustomerService';
-import Delivery from './pages/Admin/Delivery';
-import QualityControl from './pages/Admin/QualityControl';
+const Dashboard = lazy(() => import('./pages/Admin/Dashboard'));
+const SalesPOS = lazy(() => import('./pages/Admin/SalesPOS'));
+const Warehouse = lazy(() => import('./pages/Admin/Warehouse'));
+const Assembly = lazy(() => import('./pages/Admin/Assembly'));
+const HRManager = lazy(() => import('./pages/Admin/HRManager'));
+const Accountant = lazy(() => import('./pages/Admin/Accountant'));
+const Purchasing = lazy(() => import('./pages/Admin/Purchasing'));
+const SystemAdmin = lazy(() => import('./pages/Admin/SystemAdmin'));
+const SupplierPortal = lazy(() => import('./pages/SupplierPortal'));
+const CustomerService = lazy(() => import('./pages/Admin/CustomerService'));
+const Delivery = lazy(() => import('./pages/Admin/Delivery'));
+const QualityControl = lazy(() => import('./pages/Admin/QualityControl'));
+
+// Shown while a lazy route chunk downloads — same "Đang tải..." look already
+// used by ProtectedRoute/AdminLayout's own auth-loading states.
+const RouteLoadingFallback = () => (
+  <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+    <div style={{ color: 'var(--text-muted, #64748b)', fontSize: '0.95rem' }}>Đang tải...</div>
+  </div>
+);
 
 // 1. Layout for Storefront Customer Views
 const StorefrontLayout = () => {
@@ -171,6 +184,7 @@ export default function App() {
 
             <Router>
               <ScrollToTop />
+              <Suspense fallback={<RouteLoadingFallback />}>
               <Routes>
                 {/* Storefront Layout Routes */}
                 <Route path="/" element={<StorefrontLayout />}>
@@ -282,6 +296,7 @@ export default function App() {
                 {/* General fallback route */}
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
+              </Suspense>
             </Router>
         </CartProvider>
       </NotificationProvider>
