@@ -231,7 +231,9 @@ sequenceDiagram
     - Quản lý Ticket bảo hành & duyệt đơn Đổi trả linh kiện.
 
 11. **Quản Trị Hệ Thống (`SystemAdmin.jsx`)**:
-    - Quản lý tài khoản 14 nhóm quyền RBAC Matrix, xem Audit Logs.
+    - Quản lý tài khoản, 14 nhóm quyền RBAC Matrix — 5 tác vụ rủi ro cao nhất (duyệt PO, duyệt/giải ngân lương, hủy đơn & hoàn tiền, quản lý hồ sơ nhân viên) được backend thực sự chặn theo ma trận này, không chỉ ẩn nút giao diện.
+    - Nhật Ký Kiểm Toán (Audit Logs) đọc thật từ bảng `audit_logs`, ghi nhận đăng nhập thất bại, đổi mật khẩu, CRUD nhân viên, duyệt PO/lương, đổi RBAC.
+    - Sao Lưu & Khôi Phục dữ liệu thật (`pg_dump`/`pg_restore`), có chế độ bảo trì tạm khóa ghi trong lúc restore để tránh xung đột.
 
 12. **Cổng Nhà Cung Cấp (`SupplierPortal/index.jsx`)**:
     - Cổng kết nối 15 Nhà cung cấp đối tác tiếp nhận RFQ và báo giá trực tuyến.
@@ -299,7 +301,7 @@ $$P_{\text{PSU khuyến nghị}} \ge \frac{P_{\text{tổng TDP}}}{0.80}$$
 
 ### 7.2. Giao Thức WebSocket Realtime (`ws://localhost:5000/ws/cskh`)
 
-| Tên Sự Kiện (Type) | Chi Chiều Gửi | Payload Cấu Trúc | Mô Tả Tác Vụ |
+| Tên Sự Kiện (Type) | Chiều Gửi | Payload Cấu Trúc | Mô Tả Tác Vụ |
 | :--- | :---: | :--- | :--- |
 | `INIT_SESSIONS` | Server $\rightarrow$ Client | `{ sessions: Array }` | Gửi toàn bộ dữ liệu các phiên chat khi mới kết nối |
 | `CUSTOMER_SEND_MSG` | Customer $\rightarrow$ Server | `{ sessionId, text, customerName }` | Khách hàng gửi tin nhắn mới tới Server |
@@ -341,22 +343,26 @@ $$P_{\text{PSU khuyến nghị}} \ge \frac{P_{\text{tổng TDP}}}{0.80}$$
 ## 9. Công Nghệ Sử Dụng (Tech Stack)
 
 ### Frontend
-- **Core Framework**: React.js (v18) xây dựng trên nền Vite bundling tool.
+- **Core Framework**: React.js (v18) xây dựng trên nền Vite bundling tool, route-based code-splitting (`React.lazy` + `Suspense`).
 - **Styling**: Vanilla CSS Custom Variables, thiết kế Glassmorphic UI cao cấp, font chữ **Inter**.
 - **Realtime Sync**: WebSocket Client & Inter-tab BroadcastChannel API.
 - **Icons & UI**: Lucide React Icons, Chart.js / React-Chartjs-2.
-- **State Management**: `ERPContext`, `CartContext`, `AuthContext`.
+- **State Management**: `ERPContext` (lớp state nguyên bản) song song với bộ Zustand store (`stores/`: `inventoryStore`, `salesStore`, `hrStore`, `financeStore`, `utilityStore`) đang trong quá trình tái cấu trúc dần; `CartContext`, `AuthContext` cho giỏ hàng & phiên đăng nhập.
 
 ### Backend
-- **Framework**: Node.js & Express.js RESTful API.
-- **Realtime Engine**: WebSocket Server (`ws` library) khởi chạy trên `ws://localhost:5000/ws/cskh`.
-- **Database & ORM**: PostgreSQL v15 & Prisma ORM.
-- **Security & Auth**: JSON Web Token (JWT) & bcryptjs password hashing.
+- **Framework**: Node.js & Express.js RESTful API, bảo vệ bằng `helmet` + rate limiting riêng cho các endpoint xác thực.
+- **Realtime Engine**: WebSocket Server (`ws` library) khởi chạy trên cùng HTTP server tại `/ws/cskh`.
+- **Database & ORM**: PostgreSQL v15+ & Prisma ORM.
+- **Hàng Đợi Xử Lý Đơn (Order Queue)**: Redis + `ioredis`/BullMQ-style worker (`orderWorker.js`) chạy như service độc lập, tách khỏi API server chính.
+- **Security & Auth**: JSON Web Token (JWT, cookie HTTP-Only) & bcryptjs password hashing.
+- **Audit Trail & Backup Thật**: Bảng `audit_logs` ghi nhận các thao tác nhạy cảm (đăng nhập thất bại, đổi mật khẩu, CRUD nhân viên, duyệt PO/lương, đổi RBAC); tính năng Sao Lưu/Khôi Phục dùng `pg_dump`/`pg_restore` thật (`/admin/system`), có chế độ bảo trì (maintenance mode) khóa ghi trong lúc restore.
 - **AI Integration**: Google Generative AI SDK (`@google/generative-ai` - Gemini 1.5 Flash).
-- **Email Notification**: Nodemailer Service tích hợp Gmail App Password (CSS chống lóa Gmail Dark Mode).
+- **Email Notification**: Nodemailer Service tích hợp Gmail App Password (bật qua biến môi trường `GMAIL_USER`/`GMAIL_APP_PASSWORD`; tự tắt êm nếu chưa cấu hình).
 
-### Deployment & Tools
-- **Docker Compose**: Containerization trọn gói Frontend, Backend và PostgreSQL Database.
+### Triển Khai, CI/CD & Công Cụ
+- **Local Development**: Docker Compose containerization trọn gói Frontend, Backend, PostgreSQL, Redis.
+- **Production Deployment**: Railway (Backend + Postgres + Redis managed, tách biệt vòng đời khỏi container ứng dụng) — Frontend build production qua Nginx (`Dockerfile.production` + `nginx.production.conf`) proxy `/api` và WebSocket `/ws` về cùng backend, giữ same-origin cho cookie đăng nhập.
+- **CI/CD**: GitHub Actions (`.github/workflows/ci.yml`) build-check Backend (Prisma validate/generate) & Frontend (Vite build) trên mỗi lần push/PR vào `main`; Railway tự động build & deploy lại khi có commit mới (push-to-deploy).
 - **Data Generator**: Script Python cào và chuẩn hóa 1.580 dữ liệu linh kiện PC thực tế.
 
 ---
@@ -435,6 +441,18 @@ ERP_AetherPC/
 
 ---
 
+### Cách 3: Triển Khai Production (Railway + CI/CD)
+
+Hệ thống được deploy thật lên [Railway](https://railway.app) thay vì tự host database trong container local — tách biệt vòng đời dữ liệu (Postgres/Redis managed) khỏi vòng đời deploy ứng dụng, tránh mất dữ liệu mỗi lần rebuild.
+
+1. **Backend + Database**: tạo project Railway từ repo GitHub, Root Directory trỏ `backend/` (dùng `backend/Dockerfile`), thêm plugin **PostgreSQL** và **Redis**, liên kết `DATABASE_URL`/`REDIS_URL` qua biến tham chiếu (Variable Reference) của Railway. Cấu hình thêm: `JWT_SECRET`, `COOKIE_SECURE=true`, `CORS_ORIGIN=<domain-frontend>`, `NODE_ENV=production`.
+2. **Frontend**: deploy cùng repo, Root Directory trỏ `frontend/`, dùng `frontend/Dockerfile.production` — build Vite production rồi serve bằng Nginx (`nginx.production.conf`). Nginx tự proxy `location /api/` và `location /ws/` (WebSocket CSKH, có header `Upgrade`/`Connection`) về đúng backend qua biến `BACKEND_URL` (bắt buộc có `https://`), giữ mọi request cùng origin với trang — tránh vấn đề CORS/cookie cross-site.
+3. **Domain riêng**: trỏ domain gốc vào frontend, subdomain (`api.<domain>`) vào backend — cùng domain gốc để cookie đăng nhập (`SameSite=Strict`) vẫn hoạt động giữa 2 subdomain.
+4. **CI/CD**: mỗi lần `git push` lên `main`, GitHub Actions (`.github/workflows/ci.yml`) chạy build-check cả hai phía trong ~1 phút, song song đó Railway tự động build & deploy lại (push-to-deploy) — không cần thao tác thủ công.
+5. **Khôi phục dữ liệu thật vào Postgres Railway** (lần đầu, hoặc sau khi tạo mới database): dùng `backup-db.ps1`/`restore-db.ps1` — sửa `restore-db.ps1` trỏ tới connection string public (`DATABASE_PUBLIC_URL` hoặc TCP Proxy) của Railway thay vì container local.
+
+---
+
 ## 12. Danh Sách 14 Tài Khoản Demo Hệ Thống
 
 Đăng nhập tại trang `/login` bằng các tài khoản demo (Mật khẩu mặc định: `123456`):
@@ -466,5 +484,4 @@ Tài liệu báo cáo chính thức lưu trữ tại:
 ---
 
 ## Bản Quyền & Giấy Phép
-Dự án hoàn thiện phục vụ Khóa luận Tốt nghiệp Đại học chuyên ngành Hệ thống Thông tin — Khoa Công nghệ Thông tin — Trường Đại học Công nghiệp TP. Hồ Chí Minh (IUH). Tất cả quyền được bảo lưu © 2026.#   E R P _ A e t h e r P C  
- 
+Dự án hoàn thiện phục vụ Khóa luận Tốt nghiệp Đại học chuyên ngành Hệ thống Thông tin — Khoa Công nghệ Thông tin — Trường Đại học Công nghiệp TP. Hồ Chí Minh (IUH). Tất cả quyền được bảo lưu © 2026.
