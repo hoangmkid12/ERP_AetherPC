@@ -55,8 +55,16 @@ async function cleanDatabase() {
 
 async function main() {
   if (!fs.existsSync(PRODUCTS_JSON)) {
-    console.error('Error: Clean JSON files not found. Run scraper first.');
-    process.exit(1);
+    // scraper/data/ is bind-mounted locally (docker-compose.yml) but isn't part
+    // of the backend Docker build context and is gitignored (large generated
+    // data), so it never exists on a fresh host like Railway. This used to
+    // process.exit(1) here, which — since seed-if-empty.js runs this via
+    // `require()` inside the Dockerfile CMD's `&&` chain — killed the whole
+    // container before `npm start` ever ran, not just the product seeding.
+    // Skip catalog/demo seeding instead of crash-looping the entire server;
+    // load real data afterwards via restore-db.ps1 against the deployed DB.
+    console.warn('[Seed] scraper/data/products_clean.json not found — skipping catalog/demo seed. Restore a real backup (see restore-db.ps1) to populate this database.');
+    return; // main()'s own .finally() below still disconnects the Prisma client
   }
 
   // Load inputs
