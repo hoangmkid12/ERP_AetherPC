@@ -1,8 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const { authMiddleware } = require('../middlewares/auth.middleware');
+const { checkOperationalPermission } = require('../middlewares/rbac.middleware');
 const prisma = require('../config/database');
 const { QC_ROLES } = require('../constants/roles');
+const { logAudit } = require('../utils/auditLog');
 
 // Attendance.date là @db.Date; frontend so khớp theo chuỗi vi-VN "d/M/yyyy"
 // (HRManager.jsx dùng .toLocaleDateString('vi-VN') làm khóa so sánh) — parse/
@@ -144,12 +146,13 @@ router.post('/employees', authMiddleware(['ADMIN', 'HR', 'CEO']), async (req, re
         baseSalary: parseFloat(baseSalary) || 0
       }
     });
+    logAudit({ req, action: 'CREATE_EMPLOYEE', module: 'Nhân Sự', targetId: emp.id, note: `${emp.fullName} (${emp.role})` });
     res.status(201).json({ success: true, data: { ...emp, passwordHash: undefined } });
   } catch (err) { next(err); }
 });
 
 // PATCH /api/v1/hr/employees/:id/status – kích hoạt/vô hiệu hóa tài khoản
-router.patch('/employees/:id/status', authMiddleware(['ADMIN', 'HR', 'CEO']), async (req, res, next) => {
+router.patch('/employees/:id/status', authMiddleware(['ADMIN', 'HR', 'CEO']), checkOperationalPermission('hr_manage_employees'), async (req, res, next) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
@@ -157,6 +160,7 @@ router.patch('/employees/:id/status', authMiddleware(['ADMIN', 'HR', 'CEO']), as
       where: { id: parseInt(id) },
       data: { status }
     });
+    logAudit({ req, action: 'UPDATE_EMPLOYEE_STATUS', module: 'Nhân Sự', targetId: emp.id, note: `${emp.fullName} -> ${status}` });
     res.json({ success: true, data: { ...emp, passwordHash: undefined } });
   } catch (err) { next(err); }
 });
@@ -175,6 +179,7 @@ router.patch('/employees/:id/reset-password', authMiddleware(['ADMIN', 'HR', 'CE
       where: { id: parseInt(id) },
       data: { passwordHash }
     });
+    logAudit({ req, action: 'RESET_PASSWORD', module: 'Bảo Mật', targetId: emp.id, note: emp.fullName });
     res.json({ success: true, message: `Đã đặt lại mật khẩu cho ${emp.fullName} về mặc định.`, data: { ...emp, passwordHash: undefined } });
   } catch (err) { next(err); }
 });
@@ -195,6 +200,7 @@ router.put('/employees/:id', authMiddleware(['ADMIN', 'HR', 'CEO']), async (req,
         ...(baseSalary !== undefined ? { baseSalary: parseFloat(baseSalary) || 0 } : {})
       }
     });
+    logAudit({ req, action: 'UPDATE_EMPLOYEE', module: 'Nhân Sự', targetId: emp.id, note: emp.fullName });
     res.json({ success: true, data: { ...emp, passwordHash: undefined } });
   } catch (err) { next(err); }
 });
@@ -288,9 +294,12 @@ router.post('/payrolls', authMiddleware(['HR', 'CEO', 'ADMIN']), async (req, res
 
     // Khớp đúng công thức đã hiển thị ở HRManager.jsx tab "Bảng Lương" (preview
     // "Dự Thảo" trước khi có route thật): hoa hồng bán hàng cho SALES, thưởng
-    // lắp ráp cho ASSEMBLY, khấu trừ cố định cho mọi nhân viên.
-    const SALES_COMMISSION = 1250000;
-    const ASSEMBLY_BONUS = 750000;
+    // lắp ráp cho ASSEMBLY, khấu trừ cố định cho mọi nhân viên. Hai mức đầu giờ
+    // đọc từ CompanySettings (Admin > Cấu Hình) thay vì hardcode — quản trị viên
+    // đổi được thật, không còn là hằng số cứng không ai chỉnh nổi.
+    const settings = await prisma.companySettings.findUnique({ where: { id: 1 } });
+    const SALES_COMMISSION = settings ? parseFloat(settings.salesCommissionFlat) : 1250000;
+    const ASSEMBLY_BONUS = settings ? parseFloat(settings.assemblyBonus) : 750000;
     const FLAT_DEDUCTION = 50000;
 
     await prisma.payroll.createMany({
@@ -323,20 +332,23 @@ router.post('/payrolls', authMiddleware(['HR', 'CEO', 'ADMIN']), async (req, res
 
 // PATCH /api/v1/hr/payrolls/approve-ceo – CEO duyệt toàn bộ bảng lương đang
 // chờ (SUBMITTED_TO_ACCOUNTING) sang APPROVED_BY_CEO, theo kỳ (body: { period })
-router.patch('/payrolls/approve-ceo', authMiddleware(['CEO', 'ADMIN']), async (req, res, next) => {
+router.patch('/payrolls/approve-ceo', authMiddleware(['CEO', 'ADMIN']), checkOperationalPermission('hr_approve_payroll_ceo'), async (req, res, next) => {
   try {
     const { period } = req.body;
     const result = await prisma.payroll.updateMany({
       where: { status: 'SUBMITTED_TO_ACCOUNTING', ...(period ? { period } : {}) },
       data: { status: 'APPROVED_BY_CEO' }
     });
+    if (result.count > 0) {
+      logAudit({ req, action: 'APPROVE_PAYROLL', module: 'Kế Toán', note: `Kỳ ${period || 'tất cả'}: ${result.count} bảng lương` });
+    }
     res.json({ success: true, message: `CEO đã duyệt ${result.count} bảng lương.`, data: { count: result.count } });
   } catch (err) { next(err); }
 });
 
 // POST /api/v1/hr/payrolls/:id/disburse – Kế toán giải ngân 1 bảng lương,
 // tự động ghi 1 bút toán chi (EXPENSE) thật vào Sổ Cái trong cùng transaction.
-router.post('/payrolls/:id/disburse', authMiddleware(['ACCOUNTANT', 'CEO', 'ADMIN']), async (req, res, next) => {
+router.post('/payrolls/:id/disburse', authMiddleware(['ACCOUNTANT', 'CEO', 'ADMIN']), checkOperationalPermission('accounting_disburse_payroll'), async (req, res, next) => {
   try {
     const { id } = req.params;
     const payroll = await prisma.payroll.findUnique({
@@ -367,13 +379,14 @@ router.post('/payrolls/:id/disburse', authMiddleware(['ACCOUNTANT', 'CEO', 'ADMI
       return updated;
     });
 
+    logAudit({ req, action: 'DISBURSE_PAYROLL', module: 'Kế Toán', targetId: result.id, note: `${result.employee?.fullName || `NV #${result.employeeId}`}: ${result.netSalary}đ` });
     res.json({ success: true, data: { ...result, empId: result.employeeId, empName: result.employee?.fullName, netAmount: parseFloat(result.netSalary) } });
   } catch (err) { next(err); }
 });
 
 // POST /api/v1/hr/payrolls/disburse-all – Kế toán giải ngân toàn bộ bảng
 // lương đã CEO duyệt (hoặc đang chờ) trong 1 giao dịch, ghi 1 bút toán/nhân viên.
-router.post('/payrolls/disburse-all', authMiddleware(['ACCOUNTANT', 'CEO', 'ADMIN']), async (req, res, next) => {
+router.post('/payrolls/disburse-all', authMiddleware(['ACCOUNTANT', 'CEO', 'ADMIN']), checkOperationalPermission('accounting_disburse_payroll'), async (req, res, next) => {
   try {
     const eligible = await prisma.payroll.findMany({
       where: { status: { in: ['APPROVED_BY_CEO', 'SUBMITTED_TO_ACCOUNTING'] } },
@@ -398,6 +411,7 @@ router.post('/payrolls/disburse-all', authMiddleware(['ACCOUNTANT', 'CEO', 'ADMI
       });
     });
 
+    logAudit({ req, action: 'DISBURSE_PAYROLL', module: 'Kế Toán', note: `Giải ngân hàng loạt: ${eligible.length} bảng lương` });
     res.json({ success: true, message: `Đã giải ngân ${eligible.length} bảng lương.`, data: { count: eligible.length } });
   } catch (err) { next(err); }
 });

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { api } from '../../services/api';
 import { 
@@ -75,6 +75,29 @@ const ROLE_COLORS = {
   DELIVERY: '#64748b'
 };
 
+// Bộ style dùng chung cho trang này — trước đây mỗi phần tử tự viết inline
+// style riêng dù lặp lại gần như y hệt hàng chục lần (card/input/label/badge),
+// kèm vài chỗ lệch nhỏ không lý do (VD 2 nút cùng vai trò nhưng padding khác
+// nhau). Gom các khối lặp lại thật sự vào đây, lấy đúng giá trị đang chiếm đa
+// số trong chính file này — không đổi phong cách, chỉ chuẩn hoá.
+const cardStyle = { backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem' };
+const inputStyle = { width: '100%', padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', boxSizing: 'border-box' };
+const labelStyle = { display: 'block', fontWeight: 700, color: '#0f172a', marginBottom: '0.3rem' };
+const sectionTitleStyle = { fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '0.4rem' };
+const primaryBtnStyle = { backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.5rem 1rem', fontSize: '0.8rem', fontWeight: 800, cursor: 'pointer' };
+const secondaryBtnStyle = { backgroundColor: '#ffffff', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.45rem 1rem', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' };
+
+const BADGE_VARIANTS = {
+  success: { bg: '#f0fdf4', color: '#16a34a', border: '#bbf7d0' },
+  warning: { bg: '#fffbeb', color: '#d97706', border: '#fde68a' },
+  danger: { bg: '#fef2f2', color: '#dc2626', border: '#fecaca' },
+  info: { bg: '#eff6ff', color: '#2563eb', border: '#bfdbfe' },
+  neutral: { bg: '#f1f5f9', color: '#64748b', border: '#e2e8f0' }
+};
+const badgeStyle = (variant = 'neutral') => {
+  const v = BADGE_VARIANTS[variant] || BADGE_VARIANTS.neutral;
+  return { backgroundColor: v.bg, color: v.color, border: `1px solid ${v.border}`, padding: '3px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 800 };
+};
 
 export default function SystemAdmin() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -103,6 +126,21 @@ export default function SystemAdmin() {
   const [rbacMatrix, setRbacMatrix] = useState(() => getOperationalRbac());
   const [showOnlyRelevant, setShowOnlyRelevant] = useState(true);
   const [showSaveConfirmModal, setShowSaveConfirmModal] = useState(false);
+
+  // rbacMatrix/savedRbacMatrix above may have been captured before
+  // loadRbacFromServer() (stores/index.js) finished its first real fetch — once
+  // it resolves it dispatches 'erp-rbac-changed', so re-sync from the now-fresh
+  // cache instead of staying on whatever DEFAULT_OPERATIONAL_MATRIX snapshot
+  // this component happened to mount with.
+  useEffect(() => {
+    const handleRbacLoaded = () => {
+      const fresh = getOperationalRbac();
+      setSavedRbacMatrix(fresh);
+      setRbacMatrix(fresh);
+    };
+    window.addEventListener('erp-rbac-changed', handleRbacLoaded);
+    return () => window.removeEventListener('erp-rbac-changed', handleRbacLoaded);
+  }, []);
 
   const hasUnsavedChanges = useMemo(() => {
     return JSON.stringify(rbacMatrix) !== JSON.stringify(savedRbacMatrix);
@@ -188,11 +226,15 @@ export default function SystemAdmin() {
     setShowSaveConfirmModal(true);
   };
 
-  const handleConfirmSaveRbacMatrix = () => {
-    saveOperationalRbac(rbacMatrix);
-    setSavedRbacMatrix(rbacMatrix);
-    setShowSaveConfirmModal(false);
-    notify('Đã lưu và áp dụng cấu hình phân quyền nghiệp vụ mới thành công!', 'success');
+  const handleConfirmSaveRbacMatrix = async () => {
+    try {
+      await saveOperationalRbac(rbacMatrix);
+      setSavedRbacMatrix(rbacMatrix);
+      setShowSaveConfirmModal(false);
+      notify('Đã lưu và áp dụng cấu hình phân quyền nghiệp vụ mới thành công!', 'success');
+    } catch (err) {
+      notify(`Lưu cấu hình phân quyền thất bại: ${err.message || 'lỗi kết nối máy chủ'}.`, 'error');
+    }
   };
 
   const handleDiscardChanges = async () => {
@@ -208,28 +250,90 @@ export default function SystemAdmin() {
   };
 
   // System Configuration State
+  // Trước đây các giá trị này được hardcode sẵn như thể đã cấu hình thật
+  // ("AetherPC Technology ERP JSC", MST giả...) trong khi nút "Lưu" không hề
+  // lưu gì cả — giờ để trống, nạp thật từ GET /system/settings khi mount.
   const [companyConfig, setCompanyConfig] = useState({
-    companyName: 'AetherPC Technology ERP JSC',
-    taxCode: '0316888999',
-    hotline: '1900 6868',
-    email: 'admin@aetherpc.vn',
-    address: 'Tầng 12, Tòa nhà Landmark 81, TP. Hồ Chí Minh',
-    salesCommission: 1, // 1%
-    assemblyBonus: 150000, // 150K
-    defaultVat: 10, // 10%
+    companyName: '',
+    taxCode: '',
+    hotline: '',
+    address: '',
+    salesCommissionFlat: 1250000,
+    assemblyBonus: 750000,
+    defaultVat: 10,
     lowStockThreshold: 5
   });
+  const [savingSettings, setSavingSettings] = useState(false);
+  const [restoringData, setRestoringData] = useState(false);
 
-  // Audit Logs State
-  const [auditLogs, setAuditLogs] = useState([
-    { id: 1, user: 'admin@aetherpc.vn', action: 'LOGIN', module: 'Hệ Thống', timestamp: '18/08/2026 08:30:12', ip: '192.168.1.10', status: 'SUCCESS' },
-    { id: 2, user: 'hr@aetherpc.vn', action: 'CREATE_PAYROLL', module: 'Nhân Sự', timestamp: '18/08/2026 09:15:44', ip: '192.168.1.11', status: 'SUCCESS' },
-    { id: 3, user: 'sales@aetherpc.vn', action: 'CREATE_ORDER', module: 'Bán Hàng', timestamp: '18/08/2026 10:02:07', ip: '192.168.1.12', status: 'SUCCESS' },
-    { id: 4, user: 'unknown@ext.com', action: 'LOGIN', module: 'Bảo Mật', timestamp: '18/08/2026 10:45:00', ip: '103.77.12.44', status: 'FAILED' },
-    { id: 5, user: 'purchasing@aetherpc.vn', action: 'CREATE_PO', module: 'Mua Hàng', timestamp: '18/08/2026 11:20:33', ip: '192.168.1.13', status: 'SUCCESS' },
-    { id: 6, user: 'ceo@aetherpc.vn', action: 'APPROVE_PAYROLL', module: 'Ban Giám Đốc', timestamp: '18/08/2026 13:00:01', ip: '192.168.1.1', status: 'SUCCESS' },
-    { id: 7, user: 'qc@aetherpc.vn', action: 'QA_INSPECTION', module: 'Kiểm Định QC', timestamp: '18/08/2026 14:10:20', ip: '192.168.1.15', status: 'SUCCESS' }
-  ]);
+  // Trước đây thẻ "Trạng Thái Hạ Tầng" hardcode cứng "Đang chạy (Healthy)" /
+  // "Kết nối hoàn hảo" — không hề gọi gì để biết thật. GET /system/settings đã
+  // phải chạm tới backend + Postgres (qua Prisma) để trả kết quả, nên dùng
+  // ngay chính lần gọi đó làm tín hiệu "backend & DB còn sống" thay vì thêm 1
+  // request ping riêng — thành công = 'ok', lỗi (mất kết nối/500...) = 'down'.
+  const [serverStatus, setServerStatus] = useState('checking'); // 'checking' | 'ok' | 'down'
+
+  const loadCompanySettings = async () => {
+    setServerStatus('checking');
+    try {
+      const res = await api.get('/system/settings');
+      if (res?.success && res.data) {
+        const d = res.data;
+        setCompanyConfig({
+          companyName: d.companyName || '',
+          taxCode: d.taxCode || '',
+          hotline: d.hotline || '',
+          address: d.address || '',
+          salesCommissionFlat: Number(d.salesCommissionFlat) || 0,
+          assemblyBonus: Number(d.assemblyBonus) || 0,
+          defaultVat: Number(d.defaultVat) || 0,
+          lowStockThreshold: Number(d.lowStockThreshold) || 5
+        });
+      }
+      setServerStatus(res?.success ? 'ok' : 'down');
+    } catch (err) {
+      console.warn('Không tải được cấu hình doanh nghiệp:', err.message);
+      setServerStatus('down');
+    }
+  };
+
+  useEffect(() => { loadCompanySettings(); }, []);
+
+  // Nhật ký kiểm toán — trước đây là 7 dòng hardcode cứng (ngày cố định
+  // 18/08/2026, IP giả), không hề phản ánh hành động thật nào. Giờ nạp thật từ
+  // GET /system/audit-logs (bảng AuditLog, ghi bởi logAudit() ở các điểm nhạy
+  // cảm thật: đăng nhập thất bại, đổi mật khẩu, tạo/sửa nhân viên, duyệt PO,
+  // duyệt/giải ngân lương, đổi RBAC, backup/restore).
+  const [auditLogs, setAuditLogs] = useState([]);
+  const [loadingAuditLogs, setLoadingAuditLogs] = useState(false);
+
+  // Trước đây chỉ fetch khi activeTab === 'audit' — nghĩa là 2 thẻ KPI ở tab
+  // Tổng Quan dựa vào auditLogs (cảnh báo an ninh, số thao tác) luôn hiện sai
+  // (0/rỗng) cho tới khi người dùng từng ghé tab Audit ít nhất 1 lần. Nạp 1 lần
+  // khi mount để Tổng Quan đúng ngay từ đầu.
+  useEffect(() => {
+    setLoadingAuditLogs(true);
+    (async () => {
+      try {
+        const res = await api.get('/system/audit-logs?limit=200');
+        if (res?.success) {
+          setAuditLogs((res.data || []).map(l => ({
+            id: l.id,
+            user: l.actorName || 'Hệ thống',
+            action: l.action,
+            module: l.module,
+            timestamp: new Date(l.createdAt).toLocaleString('vi-VN'),
+            ip: l.ipAddress || '—',
+            status: l.status
+          })));
+        }
+      } catch (err) {
+        console.warn('Không tải được nhật ký kiểm toán:', err.message);
+      } finally {
+        setLoadingAuditLogs(false);
+      }
+    })();
+  }, []);
 
   const [form, setForm] = useState({
     fullname: '',
@@ -257,40 +361,55 @@ export default function SystemAdmin() {
     });
   }, [employees, search, roleFilter]);
 
-  // KPI Stats
+  // KPI Stats — "Cảnh Báo An Ninh" và "Thao Tác Ghi Nhận" trước đây là 2 thẻ
+  // riêng cùng đọc auditLogs, gộp lại thành 1 thẻ Nhật Ký Kiểm Toán cho đỡ rối
+  // mắt (đủ thông tin: tổng số + số thất bại trong cùng 1 chỗ). Thẻ CSDL trước
+  // đây ghi cứng "Online 99.9%" — giờ phản ánh đúng serverStatus (xem
+  // loadCompanySettings ở trên).
   const failedSecurityCount = auditLogs.filter(l => l.status === 'FAILED').length;
+  const dbStatusLabel = serverStatus === 'ok' ? 'Trực tuyến' : serverStatus === 'down' ? 'Mất kết nối' : 'Đang kiểm tra...';
+  const dbStatusVariant = serverStatus === 'ok' ? 'success' : serverStatus === 'down' ? 'danger' : 'warning';
+  const dbStatusColor = BADGE_VARIANTS[dbStatusVariant].color;
   const stats = [
     { label: 'Tài Khoản Nhân Sự', value: `${employees.length} tài khoản`, change: 'Đang hoạt động trên hệ thống', icon: <Users size={20} />, color: '#2563eb', bg: '#eff6ff' },
-    { label: 'Vai Trò Định Danh (RBAC)', value: `${ROLES.length} Roles`, change: 'Phân quyền độc lập theo Actor', icon: <Shield size={20} />, color: '#8b5cf6', bg: '#f5f3ff' },
-    { label: 'Cảnh Báo An Ninh', value: `${failedSecurityCount} cảnh báo`, change: 'Đăng nhập sai / IP bất thường', icon: <AlertTriangle size={20} />, color: failedSecurityCount > 0 ? '#ef4444' : '#16a34a', bg: '#fef2f2' },
-    { label: 'Thao Tác Ghi Nhận', value: `${auditLogs.length} sự kiện`, change: 'Lưu vết trong ngày hôm nay', icon: <Activity size={20} />, color: '#16a34a', bg: '#f0fdf4' },
-    { label: 'Cơ Sở Dữ Liệu PostgreSQL', value: 'Online 99.9%', change: 'Docker Container kltn_postgres', icon: <Database size={20} />, color: '#0ea5e9', bg: '#f0f9ff' },
+    { label: 'Vai Trò Định Danh', value: `${ROLES.length} Roles`, change: 'Phân quyền độc lập theo Actor', icon: <Shield size={20} />, color: '#8b5cf6', bg: '#f5f3ff' },
+    { label: 'Nhật Ký Kiểm Toán', value: `${auditLogs.length} sự kiện`, change: `${failedSecurityCount} cảnh báo thất bại (đăng nhập sai...)`, icon: <Activity size={20} />, color: failedSecurityCount > 0 ? '#ef4444' : '#16a34a', bg: failedSecurityCount > 0 ? '#fef2f2' : '#f0fdf4' },
+    { label: 'Cơ Sở Dữ Liệu PostgreSQL', value: dbStatusLabel, change: 'Docker Container kltn_postgres', icon: <Database size={20} />, color: dbStatusColor, bg: '#f0f9ff' },
     { label: 'Dữ Liệu Vận Hành', value: `${orders.length + inventory.length + purchaseOrders.length} bản ghi`, change: 'Đơn hàng, linh kiện kho & PO', icon: <HardDrive size={20} />, color: '#d97706', bg: '#fffbeb' }
   ];
 
-  // Department distribution chart data
+  // Department distribution chart data — trước đây có fallback số bịa
+  // [4,3,2,2,1] khi chưa có nhân viên, hiện dùng empty-state thật thay vì số giả.
   const deptCounts = {};
   employees.forEach(emp => {
     const dept = emp.department || 'Kinh Doanh';
     deptCounts[dept] = (deptCounts[dept] || 0) + 1;
   });
   const deptChartData = {
-    labels: Object.keys(deptCounts).length > 0 ? Object.keys(deptCounts) : ['Kinh Doanh', 'Kho Vận', 'Kỹ Thuật', 'Kế Toán', 'Khác'],
+    labels: Object.keys(deptCounts),
     datasets: [
       {
-        data: Object.values(deptCounts).length > 0 ? Object.values(deptCounts) : [4, 3, 2, 2, 1],
+        data: Object.values(deptCounts),
         backgroundColor: ['#3b82f6', '#10b981', '#0ea5e9', '#ec4899', '#f59e0b', '#8b5cf6', '#64748b']
       }
     ]
   };
 
-  // Hourly Audit Activity chart data
-  const hourlyActivityData = {
-    labels: ['08:00', '09:00', '10:00', '11:00', '13:00', '14:00', '15:00'],
+  // Trước đây là số bịa theo từng mốc giờ cố định ([12,28,45,32,20,38,15]),
+  // không hề tính từ đâu cả. auditLogs đã có module thật cho mỗi sự kiện —
+  // đếm theo phân hệ vừa là dữ liệu thật, vừa không ngộ nhận độ chính xác theo
+  // giờ mà hệ thống không thực sự đo được.
+  const moduleActivityCounts = {};
+  auditLogs.forEach(l => {
+    const key = l.module || 'Khác';
+    moduleActivityCounts[key] = (moduleActivityCounts[key] || 0) + 1;
+  });
+  const moduleActivityData = {
+    labels: Object.keys(moduleActivityCounts),
     datasets: [
       {
         label: 'Số Lượng Thao Tác',
-        data: [12, 28, 45, 32, 20, 38, 15],
+        data: Object.values(moduleActivityCounts),
         backgroundColor: '#2563eb'
       }
     ]
@@ -326,24 +445,77 @@ export default function SystemAdmin() {
     }
   };
 
-  const handleBackupData = () => {
-    const dataToExport = {
-      timestamp: new Date().toISOString(),
-      company: companyConfig,
-      employees,
-      orders,
-      inventory,
-      purchaseOrders,
-      auditLogs
-    };
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(dataToExport, null, 2));
-    const downloadAnchor = document.createElement('a');
-    downloadAnchor.setAttribute("href", dataStr);
-    downloadAnchor.setAttribute("download", `AetherPC_ERP_Backup_${new Date().toISOString().slice(0, 10)}.json`);
-    document.body.appendChild(downloadAnchor);
-    downloadAnchor.click();
-    downloadAnchor.remove();
-    notify('Đã xuất và tải xuống file sao lưu dữ liệu toàn hệ thống ERP thành công.', 'success');
+  const handleSaveCompanySettings = async () => {
+    setSavingSettings(true);
+    try {
+      const res = await api.put('/system/settings', companyConfig);
+      if (!res?.success) throw new Error(res?.message || 'Không thể lưu cấu hình.');
+      notify('Đã lưu cấu hình thông tin doanh nghiệp thành công.', 'success');
+    } catch (err) {
+      notify(`Lưu cấu hình thất bại: ${err.message || 'lỗi kết nối máy chủ'}.`, 'error');
+    } finally {
+      setSavingSettings(false);
+    }
+  };
+
+  // Trước đây hàm này chỉ xuất employees/orders/inventory/purchaseOrders đang
+  // có trong state frontend — thiếu tuyệt đại đa số bảng thật (GRN, QC, trả
+  // hàng, sổ cái, chấm công...). Giờ gọi thẳng pg_dump thật ở backend (GET
+  // /system/backup), cùng cơ chế với backup-db.ps1 ở gốc dự án.
+  const handleBackupData = async () => {
+    try {
+      const res = await fetch('/api/v1/system/backup', { credentials: 'include' });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => null);
+        throw new Error(errData?.message || `Lỗi máy chủ (${res.status})`);
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.href = url;
+      downloadAnchor.download = `AetherPC_ERP_Backup_${new Date().toISOString().slice(0, 10)}.dump`;
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+      URL.revokeObjectURL(url);
+      notify('Đã tải xuống bản sao lưu đầy đủ (pg_dump) toàn bộ cơ sở dữ liệu.', 'success');
+    } catch (err) {
+      notify(`Sao lưu thất bại: ${err.message || 'lỗi kết nối máy chủ'}.`, 'error');
+    }
+  };
+
+  const restoreFileInputRef = React.useRef(null);
+
+  // Trước đây nút "Khôi Phục Dữ Liệu" chỉ hiện toast hướng dẫn, không có input
+  // file, không có logic khôi phục nào cả. Giờ gọi pg_restore thật (POST
+  // /system/restore) — thao tác PHÁ HUỶ dữ liệu hiện tại nên bắt xác nhận rõ.
+  const handleRestoreFileSelected = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+
+    if (!(await confirm(
+      `Khôi phục từ file "${file.name}" sẽ XOÁ TOÀN BỘ dữ liệu hiện tại trong hệ thống và thay bằng dữ liệu trong file backup này. Hành động không thể hoàn tác. Tiếp tục?`,
+      { danger: true }
+    ))) return;
+
+    setRestoringData(true);
+    try {
+      const fileBase64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result).split(',')[1] || '');
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      const res = await api.post('/system/restore', { fileBase64, confirm: true });
+      if (!res?.success) throw new Error(res?.message || 'Khôi phục thất bại.');
+      notify('Đã khôi phục dữ liệu thành công. Tải lại trang để thấy dữ liệu mới.', 'success');
+    } catch (err) {
+      notify(`Khôi phục thất bại: ${err.message || 'lỗi kết nối máy chủ'}.`, 'error');
+    } finally {
+      setRestoringData(false);
+    }
   };
 
   return (
@@ -395,12 +567,18 @@ export default function SystemAdmin() {
       {/* ========================================================================= */}
       {activeTab === 'overview' && (
         <div>
-          {/* 6 Balanced KPI Cards (2 Rows x 3 Columns) */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem', marginBottom: '1.25rem' }}>
+          {/* 5 thẻ KPI, mỗi thẻ 1 con số khác biệt thật sự (đã gộp 2 thẻ cùng
+              đọc audit log trước đây thành 1). Số lẻ (5) không chia hết cho các
+              mốc cột thường gặp — auto-fill từng để thẻ cuối rớt xuống hàng
+              riêng, nằm lẻ bên trái với khoảng trống lớn bên phải. Cố định lưới
+              6 cột, 3 thẻ đầu chiếm 2 cột/thẻ (hàng 1 đầy), 2 thẻ sau chiếm 3
+              cột/thẻ (hàng 2 đầy) — luôn cân đối bất kể độ rộng màn hình. */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, minmax(140px, 1fr))', gap: '1rem', marginBottom: '1.25rem' }}>
             {stats.map((st, sIdx) => (
               <div
                 key={sIdx}
                 style={{
+                  gridColumn: sIdx < 3 ? 'span 2' : 'span 3',
                   backgroundColor: '#ffffff',
                   borderRadius: '10px',
                   border: '1px solid #cbd5e1',
@@ -437,47 +615,57 @@ export default function SystemAdmin() {
           {/* Charts Row */}
           <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.8fr', gap: '1.25rem', marginBottom: '1.25rem' }}>
             {/* Department Chart */}
-            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem', height: '320px', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ ...cardStyle, height: '320px', display: 'flex', flexDirection: 'column' }}>
               <h3 style={{ fontSize: '0.92rem', fontWeight: 800, color: '#0f172a', margin: '0 0 1rem 0' }}>
                 Phân Bổ Nhân Sự Theo Phòng Ban
               </h3>
               <div style={{ flex: 1, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Doughnut
-                  data={deptChartData}
-                  options={{
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } }
-                  }}
-                />
+                {Object.keys(deptCounts).length === 0 ? (
+                  <span style={{ color: '#94a3b8', fontSize: '0.82rem', fontStyle: 'italic' }}>Chưa có dữ liệu nhân sự.</span>
+                ) : (
+                  <Doughnut
+                    data={deptChartData}
+                    options={{
+                      responsive: true,
+                      maintainAspectRatio: false,
+                      plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } }
+                    }}
+                  />
+                )}
               </div>
             </div>
 
-            {/* Hourly Activity Chart */}
-            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem', height: '320px', display: 'flex', flexDirection: 'column' }}>
+            {/* Module Activity Chart — trước đây là biểu đồ giờ với số bịa */}
+            <div style={{ ...cardStyle, height: '320px', display: 'flex', flexDirection: 'column' }}>
               <h3 style={{ fontSize: '0.92rem', fontWeight: 800, color: '#0f172a', margin: '0 0 1rem 0' }}>
-                Lưu Lượng Thao Tác Hệ Thống Hôm Nay
+                Thao Tác Theo Phân Hệ (Nhật Ký Kiểm Toán)
               </h3>
-              <div style={{ flex: 1, position: 'relative' }}>
-                <Bar
-                  data={hourlyActivityData}
-                  options={{
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { position: 'top', labels: { boxWidth: 12, font: { size: 11 } } } },
-                    scales: {
-                      y: { grid: { color: '#f1f5f9' }, ticks: { font: { size: 10 } } },
-                      x: { grid: { color: '#f1f5f9' }, ticks: { font: { size: 10 } } }
-                    }
-                  }}
-                />
+              <div style={{ flex: 1, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {Object.keys(moduleActivityCounts).length === 0 ? (
+                  <span style={{ color: '#94a3b8', fontSize: '0.82rem', fontStyle: 'italic' }}>
+                    {loadingAuditLogs ? 'Đang tải nhật ký...' : 'Chưa có sự kiện nào được ghi nhận.'}
+                  </span>
+                ) : (
+                  <Bar
+                    data={moduleActivityData}
+                    options={{
+                      responsive: true,
+                      maintainAspectRatio: false,
+                      plugins: { legend: { position: 'top', labels: { boxWidth: 12, font: { size: 11 } } } },
+                      scales: {
+                        y: { grid: { color: '#f1f5f9' }, ticks: { font: { size: 10 }, precision: 0 } },
+                        x: { grid: { color: '#f1f5f9' }, ticks: { font: { size: 10 } } }
+                      }
+                    }}
+                  />
+                )}
               </div>
             </div>
           </div>
 
           {/* Quick Shortcuts */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
-            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem' }}>
+            <div style={cardStyle}>
               <h3 style={{ fontSize: '0.9rem', fontWeight: 800, color: '#0f172a', margin: '0 0 0.85rem 0' }}>
                 Tài Khoản Vừa Tạo Gần Đây
               </h3>
@@ -496,24 +684,37 @@ export default function SystemAdmin() {
               </div>
             </div>
 
-            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem' }}>
-              <h3 style={{ fontSize: '0.9rem', fontWeight: 800, color: '#0f172a', margin: '0 0 0.85rem 0' }}>
-                Trạng Thái Hạ Tầng & Backup
-              </h3>
+            <div style={cardStyle}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '0 0 0.85rem 0' }}>
+                <h3 style={{ fontSize: '0.9rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                  Trạng Thái Hạ Tầng & Backup
+                </h3>
+                <button
+                  onClick={loadCompanySettings}
+                  title="Kiểm tra lại kết nối"
+                  style={{ background: 'transparent', border: 'none', color: '#64748b', cursor: 'pointer', padding: '0.2rem', display: 'flex' }}
+                >
+                  <RefreshCw size={14} />
+                </button>
+              </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', fontSize: '0.8rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', backgroundColor: '#f0fdf4', borderRadius: '6px', border: '1px solid #bbf7d0' }}>
-                  <span>Docker Backend (Port 5000):</span>
-                  <strong style={{ color: '#16a34a' }}>Đang chạy (Healthy)</strong>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', backgroundColor: '#f0fdf4', borderRadius: '6px', border: '1px solid #bbf7d0' }}>
-                  <span>PostgreSQL DB (Port 5432):</span>
-                  <strong style={{ color: '#16a34a' }}>Kết nối hoàn hảo</strong>
+                {/* Trước đây 2 dòng "Đang chạy (Healthy)" / "Kết nối hoàn hảo" bên
+                    dưới là hardcode cứng, không hề gọi gì để biết thật — giờ phản
+                    ánh đúng kết quả gọi GET /system/settings gần nhất (serverStatus). */}
+                <div style={{
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.5rem',
+                  backgroundColor: BADGE_VARIANTS[dbStatusVariant].bg,
+                  borderRadius: '6px',
+                  border: `1px solid ${BADGE_VARIANTS[dbStatusVariant].border}`
+                }}>
+                  <span>Backend & Cơ Sở Dữ Liệu:</span>
+                  <strong style={{ color: dbStatusColor }}>{dbStatusLabel}</strong>
                 </div>
                 <button
                   onClick={handleBackupData}
-                  style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.5rem', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}
+                  style={{ ...primaryBtnStyle, padding: '0.5rem', justifyContent: 'center', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
                 >
-                  <Download size={14} /> Sao Lưu Dữ Liệu Ngay (Backup JSON)
+                  <Download size={14} /> Sao Lưu Dữ Liệu Ngay
                 </button>
               </div>
             </div>
@@ -526,7 +727,7 @@ export default function SystemAdmin() {
       {/* TAB 2: USERS (QUẢN LÝ TÀI KHOẢN) */}
       {/* ========================================================================= */}
       {activeTab === 'users' && (
-        <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem' }}>
+        <div style={cardStyle}>
           
           {/* Filter Toolbar */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1.25rem' }}>
@@ -564,7 +765,7 @@ export default function SystemAdmin() {
                   <th style={{ padding: '0.65rem 0.85rem' }}>Mã NV</th>
                   <th style={{ padding: '0.65rem 0.85rem' }}>Họ và Tên</th>
                   <th style={{ padding: '0.65rem 0.85rem' }}>Username Đăng Nhập</th>
-                  <th style={{ padding: '0.65rem 0.85rem' }}>Vai Trò (Role)</th>
+                  <th style={{ padding: '0.65rem 0.85rem' }}>Vai Trò</th>
                   <th style={{ padding: '0.65rem 0.85rem' }}>Phòng Ban</th>
                   <th style={{ padding: '0.65rem 0.85rem', textAlign: 'right' }}>Lương Cơ Bản</th>
                   <th style={{ padding: '0.65rem 0.85rem', textAlign: 'center' }}>Thao Tác Admin</th>
@@ -683,7 +884,25 @@ export default function SystemAdmin() {
 
         return (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-            
+
+            {/* Phần lớn ma trận này vẫn chỉ điều khiển việc ẨN/HIỆN menu và khoá/mở
+                nút trên giao diện — quyền gọi API cho đa số tác vụ vẫn do
+                authMiddleware() ở từng route backend quyết định độc lập, không
+                đọc ma trận này. Ngoại lệ: 5 tác vụ rủi ro cao nhất (duyệt PO,
+                CEO duyệt lương, giải ngân lương, hủy đơn & hoàn tiền, vô hiệu
+                hóa nhân viên) ĐÃ được backend thực sự kiểm tra qua bảng này
+                (checkOperationalPermission, xem rbac.middleware.js) — tắt 1
+                trong 5 quyền đó sẽ chặn thật API tương ứng, không chỉ ẩn nút. */}
+            <div style={{ backgroundColor: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px', padding: '0.75rem 1rem', fontSize: '0.8rem', color: '#92400e', display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
+              <AlertTriangle size={16} style={{ flexShrink: 0, marginTop: '1px' }} />
+              <span>
+                Phần lớn đây là cấu hình <strong>hiển thị giao diện</strong> (ẩn/hiện menu, khoá nút) theo vai trò —
+                quyền gọi API cho đa số tác vụ vẫn do backend kiểm soát độc lập theo vai trò đăng nhập.
+                Riêng <strong>5 tác vụ rủi ro cao</strong> (Ký duyệt Báo Giá/PO, Phê duyệt Bảng lương, Giải ngân lương,
+                Duyệt hủy đơn & hoàn tiền, Quản lý hồ sơ nhân viên) đã được backend <strong>thực sự chặn API</strong> theo đúng thiết lập ở đây.
+              </span>
+            </div>
+
             {/* 1. Header Toolbar */}
             <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
               <div>
@@ -726,7 +945,7 @@ export default function SystemAdmin() {
                 <button
                   type="button"
                   onClick={handleResetDefaultRbac}
-                  style={{ backgroundColor: '#ffffff', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.45rem 0.85rem', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer' }}
+                  style={secondaryBtnStyle}
                 >
                   Khôi Phục Mặc Định
                 </button>
@@ -734,17 +953,7 @@ export default function SystemAdmin() {
                 <button
                   type="button"
                   onClick={handleOpenSaveConfirm}
-                  style={{
-                    backgroundColor: '#2563eb',
-                    color: '#ffffff',
-                    border: 'none',
-                    borderRadius: '6px',
-                    padding: '0.45rem 1.25rem',
-                    fontSize: '0.8rem',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    boxShadow: '0 2px 4px rgba(37,99,235,0.2)'
-                  }}
+                  style={{ ...primaryBtnStyle, padding: '0.45rem 1.25rem', boxShadow: '0 2px 4px rgba(37,99,235,0.2)' }}
                 >
                   Lưu Phân Quyền
                 </button>
@@ -791,7 +1000,7 @@ export default function SystemAdmin() {
             </div>
 
             {/* 3. Operational Permissions Panel */}
-            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem' }}>
+            <div style={cardStyle}>
               
               {/* Active Role Header Banner */}
               <div style={{
@@ -1151,15 +1360,24 @@ export default function SystemAdmin() {
       {/* TAB 4: AUDIT (NHẬT KÝ KIỂM TOÁN) */}
       {/* ========================================================================= */}
       {activeTab === 'audit' && (
-        <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-            <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+        <div style={cardStyle}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+            <h3 style={sectionTitleStyle}>
               <Activity size={18} style={{ color: '#2563eb' }} />
               <span>Nhật Ký Thao Tác & Giám Sát An Ninh Hệ Thống</span>
             </h3>
             <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
               Hiển thị {auditLogs.length} sự kiện gần nhất
             </span>
+          </div>
+
+          {/* Dòng tổng hợp nhanh — dùng lại đúng auditLogs đã có trong state,
+              không gọi thêm API nào, chỉ để quét số nhanh hơn thay vì phải đếm
+              tay trong bảng dài phía dưới. */}
+          <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
+            <span style={badgeStyle('info')}>Tổng: {auditLogs.length}</span>
+            <span style={badgeStyle('success')}>Thành công: {auditLogs.length - failedSecurityCount}</span>
+            <span style={badgeStyle('danger')}>Thất bại: {failedSecurityCount}</span>
           </div>
 
           <div style={{ overflowX: 'auto' }}>
@@ -1175,7 +1393,11 @@ export default function SystemAdmin() {
                 </tr>
               </thead>
               <tbody>
-                {auditLogs.map(log => (
+                {loadingAuditLogs ? (
+                  <tr><td colSpan={6} style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>Đang tải nhật ký...</td></tr>
+                ) : auditLogs.length === 0 ? (
+                  <tr><td colSpan={6} style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>Chưa có sự kiện nào được ghi nhận.</td></tr>
+                ) : auditLogs.map(log => (
                   <tr key={log.id} style={{ borderBottom: '1px solid #f1f5f9', backgroundColor: log.status === 'FAILED' ? '#fef2f2' : undefined }}>
                     <td style={{ padding: '0.65rem 0.85rem', color: '#64748b', fontFamily: 'monospace' }}>{log.timestamp}</td>
                     <td style={{ padding: '0.65rem 0.85rem', fontWeight: 600, color: '#0f172a' }}>{log.user}</td>
@@ -1187,15 +1409,7 @@ export default function SystemAdmin() {
                     <td style={{ padding: '0.65rem 0.85rem', color: '#475569' }}>{log.module}</td>
                     <td style={{ padding: '0.65rem 0.85rem', color: '#64748b', fontFamily: 'monospace' }}>{log.ip}</td>
                     <td style={{ padding: '0.65rem 0.85rem', textAlign: 'center' }}>
-                      <span style={{
-                        backgroundColor: log.status === 'SUCCESS' ? '#f0fdf4' : '#fef2f2',
-                        color: log.status === 'SUCCESS' ? '#15803d' : '#dc2626',
-                        border: `1px solid ${log.status === 'SUCCESS' ? '#bbf7d0' : '#fecaca'}`,
-                        padding: '2px 8px',
-                        borderRadius: '10px',
-                        fontSize: '0.7rem',
-                        fontWeight: 800
-                      }}>
+                      <span style={badgeStyle(log.status === 'SUCCESS' ? 'success' : 'danger')}>
                         {getStatusLabel(AUDIT_LOG_STATUS, log.status)}
                       </span>
                     </td>
@@ -1214,58 +1428,59 @@ export default function SystemAdmin() {
         <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.8fr', gap: '1.25rem' }}>
           
           {/* Company Information Form */}
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem' }}>
-            <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+          <div style={cardStyle}>
+            <h3 style={{ ...sectionTitleStyle, marginBottom: '1rem' }}>
               <Building size={18} style={{ color: '#2563eb' }} />
               <span>Thông Tin Doanh Nghiệp & Hóa Đơn</span>
             </h3>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', fontSize: '0.82rem' }}>
               <div>
-                <label style={{ display: 'block', fontWeight: 700, color: '#0f172a', marginBottom: '0.3rem' }}>Tên Công Ty:</label>
+                <label style={labelStyle}>Tên Công Ty:</label>
                 <input
                   type="text"
                   value={companyConfig.companyName}
                   onChange={e => setCompanyConfig(p => ({ ...p, companyName: e.target.value }))}
-                  style={{ width: '100%', padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
+                  style={inputStyle}
                 />
               </div>
 
               <div>
-                <label style={{ display: 'block', fontWeight: 700, color: '#0f172a', marginBottom: '0.3rem' }}>Mã Số Thuế (MST):</label>
+                <label style={labelStyle}>Mã Số Thuế (MST):</label>
                 <input
                   type="text"
                   value={companyConfig.taxCode}
                   onChange={e => setCompanyConfig(p => ({ ...p, taxCode: e.target.value }))}
-                  style={{ width: '100%', padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
+                  style={inputStyle}
                 />
               </div>
 
               <div>
-                <label style={{ display: 'block', fontWeight: 700, color: '#0f172a', marginBottom: '0.3rem' }}>Hotline CSKH:</label>
+                <label style={labelStyle}>Hotline CSKH:</label>
                 <input
                   type="text"
                   value={companyConfig.hotline}
                   onChange={e => setCompanyConfig(p => ({ ...p, hotline: e.target.value }))}
-                  style={{ width: '100%', padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
+                  style={inputStyle}
                 />
               </div>
 
               <div>
-                <label style={{ display: 'block', fontWeight: 700, color: '#0f172a', marginBottom: '0.3rem' }}>Địa Chỉ Trụ Sở:</label>
+                <label style={labelStyle}>Địa Chỉ Trụ Sở:</label>
                 <input
                   type="text"
                   value={companyConfig.address}
                   onChange={e => setCompanyConfig(p => ({ ...p, address: e.target.value }))}
-                  style={{ width: '100%', padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
+                  style={inputStyle}
                 />
               </div>
 
               <button
-                onClick={() => notify('Đã lưu cấu hình thông tin doanh nghiệp thành công.', 'success')}
-                style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.5rem', fontSize: '0.8rem', fontWeight: 800, cursor: 'pointer', marginTop: '0.5rem' }}
+                disabled={savingSettings}
+                onClick={handleSaveCompanySettings}
+                style={{ ...primaryBtnStyle, padding: '0.5rem', cursor: savingSettings ? 'not-allowed' : 'pointer', marginTop: '0.5rem', opacity: savingSettings ? 0.7 : 1 }}
               >
-                Lưu Cấu Hình Doanh Nghiệp
+                {savingSettings ? 'Đang lưu...' : 'Lưu Cấu Hình Doanh Nghiệp'}
               </button>
             </div>
           </div>
@@ -1274,58 +1489,58 @@ export default function SystemAdmin() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
             
             {/* Automatic Business Parameters */}
-            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem' }}>
-              <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+            <div style={cardStyle}>
+              <h3 style={{ ...sectionTitleStyle, marginBottom: '1rem' }}>
                 <Settings size={18} style={{ color: '#16a34a' }} />
                 <span>Tham Số Tự Động Hóa Nghiệp Vụ</span>
               </h3>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', fontSize: '0.82rem' }}>
                 <div>
-                  <label style={{ display: 'block', fontWeight: 700, color: '#0f172a', marginBottom: '0.3rem' }}>Hoa Hồng Sales (%):</label>
+                  <label style={labelStyle}>Hoa Hồng Sales (VNĐ/kỳ lương):</label>
                   <input
                     type="number"
-                    value={companyConfig.salesCommission}
-                    onChange={e => setCompanyConfig(p => ({ ...p, salesCommission: Number(e.target.value) }))}
-                    style={{ width: '100%', padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
+                    value={companyConfig.salesCommissionFlat}
+                    onChange={e => setCompanyConfig(p => ({ ...p, salesCommissionFlat: Number(e.target.value) }))}
+                    style={inputStyle}
                   />
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontWeight: 700, color: '#0f172a', marginBottom: '0.3rem' }}>Thưởng Ráp PC (VNĐ/bộ):</label>
+                  <label style={labelStyle}>Thưởng Ráp PC (VNĐ/bộ):</label>
                   <input
                     type="number"
                     value={companyConfig.assemblyBonus}
                     onChange={e => setCompanyConfig(p => ({ ...p, assemblyBonus: Number(e.target.value) }))}
-                    style={{ width: '100%', padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
+                    style={inputStyle}
                   />
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontWeight: 700, color: '#0f172a', marginBottom: '0.3rem' }}>Thuế VAT Mặc Định (%):</label>
+                  <label style={labelStyle}>Thuế VAT Mặc Định (%):</label>
                   <input
                     type="number"
                     value={companyConfig.defaultVat}
                     onChange={e => setCompanyConfig(p => ({ ...p, defaultVat: Number(e.target.value) }))}
-                    style={{ width: '100%', padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
+                    style={inputStyle}
                   />
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontWeight: 700, color: '#0f172a', marginBottom: '0.3rem' }}>Ngưỡng Cảnh Báo Tồn Kho:</label>
+                  <label style={labelStyle}>Ngưỡng Cảnh Báo Tồn Kho:</label>
                   <input
                     type="number"
                     value={companyConfig.lowStockThreshold}
                     onChange={e => setCompanyConfig(p => ({ ...p, lowStockThreshold: Number(e.target.value) }))}
-                    style={{ width: '100%', padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
+                    style={inputStyle}
                   />
                 </div>
               </div>
             </div>
 
             {/* Backup & Restore Hub */}
-            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem' }}>
-              <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+            <div style={cardStyle}>
+              <h3 style={{ ...sectionTitleStyle, marginBottom: '0.5rem' }}>
                 <HardDrive size={18} style={{ color: '#d97706' }} />
                 <span>Sao Lưu & Phục Hồi Cơ Sở Dữ Liệu</span>
               </h3>
@@ -1338,13 +1553,21 @@ export default function SystemAdmin() {
                   onClick={handleBackupData}
                   style={{ backgroundColor: '#16a34a', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.5rem 1rem', fontSize: '0.8rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
                 >
-                  <Download size={15} /> Tải Về File Sao Lưu (Backup JSON)
+                  <Download size={15} /> Tải Về File Sao Lưu
                 </button>
+                <input
+                  ref={restoreFileInputRef}
+                  type="file"
+                  accept=".dump"
+                  onChange={handleRestoreFileSelected}
+                  style={{ display: 'none' }}
+                />
                 <button
-                  onClick={() => notify('Chức năng Phục Hồi Dữ Liệu: Hãy chọn file backup .json để ghi đè dữ liệu.', 'info')}
-                  style={{ backgroundColor: '#ffffff', color: '#2563eb', border: '1px solid #bfdbfe', borderRadius: '6px', padding: '0.5rem 1rem', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+                  disabled={restoringData}
+                  onClick={() => restoreFileInputRef.current?.click()}
+                  style={{ backgroundColor: '#ffffff', color: '#2563eb', border: '1px solid #bfdbfe', borderRadius: '6px', padding: '0.5rem 1rem', fontSize: '0.8rem', fontWeight: 700, cursor: restoringData ? 'not-allowed' : 'pointer', opacity: restoringData ? 0.7 : 1, display: 'flex', alignItems: 'center', gap: '0.35rem' }}
                 >
-                  <Upload size={15} /> Khôi Phục Dữ Liệu (Restore)
+                  <Upload size={15} /> {restoringData ? 'Đang khôi phục...' : 'Khôi Phục Dữ Liệu'}
                 </button>
               </div>
             </div>
@@ -1368,29 +1591,29 @@ export default function SystemAdmin() {
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', fontSize: '0.82rem' }}>
               <div>
-                <label style={{ display: 'block', fontWeight: 700, color: '#0f172a', marginBottom: '0.3rem' }}>Họ và tên *</label>
+                <label style={labelStyle}>Họ và tên *</label>
                 <input
                   type="text"
                   placeholder="Ví dụ: Nguyễn Văn Hùng"
                   value={form.fullname}
                   onChange={e => setForm(p => ({ ...p, fullname: e.target.value }))}
-                  style={{ width: '100%', padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
+                  style={inputStyle}
                 />
               </div>
 
               <div>
-                <label style={{ display: 'block', fontWeight: 700, color: '#0f172a', marginBottom: '0.3rem' }}>Username (Dùng đăng nhập) *</label>
+                <label style={labelStyle}>Username (Dùng đăng nhập) *</label>
                 <input
                   type="text"
                   placeholder="Ví dụ: hungnv"
                   value={form.username}
                   onChange={e => setForm(p => ({ ...p, username: e.target.value }))}
-                  style={{ width: '100%', padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
+                  style={inputStyle}
                 />
               </div>
 
               <div>
-                <label style={{ display: 'block', fontWeight: 700, color: '#0f172a', marginBottom: '0.3rem' }}>Vai Trò (Role) *</label>
+                <label style={labelStyle}>Vai Trò *</label>
                 <select
                   value={form.role}
                   onChange={e => {
@@ -1408,18 +1631,18 @@ export default function SystemAdmin() {
                     else if (newRole === 'ADMIN') defaultDept = 'Hệ Thống IT';
                     setForm(p => ({ ...p, role: newRole, department: defaultDept }));
                   }}
-                  style={{ width: '100%', padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
+                  style={inputStyle}
                 >
                   {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
                 </select>
               </div>
 
               <div>
-                <label style={{ display: 'block', fontWeight: 700, color: '#0f172a', marginBottom: '0.3rem' }}>Phòng ban</label>
+                <label style={labelStyle}>Phòng ban</label>
                 <select
                   value={form.department}
                   onChange={e => setForm(p => ({ ...p, department: e.target.value }))}
-                  style={{ width: '100%', padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
+                  style={inputStyle}
                 >
                   {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
                 </select>
@@ -1428,7 +1651,7 @@ export default function SystemAdmin() {
               {form.role === 'DELIVERY' && (
                 <>
                   <div>
-                    <label style={{ display: 'block', fontWeight: 700, color: '#0f172a', marginBottom: '0.3rem' }}>
+                    <label style={labelStyle}>
                       Số điện thoại Shipper *
                     </label>
                     <input
@@ -1436,13 +1659,13 @@ export default function SystemAdmin() {
                       placeholder="Ví dụ: 0912.345.678"
                       value={form.phone || ''}
                       onChange={e => setForm(p => ({ ...p, phone: e.target.value }))}
-                      style={{ width: '100%', padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
+                      style={inputStyle}
                     />
                   </div>
 
                   <div style={{ backgroundColor: '#eff6ff', padding: '0.75rem', borderRadius: '8px', border: '1.5px solid #bfdbfe' }}>
                     <label style={{ display: 'block', fontWeight: 800, color: '#1e40af', marginBottom: '0.35rem' }}>
-                      Khu Vực Giao Hàng Đảm Nhiệm (Delivery Region) *
+                      Khu Vực Giao Hàng Đảm Nhiệm *
                     </label>
                     <select
                       value={form.deliveryRegion || 'HCM_KV1'}
@@ -1461,13 +1684,13 @@ export default function SystemAdmin() {
               )}
 
               <div>
-                <label style={{ display: 'block', fontWeight: 700, color: '#0f172a', marginBottom: '0.3rem' }}>Lương cơ bản (VNĐ) *</label>
+                <label style={labelStyle}>Lương cơ bản (VNĐ) *</label>
                 <input
                   type="number"
                   placeholder="8500000"
                   value={form.salary}
                   onChange={e => setForm(p => ({ ...p, salary: e.target.value }))}
-                  style={{ width: '100%', padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
+                  style={inputStyle}
                 />
               </div>
 
@@ -1479,14 +1702,14 @@ export default function SystemAdmin() {
                 <button
                   type="button"
                   onClick={() => setShowAdd(false)}
-                  style={{ backgroundColor: '#ffffff', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.45rem 1rem', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}
+                  style={secondaryBtnStyle}
                 >
                   Hủy
                 </button>
                 <button
                   type="button"
                   onClick={handleAddEmployee}
-                  style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.45rem 1.1rem', fontSize: '0.8rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+                  style={{ ...primaryBtnStyle, display: 'flex', alignItems: 'center', gap: '0.35rem' }}
                 >
                   <Plus size={15} /> Tạo Tài Khoản
                 </button>
@@ -1511,17 +1734,17 @@ export default function SystemAdmin() {
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', fontSize: '0.82rem' }}>
               <div>
-                <label style={{ display: 'block', fontWeight: 700, color: '#0f172a', marginBottom: '0.3rem' }}>Họ và tên *</label>
+                <label style={labelStyle}>Họ và tên *</label>
                 <input
                   type="text"
                   value={editingEmp.fullname}
                   onChange={e => setEditingEmp(p => ({ ...p, fullname: e.target.value }))}
-                  style={{ width: '100%', padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
+                  style={inputStyle}
                 />
               </div>
 
               <div>
-                <label style={{ display: 'block', fontWeight: 700, color: '#0f172a', marginBottom: '0.3rem' }}>Username</label>
+                <label style={labelStyle}>Username</label>
                 <input
                   type="text"
                   value={editingEmp.username}
@@ -1531,7 +1754,7 @@ export default function SystemAdmin() {
               </div>
 
               <div>
-                <label style={{ display: 'block', fontWeight: 700, color: '#0f172a', marginBottom: '0.3rem' }}>Vai Trò (Role) *</label>
+                <label style={labelStyle}>Vai Trò *</label>
                 <select
                   value={editingEmp.role}
                   onChange={e => {
@@ -1540,7 +1763,7 @@ export default function SystemAdmin() {
                     if (newRole === 'DELIVERY') defaultDept = 'Giao Vận';
                     setEditingEmp(p => ({ ...p, role: newRole, department: defaultDept }));
                   }}
-                  style={{ width: '100%', padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
+                  style={inputStyle}
                 >
                   {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
                 </select>
@@ -1549,14 +1772,14 @@ export default function SystemAdmin() {
               {editingEmp.role === 'DELIVERY' && (
                 <>
                   <div>
-                    <label style={{ display: 'block', fontWeight: 700, color: '#0f172a', marginBottom: '0.3rem' }}>
+                    <label style={labelStyle}>
                       Số điện thoại Shipper
                     </label>
                     <input
                       type="text"
                       value={editingEmp.phone || ''}
                       onChange={e => setEditingEmp(p => ({ ...p, phone: e.target.value }))}
-                      style={{ width: '100%', padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
+                      style={inputStyle}
                     />
                   </div>
 
@@ -1577,21 +1800,17 @@ export default function SystemAdmin() {
                 </>
               )}
 
-              <div>
-                <label style={{ display: 'block', fontWeight: 700, color: '#0f172a', marginBottom: '0.3rem' }}>Lương cơ bản (VNĐ) *</label>
-                <input
-                  type="number"
-                  value={editingEmp.salary}
-                  onChange={e => setEditingEmp(p => ({ ...p, salary: parseInt(e.target.value) || 0 }))}
-                  style={{ width: '100%', padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
-                />
+              <div style={{ backgroundColor: '#f8fafc', padding: '0.65rem 0.75rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                <label style={{ display: 'block', fontWeight: 700, color: '#64748b', marginBottom: '0.3rem' }}>Lương cơ bản (VNĐ)</label>
+                <div style={{ fontWeight: 700, color: '#0f172a' }}>{fmt(editingEmp.salary)} ₫</div>
+                <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '0.25rem' }}>Chỉnh sửa tại phân hệ Nhân Sự (Hồ Sơ Nhân Sự).</div>
               </div>
 
               <div style={{ display: 'flex', gap: '0.6rem', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
                 <button
                   type="button"
                   onClick={() => setEditingEmp(null)}
-                  style={{ backgroundColor: '#ffffff', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.45rem 1rem', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}
+                  style={secondaryBtnStyle}
                 >
                   Hủy
                 </button>
@@ -1603,13 +1822,16 @@ export default function SystemAdmin() {
                       // Backend (PUT /hr/employees/:id) reads `fullName`/`baseSalary` —
                       // this previously sent `fullname`/`salary`, so name and salary
                       // edits silently never persisted while role/department did.
+                      // Admin's Users tab only owns account-level fields (name shown for
+                      // display, username, role, delivery region); salary/department stay
+                      // owned by HR's own employee-record screen (HRManager.jsx), so they
+                      // are read-only here and intentionally omitted from this payload.
                       await updateEmployee(editingEmp.id, {
                         fullName: editingEmp.fullname,
                         role: editingEmp.role,
                         department: editingEmp.department,
                         deliveryRegion: editingEmp.deliveryRegion,
-                        phone: editingEmp.phone,
-                        baseSalary: editingEmp.salary
+                        phone: editingEmp.phone
                       });
                       setEditingEmp(null);
                       notify('Cập nhật thông tin nhân viên thành công.', 'success');
@@ -1617,7 +1839,7 @@ export default function SystemAdmin() {
                       notify(`Cập nhật thất bại: ${err.message || 'lỗi kết nối máy chủ'}.`, 'error');
                     }
                   }}
-                  style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.45rem 1.1rem', fontSize: '0.8rem', fontWeight: 800, cursor: 'pointer' }}
+                  style={primaryBtnStyle}
                 >
                   Lưu Thay Đổi
                 </button>

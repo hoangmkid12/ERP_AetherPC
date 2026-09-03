@@ -838,7 +838,7 @@ function RegionalShipperModal({
 
               <div>
                 <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.35rem', whiteSpace: 'nowrap' }}>
-                  Mã Vận Đơn (Tracking Code)
+                  Mã Vận Đơn
                 </label>
                 <input
                   type="text"
@@ -899,7 +899,7 @@ function RfqAlertModal({ rfqModalData, setRfqModalData, sendSystemNotification, 
     const newLog = {
       id: 'RFQ-ALT-' + Date.now(),
       sentAt: new Date().toISOString(),
-      sender: 'Thủ kho (Warehouse)',
+      sender: 'Thủ kho',
       productId: item.id,
       productName: item.name,
       category: item.category,
@@ -1130,8 +1130,12 @@ function ReceiptDetailModal({ selectedReceipt, onClose, purchaseOrders = [], onR
     qaLog = qaLogs.find(l => l.poNumber === poNum || (effectivePo && String(l.poNumber) === String(effectivePo.id)));
   } catch (e) {}
 
-  const poStatus = qaLog?.status || effectivePo?.status || selectedReceipt.poStatus || 'QA_PASSED';
-  const isQaPassed = poStatus === 'QA_PASSED' || selectedReceipt.status === 'READY' || selectedReceipt.status === 'DONE';
+  // NOTE: selectedReceipt.status === 'READY' is the default state of EVERY receipt
+  // awaiting warehouse action — it says nothing about whether QC has inspected the
+  // batch, so it must never be treated as evidence of QA_PASSED. Only the PO's real
+  // QC status (from the QC log or the PO record itself) may gate the intake button.
+  const poStatus = qaLog?.status || effectivePo?.status || selectedReceipt.poStatus || null;
+  const isQaPassed = poStatus === 'QA_PASSED';
   const isQaPartial = poStatus === 'QA_PARTIAL';
   const canValidate = isQaPassed || isQaPartial;
 
@@ -1182,6 +1186,7 @@ function ReceiptDetailModal({ selectedReceipt, onClose, purchaseOrders = [], onR
                 <button
                   onClick={() => onRequestValidate(selectedReceipt, poStatus, itemsList)}
                   disabled={submitting || !canValidate}
+                  title={!canValidate ? 'Lô hàng chưa được QC/QA kiểm định — không thể nhập kho.' : undefined}
                   style={{ padding: '0.6rem 1.4rem', borderRadius: '6px', fontWeight: 800, fontSize: '0.88rem', backgroundColor: canValidate ? '#2563eb' : '#94a3b8', color: '#ffffff', border: 'none', cursor: canValidate ? 'pointer' : 'not-allowed' }}
                 >
                   Xác Nhận Nhập Kho {qaLog ? `(${qaLog.passedQty} SP)` : ''}
@@ -1579,6 +1584,7 @@ export default function Warehouse() {
   // Delivery Filter States
   const [deliverySearch, setDeliverySearch] = useState('');
   const [deliveryFilter, setDeliveryFilter] = useState('PENDING');
+  const [deliveryShipperFilter, setDeliveryShipperFilter] = useState('ALL');
 
   // History Filter States
   const [movementTypeFilter, setMovementTypeFilter] = useState('ALL');
@@ -1611,8 +1617,14 @@ export default function Warehouse() {
   const [lowStockRfqModalData, setLowStockRfqModalData] = useState(null);
   const [backorderRfqData, setBackorderRfqData] = useState(null);
 
+  // RFQ Alerts Filter States
+  const [rfqSearch, setRfqSearch] = useState('');
+  const [rfqSupplierFilter, setRfqSupplierFilter] = useState('ALL');
+  const [rfqStockStatusFilter, setRfqStockStatusFilter] = useState('ALL');
+
   // Backorders & Order Detail Modal State
   const [backorderSearch, setBackorderSearch] = useState('');
+  const [backorderStockFilter, setBackorderStockFilter] = useState('ALL');
   const [selectedOrderForDetail, setSelectedOrderForDetail] = useState(null);
 
   // RMA Returns Filter States
@@ -1638,7 +1650,7 @@ export default function Warehouse() {
           return {
             id: n.id,
             sentAt: n.createdAt,
-            sender: 'Thủ kho (Warehouse)',
+            sender: 'Thủ kho',
             productId: productId,
             productName: productName,
             category: itemData.category || 'STORAGE',
@@ -1817,7 +1829,10 @@ export default function Warehouse() {
 
     const effectiveStatus = qaLog?.status || currentPoStatus || receipt.po?.status;
 
-    if (!['QA_PASSED', 'QA_PARTIAL'].includes(effectiveStatus) && receipt.status !== 'READY') {
+    // receipt.status === 'READY' is just "awaiting warehouse action" — it says nothing
+    // about QC having inspected the batch, so it must never bypass this gate (the
+    // backend enforces the real gate too, but the UI should refuse before even trying).
+    if (!['QA_PASSED', 'QA_PARTIAL'].includes(effectiveStatus)) {
       notify(`Lô hàng #${poNum} chưa hoàn tất nghiệm thu QA/QC! Vui lòng chờ bộ phận QA kiểm định chất lượng.`, 'error');
       return;
     }
@@ -1966,7 +1981,7 @@ export default function Warehouse() {
       supplierCode: suppCode,
       supplier: { code: suppCode, name: supplier },
       supplierName: supplier,
-      createdBy: user?.fullname || user?.email || 'Thủ Kho (Warehouse)',
+      createdBy: user?.fullname || user?.email || 'Thủ Kho',
       orderDate: new Date().toISOString().split('T')[0],
       createdAt: new Date().toISOString(),
       expectedDeliveryDate: new Date(Date.now() + 86400000 * 3).toISOString().split('T')[0],
@@ -1999,7 +2014,7 @@ export default function Warehouse() {
     const newLog = {
       id: 'RFQ-ALT-' + Date.now(),
       sentAt: new Date().toISOString(),
-      sender: 'Thủ kho (Warehouse)',
+      sender: 'Thủ kho',
       productId,
       productName,
       category: 'COMP',
@@ -2287,6 +2302,21 @@ export default function Warehouse() {
   const activeInventory = inventory.filter(item => item.status !== 'DISCONTINUED');
   const outOfStockItems = activeInventory.filter(item => Number(item.stock) === 0);
   const lowStockItems = activeInventory.filter(item => Number(item.stock) > 0 && Number(item.stock) <= Number(item.threshold || 5));
+  // RFQ Alerts tab needs both out-of-stock and below-threshold items — the table already
+  // renders a distinct "Hết Hàng" badge/style for stock===0 rows, so the underlying list
+  // must include them too, not just lowStockItems (dưới ngưỡng nhưng còn hàng).
+  const restockNeededItems = activeInventory.filter(item => Number(item.stock) <= Number(item.threshold || 5));
+  const rfqSupplierOptions = [...new Set(restockNeededItems.map(item => item.supplier).filter(Boolean))].sort();
+  const filteredRfqItems = restockNeededItems.filter(item => {
+    const matchSearch = !rfqSearch.trim() ||
+      (item.name && item.name.toLowerCase().includes(rfqSearch.toLowerCase())) ||
+      (item.supplier && item.supplier.toLowerCase().includes(rfqSearch.toLowerCase()));
+    const matchSupplier = rfqSupplierFilter === 'ALL' || item.supplier === rfqSupplierFilter;
+    const matchStatus = rfqStockStatusFilter === 'ALL' ||
+      (rfqStockStatusFilter === 'OUT_OF_STOCK' && Number(item.stock) === 0) ||
+      (rfqStockStatusFilter === 'LOW_STOCK' && Number(item.stock) > 0);
+    return matchSearch && matchSupplier && matchStatus;
+  });
   const usingSampleReceipts = !(receipts && receipts.length > 0);
   const effectiveReceipts = usingSampleReceipts ? DEFAULT_SAMPLE_RECEIPTS : receipts;
   const usingSampleReturns = !(returnRequests && returnRequests.length > 0);
@@ -2435,13 +2465,23 @@ export default function Warehouse() {
     return { label, bg, color, border, actionText, actionColor, qcApproved, alreadyShelved, hasQcDecision, canShelveNow: qcApproved && !alreadyShelved };
   };
 
+  const DELIVERY_RELEVANT_STATUSES = [...PENDING_DELIVERY_STATUSES, 'SHIPPED', 'OUT_FOR_DELIVERY', 'ASSIGNED', 'DELIVERED', 'COMPLETED'];
+  const deliveryShipperOptions = [...new Set(
+    orders.filter(o => DELIVERY_RELEVANT_STATUSES.includes(o.status) && o.assignedShipper).map(o => o.assignedShipper)
+  )].sort();
   const filteredDeliveriesList = orders.filter(o => {
     const matchSearch = !deliverySearch.trim() || String(o.orderId || o.id).toLowerCase().includes(deliverySearch.toLowerCase()) || (o.customerName && o.customerName.toLowerCase().includes(deliverySearch.toLowerCase()));
     const matchStatus = deliveryFilter === 'ALL' ||
       (deliveryFilter === 'PENDING' && PENDING_DELIVERY_STATUSES.includes(o.status)) ||
       (deliveryFilter === 'SHIPPED' && ['SHIPPED', 'OUT_FOR_DELIVERY', 'ASSIGNED'].includes(o.status)) ||
-      (deliveryFilter === 'DELIVERED' && ['DELIVERED', 'COMPLETED'].includes(o.status));
-    return matchSearch && matchStatus;
+      (deliveryFilter === 'DELIVERED' && ['DELIVERED', 'COMPLETED'].includes(o.status)) ||
+      (deliveryFilter === 'AWAITING_STOCK' && o.status === 'AWAITING_STOCK') ||
+      (deliveryFilter === 'CANCELLED' && o.status === 'CANCELLED') ||
+      (deliveryFilter === 'FAILED_DELIVERY' && o.status === 'FAILED_DELIVERY');
+    const matchShipper = deliveryShipperFilter === 'ALL' ||
+      (deliveryShipperFilter === 'UNASSIGNED' && !o.assignedShipper) ||
+      o.assignedShipper === deliveryShipperFilter;
+    return matchSearch && matchStatus && matchShipper;
   });
 
   const filteredHistoryList = effectiveStockMovements.filter(m => {
@@ -2453,12 +2493,22 @@ export default function Warehouse() {
 
   // Backorders List (Orders with AWAITING_STOCK status)
   const backorderOrders = orders.filter(o => o && o.status === 'AWAITING_STOCK');
+  // Shared with the table row rendering below (which recomputes the same per-item
+  // breakdown for display) so the filter and the badges never disagree.
+  const isOrderFulfillable = (order) => (order.items || []).every(item => {
+    const inv = (inventory || []).find(i => String(i.id) === String(item.productId || item.id));
+    const currentStock = inv ? Number(inv.stock) : 0;
+    return currentStock >= (Number(item.quantity) || 1);
+  });
   const filteredBackordersList = backorderOrders.filter(o => {
     const matchSearch = !backorderSearch.trim() ||
       String(o.orderId || o.id).toLowerCase().includes(backorderSearch.toLowerCase()) ||
       (o.customerName && o.customerName.toLowerCase().includes(backorderSearch.toLowerCase())) ||
       (o.items && o.items.some(i => (i.name || i.productName || '').toLowerCase().includes(backorderSearch.toLowerCase())));
-    return matchSearch;
+    const matchStock = backorderStockFilter === 'ALL' ||
+      (backorderStockFilter === 'READY' && isOrderFulfillable(o)) ||
+      (backorderStockFilter === 'MISSING' && !isOrderFulfillable(o));
+    return matchSearch && matchStock;
   });
 
   // RMA Returns Classification & Filtering
@@ -2661,7 +2711,7 @@ export default function Warehouse() {
             }}>
               <div>
                 <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0284c7', margin: '0 0 1rem 0' }}>
-                  Bổ sung hàng (RFQ Alerts)
+                  Bổ sung hàng
                 </h3>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <button
@@ -2677,7 +2727,7 @@ export default function Warehouse() {
                       cursor: 'pointer'
                     }}
                   >
-                    {lowStockItems.length} Cần mua
+                    {restockNeededItems.length} Cần mua
                   </button>
                   <div style={{ fontSize: '0.82rem', color: '#475569', textAlign: 'right' }}>
                     <div>Hết hàng: <strong style={{ color: '#ef4444' }}>{outOfStockItems.length}</strong></div>
@@ -2776,7 +2826,7 @@ export default function Warehouse() {
           <div style={{ marginBottom: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
             <div>
               <h2 style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
-                Quản Lý Đơn Hàng Chờ Nhập Kho (Backorders)
+                Quản Lý Đơn Hàng Chờ Nhập Kho
               </h2>
               <p style={{ fontSize: '0.82rem', color: '#64748b', margin: '0.25rem 0 0 0' }}>
                 Danh sách các đơn hàng tạm giữ chỗ do thiếu tồn kho. Hệ thống tự động giải phóng đơn sang Chờ xuất kho khi hoàn tất nhập hàng PO.
@@ -2858,14 +2908,23 @@ export default function Warehouse() {
           </div>
 
           {/* Search Filter Bar */}
-          <div style={{ backgroundColor: '#ffffff', padding: '0.85rem 1rem', borderRadius: '8px', border: '1px solid #cbd5e1', marginBottom: '1.25rem' }}>
+          <div style={{ backgroundColor: '#ffffff', padding: '0.85rem 1rem', borderRadius: '8px', border: '1px solid #cbd5e1', marginBottom: '1.25rem', display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
             <input
               type="text"
               placeholder="Tìm theo mã đơn hàng, tên khách hàng, tên linh kiện..."
               value={backorderSearch}
               onChange={e => setBackorderSearch(e.target.value)}
-              style={{ width: '100%', padding: '0.55rem 0.85rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px' }}
+              style={{ flex: '1 1 260px', padding: '0.55rem 0.85rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px' }}
             />
+            <select
+              value={backorderStockFilter}
+              onChange={e => setBackorderStockFilter(e.target.value)}
+              style={{ padding: '0.55rem 0.85rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px' }}
+            >
+              <option value="ALL">Tất cả tình trạng tồn kho</option>
+              <option value="READY">Đã đủ hàng (sẵn sàng đóng gói)</option>
+              <option value="MISSING">Còn thiếu hàng</option>
+            </select>
           </div>
 
           {/* Backorders Table */}
@@ -3106,7 +3165,7 @@ export default function Warehouse() {
         <div>
           <div style={{ marginBottom: '1.25rem' }}>
             <h2 style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
-              Hoạt Động / Phiếu Nhập Kho (Receipts)
+              Hoạt Động / Phiếu Nhập Kho
             </h2>
             <p style={{ fontSize: '0.82rem', color: '#64748b', margin: '0.2rem 0 0 0' }}>
               Tiếp nhận lô hàng từ Nhà cung cấp sau khi đã nghiệm thu QA/QC
@@ -3225,7 +3284,7 @@ export default function Warehouse() {
         <div>
           <div style={{ marginBottom: '1.25rem' }}>
             <h2 style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
-              Hoạt Động / Lệnh Giao Hàng (Delivery Orders)
+              Hoạt Động / Lệnh Giao Hàng
             </h2>
             <p style={{ fontSize: '0.82rem', color: '#64748b', margin: '0.2rem 0 0 0' }}>
               Kiểm tra đóng gói, quét mã sản phẩm và phân công nhân viên Shipper giao hàng
@@ -3249,7 +3308,21 @@ export default function Warehouse() {
               <option value="PENDING">Chờ xuất kho & bàn giao</option>
               <option value="SHIPPED">Đang giao hàng</option>
               <option value="DELIVERED">Đã giao hàng thành công</option>
+              <option value="AWAITING_STOCK">Đang chờ hàng</option>
+              <option value="CANCELLED">Đã hủy</option>
+              <option value="FAILED_DELIVERY">Giao thất bại</option>
               <option value="ALL">Tất cả đơn hàng</option>
+            </select>
+            <select
+              value={deliveryShipperFilter}
+              onChange={(e) => setDeliveryShipperFilter(e.target.value)}
+              style={{ padding: '0.55rem 0.85rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px' }}
+            >
+              <option value="ALL">Tất cả Shipper</option>
+              <option value="UNASSIGNED">Chưa phân công</option>
+              {deliveryShipperOptions.map(name => (
+                <option key={name} value={name}>{name}</option>
+              ))}
             </select>
           </div>
 
@@ -3280,6 +3353,12 @@ export default function Warehouse() {
                     const isPackedWaitingShipper = ['PACKED', 'READY_TO_SHIP'].includes(o.status);
                     const isShipping = ['SHIPPED', 'OUT_FOR_DELIVERY', 'ASSIGNED'].includes(o.status);
                     const isDelivered = ['DELIVERED', 'COMPLETED'].includes(o.status);
+                    // Only reachable when deliveryFilter === 'ALL' — none of the 4 buckets above
+                    // include these, so without this the progress badge and action button were
+                    // silently blank for every cancelled/failed order in the "all orders" view.
+                    const isCancelled = o.status === 'CANCELLED';
+                    const isFailedDelivery = o.status === 'FAILED_DELIVERY';
+                    const isAwaitingStock = o.status === 'AWAITING_STOCK';
 
                     return (
                       <tr key={o.id || o.orderId} style={{ borderBottom: '1px solid #f1f5f9' }}>
@@ -3316,11 +3395,12 @@ export default function Warehouse() {
                               borderRadius: '4px',
                               fontSize: '0.75rem',
                               fontWeight: 700,
+                              whiteSpace: 'nowrap',
                               backgroundColor: '#fff7ed',
                               color: '#c2410c',
                               border: '1px solid #fdba74'
                             }}>
-                              Bước 1: Chờ Đóng Gói
+                              Chờ Đóng Gói
                             </span>
                           )}
 
@@ -3330,11 +3410,12 @@ export default function Warehouse() {
                               borderRadius: '4px',
                               fontSize: '0.75rem',
                               fontWeight: 700,
+                              whiteSpace: 'nowrap',
                               backgroundColor: '#f5f3ff',
                               color: '#6d28d9',
                               border: '1px solid #ddd6fe'
                             }}>
-                              Bước 2: Đã Đóng Gói (Chờ Shipper)
+                              Đã Đóng Gói
                             </span>
                           )}
 
@@ -3344,11 +3425,12 @@ export default function Warehouse() {
                               borderRadius: '4px',
                               fontSize: '0.75rem',
                               fontWeight: 700,
+                              whiteSpace: 'nowrap',
                               backgroundColor: '#eff6ff',
                               color: '#1d4ed8',
                               border: '1px solid #bfdbfe'
                             }}>
-                              Bước 3: Đang Giao Hàng
+                              Đang Giao Hàng
                             </span>
                           )}
 
@@ -3358,11 +3440,57 @@ export default function Warehouse() {
                               borderRadius: '4px',
                               fontSize: '0.75rem',
                               fontWeight: 700,
+                              whiteSpace: 'nowrap',
                               backgroundColor: '#f0fdf4',
                               color: '#15803d',
                               border: '1px solid #bbf7d0'
                             }}>
-                              Hoàn Tất: Đã Giao Hàng
+                              Đã Giao Hàng
+                            </span>
+                          )}
+
+                          {isCancelled && (
+                            <span style={{
+                              padding: '3px 10px',
+                              borderRadius: '4px',
+                              fontSize: '0.75rem',
+                              fontWeight: 700,
+                              whiteSpace: 'nowrap',
+                              backgroundColor: '#f1f5f9',
+                              color: '#64748b',
+                              border: '1px solid #cbd5e1'
+                            }}>
+                              Đã Hủy
+                            </span>
+                          )}
+
+                          {isFailedDelivery && (
+                            <span style={{
+                              padding: '3px 10px',
+                              borderRadius: '4px',
+                              fontSize: '0.75rem',
+                              fontWeight: 700,
+                              whiteSpace: 'nowrap',
+                              backgroundColor: '#fef2f2',
+                              color: '#b91c1c',
+                              border: '1px solid #fecaca'
+                            }}>
+                              Giao Thất Bại
+                            </span>
+                          )}
+
+                          {isAwaitingStock && (
+                            <span style={{
+                              padding: '3px 10px',
+                              borderRadius: '4px',
+                              fontSize: '0.75rem',
+                              fontWeight: 700,
+                              whiteSpace: 'nowrap',
+                              backgroundColor: '#fff7ed',
+                              color: '#c2410c',
+                              border: '1px solid #fdba74'
+                            }}>
+                              Chờ Hàng
                             </span>
                           )}
                         </td>
@@ -3467,7 +3595,26 @@ export default function Warehouse() {
                               )
                             )}
 
-                            {(isShipping || isDelivered) && (
+                            {isAwaitingStock && (
+                              <button
+                                onClick={() => setActiveTab('backorders')}
+                                style={{
+                                  backgroundColor: '#fff7ed',
+                                  color: '#c2410c',
+                                  border: '1px solid #fdba74',
+                                  borderRadius: '5px',
+                                  padding: '0.45rem 0.65rem',
+                                  fontSize: '0.75rem',
+                                  fontWeight: 700,
+                                  whiteSpace: 'nowrap',
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                Xem Chờ Hàng
+                              </button>
+                            )}
+
+                            {(isShipping || isDelivered || isCancelled || isFailedDelivery) && (
                               <button
                                 onClick={() => setSelectedOrderForDetail(o)}
                                 style={{
@@ -3632,7 +3779,7 @@ export default function Warehouse() {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
             <div>
               <h2 style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
-                Hoạt Động / Mua Sắm & Bổ Sung Hàng (RFQ Alerts)
+                Hoạt Động / Mua Sắm & Bổ Sung Hàng
               </h2>
               <p style={{ fontSize: '0.82rem', color: '#64748b', margin: '0.2rem 0 0 0' }}>
                 Quản lý danh sách linh kiện chạm ngưỡng tồn kho an toàn và gửi cảnh báo YCBG
@@ -3655,6 +3802,36 @@ export default function Warehouse() {
             </button>
           </div>
 
+          {/* Filter bar */}
+          <div style={{ backgroundColor: '#ffffff', padding: '1rem', borderRadius: '8px', border: '1px solid #cbd5e1', marginBottom: '1.25rem', display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
+            <input
+              type="text"
+              placeholder="Tìm theo tên sản phẩm, nhà cung cấp..."
+              value={rfqSearch}
+              onChange={(e) => setRfqSearch(e.target.value)}
+              style={{ flex: 1, minWidth: '220px', padding: '0.55rem 0.85rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px' }}
+            />
+            <select
+              value={rfqSupplierFilter}
+              onChange={(e) => setRfqSupplierFilter(e.target.value)}
+              style={{ padding: '0.55rem 0.85rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px' }}
+            >
+              <option value="ALL">Tất cả nhà cung cấp</option>
+              {rfqSupplierOptions.map(sup => (
+                <option key={sup} value={sup}>{sup}</option>
+              ))}
+            </select>
+            <select
+              value={rfqStockStatusFilter}
+              onChange={(e) => setRfqStockStatusFilter(e.target.value)}
+              style={{ padding: '0.55rem 0.85rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px' }}
+            >
+              <option value="ALL">Tất cả trạng thái</option>
+              <option value="OUT_OF_STOCK">Hết Hàng</option>
+              <option value="LOW_STOCK">Cảnh Báo Tồn</option>
+            </select>
+          </div>
+
           {/* Low stock table */}
           <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', overflow: 'hidden' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.83rem' }}>
@@ -3669,14 +3846,16 @@ export default function Warehouse() {
                 </tr>
               </thead>
               <tbody>
-                {lowStockItems.length === 0 ? (
+                {filteredRfqItems.length === 0 ? (
                   <tr>
                     <td colSpan="6" style={{ textAlign: 'center', padding: '3rem', color: '#64748b' }}>
-                      Tất cả sản phẩm đều đang ở mức tồn kho an toàn!
+                      {restockNeededItems.length === 0
+                        ? 'Tất cả sản phẩm đều đang ở mức tồn kho an toàn!'
+                        : 'Không tìm thấy sản phẩm nào khớp bộ lọc.'}
                     </td>
                   </tr>
                 ) : (
-                  lowStockItems.map(item => (
+                  filteredRfqItems.map(item => (
                     <tr key={item.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
                       <td style={{ padding: '0.75rem 1rem', fontWeight: 700, color: '#0f172a' }}>{item.name}</td>
                       <td style={{ padding: '0.75rem 1rem', color: '#475569' }}>{item.supplier}</td>
@@ -3726,7 +3905,7 @@ export default function Warehouse() {
           <div style={{ marginBottom: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
             <div>
               <h2 style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <span>Hoạt Động / Hàng Lỗi & Trả Về (Scrap & Returns / RMA)</span>
+                <span>Hoạt Động / Hàng Lỗi & Trả Về</span>
                 <span style={{ fontSize: '0.78rem', padding: '2px 8px', borderRadius: '12px', fontWeight: 800, backgroundColor: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe' }}>
                   {effectiveReturnRequests.length} Hồ Sơ
                 </span>
@@ -4554,7 +4733,7 @@ export default function Warehouse() {
         <div>
           <div style={{ marginBottom: '1.25rem' }}>
             <h2 style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
-              Báo Cáo / Lịch Sử Điều Chuyển Kho (Stock Movements)
+              Báo Cáo / Lịch Sử Điều Chuyển Kho
             </h2>
             <p style={{ fontSize: '0.82rem', color: '#64748b', margin: '0.2rem 0 0 0' }}>
               Nhật ký xuất nhập kho hai chiều ghi nhận tất cả biến động linh kiện (Nhấn vào bất kỳ dòng nào để xem chi tiết)
@@ -4668,7 +4847,7 @@ export default function Warehouse() {
         <div>
           <div style={{ marginBottom: '1.25rem' }}>
             <h2 style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
-              Cấu Hình / Kho Hàng & Vị Trí Kệ (Warehouses & Bins)
+              Cấu Hình / Kho Hàng & Vị Trí Kệ
             </h2>
             <p style={{ fontSize: '0.82rem', color: '#64748b', margin: '0.2rem 0 0 0' }}>
               Danh sách khu vực kệ kho cố định trong nhà kho
@@ -4697,7 +4876,7 @@ export default function Warehouse() {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
             <div>
               <h2 style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
-                Cấu Hình / Danh Mục Sản Phẩm (Categories)
+                Cấu Hình / Danh Mục Sản Phẩm
               </h2>
               <p style={{ fontSize: '0.82rem', color: '#64748b', margin: '0.2rem 0 0 0' }}>
                 Quản lý phân nhóm danh mục linh kiện, tổng mã sản phẩm, số lượng tồn thực tế và giá trị tài sản
@@ -5048,7 +5227,7 @@ export default function Warehouse() {
                       <input type="number" required min="0" value={editingProd.stock !== undefined ? editingProd.stock : 0} onChange={(e) => setEditingProd({ ...editingProd, stock: parseInt(e.target.value, 10) || 0 })} style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.85rem', fontWeight: 700, border: '1px solid #cbd5e1', borderRadius: '6px', backgroundColor: '#ffffff', color: '#0f172a' }} />
                     </div>
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.35rem' }}>Ngưỡng An Toàn (Threshold)</label>
+                      <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.35rem' }}>Ngưỡng An Toàn</label>
                       <input type="number" min="1" value={editingProd.threshold || 5} onChange={(e) => setEditingProd({ ...editingProd, threshold: parseInt(e.target.value, 10) || 5 })} style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.85rem', border: '1px solid #cbd5e1', borderRadius: '6px', backgroundColor: '#ffffff', color: '#0f172a' }} />
                     </div>
                   </div>

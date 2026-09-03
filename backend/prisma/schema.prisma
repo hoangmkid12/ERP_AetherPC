@@ -894,3 +894,65 @@ model LedgerEntry {
   @@map("ledger_entries")
 }
 
+// ============================================================================
+//   9. NHÓM MODEL QUẢN TRỊ HỆ THỐNG (SYSTEM ADMIN)
+// ============================================================================
+
+// Ghi lại các hành động thật sự nhạy cảm (đăng nhập thất bại, đổi mật khẩu,
+// tạo/sửa/xoá nhân viên, duyệt PO, duyệt/giải ngân lương, đổi ma trận phân
+// quyền) — không cố ghi mọi request, chỉ các điểm có ý nghĩa kiểm toán thật.
+model AuditLog {
+  id         Int      @id @default(autoincrement())
+  actorId    String?  @map("actor_id") @db.VarChar(50)
+  actorName  String?  @map("actor_name") @db.VarChar(150)
+  actorRole  String?  @map("actor_role") @db.VarChar(30)
+  action     String   @db.VarChar(50)
+  module     String   @db.VarChar(50)
+  targetId   String?  @map("target_id") @db.VarChar(50)
+  note       String?  @db.Text
+  ipAddress  String?  @map("ip_address") @db.VarChar(50)
+  status     String   @default("SUCCESS") @db.VarChar(20) // SUCCESS, FAILED
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  @@index([module])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+// Cấu hình toàn công ty — 1 dòng duy nhất (id luôn = 1), thay cho việc lưu
+// tạm ở React state của SystemAdmin.jsx (nút "Lưu" trước đây không lưu gì cả).
+model CompanySettings {
+  id                  Int      @id @default(1)
+  companyName         String?  @map("company_name") @db.VarChar(255)
+  taxCode             String?  @map("tax_code") @db.VarChar(50)
+  hotline             String?  @db.VarChar(30)
+  address             String?
+  // Hoa hồng/thưởng dưới đây là SỐ TIỀN CỐ ĐỊNH mỗi kỳ lương, khớp đúng cách
+  // POST /hr/payrolls (hr.routes.js) đang tính — không phải % doanh thu (tính
+  // % thật cần tổng hợp doanh số riêng từng nhân viên, ngoài phạm vi hiện tại).
+  salesCommissionFlat Decimal  @default(1250000.00) @map("sales_commission_flat") @db.Decimal(15, 2)
+  assemblyBonus       Decimal  @default(750000.00) @map("assembly_bonus") @db.Decimal(15, 2)
+  defaultVat          Decimal  @default(10.00) @map("default_vat") @db.Decimal(5, 2)
+  lowStockThreshold   Int      @default(5) @map("low_stock_threshold")
+  updatedAt           DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  @@map("company_settings")
+}
+
+// Ma trận phân quyền hiển thị chức năng theo vai trò — trước đây chỉ lưu ở
+// localStorage (mỗi trình duyệt một trạng thái riêng, không đồng bộ). LƯU Ý:
+// đây là điều khiển HIỂN THỊ giao diện (ẩn/hiện menu, khoá nút), KHÔNG phải
+// lớp bảo mật — quyền truy cập API thật vẫn do authMiddleware() ở từng route
+// backend quyết định độc lập.
+model RolePermission {
+  id          Int      @id @default(autoincrement())
+  role        String   @db.VarChar(30)
+  operationId String   @map("operation_id") @db.VarChar(100)
+  allowed     Boolean  @default(false)
+  updatedBy   String?  @map("updated_by") @db.VarChar(150)
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  @@unique([role, operationId])
+  @@map("role_permissions")
+}
+

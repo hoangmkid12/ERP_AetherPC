@@ -1522,7 +1522,7 @@ export default function Purchasing() {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '1rem' }}>
             <div>
               <h2 style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
-                Danh Bạ Nhà Cung Cấp (Vendors)
+                Danh Bạ Nhà Cung Cấp
               </h2>
               <p style={{ color: '#64748b', fontSize: '0.85rem', margin: '0.25rem 0 0' }}>
                 Quản lý hồ sơ đối tác, danh mục phân phối chính và lịch sử giao dịch mua hàng ({suppliers.length} đối tác)
@@ -2283,7 +2283,7 @@ export default function Purchasing() {
                 <div style={{ backgroundColor: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px', padding: '0.85rem 1rem', marginBottom: '1.25rem' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <div>
-                      <strong style={{ fontSize: '0.85rem', color: '#92400e', display: 'block' }}>Đây Là Hợp Đồng Khung (Blanket PO)</strong>
+                      <strong style={{ fontSize: '0.85rem', color: '#92400e', display: 'block' }}>Đây Là Hợp Đồng Khung</strong>
                       <span style={{ fontSize: '0.75rem', color: '#b45309' }}>Đặt hạn mức tổng + thời hạn để tạo nhiều đơn mua lặp lại từ hợp đồng này sau này</span>
                     </div>
                     <input
@@ -2847,7 +2847,7 @@ export default function Purchasing() {
                   title="Tạo đơn mua mới với cùng NCC và toàn bộ linh kiện/đơn giá của đơn này"
                   style={{ backgroundColor: '#ffffff', color: '#2563eb', border: '1px solid #bfdbfe', borderRadius: '6px', padding: '0.5rem 1rem', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
                 >
-                  Tạo Đơn Mua Lặp Lại Từ Đơn Này
+                  Tạo Đơn Lặp Lại
                 </button>
               )}
 
@@ -2882,7 +2882,7 @@ export default function Purchasing() {
                         }}
                         style={{ backgroundColor: '#fee2e2', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '6px', padding: '0.5rem 1.1rem', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
                       >
-                        Hủy Báo Giá Này
+                        Hủy Báo Giá
                       </button>
                       {(() => {
                         const items = selectedPO.items || [];
@@ -2901,7 +2901,7 @@ export default function Purchasing() {
                               opacity: blocked ? 0.75 : 1
                             }}
                           >
-                            {blocked ? 'Thiếu Đơn Giá — Không Thể Duyệt' : 'CEO Phê Duyệt → Phát Hành PO'}
+                            {blocked ? 'Thiếu Đơn Giá' : 'Duyệt & Phát Hành PO'}
                           </button>
                         );
                       })()}

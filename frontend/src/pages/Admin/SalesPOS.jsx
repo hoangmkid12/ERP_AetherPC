@@ -147,6 +147,7 @@ export default function SalesPOS() {
 
   // Customers CRM State
   const [customerSearch, setCustomerSearch] = useState('');
+  const [customerTierFilter, setCustomerTierFilter] = useState('ALL');
 
   // Promotions State
   const [promotionsList, setPromotionsList] = useState([
@@ -355,14 +356,18 @@ export default function SalesPOS() {
     return Object.values(custMap).sort((a, b) => b.totalSpent - a.totalSpent);
   }, [orders]);
 
+  const getCustomerTier = (c) => (c.totalSpent >= 20000000 ? 'VIP' : c.totalSpent >= 5000000 ? 'LOYAL' : 'REGULAR');
+
   const filteredCustomers = useMemo(() => {
-    return derivedCustomers.filter(c => 
-      !customerSearch.trim() ||
-      c.name.toLowerCase().includes(customerSearch.toLowerCase()) ||
-      c.phone.includes(customerSearch) ||
-      c.email.toLowerCase().includes(customerSearch.toLowerCase())
-    );
-  }, [derivedCustomers, customerSearch]);
+    return derivedCustomers.filter(c => {
+      const matchSearch = !customerSearch.trim() ||
+        c.name.toLowerCase().includes(customerSearch.toLowerCase()) ||
+        c.phone.includes(customerSearch) ||
+        c.email.toLowerCase().includes(customerSearch.toLowerCase());
+      const matchTier = customerTierFilter === 'ALL' || getCustomerTier(c) === customerTierFilter;
+      return matchSearch && matchTier;
+    });
+  }, [derivedCustomers, customerSearch, customerTierFilter]);
 
   // Order Status Change Action
   const handleUpdateOrderStatus = (orderId, newStatus) => {
@@ -386,9 +391,9 @@ export default function SalesPOS() {
       <div style={{ marginBottom: '1.25rem' }}>
         <h2 style={{ fontSize: '1.35rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
           {activeTab === 'overview' && 'Tổng Quan Phân Hệ Bán Hàng & Doanh Thu'}
-          {activeTab === 'pos' && 'Điểm Bán Hàng Trực Tiếp Tại Quầy (Sales POS)'}
+          {activeTab === 'pos' && 'Điểm Bán Hàng Trực Tiếp Tại Quầy'}
           {activeTab === 'orders' && 'Quản Lý Đơn Hàng Bán Lẻ & Online'}
-          {activeTab === 'customers' && 'Danh Bạ & Hồ Sơ Khách Hàng (Sales CRM)'}
+          {activeTab === 'customers' && 'Danh Bạ & Hồ Sơ Khách Hàng'}
           {activeTab === 'promotions' && 'Chương Trình Khuyến Mãi & Bảng Giá Ưu Đãi'}
           {activeTab === 'reports' && 'Báo Cáo Doanh Thu & Hiệu Suất Kinh Doanh'}
         </h2>
@@ -427,7 +432,7 @@ export default function SalesPOS() {
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
-                Trung Tâm Nhiệm Vụ Bán Hàng (Sales Task Center)
+                Trung Tâm Nhiệm Vụ Bán Hàng
               </h3>
               {pendingConfirmationCount > 0 && (
                 <span style={{
@@ -584,7 +589,7 @@ export default function SalesPOS() {
             <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
               <div>
                 <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', margin: '0 0 0.5rem' }}>
-                  Quầy Bán Hàng Nhanh (POS Checkout)
+                  Quầy Bán Hàng Nhanh
                 </h3>
                 <p style={{ fontSize: '0.82rem', color: '#64748b', lineHeight: 1.4, margin: '0 0 1rem' }}>
                   Tạo đơn hàng tức thời cho khách mua linh kiện tại cửa hàng, tra cứu tồn kho thực tế, áp dụng chiết khấu và in phiếu thu.
@@ -1102,28 +1107,58 @@ export default function SalesPOS() {
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '1rem' }}>
             <div>
-              <h2 style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
-                Hồ Sơ & Danh Bạ Khách Hàng (Sales CRM)
+              <h2 style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                <span>Hồ Sơ & Danh Bạ Khách Hàng</span>
+                <span style={{ fontSize: '0.78rem', padding: '2px 10px', borderRadius: '12px', fontWeight: 800, backgroundColor: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe' }}>
+                  Tổng {derivedCustomers.length} Khách Hàng
+                </span>
               </h2>
               <p style={{ color: '#64748b', fontSize: '0.85rem', margin: '0.25rem 0 0' }}>
-                Quản lý lịch sử giao dịch, tổng chi tiêu tích lũy và chăm sóc khách hàng thân thiết ({filteredCustomers.length} khách hàng)
+                Quản lý lịch sử giao dịch, tổng chi tiêu tích lũy và chăm sóc khách hàng thân thiết — đang hiển thị {filteredCustomers.length}/{derivedCustomers.length} khách hàng
               </p>
-            </div>
-            <div style={{ width: '300px' }}>
-              <input
-                type="text"
-                placeholder="Tìm theo tên, SĐT, email khách..."
-                value={customerSearch}
-                onChange={(e) => setCustomerSearch(e.target.value)}
-                style={{ width: '100%', height: '38px', padding: '0 0.85rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px', boxSizing: 'border-box' }}
-              />
             </div>
           </div>
 
+          {/* Filter bar */}
+          <div style={{
+            backgroundColor: '#ffffff',
+            padding: '0.85rem 1rem',
+            borderRadius: '8px',
+            border: '1px solid #cbd5e1',
+            marginBottom: '1.25rem',
+            display: 'grid',
+            gridTemplateColumns: 'minmax(220px, 2fr) minmax(180px, 1fr)',
+            gap: '0.75rem',
+            alignItems: 'center'
+          }}>
+            <input
+              type="text"
+              placeholder="Tìm theo tên, SĐT, email khách..."
+              value={customerSearch}
+              onChange={(e) => setCustomerSearch(e.target.value)}
+              style={{ width: '100%', height: '38px', padding: '0 0.85rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px', boxSizing: 'border-box' }}
+            />
+            <select
+              value={customerTierFilter}
+              onChange={(e) => setCustomerTierFilter(e.target.value)}
+              style={{ width: '100%', height: '38px', padding: '0 0.65rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px', color: '#0f172a', boxSizing: 'border-box', backgroundColor: '#ffffff', cursor: 'pointer' }}
+            >
+              <option value="ALL">Tất cả hạng khách hàng</option>
+              <option value="VIP">Hạng Vàng (VIP)</option>
+              <option value="LOYAL">Thành Viên Bạc</option>
+              <option value="REGULAR">Khách Thường</option>
+            </select>
+          </div>
+
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.25rem' }}>
-            {filteredCustomers.map((cust, idx) => {
-              const isVIP = cust.totalSpent >= 20000000;
-              const isLoyal = cust.totalSpent >= 5000000 && !isVIP;
+            {filteredCustomers.length === 0 ? (
+              <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '3rem', color: '#94a3b8', backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
+                Không tìm thấy khách hàng nào phù hợp với bộ lọc.
+              </div>
+            ) : filteredCustomers.map((cust, idx) => {
+              const tier = getCustomerTier(cust);
+              const isVIP = tier === 'VIP';
+              const isLoyal = tier === 'LOYAL';
 
               return (
                 <div key={idx} style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>

@@ -172,7 +172,7 @@ export default function Accountant() {
   const stats = [
     { label: 'Tổng Doanh Thu Bán Hàng', value: fmt(totalRevenue), change: 'Bao gồm POS & Website Online', icon: <ArrowUpRight size={20} />, color: '#16a34a', bg: '#f0fdf4' },
     { label: 'Tổng Chi Phí Hoạt Động', value: fmt(totalExpense), change: 'Giá vốn, lương & mua linh kiện', icon: <ArrowDownLeft size={20} />, color: '#ef4444', bg: '#fef2f2' },
-    { label: 'Lợi Nhuận Ròng (Net Profit)', value: fmt(netProfit), change: netProfit >= 0 ? 'Tỷ suất lợi nhuận dương' : 'Cần tối ưu chi phí', icon: <DollarSign size={20} />, color: netProfit >= 0 ? '#16a34a' : '#ef4444', bg: netProfit >= 0 ? '#f0fdf4' : '#fef2f2' },
+    { label: 'Lợi Nhuận Ròng', value: fmt(netProfit), change: netProfit >= 0 ? 'Tỷ suất lợi nhuận dương' : 'Cần tối ưu chi phí', icon: <DollarSign size={20} />, color: netProfit >= 0 ? '#16a34a' : '#ef4444', bg: netProfit >= 0 ? '#f0fdf4' : '#fef2f2' },
     { label: 'Lợi Nhuận Ròng Lũy Kế', value: fmt(cashBalance), change: 'Chưa gồm vốn góp ban đầu (không có module vốn chủ sở hữu)', icon: <CreditCard size={20} />, color: '#2563eb', bg: '#eff6ff' },
     { label: 'Đơn PO Chờ Thanh Toán NCC', value: `${unpaidPOs.length} đơn (${fmt(unpaidPOAmount)})`, change: 'Cần giải ngân cho Nhà Cung Cấp', icon: <ShoppingBag size={20} />, color: '#f59e0b', bg: '#fffbeb' },
     { label: 'Quỹ Lương Chờ Chi Trả', value: fmt(totalPayrollFund), change: 'Dự toán kỳ lương tháng hiện tại', icon: <Users size={20} />, color: '#8b5cf6', bg: '#f5f3ff' }
@@ -180,7 +180,7 @@ export default function Accountant() {
 
   // Chart 1: Income vs Expense Doughnut
   const cashFlowChartData = {
-    labels: ['Doanh Thu Bán Hàng', 'Giá Vốn Hàng Bán (COGS)', 'Chi Lương Nhân Sự', 'Chi Phí Vận Hành Khác'],
+    labels: ['Doanh Thu Bán Hàng', 'Giá Vốn Hàng Bán', 'Chi Lương Nhân Sự', 'Chi Phí Vận Hành Khác'],
     datasets: [
       {
         data: [
@@ -489,11 +489,11 @@ export default function Accountant() {
           <h2 style={{ fontSize: '1.35rem', fontWeight: 800, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <DollarSign size={24} style={{ color: '#16a34a' }} />
             {activeTab === 'overview' && 'Tổng Quan Tài Chính & Dòng Tiền Doanh Nghiệp'}
-            {activeTab === 'refunds' && 'Chi Hoàn Tiền Đổi Trả Khách Hàng (Refunds Disbursement)'}
-            {activeTab === 'ledger' && 'Sổ Cái Kế Toán & Lịch Sử Dòng Tiền (General Ledger)'}
-            {activeTab === 'po_payments' && 'Thanh Toán Đơn Mua Hàng Nhà Cung Cấp (PO Payments)'}
-            {activeTab === 'payroll_disbursement' && 'Chi Trả & Giải Ngân Bảng Lương (Payroll Disbursement)'}
-            {activeTab === 'reports' && 'Báo Cáo Tài Chính P&L & Thuế GTGT (VAT)'}
+            {activeTab === 'refunds' && 'Chi Hoàn Tiền Đổi Trả Khách Hàng'}
+            {activeTab === 'ledger' && 'Sổ Cái Kế Toán & Lịch Sử Dòng Tiền'}
+            {activeTab === 'po_payments' && 'Thanh Toán Đơn Mua Hàng Nhà Cung Cấp'}
+            {activeTab === 'payroll_disbursement' && 'Chi Trả & Giải Ngân Bảng Lương'}
+            {activeTab === 'reports' && 'Báo Cáo Tài Chính P&L & Thuế GTGT'}
           </h2>
           <p style={{ color: '#64748b', fontSize: '0.82rem', margin: '0.25rem 0 0' }}>
             Quản trị dòng tiền thu chi, thanh toán NCC, chi lương và báo cáo lãi lỗ P&L
@@ -1285,7 +1285,7 @@ export default function Accountant() {
           <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem' }}>
             <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
               <FileText size={18} style={{ color: '#2563eb' }} />
-              <span>Báo Cáo Kết Quả Hoạt Động Kinh Doanh (P&L Statement)</span>
+              <span>Báo Cáo Kết Quả Hoạt Động Kinh Doanh</span>
             </h3>
             <p style={{ color: '#64748b', fontSize: '0.78rem', marginBottom: '1.25rem' }}>
               Kỳ tính toán: Tháng {today.getMonth() + 1}/{today.getFullYear()}
@@ -1298,7 +1298,7 @@ export default function Accountant() {
               </div>
 
               <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'baseline', gap: '0.5rem', padding: '0.75rem', backgroundColor: '#fef2f2', borderRadius: '6px', border: '1px solid #fecaca' }}>
-                <strong style={{ color: '#dc2626', flex: '1 1 260px', minWidth: 0 }}>2. GIÁ VỐN HÀNG BÁN (COGS):</strong>
+                <strong style={{ color: '#dc2626', flex: '1 1 260px', minWidth: 0 }}>2. GIÁ VỐN HÀNG BÁN:</strong>
                 <strong style={{ color: '#dc2626', fontSize: '1rem', whiteSpace: 'nowrap' }}>- {fmt(cogsAmount)}</strong>
               </div>
 
@@ -1313,12 +1313,12 @@ export default function Accountant() {
               </div>
 
               <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'baseline', gap: '0.5rem', padding: '0.75rem', backgroundColor: '#fef2f2', borderRadius: '6px', border: '1px solid #fecaca' }}>
-                <strong style={{ color: '#dc2626', flex: '1 1 260px', minWidth: 0 }}>5. CHI HOÀN TIỀN KHÁCH HÀNG (REFUND):</strong>
+                <strong style={{ color: '#dc2626', flex: '1 1 260px', minWidth: 0 }}>5. CHI HOÀN TIỀN KHÁCH HÀNG:</strong>
                 <strong style={{ color: '#dc2626', fontSize: '1rem', whiteSpace: 'nowrap' }}>- {fmt(refundAmount)}</strong>
               </div>
 
               <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'baseline', gap: '0.5rem', padding: '1rem', backgroundColor: '#eff6ff', borderRadius: '8px', border: '2px solid #3b82f6', marginTop: '0.5rem' }}>
-                <strong style={{ color: '#1d4ed8', fontSize: '1.05rem', flex: '1 1 260px', minWidth: 0 }}>6. LỢI NHUẬN RÒNG TRƯỚC THUẾ (NET PROFIT):</strong>
+                <strong style={{ color: '#1d4ed8', fontSize: '1.05rem', flex: '1 1 260px', minWidth: 0 }}>6. LỢI NHUẬN RÒNG TRƯỚC THUẾ:</strong>
                 <strong style={{ color: '#1d4ed8', fontSize: '1.15rem', whiteSpace: 'nowrap' }}>{fmt(netProfit)}</strong>
               </div>
             </div>

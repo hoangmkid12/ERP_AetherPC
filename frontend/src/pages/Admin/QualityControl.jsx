@@ -756,11 +756,11 @@ export default function QualityControl() {
         <div>
           <h2 style={{ fontSize: '1.35rem', fontWeight: 800, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <ShieldCheck size={24} style={{ color: '#2563eb' }} />
-            {activeTab === 'overview' && 'Tổng Quan Kiểm Định Chất Lượng (QA / QC Dashboard)'}
-            {activeTab === 'inbound' && 'Kiểm Định Hàng Nhập Từ Nhà Cung Cấp (Inbound Inspection)'}
-            {activeTab === 'returns' && 'Thẩm Định Hàng Đổi Trả Khách Hàng (Customer RMA)'}
-            {activeTab === 'logs' && 'Nhật Ký & Biên Bản Nghiệm Thu Chất Lượng (Inspection Logs)'}
-            {activeTab === 'reports' && 'Báo Cáo Chất Lượng & Đánh Giá Nhà Cung Cấp (Vendor Quality)'}
+            {activeTab === 'overview' && 'Tổng Quan Kiểm Định Chất Lượng'}
+            {activeTab === 'inbound' && 'Kiểm Định Hàng Nhập Từ Nhà Cung Cấp'}
+            {activeTab === 'returns' && 'Thẩm Định Hàng Đổi Trả Khách Hàng'}
+            {activeTab === 'logs' && 'Nhật Ký & Biên Bản Nghiệm Thu Chất Lượng'}
+            {activeTab === 'reports' && 'Báo Cáo Chất Lượng & Đánh Giá Nhà Cung Cấp'}
           </h2>
           <p style={{ color: '#64748b', fontSize: '0.82rem', margin: '0.25rem 0 0' }}>
             Hệ thống kiểm soát chất lượng linh kiện đầu vào, phân loại lỗi và thẩm định hàng bảo hành đổi trả
@@ -1242,7 +1242,7 @@ export default function QualityControl() {
               <div>
                 <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                   <ShieldAlert size={18} style={{ color: '#8b5cf6' }} />
-                  <span>Thẩm Định Hàng Trả Về & Bảo Hành (Customer RMA & Failed Deliveries)</span>
+                  <span>Thẩm Định Hàng Trả Về & Bảo Hành</span>
                 </h3>
                 <p style={{ fontSize: '0.78rem', color: '#64748b', margin: '0.2rem 0 0' }}>
                   Phân loại kiểm định: <strong>Hàng giao thất bại/bom hàng hoàn về</strong> (kiểm tra seal & nhập kho) vs <strong>Hàng khách đổi trả RMA</strong> (thẩm định lỗi kỹ thuật)
@@ -1829,7 +1829,7 @@ export default function QualityControl() {
               {/* 2. Step 1: Technical Inspection Criteria Checklist */}
               <div style={{ marginBottom: '1.25rem', padding: '1rem', borderRadius: '8px', border: '1px solid #e2e8f0', backgroundColor: '#ffffff' }}>
                 <div style={{ fontSize: '0.84rem', fontWeight: 800, color: '#0f172a', marginBottom: '0.65rem' }}>
-                  Bước 1: Kiểm Tra Tiêu Chuẩn Kỹ Thuật (Inspection Criteria)
+                  Bước 1: Kiểm Tra Tiêu Chuẩn Kỹ Thuật
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', fontSize: '0.78rem' }}>
@@ -1894,7 +1894,7 @@ export default function QualityControl() {
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                       <div>
                         <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#15803d', display: 'block', marginBottom: '0.25rem' }}>
-                          Số Lượng ĐẠT TIÊU CHUẨN (Passed):
+                          Số Lượng ĐẠT TIÊU CHUẨN:
                         </label>
                         <input
                           type="number"
@@ -1908,7 +1908,7 @@ export default function QualityControl() {
 
                       <div>
                         <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#dc2626', display: 'block', marginBottom: '0.25rem' }}>
-                          Số Lượng LỖI / HƯ HỎNG (Defective):
+                          Số Lượng LỖI / HƯ HỎNG:
                         </label>
                         <input
                           type="number"
@@ -1930,7 +1930,7 @@ export default function QualityControl() {
                 return (
                   <div style={{ marginBottom: '1.25rem' }}>
                     <label style={{ fontSize: '0.84rem', fontWeight: 800, color: '#0f172a', display: 'block', marginBottom: '0.45rem' }}>
-                      Bước 3: Quyết Định Nghiệm Thu Kỹ Thuật (QA Verdict):
+                      Bước 3: Quyết Định Nghiệm Thu Kỹ Thuật:
                     </label>
 
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem' }}>
@@ -2244,7 +2244,7 @@ export default function QualityControl() {
               {/* BƯỚC 3: QUYẾT ĐỊNH XỬ LÝ (RMA VERDICT) */}
               <div style={{ marginBottom: '1.25rem' }}>
                 <label style={{ fontSize: '0.84rem', fontWeight: 800, color: '#0f172a', display: 'block', marginBottom: '0.45rem' }}>
-                  Bước 3: Quyết Định Thẩm Định Kỹ Thuật (RMA Verdict):
+                  Bước 3: Quyết Định Thẩm Định Kỹ Thuật:
                 </label>
                 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
@@ -2917,7 +2917,7 @@ export default function QualityControl() {
                       style={{ marginTop: '3px' }}
                     />
                     <div>
-                      <strong style={{ color: '#15803d', fontSize: '0.82rem' }}>ĐẠT CHUẨN 100% → NHẬP LẠI KHO BÁN MỚI (RESTOCK NEW)</strong>
+                      <strong style={{ color: '#15803d', fontSize: '0.82rem' }}>ĐẠT CHUẨN 100% → NHẬP LẠI KHO BÁN MỚI</strong>
                       <div style={{ fontSize: '0.74rem', color: '#4b5563' }}>Tem seal hoàn hảo. Tự động cộng lại số lượng vào Tồn Kho Bán Lẻ ERP ngay lập tức.</div>
                     </div>
                   </label>
@@ -2941,7 +2941,7 @@ export default function QualityControl() {
                       style={{ marginTop: '3px' }}
                     />
                     <div>
-                      <strong style={{ color: '#c2410c', fontSize: '0.82rem' }}>MÓP VỎ HỘP NHẸ → NHẬP KHO THANH LÝ / OPEN-BOX (OUTLET)</strong>
+                      <strong style={{ color: '#c2410c', fontSize: '0.82rem' }}>MÓP VỎ HỘP NHẸ → NHẬP KHO THANH LÝ / OPEN-BOX</strong>
                       <div style={{ fontSize: '0.74rem', color: '#4b5563' }}>Linh kiện bên trong nguyên vẹn nhưng vỏ hộp trầy xước/móp nhẹ khi vận chuyển.</div>
                     </div>
                   </label>

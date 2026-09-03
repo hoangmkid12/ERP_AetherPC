@@ -5,6 +5,7 @@ const morgan = require('morgan');
 const cookieParser = require('cookie-parser');
 const rateLimit = require('express-rate-limit');
 const { errorMiddleware } = require('./middlewares/error.middleware');
+const { isMaintenanceMode } = require('./services/maintenanceMode');
 
 const app = express();
 
@@ -55,6 +56,17 @@ app.get('/status', (req, res) => {
 
 // Routes API V1
 app.use('/api/v1', apiLimiter);
+
+// While /system/restore is disconnecting the shared Prisma pool to run
+// `pg_restore`, every other request would otherwise hit a torn-down
+// connection mid-query — reject them up front with a clear message instead.
+// The restore route itself (and its own DB calls) is exempt so it can run.
+app.use('/api/v1', (req, res, next) => {
+  if (isMaintenanceMode() && req.path !== '/system/restore') {
+    return res.status(503).json({ success: false, message: 'Hệ thống đang trong quá trình khôi phục dữ liệu, vui lòng thử lại sau ít phút.' });
+  }
+  next();
+});
 app.use('/api/v1/auth', require('./routes/auth.routes')(authLimiter));
 app.use('/api/v1/products', require('./routes/product.routes'));
 app.use('/api/v1/orders', require('./routes/order.routes'));
@@ -67,6 +79,7 @@ app.use('/api/v1/employees', require('./routes/hr.routes'));
 app.use('/api/v1/customers', require('./routes/customer.routes'));
 app.use('/api/v1/ledger', require('./routes/ledger.routes'));
 app.use('/api/v1/complaints', require('./routes/complaint.routes'));
+app.use('/api/v1/system', require('./routes/system.routes'));
 
 // Global Error Handler Middleware
 app.use(errorMiddleware);

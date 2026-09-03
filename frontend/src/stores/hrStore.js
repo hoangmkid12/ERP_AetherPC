@@ -111,7 +111,20 @@ export const useHRStore = create((set, get) => ({
           console.warn('Backend getEmployees offline, using local cache:', e.message);
         }
       }
-      
+
+      // Server returns real column names (fullName/baseSalary, no username —
+      // just email) — the rest of this store's `employees` shape (and every
+      // page reading it, e.g. SystemAdmin's account table) expects
+      // fullname/username/salary. Without this mapping every freshly-fetched
+      // row rendered those columns blank.
+      employees = employees.map(e => ({
+        ...e,
+        fullname: e.fullname || e.fullName,
+        username: e.username || (e.email ? e.email.split('@')[0] : ''),
+        salary: parseFloat(e.salary ?? e.baseSalary) || 0,
+        baseSalary: parseFloat(e.baseSalary ?? e.salary) || 0,
+      }));
+
       if (employees.length > 0) {
         set({ employees });
         try {
@@ -158,12 +171,22 @@ export const useHRStore = create((set, get) => ({
     try {
       set({ error: null });
       let leaveRequests = [];
+      // CEO/HR/ADMIN need every employee's requests (with the `employee` relation,
+      // used to display real names) to actually approve/reject anything — /hr/leaves
+      // only returns the logged-in user's OWN requests and 403s for those roles' own
+      // employeeId lookups being irrelevant here. Try the privileged endpoint first
+      // and fall back to the self-service one for roles that get a 403 from it.
       try {
-        const data = await api.get('/hr/leaves');
+        const data = await api.get('/hr/leaves/all');
         leaveRequests = Array.isArray(data) ? data : (data?.data || []);
       } catch (_) {
-        const data = await api.get('/leaves');
-        leaveRequests = Array.isArray(data) ? data : (data?.data || []);
+        try {
+          const data = await api.get('/hr/leaves');
+          leaveRequests = Array.isArray(data) ? data : (data?.data || []);
+        } catch (__) {
+          const data = await api.get('/leaves');
+          leaveRequests = Array.isArray(data) ? data : (data?.data || []);
+        }
       }
       
       set({ leaveRequests });

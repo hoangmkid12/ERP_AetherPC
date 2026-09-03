@@ -167,7 +167,7 @@ export default function CustomerService() {
     { label: 'Tỷ Lệ Giải Quyết (SLA)', value: `${resolutionRate}%`, change: 'Mục tiêu chất lượng dịch vụ ≥ 95%', icon: <CheckCircle size={20} />, color: '#16a34a', bg: '#f0fdf4' },
     { label: 'Yêu Cầu Đổi Trả (RMA)', value: `${pendingRmaCount} yêu cầu`, change: 'Chờ CSKH thẩm định & duyệt thu hồi', icon: <RefreshCw size={20} />, color: '#8b5cf6', bg: '#f5f3ff' },
     { label: 'Phiên Chat Trực Tuyến', value: `${liveChatSessions.length} phiên`, change: 'Khách hàng đang online', icon: <MessageSquare size={20} />, color: '#0ea5e9', bg: '#f0f9ff' },
-    { label: 'Đánh Giá Dịch Vụ (CSAT)', value: '4.85 / 5.0', change: '96.4% đánh giá rất hài lòng', icon: <Star size={20} />, color: '#eab308', bg: '#fefce8' }
+    { label: 'Đánh Giá Dịch Vụ', value: '4.85 / 5.0', change: '96.4% đánh giá rất hài lòng', icon: <Star size={20} />, color: '#eab308', bg: '#fefce8' }
   ];
 
   // Chart 1: Complaint Categories Doughnut
@@ -224,11 +224,11 @@ export default function CustomerService() {
         <div>
           <h2 style={{ fontSize: '1.35rem', fontWeight: 800, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <HeadphonesIcon size={24} style={{ color: '#2563eb' }} />
-            {activeTab === 'overview' && 'Tổng Quan Chăm Sóc Khách Hàng (CSKH Dashboard)'}
-            {activeTab === 'complaints' && 'Xử Lý Khiếu Nại & Hỗ Trợ Kỹ Thuật (Tickets Hub)'}
-            {activeTab === 'livechat' && 'Tư Vấn Trực Tuyến Thời Gian Thực (Live Chat Realtime)'}
-            {activeTab === 'returns' && 'Tiếp Nhận & Điều Phối Đổi Trả (Customer RMA)'}
-            {activeTab === 'feedback' && 'Khảo Sát Hài Lòng Khách Hàng (CSAT & Loyalty)'}
+            {activeTab === 'overview' && 'Tổng Quan Chăm Sóc Khách Hàng'}
+            {activeTab === 'complaints' && 'Xử Lý Khiếu Nại & Hỗ Trợ Kỹ Thuật'}
+            {activeTab === 'livechat' && 'Tư Vấn Trực Tuyến Thời Gian Thực'}
+            {activeTab === 'returns' && 'Tiếp Nhận & Điều Phối Đổi Trả'}
+            {activeTab === 'feedback' && 'Khảo Sát Hài Lòng Khách Hàng'}
           </h2>
           <p style={{ color: '#64748b', fontSize: '0.82rem', margin: '0.25rem 0 0' }}>
             Tiếp nhận khiếu nại, tư vấn cấu hình PC trực tuyến, xử lý đổi trả và nâng cao trải nghiệm khách hàng
@@ -602,7 +602,7 @@ export default function CustomerService() {
         <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem' }}>
           <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
             <RefreshCw size={18} style={{ color: '#8b5cf6' }} />
-            <span>Tiếp Nhận & Thẩm Định Đổi Trả Sản Phẩm (Customer RMA)</span>
+            <span>Tiếp Nhận & Thẩm Định Đổi Trả Sản Phẩm</span>
           </h3>
           <p style={{ color: '#64748b', fontSize: '0.78rem', marginBottom: '1.25rem' }}>
             Kiểm tra bằng chứng lỗi, đối chiếu bảo hành 36 tháng và đồng ý thu hồi hàng chuyển cho Shipper lấy
@@ -716,7 +716,7 @@ export default function CustomerService() {
           <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem' }}>
             <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
               <Award size={18} style={{ color: '#eab308' }} />
-              <span>Chỉ Số Hài Lòng Khách Hàng (CSAT)</span>
+              <span>Chỉ Số Hài Lòng Khách Hàng</span>
             </h3>
 
             <div style={{ textAlign: 'center', padding: '1.5rem 0', backgroundColor: '#f8fafc', borderRadius: '8px', marginBottom: '1rem' }}>

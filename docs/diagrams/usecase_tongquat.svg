@@ -1,0 +1,208 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1650 1850" font-family="Arial, 'Segoe UI', sans-serif">
+  <defs>
+    <marker id="openArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="11" markerHeight="11" orient="auto-start-reverse">
+      <path d="M 1 1 L 9 5 L 1 9" fill="none" stroke="black" stroke-width="1.6"/>
+    </marker>
+    <marker id="hollowTriangle" viewBox="0 0 12 12" refX="11" refY="6" markerWidth="16" markerHeight="16" orient="auto-start-reverse">
+      <path d="M 1 1 L 11 6 L 1 11 Z" fill="white" stroke="black" stroke-width="1.3"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1650" height="1850" fill="#ffffff"/>
+
+  <!-- ============== SYSTEM BOUNDARY ============== -->
+  <rect x="380" y="20" width="1050" height="1750" rx="6" fill="#eaf3fb" stroke="black" stroke-width="2.2"/>
+  <text x="905" y="55" text-anchor="middle" font-size="19" font-weight="bold" fill="black">HỆ THỐNG AETHERPC ERP</text>
+
+  <!-- ============== ASSOCIATIONS (đường liền, không mũi tên) — vẽ trước để nằm dưới ellipse ============== -->
+  <g stroke="black" stroke-width="1.4">
+    <line x1="90" y1="250" x2="650" y2="100"/>
+    <line x1="90" y1="250" x2="650" y2="260"/>
+    <line x1="90" y1="250" x2="470" y2="550"/>
+    <line x1="230" y1="1175" x2="470" y2="550"/>
+    <line x1="90" y1="700" x2="650" y2="700"/>
+    <line x1="90" y1="1050" x2="1050" y2="1050"/>
+    <line x1="90" y1="1350" x2="1050" y2="1350"/>
+    <line x1="90" y1="1600" x2="1050" y2="1200"/>
+    <line x1="90" y1="1600" x2="700" y2="1550"/>
+    <line x1="90" y1="1600" x2="1050" y2="1650"/>
+    <line x1="1520" y1="1200" x2="1050" y2="1200"/>
+    <line x1="1520" y1="100" x2="950" y2="100"/>
+  </g>
+
+  <!-- ============== GENERALIZATION (đường liền, mũi tên tam giác rỗng trỏ về Nhân Viên) ============== -->
+  <g stroke="black" stroke-width="1.5" fill="none" marker-end="url(#hollowTriangle)">
+    <line x1="90" y1="700" x2="228" y2="1133"/>
+    <line x1="90" y1="1050" x2="216" y2="1146"/>
+    <line x1="90" y1="1350" x2="216" y2="1176"/>
+    <line x1="90" y1="1600" x2="228" y2="1196"/>
+  </g>
+
+  <!-- ============== INCLUDE (nét đứt, mũi tên hở, từ UC gốc đến UC được include) ============== -->
+  <g stroke="black" stroke-width="1.4" stroke-dasharray="7,5" fill="none" marker-end="url(#openArrow)">
+    <line x1="726" y1="100" x2="848" y2="100"/>
+    <line x1="750" y1="716" x2="967" y2="1023"/>
+  </g>
+  <text x="787" y="90" text-anchor="middle" font-size="11.5" font-style="italic" fill="black">&#171;include&#187;</text>
+  <text x="905" y="850" text-anchor="middle" font-size="11.5" font-style="italic" fill="black" transform="rotate(38 905 850)">&#171;include&#187;</text>
+
+  <!-- ============== EXTEND (nét đứt, mũi tên hở, từ UC mở rộng đến UC gốc) ============== -->
+  <g stroke="black" stroke-width="1.4" stroke-dasharray="7,5" fill="none" marker-end="url(#openArrow)">
+    <line x1="650" y1="392" x2="650" y2="313"/>
+    <line x1="650" y1="832" x2="650" y2="753"/>
+  </g>
+  <text x="692" y="355" text-anchor="middle" font-size="11.5" font-style="italic" fill="black">&#171;extend&#187;</text>
+  <text x="692" y="795" text-anchor="middle" font-size="11.5" font-style="italic" fill="black">&#171;extend&#187;</text>
+
+  <!-- ============== USE CASES ============== -->
+  <!-- UC: Đặt Hàng -->
+  <ellipse cx="650" cy="100" rx="75" ry="38" fill="#bcdcf7" stroke="black" stroke-width="1.6"/>
+  <text x="650" y="105" text-anchor="middle" font-size="14" fill="black">Đặt Hàng</text>
+
+  <!-- UC: Xử Lý Thanh Toán -->
+  <ellipse cx="950" cy="100" rx="100" ry="38" fill="#bcdcf7" stroke="black" stroke-width="1.6"/>
+  <text x="950" y="105" text-anchor="middle" font-size="14" fill="black">Xử Lý Thanh Toán</text>
+
+  <!-- UC: Theo Dõi Đơn Hàng (có extension point) -->
+  <ellipse cx="650" cy="260" rx="105" ry="50" fill="#bcdcf7" stroke="black" stroke-width="1.6"/>
+  <text x="650" y="250" text-anchor="middle" font-size="14" fill="black">Theo Dõi Đơn Hàng</text>
+  <line x1="558" y1="272" x2="742" y2="272" stroke="black" stroke-width="1"/>
+  <text x="650" y="287" text-anchor="middle" font-size="10.5" fill="black">Extension points:</text>
+  <text x="650" y="301" text-anchor="middle" font-size="10.5" fill="black">Sau Khi Giao Hàng</text>
+
+  <!-- UC: Yêu Cầu Đổi/Trả Hàng -->
+  <ellipse cx="650" cy="430" rx="115" ry="38" fill="#bcdcf7" stroke="black" stroke-width="1.6"/>
+  <text x="650" y="435" text-anchor="middle" font-size="14" fill="black">Yêu Cầu Đổi/Trả Hàng</text>
+
+  <!-- UC: Đăng Nhập Hệ Thống -->
+  <ellipse cx="470" cy="550" rx="100" ry="38" fill="#bcdcf7" stroke="black" stroke-width="1.6"/>
+  <text x="470" y="555" text-anchor="middle" font-size="14" fill="black">Đăng Nhập Hệ Thống</text>
+
+  <!-- UC: Xử Lý Đơn Hàng (có extension point) -->
+  <ellipse cx="650" cy="700" rx="100" ry="50" fill="#bcdcf7" stroke="black" stroke-width="1.6"/>
+  <text x="650" y="690" text-anchor="middle" font-size="14" fill="black">Xử Lý Đơn Hàng</text>
+  <line x1="560" y1="712" x2="740" y2="712" stroke="black" stroke-width="1"/>
+  <text x="650" y="727" text-anchor="middle" font-size="10.5" fill="black">Extension points:</text>
+  <text x="650" y="741" text-anchor="middle" font-size="10.5" fill="black">Đơn Hàng Cần Duyệt Giá</text>
+
+  <!-- UC: Duyệt Chiết Khấu Đặc Biệt -->
+  <ellipse cx="650" cy="870" rx="115" ry="38" fill="#bcdcf7" stroke="black" stroke-width="1.6"/>
+  <text x="650" y="865" text-anchor="middle" font-size="14" fill="black">Duyệt Chiết Khấu</text>
+  <text x="650" y="881" text-anchor="middle" font-size="14" fill="black">Đặc Biệt</text>
+
+  <!-- UC: Quản Lý Kho -->
+  <ellipse cx="1050" cy="1050" rx="85" ry="38" fill="#bcdcf7" stroke="black" stroke-width="1.6"/>
+  <text x="1050" y="1055" text-anchor="middle" font-size="14" fill="black">Quản Lý Kho</text>
+
+  <!-- UC: Lập Đơn Mua Hàng -->
+  <ellipse cx="1050" cy="1200" rx="100" ry="38" fill="#bcdcf7" stroke="black" stroke-width="1.6"/>
+  <text x="1050" y="1205" text-anchor="middle" font-size="14" fill="black">Lập Đơn Mua Hàng</text>
+
+  <!-- UC: Giao Hàng & Thu Tiền -->
+  <ellipse cx="1050" cy="1350" rx="115" ry="38" fill="#bcdcf7" stroke="black" stroke-width="1.6"/>
+  <text x="1050" y="1355" text-anchor="middle" font-size="14" fill="black">Giao Hàng &amp; Thu Tiền</text>
+
+  <!-- UC: Quản Lý Người Dùng & Phân Quyền -->
+  <ellipse cx="700" cy="1550" rx="125" ry="38" fill="#bcdcf7" stroke="black" stroke-width="1.6"/>
+  <text x="700" y="1545" text-anchor="middle" font-size="14" fill="black">Quản Lý Người Dùng</text>
+  <text x="700" y="1561" text-anchor="middle" font-size="14" fill="black">&amp; Phân Quyền</text>
+
+  <!-- UC: Xem Báo Cáo Thống Kê -->
+  <ellipse cx="1050" cy="1650" rx="110" ry="38" fill="#bcdcf7" stroke="black" stroke-width="1.6"/>
+  <text x="1050" y="1655" text-anchor="middle" font-size="14" fill="black">Xem Báo Cáo Thống Kê</text>
+
+  <!-- ============== ACTORS — TRÁI (chính) ============== -->
+  <!-- Khách Hàng -->
+  <g stroke="black" stroke-width="2" fill="none">
+    <circle cx="90" cy="220" r="13"/>
+    <line x1="90" y1="233" x2="90" y2="265"/>
+    <line x1="72" y1="245" x2="108" y2="245"/>
+    <line x1="90" y1="265" x2="74" y2="295"/>
+    <line x1="90" y1="265" x2="106" y2="295"/>
+  </g>
+  <text x="90" y="315" text-anchor="middle" font-size="13.5" font-weight="bold" fill="black">Khách Hàng</text>
+
+  <!-- Nhân Viên Bán Hàng -->
+  <g stroke="black" stroke-width="2" fill="none">
+    <circle cx="90" cy="670" r="13"/>
+    <line x1="90" y1="683" x2="90" y2="715"/>
+    <line x1="72" y1="695" x2="108" y2="695"/>
+    <line x1="90" y1="715" x2="74" y2="745"/>
+    <line x1="90" y1="715" x2="106" y2="745"/>
+  </g>
+  <text x="90" y="765" text-anchor="middle" font-size="13.5" font-weight="bold" fill="black">Nhân Viên Bán Hàng</text>
+
+  <!-- Nhân Viên Kho -->
+  <g stroke="black" stroke-width="2" fill="none">
+    <circle cx="90" cy="1020" r="13"/>
+    <line x1="90" y1="1033" x2="90" y2="1065"/>
+    <line x1="72" y1="1045" x2="108" y2="1045"/>
+    <line x1="90" y1="1065" x2="74" y2="1095"/>
+    <line x1="90" y1="1065" x2="106" y2="1095"/>
+  </g>
+  <text x="90" y="1115" text-anchor="middle" font-size="13.5" font-weight="bold" fill="black">Nhân Viên Kho</text>
+
+  <!-- Nhân Viên Giao Hàng -->
+  <g stroke="black" stroke-width="2" fill="none">
+    <circle cx="90" cy="1320" r="13"/>
+    <line x1="90" y1="1333" x2="90" y2="1365"/>
+    <line x1="72" y1="1345" x2="108" y2="1345"/>
+    <line x1="90" y1="1365" x2="74" y2="1395"/>
+    <line x1="90" y1="1365" x2="106" y2="1395"/>
+  </g>
+  <text x="90" y="1415" text-anchor="middle" font-size="13.5" font-weight="bold" fill="black">Nhân Viên Giao Hàng</text>
+
+  <!-- Quản Trị Viên / Ban Giám Đốc -->
+  <g stroke="black" stroke-width="2" fill="none">
+    <circle cx="90" cy="1570" r="13"/>
+    <line x1="90" y1="1583" x2="90" y2="1615"/>
+    <line x1="72" y1="1595" x2="108" y2="1595"/>
+    <line x1="90" y1="1615" x2="74" y2="1645"/>
+    <line x1="90" y1="1615" x2="106" y2="1645"/>
+  </g>
+  <text x="90" y="1665" text-anchor="middle" font-size="13.5" font-weight="bold" fill="black">Quản Trị Viên</text>
+  <text x="90" y="1681" text-anchor="middle" font-size="13.5" font-weight="bold" fill="black">/ Ban Giám Đốc</text>
+
+  <!-- Nhân Viên (actor tổng quát - generalization parent) -->
+  <g stroke="black" stroke-width="2" fill="none">
+    <circle cx="230" cy="1145" r="13"/>
+    <line x1="230" y1="1158" x2="230" y2="1190"/>
+    <line x1="212" y1="1170" x2="248" y2="1170"/>
+    <line x1="230" y1="1190" x2="214" y2="1220"/>
+    <line x1="230" y1="1190" x2="246" y2="1220"/>
+  </g>
+  <text x="230" y="1240" text-anchor="middle" font-size="13.5" font-weight="bold" fill="black">Nhân Viên</text>
+
+  <!-- ============== ACTORS — PHẢI (phụ, hệ thống ngoài) ============== -->
+  <!-- Cổng Thanh Toán -->
+  <g stroke="black" stroke-width="2" fill="none">
+    <circle cx="1520" cy="70" r="13"/>
+    <line x1="1520" y1="83" x2="1520" y2="115"/>
+    <line x1="1502" y1="95" x2="1538" y2="95"/>
+    <line x1="1520" y1="115" x2="1504" y2="145"/>
+    <line x1="1520" y1="115" x2="1536" y2="145"/>
+  </g>
+  <text x="1520" y="165" text-anchor="middle" font-size="13.5" font-weight="bold" fill="black">Cổng Thanh Toán</text>
+
+  <!-- Nhà Cung Cấp -->
+  <g stroke="black" stroke-width="2" fill="none">
+    <circle cx="1520" cy="1170" r="13"/>
+    <line x1="1520" y1="1183" x2="1520" y2="1215"/>
+    <line x1="1502" y1="1195" x2="1538" y2="1195"/>
+    <line x1="1520" y1="1215" x2="1504" y2="1245"/>
+    <line x1="1520" y1="1215" x2="1536" y2="1245"/>
+  </g>
+  <text x="1520" y="1265" text-anchor="middle" font-size="13.5" font-weight="bold" fill="black">Nhà Cung Cấp</text>
+
+  <!-- ============== LEGEND ============== -->
+  <g font-size="12.5" fill="black">
+    <rect x="382" y="1790" width="620" height="50" fill="white" stroke="black" stroke-width="1.2"/>
+    <text x="392" y="1808" font-weight="bold">Chú thích:</text>
+    <line x1="392" y1="1822" x2="430" y2="1822" stroke="black" stroke-width="1.4"/>
+    <text x="438" y="1826">Association</text>
+    <line x1="560" y1="1822" x2="598" y2="1822" stroke="black" stroke-width="1.4" stroke-dasharray="6,4" marker-end="url(#openArrow)"/>
+    <text x="606" y="1826">&#171;include&#187;/&#171;extend&#187;</text>
+    <line x1="790" y1="1822" x2="828" y2="1822" stroke="black" stroke-width="1.4" marker-end="url(#hollowTriangle)"/>
+    <text x="836" y="1826">Generalization</text>
+  </g>
+</svg>

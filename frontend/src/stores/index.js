@@ -15,6 +15,7 @@ import { useSalesStore } from './salesStore';
 import { useHRStore } from './hrStore';
 import { useFinanceStore } from './financeStore';
 import { useUtilityStore } from './utilityStore';
+import { loadRbacFromServer } from '../utils/rbacEngine';
 
 export { useInventoryStore, useSalesStore, useHRStore, useFinanceStore, useUtilityStore };
 
@@ -30,6 +31,7 @@ export const initializeAllStores = async () => {
     useHRStore.getState().initialize(),
     useFinanceStore.getState().initialize(),
     useUtilityStore.getState().initialize(),
+    loadRbacFromServer(),
   ]);
 };
 

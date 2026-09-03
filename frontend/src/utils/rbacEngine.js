@@ -1,4 +1,5 @@
 // Centralized Granular Operational RBAC Engine for AetherPC ERP
+import { api } from '../services/api';
 
 export const ERP_SYSTEM_MODULES = [
   { id: 'dashboard', name: 'Báo Cáo Tổng Quan', path: '/admin/dashboard', desc: 'Chỉ số KPI, hiệu quả kinh doanh, tài chính và điều hành', category: 'Quản Trị' },
@@ -228,24 +229,65 @@ export const DEFAULT_OPERATIONAL_MATRIX = {
   }
 };
 
-export const getOperationalRbac = () => {
-  try {
-    const raw = localStorage.getItem('erp_operational_rbac_v3');
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (typeof parsed === 'object' && parsed !== null) {
-        return { ...DEFAULT_OPERATIONAL_MATRIX, ...parsed };
-      }
-    }
-  } catch (e) {}
-  return DEFAULT_OPERATIONAL_MATRIX;
+// Ma trận này trước đây chỉ sống trong localStorage — mỗi trình duyệt một
+// trạng thái riêng, admin đổi quyền trên máy này không hề ảnh hưởng máy khác,
+// và không có cách nào biết ai đã đổi quyền gì. Giờ đọc/ghi qua API thật
+// (/api/v1/system/rbac, bảng RolePermission) — nhưng `canDo`/`hasPermission`
+// được gọi ĐỒNG BỘ ở rất nhiều nơi trong toàn bộ ứng dụng, nên vẫn cần một giá
+// trị trả về được ngay lập tức: `cachedMatrix` giữ bản đã tải gần nhất trong
+// bộ nhớ, khởi tạo bằng DEFAULT_OPERATIONAL_MATRIX cho tới khi tải xong lần
+// đầu — hành vi mặc định đúng ngay cả trong lúc chờ, không có khoảng trống
+// "mất quyền" nào khi mới load trang.
+let cachedMatrix = null;
+
+const flattenMatrix = (matrix) => {
+  const entries = [];
+  Object.entries(matrix || {}).forEach(([role, ops]) => {
+    Object.entries(ops || {}).forEach(([operationId, allowed]) => {
+      entries.push({ role, operationId, allowed: !!allowed });
+    });
+  });
+  return entries;
 };
 
-export const saveOperationalRbac = (newMatrix) => {
+const mergeRowsOntoDefaults = (rows) => {
+  const merged = {};
+  Object.keys(DEFAULT_OPERATIONAL_MATRIX).forEach(role => {
+    merged[role] = { ...DEFAULT_OPERATIONAL_MATRIX[role] };
+  });
+  (rows || []).forEach(r => {
+    if (!merged[r.role]) merged[r.role] = {};
+    merged[r.role][r.operationId] = !!r.allowed;
+  });
+  return merged;
+};
+
+// Gọi một lần khi ứng dụng khởi động (initializeAllStores) — nạp ma trận thật
+// từ DB vào cache trong bộ nhớ rồi phát 'erp-rbac-changed' để mọi component
+// đang dùng usePermission() tự re-render với dữ liệu thật.
+export const loadRbacFromServer = async () => {
   try {
-    localStorage.setItem('erp_operational_rbac_v3', JSON.stringify(newMatrix));
-    window.dispatchEvent(new Event('erp-rbac-changed'));
-  } catch (e) {}
+    const res = await api.get('/system/rbac');
+    const rows = Array.isArray(res) ? res : (res?.data || []);
+    cachedMatrix = mergeRowsOntoDefaults(rows);
+  } catch (e) {
+    console.warn('Không tải được ma trận phân quyền từ máy chủ, dùng mặc định:', e.message);
+    cachedMatrix = { ...DEFAULT_OPERATIONAL_MATRIX };
+  }
+  try { window.dispatchEvent(new Event('erp-rbac-changed')); } catch (e) {}
+  return cachedMatrix;
+};
+
+export const getOperationalRbac = () => cachedMatrix || DEFAULT_OPERATIONAL_MATRIX;
+
+export const saveOperationalRbac = async (newMatrix) => {
+  // Persist first, THEN update the in-memory cache every other component in
+  // the app reads from — updating it optimistically (before the API call
+  // resolves) meant a failed save (network error, expired session) still left
+  // the whole app enforcing an un-persisted permission set until next reload.
+  await api.put('/system/rbac', { entries: flattenMatrix(newMatrix) });
+  cachedMatrix = newMatrix;
+  try { window.dispatchEvent(new Event('erp-rbac-changed')); } catch (e) {}
 };
 
 // QC, QA và QUALITY_CONTROL là 3 giá trị role tương đương cho cùng 1 chức

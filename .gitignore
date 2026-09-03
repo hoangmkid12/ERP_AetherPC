@@ -60,3 +60,10 @@ scratch/
 backend/logs/
 backend/email_logs.json
 
+# Database backups (pg_dump) — real data, not source; keep the file on disk for
+# zip/manual transfer between machines, but don't let it bloat git history.
+# No leading slash + slash in the middle would otherwise anchor this to the
+# repo root only (backup-db.ps1 actually writes to backend/backups/) — the
+# leading **/ makes it match backups/ at any depth.
+**/backups/*.dump
+

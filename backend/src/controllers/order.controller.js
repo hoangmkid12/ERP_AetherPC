@@ -1,6 +1,7 @@
 const prisma = require('../config/database');
 const { sendOrderConfirmationEmail, sendOrderStatusUpdateEmail } = require('../services/emailService');
 const { claimAvailableSerials } = require('../utils/serialAllocation');
+const { hasOperationalPermission } = require('../middlewares/rbac.middleware');
 
 const LOYALTY_VND_PER_POINT = 10000; // 10.000 VNĐ = 1 điểm
 
@@ -440,6 +441,20 @@ const updateOrderStatus = async (req, res, next) => {
 
       if (!existingOrder) {
         throw new Error('Không tìm thấy đơn hàng trong hệ thống');
+      }
+
+      // This route carries every order status transition (confirm, pack, ship,
+      // deliver...), so the operational permission check can't sit at the
+      // router level — only the actual cancel action is gated by the
+      // admin-configurable RBAC matrix. Skip on a no-op resubmit of an
+      // already-cancelled order (frontend double-submit race).
+      if (status === 'CANCELLED' && existingOrder.status !== 'CANCELLED') {
+        const allowed = await hasOperationalPermission(req.user?.role, 'sales_cancel_order');
+        if (!allowed) {
+          const error = new Error('Tài khoản của bạn không có quyền hủy đơn hàng (đã bị quản trị viên tắt trong Ma Trận Phân Quyền).');
+          error.statusCode = 403;
+          throw error;
+        }
       }
 
       // Xử lý trừ kho khi chuyển sang trạng thái đã duyệt (CONFIRMED / PACKED / PROCESSING / READY_TO_SHIP)

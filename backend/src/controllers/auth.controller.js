@@ -2,6 +2,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const prisma = require('../config/database');
 const { sendWelcomeEmail } = require('../services/emailService');
+const { logAudit } = require('../utils/auditLog');
 
 const getJWTSecret = () => {
   const secret = process.env.JWT_SECRET;
@@ -196,18 +197,23 @@ const loginEmployee = async (req, res, next) => {
     }
 
     if (!user) {
+      logAudit({ req, action: 'LOGIN', module: 'Bảo Mật', status: 'FAILED', note: `Không tìm thấy tài khoản: ${loginIdentifier}`, actorOverride: { id: null, name: loginIdentifier, role: null } });
       return res.status(401).json({ success: false, message: 'Invalid credentials' });
     }
 
     const isMatch = await bcrypt.compare(password, user.passwordHash);
     if (!isMatch) {
+      logAudit({ req, action: 'LOGIN', module: 'Bảo Mật', status: 'FAILED', note: 'Sai mật khẩu', actorOverride: { id: isSupplier ? user.code : user.id, name: loginIdentifier, role } });
       return res.status(401).json({ success: false, message: 'Invalid credentials' });
     }
 
     if (isSupplier) {
-      tokenPayload = { id: user.code, code: user.code, email: user.email, role: 'SUPPLIER', department: 'SUPPLY' };
+      // `name` here is the supplier's real company name — without it, every audit-trail
+      // "changedBy" for a supplier action (RFQ status history, GRN confirmation, etc.)
+      // fell back to the raw login email, which reads poorly next to CEO/staff names.
+      tokenPayload = { id: user.code, code: user.code, email: user.email, name: user.name, role: 'SUPPLIER', department: 'SUPPLY' };
     } else {
-      tokenPayload = { id: user.id, code: user.employeeCode, email: user.email, role: user.role, department: user.department };
+      tokenPayload = { id: user.id, code: user.employeeCode, email: user.email, name: user.fullName, role: user.role, department: user.department };
     }
 
     const token = jwt.sign(
@@ -429,6 +435,7 @@ const changePassword = async (req, res, next) => {
         where: { customerId: req.user.id },
         data: { passwordHash: newHash }
       });
+      logAudit({ req, action: 'CHANGE_PASSWORD', module: 'Bảo Mật', targetId: req.user.id });
       return res.json({ success: true, message: 'Đổi mật khẩu thành công!' });
     } else if (req.user.role === 'SUPPLIER') {
       const supplier = await prisma.supplier.findUnique({
@@ -447,6 +454,7 @@ const changePassword = async (req, res, next) => {
         where: { code: req.user.id },
         data: { passwordHash: newHash }
       });
+      logAudit({ req, action: 'CHANGE_PASSWORD', module: 'Bảo Mật', targetId: req.user.id });
       return res.json({ success: true, message: 'Đổi mật khẩu thành công!' });
     } else {
       const employeeId = parseInt(req.user.id);
@@ -469,6 +477,7 @@ const changePassword = async (req, res, next) => {
         where: { id: employeeId },
         data: { passwordHash: newHash }
       });
+      logAudit({ req, action: 'CHANGE_PASSWORD', module: 'Bảo Mật', targetId: employeeId });
       return res.json({ success: true, message: 'Đổi mật khẩu thành công!' });
     }
   } catch (err) {

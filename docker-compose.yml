@@ -97,6 +97,13 @@ services:
     restart: always
     ports:
       - "3000:3000"
+    # frontend/.env hardcodes VITE_API_PROXY_TARGET=http://localhost:5000 for
+    # running "npm run dev" outside Docker. Inside the frontend container,
+    # "localhost" is the container itself (nothing listens on :5000 there),
+    # so override it to the Docker Compose service name — same pattern as
+    # the DATABASE_URL override on the backend service below.
+    environment:
+      - VITE_API_PROXY_TARGET=http://backend:5000
     volumes:
       - ./frontend:/app
       - /app/node_modules

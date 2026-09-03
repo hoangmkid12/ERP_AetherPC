@@ -1,0 +1,284 @@
+digraph UseCaseAetherPC {
+  charset="UTF-8";
+  graph [rankdir=LR, splines=ortho, overlap=false, nodesep=0.45, ranksep=2.2,
+         fontname="Arial", bgcolor=white, compound=true,
+         label="Xây Dựng Và Triển Khai Hệ Thống ERP Cho Doanh Nghiệp AetherPC",
+         labelloc=t, fontsize=20, fontcolor="#111111"];
+  node [fontname="Arial", fontsize=11, color="#333333"];
+  edge [color="#555555", arrowsize=0.7, fontsize=9];
+
+  // ============================================================
+  // SYSTEM BOUNDARY — nhãn khung là TÊN HỆ THỐNG ("Hệ Thống ERP
+  // AetherPC"), khác với label toàn graph ở trên là TÊN ĐỀ TÀI —
+  // đúng theo góp ý: 2 nhãn khác vai trò không được dùng chung 1 chữ.
+  // ============================================================
+  subgraph cluster_system {
+    label="Hệ Thống ERP AetherPC";
+    fontsize=15;
+    fontname="Arial";
+    labelloc=t;
+    style=solid;
+    color="#333333";
+    margin=30;
+    node [shape=ellipse, style=filled, fillcolor=white, width=1.8];
+
+    // ---------- CỘT 2 — USE CASE CỦA CÁC ACTOR CỘT 1 ----------
+    // Khách Vãng Lai (2)
+    uc_xemsp    [label="Xem / Tìm\nSản Phẩm"];
+    uc_dangky   [label="Đăng Ký\nTài Khoản"];
+    // Khách Hàng (7)
+    uc_dathang  [label="Đặt Hàng"];
+    uc_suahuy   [label="Sửa / Hủy\nĐơn Hàng"];
+    uc_theodoi  [label="Theo Dõi\nĐơn Hàng"];
+    uc_hoso     [label="Quản Lý Hồ Sơ\n& Sổ Địa Chỉ"];
+    uc_danhgia  [label="Đánh Giá\nSản Phẩm"];
+    uc_khieunai [label="Gửi Khiếu Nại /\nĐổi Trả"];
+    uc_chatkh   [label="Chat Hỗ Trợ\nTrực Tuyến"];
+    // Nhân Viên CSKH (2)
+    uc_chat      [label="Trả Lời Chat\nTrực Tuyến"];
+    uc_xlkhieunai[label="Xử Lý\nKhiếu Nại"];
+    // Nhà Cung Cấp (2 — đã gộp "Xem Đơn Mua Hàng Của Mình" vào 2 UC
+    // dưới vì đó chỉ là thao tác xem trước khi phản hồi/xác nhận,
+    // không phải mục tiêu nghiệp vụ riêng — sửa theo góp ý mục 4)
+    uc_phanhoi  [label="Phản Hồi\nBáo Giá (RFQ)"];
+    uc_xacnhanpo[label="Xác Nhận Đơn\nMua Hàng (PO)"];
+    // Nhân Viên Bán Hàng (2)
+    uc_pos       [label="Bán Hàng Tại\nQuầy (POS)"];
+    uc_xldonhang [label="Xử Lý & Cập Nhật\nĐơn Hàng"];
+    // Quản Lý Bán Hàng (1)
+    uc_duyethuy  [label="Duyệt Hủy\nĐơn Hàng"];
+    // Nhân Viên Mua Hàng (3)
+    uc_qlncc     [label="Quản Lý & Đánh\nGiá Nhà Cung Cấp"];
+    uc_rfq       [label="Lập RFQ & So\nSánh Báo Giá"];
+    uc_taopo     [label="Tạo Đơn Mua\nHàng (PO)"];
+    // Nhân Viên QC (2)
+    uc_qa        [label="Kiểm Tra Chất\nLượng Hàng Nhập (QA)"];
+    uc_qctra     [label="Thẩm Định\nHàng Hoàn Trả"];
+
+    { rank=same;
+      uc_xemsp; uc_dangky;
+      uc_dathang; uc_suahuy; uc_theodoi; uc_hoso; uc_danhgia; uc_khieunai; uc_chatkh;
+      uc_chat; uc_xlkhieunai;
+      uc_phanhoi; uc_xacnhanpo;
+      uc_pos; uc_xldonhang;
+      uc_duyethuy;
+      uc_qlncc; uc_rfq; uc_taopo;
+      uc_qa; uc_qctra;
+    }
+    uc_xemsp -> uc_dangky
+      -> uc_dathang -> uc_suahuy -> uc_theodoi -> uc_hoso -> uc_danhgia -> uc_khieunai -> uc_chatkh
+      -> uc_chat -> uc_xlkhieunai
+      -> uc_phanhoi -> uc_xacnhanpo
+      -> uc_pos -> uc_xldonhang
+      -> uc_duyethuy
+      -> uc_qlncc -> uc_rfq -> uc_taopo
+      -> uc_qa -> uc_qctra [style=invis];
+
+    // ---------- CỘT 3 — USE CASE DÙNG CHUNG ----------
+    // Đã BỎ "Đăng Nhập Hệ Thống" khỏi sơ đồ (góp ý mục 2): đăng nhập là
+    // precondition của gần như mọi use case, không phải bước con bên
+    // trong 1 luồng nghiệp vụ cụ thể — đúng chuẩn UML phải ghi ở phần
+    // Precondition của bảng đặc tả use case, không vẽ <<include>>.
+    // Chỉ còn 1 use case dùng chung thật sự là sub-flow bắt buộc của
+    // nhiều actor khác nhau: kiểm tra/trừ tồn kho.
+    uc_tonkho   [label="Kiểm Tra & Cập\nNhật Tồn Kho"];
+
+    // Cầu nối rank vô hình cột 3 → cột 4: cạnh include thật duy nhất nối
+    // 2 cụm này (uc_xuatkho -> uc_tonkho) bị đánh dấu constraint=false
+    // (do ngược chiều rank cột 4→cột 3) nên cần 1 cạnh ẩn thay thế, nếu
+    // không 2 cụm sẽ thành rời rạc và dot xếp sai rank (lỗi đã gặp).
+    uc_tonkho -> uc_grn [style=invis];
+
+    // ---------- CỘT 4 — USE CASE CỦA CÁC ACTOR CỘT 5 ----------
+    // Nhân Viên Kho (1 — đã gộp "Xem Lịch Sử Điều Chuyển Kho" vào GRN:
+    // gộp theo tiêu chí mục 4, vì xem lịch sử chỉ là 1 màn hình tra cứu
+    // đi kèm nghiệp vụ nghiệm thu, không phải mục tiêu riêng của actor)
+    uc_grn       [label="Nghiệm Thu Hàng Nhập\n& Theo Dõi Kho (GRN)"];
+    // Quản Lý Kho (3)
+    uc_xuatkho   [label="Xác Nhận Xuất Kho\n& P.Công Shipper"];
+    uc_kiemke    [label="Điều Chỉnh /\nKiểm Kê Kho"];
+    uc_danhmucsp [label="Quản Lý Danh\nMục Sản Phẩm"];
+    // Nhân Viên Lắp Ráp (2)
+    uc_nhanlenh  [label="Nhận Lệnh\nLắp Ráp PC"];
+    uc_tiendo    [label="Cập Nhật Tiến\nĐộ Lắp Ráp"];
+    // Nhân Viên Giao Hàng (2)
+    uc_giaohang  [label="Giao Hàng &\nThu Tiền COD"];
+    uc_thuhoi    [label="Thu Hồi Hàng Bảo\nHành / Hoàn Trả"];
+    // Nhân Viên Kế Toán (4)
+    uc_socai     [label="Quản Lý Sổ\nCái Thu Chi"];
+    uc_ttncc     [label="Thanh Toán\nNhà Cung Cấp"];
+    uc_hoantien  [label="Giải Ngân Hoàn\nTiền Khách Hàng"];
+    uc_luong     [label="Giải Ngân\nLương Nhân Viên"];
+    // Nhân Viên Nhân Sự (4)
+    uc_hosonv    [label="Quản Lý Hồ Sơ\nNhân Viên"];
+    uc_chamcong  [label="Chấm Công\nHàng Ngày"];
+    uc_lapluong  [label="Lập Bảng\nLương"];
+    uc_nghiphep  [label="Duyệt / Quản Lý\nNghỉ Phép"];
+    // Quản Trị Viên (2 — đã gộp "Xem Nhật Ký Kiểm Toán" vào use case
+    // quản lý tài khoản, cùng tiêu chí gộp UC "Xem..." ở mục 4)
+    uc_qltk      [label="Quản Trị Tài Khoản,\nPhân Quyền & Nhật Ký"];
+    uc_backup    [label="Sao Lưu & Phục\nHồi Dữ Liệu"];
+    // Ban Giám Đốc (3)
+    uc_duyetpo    [label="Duyệt Đơn Mua\nHàng (PO)"];
+    uc_duyetluong [label="Duyệt Bảng Lương\nToàn Công Ty"];
+    uc_dashboard  [label="Xem Báo Cáo &\nDashboard Tổng Thể"];
+
+    { rank=same;
+      uc_tonkho;
+      uc_grn;
+      uc_xuatkho; uc_kiemke; uc_danhmucsp;
+      uc_nhanlenh; uc_tiendo;
+      uc_giaohang; uc_thuhoi;
+      uc_socai; uc_ttncc; uc_hoantien; uc_luong;
+      uc_hosonv; uc_chamcong; uc_lapluong; uc_nghiphep;
+      uc_qltk; uc_backup;
+      uc_duyetpo; uc_duyetluong; uc_dashboard;
+    }
+    uc_grn
+      -> uc_xuatkho -> uc_kiemke -> uc_danhmucsp
+      -> uc_nhanlenh -> uc_tiendo
+      -> uc_giaohang -> uc_thuhoi
+      -> uc_socai -> uc_ttncc -> uc_hoantien -> uc_luong
+      -> uc_hosonv -> uc_chamcong -> uc_lapluong -> uc_nghiphep
+      -> uc_qltk -> uc_backup
+      -> uc_duyetpo -> uc_duyetluong -> uc_dashboard [style=invis];
+  }
+
+  // ============================================================
+  // CỘT 1 — 8 ACTOR (trái, NẰM NGOÀI boundary) — người que UML
+  // ============================================================
+  node [shape=plaintext];
+  a1 [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="2"><TR><TD><IMG SRC="actor_icon.png"/></TD></TR><TR><TD>Khách Vãng Lai</TD></TR></TABLE>>];
+  a2 [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="2"><TR><TD><IMG SRC="actor_icon.png"/></TD></TR><TR><TD>Khách Hàng<BR/>(Thành Viên)</TD></TR></TABLE>>];
+  a6 [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="2"><TR><TD><IMG SRC="actor_icon.png"/></TD></TR><TR><TD>Nhân Viên CSKH</TD></TR></TABLE>>];
+  a3 [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="2"><TR><TD><IMG SRC="actor_icon.png"/></TD></TR><TR><TD>Nhà Cung Cấp</TD></TR></TABLE>>];
+  a4 [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="2"><TR><TD><IMG SRC="actor_icon.png"/></TD></TR><TR><TD>Nhân Viên<BR/>Bán Hàng</TD></TR></TABLE>>];
+  a5 [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="2"><TR><TD><IMG SRC="actor_icon.png"/></TD></TR><TR><TD>Quản Lý<BR/>Bán Hàng</TD></TR></TABLE>>];
+  a7 [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="2"><TR><TD><IMG SRC="actor_icon.png"/></TD></TR><TR><TD>Nhân Viên<BR/>Mua Hàng</TD></TR></TABLE>>];
+  a8 [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="2"><TR><TD><IMG SRC="actor_icon.png"/></TD></TR><TR><TD>Nhân Viên QC</TD></TR></TABLE>>];
+  { rank=same; a1; a2; a6; a3; a4; a5; a7; a8; }
+  // Thứ tự: CSKH (a6) ngay sau Khách Hàng (a2) để đường extend
+  // "Xử Lý Khiếu Nại → Gửi Khiếu Nại" ngắn, không đi vòng cả sơ đồ.
+  a1 -> a2 -> a6 -> a3 -> a4 -> a5 -> a7 -> a8 [style=invis];
+
+  // ============================================================
+  // CỘT 5 — 9 ACTOR (phải, NẰM NGOÀI boundary) — thêm actor hệ thống
+  // ngoài «system» Hệ Thống Email (SMTP/nodemailer có thật, xem
+  // backend/src/services/emailService.js) theo góp ý mục 8.
+  // ============================================================
+  a9  [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="2"><TR><TD><IMG SRC="actor_icon.png"/></TD></TR><TR><TD>Nhân Viên Kho</TD></TR></TABLE>>];
+  a10 [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="2"><TR><TD><IMG SRC="actor_icon.png"/></TD></TR><TR><TD>Quản Lý Kho</TD></TR></TABLE>>];
+  a11 [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="2"><TR><TD><IMG SRC="actor_icon.png"/></TD></TR><TR><TD>Nhân Viên<BR/>Lắp Ráp</TD></TR></TABLE>>];
+  a12 [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="2"><TR><TD><IMG SRC="actor_icon.png"/></TD></TR><TR><TD>Nhân Viên<BR/>Giao Hàng</TD></TR></TABLE>>];
+  a17 [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="2"><TR><TD><IMG SRC="actor_icon.png"/></TD></TR><TR><TD>«system»<BR/>Hệ Thống Email</TD></TR></TABLE>>];
+  a13 [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="2"><TR><TD><IMG SRC="actor_icon.png"/></TD></TR><TR><TD>Nhân Viên<BR/>Kế Toán</TD></TR></TABLE>>];
+  a14 [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="2"><TR><TD><IMG SRC="actor_icon.png"/></TD></TR><TR><TD>Nhân Viên<BR/>Nhân Sự</TD></TR></TABLE>>];
+  a15 [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="2"><TR><TD><IMG SRC="actor_icon.png"/></TD></TR><TR><TD>Quản Trị Viên</TD></TR></TABLE>>];
+  a16 [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="2"><TR><TD><IMG SRC="actor_icon.png"/></TD></TR><TR><TD>Ban Giám Đốc</TD></TR></TABLE>>];
+  { rank=same; a9; a10; a11; a12; a17; a13; a14; a15; a16; }
+  // a17 (Hệ Thống Email) đặt cạnh Giao Hàng vì email trạng thái đơn
+  // hàng gắn với bước xuất kho/giao hàng — không đi vòng xa.
+  a9 -> a10 -> a11 -> a12 -> a17 -> a13 -> a14 -> a15 -> a16 [style=invis];
+
+  // ============================================================
+  // ASSOCIATION — Actor cột 1 ↔ Use case cột 2 (liền kề)
+  // ============================================================
+  edge [style=solid, dir=none, arrowhead=none, label=""];
+  a1 -> uc_xemsp;
+  a1 -> uc_dangky;
+  a2 -> uc_dathang;
+  a2 -> uc_suahuy;
+  a2 -> uc_theodoi;
+  a2 -> uc_hoso;
+  a2 -> uc_danhgia;
+  a2 -> uc_khieunai;
+  a2 -> uc_chatkh;
+  a6 -> uc_chat;
+  a6 -> uc_xlkhieunai;
+  a3 -> uc_phanhoi;
+  a3 -> uc_xacnhanpo;
+  a4 -> uc_pos;
+  a4 -> uc_xldonhang;
+  a5 -> uc_duyethuy;
+  a7 -> uc_qlncc;
+  a7 -> uc_rfq;
+  a7 -> uc_taopo;
+  a8 -> uc_qa;
+  a8 -> uc_qctra;
+
+  // ============================================================
+  // ASSOCIATION — Use case cột 4 ↔ Actor cột 5 (liền kề)
+  // Chiều edge phải là uc -> actor (không phải actor -> uc) để dot xếp
+  // đúng thứ tự rank trái→phải; arrowhead=none nên không hiện mũi tên,
+  // đúng ý nghĩa Association 2 chiều dù chiều edge kỹ thuật là 1 chiều.
+  // ============================================================
+  uc_grn -> a9;
+  uc_xuatkho -> a10; uc_kiemke -> a10; uc_danhmucsp -> a10;
+  uc_nhanlenh -> a11; uc_tiendo -> a11;
+  uc_giaohang -> a12; uc_thuhoi -> a12;
+  uc_socai -> a13; uc_ttncc -> a13; uc_hoantien -> a13; uc_luong -> a13;
+  uc_hosonv -> a14; uc_chamcong -> a14; uc_lapluong -> a14; uc_nghiphep -> a14;
+  uc_qltk -> a15; uc_backup -> a15;
+  uc_duyetpo -> a16; uc_duyetluong -> a16; uc_dashboard -> a16;
+  // Hệ Thống Email gửi thư xác nhận đơn hàng & thông báo trạng thái
+  // giao hàng — bám đúng 2 hàm thật trong emailService.js
+  // (sendOrderConfirmationEmail, sendOrderStatusUpdateEmail).
+  uc_xuatkho -> a17 [style=dashed];
+  uc_giaohang -> a17 [style=dashed];
+
+  // ============================================================
+  // GENERALIZATION — 3 quan hệ, tam giác rỗng LUÔN nằm ở đầu actor
+  // TỔNG QUÁT (cha), mũi tên hướng TỪ actor cụ thể (con) ĐẾN actor
+  // tổng quát — đã sửa lỗi chiều mũi tên (mục 5): trước đây dùng
+  // dir=back + arrowtail khiến tam giác rơi vào đầu Khách Hàng thay
+  // vì Khách Vãng Lai. Cách đúng: dir=forward (mặc định) + arrowhead=
+  // empty, vì head của cạnh actor_con -> actor_cha CHÍNH LÀ actor cha.
+  // ============================================================
+  a2  -> a1 [arrowhead=empty, style=solid, constraint=false, weight=0];
+  // Quản Lý Kho làm được mọi việc Nhân Viên Kho làm (toàn bộ route
+  // warehouse.routes.js cho phép cả 2 role WAREHOUSE/WAREHOUSE_MANAGER)
+  // cộng thêm quyền riêng (duyệt xuất kho, quản lý danh mục SP) — đủ
+  // điều kiện generalization thật, không chỉ là 2 actor cùng phòng ban.
+  a10 -> a9 [arrowhead=empty, style=solid, constraint=false, weight=0];
+  // Tương tự: Quản Lý Bán Hàng làm được mọi việc Nhân Viên Bán Hàng
+  // làm (POS, xử lý đơn) cộng thêm quyền duyệt hủy đơn riêng.
+  a5  -> a4 [arrowhead=empty, style=solid, constraint=false, weight=0];
+
+  // ============================================================
+  // INCLUDE — chỉ còn 3 quan hệ, tất cả cùng trỏ về use case dùng
+  // chung duy nhất "Kiểm Tra & Cập Nhật Tồn Kho" (đã bỏ Đăng Nhập,
+  // xem giải trình ở khai báo use case cột 3 phía trên).
+  // ============================================================
+  edge [style=dashed, dir=forward, arrowhead=vee, fontname="Arial", fontsize=9];
+  uc_dathang -> uc_tonkho [xlabel="«include»"];
+  uc_pos     -> uc_tonkho [xlabel="«include»"];
+  uc_xuatkho -> uc_tonkho [xlabel="«include»", constraint=false];
+
+  // ============================================================
+  // EXTEND — 3 quan hệ, mỗi quan hệ có 1 UC gốc + 1 UC mở rộng rõ
+  // ràng, không dùng chung use case gốc với include (tránh mơ hồ
+  // include/extend cùng 1 cặp — góp ý mục 3).
+  // ============================================================
+  uc_duyethuy   -> uc_xldonhang [xlabel="«extend»"];
+  uc_danhgia    -> uc_theodoi   [xlabel="«extend»"];
+  uc_xlkhieunai -> uc_khieunai  [xlabel="«extend»"];
+
+  // ============================================================
+  // LEGEND — bắt buộc phải có khi sơ đồ nhiều loại quan hệ (góp ý mục 9)
+  // ============================================================
+  subgraph cluster_legend {
+    label="Chú Thích";
+    fontsize=13;
+    fontname="Arial";
+    style=solid;
+    color="#333333";
+    margin=15;
+    node [shape=point, width=0.01, style=invis];
+    edge [fontname="Arial", fontsize=10, fontcolor="#111111"];
+    { rank=same; l1a; l1b; l2a; l2b; l3a; l3b; l4a; l4b; }
+    l1a -> l1b [dir=none, taillabel="", label="   Association (actor thực hiện use case)"];
+    l2a -> l2b [style=dashed, arrowhead=vee, label="   <<include>> (luôn thực hiện — UC gốc → UC được include)"];
+    l3a -> l3b [style=dashed, arrowhead=vee, label="   <<extend>> (tùy chọn — UC mở rộng → UC gốc)"];
+    l4a -> l4b [arrowhead=empty, label="   Generalization (actor con → actor cha, kế thừa mọi hành vi)"];
+  }
+}

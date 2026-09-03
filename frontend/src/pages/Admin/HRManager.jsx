@@ -285,7 +285,7 @@ export default function HRManager() {
         <div>
           <h2 style={{ fontSize: '1.35rem', fontWeight: 800, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <Users size={24} style={{ color: '#2563eb' }} />
-            {activeTab === 'overview' && 'Tổng Quan Nhân Sự Toàn Doanh Nghiệp (HR Dashboard)'}
+            {activeTab === 'overview' && 'Tổng Quan Nhân Sự Toàn Doanh Nghiệp'}
             {activeTab === 'attendance' && 'Chấm Công & Giám Sát Chuyên Cần Hàng Ngày'}
             {activeTab === 'employees' && 'Hồ Sơ Nhân Sự & Hợp Đồng Lao Động'}
             {activeTab === 'leaves' && 'Quản Lý Đơn Xin Nghỉ Phép'}
@@ -435,8 +435,8 @@ export default function HRManager() {
                 {leaveRequests.filter(l => l.status === 'PENDING' || l.status === 'PENDING_CEO').slice(0, 3).map((l, lIdx) => (
                   <div key={l.id || lIdx} style={{ padding: '0.65rem 0.85rem', borderRadius: '6px', border: '1px solid #e2e8f0', backgroundColor: '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
-                      <strong style={{ fontSize: '0.82rem', color: '#0f172a' }}>{l.employeeName || 'Nguyễn Văn Nam'}</strong>
-                      <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block' }}>Lý do: {l.reason || 'Nghỉ ốm'} (Từ {l.startDate || '18/08'})</span>
+                      <strong style={{ fontSize: '0.82rem', color: '#0f172a' }}>{l.employee?.fullName || `Nhân viên #${l.employeeId ?? l.id}`}</strong>
+                      <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block' }}>Lý do: {l.reason || 'Nghỉ ốm'} (Từ {l.startDate ? new Date(l.startDate).toLocaleDateString('vi-VN') : '---'})</span>
                     </div>
                     <button
                       onClick={() => setTab('leaves')}
@@ -712,9 +712,9 @@ export default function HRManager() {
               <tbody>
                 {leaveRequests.map((lv, lIdx) => (
                   <tr key={lv.id || lIdx} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                    <td style={{ padding: '0.65rem 0.85rem', fontWeight: 700, color: '#0f172a' }}>{lv.employeeName || 'Nguyễn Văn Nam'}</td>
+                    <td style={{ padding: '0.65rem 0.85rem', fontWeight: 700, color: '#0f172a' }}>{lv.employee?.fullName || `Nhân viên #${lv.employeeId ?? lv.id}`}</td>
                     <td style={{ padding: '0.65rem 0.85rem', color: '#2563eb', fontWeight: 600 }}>{lv.type || 'Phép Năm'}</td>
-                    <td style={{ padding: '0.65rem 0.85rem', color: '#475569' }}>{lv.startDate || '18/08/2026'} → {lv.endDate || '19/08/2026'}</td>
+                    <td style={{ padding: '0.65rem 0.85rem', color: '#475569' }}>{lv.startDate ? new Date(lv.startDate).toLocaleDateString('vi-VN') : '---'} → {lv.endDate ? new Date(lv.endDate).toLocaleDateString('vi-VN') : '---'}</td>
                     <td style={{ padding: '0.65rem 0.85rem', color: '#64748b' }}>"{lv.reason || 'Có việc gia đình'}"</td>
                     <td style={{ padding: '0.65rem 0.85rem' }}>
                       {/* Bất kỳ trạng thái nào khác APPROVED/REJECTED (kể cả PENDING_CEO) đều coi là "Chờ Duyệt" — giữ đúng hành vi gốc trước khi có dictionary chung. */}
@@ -865,7 +865,7 @@ export default function HRManager() {
               </div>
 
               <div>
-                <label style={{ display: 'block', fontWeight: 700, color: '#0f172a', marginBottom: '0.3rem' }}>Chức danh (Role) *</label>
+                <label style={{ display: 'block', fontWeight: 700, color: '#0f172a', marginBottom: '0.3rem' }}>Chức danh *</label>
                 <select
                   value={newEmpForm.role}
                   onChange={e => {
@@ -916,7 +916,7 @@ export default function HRManager() {
 
                   <div style={{ backgroundColor: '#eff6ff', padding: '0.75rem', borderRadius: '8px', border: '1.5px solid #bfdbfe' }}>
                     <label style={{ display: 'block', fontWeight: 800, color: '#1e40af', marginBottom: '0.35rem' }}>
-                      Khu Vực Giao Hàng Đảm Nhiệm (Delivery Region) *
+                      Khu Vực Giao Hàng Đảm Nhiệm *
                     </label>
                     <select
                       value={newEmpForm.deliveryRegion || 'HCM_KV1'}

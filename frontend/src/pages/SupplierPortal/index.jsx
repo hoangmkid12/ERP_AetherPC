@@ -73,29 +73,21 @@ export default function SupplierPortal() {
         try {
           latestLocalPOs = JSON.parse(localStorage.getItem('erp_pos') || '[]');
         } catch (e) { latestLocalPOs = purchaseOrders; }
-        
-        // Merge: for POs that exist in both API and local, prefer local if local has items with prices
-        const mergedPOs = apiPOs.map(apiPo => {
-          const localPo = latestLocalPOs.find(lp => lp.poNumber === apiPo.poNumber || String(lp.id) === String(apiPo.id));
-          if (localPo && (
-            ['CONFIRMED_BY_SUPPLIER', 'QA_PASSED', 'QA_PARTIAL', 'QA_REJECTED', 'RECEIVED'].includes(localPo.status) ||
-            (localPo.items && localPo.items.some(i => (i.unitCost || i.unitPrice || i.price) > 0))
-          )) {
-            return { ...apiPo, ...localPo };
-          }
-          return apiPo;
-        });
-        
-        // Only let stale localStorage/context POs introduce brand-new rows when the
-        // real API genuinely returned nothing — once it has data, it's authoritative
-        // on which POs exist, so old local-only entries (possibly carrying ad-hoc
-        // status values that were never real backend statuses) can't inject phantom orders.
-        const contextPOs = apiPOs.length === 0
-          ? latestLocalPOs.filter(po =>
-              !apiPOs.some(ap => ap.poNumber === po.poNumber || String(ap.id) === String(po.id))
-            )
-          : [];
-        const formattedOrders = [...mergedPOs, ...contextPOs].map(po => ({
+
+        // NOTE: this used to merge a cached local copy of each PO on top of the fresh
+        // API response ("prefer local if it has items with prices"), meaning a stale
+        // localStorage snapshot — from an earlier/aborted quote attempt, or a PO whose
+        // items never had a real numeric `id` (e.g. the Warehouse backorder-RFQ flow) —
+        // could silently overwrite the price a supplier had just quoted and the backend
+        // had correctly saved. That's the "I enter one price and it confirms a different
+        // one" bug: once the API has this PO, it is authoritative, full stop — the same
+        // rule already applied to Purchasing.jsx and Warehouse.jsx's own PO fetches.
+        //
+        // Local/context data may still introduce a PO the API doesn't know about yet.
+        const contextPOs = latestLocalPOs.filter(po =>
+          !apiPOs.some(ap => ap.poNumber === po.poNumber || String(ap.id) === String(po.id))
+        );
+        const formattedOrders = [...apiPOs, ...contextPOs].map(po => ({
           ...po,
           poNumber: formatPurchaseReference(po)
         }));
@@ -257,18 +249,11 @@ export default function SupplierPortal() {
 
   // Initialize price inputs and delivery date when selecting a PO
   const handleSelectPO = (po) => {
-    // Read freshest PO data from localStorage to ensure quoted prices are included
-    let freshPO = po;
-    try {
-      const allLocalPOs = JSON.parse(localStorage.getItem('erp_pos') || '[]');
-      const localMatch = allLocalPOs.find(lp => 
-        lp.poNumber === po.poNumber || String(lp.id) === String(po.id)
-      );
-      if (localMatch) {
-        // Merge: prefer local data (which has updated items with prices)
-        freshPO = { ...po, ...localMatch };
-      }
-    } catch (e) { /* fallback to po as-is */ }
+    // `po` already comes from `orders`, which fetchData() populates from the real API
+    // (authoritative once it has this PO) — merging a cached localStorage copy on top
+    // here re-introduced the exact same "stale price overwrites the real one" bug that
+    // was just fixed in fetchData(), just triggered by opening a PO instead of listing it.
+    const freshPO = po;
 
     setSelectedPO(freshPO);
     const defaultDate = freshPO.expectedDeliveryDate 
@@ -510,25 +495,51 @@ export default function SupplierPortal() {
   const [activeTab, setActiveTab] = useState('orders'); // 'orders' or 'finance'
   const [statusFilter, setStatusFilter] = useState('ALL');
 
-  // Financial calculations for supplier
+  // Financial calculations for supplier — must cover the FULL post-quote lifecycle
+  // (QUOTED -> PO -> CONFIRMED_BY_SUPPLIER -> PENDING_QA -> QA_PASSED/PARTIAL -> RECEIVED
+  // -> DONE), not just the two endpoints. Missing the intermediate statuses used to make
+  // an order's value briefly vanish from every KPI the moment the supplier shipped it —
+  // it fell out of "pending" (no longer QUOTED/PO) but wasn't "earned" (not DONE, which
+  // only happens once Accounting has also fully paid the vendor bill).
+  const AWAITING_PAYMENT_STATUSES = ['QUOTED', 'PO', 'CONFIRMED_BY_SUPPLIER', 'PENDING_QA', 'QA_PASSED', 'QA_PARTIAL', 'RECEIVED'];
+  const SUPPLIED_STATUSES = ['CONFIRMED_BY_SUPPLIER', 'PENDING_QA', 'QA_PASSED', 'QA_PARTIAL', 'QA_REJECTED', 'RECEIVED', 'DONE'];
+
   const earnedRevenue = myPOs
     .filter(po => po.status === 'DONE')
     .reduce((sum, po) => sum + (parseFloat(po.totalAmount) || 0), 0);
 
   const pendingRevenue = myPOs
-    .filter(po => ['PO', 'QUOTED'].includes(po.status))
+    .filter(po => AWAITING_PAYMENT_STATUSES.includes(po.status))
     .reduce((sum, po) => sum + (parseFloat(po.totalAmount) || 0), 0);
 
-  const fulfilledCount = myPOs.filter(po => ['PO', 'DONE'].includes(po.status)).length;
+  // "Đơn Hàng Đã Cung Cấp" = orders the supplier has actually shipped — 'PO' alone
+  // (CEO approved, supplier hasn't even confirmed delivery yet) was never "supplied".
+  const fulfilledCount = myPOs.filter(po => SUPPLIED_STATUSES.includes(po.status)).length;
 
   const totalQuotedVal = myPOs
-    .filter(po => ['QUOTED', 'PO', 'DONE'].includes(po.status))
+    .filter(po => ['QUOTED', ...AWAITING_PAYMENT_STATUSES, 'DONE'].includes(po.status))
     .reduce((sum, po) => sum + (parseFloat(po.totalAmount) || 0), 0);
+
+  // Covers the full PO lifecycle — the old chip list only had 6 exact-match statuses
+  // (RFQ_SENT/QUOTED/PO/DONE/CANCELLED) out of ~13 real ones, so any order sitting in
+  // the middle of fulfillment (confirmed, awaiting QC, QC passed/rejected, received)
+  // had nowhere to be found except "Tất cả".
+  const STATUS_FILTER_GROUPS = [
+    { id: 'ALL', label: 'Tất cả', match: null },
+    { id: 'RFQ_SENT', label: 'Chờ Báo Giá', match: ['RFQ', 'RFQ_SENT', 'SENT'] },
+    { id: 'QUOTED', label: 'Chờ CEO Duyệt', match: ['QUOTED'] },
+    { id: 'PO', label: 'Đã Duyệt (PO)', match: ['PO', 'APPROVED'] },
+    { id: 'SHIPPING', label: 'Đang Giao/Chờ QC', match: ['CONFIRMED_BY_SUPPLIER', 'PENDING_QA'] },
+    { id: 'QA_DONE', label: 'QC Đã Kiểm Định', match: ['QA_PASSED', 'QA_PARTIAL', 'QA_REJECTED', 'RECEIVED'] },
+    { id: 'DONE', label: 'Hoàn Tất', match: ['DONE', 'COMPLETED'] },
+    { id: 'CANCELLED', label: 'Đã Hủy', match: ['CANCELLED'] }
+  ];
 
   const filteredMyPOs = myPOs
     .filter(po => {
       if (statusFilter === 'ALL') return true;
-      return po.status === statusFilter;
+      const group = STATUS_FILTER_GROUPS.find(g => g.id === statusFilter);
+      return group ? group.match.includes(po.status) : po.status === statusFilter;
     })
     .sort((a, b) => {
       const dA = new Date(a.createdAt || a.date || a.issueDate || 0);
@@ -542,7 +553,7 @@ export default function SupplierPortal() {
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '1rem', borderBottom: '1px solid var(--border-glass)' }}>
         <div>
-          <h1 style={{ fontSize: '1.65rem', fontWeight: 800, fontFamily: 'var(--font-title)', color: 'var(--text-primary)', marginBottom: '0.2rem' }}>Cổng Nhà Cung Cấp (Supplier Portal)</h1>
+          <h1 style={{ fontSize: '1.65rem', fontWeight: 800, fontFamily: 'var(--font-title)', color: 'var(--text-primary)', marginBottom: '0.2rem' }}>Cổng Nhà Cung Cấp</h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: 0 }}>Đối tác: <strong style={{ color: 'var(--primary)' }}>{user?.fullName || user?.fullname || user?.name || 'Nhà Cung Cấp'}</strong></p>
         </div>
         <button onClick={handleLogout} className="btn btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', padding: '0.45rem 0.85rem', borderRadius: '8px' }}>
@@ -558,7 +569,7 @@ export default function SupplierPortal() {
             <DollarSign size={22} />
           </div>
           <div>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.72rem', fontWeight: 600, textTransform: 'uppercase', margin: 0 }}>Doanh Thu Đã Thu (DONE)</p>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.72rem', fontWeight: 600, textTransform: 'uppercase', margin: 0 }}>Doanh Thu Đã Thu</p>
             <h3 style={{ fontSize: '1.35rem', fontWeight: 800, marginTop: '0.1rem', marginBottom: 0, color: 'var(--success)' }}>{formatPrice(earnedRevenue)}</h3>
           </div>
         </div>
@@ -700,14 +711,7 @@ export default function SupplierPortal() {
               
               {/* Filter chips */}
               <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap', background: 'rgba(255,255,255,0.03)', padding: '0.2rem', borderRadius: '8px' }}>
-                {[
-                  { id: 'ALL', label: 'Tất cả' },
-                  { id: 'RFQ_SENT', label: 'Chờ Báo Giá' },
-                  { id: 'QUOTED', label: 'Chờ CEO Duyệt' },
-                  { id: 'PO', label: 'Đã Duyệt (PO)' },
-                  { id: 'DONE', label: 'Hoàn Tất' },
-                  { id: 'CANCELLED', label: 'Đã Hủy' }
-                ].map(f => (
+                {STATUS_FILTER_GROUPS.map(f => (
                   <button
                     key={f.id}
                     onClick={() => setStatusFilter(f.id)}
@@ -790,7 +794,7 @@ export default function SupplierPortal() {
                           >
                             <Eye size={12} /> Chi tiết
                           </button>
-                          {po.status === 'RFQ_SENT' && (
+                          {['RFQ', 'RFQ_SENT', 'SENT'].includes(po.status) && (
                             <button
                               onClick={() => { setCancelModalPO(po); setCancelReason(''); }}
                               style={{
@@ -883,6 +887,10 @@ export default function SupplierPortal() {
                               Đã Thanh Toán 100%
                             </span>
                           ) : po.status === 'PO' ? (
+                            <span className="badge badge-warning" style={{ backgroundColor: 'rgba(245,158,11,0.15)', color: '#fbbf24', padding: '0.35rem 0.75rem', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 700 }}>
+                              Đã Duyệt - Chờ NCC Xác Nhận
+                            </span>
+                          ) : ['CONFIRMED_BY_SUPPLIER', 'PENDING_QA', 'QA_PASSED', 'QA_PARTIAL', 'RECEIVED'].includes(po.status) ? (
                             <span className="badge badge-warning" style={{ backgroundColor: 'rgba(245,158,11,0.15)', color: '#fbbf24', padding: '0.35rem 0.75rem', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 700 }}>
                               Đang Cung Cấp - Chờ Thanh Toán
                             </span>
@@ -1190,7 +1198,7 @@ export default function SupplierPortal() {
                 PACKAGE_DAMAGED: 'Móp hộp outer / Hỏng niêm phong đóng gói',
                 ELECTRICAL_POWER_FAIL: 'Lỗi nguồn / Điện áp / Lỗi bo mạch không lên',
                 SERIAL_WARRANTY_MISSING: 'Thiếu tem bảo hành chính hãng / Sai Serial Number',
-                SPEC_MISMATCH: 'Trầy xước / Sai thông số kỹ thuật (Wrong Specs)',
+                SPEC_MISMATCH: 'Trầy xước / Sai thông số kỹ thuật',
                 COUNTERFEIT_FAKE: 'Hàng nghi ngờ nhái / Không đúng mô tả',
                 NONE: 'Không có lỗi'
               };

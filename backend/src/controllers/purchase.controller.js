@@ -1,6 +1,18 @@
 const prisma = require('../config/database');
 const { normalizeQcRole } = require('../constants/roles');
 const { computeBlendedAverageCost } = require('../utils/inventoryCosting');
+const { logAudit } = require('../utils/auditLog');
+const { hasOperationalPermission } = require('../middlewares/rbac.middleware');
+
+// Neither the supplier-quote submission nor the CEO PO-approval action on the frontend
+// ever sends a reason/note (there's no free-text field for either step), so every such
+// entry in the approval-history timeline showed a blank "—" note. These fill that gap
+// with a short factual description of what happened, same as the RFQ-creation note.
+const DEFAULT_TRANSITION_NOTES = {
+  RFQ_SENT: 'Phòng Mua Hàng đã gửi Yêu Cầu Báo Giá đến Nhà Cung Cấp.',
+  QUOTED: 'Nhà cung cấp đã gửi báo giá cho Yêu Cầu Báo Giá.',
+  PO: 'CEO đã phê duyệt báo giá, phát hành PO chính thức.'
+};
 
 // GET /api/v1/purchasing/suppliers
 const getSuppliers = async (req, res, next) => {
@@ -277,7 +289,7 @@ const createPurchaseOrder = async (req, res, next) => {
             : blanket
               ? `Tạo đơn mua theo hợp đồng khung ${blanket.poNumber}`
               : 'Khởi tạo Yêu Cầu Báo Giá (RFQ)',
-          changedBy: req.user?.email || req.user?.code || req.user?.name || null,
+          changedBy: req.user?.name || req.user?.email || req.user?.code || null,
           changedByRole: req.user?.role || null
         }
       });
@@ -325,6 +337,19 @@ const updatePurchaseOrderStatus = async (req, res, next) => {
       // re-affirming the current status (and may still carry extra fields, e.g. itemPrices
       // or QC quantities, that need to be applied).
       const isNoOpResubmit = status === po.status;
+
+      // This route also carries every other RFQ/QC/receiving status transition
+      // (SUPPLIER quoting, QC pass/fail, warehouse receiving...) so the operational
+      // permission check can't sit at the router level — only the actual
+      // QUOTED → PO approve step is gated by the admin-configurable RBAC matrix.
+      if (status === 'PO' && po.status === 'QUOTED' && !isNoOpResubmit) {
+        const allowed = await hasOperationalPermission(userRole, 'purchasing_approve_po');
+        if (!allowed) {
+          const error = new Error('Tài khoản của bạn không có quyền duyệt PO (đã bị quản trị viên tắt trong Ma Trận Phân Quyền).');
+          error.statusCode = 403;
+          throw error;
+        }
+      }
 
       if (userRole === 'CEO' && !isNoOpResubmit && status !== 'CANCELLED' && !(po.status === 'QUOTED' && status === 'PO')) {
         const error = new Error('CEO chỉ phê duyệt báo giá để phát hành PO hoặc hủy đơn trong trường hợp ngoại lệ.');
@@ -417,9 +442,19 @@ const updatePurchaseOrderStatus = async (req, res, next) => {
         updateData.cancelReason = reason || supplierNote || null;
       }
 
-      const updated = await tx.purchaseOrder.update({
+      // Atomically claim this transition: the conditional updateMany only succeeds if the
+      // row's status still matches what we read as `po.status` above. Without this, two
+      // racing requests for the same transition (see isNoOpResubmit above) can both pass
+      // the isNoOpResubmit check against the same stale pre-write read and both go on to
+      // write the update *and* the history/QC side effects below — producing duplicate
+      // history rows with the same status and near-identical timestamps. This closes that
+      // window the same way warehouse.controller.js's validateReceipt claims a receipt.
+      const claim = await tx.purchaseOrder.updateMany({
+        where: { id: po.id, status: po.status },
+        data: updateData
+      });
+      const updated = await tx.purchaseOrder.findUnique({
         where: { id: po.id },
-        data: updateData,
         include: {
           supplier: true,
           items: {
@@ -430,23 +465,28 @@ const updatePurchaseOrderStatus = async (req, res, next) => {
         }
       });
 
+      // True only for the request that actually lost the race — status moved on before
+      // this write landed. A deliberate resubmit (isNoOpResubmit) is not a race loss.
+      const lostRace = claim.count === 0 && !isNoOpResubmit;
+      const skipSideEffects = isNoOpResubmit || lostRace;
+
       // Record this transition for the approval-history timeline. Skipped on a no-op
-      // resubmit (see isNoOpResubmit above) so a racing duplicate request from the
+      // resubmit or a lost race (see above) so a racing duplicate request from the
       // frontend doesn't log the same decision twice.
-      if (!isNoOpResubmit) {
+      if (!skipSideEffects) {
         await tx.purchaseOrderStatusHistory.create({
           data: {
             poId: updated.id,
             status,
-            note: reason || supplierNote || qcNotes || null,
-            changedBy: req.user?.email || req.user?.code || req.user?.name || null,
+            note: reason || supplierNote || qcNotes || DEFAULT_TRANSITION_NOTES[status] || null,
+            changedBy: req.user?.name || req.user?.email || req.user?.code || null,
             changedByRole: userRole || null
           }
         });
       }
 
       // Automatically generate a GoodsReceipt in READY state when Supplier Confirms delivery (CONFIRMED_BY_SUPPLIER)
-      if (status === 'CONFIRMED_BY_SUPPLIER' && po.status !== 'CONFIRMED_BY_SUPPLIER') {
+      if (!skipSideEffects && status === 'CONFIRMED_BY_SUPPLIER' && po.status !== 'CONFIRMED_BY_SUPPLIER') {
         const existingReceipt = await tx.goodsReceipt.findFirst({ where: { poId: updated.id } });
         if (!existingReceipt) {
           const dateStr = new Date().toISOString().slice(2, 10).replace(/-/g, '');
@@ -477,9 +517,9 @@ const updatePurchaseOrderStatus = async (req, res, next) => {
       // Persist the QC/QA inspection outcome so `validateReceipt` knows exactly how many
       // units actually passed (needed for QA_PARTIAL, where only part of the shipment
       // may enter stock) instead of guessing from the full PO item quantity. Skip this on
-      // a no-op resubmit (see isNoOpResubmit above) so a racing duplicate request doesn't
-      // create a second inspection record for the same decision.
-      if (!isNoOpResubmit && ['QA_PASSED', 'QA_PARTIAL', 'QA_REJECTED'].includes(status)) {
+      // a no-op resubmit or a lost race (see skipSideEffects above) so a racing duplicate
+      // request doesn't create a second inspection record for the same decision.
+      if (!skipSideEffects && ['QA_PASSED', 'QA_PARTIAL', 'QA_REJECTED'].includes(status)) {
         const receipt = await tx.goodsReceipt.findFirst({
           where: { poId: updated.id },
           orderBy: { id: 'desc' }
@@ -512,13 +552,20 @@ const updatePurchaseOrderStatus = async (req, res, next) => {
         }
       }
 
-      return updated;
+      // Exposed only to decide whether to audit-log below — a racing duplicate
+      // request must not double-log the same approval (see skipSideEffects above).
+      return { ...updated, __skipAudit: skipSideEffects };
     });
+
+    const { __skipAudit, ...updatedPOClean } = updatedPO;
+    if (status === 'PO' && !__skipAudit) {
+      logAudit({ req, action: 'APPROVE_PO', module: 'Mua Hàng', targetId: updatedPOClean.id, note: `${updatedPOClean.poNumber}: ${updatedPOClean.totalAmount}đ` });
+    }
 
     res.json({
       success: true,
       message: `Status updated to ${status} successfully`,
-      data: updatedPO
+      data: updatedPOClean
     });
   } catch (err) {
     next(err);
@@ -597,7 +644,7 @@ const createVendorBill = async (req, res, next) => {
             poId: po.id,
             status: po.status,
             note: `Đối chiếu QC: tỷ lệ nghiệm thu đạt ${(acceptRatio * 100).toFixed(1)}% (${totalPassed}/${totalInspected}) — điều chỉnh hóa đơn ${billNumber} từ ${originalAmount.toLocaleString('vi-VN')}đ xuống ${amountTotal.toLocaleString('vi-VN')}đ.`,
-            changedBy: req.user?.email || req.user?.code,
+            changedBy: req.user?.name || req.user?.email || req.user?.code,
             changedByRole: req.user?.role
           }
         });

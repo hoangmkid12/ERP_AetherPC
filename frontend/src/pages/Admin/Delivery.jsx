@@ -748,11 +748,11 @@ export default function Delivery() {
         <div>
           <h2 style={{ fontSize: '1.35rem', fontWeight: 800, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <Truck size={24} style={{ color: '#2563eb' }} />
-            {activeTab === 'overview' && 'Tổng Quan Giao Vận & Điều Phối (Delivery Dashboard)'}
+            {activeTab === 'overview' && 'Tổng Quan Giao Vận & Điều Phối'}
             {activeTab === 'pending' && 'Đơn Hàng Sẵn Sàng Giao (Chờ Nhận Đơn Tại Kho)'}
-            {activeTab === 'active' && 'Đang Giao & Xác Nhận Minh Chứng (Proof of Delivery - POD)'}
-            {activeTab === 'returns' && 'Thu Hồi Hàng Đổi Trả Tại Nhà Khách (RMA Pickup)'}
-            {activeTab === 'history' && 'Lịch Sử Giao Hàng & Bảng Kê Thu Hộ (COD Ledger)'}
+            {activeTab === 'active' && 'Đang Giao & Xác Nhận Minh Chứng'}
+            {activeTab === 'returns' && 'Thu Hồi Hàng Đổi Trả Tại Nhà Khách'}
+            {activeTab === 'history' && 'Lịch Sử Giao Hàng & Bảng Kê Thu Hộ'}
           </h2>
           <p style={{ color: '#64748b', fontSize: '0.82rem', margin: '0.25rem 0 0' }}>
             Điều phối shipper, xác nhận giao hàng bằng ảnh minh chứng POD và đối soát tiền mặt COD
@@ -1768,7 +1768,7 @@ export default function Delivery() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.85rem', borderBottom: '1px solid #f1f5f9', paddingBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
               <div>
                 <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <span>Nhiệm Vụ Thu Hồi Hàng Đổi Trả / Hoàn Tiền (RMA Pickup)</span>
+                  <span>Nhiệm Vụ Thu Hồi Hàng Đổi Trả / Hoàn Tiền</span>
                   <span style={{ backgroundColor: '#f5f3ff', color: '#7c3aed', padding: '2px 8px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 800, border: '1px solid #ddd6fe' }}>
                     {filteredReturns.length} / {pendingReturns.length} Nhiệm vụ
                   </span>
@@ -2527,7 +2527,7 @@ export default function Delivery() {
                           boxShadow: isCameraActive ? '0 4px 10px rgba(220,38,38,0.3)' : 'none'
                         }}
                       >
-                        <Camera size={18} /> Bấm Chụp Ảnh Minh Chứng (Capture POD)
+                        <Camera size={18} /> Bấm Chụp Ảnh Minh Chứng
                       </button>
                     )}
                   </div>

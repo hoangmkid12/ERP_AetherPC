@@ -1,0 +1,381 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1650 1320" font-family="Arial, 'Segoe UI', sans-serif">
+  <defs>
+    <marker id="openArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" orient="auto-start-reverse">
+      <path d="M 1 1 L 9 5 L 1 9" fill="none" stroke="black" stroke-width="1.4"/>
+    </marker>
+    <marker id="hollowTriangle" viewBox="0 0 12 12" refX="11" refY="6" markerWidth="14" markerHeight="14" orient="auto-start-reverse">
+      <path d="M 1 1 L 11 6 L 1 11 Z" fill="white" stroke="black" stroke-width="1.2"/>
+    </marker>
+    <filter id="shadow" x="-5%" y="-5%" width="115%" height="115%">
+      <feDropShadow dx="1" dy="1" stdDeviation="1.5" flood-color="#00000033"/>
+    </filter>
+  </defs>
+
+  <rect width="1650" height="1320" fill="#ffffff"/>
+
+  <!-- ============== SYSTEM BOUNDARY ============== -->
+  <rect x="230" y="55" width="1150" height="1000" rx="6" fill="#eaf3fb" stroke="black" stroke-width="2.2"/>
+  <text x="805" y="85" text-anchor="middle" font-size="18" font-weight="bold" fill="black">HỆ THỐNG AETHERPC ERP — SƠ ĐỒ USE CASE ĐẦY ĐỦ</text>
+
+  <!-- ============== MODULE GROUP BOXES ============== -->
+  <g font-size="12" font-weight="bold">
+    <rect x="245" y="95" width="520" height="220" rx="6" fill="#fff7ed" stroke="#f97316" stroke-width="1.5" stroke-dasharray="6,3"/>
+    <text x="258" y="112" fill="#c2410c">KHÁCH HÀNG (STOREFRONT)</text>
+
+    <rect x="245" y="335" width="520" height="160" rx="6" fill="#fef9c3" stroke="#ca8a04" stroke-width="1.5" stroke-dasharray="6,3"/>
+    <text x="258" y="352" fill="#92400e">BÁN HÀNG &amp; CSKH</text>
+
+    <rect x="245" y="515" width="520" height="220" rx="6" fill="#dbeafe" stroke="#2563eb" stroke-width="1.5" stroke-dasharray="6,3"/>
+    <text x="258" y="532" fill="#1d4ed8">KHO VẬN</text>
+
+    <rect x="245" y="755" width="520" height="160" rx="6" fill="#ccfbf1" stroke="#0d9488" stroke-width="1.5" stroke-dasharray="6,3"/>
+    <text x="258" y="772" fill="#0f766e">MUA HÀNG &amp; NHÀ CUNG CẤP</text>
+
+    <rect x="820" y="95" width="520" height="100" rx="6" fill="#ede9fe" stroke="#7c3aed" stroke-width="1.5" stroke-dasharray="6,3"/>
+    <text x="833" y="112" fill="#5b21b6">KIỂM ĐỊNH CHẤT LƯỢNG (QC)</text>
+
+    <rect x="820" y="215" width="520" height="100" rx="6" fill="#dcfce7" stroke="#16a34a" stroke-width="1.5" stroke-dasharray="6,3"/>
+    <text x="833" y="232" fill="#15803d">LẮP RÁP MÁY TÍNH</text>
+
+    <rect x="820" y="335" width="520" height="100" rx="6" fill="#fce7f3" stroke="#db2777" stroke-width="1.5" stroke-dasharray="6,3"/>
+    <text x="833" y="352" fill="#9d174d">GIAO HÀNG</text>
+
+    <rect x="820" y="455" width="520" height="160" rx="6" fill="#e0e7ff" stroke="#4f46e5" stroke-width="1.5" stroke-dasharray="6,3"/>
+    <text x="833" y="472" fill="#3730a3">KẾ TOÁN &amp; TÀI CHÍNH</text>
+
+    <rect x="820" y="635" width="520" height="220" rx="6" fill="#ffe4e6" stroke="#e11d48" stroke-width="1.5" stroke-dasharray="6,3"/>
+    <text x="833" y="652" fill="#9f1239">NHÂN SỰ &amp; BAN GIÁM ĐỐC</text>
+
+    <rect x="820" y="875" width="520" height="160" rx="6" fill="#e0f2fe" stroke="#0284c7" stroke-width="1.5" stroke-dasharray="6,3"/>
+    <text x="833" y="892" fill="#0369a1">QUẢN TRỊ HỆ THỐNG</text>
+  </g>
+
+  <!-- ============== ASSOCIATIONS (vẽ trước, nằm dưới ellipse) ============== -->
+  <g stroke="#555" stroke-width="1.1">
+    <!-- Khách Hàng -->
+    <line x1="80" y1="205" x2="345" y2="150"/>
+    <line x1="80" y1="205" x2="510" y2="150"/>
+    <line x1="80" y1="205" x2="675" y2="150"/>
+    <line x1="80" y1="205" x2="345" y2="210"/>
+    <line x1="80" y1="205" x2="510" y2="210"/>
+    <line x1="80" y1="205" x2="675" y2="210"/>
+    <line x1="80" y1="205" x2="345" y2="270"/>
+    <line x1="80" y1="205" x2="510" y2="270"/>
+    <!-- Nhân Viên Bán Hàng -->
+    <line x1="80" y1="390" x2="345" y2="390"/>
+    <line x1="80" y1="390" x2="510" y2="390"/>
+    <line x1="80" y1="390" x2="675" y2="390"/>
+    <!-- Nhân Viên CSKH -->
+    <line x1="80" y1="450" x2="345" y2="450"/>
+    <line x1="80" y1="450" x2="510" y2="450"/>
+    <!-- Nhân Viên Kho -->
+    <line x1="80" y1="625" x2="345" y2="570"/>
+    <line x1="80" y1="625" x2="510" y2="570"/>
+    <line x1="80" y1="625" x2="675" y2="570"/>
+    <line x1="80" y1="625" x2="345" y2="630"/>
+    <line x1="80" y1="625" x2="510" y2="630"/>
+    <line x1="80" y1="625" x2="675" y2="630"/>
+    <line x1="80" y1="625" x2="345" y2="690"/>
+    <!-- Nhân Viên Mua Hàng -->
+    <line x1="80" y1="810" x2="345" y2="810"/>
+    <line x1="80" y1="810" x2="510" y2="810"/>
+    <line x1="80" y1="810" x2="675" y2="810"/>
+    <!-- Nhà Cung Cấp -->
+    <line x1="80" y1="870" x2="345" y2="870"/>
+    <line x1="80" y1="870" x2="510" y2="870"/>
+    <!-- Nhân Viên QC -->
+    <line x1="1500" y1="150" x2="920" y2="150"/>
+    <line x1="1500" y1="150" x2="1085" y2="150"/>
+    <!-- Nhân Viên Lắp Ráp -->
+    <line x1="1500" y1="270" x2="920" y2="270"/>
+    <line x1="1500" y1="270" x2="1085" y2="270"/>
+    <!-- Nhân Viên Giao Hàng -->
+    <line x1="1500" y1="390" x2="920" y2="390"/>
+    <line x1="1500" y1="390" x2="1085" y2="390"/>
+    <!-- Kế Toán -->
+    <line x1="1500" y1="540" x2="920" y2="510"/>
+    <line x1="1500" y1="540" x2="1085" y2="510"/>
+    <line x1="1500" y1="540" x2="1250" y2="510"/>
+    <line x1="1500" y1="540" x2="920" y2="570"/>
+    <!-- Nhân Sự -->
+    <line x1="1500" y1="715" x2="920" y2="690"/>
+    <line x1="1500" y1="715" x2="1085" y2="690"/>
+    <line x1="1500" y1="715" x2="920" y2="750"/>
+    <!-- Ban Giám Đốc -->
+    <line x1="1500" y1="770" x2="1085" y2="750"/>
+    <line x1="1500" y1="770" x2="1250" y2="750"/>
+    <line x1="1500" y1="770" x2="920" y2="810"/>
+    <!-- Quản Trị Viên -->
+    <line x1="1500" y1="955" x2="920" y2="930"/>
+    <line x1="1500" y1="955" x2="1085" y2="930"/>
+    <line x1="1500" y1="955" x2="1250" y2="930"/>
+    <line x1="1500" y1="955" x2="920" y2="990"/>
+    <!-- Hệ Thống Email -->
+    <line x1="1560" y1="60" x2="510" y2="210" stroke-dasharray="1,0"/>
+  </g>
+
+  <!-- ============== GENERALIZATION (đại diện: 3 vai trò kế thừa Nhân Viên) ============== -->
+  <g stroke="black" stroke-width="1.4" fill="none" marker-end="url(#hollowTriangle)">
+    <line x1="80" y1="390" x2="163" y2="595"/>
+    <line x1="80" y1="625" x2="158" y2="608"/>
+    <line x1="80" y1="810" x2="163" y2="621"/>
+  </g>
+
+  <!-- ============== INCLUDE ============== -->
+  <g stroke="black" stroke-width="1.3" stroke-dasharray="6,4" fill="none" marker-end="url(#openArrow)">
+    <line x1="595" y1="410" x2="530" y2="590"/>
+    <line x1="765" y1="588" x2="920" y2="165"/>
+  </g>
+  <text x="620" y="480" text-anchor="middle" font-size="10" font-style="italic" fill="black" transform="rotate(70 620 480)">&#171;include&#187;</text>
+  <text x="900" y="360" text-anchor="middle" font-size="10" font-style="italic" fill="black" transform="rotate(-72 900 360)">&#171;include&#187;</text>
+
+  <!-- ============== EXTEND ============== -->
+  <g stroke="black" stroke-width="1.3" stroke-dasharray="6,4" fill="none" marker-end="url(#openArrow)">
+    <line x1="380" y1="285" x2="640" y2="222"/>
+    <line x1="675" y1="410" x2="580" y2="398"/>
+  </g>
+  <text x="410" y="272" text-anchor="middle" font-size="10" font-style="italic" fill="black">&#171;extend&#187;</text>
+  <text x="655" y="422" text-anchor="middle" font-size="10" font-style="italic" fill="black">&#171;extend&#187;</text>
+
+  <!-- ============== USE CASES ============== -->
+  <g font-size="9.5" text-anchor="middle" fill="black">
+    <!-- GROUP A: KHÁCH HÀNG -->
+    <g stroke="#f97316" stroke-width="1.3">
+      <ellipse cx="345" cy="150" rx="85" ry="20" fill="white" filter="url(#shadow)"/>
+      <ellipse cx="510" cy="150" rx="85" ry="20" fill="white" filter="url(#shadow)"/>
+      <ellipse cx="675" cy="150" rx="85" ry="20" fill="white" filter="url(#shadow)"/>
+      <ellipse cx="345" cy="210" rx="85" ry="20" fill="white" filter="url(#shadow)"/>
+      <ellipse cx="510" cy="210" rx="85" ry="20" fill="white" filter="url(#shadow)"/>
+      <ellipse cx="675" cy="210" rx="85" ry="20" fill="white" filter="url(#shadow)"/>
+      <ellipse cx="345" cy="270" rx="85" ry="20" fill="white" filter="url(#shadow)"/>
+      <ellipse cx="510" cy="270" rx="85" ry="20" fill="white" filter="url(#shadow)"/>
+    </g>
+    <text x="345" y="146">Đăng Ký /</text><text x="345" y="158">Đăng Nhập</text>
+    <text x="510" y="146">Quản Lý Hồ Sơ</text><text x="510" y="158">&amp; Sổ Địa Chỉ</text>
+    <text x="675" y="146">Tìm Kiếm &amp;</text><text x="675" y="158">Xem Sản Phẩm</text>
+    <text x="345" y="206">Đánh Giá</text><text x="345" y="218">Sản Phẩm</text>
+    <text x="510" y="206">Đặt Hàng &amp;</text><text x="510" y="218">Thanh Toán</text>
+    <text x="675" y="206">Theo Dõi</text><text x="675" y="218">Đơn Hàng</text>
+    <text x="345" y="266">Đổi/Trả Hàng</text><text x="345" y="278">&amp; Khiếu Nại</text>
+    <text x="510" y="266">Chat Hỗ Trợ</text><text x="510" y="278">Trực Tuyến</text>
+
+    <!-- GROUP B: BÁN HÀNG & CSKH -->
+    <g stroke="#ca8a04" stroke-width="1.3">
+      <ellipse cx="345" cy="390" rx="85" ry="20" fill="white" filter="url(#shadow)"/>
+      <ellipse cx="510" cy="390" rx="85" ry="20" fill="white" filter="url(#shadow)"/>
+      <ellipse cx="675" cy="390" rx="85" ry="20" fill="white" filter="url(#shadow)"/>
+      <ellipse cx="345" cy="450" rx="85" ry="20" fill="white" filter="url(#shadow)"/>
+      <ellipse cx="510" cy="450" rx="85" ry="20" fill="white" filter="url(#shadow)"/>
+    </g>
+    <text x="345" y="386">Bán Hàng Tại</text><text x="345" y="398">Quầy (POS)</text>
+    <text x="510" y="386">Xử Lý &amp; Cập Nhật</text><text x="510" y="398">Đơn Hàng</text>
+    <text x="675" y="386">Duyệt Hủy Đơn</text><text x="675" y="398">&amp; Hoàn Tiền</text>
+    <text x="345" y="446">Trả Lời Chat</text><text x="345" y="458">Khách Hàng</text>
+    <text x="510" y="446">Xử Lý</text><text x="510" y="458">Khiếu Nại</text>
+
+    <!-- GROUP C: KHO VẬN -->
+    <g stroke="#2563eb" stroke-width="1.3">
+      <ellipse cx="345" cy="570" rx="85" ry="20" fill="white" filter="url(#shadow)"/>
+      <ellipse cx="510" cy="570" rx="85" ry="20" fill="white" filter="url(#shadow)"/>
+      <ellipse cx="675" cy="570" rx="85" ry="20" fill="white" filter="url(#shadow)"/>
+      <ellipse cx="345" cy="630" rx="85" ry="20" fill="white" filter="url(#shadow)"/>
+      <ellipse cx="510" cy="630" rx="85" ry="20" fill="white" filter="url(#shadow)"/>
+      <ellipse cx="675" cy="630" rx="85" ry="20" fill="white" filter="url(#shadow)"/>
+      <ellipse cx="345" cy="690" rx="85" ry="20" fill="white" filter="url(#shadow)"/>
+    </g>
+    <text x="345" y="566">Nghiệm Thu</text><text x="345" y="578">Hàng Nhập (GRN)</text>
+    <text x="510" y="566">Quản Lý</text><text x="510" y="578">Tồn Kho</text>
+    <text x="675" y="566">Điều Chỉnh /</text><text x="675" y="578">Kiểm Kê Kho</text>
+    <text x="345" y="626">Lịch Sử Điều</text><text x="345" y="638">Chuyển Kho</text>
+    <text x="510" y="626">Xuất Kho &amp;</text><text x="510" y="638">P.Công Shipper</text>
+    <text x="675" y="626">Nhận Lại</text><text x="675" y="638">Hàng Hoàn</text>
+    <text x="345" y="686">Quản Lý Danh</text><text x="345" y="698">Mục Sản Phẩm</text>
+
+    <!-- GROUP D: MUA HÀNG & NCC -->
+    <g stroke="#0d9488" stroke-width="1.3">
+      <ellipse cx="345" cy="810" rx="85" ry="20" fill="white" filter="url(#shadow)"/>
+      <ellipse cx="510" cy="810" rx="85" ry="20" fill="white" filter="url(#shadow)"/>
+      <ellipse cx="675" cy="810" rx="85" ry="20" fill="white" filter="url(#shadow)"/>
+      <ellipse cx="345" cy="870" rx="85" ry="20" fill="white" filter="url(#shadow)"/>
+      <ellipse cx="510" cy="870" rx="85" ry="20" fill="white" filter="url(#shadow)"/>
+    </g>
+    <text x="345" y="806">Quản Lý &amp;</text><text x="345" y="818">Đánh Giá NCC</text>
+    <text x="510" y="806">Lập RFQ &amp; So</text><text x="510" y="818">Sánh Báo Giá</text>
+    <text x="675" y="806">Tạo &amp; Duyệt Đơn</text><text x="675" y="818">Mua Hàng (PO)</text>
+    <text x="345" y="866">Phản Hồi</text><text x="345" y="878">Báo Giá RFQ</text>
+    <text x="510" y="866">Xác Nhận Đơn</text><text x="510" y="878">Mua Hàng (PO)</text>
+
+    <!-- GROUP E: QC -->
+    <g stroke="#7c3aed" stroke-width="1.3">
+      <ellipse cx="920" cy="150" rx="85" ry="20" fill="white" filter="url(#shadow)"/>
+      <ellipse cx="1085" cy="150" rx="85" ry="20" fill="white" filter="url(#shadow)"/>
+    </g>
+    <text x="920" y="146">Kiểm Tra Chất</text><text x="920" y="158">Lượng Hàng Nhập</text>
+    <text x="1085" y="146">Thẩm Định</text><text x="1085" y="158">Hàng Hoàn Trả</text>
+
+    <!-- GROUP F: LẮP RÁP -->
+    <g stroke="#16a34a" stroke-width="1.3">
+      <ellipse cx="920" cy="270" rx="85" ry="20" fill="white" filter="url(#shadow)"/>
+      <ellipse cx="1085" cy="270" rx="85" ry="20" fill="white" filter="url(#shadow)"/>
+    </g>
+    <text x="920" y="266">Nhận Lệnh</text><text x="920" y="278">Lắp Ráp PC</text>
+    <text x="1085" y="266">Cập Nhật Tiến</text><text x="1085" y="278">Độ Lắp Ráp</text>
+
+    <!-- GROUP G: GIAO HÀNG -->
+    <g stroke="#db2777" stroke-width="1.3">
+      <ellipse cx="920" cy="390" rx="85" ry="20" fill="white" filter="url(#shadow)"/>
+      <ellipse cx="1085" cy="390" rx="85" ry="20" fill="white" filter="url(#shadow)"/>
+    </g>
+    <text x="920" y="386">Giao Hàng &amp;</text><text x="920" y="398">Thu Tiền COD</text>
+    <text x="1085" y="386">Thu Hồi Hàng</text><text x="1085" y="398">Bảo Hành/Hoàn</text>
+
+    <!-- GROUP H: KẾ TOÁN -->
+    <g stroke="#4f46e5" stroke-width="1.3">
+      <ellipse cx="920" cy="510" rx="85" ry="20" fill="white" filter="url(#shadow)"/>
+      <ellipse cx="1085" cy="510" rx="85" ry="20" fill="white" filter="url(#shadow)"/>
+      <ellipse cx="1250" cy="510" rx="85" ry="20" fill="white" filter="url(#shadow)"/>
+      <ellipse cx="920" cy="570" rx="85" ry="20" fill="white" filter="url(#shadow)"/>
+    </g>
+    <text x="920" y="506">Quản Lý Sổ</text><text x="920" y="518">Cái Thu Chi</text>
+    <text x="1085" y="506">Thanh Toán</text><text x="1085" y="518">Nhà Cung Cấp</text>
+    <text x="1250" y="506">Giải Ngân Hoàn</text><text x="1250" y="518">Tiền Khách Hàng</text>
+    <text x="920" y="566">Giải Ngân</text><text x="920" y="578">Lương NV</text>
+
+    <!-- GROUP I: NHÂN SỰ & BAN GIÁM ĐỐC -->
+    <g stroke="#e11d48" stroke-width="1.3">
+      <ellipse cx="920" cy="690" rx="85" ry="20" fill="white" filter="url(#shadow)"/>
+      <ellipse cx="1085" cy="690" rx="85" ry="20" fill="white" filter="url(#shadow)"/>
+      <ellipse cx="1250" cy="690" rx="85" ry="20" fill="white" filter="url(#shadow)"/>
+      <ellipse cx="920" cy="750" rx="85" ry="20" fill="white" filter="url(#shadow)"/>
+      <ellipse cx="1085" cy="750" rx="85" ry="20" fill="white" filter="url(#shadow)"/>
+      <ellipse cx="1250" cy="750" rx="85" ry="20" fill="white" filter="url(#shadow)"/>
+      <ellipse cx="920" cy="810" rx="90" ry="20" fill="white" filter="url(#shadow)"/>
+    </g>
+    <text x="920" y="686">Quản Lý Hồ Sơ</text><text x="920" y="698">Nhân Viên</text>
+    <text x="1085" y="686">Chấm Công</text><text x="1085" y="698">Hàng Ngày</text>
+    <text x="1250" y="686">Lập Bảng</text><text x="1250" y="698">Lương</text>
+    <text x="920" y="746">Duyệt / Quản Lý</text><text x="920" y="758">Nghỉ Phép</text>
+    <text x="1085" y="746">Duyệt Đơn Mua</text><text x="1085" y="758">Hàng (PO)</text>
+    <text x="1250" y="746">Duyệt Bảng Lương</text><text x="1250" y="758">Toàn Công Ty</text>
+    <text x="920" y="806">Xem Báo Cáo &amp;</text><text x="920" y="818">Dashboard Tổng Thể</text>
+
+    <!-- GROUP J: QUẢN TRỊ HỆ THỐNG -->
+    <g stroke="#0284c7" stroke-width="1.3">
+      <ellipse cx="920" cy="930" rx="85" ry="20" fill="white" filter="url(#shadow)"/>
+      <ellipse cx="1085" cy="930" rx="85" ry="20" fill="white" filter="url(#shadow)"/>
+      <ellipse cx="1250" cy="930" rx="85" ry="20" fill="white" filter="url(#shadow)"/>
+      <ellipse cx="920" cy="990" rx="85" ry="20" fill="white" filter="url(#shadow)"/>
+    </g>
+    <text x="920" y="926">Quản Lý TK &amp;</text><text x="920" y="938">Phân Quyền</text>
+    <text x="1085" y="926">Xem Nhật Ký</text><text x="1085" y="938">Kiểm Toán</text>
+    <text x="1250" y="926">Cấu Hình</text><text x="1250" y="938">Hệ Thống</text>
+    <text x="920" y="986">Sao Lưu &amp;</text><text x="920" y="998">Phục Hồi DL</text>
+  </g>
+
+  <!-- ============== ACTORS — TRÁI (nội bộ, ưu tiên chính) ============== -->
+  <g font-size="12" font-weight="bold" text-anchor="middle" fill="black">
+    <!-- Khách Hàng -->
+    <g stroke="black" stroke-width="2" fill="none">
+      <circle cx="80" cy="185" r="13"/><line x1="80" y1="198" x2="80" y2="228"/><line x1="63" y1="209" x2="97" y2="209"/><line x1="80" y1="228" x2="65" y2="255"/><line x1="80" y1="228" x2="95" y2="255"/>
+    </g>
+    <text x="80" y="275">Khách Hàng</text>
+
+    <!-- Nhân Viên Bán Hàng -->
+    <g stroke="black" stroke-width="2" fill="none">
+      <circle cx="80" cy="375" r="13"/><line x1="80" y1="388" x2="80" y2="418"/><line x1="63" y1="399" x2="97" y2="399"/><line x1="80" y1="418" x2="65" y2="445"/><line x1="80" y1="418" x2="95" y2="445"/>
+    </g>
+    <text x="80" y="465">NV Bán Hàng</text>
+
+    <!-- Nhân Viên CSKH -->
+    <g stroke="black" stroke-width="2" fill="none">
+      <circle cx="80" cy="500" r="13"/><line x1="80" y1="513" x2="80" y2="543"/><line x1="63" y1="524" x2="97" y2="524"/><line x1="80" y1="543" x2="65" y2="570"/><line x1="80" y1="543" x2="95" y2="570"/>
+    </g>
+    <text x="80" y="590">NV CSKH</text>
+
+    <!-- Nhân Viên Kho -->
+    <g stroke="black" stroke-width="2" fill="none">
+      <circle cx="80" cy="625" r="13"/><line x1="80" y1="638" x2="80" y2="668"/><line x1="63" y1="649" x2="97" y2="649"/><line x1="80" y1="668" x2="65" y2="695"/><line x1="80" y1="668" x2="95" y2="695"/>
+    </g>
+    <text x="80" y="715">Nhân Viên Kho</text>
+
+    <!-- Nhân Viên Mua Hàng -->
+    <g stroke="black" stroke-width="2" fill="none">
+      <circle cx="80" cy="795" r="13"/><line x1="80" y1="808" x2="80" y2="838"/><line x1="63" y1="819" x2="97" y2="819"/><line x1="80" y1="838" x2="65" y2="865"/><line x1="80" y1="838" x2="95" y2="865"/>
+    </g>
+    <text x="80" y="885">NV Mua Hàng</text>
+
+    <!-- Nhà Cung Cấp -->
+    <g stroke="black" stroke-width="2" fill="none">
+      <circle cx="80" cy="920" r="13"/><line x1="80" y1="933" x2="80" y2="963"/><line x1="63" y1="944" x2="97" y2="944"/><line x1="80" y1="963" x2="65" y2="990"/><line x1="80" y1="963" x2="95" y2="990"/>
+    </g>
+    <text x="80" y="1010">Nhà Cung Cấp</text>
+
+    <!-- Nhân Viên (actor tổng quát) -->
+    <g stroke="black" stroke-width="2" fill="none">
+      <circle cx="175" cy="608" r="13"/><line x1="175" y1="621" x2="175" y2="651"/><line x1="158" y1="632" x2="192" y2="632"/><line x1="175" y1="651" x2="160" y2="678"/><line x1="175" y1="651" x2="190" y2="678"/>
+    </g>
+    <text x="175" y="698">Nhân Viên</text>
+  </g>
+
+  <!-- ============== ACTORS — PHẢI (nội bộ khác + hệ thống ngoài) ============== -->
+  <g font-size="12" font-weight="bold" text-anchor="middle" fill="black">
+    <g stroke="black" stroke-width="2" fill="none">
+      <circle cx="1500" cy="135" r="13"/><line x1="1500" y1="148" x2="1500" y2="178"/><line x1="1483" y1="159" x2="1517" y2="159"/><line x1="1500" y1="178" x2="1485" y2="205"/><line x1="1500" y1="178" x2="1515" y2="205"/>
+    </g>
+    <text x="1500" y="225">NV QC</text>
+
+    <g stroke="black" stroke-width="2" fill="none">
+      <circle cx="1500" cy="255" r="13"/><line x1="1500" y1="268" x2="1500" y2="298"/><line x1="1483" y1="279" x2="1517" y2="279"/><line x1="1500" y1="298" x2="1485" y2="325"/><line x1="1500" y1="298" x2="1515" y2="325"/>
+    </g>
+    <text x="1500" y="345">NV Lắp Ráp</text>
+
+    <g stroke="black" stroke-width="2" fill="none">
+      <circle cx="1500" cy="375" r="13"/><line x1="1500" y1="388" x2="1500" y2="418"/><line x1="1483" y1="399" x2="1517" y2="399"/><line x1="1500" y1="418" x2="1485" y2="445"/><line x1="1500" y1="418" x2="1515" y2="445"/>
+    </g>
+    <text x="1500" y="465">NV Giao Hàng</text>
+
+    <g stroke="black" stroke-width="2" fill="none">
+      <circle cx="1500" cy="525" r="13"/><line x1="1500" y1="538" x2="1500" y2="568"/><line x1="1483" y1="549" x2="1517" y2="549"/><line x1="1500" y1="568" x2="1485" y2="595"/><line x1="1500" y1="568" x2="1515" y2="595"/>
+    </g>
+    <text x="1500" y="615">Kế Toán</text>
+
+    <g stroke="black" stroke-width="2" fill="none">
+      <circle cx="1500" cy="700" r="13"/><line x1="1500" y1="713" x2="1500" y2="743"/><line x1="1483" y1="724" x2="1517" y2="724"/><line x1="1500" y1="743" x2="1485" y2="770"/><line x1="1500" y1="743" x2="1515" y2="770"/>
+    </g>
+    <text x="1500" y="790">Nhân Sự</text>
+
+    <g stroke="black" stroke-width="2" fill="none">
+      <circle cx="1500" cy="815" r="13"/><line x1="1500" y1="828" x2="1500" y2="858"/><line x1="1483" y1="839" x2="1517" y2="839"/><line x1="1500" y1="858" x2="1485" y2="885"/><line x1="1500" y1="858" x2="1515" y2="885"/>
+    </g>
+    <text x="1500" y="905">Ban Giám Đốc</text>
+
+    <g stroke="black" stroke-width="2" fill="none">
+      <circle cx="1500" cy="940" r="13"/><line x1="1500" y1="953" x2="1500" y2="983"/><line x1="1483" y1="964" x2="1517" y2="964"/><line x1="1500" y1="983" x2="1485" y2="1010"/><line x1="1500" y1="983" x2="1515" y2="1010"/>
+    </g>
+    <text x="1500" y="1030">Quản Trị Viên</text>
+
+    <!-- Hệ Thống Email (actor hệ thống ngoài, hình chữ nhật) -->
+    <g stroke="#64748b" stroke-width="2" fill="none">
+      <rect x="1548" y="18" width="24" height="24" rx="4"/>
+      <line x1="1560" y1="42" x2="1560" y2="58"/><line x1="1546" y1="50" x2="1574" y2="50"/><line x1="1560" y1="58" x2="1548" y2="78"/><line x1="1560" y1="58" x2="1572" y2="78"/>
+    </g>
+    <text x="1560" y="96" font-size="10" fill="#334155">«system»</text>
+    <text x="1560" y="108" font-size="10" fill="#334155">Hệ Thống Email</text>
+  </g>
+
+  <!-- ============== LEGEND ============== -->
+  <g font-size="11.5" fill="black">
+    <rect x="245" y="1075" width="1130" height="70" fill="white" stroke="black" stroke-width="1.2"/>
+    <text x="255" y="1092" font-weight="bold">Chú thích:</text>
+    <line x1="255" y1="1106" x2="290" y2="1106" stroke="black" stroke-width="1.3"/>
+    <text x="296" y="1110">Association</text>
+    <line x1="420" y1="1106" x2="455" y2="1106" stroke="black" stroke-width="1.3" stroke-dasharray="6,4" marker-end="url(#openArrow)"/>
+    <text x="461" y="1110">«include»/«extend» (nét đứt, mũi tên hở)</text>
+    <line x1="770" y1="1106" x2="805" y2="1106" stroke="black" stroke-width="1.3" marker-end="url(#hollowTriangle)"/>
+    <text x="811" y="1110">Generalization</text>
+    <text x="255" y="1132" font-size="10.5" fill="#475569">Ghi chú: Generalization chỉ minh họa đại diện 3/10 vai trò nội bộ kế thừa "Nhân Viên" (Bán Hàng, Kho, Mua Hàng) — thực tế cả 10 vai trò nội bộ đều là 1 dòng trong bảng Employee.</text>
+    <text x="255" y="1145" font-size="10.5" fill="#475569">Không có Cổng Thanh Toán thật trong hệ thống (COD/chuyển khoản thủ công) nên không vẽ actor này — chỉ Hệ Thống Email (SMTP/nodemailer) là hệ thống ngoài có thật.</text>
+  </g>
+
+  <text x="825" y="1180" text-anchor="middle" font-size="10" fill="#94a3b8">AetherPC ERP — Khóa luận tốt nghiệp — Sơ đồ dựng từ route/RBAC thật của backend, không thêm chức năng chưa được cài đặt</text>
+</svg>

@@ -358,7 +358,7 @@ export default function Assembly() {
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
-                Trung Tâm Nhiệm Vụ Kỹ Thuật Lắp Ráp (Assembly Task Center)
+                Trung Tâm Nhiệm Vụ Kỹ Thuật Lắp Ráp
               </h3>
               {pendingJobs.length > 0 && (
                 <span style={{
@@ -769,7 +769,7 @@ export default function Assembly() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
                   <h4 style={{ fontSize: '0.9rem', fontWeight: 800, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                     <ShieldCheck size={16} style={{ color: '#16a34a' }} />
-                    <span>2. Checklist Kiểm Định Chất Lượng & Stress Test (QA Testing)</span>
+                    <span>2. Checklist Kiểm Định Chất Lượng & Stress Test</span>
                   </h4>
 
                   {activeJob.status === 'ASSEMBLING' && (
@@ -794,7 +794,7 @@ export default function Assembly() {
                       }}
                     >
                       <Sparkles size={13} />
-                      <span>Đạt Tất Cả Tiêu Chuẩn (Pass All)</span>
+                      <span>Đạt Tất Cả Tiêu Chuẩn</span>
                     </button>
                   )}
                 </div>
@@ -1283,7 +1283,7 @@ export default function Assembly() {
             <div style={{ marginBottom: '1.5rem' }}>
               <h4 style={{ fontSize: '0.88rem', fontWeight: 800, color: '#0f172a', marginBottom: '0.6rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                 <ShieldCheck size={16} style={{ color: '#16a34a' }} />
-                <span>2. Kết Quả Kiểm Định Chất Lượng & Stress Test (QA Checklist)</span>
+                <span>2. Kết Quả Kiểm Định Chất Lượng & Stress Test</span>
               </h4>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>

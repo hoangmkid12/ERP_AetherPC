@@ -21,7 +21,7 @@ import {
 import { 
   DollarSign, ShoppingBag, AlertTriangle, Users, TrendingUp, Truck, Wrench, 
   Bell, Check, ArrowRight, Eye, X, Package, Calendar, ShieldCheck, FileText, 
-  Sparkles, CheckCircle2, XCircle, Clock, PieChart, Layers, ArrowUpRight, Award
+  Sparkles, CheckCircle2, XCircle, Clock, PieChart, Layers, ArrowUpRight, Award, ChevronLeft
 } from 'lucide-react';
 import OrderDetailModal from '../../components/OrderDetailModal';
 
@@ -160,6 +160,9 @@ export default function Dashboard() {
   const [historyStatusFilter, setHistoryStatusFilter] = useState('ALL');
   const [historyFromDate, setHistoryFromDate] = useState('');
   const [historyToDate, setHistoryToDate] = useState('');
+  // null = show the grouped one-row-per-order list; a poNumber = drilled into
+  // that order's full flat timeline (every status-change entry).
+  const [historyDrilldownPO, setHistoryDrilldownPO] = useState(null);
 
   const SUPPLIER_NAME_MAP = {
     's1': 'Samsung Vina Electronics Co., Ltd',
@@ -475,7 +478,8 @@ export default function Dashboard() {
         (po.statusHistory || []).map(h => ({
           ...h,
           poNumber: formatPurchaseReference(po),
-          supplierName: getSupplierName(po)
+          supplierName: getSupplierName(po),
+          po
         }))
       );
       flattened.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
@@ -621,7 +625,8 @@ export default function Dashboard() {
   // Pending Approvals Count for CEO
   const pendingQuotedPOsCount = filteredQuotedOrders.length;
   const pendingPayrollApprovalCount = (payrolls && payrolls.length > 0 && payrolls[0]?.status === 'SUBMITTED_TO_CEO') ? 1 : 0;
-  const pendingLeaveApprovalCount = (leaveRequests || []).filter(l => l && (l.status === 'PENDING_CEO' || l.status === 'PENDING')).length;
+  const pendingLeaveList = (leaveRequests || []).filter(l => l && (l.status === 'PENDING_CEO' || l.status === 'PENDING'));
+  const pendingLeaveApprovalCount = pendingLeaveList.length;
   const totalPendingCeoApprovals = pendingQuotedPOsCount + pendingPayrollApprovalCount + pendingLeaveApprovalCount;
 
   // 6 Balanced Executive KPI Cards
@@ -748,9 +753,9 @@ export default function Dashboard() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.25rem' }}>
         <div>
           <h2 style={{ fontSize: '1.35rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
-            {activeTab === 'overview' && 'Tổng Quan Điều Hành Ban Giám Đốc (Executive Dashboard)'}
-            {activeTab === 'approvals' && 'Trung Tâm Phê Duyệt Cấp Cao (CEO Approvals Hub)'}
-            {activeTab === 'financials' && 'Báo Cáo Tài Chính & Lãi Lỗ (P&L & Cashflow)'}
+            {activeTab === 'overview' && 'Tổng Quan Điều Hành Ban Giám Đốc'}
+            {activeTab === 'approvals' && 'Trung Tâm Phê Duyệt Cấp Cao'}
+            {activeTab === 'financials' && 'Báo Cáo Tài Chính & Lãi Lỗ'}
             {activeTab === 'kpi' && 'Đánh Giá Năng Suất & KPI Nhân Sự Toàn Công Ty'}
             {activeTab === 'supplychain' && 'Giám Sát Chuỗi Cung Ứng & Sức Khỏe Kho Hàng'}
           </h2>
@@ -1063,7 +1068,7 @@ export default function Dashboard() {
                   Duyệt báo giá để chính thức phát hành PO và phiếu nhận hàng cho Kho
                 </span>
                 <button
-                  onClick={() => { setShowApprovalHistory(true); fetchApprovalHistory(); }}
+                  onClick={() => { setShowApprovalHistory(true); setHistoryDrilldownPO(null); fetchApprovalHistory(); }}
                   style={{
                     display: 'flex', alignItems: 'center', gap: '0.35rem',
                     backgroundColor: '#ffffff', color: '#334155', border: '1px solid #cbd5e1',
@@ -1096,7 +1101,13 @@ export default function Dashboard() {
                       const totalQty = po.items?.reduce((s, i) => s + (parseInt(i.quantity) || 1), 0) || 1;
                       return (
                         <tr key={po.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                          <td style={{ padding: '0.65rem 0.85rem', fontWeight: 700, color: '#2563eb' }}>
+                          <td
+                            onClick={() => setSelectedDetailPO(po)}
+                            title="Xem chi tiết sản phẩm trong đơn"
+                            style={{ padding: '0.65rem 0.85rem', fontWeight: 700, color: '#2563eb', cursor: 'pointer', textDecoration: 'underline', textDecorationColor: 'transparent' }}
+                            onMouseEnter={(e) => e.currentTarget.style.textDecorationColor = '#2563eb'}
+                            onMouseLeave={(e) => e.currentTarget.style.textDecorationColor = 'transparent'}
+                          >
                             {formatPurchaseReference(po)}
                           </td>
                           <td style={{ padding: '0.65rem 0.85rem', fontWeight: 600, color: '#0f172a' }}>
@@ -1197,37 +1208,56 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {leaveRequests.length === 0 ? (
+            {pendingLeaveList.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '1.5rem', color: '#94a3b8', fontSize: '0.8rem' }}>
                 Không có đơn xin nghỉ phép nào đang chờ duyệt.
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                {leaveRequests.map((lr, idx) => (
-                  <div key={idx} style={{ padding: '0.85rem 1rem', borderRadius: '6px', border: '1px solid #e2e8f0', backgroundColor: '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                {pendingLeaveList.map((lr) => {
+                  const employeeLabel = lr.employee?.fullName
+                    ? `${lr.employee.fullName}${lr.employee.department ? ` (${lr.employee.department})` : ''}`
+                    : `Nhân viên #${lr.employeeId ?? lr.id}`;
+                  const start = lr.startDate ? new Date(lr.startDate) : null;
+                  const end = lr.endDate ? new Date(lr.endDate) : null;
+                  const days = (start && end && !isNaN(start) && !isNaN(end))
+                    ? Math.round((end - start) / 86400000) + 1
+                    : null;
+                  return (
+                  <div key={lr.id} style={{ padding: '0.85rem 1rem', borderRadius: '6px', border: '1px solid #e2e8f0', backgroundColor: '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
                       <strong style={{ fontSize: '0.85rem', color: '#0f172a', display: 'block' }}>
-                        {lr.employeeName || lr.name || lr.employee?.fullname || (idx === 0 ? 'Nguyễn Văn Tuấn (Bộ phận Kỹ thuật)' : 'Trần Thị Mai (Bộ phận Kinh doanh)')}
+                        {employeeLabel}
                       </strong>
                       <span style={{ fontSize: '0.78rem', color: '#475569', marginTop: '0.15rem', display: 'block' }}>
-                        Lý do: <strong style={{ color: '#334155' }}>{lr.reason || 'Nghỉ phép cá nhân'}</strong> | Thời gian: <strong>{lr.startDate}</strong> - <strong>{lr.endDate}</strong> ({lr.days || 1} ngày)
+                        Lý do: <strong style={{ color: '#334155' }}>{lr.reason || 'Nghỉ phép cá nhân'}</strong> | Thời gian: <strong>{start ? start.toLocaleDateString('vi-VN') : '---'}</strong> - <strong>{end ? end.toLocaleDateString('vi-VN') : '---'}</strong> {days ? `(${days} ngày)` : ''}
                       </span>
                     </div>
 
                     <div style={{ display: 'flex', gap: '0.4rem' }}>
                       <button
-                        onClick={() => {
-                          if (typeof approveLeaveRequest === 'function') approveLeaveRequest(lr.id);
-                          notify('Đã duyệt đơn nghỉ phép!', 'success');
+                        onClick={async () => {
+                          if (typeof approveLeaveRequest !== 'function') return;
+                          try {
+                            await approveLeaveRequest(lr.id);
+                            notify('Đã duyệt đơn nghỉ phép!', 'success');
+                          } catch (err) {
+                            notify(`Duyệt đơn nghỉ phép thất bại: ${err.message || 'lỗi kết nối máy chủ'}.`, 'error');
+                          }
                         }}
                         style={{ backgroundColor: '#16a34a', color: '#ffffff', border: 'none', borderRadius: '4px', padding: '0.3rem 0.65rem', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}
                       >
                         Duyệt
                       </button>
                       <button
-                        onClick={() => {
-                          if (typeof rejectLeaveRequest === 'function') rejectLeaveRequest(lr.id);
-                          notify('Đã từ chối đơn nghỉ phép.', 'info');
+                        onClick={async () => {
+                          if (typeof rejectLeaveRequest !== 'function') return;
+                          try {
+                            await rejectLeaveRequest(lr.id);
+                            notify('Đã từ chối đơn nghỉ phép.', 'info');
+                          } catch (err) {
+                            notify(`Từ chối đơn nghỉ phép thất bại: ${err.message || 'lỗi kết nối máy chủ'}.`, 'error');
+                          }
                         }}
                         style={{ backgroundColor: '#ffffff', color: '#ef4444', border: '1px solid #fca5a5', borderRadius: '4px', padding: '0.3rem 0.65rem', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}
                       >
@@ -1235,7 +1265,8 @@ export default function Dashboard() {
                       </button>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -1253,7 +1284,7 @@ export default function Dashboard() {
           <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem' }}>
             <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
               <FileText size={16} style={{ color: '#2563eb' }} />
-              <span>Báo Cáo Lãi / Lỗ Tóm Tắt (Executive P&L)</span>
+              <span>Báo Cáo Lãi / Lỗ Tóm Tắt</span>
             </h3>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', fontSize: '0.82rem' }}>
@@ -1331,7 +1362,7 @@ export default function Dashboard() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
               <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                 <Award size={16} style={{ color: '#f59e0b' }} />
-                <span>Bảng Xếp Hạng Doanh Số Bán Hàng (Sales Team)</span>
+                <span>Bảng Xếp Hạng Doanh Số Bán Hàng</span>
               </h3>
             </div>
 
@@ -1571,15 +1602,20 @@ export default function Dashboard() {
               >
                 Đóng
               </button>
-              <button
-                onClick={() => {
-                  handleApproveQuotedPO(selectedDetailPO.id, selectedDetailPO.poNumber || selectedDetailPO.id);
-                  setSelectedDetailPO(null);
-                }}
-                style={{ backgroundColor: '#16a34a', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.5rem 1.25rem', fontSize: '0.82rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
-              >
-                <Check size={16} /> Phê Duyệt PO Này
-              </button>
+              {/* Chỉ đơn còn ở giai đoạn chờ CEO duyệt báo giá mới cần nút này — một đơn
+                  mở từ Lịch Sử Duyệt có thể đã đi xa hơn (PO, NCC xác nhận...), lúc đó
+                  việc "duyệt lại" không còn ý nghĩa và dễ gây hiểu nhầm. */}
+              {['QUOTED', 'QUOTED_PENDING_CEO', 'AWAITING_CEO_APPROVAL'].includes(selectedDetailPO.status) && (
+                <button
+                  onClick={() => {
+                    handleApproveQuotedPO(selectedDetailPO.id, selectedDetailPO.poNumber || selectedDetailPO.id);
+                    setSelectedDetailPO(null);
+                  }}
+                  style={{ backgroundColor: '#16a34a', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.5rem 1.25rem', fontSize: '0.82rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+                >
+                  <Check size={16} /> Phê Duyệt PO Này
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -1652,55 +1688,136 @@ export default function Dashboard() {
                   <div style={{ textAlign: 'center', padding: '3rem', color: '#94a3b8', fontSize: '0.85rem' }}>
                     {approvalHistoryEntries.length === 0 ? 'Chưa có lịch sử duyệt nào được ghi nhận.' : 'Không có kết quả phù hợp với bộ lọc.'}
                   </div>
-                ) : (
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
-                    <thead>
-                      <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569', position: 'sticky', top: 0 }}>
-                        <th style={{ padding: '0.65rem 0.75rem', whiteSpace: 'nowrap' }}>Thời Gian</th>
-                        <th style={{ padding: '0.65rem 0.75rem' }}>Mã Đơn</th>
-                        <th style={{ padding: '0.65rem 0.75rem' }}>Nhà Cung Cấp</th>
-                        <th style={{ padding: '0.65rem 0.75rem', textAlign: 'center' }}>Trạng Thái</th>
-                        <th style={{ padding: '0.65rem 0.75rem' }}>Người Thực Hiện</th>
-                        <th style={{ padding: '0.65rem 0.75rem' }}>Ghi Chú</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredApprovalHistory.map((h, idx) => (
-                        <tr key={h.id || idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                          <td style={{ padding: '0.6rem 0.75rem', whiteSpace: 'nowrap', color: '#64748b' }}>
-                            {h.timestamp ? new Date(h.timestamp).toLocaleString('vi-VN') : ''}
-                          </td>
-                          <td style={{ padding: '0.6rem 0.75rem', fontWeight: 700, color: '#2563eb', whiteSpace: 'nowrap' }}>
-                            {h.poNumber}
-                          </td>
-                          <td style={{ padding: '0.6rem 0.75rem', color: '#334155' }}>
-                            {h.supplierName}
-                          </td>
-                          <td style={{ padding: '0.6rem 0.75rem', textAlign: 'center' }}>
-                            <span style={{
-                              padding: '1px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 800,
-                              backgroundColor: getHistoryStatusBadge(h.status).bg, color: getHistoryStatusBadge(h.status).color, border: `1px solid ${getHistoryStatusBadge(h.status).border}`
-                            }}>
-                              {getStatusLabel(PO_STATUS, h.status)}
-                            </span>
-                          </td>
-                          <td style={{ padding: '0.6rem 0.75rem', color: '#334155' }}>
-                            {h.changedBy || 'Hệ thống'}
-                            {h.changedByRole && <span style={{ color: '#94a3b8' }}> ({h.changedByRole})</span>}
-                          </td>
-                          <td style={{ padding: '0.6rem 0.75rem', color: '#64748b', fontStyle: h.note ? 'italic' : 'normal' }}>
-                            {h.note || '—'}
-                          </td>
+                ) : (() => {
+                  // One row per order (latest status first, since filteredApprovalHistory is
+                  // already sorted newest-first — the first entry seen per poNumber is the latest).
+                  const groups = [];
+                  const groupIndex = new Map();
+                  filteredApprovalHistory.forEach(h => {
+                    let g = groupIndex.get(h.poNumber);
+                    if (!g) {
+                      g = { poNumber: h.poNumber, supplierName: h.supplierName, po: h.po, latestStatus: h.status, latestTimestamp: h.timestamp, entries: [] };
+                      groupIndex.set(h.poNumber, g);
+                      groups.push(g);
+                    }
+                    g.entries.push(h);
+                  });
+
+                  const activeGroup = historyDrilldownPO ? groups.find(g => g.poNumber === historyDrilldownPO) : null;
+
+                  if (activeGroup) {
+                    return (
+                      <>
+                        <button
+                          onClick={() => setHistoryDrilldownPO(null)}
+                          style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', background: 'none', border: 'none', color: '#2563eb', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', padding: '0.75rem 0 0.5rem 0' }}
+                        >
+                          <ChevronLeft size={16} /> Quay lại danh sách đơn
+                        </button>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                          <div style={{ fontSize: '0.85rem', color: '#334155' }}>
+                            <strong style={{ color: '#0f172a' }}>{activeGroup.poNumber}</strong> — {activeGroup.supplierName} ({activeGroup.entries.length} lượt thay đổi)
+                          </div>
+                          {activeGroup.po && (
+                            <button
+                              onClick={() => { setShowApprovalHistory(false); setSelectedDetailPO(activeGroup.po); }}
+                              style={{ backgroundColor: '#ffffff', color: '#2563eb', border: '1px solid #bfdbfe', borderRadius: '4px', padding: '0.3rem 0.75rem', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer' }}
+                            >
+                              Xem Chi Tiết Sản Phẩm
+                            </button>
+                          )}
+                        </div>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+                          <thead>
+                            <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569', position: 'sticky', top: 0 }}>
+                              <th style={{ padding: '0.65rem 0.75rem', whiteSpace: 'nowrap' }}>Thời Gian</th>
+                              <th style={{ padding: '0.65rem 0.75rem', textAlign: 'center' }}>Trạng Thái</th>
+                              <th style={{ padding: '0.65rem 0.75rem' }}>Người Thực Hiện</th>
+                              <th style={{ padding: '0.65rem 0.75rem' }}>Ghi Chú</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {activeGroup.entries.map((h, idx) => (
+                              <tr key={h.id || idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                <td style={{ padding: '0.6rem 0.75rem', whiteSpace: 'nowrap', color: '#64748b' }}>
+                                  {h.timestamp ? new Date(h.timestamp).toLocaleString('vi-VN') : ''}
+                                </td>
+                                <td style={{ padding: '0.6rem 0.75rem', textAlign: 'center' }}>
+                                  <span style={{
+                                    padding: '1px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 800,
+                                    backgroundColor: getHistoryStatusBadge(h.status).bg, color: getHistoryStatusBadge(h.status).color, border: `1px solid ${getHistoryStatusBadge(h.status).border}`
+                                  }}>
+                                    {getStatusLabel(PO_STATUS, h.status)}
+                                  </span>
+                                </td>
+                                <td style={{ padding: '0.6rem 0.75rem', color: '#334155' }}>
+                                  {h.changedBy || 'Hệ thống'}
+                                  {h.changedByRole && <span style={{ color: '#94a3b8' }}> ({h.changedByRole})</span>}
+                                </td>
+                                <td style={{ padding: '0.6rem 0.75rem', color: '#64748b', fontStyle: h.note ? 'italic' : 'normal' }}>
+                                  {h.note || '—'}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </>
+                    );
+                  }
+
+                  return (
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+                      <thead>
+                        <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569', position: 'sticky', top: 0 }}>
+                          <th style={{ padding: '0.65rem 0.75rem' }}>Mã Đơn</th>
+                          <th style={{ padding: '0.65rem 0.75rem' }}>Nhà Cung Cấp</th>
+                          <th style={{ padding: '0.65rem 0.75rem', textAlign: 'center' }}>Trạng Thái Hiện Tại</th>
+                          <th style={{ padding: '0.65rem 0.75rem', textAlign: 'center' }}>Số Lượt Thay Đổi</th>
+                          <th style={{ padding: '0.65rem 0.75rem', whiteSpace: 'nowrap' }}>Cập Nhật Gần Nhất</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
+                      </thead>
+                      <tbody>
+                        {groups.map(g => (
+                          <tr
+                            key={g.poNumber}
+                            onClick={() => setHistoryDrilldownPO(g.poNumber)}
+                            style={{ borderBottom: '1px solid #f1f5f9', cursor: 'pointer' }}
+                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
+                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                          >
+                            <td style={{ padding: '0.65rem 0.75rem', fontWeight: 700, color: '#2563eb', whiteSpace: 'nowrap' }}>
+                              {g.poNumber}
+                            </td>
+                            <td style={{ padding: '0.65rem 0.75rem', color: '#334155' }}>
+                              {g.supplierName}
+                            </td>
+                            <td style={{ padding: '0.65rem 0.75rem', textAlign: 'center' }}>
+                              <span style={{
+                                padding: '1px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 800,
+                                backgroundColor: getHistoryStatusBadge(g.latestStatus).bg, color: getHistoryStatusBadge(g.latestStatus).color, border: `1px solid ${getHistoryStatusBadge(g.latestStatus).border}`
+                              }}>
+                                {getStatusLabel(PO_STATUS, g.latestStatus)}
+                              </span>
+                            </td>
+                            <td style={{ padding: '0.65rem 0.75rem', textAlign: 'center', color: '#334155' }}>
+                              {g.entries.length}
+                            </td>
+                            <td style={{ padding: '0.65rem 0.75rem', whiteSpace: 'nowrap', color: '#64748b' }}>
+                              {g.latestTimestamp ? new Date(g.latestTimestamp).toLocaleString('vi-VN') : ''}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  );
+                })()}
               </div>
 
               <div style={{ padding: '1rem 1.5rem', borderTop: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>
-                  Hiển thị {filteredApprovalHistory.length} / {approvalHistoryEntries.length} lượt thay đổi
+                  {historyDrilldownPO
+                    ? `Hiển thị ${filteredApprovalHistory.filter(h => h.poNumber === historyDrilldownPO).length} lượt thay đổi của đơn ${historyDrilldownPO}`
+                    : `Hiển thị ${new Set(filteredApprovalHistory.map(h => h.poNumber)).size} đơn / ${approvalHistoryEntries.length} lượt thay đổi`}
                 </span>
                 <button
                   onClick={() => setShowApprovalHistory(false)}

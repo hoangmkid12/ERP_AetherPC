@@ -63,7 +63,14 @@ async function main() {
   const productsRaw = JSON.parse(fs.readFileSync(PRODUCTS_JSON, 'utf-8'));
   const suppliers = JSON.parse(fs.readFileSync(SUPPLIERS_JSON, 'utf-8'));
   const customers = JSON.parse(fs.readFileSync(CUSTOMERS_JSON, 'utf-8'));
-  const orders = JSON.parse(fs.readFileSync(ORDERS_JSON, 'utf-8'));
+  // orders.json was an orphaned sample dataset from an older product catalog —
+  // its product_id values (e.g. "SSD-002") never matched the real GearVN-scraped
+  // products below, so every order's item list always filtered down to empty and
+  // got skipped (see the loop below). It's been removed; this stays resilient to
+  // its absence rather than crashing a fresh install. For demo Order/PO data
+  // against the real seeded catalog, run `node prisma/seedSampleTransactions.js`
+  // after this script.
+  const orders = fs.existsSync(ORDERS_JSON) ? JSON.parse(fs.readFileSync(ORDERS_JSON, 'utf-8')) : [];
 
   // Filter products to ensure unique product_id, handle, and sku
   const products = [];
@@ -324,11 +331,16 @@ async function main() {
   // 6. Employees (HRM)
   console.log('Seeding Employees...');
   const employeesData = [
-    { id: 1, code: 'EMP-0001', name: 'Nguyễn Văn Trưởng', email: 'truong.nv@kltn-erp.vn', dept: 'Tech', role: 'MANAGER', salary: 25000000 },
-    { id: 2, code: 'EMP-0002', name: 'Trần Thị Huệ', email: 'hue.tt@kltn-erp.vn', dept: 'Sales', role: 'STAFF', salary: 12000000 },
-    { id: 3, code: 'EMP-0003', name: 'Phạm Văn Minh', email: 'minh.pv@kltn-erp.vn', dept: 'Warehouse', role: 'STAFF', salary: 10000000 },
-    { id: 4, code: 'EMP-0004', name: 'Lê Văn Hùng', email: 'hung.lv@kltn-erp.vn', dept: 'Assembly', role: 'STAFF', salary: 11000000 },
-    { id: 5, code: 'EMP-0005', name: 'Hoàng Văn Tuấn', email: 'tuan.hv@kltn-erp.vn', dept: 'HRM', role: 'MANAGER', salary: 18000000 },
+    // 'MANAGER'/'STAFF' used to be seeded here — those aren't real role codes
+    // anywhere in the app (App.jsx's AdminIndexRedirect switch, rbacEngine's
+    // getRolesForModule), so these 5 accounts could log in but were always
+    // silently bounced back to "/" from every admin route. Mapped to the real
+    // role closest to each employee's department instead.
+    { id: 1, code: 'EMP-0001', name: 'Nguyễn Văn Trưởng', email: 'truong.nv@kltn-erp.vn', dept: 'IT', role: 'ADMIN', salary: 25000000 },
+    { id: 2, code: 'EMP-0002', name: 'Trần Thị Huệ', email: 'hue.tt@kltn-erp.vn', dept: 'Kinh Doanh', role: 'SALES', salary: 12000000 },
+    { id: 3, code: 'EMP-0003', name: 'Phạm Văn Minh', email: 'minh.pv@kltn-erp.vn', dept: 'Kho Vận', role: 'WAREHOUSE', salary: 10000000 },
+    { id: 4, code: 'EMP-0004', name: 'Lê Văn Hùng', email: 'hung.lv@kltn-erp.vn', dept: 'Kỹ Thuật Lắp Ráp', role: 'ASSEMBLY', salary: 11000000 },
+    { id: 5, code: 'EMP-0005', name: 'Hoàng Văn Tuấn', email: 'tuan.hv@kltn-erp.vn', dept: 'Nhân Sự', role: 'HR', salary: 18000000 },
     // Demo accounts for thesis presentation
     { id: 6, code: 'ceo', name: 'Nguyễn Văn A (CEO)', email: 'ceo@kltn-erp.vn', dept: 'Management', role: 'CEO', salary: 50000000 },
     { id: 7, code: 'admin', name: 'Quản Trị Viên', email: 'admin@kltn-erp.vn', dept: 'IT', role: 'ADMIN', salary: 30000000 },
