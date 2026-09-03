@@ -41,49 +41,56 @@ export const AuthProvider = ({ children }) => {
       const cleanUser = String(username || '').trim();
       const lowerUser = cleanUser.toLowerCase();
 
-      // 1. Employee / staff / supplier login
-      // Only pass `email` when the user actually typed one — the backend
-      // already derives a `{code}@kltn-erp.vn` guess from `username` itself
-      // and also matches employeeCode/supplier code directly. Guessing an
-      // email here and always sending it made the backend's `email ||
-      // username` priority pick the guess over the real identifier for
-      // every account whose real email doesn't follow that pattern (e.g.
-      // supplier accounts like SUP-FPT, whose real email is a company
-      // address, not sup-fpt@kltn-erp.vn) — login failed with a wrong-looking
-      // "Invalid credentials" no matter how correct the typed code/password was.
+      // Employee/staff/supplier and customer accounts live in separate tables
+      // behind separate endpoints, and there's no way to tell which one a
+      // typed identifier belongs to up front — only the backend knows.
+      // Firing both concurrently and taking whichever succeeds first (instead
+      // of trying employee, awaiting its failure, then only starting the
+      // customer attempt) roughly halves perceived login latency for every
+      // customer account, since it no longer pays for a full extra
+      // network round-trip + bcrypt compare before even starting the
+      // request that will actually succeed. api.js already throws on a
+      // non-2xx response, so Promise.any's "first fulfilled" is exactly
+      // "first endpoint that actually accepted these credentials" — it only
+      // rejects (AggregateError) once *both* have failed.
+      //
+      // Only pass `email` on the employee attempt when the user actually
+      // typed one — the backend already derives a `{code}@kltn-erp.vn` guess
+      // from `username` itself and also matches employeeCode/supplier code
+      // directly. Guessing an email here and always sending it made the
+      // backend's `email || username` priority pick the guess over the real
+      // identifier for every account whose real email doesn't follow that
+      // pattern (e.g. supplier accounts like SUP-FPT, whose real email is a
+      // company address, not sup-fpt@kltn-erp.vn) — login failed with a
+      // wrong-looking "Invalid credentials" no matter how correct the typed
+      // code/password was.
+      const employeeAttempt = api.post('/auth/employee/login', {
+        ...(cleanUser.includes('@') ? { email: cleanUser } : {}),
+        username: cleanUser,
+        password
+      }).then(response => ({ kind: 'employee', response }));
+
+      const customerAttempt = api.post('/auth/login', { email: cleanUser, username: cleanUser, password })
+        .then(response => ({ kind: 'customer', response }));
+
+      let kind, response;
       try {
-        const response = await api.post('/auth/employee/login', {
-          ...(cleanUser.includes('@') ? { email: cleanUser } : {}),
-          username: cleanUser,
-          password
-        });
-        if (response && response.token && response.user) {
-          const userObj = {
-            ...response.user,
-            username: response.user.username || lowerUser,
-            role: response.user.role || 'DELIVERY'
-          };
-          setUser(userObj);
-          setLoading(false);
-          return userObj;
-        }
-      } catch (empError) {
-        // Not an employee/supplier account — fall through to customer login.
+        ({ kind, response } = await Promise.any([employeeAttempt, customerAttempt]));
+      } catch (aggregateError) {
+        throw new Error('Tài khoản hoặc mật khẩu không chính xác');
       }
 
-      // 2. Customer login
-      const response = await api.post('/auth/login', { email: cleanUser, username: cleanUser, password });
-      if (response && response.token && response.user) {
-        const userObj = {
-          ...response.user,
-          role: response.user.role || 'CUSTOMER'
-        };
-        setUser(userObj);
-        setLoading(false);
-        return userObj;
+      if (!response || !response.token || !response.user) {
+        throw new Error('Tài khoản hoặc mật khẩu không chính xác');
       }
 
-      throw new Error('Tài khoản hoặc mật khẩu không chính xác');
+      const userObj = kind === 'employee'
+        ? { ...response.user, username: response.user.username || lowerUser, role: response.user.role || 'DELIVERY' }
+        : { ...response.user, role: response.user.role || 'CUSTOMER' };
+
+      setUser(userObj);
+      setLoading(false);
+      return userObj;
     } catch (error) {
       setLoading(false);
       throw error;
