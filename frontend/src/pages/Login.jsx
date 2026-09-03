@@ -47,6 +47,7 @@ export default function Login() {
 
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [showDemoAccounts, setShowDemoAccounts] = useState(false);
   const { login, register } = useAuth();
   const navigate = useNavigate();
 
@@ -508,16 +509,41 @@ export default function Login() {
                 flexDirection: 'column',
                 justifyContent: 'center'
               }}>
-                {import.meta.env.DEV ? (
+                <div style={{ marginBottom: '1.25rem' }}>
+                  <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0f172a', margin: 0, letterSpacing: '-0.01em' }}>
+                    Tài Khoản Demo Hệ Thống
+                  </h3>
+                  <p style={{ fontSize: '0.8rem', color: '#475569', marginTop: '0.25rem', marginBottom: '0.85rem' }}>
+                    Danh sách tài khoản demo dùng để trải nghiệm nhanh các vai trò trong hệ thống.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setShowDemoAccounts(v => !v)}
+                    style={{
+                      width: '100%',
+                      backgroundColor: '#ffffff',
+                      border: '1px solid #cbd5e1',
+                      borderRadius: '10px',
+                      padding: '0.6rem 0.9rem',
+                      fontSize: '0.85rem',
+                      fontWeight: 700,
+                      color: '#2563eb',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between'
+                    }}
+                  >
+                    <span>{showDemoAccounts ? 'Ẩn danh sách tài khoản demo' : 'Xem danh sách tài khoản demo'}</span>
+                    <span>{showDemoAccounts ? '▲' : '▼'}</span>
+                  </button>
+                </div>
+
+                {showDemoAccounts && (
                   <>
-                    <div style={{ marginBottom: '1.25rem' }}>
-                      <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0f172a', margin: 0, letterSpacing: '-0.01em' }}>
-                        Tài Khoản Demo Hệ Thống
-                      </h3>
-                      <p style={{ fontSize: '0.8rem', color: '#475569', marginTop: '0.25rem', marginBottom: 0 }}>
-                        Chọn vai trò để đăng nhập nhanh (Mật khẩu: <code style={{ color: '#2563eb', fontWeight: 700, backgroundColor: '#eff6ff', padding: '1px 6px', borderRadius: '4px', border: '1px solid #bfdbfe' }}>123456</code>)
-                      </p>
-                    </div>
+                    <p style={{ fontSize: '0.8rem', color: '#475569', marginTop: '-0.5rem', marginBottom: '0.85rem' }}>
+                      Chọn vai trò để đăng nhập nhanh (Mật khẩu: <code style={{ color: '#2563eb', fontWeight: 700, backgroundColor: '#eff6ff', padding: '1px 6px', borderRadius: '4px', border: '1px solid #bfdbfe' }}>123456</code>)
+                    </p>
 
                     <div style={{ maxHeight: '380px', overflowY: 'auto', padding: '4px 4px 4px 2px' }}>
                     <div style={{
@@ -605,15 +631,6 @@ export default function Login() {
                     </div>
                     </div>
                   </>
-                ) : (
-                  <div>
-                    <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0f172a', margin: 0, letterSpacing: '-0.01em' }}>
-                      Chào mừng trở lại
-                    </h3>
-                    <p style={{ fontSize: '0.85rem', color: '#475569', marginTop: '0.5rem' }}>
-                      Vui lòng liên hệ quản trị viên nếu bạn cần được cấp tài khoản truy cập hệ thống.
-                    </p>
-                  </div>
                 )}
               </div>
             )}
