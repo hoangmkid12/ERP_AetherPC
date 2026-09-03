@@ -25,14 +25,19 @@ const isCookieSecure = () => process.env.COOKIE_SECURE === 'true';
 const loginCustomer = async (req, res, next) => {
   try {
     const { email, username, password } = req.body;
-    const loginIdentifier = email || username;
+    const loginIdentifier = (email || username || '').trim();
 
     if (!loginIdentifier || !password) {
       return res.status(400).json({ success: false, message: 'Email and password are required' });
     }
 
-    const customer = await prisma.customer.findUnique({
-      where: { email: loginIdentifier }
+    const customer = await prisma.customer.findFirst({
+      where: {
+        OR: [
+          { email: loginIdentifier },
+          { username: loginIdentifier.toLowerCase() }
+        ]
+      }
     });
 
     if (!customer) {
@@ -65,6 +70,7 @@ const loginCustomer = async (req, res, next) => {
         id: customer.customerId,
         name: customer.name,
         email: customer.email,
+        username: customer.username,
         tier: customer.tier,
         loyaltyPoints: customer.loyaltyPoints,
         phone: customer.phone,
@@ -79,18 +85,27 @@ const loginCustomer = async (req, res, next) => {
 
 const registerCustomer = async (req, res, next) => {
   try {
-    const { email, password, name, phone, address, city } = req.body;
+    const { email, username, password, name, phone, address, city } = req.body;
 
     if (!email || !password || !name) {
       return res.status(400).json({ success: false, message: 'Email, mật khẩu và họ tên là bắt buộc' });
     }
 
-    const existingCustomer = await prisma.customer.findUnique({
-      where: { email }
+    const usernameTrim = (username || '').trim().toLowerCase();
+    if (!usernameTrim) {
+      return res.status(400).json({ success: false, message: 'Tên đăng nhập là bắt buộc' });
+    }
+    if (!/^[a-z0-9_]{3,30}$/.test(usernameTrim)) {
+      return res.status(400).json({ success: false, message: 'Tên đăng nhập chỉ gồm chữ thường, số và dấu gạch dưới (3-30 ký tự)' });
+    }
+
+    const existingCustomer = await prisma.customer.findFirst({
+      where: { OR: [{ email }, { username: usernameTrim }] }
     });
 
     if (existingCustomer) {
-      return res.status(400).json({ success: false, message: 'Email đã được sử dụng bởi tài khoản khác' });
+      const conflictField = existingCustomer.email === email ? 'Email' : 'Tên đăng nhập';
+      return res.status(400).json({ success: false, message: `${conflictField} đã được sử dụng bởi tài khoản khác` });
     }
 
     const salt = await bcrypt.genSalt(10);
@@ -101,6 +116,7 @@ const registerCustomer = async (req, res, next) => {
       data: {
         customerId,
         email,
+        username: usernameTrim,
         passwordHash,
         name,
         phone: phone || null,
@@ -140,6 +156,7 @@ const registerCustomer = async (req, res, next) => {
         id: newCustomer.customerId,
         name: newCustomer.name,
         email: newCustomer.email,
+        username: newCustomer.username,
         tier: newCustomer.tier,
         loyaltyPoints: newCustomer.loyaltyPoints,
         phone: newCustomer.phone,
@@ -267,6 +284,7 @@ const getMe = async (req, res, next) => {
           id: customer.customerId,
           name: customer.name,
           email: customer.email,
+          username: customer.username,
           tier: customer.tier,
           loyaltyPoints: customer.loyaltyPoints,
           phone: customer.phone,

@@ -337,6 +337,39 @@ async function main() {
     }
   });
 
+  // Login.jsx's DEMO_ACCOUNTS quick-login list has a { role: 'customer' }
+  // entry that fills username "customer" / password "123456" — without a
+  // matching account that button always failed with "Invalid credentials".
+  await prisma.customer.create({
+    data: {
+      customerId: 'customer_demo',
+      email: 'customer_demo@kltn-erp.vn',
+      username: 'customer',
+      // mock password "123456" (same hash used for the customers.json cohort above)
+      passwordHash: "$2a$10$IyfWpe/v6d3OiOESKMx74eJNfiLnHx0T2oPH.isjyKrGgqXVHFRSG",
+      name: 'Khách Hàng Demo',
+      gender: 'FEMALE',
+      phone: '0987654321',
+      address: '1 Đường Nguyễn Huệ, Phường Bến Nghé, TP. Hồ Chí Minh',
+      city: 'Hồ Chí Minh',
+      loyaltyPoints: 0,
+      tier: 'BRONZE',
+      status: 'ACTIVE',
+      createdAt: new Date()
+    }
+  });
+
+  await prisma.customerAddress.create({
+    data: {
+      customerId: 'customer_demo',
+      recipientName: 'Khách Hàng Demo',
+      recipientPhone: '0987654321',
+      addressLine: '1 Đường Nguyễn Huệ, Phường Bến Nghé, TP. Hồ Chí Minh',
+      city: 'Hồ Chí Minh',
+      isDefault: true
+    }
+  });
+
   // 6. Employees (HRM)
   console.log('Seeding Employees...');
   const employeesData = [

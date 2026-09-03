@@ -39,6 +39,7 @@ export default function Login() {
 
   // Register fields
   const [name, setName] = useState('');
+  const [regUsername, setRegUsername] = useState('');
   const [email, setEmail] = useState('');
   const [registerPassword, setRegisterPassword] = useState('');
   const [phone, setPhone] = useState('');
@@ -56,7 +57,15 @@ export default function Login() {
     setError(null);
     try {
       if (isRegister) {
-        // 1. Email format validation
+        // 1. Username validation (lowercase letters, digits, underscore)
+        const usernameTrim = regUsername.trim().toLowerCase();
+        const usernameRegex = /^[a-z0-9_]{3,30}$/;
+        if (!usernameRegex.test(usernameTrim)) {
+          setError('Tên đăng nhập phải từ 3-30 ký tự, chỉ gồm chữ thường, số và dấu gạch dưới');
+          return;
+        }
+
+        // 2. Email format validation
         const emailTrim = email.trim();
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(emailTrim)) {
@@ -64,13 +73,13 @@ export default function Login() {
           return;
         }
 
-        // 2. Password length validation
+        // 3. Password length validation
         if (registerPassword.length < 6) {
           setError('Mật khẩu phải chứa ít nhất 6 ký tự');
           return;
         }
 
-        // 3. Vietnamese Phone number validation (10 digits starting with 0)
+        // 4. Vietnamese Phone number validation (10 digits starting with 0)
         const phoneTrim = phone.trim();
         const phoneRegex = /^0[3|5|7|8|9]\d{8}$/;
         if (!phoneTrim) {
@@ -85,6 +94,7 @@ export default function Login() {
         setLoading(true);
         // Customer Registration
         await register({
+          username: usernameTrim,
           email: emailTrim,
           password: registerPassword,
           name: name.trim(),
@@ -355,6 +365,22 @@ export default function Login() {
                 ) : (
                   /* REGISTER FORM */
                   <>
+                    <div className="form-group" style={{ marginBottom: '0.875rem' }}>
+                      <label className="form-label" htmlFor="regUsername" style={{ color: '#334155', fontWeight: 700, fontSize: '0.85rem' }}>Tên đăng nhập *</label>
+                      <input
+                        id="regUsername"
+                        type="text"
+                        className="input-field"
+                        placeholder="vd: nguyenvana (dùng để đăng nhập)"
+                        value={regUsername}
+                        onChange={(e) => setRegUsername(e.target.value)}
+                        style={{ height: '40px', fontSize: '0.85rem', backgroundColor: '#ffffff', border: '1px solid #cbd5e1', color: '#0f172a', borderRadius: '10px' }}
+                        pattern="^[a-zA-Z0-9_]{3,30}$"
+                        title="3-30 ký tự, chỉ gồm chữ, số và dấu gạch dưới"
+                        required
+                      />
+                    </div>
+
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.875rem', marginBottom: '0.875rem' }}>
                       <div className="form-group">
                         <label className="form-label" htmlFor="regName" style={{ color: '#334155', fontWeight: 700, fontSize: '0.85rem' }}>Họ và Tên *</label>

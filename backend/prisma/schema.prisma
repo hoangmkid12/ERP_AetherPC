@@ -131,6 +131,7 @@ model ProductImage {
 model Customer {
   customerId    String            @id @map("customer_id") @db.VarChar(50)
   email         String            @unique @db.VarChar(100)
+  username      String?           @unique @db.VarChar(30)
   passwordHash  String?           @map("password_hash") @db.VarChar(255)
   name          String            @db.VarChar(150)
   customerType  String?           @default("B2C") @map("customer_type") @db.VarChar(10)
