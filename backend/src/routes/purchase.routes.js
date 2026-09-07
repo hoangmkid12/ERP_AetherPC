@@ -4,6 +4,9 @@ const { authMiddleware } = require('../middlewares/auth.middleware');
 const { QC_ROLES } = require('../constants/roles');
 const {
   getSuppliers,
+  createSupplier,
+  updateSupplier,
+  deactivateSupplier,
   createSupplierEvaluation,
   getPurchasingProducts,
   getPurchaseOrders,
@@ -16,6 +19,15 @@ const {
 
 // @route   GET /api/v1/purchasing/suppliers
 router.get('/suppliers', authMiddleware(['PURCHASING', 'WAREHOUSE_MANAGER', 'CEO', 'ADMIN', 'SUPPLIER']), getSuppliers);
+
+// @route   POST /api/v1/purchasing/suppliers
+router.post('/suppliers', authMiddleware(['PURCHASING', 'CEO', 'ADMIN']), createSupplier);
+
+// @route   PUT /api/v1/purchasing/suppliers/:code
+router.put('/suppliers/:code', authMiddleware(['PURCHASING', 'CEO', 'ADMIN']), updateSupplier);
+
+// @route   DELETE /api/v1/purchasing/suppliers/:code
+router.delete('/suppliers/:code', authMiddleware(['PURCHASING', 'CEO', 'ADMIN']), deactivateSupplier);
 
 // @route   POST /api/v1/purchasing/suppliers/:code/evaluations
 router.post('/suppliers/:code/evaluations', authMiddleware(['PURCHASING', 'CEO', 'ADMIN']), createSupplierEvaluation);

@@ -323,9 +323,6 @@ export default function Products() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', backgroundColor: '#ffffff', padding: '0.75rem 1.25rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
               <div style={{ fontSize: '0.85rem', color: '#64748b' }}>
                 Tìm thấy <strong style={{ color: '#0f172a' }}>{filteredProducts.length}</strong> sản phẩm
-                <span style={{ marginLeft: '0.5rem', fontSize: '0.75rem', color: '#16a34a', fontWeight: 700 }}>
-                  (Ưu tiên hàng có sẵn tại kho)
-                </span>
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>

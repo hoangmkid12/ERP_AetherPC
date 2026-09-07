@@ -72,6 +72,31 @@ const normalizeProductSpecs = (specs) => {
   return normalizedSpecs;
 };
 
+// Shared shape mapping from a raw backend Product row (whether from the list endpoint
+// GET /products or the single-product GET /products/:id) to what every storefront page
+// actually reads (id/imageUrls/category/specs/...). Was previously only inlined for the
+// list endpoint; ProductDetail.jsx needs the identical mapping for a single product, so
+// this is exported instead of duplicated.
+export const normalizeProduct = (p) => {
+  const dbUrls = p.images ? p.images.map(img => img.url) : [p.primaryImage || p.image || ''];
+  return {
+    id: p.productId || p.id,
+    sku: p.sku || `SKU-${p.productId || p.id}`,
+    name: p.name,
+    brand: p.brand?.name || p.brand || 'Khác',
+    price: p.price ? parseFloat(p.price) : 0,
+    originalPrice: p.originalPrice ? parseFloat(p.originalPrice) : (p.price ? parseFloat(p.price) : 0),
+    discountPercent: p.discountPercent ? parseFloat(p.discountPercent) : 0,
+    category: p.category?.slug ? mapSlugToCategory(p.category.slug) : mapSlugToCategory(p.category?.name || p.category || 'OTHER'),
+    specs: normalizeProductSpecs(p.specs),
+    image: p.primaryImage || p.image || '',
+    imageUrls: dbUrls.length > 0 ? dbUrls : [p.primaryImage || p.image || ''],
+    available: p.available ?? true,
+    stockQuantity: p.stockQuantity !== undefined ? p.stockQuantity : (p.stock_quantity || 0),
+    descriptionText: p.descriptionText || p.description || ''
+  };
+};
+
 async function request(endpoint, options = {}) {
   // Intercept and handle '/products' endpoint for fallback dataset
   if (endpoint === '/products') {
@@ -91,24 +116,7 @@ async function request(endpoint, options = {}) {
           else if (resData.success && Array.isArray(resData.data)) list = resData.data;
 
           if (list.length > 0) {
-            return list.map(p => {
-              const dbUrls = p.images ? p.images.map(img => img.url) : [p.primaryImage || p.image || ''];
-              return {
-                id: p.productId ? parseInt(p.productId) : p.id,
-                sku: p.sku || `SKU-${p.productId || p.id}`,
-                name: p.name,
-                brand: p.brand?.name || p.brand || 'Khác',
-                price: p.price ? parseFloat(p.price) : 0,
-                originalPrice: p.originalPrice ? parseFloat(p.originalPrice) : (p.price ? parseFloat(p.price) : 0),
-                discountPercent: p.discountPercent ? parseFloat(p.discountPercent) : 0,
-                category: p.category?.slug ? mapSlugToCategory(p.category.slug) : mapSlugToCategory(p.category?.name || p.category || 'OTHER'),
-                specs: normalizeProductSpecs(p.specs),
-                image: p.primaryImage || p.image || '',
-                imageUrls: dbUrls.length > 0 ? dbUrls : [p.primaryImage || p.image || ''],
-                available: p.available ?? true,
-                stockQuantity: p.stockQuantity !== undefined ? p.stockQuantity : (p.stock_quantity || 0)
-              };
-            });
+            return list.map(normalizeProduct);
           }
         }
       }
@@ -145,8 +153,13 @@ async function request(endpoint, options = {}) {
     }
   }
 
+  // FormData bodies (product image upload) must NOT be JSON.stringify'd, and must NOT
+  // get a manual Content-Type — the browser sets multipart/form-data with the correct
+  // boundary itself only when Content-Type is left unset.
+  const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
+
   const headers = {
-    'Content-Type': 'application/json',
+    ...(!isFormData && { 'Content-Type': 'application/json' }),
     ...options.headers,
   };
 
@@ -156,7 +169,7 @@ async function request(endpoint, options = {}) {
     credentials: 'include' // Session lives in the backend's HTTP-Only authToken cookie
   };
 
-  if (config.body && typeof config.body === 'object') {
+  if (config.body && typeof config.body === 'object' && !isFormData) {
     config.body = JSON.stringify(config.body);
   }
 

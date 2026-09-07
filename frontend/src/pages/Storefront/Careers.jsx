@@ -243,7 +243,7 @@ export default function Careers() {
         <img src="/careers_banner.png" alt="Tuyển dụng AetherPC" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
         <div style={{
           position: 'absolute', inset: 0,
-          background: 'linear-gradient(135deg, rgba(11,15,25,0.92) 0%, rgba(11,15,25,0.45) 100%)',
+          background: 'linear-gradient(90deg, rgba(6,8,15,0.94) 0%, rgba(6,8,15,0.86) 45%, rgba(6,8,15,0.55) 100%)',
           display: 'flex', alignItems: 'center',
         }}>
           <div className="container">
@@ -252,11 +252,12 @@ export default function Careers() {
             </span>
             <h1 style={{
               fontSize: 'clamp(1.75rem, 4vw, 2.75rem)', fontWeight: 900,
-              lineHeight: 1.2, marginBottom: '1.25rem', maxWidth: '600px',
+              lineHeight: 1.2, marginBottom: '1.25rem', maxWidth: '600px', color: '#fff',
+              textShadow: '0 2px 16px rgba(0,0,0,0.55)',
             }}>
               Xây Dựng Tương Lai Cùng <span className="gradient-text">AetherPC</span>
             </h1>
-            <p style={{ color: 'rgba(255,255,255,0.75)', fontSize: '1rem', maxWidth: '500px', lineHeight: 1.7, marginBottom: '2rem' }}>
+            <p style={{ color: 'rgba(255,255,255,0.85)', fontSize: '1rem', maxWidth: '500px', lineHeight: 1.7, marginBottom: '2rem', textShadow: '0 1px 8px rgba(0,0,0,0.5)' }}>
               Chúng tôi tìm kiếm những tài năng đam mê công nghệ, sẵn sàng cùng nhau tạo ra trải nghiệm mua sắm tuyệt vời nhất cho người dùng Việt Nam.
             </p>
             <div style={{ display: 'flex', gap: '1rem' }}>
@@ -292,7 +293,7 @@ export default function Careers() {
 
       {/* Hiring Process */}
       <section style={{
-        background: 'linear-gradient(135deg, rgba(21,27,44,0.8), rgba(11,15,25,0.9))',
+        background: 'linear-gradient(135deg, rgba(99,102,241,0.05), rgba(14,165,233,0.05))',
         borderTop: '1px solid var(--border-glass)', borderBottom: '1px solid var(--border-glass)',
         padding: '3.5rem 0', marginBottom: '4rem',
       }}>
@@ -342,10 +343,9 @@ export default function Careers() {
               padding: '0.4rem 1.125rem', borderRadius: 'var(--radius-md)', cursor: 'pointer',
               border: '1px solid var(--border-glass)', fontWeight: 600, fontSize: '0.8125rem',
               fontFamily: 'var(--font-sans)',
-              background: filterDept === d ? 'var(--primary)' : 'rgba(255,255,255,0.02)',
+              background: filterDept === d ? 'var(--primary)' : 'var(--bg-tertiary)',
               color: filterDept === d ? '#fff' : 'var(--text-secondary)',
               transition: 'all var(--transition-fast)',
-              textTransform: d === 'all' ? 'none' : 'none',
             }}>
               {d === 'all' ? 'Tất Cả Phòng Ban' : d}
             </button>

@@ -9,7 +9,7 @@ import ActorNotificationBar from '../../components/ActorNotificationBar';
 import { 
   Search, ShoppingCart, Plus, Minus, Trash2, Printer, FileText,
   BarChart2, DollarSign, Users, Award, ClipboardList, TrendingUp, Truck, X, Check,
-  Eye, MapPin, Phone, User, Package, Calendar, Tag, ChevronLeft, ChevronRight,
+  Eye, EyeOff, MapPin, Phone, User, Package, Calendar, Tag, ChevronLeft, ChevronRight,
   CreditCard, ShieldCheck, CheckCircle2, ArrowRight, RefreshCw, AlertCircle, Lock
 } from 'lucide-react';
 
@@ -148,6 +148,31 @@ export default function SalesPOS() {
   // Customers CRM State
   const [customerSearch, setCustomerSearch] = useState('');
   const [customerTierFilter, setCustomerTierFilter] = useState('ALL');
+
+  // Catalog (Danh Mục Sản Phẩm) State — Sales Manager toggles storefront visibility here,
+  // scoped to the narrow PATCH .../visibility endpoint (can't touch price/stock/NCC).
+  const [catalogSearch, setCatalogSearch] = useState('');
+  const [catalogCategoryFilter, setCatalogCategoryFilter] = useState('ALL');
+  const [catalogVisibilityFilter, setCatalogVisibilityFilter] = useState('ALL');
+  const [togglingProductId, setTogglingProductId] = useState(null);
+  const toggleProductVisibility = useInventoryStore(state => state.toggleProductVisibility);
+  const canToggleVisibility = isSalesManager || isCEO || isAdmin;
+
+  const handleToggleCatalogVisibility = async (product) => {
+    if (!canToggleVisibility) {
+      notify('Bạn không có quyền ẩn/hiện sản phẩm.', 'error');
+      return;
+    }
+    setTogglingProductId(product.id);
+    try {
+      await toggleProductVisibility(product.id, !(product.available !== false));
+      notify(`Đã ${product.available !== false ? 'ẩn' : 'hiện'} sản phẩm "${product.name}" ${product.available !== false ? 'khỏi' : 'trên'} trang bán hàng.`, 'success');
+    } catch (err) {
+      notify(err?.message || 'Không thể cập nhật hiển thị sản phẩm.', 'error');
+    } finally {
+      setTogglingProductId(null);
+    }
+  };
 
   // Promotions State
   const [promotionsList, setPromotionsList] = useState([
@@ -394,6 +419,7 @@ export default function SalesPOS() {
           {activeTab === 'pos' && 'Điểm Bán Hàng Trực Tiếp Tại Quầy'}
           {activeTab === 'orders' && 'Quản Lý Đơn Hàng Bán Lẻ & Online'}
           {activeTab === 'customers' && 'Danh Bạ & Hồ Sơ Khách Hàng'}
+          {activeTab === 'catalog' && 'Danh Mục Sản Phẩm & Hiển Thị Trang Bán Hàng'}
           {activeTab === 'promotions' && 'Chương Trình Khuyến Mãi & Bảng Giá Ưu Đãi'}
           {activeTab === 'reports' && 'Báo Cáo Doanh Thu & Hiệu Suất Kinh Doanh'}
         </h2>
@@ -1240,6 +1266,125 @@ export default function SalesPOS() {
           </div>
         </div>
       )}
+
+      {/* ========================================================================= */}
+      {/* TAB: DANH MỤC SẢN PHẨM (ẨN/HIỆN TRÊN TRANG BÁN HÀNG) */}
+      {/* Read-only catalog view for Sales — only the visibility toggle is a real write
+          (PATCH .../visibility), everything else (giá/tồn/NCC) stays Kho's domain via
+          the full product-edit modal in /admin/warehouse. */}
+      {/* ========================================================================= */}
+      {activeTab === 'catalog' && (() => {
+        const filteredCatalog = effectiveCatalog.filter(p => {
+          const matchSearch = !catalogSearch.trim() || (p.name || '').toLowerCase().includes(catalogSearch.toLowerCase());
+          const matchCategory = catalogCategoryFilter === 'ALL' || p.category === catalogCategoryFilter;
+          const isVisible = p.available !== false;
+          const matchVisibility = catalogVisibilityFilter === 'ALL' ||
+            (catalogVisibilityFilter === 'VISIBLE' && isVisible) ||
+            (catalogVisibilityFilter === 'HIDDEN' && !isVisible);
+          return matchSearch && matchCategory && matchVisibility;
+        });
+
+        return (
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '1rem' }}>
+            <div>
+              <h2 style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>Danh Mục Sản Phẩm</h2>
+              <p style={{ color: '#64748b', fontSize: '0.85rem', margin: '0.25rem 0 0' }}>
+                {canToggleVisibility
+                  ? 'Bật/tắt hiển thị sản phẩm trên trang bán hàng. Giá, tồn kho và nhà cung cấp do bộ phận Kho quản lý.'
+                  : 'Xem trạng thái hiển thị sản phẩm trên trang bán hàng (chỉ Quản Lý Bán Hàng mới có thể đổi).'}
+              </p>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.25rem', flexWrap: 'wrap' }}>
+            <input
+              type="text"
+              placeholder="Tìm theo tên sản phẩm..."
+              value={catalogSearch}
+              onChange={(e) => setCatalogSearch(e.target.value)}
+              style={{ flex: '1 1 260px', height: '38px', padding: '0 0.85rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px', boxSizing: 'border-box' }}
+            />
+            <select value={catalogCategoryFilter} onChange={(e) => setCatalogCategoryFilter(e.target.value)} style={{ height: '38px', padding: '0 0.65rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px', backgroundColor: '#ffffff', cursor: 'pointer' }}>
+              <option value="ALL">Tất cả phân nhóm</option>
+              {Object.keys(CATEGORY_MAP_VI).map(cat => (
+                <option key={cat} value={cat}>{CATEGORY_MAP_VI[cat] || cat}</option>
+              ))}
+            </select>
+            <select value={catalogVisibilityFilter} onChange={(e) => setCatalogVisibilityFilter(e.target.value)} style={{ height: '38px', padding: '0 0.65rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px', backgroundColor: '#ffffff', cursor: 'pointer' }}>
+              <option value="ALL">Tất cả trạng thái</option>
+              <option value="VISIBLE">Đang hiển thị</option>
+              <option value="HIDDEN">Đang ẩn</option>
+            </select>
+          </div>
+
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', overflow: 'hidden' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.83rem' }}>
+              <thead>
+                <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569' }}>
+                  <th style={{ padding: '0.75rem 1rem' }}>Tên Sản Phẩm</th>
+                  <th style={{ padding: '0.75rem 0.85rem' }}>Phân Nhóm</th>
+                  <th style={{ padding: '0.75rem 0.85rem' }}>Nhà Cung Cấp</th>
+                  <th style={{ padding: '0.75rem 0.85rem', textAlign: 'center' }}>Tồn Kho</th>
+                  <th style={{ padding: '0.75rem 0.85rem', textAlign: 'center' }}>Trạng Thái</th>
+                  {canToggleVisibility && <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Hành Động</th>}
+                </tr>
+              </thead>
+              <tbody>
+                {filteredCatalog.length === 0 ? (
+                  <tr>
+                    <td colSpan={canToggleVisibility ? 6 : 5} style={{ textAlign: 'center', padding: '3rem', color: '#64748b' }}>
+                      Không tìm thấy sản phẩm nào.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredCatalog.map(p => {
+                    const isVisible = p.available !== false;
+                    const isToggling = togglingProductId === p.id;
+                    return (
+                      <tr key={p.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                        <td style={{ padding: '0.75rem 1rem', fontWeight: 700, color: '#0f172a' }}>{p.name}</td>
+                        <td style={{ padding: '0.75rem 0.85rem', color: '#475569' }}>{CATEGORY_MAP_VI[p.category] || p.category}</td>
+                        <td style={{ padding: '0.75rem 0.85rem', color: '#64748b' }}>{p.supplier || 'Chưa rõ'}</td>
+                        <td style={{ padding: '0.75rem 0.85rem', textAlign: 'center', fontWeight: 700 }}>{Number(p.stock) || 0}</td>
+                        <td style={{ padding: '0.75rem 0.85rem', textAlign: 'center' }}>
+                          <span style={{
+                            display: 'inline-flex', alignItems: 'center', gap: '0.3rem', padding: '0.2rem 0.6rem', fontSize: '0.72rem', fontWeight: 700, borderRadius: '12px',
+                            color: isVisible ? '#15803d' : '#dc2626',
+                            backgroundColor: isVisible ? '#f0fdf4' : '#fef2f2',
+                            border: `1px solid ${isVisible ? '#bbf7d0' : '#fecaca'}`
+                          }}>
+                            {isVisible ? <Eye size={12} /> : <EyeOff size={12} />}
+                            {isVisible ? 'Đang hiển thị' : 'Đang ẩn'}
+                          </span>
+                        </td>
+                        {canToggleVisibility && (
+                          <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
+                            <button
+                              onClick={() => handleToggleCatalogVisibility(p)}
+                              disabled={isToggling}
+                              style={{
+                                padding: '0.35rem 0.85rem', fontSize: '0.75rem', fontWeight: 700, borderRadius: '6px', cursor: isToggling ? 'default' : 'pointer',
+                                border: `1px solid ${isVisible ? '#fecaca' : '#bbf7d0'}`,
+                                color: isVisible ? '#dc2626' : '#15803d',
+                                backgroundColor: isVisible ? '#fef2f2' : '#f0fdf4',
+                                opacity: isToggling ? 0.6 : 1
+                              }}
+                            >
+                              {isToggling ? 'Đang lưu...' : (isVisible ? 'Ẩn Sản Phẩm' : 'Hiện Sản Phẩm')}
+                            </button>
+                          </td>
+                        )}
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        );
+      })()}
 
       {/* ========================================================================= */}
       {/* TAB 5: PROMOTIONS (BẢNG GIÁ & KHUYẾN MÃI) */}

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useCart } from '../../context/CartContext';
-import { api } from '../../services/api';
+import { api, normalizeProduct } from '../../services/api';
 import {
   ShoppingCart, Star, Shield, Truck, RotateCcw,
   ChevronRight, ChevronLeft, ThumbsUp, Send, Check,
@@ -139,47 +139,22 @@ export default function ProductDetail() {
   const { addToCart, toggleWishlist, isInWishlist } = useCart();
   const fav = isInWishlist(id);
 
-  const [product, setProduct] = useState(() => {
-    const cached = localStorage.getItem('aetherpc_products');
-    if (cached) {
-      const list = JSON.parse(cached);
-      return list.find(p => String(p.id) === String(id)) || null;
-    }
-    return FALLBACK_PRODUCTS.find(p => String(p.id) === String(id)) || null;
-  });
-
-  const [allProducts, setAllProducts] = useState(() => {
-    const cached = localStorage.getItem('aetherpc_products');
-    return cached ? JSON.parse(cached) : FALLBACK_PRODUCTS;
-  });
-
-  const [loading, setLoading] = useState(() => {
-    const cached = localStorage.getItem('aetherpc_products');
-    if (cached) {
-      const list = JSON.parse(cached);
-      return !list.some(p => String(p.id) === String(id));
-    }
-    return !FALLBACK_PRODUCTS.some(p => String(p.id) === String(id));
-  });
+  // Instant paint from the small built-in sample list if this id happens to be in it;
+  // otherwise blank until the real fetch below resolves. No longer seeded from the
+  // whole-catalog localStorage cache — this page fetches its own single product now
+  // (see the effect below), so it no longer needs the full list at all.
+  const [product, setProduct] = useState(() => FALLBACK_PRODUCTS.find(p => String(p.id) === String(id)) || null);
+  const [related, setRelated] = useState([]);
+  const [loading, setLoading] = useState(() => !FALLBACK_PRODUCTS.some(p => String(p.id) === String(id)));
 
   const [qty, setQty] = useState(1);
   const [activeTab, setActiveTab] = useState('specs');
   const [activeImg, setActiveImg] = useState(null);
   const thumbnailRef = useRef(null);
-  
+
   const [reviews, setReviews] = useState(() => {
-    const cached = localStorage.getItem('aetherpc_products');
-    let foundId = null;
-    if (cached) {
-      const list = JSON.parse(cached);
-      const found = list.find(p => String(p.id) === String(id));
-      if (found) foundId = found.id;
-    }
-    if (!foundId) {
-      const found = FALLBACK_PRODUCTS.find(p => String(p.id) === String(id));
-      if (found) foundId = found.id;
-    }
-    return foundId ? generateReviews(foundId) : [];
+    const found = FALLBACK_PRODUCTS.find(p => String(p.id) === String(id));
+    return found ? generateReviews(found.id) : [];
   });
 
   const [cartOk, setCartOk] = useState(false);
@@ -191,39 +166,41 @@ export default function ProductDetail() {
   useEffect(() => {
     window.scrollTo(0, 0);
     setActiveImg(null);
+    setLoading(true);
+
+    // Single product by id (GET /products/:id, product.controller.js getProductById) —
+    // was previously the whole /products catalog (1538 rows, full image galleries)
+    // fetched just to .find() one row client-side, which is why this page used to sit
+    // blank for a noticeable moment before showing anything.
     const load = async () => {
-      const cached = localStorage.getItem('aetherpc_products');
-      let hasProduct = false;
-      if (cached) {
-        const list = JSON.parse(cached);
-        hasProduct = list.some(p => String(p.id) === String(id));
-      } else {
-        hasProduct = FALLBACK_PRODUCTS.some(p => String(p.id) === String(id));
-      }
-
-      if (!hasProduct) {
-        setLoading(true);
-      }
-
       try {
-        const data = await api.get('/products');
-        const list = data && data.length > 0 ? data : FALLBACK_PRODUCTS;
-        setAllProducts(list);
-        localStorage.setItem('aetherpc_products', JSON.stringify(list));
-        const found = list.find(p => String(p.id) === String(id));
-        setProduct(found || null);
-        if (found) setReviews(generateReviews(found.id));
+        const res = await api.get(`/products/${id}`);
+        const raw = res?.data || res;
+        if (!raw || !raw.name) throw new Error('not found');
+        const found = normalizeProduct(raw);
+        setProduct(found);
+        setReviews(generateReviews(found.id));
       } catch {
-        const list = cached ? JSON.parse(cached) : FALLBACK_PRODUCTS;
-        setAllProducts(list);
-        const found = list.find(p => String(p.id) === String(id));
-        setProduct(found || null);
-        if (found) setReviews(generateReviews(found.id));
+        const fallback = FALLBACK_PRODUCTS.find(p => String(p.id) === String(id)) || null;
+        setProduct(fallback);
+        if (fallback) setReviews(generateReviews(fallback.id));
       } finally {
         setLoading(false);
       }
     };
     load();
+
+    // "Sản phẩm liên quan" — was computed client-side by filtering the whole catalog
+    // by category; the backend already has this exact query (same category, available
+    // only, limit 5) at GET /products/:id/recommendations. Fetched separately so a slow
+    // related-products call never blocks the main product from showing.
+    setRelated([]);
+    api.get(`/products/${id}/recommendations`)
+      .then(res => {
+        const list = res?.data || res;
+        if (Array.isArray(list)) setRelated(list.map(normalizeProduct));
+      })
+      .catch(() => {});
   }, [id]);
 
   const handleCart = () => {
@@ -250,7 +227,7 @@ export default function ProductDetail() {
 
   const avg = reviews.length > 0 ? (reviews.reduce((s, r) => s + r.stars, 0) / reviews.length).toFixed(1) : 0;
   const starCounts = [5, 4, 3, 2, 1].map(s => ({ stars: s, count: reviews.filter(r => r.stars === s).length }));
-  const related = allProducts.filter(p => product && p.category === product.category && String(p.id) !== String(id)).slice(0, 4);
+  const relatedProducts = related.filter(p => String(p.id) !== String(id)).slice(0, 4);
   const filteredReviews = rfil === 'all' ? reviews : reviews.filter(r => r.stars === parseInt(rfil));
 
   if (loading) return (
@@ -792,7 +769,7 @@ export default function ProductDetail() {
         {/* ══════════════════════════════════════════════════════
             RELATED PRODUCTS
         ════════════════════════════════════════════════════════ */}
-        {related.length > 0 && (
+        {relatedProducts.length > 0 && (
           <section>
             <div className="section-header" style={{ marginBottom: '1.25rem' }}>
               <h2 className="section-title" style={{ fontSize: '1.25rem' }}>
@@ -803,7 +780,7 @@ export default function ProductDetail() {
               </Link>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(210px, 1fr))', gap: '1.125rem' }}>
-              {related.map(rp => (
+              {relatedProducts.map(rp => (
                 <Link key={rp.id} to={`/product/${rp.id}`} style={{ textDecoration: 'none' }}>
                   <div className="card-glass" style={{ padding: '1rem', height: '100%', transition: 'transform 0.2s, border-color 0.2s' }}
                     onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.borderColor = 'rgba(99,102,241,0.35)'; }}

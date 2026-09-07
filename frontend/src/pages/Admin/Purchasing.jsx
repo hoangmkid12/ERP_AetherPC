@@ -132,6 +132,14 @@ export default function Purchasing() {
   const [evalSubmitting, setEvalSubmitting] = useState(false);
   const [evalError, setEvalError] = useState(null);
 
+  // Add/Edit Supplier modal — real CRUD against Supplier (see purchase.controller.js
+  // createSupplier/updateSupplier), replacing the read-only supplier directory that
+  // could only ever show whatever the scraper's suppliers.json had seeded.
+  const [supplierModal, setSupplierModal] = useState(null); // { mode: 'create' | 'edit', code? } or null when closed
+  const [supplierForm, setSupplierForm] = useState({ code: '', name: '', email: '', phone: '', address: '', paymentTerms: '', leadTimeDays: '7' });
+  const [supplierSubmitting, setSupplierSubmitting] = useState(false);
+  const [supplierFormError, setSupplierFormError] = useState(null);
+
   // Build groups of RFQs that share the same set of product IDs (same batch from multi-supplier RFQ)
   const rfqGroups = (() => {
     const comparableOrders = orders.filter(po => ['RFQ', 'RFQ_SENT', 'QUOTED'].includes(po.status));
@@ -249,6 +257,70 @@ export default function Purchasing() {
     setPoBlanketRefId(null);
     try { window.history.replaceState({}, document.title); } catch (_) {}
     setShowCreateModal(true);
+  };
+
+  const handleOpenAddSupplier = () => {
+    setSupplierForm({ code: '', name: '', email: '', phone: '', address: '', paymentTerms: '', leadTimeDays: '7' });
+    setSupplierFormError(null);
+    setSupplierModal({ mode: 'create' });
+  };
+
+  const handleOpenEditSupplier = (sup) => {
+    setSupplierForm({
+      code: sup.code,
+      name: sup.name || '',
+      email: sup.email || '',
+      phone: sup.phone || '',
+      address: sup.address || '',
+      paymentTerms: sup.paymentTerms || '',
+      leadTimeDays: sup.leadTimeDays !== undefined && sup.leadTimeDays !== null ? String(sup.leadTimeDays) : '7'
+    });
+    setSupplierFormError(null);
+    setSupplierModal({ mode: 'edit', code: sup.code });
+  };
+
+  const handleSubmitSupplier = async () => {
+    setSupplierFormError(null);
+    const { code, name, email, phone, address, paymentTerms, leadTimeDays } = supplierForm;
+    if (!name.trim() || !email.trim() || !phone.trim() || !address.trim() || (supplierModal?.mode === 'create' && !code.trim())) {
+      setSupplierFormError('Vui lòng nhập đầy đủ Mã, Tên, Email, SĐT và Địa chỉ.');
+      return;
+    }
+    setSupplierSubmitting(true);
+    try {
+      const payload = { name: name.trim(), email: email.trim(), phone: phone.trim(), address: address.trim(), paymentTerms: paymentTerms.trim(), leadTimeDays };
+      if (supplierModal?.mode === 'create') {
+        await api.post('/purchasing/suppliers', { ...payload, code: code.trim() });
+        notify(`Đã thêm Nhà Cung Cấp "${name.trim()}" thành công.`, 'success');
+      } else {
+        await api.put(`/purchasing/suppliers/${supplierModal.code}`, payload);
+        notify(`Đã cập nhật thông tin "${name.trim()}" thành công.`, 'success');
+      }
+      await fetchData();
+      setSupplierModal(null);
+    } catch (err) {
+      setSupplierFormError(err.message || 'Không thể lưu Nhà Cung Cấp. Vui lòng thử lại.');
+    } finally {
+      setSupplierSubmitting(false);
+    }
+  };
+
+  const handleToggleSupplierStatus = async (sup) => {
+    const isActive = sup.status !== 'INACTIVE';
+    const label = isActive ? 'ngừng hợp tác với' : 'kích hoạt lại';
+    const confirmed = window.confirm(`Bạn có chắc muốn ${label} Nhà Cung Cấp "${sup.name}"?`);
+    if (!confirmed) return;
+    try {
+      if (isActive) {
+        await api.delete(`/purchasing/suppliers/${sup.code}`);
+      } else {
+        await api.put(`/purchasing/suppliers/${sup.code}`, { status: 'ACTIVE' });
+      }
+      notify(`Đã ${label} "${sup.name}".`, 'success');
+      await fetchData();
+    } catch (err) {
+      notify(err.message || 'Không thể cập nhật trạng thái Nhà Cung Cấp.', 'error');
+    }
   };
 
   // Pre-fills the create-RFQ form with the same supplier + items/prices as an
@@ -1528,14 +1600,25 @@ export default function Purchasing() {
                 Quản lý hồ sơ đối tác, danh mục phân phối chính và lịch sử giao dịch mua hàng ({suppliers.length} đối tác)
               </p>
             </div>
-            <div style={{ width: '320px' }}>
-              <input
-                type="text"
-                placeholder="Tìm theo tên, email, số điện thoại NCC..."
-                value={supplierSearch}
-                onChange={(e) => setSupplierSearch(e.target.value)}
-                style={{ width: '100%', height: '38px', padding: '0 0.85rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px', boxSizing: 'border-box' }}
-              />
+            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+              <div style={{ width: '320px' }}>
+                <input
+                  type="text"
+                  placeholder="Tìm theo tên, email, số điện thoại NCC..."
+                  value={supplierSearch}
+                  onChange={(e) => setSupplierSearch(e.target.value)}
+                  style={{ width: '100%', height: '38px', padding: '0 0.85rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px', boxSizing: 'border-box' }}
+                />
+              </div>
+              {(isPurchasing || isCEO || isAdmin) && (
+                <button
+                  onClick={handleOpenAddSupplier}
+                  style={{ height: '38px', padding: '0 1rem', backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '6px', fontSize: '0.83rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem', whiteSpace: 'nowrap' }}
+                >
+                  <Plus size={15} />
+                  <span>Thêm NCC</span>
+                </button>
+              )}
             </div>
           </div>
 
@@ -1551,8 +1634,9 @@ export default function Purchasing() {
                 const distributedCats = [...new Set(distributedProds.map(p => p.category || getCategoryUpper(p)).filter(Boolean))];
                 const avgScore = getSupplierAvgScore(sup);
 
+                const isInactive = sup.status === 'INACTIVE';
                 return (
-                  <div key={sup.code || idx} style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                  <div key={sup.code || idx} style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', opacity: isInactive ? 0.6 : 1 }}>
                     <div>
                       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '0.85rem' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
@@ -1564,13 +1648,20 @@ export default function Purchasing() {
                             <span style={{ fontSize: '0.72rem', color: '#64748b' }}>Mã: {sup.code || `SUP-${idx+1}`}</span>
                           </div>
                         </div>
-                        <span
-                          title={avgScore === null ? 'Chưa có đánh giá nào cho NCC này' : `Điểm trung bình từ ${sup.evaluations.length} lần đánh giá`}
-                          style={{ backgroundColor: avgScore === null ? '#f1f5f9' : '#fef3c7', color: avgScore === null ? '#64748b' : '#b45309', padding: '2px 8px', borderRadius: '10px', fontSize: '0.72rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '2px', whiteSpace: 'nowrap' }}
-                        >
-                          <Star size={12} fill={avgScore === null ? 'none' : '#b45309'} />
-                          {avgScore === null ? 'Chưa đánh giá' : `${avgScore}/10`}
-                        </span>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.3rem' }}>
+                          {isInactive && (
+                            <span style={{ backgroundColor: '#fee2e2', color: '#dc2626', padding: '2px 8px', borderRadius: '10px', fontSize: '0.68rem', fontWeight: 800, whiteSpace: 'nowrap' }}>
+                              Ngừng hợp tác
+                            </span>
+                          )}
+                          <span
+                            title={avgScore === null ? 'Chưa có đánh giá nào cho NCC này' : `Điểm trung bình từ ${sup.evaluations.length} lần đánh giá`}
+                            style={{ backgroundColor: avgScore === null ? '#f1f5f9' : '#fef3c7', color: avgScore === null ? '#64748b' : '#b45309', padding: '2px 8px', borderRadius: '10px', fontSize: '0.72rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '2px', whiteSpace: 'nowrap' }}
+                          >
+                            <Star size={12} fill={avgScore === null ? 'none' : '#b45309'} />
+                            {avgScore === null ? 'Chưa đánh giá' : `${avgScore}/10`}
+                          </span>
+                        </div>
                       </div>
 
                       {/* Main Distributed Categories Badges */}
@@ -1699,6 +1790,33 @@ export default function Purchasing() {
                             <Star size={13} />
                             <span>Đánh Giá NCC</span>
                           </button>
+                        )}
+
+                        {(isPurchasing || isCEO || isAdmin) && (
+                          <>
+                            <button
+                              onClick={() => handleOpenEditSupplier(sup)}
+                              style={{
+                                backgroundColor: '#f8fafc', color: '#334155', border: '1px solid #cbd5e1', borderRadius: '6px',
+                                padding: '0.45rem', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center'
+                              }}
+                            >
+                              <span>Sửa Hồ Sơ</span>
+                            </button>
+                            <button
+                              onClick={() => handleToggleSupplierStatus(sup)}
+                              style={{
+                                backgroundColor: isInactive ? '#f0fdf4' : '#fef2f2',
+                                color: isInactive ? '#16a34a' : '#dc2626',
+                                border: `1px solid ${isInactive ? '#bbf7d0' : '#fecaca'}`,
+                                borderRadius: '6px', padding: '0.45rem', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center'
+                              }}
+                            >
+                              <span>{isInactive ? 'Kích Hoạt Lại' : 'Ngừng Hợp Tác'}</span>
+                            </button>
+                          </>
                         )}
                       </div>
                     </div>
@@ -3022,6 +3140,71 @@ export default function Purchasing() {
                   style={{ flex: 1, backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.6rem', fontSize: '0.83rem', fontWeight: 700, cursor: evalSubmitting ? 'default' : 'pointer', opacity: evalSubmitting ? 0.7 : 1 }}
                 >
                   {evalSubmitting ? 'Đang lưu...' : 'Lưu Đánh Giá'}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ================= MODAL THÊM / SỬA NHÀ CUNG CẤP ================= */}
+      {supplierModal && (() => {
+        const isEdit = supplierModal.mode === 'edit';
+        const field = (label, key, opts = {}) => (
+          <div style={{ marginBottom: '0.85rem' }}>
+            <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#334155', marginBottom: '0.3rem' }}>{label}</label>
+            <input
+              type={opts.type || 'text'}
+              disabled={opts.disabled}
+              placeholder={opts.placeholder}
+              value={supplierForm[key]}
+              onChange={(e) => setSupplierForm(f => ({ ...f, [key]: e.target.value }))}
+              style={{ width: '100%', height: '38px', padding: '0 0.75rem', fontSize: '0.85rem', border: '1px solid #cbd5e1', borderRadius: '6px', boxSizing: 'border-box', backgroundColor: opts.disabled ? '#f1f5f9' : '#ffffff', color: '#0f172a' }}
+            />
+          </div>
+        );
+
+        return (
+          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(6px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '1.5rem' }}>
+            <div style={{ width: '100%', maxWidth: '460px', maxHeight: '90vh', overflowY: 'auto', padding: '1.75rem', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.25rem' }}>
+                <div>
+                  <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>{isEdit ? 'Sửa Hồ Sơ Nhà Cung Cấp' : 'Thêm Nhà Cung Cấp Mới'}</h3>
+                  <p style={{ fontSize: '0.8rem', color: '#64748b', margin: '0.2rem 0 0' }}>{isEdit ? supplierForm.name : 'Nhập thông tin đối tác cung ứng'}</p>
+                </div>
+                <button onClick={() => setSupplierModal(null)} style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#475569', cursor: 'pointer', padding: '0.35rem', borderRadius: '6px', display: 'flex' }}>
+                  <X size={16} />
+                </button>
+              </div>
+
+              {field('Mã Nhà Cung Cấp' + (isEdit ? '' : ' *'), 'code', { disabled: isEdit, placeholder: 'VD: SUP-ABC' })}
+              {field('Tên Nhà Cung Cấp *', 'name', { placeholder: 'VD: Công ty TNHH ABC' })}
+              {field('Email *', 'email', { type: 'email', placeholder: 'contact@supplier.vn' })}
+              {field('Số Điện Thoại *', 'phone', { placeholder: '028 xxxx xxxx' })}
+              {field('Địa Chỉ *', 'address', { placeholder: 'TP. Hồ Chí Minh, Việt Nam' })}
+              {field('Điều Khoản Thanh Toán', 'paymentTerms', { placeholder: 'VD: Net 30' })}
+              {field('Thời Gian Giao Hàng (ngày)', 'leadTimeDays', { type: 'number' })}
+
+              {supplierFormError && (
+                <div style={{ backgroundColor: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', borderRadius: '6px', padding: '0.6rem 0.75rem', fontSize: '0.8rem', marginBottom: '0.85rem' }}>
+                  {supplierFormError}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: '0.6rem' }}>
+                <button
+                  onClick={() => setSupplierModal(null)}
+                  disabled={supplierSubmitting}
+                  style={{ flex: 1, backgroundColor: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.6rem', fontSize: '0.83rem', fontWeight: 700, cursor: 'pointer' }}
+                >
+                  Hủy
+                </button>
+                <button
+                  onClick={handleSubmitSupplier}
+                  disabled={supplierSubmitting}
+                  style={{ flex: 1, backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.6rem', fontSize: '0.83rem', fontWeight: 700, cursor: supplierSubmitting ? 'default' : 'pointer', opacity: supplierSubmitting ? 0.7 : 1 }}
+                >
+                  {supplierSubmitting ? 'Đang lưu...' : (isEdit ? 'Lưu Thay Đổi' : 'Thêm Nhà Cung Cấp')}
                 </button>
               </div>
             </div>

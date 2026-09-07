@@ -322,6 +322,8 @@ const getInventory = async (req, res, next) => {
               price: true,
               stockQuantity: true,
               primaryImage: true,
+              descriptionText: true,
+              images: { orderBy: { sortOrder: 'asc' }, select: { id: true, url: true } },
               available: true,
               status: true,
               // The Kho product-list filter buckets by category (CPU/VGA/RAM/...) —

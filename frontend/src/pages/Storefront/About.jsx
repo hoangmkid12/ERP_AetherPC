@@ -40,7 +40,7 @@ export default function About() {
         <img src="/about_team.png" alt="Đội ngũ AetherPC" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
         <div style={{
           position: 'absolute', inset: 0,
-          background: 'linear-gradient(135deg, rgba(11,15,25,0.92) 0%, rgba(11,15,25,0.5) 100%)',
+          background: 'linear-gradient(90deg, rgba(6,8,15,0.94) 0%, rgba(6,8,15,0.86) 45%, rgba(6,8,15,0.55) 100%)',
           display: 'flex', alignItems: 'center',
         }}>
           <div className="container">
@@ -50,11 +50,12 @@ export default function About() {
             <h1 style={{
               fontSize: 'clamp(2rem, 4vw, 3rem)', fontWeight: 900,
               fontFamily: 'var(--font-title)', lineHeight: 1.2,
-              marginBottom: '1.25rem', maxWidth: '620px',
+              marginBottom: '1.25rem', maxWidth: '620px', color: '#fff',
+              textShadow: '0 2px 16px rgba(0,0,0,0.55)',
             }}>
               Hơn 10 Năm Đồng Hành Cùng <span className="gradient-text">Công Nghệ Việt</span>
             </h1>
-            <p style={{ color: 'rgba(255,255,255,0.75)', fontSize: '1.05rem', maxWidth: '520px', lineHeight: 1.7, marginBottom: '2rem' }}>
+            <p style={{ color: 'rgba(255,255,255,0.85)', fontSize: '1.05rem', maxWidth: '520px', lineHeight: 1.7, marginBottom: '2rem', textShadow: '0 1px 8px rgba(0,0,0,0.5)' }}>
               AetherPC là hệ thống cửa hàng linh kiện máy tính chính hãng, được tin tưởng bởi hơn 50.000 khách hàng trên toàn quốc.
             </p>
             <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
@@ -118,7 +119,7 @@ export default function About() {
 
       {/* Core Values */}
       <section style={{
-        background: 'linear-gradient(135deg, rgba(21,27,44,0.8), rgba(11,15,25,0.9))',
+        background: 'linear-gradient(135deg, rgba(99,102,241,0.05), rgba(14,165,233,0.05))',
         borderTop: '1px solid var(--border-glass)', borderBottom: '1px solid var(--border-glass)',
         padding: '4rem 0', marginBottom: '5rem',
       }}>

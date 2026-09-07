@@ -66,6 +66,30 @@ const CATEGORY_SLUG_TO_CODE = {
   mouse: 'MOUSE',
 };
 
+// createProduct/updateProduct accept a plain object as before for every existing
+// caller; only when `imageFile` (cover, a single File) or `imageFiles` (gallery, an
+// array of File) is present does this switch to FormData so the backend's multer
+// middleware can receive them — api.js's request() already knows to skip
+// JSON.stringify for a FormData body. `image` / `images` are multer's field names
+// (see upload.middleware.js's upload.fields([...])).
+const toRequestBody = (productData) => {
+  const hasCoverFile = productData?.imageFile instanceof File;
+  const hasGalleryFiles = Array.isArray(productData?.imageFiles) && productData.imageFiles.some(f => f instanceof File);
+  if (!hasCoverFile && !hasGalleryFiles) return productData;
+
+  const formData = new FormData();
+  Object.entries(productData).forEach(([key, value]) => {
+    if (key === 'imageFile') {
+      if (value instanceof File) formData.append('image', value);
+    } else if (key === 'imageFiles') {
+      (value || []).forEach(f => { if (f instanceof File) formData.append('images', f); });
+    } else if (value !== undefined && value !== null) {
+      formData.append(key, value);
+    }
+  });
+  return formData;
+};
+
 const loadFromLocalStorage = () => {
   const state = { ...INITIAL_STATE };
   try {
@@ -164,6 +188,9 @@ export const useInventoryStore = create((set, get) => ({
         price: row.product?.price ?? row.price ?? 0,
         available: row.product?.available ?? true,
         status: row.product?.status || 'ACTIVE',
+        image: row.product?.primaryImage || null,
+        description: row.product?.descriptionText || '',
+        gallery: row.product?.images || [],
       }));
 
       set({ inventory });
@@ -209,16 +236,26 @@ export const useInventoryStore = create((set, get) => ({
   createProduct: async (productData) => {
     try {
       set({ error: null });
-      const newProduct = await api.post('/products', productData);
-      
+      // Real route is /products/admin (see product.routes.js) — plain /products only has
+      // GET (public storefront listing); POSTing there always 404'd, so the Kho "Thêm Sản
+      // Phẩm Mới" form never actually created anything in the DB.
+      const res = await api.post('/products/admin', toRequestBody(productData));
+      const newProduct = res?.data || res;
+
       set(state => {
-        const updated = [...state.products, newProduct];
+        const products = [...state.products, newProduct];
         try {
-          localStorage.setItem(STORAGE_KEYS.products, JSON.stringify(updated));
+          localStorage.setItem(STORAGE_KEYS.products, JSON.stringify(products));
         } catch (e) {}
-        return { products: updated };
+        return { products };
       });
-      
+
+      // Re-fetch inventory from the DB instead of hand-assembling a row locally — the
+      // backend also created the matching Inventory row (see product.controller.js
+      // createProduct), and refetching guarantees the Kho table shows the exact shape/id
+      // the server actually persisted rather than a guessed one.
+      try { await get().getInventory(); } catch (_) {}
+
       return newProduct;
     } catch (err) {
       const errorMsg = err.message || 'Failed to create product';
@@ -234,21 +271,91 @@ export const useInventoryStore = create((set, get) => ({
   updateProduct: async (productId, productData) => {
     try {
       set({ error: null });
-      const updated = await api.put(`/products/${productId}`, productData);
-      
+      // The real route is /products/admin/:id (see product.routes.js) — plain
+      // /products/:id doesn't exist and always 404'd, so every edit made from the Kho
+      // "Chỉnh Sửa sản phẩm" modal (name/price/stock/NCC) silently never reached the
+      // DB. The response is the standard {success, data, message} envelope, not the
+      // bare product — unwrap .data before using it.
+      const res = await api.put(`/products/admin/${productId}`, toRequestBody(productData));
+      const updated = res?.data || res;
+
       set(state => {
         const products = state.products.map(p => p.id === productId ? updated : p);
+        // `inventory` (not `products`) is what the Kho product table actually reads —
+        // patch it too, otherwise the table kept showing the pre-edit value until the
+        // next full getInventory() refetch even though the DB write succeeded.
+        const inventory = state.inventory.map(i => i.id === productId
+          ? {
+              ...i,
+              ...(productData.name !== undefined && { name: productData.name }),
+              ...(productData.price !== undefined && { price: productData.price }),
+              ...(productData.stock !== undefined && { stock: productData.stock }),
+              ...(productData.available !== undefined && { available: productData.available }),
+              ...(productData.description !== undefined && { description: productData.description }),
+              ...(updated?.primaryImage && { image: updated.primaryImage }),
+              ...(updated?.images && { gallery: updated.images }),
+              ...(updated?.defaultSupplier?.name && { supplier: updated.defaultSupplier.name })
+            }
+          : i);
         try {
           localStorage.setItem(STORAGE_KEYS.products, JSON.stringify(products));
+          localStorage.setItem(STORAGE_KEYS.inventory, JSON.stringify(inventory));
         } catch (e) {}
-        return { products };
+        return { products, inventory };
       });
-      
+
       return updated;
     } catch (err) {
       const errorMsg = err.message || 'Failed to update product';
       set({ error: errorMsg });
       console.error('Error updating product:', err);
+      throw err;
+    }
+  },
+
+  /**
+   * Toggle whether a product is shown on the storefront — narrower than updateProduct,
+   * so callers that only have visibility rights (Sales Manager, not full product-edit
+   * rights) can use it: PATCH /products/admin/:id/visibility instead of the full PUT.
+   */
+  toggleProductVisibility: async (productId, available) => {
+    try {
+      set({ error: null });
+      const res = await api.patch(`/products/admin/${productId}/visibility`, { available });
+      const updated = res?.data || res;
+
+      set(state => ({
+        inventory: state.inventory.map(i => i.id === productId ? { ...i, available } : i),
+        products: state.products.map(p => p.id === productId ? { ...p, available } : p)
+      }));
+
+      return updated;
+    } catch (err) {
+      const errorMsg = err.message || 'Failed to toggle product visibility';
+      set({ error: errorMsg });
+      console.error('Error toggling product visibility:', err);
+      throw err;
+    }
+  },
+
+  /**
+   * Remove one gallery (secondary) photo from a product — separate from updateProduct,
+   * which only ever appends new gallery photos (see product.controller.js updateProduct).
+   */
+  deleteProductImage: async (productId, imageId) => {
+    try {
+      set({ error: null });
+      await api.delete(`/products/admin/${productId}/images/${imageId}`);
+
+      set(state => ({
+        inventory: state.inventory.map(i => i.id === productId
+          ? { ...i, gallery: (i.gallery || []).filter(img => img.id !== imageId) }
+          : i)
+      }));
+    } catch (err) {
+      const errorMsg = err.message || 'Failed to delete product image';
+      set({ error: errorMsg });
+      console.error('Error deleting product image:', err);
       throw err;
     }
   },

@@ -82,6 +82,114 @@ const createSupplierEvaluation = async (req, res, next) => {
   }
 };
 
+// POST /api/v1/purchasing/suppliers
+const createSupplier = async (req, res, next) => {
+  try {
+    const { code, name, email, phone, address, paymentTerms, leadTimeDays } = req.body;
+
+    for (const [key, label] of [['code', 'Mã'], ['name', 'Tên'], ['email', 'Email'], ['phone', 'Số điện thoại'], ['address', 'Địa chỉ']]) {
+      if (!req.body[key] || !String(req.body[key]).trim()) {
+        const error = new Error(`Vui lòng nhập ${label} Nhà Cung Cấp.`);
+        error.statusCode = 400;
+        throw error;
+      }
+    }
+
+    const normalizedCode = String(code).trim().toUpperCase().replace(/\s+/g, '-');
+
+    const existing = await prisma.supplier.findUnique({ where: { code: normalizedCode } });
+    if (existing) {
+      const error = new Error(`Mã Nhà Cung Cấp "${normalizedCode}" đã tồn tại.`);
+      error.statusCode = 409;
+      throw error;
+    }
+
+    const supplier = await prisma.supplier.create({
+      data: {
+        code: normalizedCode,
+        name: String(name).trim(),
+        email: String(email).trim(),
+        phone: String(phone).trim(),
+        address: String(address).trim(),
+        paymentTerms: paymentTerms ? String(paymentTerms).trim() : null,
+        leadTimeDays: leadTimeDays !== undefined && leadTimeDays !== '' ? parseInt(leadTimeDays, 10) : 7,
+        status: 'ACTIVE'
+      }
+    });
+
+    res.status(201).json({ success: true, data: supplier });
+  } catch (err) {
+    if (err.code === 'P2002') {
+      err.statusCode = 409;
+      err.message = 'Email Nhà Cung Cấp đã được sử dụng bởi một NCC khác.';
+    }
+    next(err);
+  }
+};
+
+// PUT /api/v1/purchasing/suppliers/:code
+const updateSupplier = async (req, res, next) => {
+  try {
+    const { code } = req.params;
+    const { name, email, phone, address, paymentTerms, leadTimeDays, status } = req.body;
+
+    const existing = await prisma.supplier.findUnique({ where: { code } });
+    if (!existing) {
+      const error = new Error('Không tìm thấy nhà cung cấp.');
+      error.statusCode = 404;
+      throw error;
+    }
+
+    if (status !== undefined && !['ACTIVE', 'INACTIVE'].includes(status)) {
+      const error = new Error('Trạng thái không hợp lệ.');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const supplier = await prisma.supplier.update({
+      where: { code },
+      data: {
+        ...(name !== undefined && { name: String(name).trim() }),
+        ...(email !== undefined && { email: String(email).trim() }),
+        ...(phone !== undefined && { phone: String(phone).trim() }),
+        ...(address !== undefined && { address: String(address).trim() }),
+        ...(paymentTerms !== undefined && { paymentTerms: paymentTerms ? String(paymentTerms).trim() : null }),
+        ...(leadTimeDays !== undefined && leadTimeDays !== '' && { leadTimeDays: parseInt(leadTimeDays, 10) }),
+        ...(status !== undefined && { status })
+      }
+    });
+
+    res.json({ success: true, data: supplier });
+  } catch (err) {
+    if (err.code === 'P2002') {
+      err.statusCode = 409;
+      err.message = 'Email Nhà Cung Cấp đã được sử dụng bởi một NCC khác.';
+    }
+    next(err);
+  }
+};
+
+// DELETE /api/v1/purchasing/suppliers/:code — soft-delete only: existing Products
+// (defaultSupplierCode) and PurchaseOrders reference this supplier by code (FK), so
+// hard-deleting would either cascade-destroy purchase history or fail outright. Flips
+// status to INACTIVE instead, keeping historical PO/product data intact; PUT can flip
+// it back to ACTIVE to "re-hire" the same supplier later.
+const deactivateSupplier = async (req, res, next) => {
+  try {
+    const { code } = req.params;
+    const existing = await prisma.supplier.findUnique({ where: { code } });
+    if (!existing) {
+      const error = new Error('Không tìm thấy nhà cung cấp.');
+      error.statusCode = 404;
+      throw error;
+    }
+    const supplier = await prisma.supplier.update({ where: { code }, data: { status: 'INACTIVE' } });
+    res.json({ success: true, data: supplier, message: 'Đã ngừng hợp tác với nhà cung cấp.' });
+  } catch (err) {
+    next(err);
+  }
+};
+
 // GET /api/v1/purchasing/products
 const getPurchasingProducts = async (req, res, next) => {
   try {
@@ -910,6 +1018,9 @@ const validateReceipt = async (req, res, next) => {
 
 module.exports = {
   getSuppliers,
+  createSupplier,
+  updateSupplier,
+  deactivateSupplier,
   createSupplierEvaluation,
   getPurchasingProducts,
   getPurchaseOrders,

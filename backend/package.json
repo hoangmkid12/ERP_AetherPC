@@ -25,6 +25,7 @@
     "ioredis": "^5.3.2",
     "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.0",
+    "multer": "^1.4.5-lts.1",
     "node-nlp": "^5.0.0-alpha.5",
     "nodemailer": "^9.0.3",
     "ws": "^8.21.2"

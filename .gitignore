@@ -10,6 +10,7 @@ build/
 
 # Local environment variables and secrets
 backend/.env
+frontend/.env
 .env
 .env.local
 .env.development.local
@@ -26,6 +27,7 @@ pnpm-debug.log*
 # Editor / IDE settings
 .vscode/
 .idea/
+.claude/*.lock
 *.suo
 *.ntvs*
 *.njsproj

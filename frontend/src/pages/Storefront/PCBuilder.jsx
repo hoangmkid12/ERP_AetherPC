@@ -6,7 +6,7 @@ import { api } from '../../services/api';
 import {
   Cpu, Trash2, ShieldCheck, ShieldAlert, ShoppingCart, HelpCircle, Sparkles,
   AlertTriangle, XCircle, Layers, Database, Gamepad2, Zap, HardDrive, Box, Wind,
-  Copy, Printer, MessageSquare
+  Copy, Printer, MessageSquare, ChevronDown, ChevronUp, X, SlidersHorizontal
 } from 'lucide-react';
 import { HARDWARE_KNOWLEDGE_BASE, parseCustomerPrompt, runAIOptimizer } from '../../config/pcBuilderAIKnowledge';
 
@@ -209,6 +209,7 @@ export default function PCBuilder() {
   const [isAnalyzingAI, setIsAnalyzingAI] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
   const [activeStepTab, setActiveStepTab] = useState(0);
+  const [showAdvancedAI, setShowAdvancedAI] = useState(false);
   const { addToCart } = useCart();
 
   useEffect(() => {
@@ -587,6 +588,20 @@ export default function PCBuilder() {
   return (
     <div className="container" style={{ padding: '2rem 1.5rem 4rem 1.5rem' }}>
       <style>{`
+        .pcb-main-grid {
+          display: grid;
+          grid-template-columns: 3fr 2fr;
+          gap: 2rem;
+          align-items: start;
+        }
+        @media (max-width: 900px) {
+          .pcb-main-grid {
+            grid-template-columns: 1fr;
+          }
+          .pcb-sidebar {
+            position: static !important;
+          }
+        }
         .print-only-layout {
           display: none;
         }
@@ -609,96 +624,87 @@ export default function PCBuilder() {
       `}</style>
 
       <div className="pc-builder-screen-layout">
-        <div style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
+        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
           <h1 style={{
-            fontSize: '2.5rem',
+            fontSize: '2.25rem',
             fontFamily: 'var(--font-title)',
-            color: '#0f172a',
+            color: 'var(--text-primary)',
             fontWeight: 800,
             marginBottom: '0.5rem'
           }}>
             Trình Tự Chọn Lắp Ráp PC Thông Minh
           </h1>
-          <p style={{ color: 'var(--text-secondary)', marginBottom: '1rem' }}>
+          <p style={{ color: 'var(--text-secondary)', marginBottom: '1.25rem' }}>
             Hệ thống sẽ tự động đối chiếu thông số socket, loại RAM và công suất nguồn để đưa ra các gợi ý tương thích.
           </p>
 
           <button
             onClick={() => setShowGuide(!showGuide)}
+            className="btn"
             style={{
               padding: '0.5rem 1.25rem',
               fontSize: '0.85rem',
               fontWeight: 700,
               borderRadius: '99px',
-              border: '1px solid #bfdbfe',
-              backgroundColor: showGuide ? '#2563eb' : '#eff6ff',
-              color: showGuide ? '#ffffff' : '#2563eb',
+              border: `1px solid ${showGuide ? 'var(--primary)' : 'var(--border-glass)'}`,
+              backgroundColor: showGuide ? 'var(--primary)' : '#ffffff',
+              color: showGuide ? '#ffffff' : 'var(--primary)',
               cursor: 'pointer',
               display: 'inline-flex',
               alignItems: 'center',
-              gap: '0.5rem',
-              boxShadow: '0 4px 12px rgba(37,99,235,0.12)',
-              transition: 'all 0.2s'
+              gap: '0.5rem'
             }}
           >
             <HelpCircle size={16} />
-            <span>{showGuide ? 'Đóng Cẩm Nang Build PC' : 'Cẩm Nang Chọn Linh Kiện PC Siêu Chi Tiết (Click để xem)'}</span>
+            <span>{showGuide ? 'Đóng Cẩm Nang Build PC' : 'Cẩm Nang Chọn Linh Kiện Cho Người Mới'}</span>
           </button>
         </div>
 
       {/* AI Custom Suggestions based on user needs & Knowledge Engine */}
-      <div className="card-glass" style={{ marginBottom: '2rem', padding: '1.5rem', borderRadius: '18px', border: '1.5px solid #bfdbfe', backgroundColor: '#ffffff', boxShadow: '0 8px 30px rgba(37,99,235,0.06)' }}>
+      <div className="card-glass" style={{ marginBottom: '2rem', padding: '1.5rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', color: '#2563eb' }}>
-            <div style={{ width: '36px', height: '36px', borderRadius: '10px', backgroundColor: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Sparkles size={20} color="#2563eb" />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', color: 'var(--primary)' }}>
+            <div style={{ width: '36px', height: '36px', borderRadius: 'var(--radius-md)', backgroundColor: 'rgba(37,99,235,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Sparkles size={20} color="var(--primary)" />
             </div>
             <div>
-              <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>Trợ lý Cấu hình PC AI Thông Minh</h3>
-              <p style={{ fontSize: '0.78rem', color: '#64748b', margin: '0.15rem 0 0 0' }}>Tự động phân tích nhu cầu tự do hoặc chọn tiêu chí có sẵn từ kho 1.580 linh kiện PC</p>
+              <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>Trợ lý Cấu hình PC AI</h3>
+              <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: '0.15rem 0 0 0' }}>Mô tả nhu cầu bằng lời — AI chọn linh kiện tương thích và phù hợp ngân sách</p>
             </div>
           </div>
-          <span style={{ fontSize: '0.72rem', fontWeight: 800, backgroundColor: '#eff6ff', color: '#2563eb', padding: '0.3rem 0.75rem', borderRadius: '20px', border: '1px solid #bfdbfe' }}>
-            Bộ Trí Thức AI v2.5
-          </span>
         </div>
 
-        {/* Custom Natural Language Prompt Input */}
-        <div style={{ backgroundColor: '#f8fafc', padding: '1rem', borderRadius: '14px', border: '1px solid #e2e8f0', marginBottom: '1.25rem' }}>
-          <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 800, color: '#0f172a', marginBottom: '0.4rem' }}>
-            Nhập yêu cầu cụ thể của bạn (AI tự động trích xuất Ngân sách, Nhu cầu & Tối ưu hóa linh kiện):
-          </label>
+        {/* Custom Natural Language Prompt Input — the one and only "run AI" action on
+            this card; a second identical button used to sit in the action row below,
+            which just meant two buttons doing the exact same generateAIBuild() call. */}
+        <div style={{ marginBottom: '1rem' }}>
           <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.6rem' }}>
             <input
               type="text"
               value={customPromptText}
               onChange={e => setCustomPromptText(e.target.value)}
-              placeholder="Ví dụ: Build PC 22 triệu chơi mượt Valorant 240fps & edit video 4K TikTok, tông màu trắng..."
+              onKeyDown={e => { if (e.key === 'Enter' && !isAnalyzingAI) generateAIBuild(aiUsage, aiBudget, aiBrand, customPromptText); }}
+              placeholder="Ví dụ: Build PC 22 triệu chơi mượt Valorant 240fps & edit video 4K TikTok..."
               style={{
-                flex: 1, padding: '0.65rem 0.85rem', borderRadius: '10px',
-                border: '1.5px solid #cbd5e1', fontSize: '0.85rem', color: '#0f172a',
+                flex: 1, padding: '0.65rem 0.85rem', borderRadius: 'var(--radius-md)',
+                border: '1.5px solid var(--border-glass)', fontSize: '0.85rem', color: 'var(--text-primary)',
                 backgroundColor: '#ffffff', outline: 'none', boxSizing: 'border-box'
               }}
             />
             <button
               onClick={() => generateAIBuild(aiUsage, aiBudget, aiBrand, customPromptText)}
               disabled={isAnalyzingAI}
-              style={{
-                padding: '0.65rem 1.4rem', borderRadius: '10px', border: 'none',
-                background: 'linear-gradient(135deg, #2563eb, #6366f1)',
-                color: '#ffffff', fontWeight: 800, fontSize: '0.85rem', cursor: 'pointer',
-                display: 'flex', alignItems: 'center', gap: '0.4rem', whiteSpace: 'nowrap',
-                boxShadow: '0 4px 12px rgba(37,99,235,0.2)'
-              }}
+              className="btn btn-primary"
+              style={{ padding: '0.65rem 1.4rem', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.4rem', whiteSpace: 'nowrap' }}
             >
               <Sparkles size={16} />
-              {isAnalyzingAI ? 'AI Đang Phân Tích...' : 'AI Phân Tích & Tối Ưu'}
+              {isAnalyzingAI ? 'Đang phân tích...' : 'Gợi ý cấu hình'}
             </button>
           </div>
 
           {/* Quick Sample Prompts */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 700 }}>Gợi ý nhanh:</span>
+            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700 }}>Gợi ý nhanh:</span>
             {[
               "PC 20 triệu chơi mượt CS2 & Valorant 240Hz",
               "PC 35 triệu làm đồ họa 3D Blender & Unreal 5",
@@ -713,8 +719,8 @@ export default function PCBuilder() {
                 }}
                 style={{
                   padding: '0.25rem 0.65rem', borderRadius: '20px',
-                  border: '1px solid #bfdbfe', backgroundColor: '#eff6ff',
-                  color: '#2563eb', fontSize: '0.72rem', fontWeight: 600,
+                  border: '1px solid var(--border-glass)', backgroundColor: '#ffffff',
+                  color: 'var(--text-secondary)', fontSize: '0.72rem', fontWeight: 600,
                   cursor: 'pointer', transition: 'all 0.15s'
                 }}
               >
@@ -723,8 +729,24 @@ export default function PCBuilder() {
             ))}
           </div>
         </div>
-        
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+
+        {/* Advanced filters — collapsed by default so the card's default state is just
+            the prompt box + quick chips, instead of always showing 4 stacked filter
+            rows before the customer even reaches the part-picker below. */}
+        <button
+          onClick={() => setShowAdvancedAI(v => !v)}
+          style={{
+            display: 'flex', alignItems: 'center', gap: '0.35rem', background: 'none', border: 'none',
+            color: 'var(--primary)', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', padding: '0.25rem 0'
+          }}
+        >
+          <SlidersHorizontal size={14} />
+          Tuỳ chỉnh nâng cao (nhu cầu, ngân sách, thương hiệu)
+          {showAdvancedAI ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+        </button>
+
+        {showAdvancedAI && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', marginTop: '1rem', paddingTop: '1.25rem', borderTop: '1px solid var(--border-glass)' }}>
           {/* Row 1: Nhu cầu linh hoạt */}
           <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '1rem' }}>
             <span style={{ fontSize: '0.875rem', fontWeight: 700, minWidth: '120px', color: '#334155' }}>Nhu cầu sử dụng:</span>
@@ -900,7 +922,7 @@ export default function PCBuilder() {
 
           {/* Row 4: Thương hiệu Hãng sản xuất (Hệ sinh thái Hãng) */}
           <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.6rem', marginTop: '0.25rem' }}>
-            <span style={{ fontSize: '0.82rem', fontWeight: 700, minWidth: '120px', color: '#334155' }}>Hãng sản xuất yêu thích:</span>
+            <span style={{ fontSize: '0.82rem', fontWeight: 700, minWidth: '120px', color: 'var(--text-secondary)' }}>Hãng sản xuất yêu thích:</span>
             <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
               {[
                 { key: 'all', label: 'Tất cả Hãng' },
@@ -919,10 +941,10 @@ export default function PCBuilder() {
                   style={{
                     padding: '0.28rem 0.65rem',
                     fontSize: '0.78rem',
-                    borderRadius: '8px',
-                    border: `1.5px solid ${aiMfgBrand === opt.key ? '#2563eb' : '#cbd5e1'}`,
-                    backgroundColor: aiMfgBrand === opt.key ? '#eff6ff' : '#ffffff',
-                    color: aiMfgBrand === opt.key ? '#2563eb' : '#334155',
+                    borderRadius: 'var(--radius-sm)',
+                    border: `1.5px solid ${aiMfgBrand === opt.key ? 'var(--primary)' : 'var(--border-glass)'}`,
+                    backgroundColor: aiMfgBrand === opt.key ? 'rgba(37,99,235,0.08)' : '#ffffff',
+                    color: aiMfgBrand === opt.key ? 'var(--primary)' : 'var(--text-secondary)',
                     fontWeight: aiMfgBrand === opt.key ? 800 : 600,
                     cursor: 'pointer',
                     transition: 'all 0.15s'
@@ -933,67 +955,30 @@ export default function PCBuilder() {
               ))}
             </div>
           </div>
+        </div>
+        )}
 
-          {/* Action Row */}
-          <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
-            <button
-              onClick={() => generateAIBuild(aiUsage, aiBudget, aiBrand, customPromptText)}
-              disabled={isAnalyzingAI}
-              className="btn btn-primary"
-              style={{
-                padding: '0.625rem 2rem',
-                fontSize: '0.875rem',
-                fontWeight: 700,
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                background: 'linear-gradient(135deg, var(--primary), #4f46e5)',
-                border: 'none',
-                cursor: 'pointer'
-              }}
-            >
-              <Sparkles size={16} />
-              {isAnalyzingAI ? 'AI Đang Phân Tích...' : 'Gợi ý Cấu hình Tối ưu'}
-            </button>
-            
-            <button
-              onClick={() => {
-                setSelectedParts({ CPU: null, MAINBOARD: null, RAM: null, VGA: null, PSU: null, STORAGE: null, CASE: null, COOLER: null });
-                setAiReport(null);
-              }}
-              className="btn btn-secondary"
-              style={{
-                borderColor: 'rgba(239, 68, 68, 0.2)',
-                color: 'var(--danger)',
-                padding: '0.625rem 1.5rem',
-                fontSize: '0.875rem',
-                cursor: 'pointer'
-              }}
-            >
-              Làm sạch cấu hình
-            </button>
-
-            <button
-              onClick={() => setShowGuide(!showGuide)}
-              className="btn btn-secondary"
-              style={{
-                borderColor: 'rgba(37, 99, 235, 0.3)',
-                color: '#2563eb',
-                backgroundColor: showGuide ? '#eff6ff' : '#ffffff',
-                padding: '0.625rem 1.5rem',
-                fontSize: '0.875rem',
-                fontWeight: 700,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                marginLeft: 'auto'
-              }}
-            >
-              <HelpCircle size={16} />
-              {showGuide ? 'Thu gọn hướng dẫn' : 'Hướng dẫn build PC cho người mới'}
-            </button>
-          </div>
+        {/* Action Row — a single secondary action (reset); the primary "run AI" action
+            lives with the prompt input above, and the build guide has its own toggle
+            in the page header — no need to repeat either one here. */}
+        <div style={{ display: 'flex', marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--border-glass)' }}>
+          <button
+            onClick={() => {
+              setSelectedParts({ CPU: null, MAINBOARD: null, RAM: null, VGA: null, PSU: null, STORAGE: null, CASE: null, COOLER: null });
+              setAiReport(null);
+            }}
+            className="btn btn-secondary"
+            style={{
+              borderColor: 'rgba(239, 68, 68, 0.2)',
+              color: 'var(--danger)',
+              padding: '0.5rem 1.25rem',
+              fontSize: '0.82rem',
+              cursor: 'pointer'
+            }}
+          >
+            Làm sạch cấu hình
+          </button>
+        </div>
 
           {/* AI Hardware Report Card */}
           {aiReport && (
@@ -1016,40 +1001,27 @@ export default function PCBuilder() {
               </div>
             </div>
           )}
-        </div>
       </div>
 
       {/* Super Detailed Beginner PC Building Masterclass Card Panel */}
       {showGuide && (
-        <div className="card-glass" style={{ marginBottom: '2.5rem', padding: '2rem', border: '2px solid #2563eb', backgroundColor: '#ffffff', borderRadius: '20px', boxShadow: '0 10px 30px rgba(37,99,235,0.08)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #f1f5f9', paddingBottom: '1.25rem', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+        <div className="card-glass" style={{ marginBottom: '2.5rem', padding: '2rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid var(--border-glass)', paddingBottom: '1.25rem', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
-              <div style={{ width: '46px', height: '46px', borderRadius: '14px', backgroundColor: '#eff6ff', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800 }}>
+              <div style={{ width: '46px', height: '46px', borderRadius: 'var(--radius-md)', backgroundColor: 'rgba(37,99,235,0.08)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <HelpCircle size={24} />
               </div>
               <div>
-                <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: '#0f172a', margin: 0, fontFamily: 'var(--font-title)' }}>
-                  Cẩm Nang Hướng Dẫn Chọn Linh Kiện PC Chi Tiết Từ A - Z
+                <h2 style={{ fontSize: '1.3rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0, fontFamily: 'var(--font-title)' }}>
+                  Cẩm Nang Chọn Linh Kiện PC Cho Người Mới
                 </h2>
-                <p style={{ fontSize: '0.875rem', color: '#64748b', margin: '0.25rem 0 0 0' }}>
-                  Dành cho người chưa từng build máy tính: Hiểu rõ vai trò 8 linh kiện cốt lõi & nguyên tắc phối ghép chuẩn 100%.
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: '0.25rem 0 0 0' }}>
+                  Vai trò của 8 linh kiện cốt lõi & nguyên tắc phối ghép tương thích.
                 </p>
               </div>
             </div>
 
-            <button
-              onClick={() => setShowGuide(false)}
-              style={{
-                padding: '0.4rem 0.85rem',
-                fontSize: '0.8rem',
-                fontWeight: 700,
-                backgroundColor: '#fef2f2',
-                color: '#dc2626',
-                border: '1px solid #fecaca',
-                borderRadius: '8px',
-                cursor: 'pointer'
-              }}
-            >
+            <button onClick={() => setShowGuide(false)} className="btn btn-secondary" style={{ padding: '0.4rem 0.85rem', fontSize: '0.8rem' }}>
               Đóng Hướng Dẫn
             </button>
           </div>
@@ -1073,9 +1045,9 @@ export default function PCBuilder() {
                   onClick={() => setActiveStepTab(step.id)}
                   style={{
                     padding: '0.65rem 0.5rem',
-                    borderRadius: '10px',
-                    border: isActive ? `2px solid ${step.color}` : '1px solid #cbd5e1',
-                    backgroundColor: isActive ? '#eff6ff' : '#ffffff',
+                    borderRadius: 'var(--radius-md)',
+                    border: isActive ? `2px solid ${step.color}` : '1px solid var(--border-glass)',
+                    backgroundColor: isActive ? 'rgba(37,99,235,0.06)' : '#ffffff',
                     textAlign: 'center',
                     cursor: 'pointer',
                     transition: 'all 0.15s',
@@ -1086,15 +1058,15 @@ export default function PCBuilder() {
                   }}
                 >
                   <div style={{ color: step.color }}>{step.icon}</div>
-                  <strong style={{ fontSize: '0.8rem', color: isActive ? '#2563eb' : '#0f172a', fontWeight: 800 }}>{step.title}</strong>
-                  <span style={{ fontSize: '0.7rem', color: '#64748b' }}>{step.label}</span>
+                  <strong style={{ fontSize: '0.8rem', color: isActive ? step.color : 'var(--text-primary)', fontWeight: 800 }}>{step.title}</strong>
+                  <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{step.label}</span>
                 </button>
               );
             })}
           </div>
 
           {/* Masterclass Detail Panels */}
-          <div style={{ padding: '1.5rem', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '14px' }}>
+          <div style={{ padding: '1.5rem', backgroundColor: 'var(--bg-tertiary)', border: '1px solid var(--border-glass)', borderRadius: 'var(--radius-lg)' }}>
             {activeStepTab === 0 && (
               <div>
                 <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -1287,12 +1259,7 @@ export default function PCBuilder() {
         </div>
       )}
 
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: '3fr 2fr',
-        gap: '2rem',
-        alignItems: 'start'
-      }}>
+      <div className="pcb-main-grid">
         {/* Main List of Slots */}
         <div className="card-glass" style={{ padding: '1.5rem' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -1386,8 +1353,9 @@ export default function PCBuilder() {
         </div>
 
         {/* Compatibility and Action Panel */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem', position: 'sticky', top: '100px' }}>
-          {/* Compatibility Checks */}
+        <div className="pcb-sidebar" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', position: 'sticky', top: '100px' }}>
+          {/* Trạng thái cấu hình — gộp cảnh báo tương thích + công suất ước tính vào
+              một thẻ duy nhất (trước đây là 2 thẻ tách rời, xếp chồng không cần thiết). */}
           <div className="card-glass" style={{ padding: '1.5rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', borderBottom: '1px solid var(--border-glass)', paddingBottom: '0.5rem' }}>
               {warnings.length === 0 ? (
@@ -1395,7 +1363,7 @@ export default function PCBuilder() {
               ) : (
                 <ShieldAlert size={20} style={{ color: 'var(--warning)' }} />
               )}
-              <h3 style={{ fontSize: '1.1rem' }}>Bộ tương thích linh kiện</h3>
+              <h3 style={{ fontSize: '1.1rem', margin: 0 }}>Trạng thái cấu hình</h3>
             </div>
 
             {warnings.length === 0 ? (
@@ -1430,42 +1398,43 @@ export default function PCBuilder() {
                 ))}
               </div>
             )}
-          </div>
 
-          {/* TDP Wattage Estimation */}
-          {(() => {
-            const estTdp = getEstimatedTdp();
-            const psuWatts = getPsuWattage();
-            const percent = psuWatts > 0 ? Math.min(100, Math.round((estTdp / psuWatts) * 100)) : 0;
-            const isOverloaded = psuWatts > 0 && estTdp > psuWatts * 0.9;
-            
-            return (
-              <div className="card-glass" style={{ padding: '1.25rem', marginBottom: '1.25rem' }}>
-                <h4 style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.75rem' }}>
-                  Điện năng tiêu thụ
-                </h4>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '0.375rem' }}>
-                  <span>Công suất ước tính:</span>
-                  <strong style={{ color: 'var(--text-primary)' }}>{estTdp}W</strong>
-                </div>
-                {psuWatts > 0 ? (
-                  <>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '0.5rem' }}>
-                      <span>Nguồn đang chọn:</span>
-                      <strong style={{ color: isOverloaded ? 'var(--danger)' : 'var(--success)' }}>{psuWatts}W ({percent}% tải)</strong>
-                    </div>
-                    <div style={{ height: '6px', background: 'rgba(255,255,255,0.06)', borderRadius: '99px', overflow: 'hidden' }}>
-                      <div style={{ height: '100%', width: `${percent}%`, background: isOverloaded ? 'var(--danger)' : 'var(--primary)', borderRadius: '99px', transition: 'width 0.3s ease' }} />
-                    </div>
-                  </>
-                ) : (
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>
-                    Chưa chọn bộ nguồn (PSU). Khuyên dùng nguồn tối thiểu: <strong style={{ color: 'var(--warning)' }}>{Math.ceil(estTdp * 1.25)}W</strong>.
+            {/* Điện năng tiêu thụ — cùng thẻ với cảnh báo tương thích ở trên, tách bằng
+                đường viền thay vì một thẻ card-glass riêng. */}
+            {(() => {
+              const estTdp = getEstimatedTdp();
+              const psuWatts = getPsuWattage();
+              const percent = psuWatts > 0 ? Math.min(100, Math.round((estTdp / psuWatts) * 100)) : 0;
+              const isOverloaded = psuWatts > 0 && estTdp > psuWatts * 0.9;
+
+              return (
+                <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--border-glass)' }}>
+                  <h4 style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.75rem', fontWeight: 700 }}>
+                    Điện năng tiêu thụ
+                  </h4>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '0.375rem' }}>
+                    <span>Công suất ước tính:</span>
+                    <strong style={{ color: 'var(--text-primary)' }}>{estTdp}W</strong>
                   </div>
-                )}
-              </div>
-            );
-          })()}
+                  {psuWatts > 0 ? (
+                    <>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '0.5rem' }}>
+                        <span>Nguồn đang chọn:</span>
+                        <strong style={{ color: isOverloaded ? 'var(--danger)' : 'var(--success)' }}>{psuWatts}W ({percent}% tải)</strong>
+                      </div>
+                      <div style={{ height: '6px', background: 'var(--border-glass)', borderRadius: '99px', overflow: 'hidden' }}>
+                        <div style={{ height: '100%', width: `${percent}%`, background: isOverloaded ? 'var(--danger)' : 'var(--primary)', borderRadius: '99px', transition: 'width 0.3s ease' }} />
+                      </div>
+                    </>
+                  ) : (
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>
+                      Chưa chọn bộ nguồn (PSU). Khuyên dùng nguồn tối thiểu: <strong style={{ color: 'var(--warning)' }}>{Math.ceil(estTdp * 1.25)}W</strong>.
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+          </div>
 
           {/* Detailed System Specifications Monitor */}
           <div className="card-glass" style={{ padding: '1.5rem' }}>
@@ -1475,39 +1444,39 @@ export default function PCBuilder() {
             </div>
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', fontSize: '0.85rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed #e2e8f0', paddingBottom: '0.375rem' }}>
-                <span style={{ color: '#64748b' }}>Socket CPU:</span>
-                <span style={{ fontWeight: 700, color: selectedParts.CPU ? '#0f172a' : '#94a3b8' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed var(--border-glass)', paddingBottom: '0.375rem' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Socket CPU:</span>
+                <span style={{ fontWeight: 700, color: selectedParts.CPU ? 'var(--text-primary)' : 'var(--text-muted)' }}>
                   {selectedParts.CPU ? (getSocket(selectedParts.CPU) || 'Đang phân tích...') : 'Chưa chọn'}
                 </span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed #e2e8f0', paddingBottom: '0.375rem' }}>
-                <span style={{ color: '#64748b' }}>Socket Bo mạch chủ:</span>
-                <span style={{ fontWeight: 700, color: selectedParts.MAINBOARD ? '#0f172a' : '#94a3b8' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed var(--border-glass)', paddingBottom: '0.375rem' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Socket Bo mạch chủ:</span>
+                <span style={{ fontWeight: 700, color: selectedParts.MAINBOARD ? 'var(--text-primary)' : 'var(--text-muted)' }}>
                   {selectedParts.MAINBOARD ? (getSocket(selectedParts.MAINBOARD) || 'Đang phân tích...') : 'Chưa chọn'}
                 </span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed #e2e8f0', paddingBottom: '0.375rem' }}>
-                <span style={{ color: '#64748b' }}>RAM hỗ trợ (Mainboard):</span>
-                <span style={{ fontWeight: 700, color: selectedParts.MAINBOARD ? '#0f172a' : '#94a3b8' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed var(--border-glass)', paddingBottom: '0.375rem' }}>
+                <span style={{ color: 'var(--text-muted)' }}>RAM hỗ trợ (Mainboard):</span>
+                <span style={{ fontWeight: 700, color: selectedParts.MAINBOARD ? 'var(--text-primary)' : 'var(--text-muted)' }}>
                   {selectedParts.MAINBOARD ? (getRamType(selectedParts.MAINBOARD) || 'Đang phân tích...') : 'Chưa chọn'}
                 </span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed #e2e8f0', paddingBottom: '0.375rem' }}>
-                <span style={{ color: '#64748b' }}>RAM đang chọn:</span>
-                <span style={{ fontWeight: 700, color: selectedParts.RAM ? '#0f172a' : '#94a3b8' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed var(--border-glass)', paddingBottom: '0.375rem' }}>
+                <span style={{ color: 'var(--text-muted)' }}>RAM đang chọn:</span>
+                <span style={{ fontWeight: 700, color: selectedParts.RAM ? 'var(--text-primary)' : 'var(--text-muted)' }}>
                   {selectedParts.RAM ? `${getRamType(selectedParts.RAM) || 'N/A'} (${getRamFormFactor(selectedParts.RAM) === 'SODIMM' ? 'Laptop' : 'Desktop'})` : 'Chưa chọn'}
                 </span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed #e2e8f0', paddingBottom: '0.375rem' }}>
-                <span style={{ color: '#64748b' }}>Kích thước Bo mạch chủ:</span>
-                <span style={{ fontWeight: 700, color: selectedParts.MAINBOARD ? '#0f172a' : '#94a3b8' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed var(--border-glass)', paddingBottom: '0.375rem' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Kích thước Bo mạch chủ:</span>
+                <span style={{ fontWeight: 700, color: selectedParts.MAINBOARD ? 'var(--text-primary)' : 'var(--text-muted)' }}>
                   {selectedParts.MAINBOARD ? (getMbSize(selectedParts.MAINBOARD) || 'N/A') : 'Chưa chọn'}
                 </span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed #e2e8f0', paddingBottom: '0.375rem' }}>
-                <span style={{ color: '#64748b' }}>Kích thước Case hỗ trợ:</span>
-                <span style={{ fontWeight: 700, color: selectedParts.CASE ? '#0f172a' : '#94a3b8' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '0.375rem' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Kích thước Case hỗ trợ:</span>
+                <span style={{ fontWeight: 700, color: selectedParts.CASE ? 'var(--text-primary)' : 'var(--text-muted)' }}>
                   {selectedParts.CASE ? (getCaseSizeSupport(selectedParts.CASE) || 'N/A') : 'Chưa chọn'}
                 </span>
               </div>
@@ -1619,34 +1588,39 @@ export default function PCBuilder() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          zIndex: 1000,
+          // The storefront's sticky header (Header.jsx) renders at zIndex up to
+          // 100,000,000 — this modal's old zIndex:1000 sat far below that, so the
+          // header rendered on top of the modal's own header/close button. Match the
+          // convention other storefront modals already use for this exact reason
+          // (see Home.jsx/Profile.jsx fullscreen modals).
+          zIndex: 100000000,
           padding: '2rem'
         }}>
           <div style={{
             width: '100%',
             maxWidth: '1000px',
             backgroundColor: '#ffffff',
-            borderRadius: '8px',
+            borderRadius: 'var(--radius-lg)',
             maxHeight: '90vh',
             display: 'flex',
             flexDirection: 'column',
             padding: '1.5rem',
             position: 'relative',
-            color: '#333'
+            color: 'var(--text-secondary)'
           }}>
             <button
               onClick={() => { setActiveSlot(null); setModalSearch(''); setModalBrandFilter('all'); setModalSortOrder('default'); }}
               style={{
                 position: 'absolute',
                 top: '1rem', right: '1rem',
-                background: 'none', border: 'none',
-                color: '#666', fontSize: '1.5rem', cursor: 'pointer'
+                background: 'none', border: '1px solid var(--border-glass)', borderRadius: 'var(--radius-md)',
+                color: 'var(--text-secondary)', padding: '0.35rem', cursor: 'pointer', display: 'flex'
               }}
             >
-              &times;
+              <X size={18} />
             </button>
 
-            <h3 style={{ fontSize: '1.25rem', marginBottom: '0.5rem', fontWeight: 700, color: '#0f172a' }}>
+            <h3 style={{ fontSize: '1.25rem', marginBottom: '0.5rem', fontWeight: 700, color: 'var(--text-primary)' }}>
               Chọn linh kiện: {COMPONENT_SLOTS.find(s => s.id === activeSlot)?.label}
             </h3>
 
@@ -1670,7 +1644,7 @@ export default function PCBuilder() {
 
               if (!reasonText) return null;
               return (
-                <div style={{ padding: '0.6rem 0.85rem', backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', color: '#15803d', fontSize: '0.825rem', fontWeight: 700, marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <div style={{ padding: '0.6rem 0.85rem', backgroundColor: 'rgba(16,163,74,0.08)', border: '1px solid rgba(16,163,74,0.25)', borderRadius: 'var(--radius-md)', color: 'var(--success)', fontSize: '0.825rem', fontWeight: 700, marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <ShieldCheck size={18} />
                   <span>{reasonText}</span>
                 </div>
@@ -1678,21 +1652,21 @@ export default function PCBuilder() {
             })()}
 
             {/* Filters Bar */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem', borderBottom: '1px solid #eaeaea', paddingBottom: '1rem' }}>
-              
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', marginBottom: '1.25rem', borderBottom: '1px solid var(--border-glass)', paddingBottom: '1rem' }}>
+
               <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <span style={{ fontSize: '0.875rem', fontWeight: 600 }}>Chọn thương hiệu:</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-secondary)' }}>Thương hiệu:</span>
                   <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap' }}>
                     <button
                       onClick={() => setModalBrandFilter('all')}
                       style={{
                         padding: '0.25rem 0.75rem',
-                        fontSize: '0.8125rem',
-                        border: `1px solid ${modalBrandFilter === 'all' ? '#2563eb' : '#ccc'}`,
-                        backgroundColor: modalBrandFilter === 'all' ? '#eff6ff' : '#fff',
-                        color: modalBrandFilter === 'all' ? '#2563eb' : '#333',
-                        borderRadius: '4px',
+                        fontSize: '0.8rem',
+                        border: `1px solid ${modalBrandFilter === 'all' ? 'var(--primary)' : 'var(--border-glass)'}`,
+                        backgroundColor: modalBrandFilter === 'all' ? 'rgba(37,99,235,0.08)' : '#ffffff',
+                        color: modalBrandFilter === 'all' ? 'var(--primary)' : 'var(--text-secondary)',
+                        borderRadius: 'var(--radius-sm)',
                         fontWeight: modalBrandFilter === 'all' ? 700 : 500,
                         cursor: 'pointer'
                       }}
@@ -1703,11 +1677,11 @@ export default function PCBuilder() {
                         onClick={() => setModalBrandFilter(brand)}
                         style={{
                           padding: '0.25rem 0.75rem',
-                          fontSize: '0.8125rem',
-                          border: `1px solid ${modalBrandFilter === brand ? '#2563eb' : '#ccc'}`,
-                          backgroundColor: modalBrandFilter === brand ? '#eff6ff' : '#fff',
-                          color: modalBrandFilter === brand ? '#2563eb' : '#333',
-                          borderRadius: '4px',
+                          fontSize: '0.8rem',
+                          border: `1px solid ${modalBrandFilter === brand ? 'var(--primary)' : 'var(--border-glass)'}`,
+                          backgroundColor: modalBrandFilter === brand ? 'rgba(37,99,235,0.08)' : '#ffffff',
+                          color: modalBrandFilter === brand ? 'var(--primary)' : 'var(--text-secondary)',
+                          borderRadius: 'var(--radius-sm)',
                           fontWeight: modalBrandFilter === brand ? 700 : 500,
                           cursor: 'pointer'
                         }}
@@ -1727,18 +1701,18 @@ export default function PCBuilder() {
                     style={{
                       width: '100%',
                       padding: '0.5rem 1rem',
-                      border: '1px solid #cbd5e1',
+                      border: '1px solid var(--border-glass)',
                       borderRadius: '20px',
-                      fontSize: '0.875rem',
+                      fontSize: '0.85rem',
                       outline: 'none',
-                      color: '#0f172a',
-                      backgroundColor: '#fff'
+                      color: 'var(--text-primary)',
+                      backgroundColor: '#ffffff'
                     }}
                     autoFocus
                   />
                 </div>
 
-                <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
                   {['CPU', 'MAINBOARD', 'RAM', 'COOLER', 'PSU'].includes(activeSlot) && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                       <input
@@ -1748,28 +1722,28 @@ export default function PCBuilder() {
                         onChange={(e) => setOnlyCompatible(e.target.checked)}
                         style={{ cursor: 'pointer' }}
                       />
-                      <label htmlFor="compat-filter" style={{ fontSize: '0.8125rem', cursor: 'pointer', userSelect: 'none', fontWeight: 600, color: '#2563eb' }}>
+                      <label htmlFor="compat-filter" style={{ fontSize: '0.8rem', cursor: 'pointer', userSelect: 'none', fontWeight: 600, color: 'var(--primary)' }}>
                         Chỉ hiện linh kiện tương thích 100%
                       </label>
                     </div>
                   )}
 
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <span style={{ fontSize: '0.875rem', fontWeight: 600 }}>Sắp xếp:</span>
+                    <span style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-secondary)' }}>Sắp xếp:</span>
                     <select
                       value={modalSortOrder}
                       onChange={(e) => setModalSortOrder(e.target.value)}
                       style={{
-                        padding: '0.25rem 0.5rem',
-                        fontSize: '0.8125rem',
-                        border: '1px solid #cbd5e1',
-                        borderRadius: '4px',
+                        padding: '0.3rem 0.5rem',
+                        fontSize: '0.8rem',
+                        border: '1px solid var(--border-glass)',
+                        borderRadius: 'var(--radius-sm)',
                         outline: 'none',
-                        color: '#0f172a',
-                        backgroundColor: '#fff'
+                        color: 'var(--text-primary)',
+                        backgroundColor: '#ffffff'
                       }}
                     >
-                      <option value="default">Mặc định (Ưu tiên Tương Thích)</option>
+                      <option value="default">Mặc định (Ưu tiên tương thích)</option>
                       <option value="price-asc">Giá tăng dần</option>
                       <option value="price-desc">Giá giảm dần</option>
                     </select>
@@ -1782,7 +1756,7 @@ export default function PCBuilder() {
             {/* Grid List */}
             <div style={{ flex: 1, overflowY: 'auto', paddingRight: '0.5rem' }}>
               {filteredModalProducts.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '3rem', color: '#666' }}>
+                <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
                   Không tìm thấy linh kiện nào phù hợp.
                 </div>
               ) : (
@@ -1791,16 +1765,14 @@ export default function PCBuilder() {
                   gridTemplateColumns: 'repeat(auto-fill, minmax(210px, 1fr))',
                   gap: '1rem'
                 }}>
-                  {filteredModalProducts.map(p => {
-                    const originalPrice = p.price * 1.1; // Giả lập giá cũ
-                    return (
+                  {filteredModalProducts.map(p => (
                     <div key={p.id} style={{
                       display: 'flex',
                       flexDirection: 'column',
-                      border: p.isCompatible ? '2px solid #bbf7d0' : '1px solid #eaeaea',
-                      borderRadius: '10px',
+                      border: p.isCompatible ? '2px solid rgba(16,163,74,0.35)' : '1px solid var(--border-glass)',
+                      borderRadius: 'var(--radius-md)',
                       padding: '1rem',
-                      backgroundColor: p.isCompatible ? '#f0fdf4' : '#fff',
+                      backgroundColor: p.isCompatible ? 'rgba(16,163,74,0.04)' : '#ffffff',
                       position: 'relative',
                       transition: 'all 0.2s',
                     }}
@@ -1808,72 +1780,64 @@ export default function PCBuilder() {
                     onMouseLeave={(e) => e.currentTarget.style.boxShadow = 'none'}
                     >
                       {p.isCompatible && (
-                        <span style={{ position: 'absolute', top: '8px', right: '8px', backgroundColor: '#16a34a', color: '#fff', fontSize: '0.65rem', fontWeight: 800, padding: '2px 6px', borderRadius: '4px' }}>
+                        <span style={{ position: 'absolute', top: '8px', right: '8px', backgroundColor: 'var(--success)', color: '#fff', fontSize: '0.65rem', fontWeight: 800, padding: '2px 6px', borderRadius: 'var(--radius-sm)' }}>
                           ĐỀ XUẤT TỐI ƯU
                         </span>
                       )}
 
                       <div style={{ height: '130px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '0.75rem', marginTop: p.isCompatible ? '0.5rem' : '0' }}>
-                        <img 
-                          src={p.image || `https://placehold.co/120x120/ffffff/cccccc?text=${activeSlot}`} 
+                        <img
+                          src={p.image || `https://placehold.co/120x120/ffffff/cccccc?text=${activeSlot}`}
                           alt={p.name}
                           style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
                           onError={(e) => { e.target.src = `https://placehold.co/120x120/ffffff/cccccc?text=${activeSlot}`; }}
                         />
                       </div>
-                      <h4 style={{ 
-                        fontSize: '0.875rem', 
-                        fontWeight: 700, 
-                        lineHeight: '1.35', 
-                        height: '2.7rem', 
-                        overflow: 'hidden', 
-                        display: '-webkit-box', 
-                        WebkitLineClamp: 2, 
+                      <h4 style={{
+                        fontSize: '0.875rem',
+                        fontWeight: 700,
+                        lineHeight: '1.4',
+                        // -webkit-line-clamp already truncates to exactly 2 lines with an
+                        // ellipsis on its own — pairing it with a fixed `height` shorter
+                        // than 2 real lines made the outer `overflow: hidden` cut a sliver
+                        // of a 3rd line off mid-glyph, crowding into the price below it.
+                        // `minHeight` instead just reserves consistent card space without
+                        // re-clipping what line-clamp already handled.
+                        minHeight: '2.45rem',
+                        overflow: 'hidden',
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
                         WebkitBoxOrient: 'vertical',
-                        marginBottom: '0.35rem',
-                        color: '#0f172a'
+                        marginBottom: '0.4rem',
+                        color: 'var(--text-primary)'
                       }}>
                         {p.name}
                       </h4>
 
                       {p.compatReason && (
-                        <div style={{ fontSize: '0.72rem', color: '#16a34a', fontWeight: 700, marginBottom: '0.4rem', backgroundColor: '#dcfce7', padding: '2px 6px', borderRadius: '4px', display: 'inline-block' }}>
+                        <div style={{ fontSize: '0.72rem', color: 'var(--success)', fontWeight: 700, marginBottom: '0.4rem', backgroundColor: 'rgba(16,163,74,0.1)', padding: '2px 6px', borderRadius: 'var(--radius-sm)', display: 'inline-block' }}>
                           {p.compatReason}
                         </div>
                       )}
 
-                      <div style={{ marginBottom: '0.75rem', marginTop: 'auto' }}>
-                        <div style={{ fontSize: '0.78rem', color: '#94a3b8', textDecoration: 'line-through' }}>
-                          {formatPrice(originalPrice)}
-                        </div>
-                        <div style={{ fontSize: '1rem', fontWeight: 800, color: '#2563eb' }}>
-                          {formatPrice(p.price)}
-                        </div>
+                      <div style={{ marginBottom: '0.75rem', marginTop: 'auto', fontSize: '1rem', fontWeight: 800, color: 'var(--primary)' }}>
+                        {formatPrice(p.price)}
                       </div>
-                      
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px dashed #cbd5e1', paddingTop: '0.5rem' }}>
-                        <a href={`/product/${p.id}`} target="_blank" rel="noreferrer" style={{ fontSize: '0.78rem', color: '#64748b', textDecoration: 'none', fontWeight: 600 }}>
+
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px dashed var(--border-glass)', paddingTop: '0.5rem' }}>
+                        <a href={`/product/${p.id}`} target="_blank" rel="noreferrer" style={{ fontSize: '0.78rem', color: 'var(--text-muted)', textDecoration: 'none', fontWeight: 600 }}>
                           Xem chi tiết
                         </a>
-                        <button 
-                          onClick={() => selectPart(activeSlot, p)} 
-                          style={{ 
-                            backgroundColor: '#2563eb', 
-                            color: '#fff', 
-                            border: 'none', 
-                            borderRadius: '6px', 
-                            padding: '0.4rem 1rem', 
-                            fontSize: '0.8125rem', 
-                            fontWeight: 700,
-                            cursor: 'pointer',
-                            boxShadow: '0 2px 6px rgba(37,99,235,0.2)'
-                          }}
+                        <button
+                          onClick={() => selectPart(activeSlot, p)}
+                          className="btn btn-primary"
+                          style={{ padding: '0.4rem 1rem', fontSize: '0.8125rem' }}
                         >
                           Chọn linh kiện
                         </button>
                       </div>
                     </div>
-                  )})}
+                  ))}
                 </div>
               )}
             </div>

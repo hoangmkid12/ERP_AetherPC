@@ -1120,3 +1120,162 @@ select.input-field option {
   to { transform: translateX(0); }
 }
 
+/* ============================================================= */
+/* Delivery (Shipper) Mobile App Shell — permanent phone-style UI */
+/* used only for the DELIVERY role, regardless of viewport width. */
+/* ============================================================= */
+.delivery-app-shell {
+  min-height: 100vh;
+  width: 100%;
+  background: var(--bg-app);
+  display: flex;
+  justify-content: center;
+}
+
+.delivery-app-inner {
+  width: 100%;
+  max-width: 480px;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-app);
+  position: relative;
+  box-shadow: var(--shadow-lg);
+}
+
+.delivery-topbar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.65rem 1rem;
+  background: var(--bg-primary);
+  border-bottom: 1px solid var(--border-glass);
+  z-index: 10;
+}
+
+.delivery-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-glass);
+  background: var(--bg-app);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.delivery-icon-btn:hover {
+  background: var(--border-glass);
+}
+
+.delivery-content {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 0.85rem 0.85rem 1.5rem;
+}
+
+.delivery-bottom-nav {
+  flex-shrink: 0;
+  display: flex;
+  align-items: stretch;
+  background: var(--bg-primary);
+  border-top: 1px solid var(--border-glass);
+  padding-bottom: env(safe-area-inset-bottom, 0);
+  z-index: 10;
+}
+
+.delivery-bottom-nav-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.2rem;
+  padding: 0.5rem 0.25rem;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.66rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.delivery-bottom-nav-item.active {
+  color: var(--primary);
+}
+
+.delivery-card {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-lg);
+  padding: 1rem;
+  box-shadow: var(--shadow-sm);
+  margin-bottom: 0.85rem;
+}
+
+/* Bottom sheet used for filters — same overlay/slide pattern as
+   .mobile-filters-drawer above, but slides UP from the bottom instead
+   of in from the right (mobile-app convention for filter sheets). */
+.delivery-filter-sheet-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(6px);
+  z-index: 20001;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  animation: fadeInOverlay 0.2s ease;
+}
+
+.delivery-filter-sheet {
+  width: 100%;
+  max-width: 480px;
+  max-height: 85vh;
+  background: var(--bg-primary);
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  padding: 1.1rem 1.1rem calc(1.1rem + env(safe-area-inset-bottom, 0));
+  box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.15);
+  overflow-y: auto;
+  animation: slideUpSheet 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--border-glass);
+}
+
+@keyframes slideUpSheet {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Full-screen modal used by PODModal / FailModal / OrderDetailSheet —
+   always fills the 480px phone-frame column, not a centered dialog. */
+.delivery-fullscreen-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 20000;
+  display: flex;
+  justify-content: center;
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.delivery-fullscreen-modal-inner {
+  width: 100%;
+  max-width: 480px;
+  height: 100%;
+  background: var(--bg-app);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+

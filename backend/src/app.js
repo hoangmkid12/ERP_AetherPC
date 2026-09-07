@@ -6,6 +6,7 @@ const cookieParser = require('cookie-parser');
 const rateLimit = require('express-rate-limit');
 const { errorMiddleware } = require('./middlewares/error.middleware');
 const { isMaintenanceMode } = require('./services/maintenanceMode');
+const { UPLOAD_DIR } = require('./middlewares/upload.middleware');
 
 const app = express();
 
@@ -15,6 +16,12 @@ app.use(cors({
   origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
   credentials: true // Allow credentials (cookies)
 }));
+
+// Uploaded product photos (Kho's Add/Edit Product form — see upload.middleware.js).
+// Mounted at /api/uploads (not /uploads) so it rides the frontend's existing /api Vite
+// proxy without needing a second proxy rule; kept outside /api/v1 so it isn't subject
+// to apiLimiter or the maintenance-mode write-lock, since it's just static file reads.
+app.use('/api/uploads/products', express.static(UPLOAD_DIR));
 
 // Rate limiting: a tight limit on auth endpoints (brute-force/credential
 // stuffing target), a looser one for the rest of the API.

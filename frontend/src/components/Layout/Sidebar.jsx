@@ -720,6 +720,7 @@ export default function Sidebar() {
                       { tab: 'pos', label: 'Điểm Bán Hàng (POS)', opId: 'sales_pos_checkout' },
                       { tab: 'orders', label: 'Quản Lý Đơn Hàng', badgeKey: 'pendingOrders' },
                       { tab: 'customers', label: 'Khách Hàng (CRM)' },
+                      { tab: 'catalog', label: 'Danh Mục Sản Phẩm' },
                       { tab: 'promotions', label: 'Bảng Giá & Khuyến Mãi', opId: 'sales_manage_promotions' },
                       { tab: 'reports', label: 'Báo Cáo Doanh Thu' }
                     ].filter(sub => !sub.opId || canDo(sub.opId)).map(sub => {

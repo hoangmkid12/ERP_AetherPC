@@ -14,6 +14,7 @@ import Header from './components/Layout/Header';
 import Footer from './components/Layout/Footer';
 import Chatbot from './components/Layout/Chatbot';
 import Sidebar from './components/Layout/Sidebar';
+import DeliveryAppShell from './components/Layout/DeliveryAppShell';
 
 // Storefront Components
 const Home = lazy(() => import('./pages/Storefront/Home'));
@@ -88,6 +89,17 @@ const AdminLayout = () => {
   const isEmployee = ['CEO', 'SALES', 'SALES_MANAGER', 'WAREHOUSE', 'WAREHOUSE_MANAGER', 'ASSEMBLY', 'HR', 'ACCOUNTANT', 'PURCHASING', 'ADMIN', 'CSKH', 'DELIVERY', 'QC', 'QA', 'QUALITY_CONTROL'].includes(user?.role);
   if (!isEmployee) {
     return <Navigate to="/" replace />;
+  }
+
+  // Shippers get a permanent mobile-app-style shell (top bar + bottom tab
+  // bar), regardless of viewport width — every other role keeps the
+  // Sidebar+main desktop layout unchanged.
+  if (user?.role === 'DELIVERY') {
+    return (
+      <DeliveryAppShell>
+        <Outlet />
+      </DeliveryAppShell>
+    );
   }
 
   return (

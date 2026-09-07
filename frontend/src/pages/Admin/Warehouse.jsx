@@ -7,7 +7,7 @@ import { useNotification, notify, promptText } from '../../context/NotificationC
 import { DELIVERY_REGIONS, detectDeliveryRegion } from '../../utils/deliveryRegions';
 import { QC_STATUS, getStatusInfo } from '../../utils/statusLabels';
 import { api } from '../../services/api';
-import { Package, CheckCircle, X, AlertCircle, Truck, RotateCcw, Sparkles, RefreshCw, Box } from 'lucide-react';
+import { Package, CheckCircle, X, AlertCircle, Truck, RotateCcw, Sparkles, RefreshCw, Box, Image, Plus } from 'lucide-react';
 import ActorNotificationBar from '../../components/ActorNotificationBar';
 import PackAndScanModal from '../../components/PackAndScanModal';
 import OrderDetailModal from '../../components/OrderDetailModal';
@@ -39,6 +39,117 @@ const PREDEFINED_LOCATIONS = [
 const safeFormatPrice = (amount) => {
   const n = parseFloat(amount) || 0;
   return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(n);
+};
+
+const MAX_GALLERY_IMAGES = 8;
+
+// Shared cover-photo + gallery editor for the Add/Edit Product forms — matches how the
+// storefront itself presents a product (Product.primaryImage as the cover shown in
+// listings, ProductImage rows as the secondary photo strip on the detail page; see
+// ProductDetail.jsx's productImages = [cover, ...imageUrls]). `existingImages` (already
+// saved, id+url — deletable one at a time via onDeleteExistingImage) and `pendingFiles`
+// (chosen this session, not yet uploaded — removable locally, no id yet) render as one
+// continuous thumbnail strip so Kho staff see the final gallery order they're building.
+const GALLERY_THUMB_SIZE = 88; // same size as the cover box — keeps the two rows visually level
+
+const ProductGalleryField = ({ coverFile, coverUrl, onCoverSelect, existingImages, pendingFiles, onAddFiles, onRemovePendingFile, onDeleteExistingImage, deletingImageId }) => {
+  const coverPreview = coverFile ? URL.createObjectURL(coverFile) : coverUrl;
+  const totalGalleryCount = (existingImages || []).length + (pendingFiles || []).length;
+
+  // The delete "×" badge sits half outside each thumbnail (top/right: -7px) so it reads
+  // as an overlay rather than crowding the photo — the scroll strip needs matching
+  // padding on those same sides, or that overlap gets clipped by the strip's own
+  // overflow-x: auto (which computes overflow-y to auto too, clipping the badge's top).
+  const thumbWrapStyle = { position: 'relative', flexShrink: 0, width: GALLERY_THUMB_SIZE, height: GALLERY_THUMB_SIZE };
+  const badgeStyle = (bg) => ({
+    position: 'absolute', top: '-7px', right: '-7px', width: '20px', height: '20px', borderRadius: '50%',
+    backgroundColor: bg, color: '#ffffff', border: '2px solid #ffffff', boxShadow: '0 1px 3px rgba(0,0,0,0.25)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0
+  });
+
+  return (
+    <div>
+      <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: '0.6rem', color: '#1e293b' }}>Hình Ảnh Sản Phẩm</label>
+      <div style={{ display: 'flex', gap: '1.1rem', alignItems: 'flex-start' }}>
+        {/* Cover photo */}
+        <div style={{ flexShrink: 0, width: GALLERY_THUMB_SIZE }}>
+          <label
+            htmlFor="product-cover-input"
+            style={{
+              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+              width: GALLERY_THUMB_SIZE, height: GALLERY_THUMB_SIZE, borderRadius: '8px', cursor: 'pointer', overflow: 'hidden',
+              border: coverPreview ? '1px solid #cbd5e1' : '2px dashed #cbd5e1',
+              backgroundColor: coverPreview ? 'transparent' : '#f8fafc'
+            }}
+          >
+            {coverPreview ? (
+              <img src={coverPreview} alt="Ảnh bìa" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            ) : (
+              <>
+                <Image size={20} style={{ color: '#94a3b8' }} />
+                <span style={{ fontSize: '0.65rem', color: '#94a3b8', marginTop: '0.25rem', textAlign: 'center', padding: '0 0.3rem' }}>Chọn ảnh</span>
+              </>
+            )}
+          </label>
+          <input id="product-cover-input" type="file" accept="image/jpeg,image/png,image/webp,image/gif" onChange={(e) => onCoverSelect(e.target.files?.[0] || null)} style={{ display: 'none' }} />
+          <div style={{ fontSize: '0.68rem', fontWeight: 600, color: '#64748b', textAlign: 'center', marginTop: '0.4rem' }}>Ảnh Bìa</div>
+        </div>
+
+        {/* Divider between cover and gallery — makes the "one main photo, several extra
+            photos" grouping visually obvious instead of one undifferentiated row. */}
+        <div style={{ width: '1px', alignSelf: 'stretch', backgroundColor: '#e2e8f0', flexShrink: 0 }} />
+
+        {/* Gallery strip */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', gap: '0.6rem', overflowX: 'auto', padding: '7px 7px 0.3rem 2px', margin: '-7px -7px 0 -2px' }}>
+            {(existingImages || []).map(img => (
+              <div key={img.id} style={thumbWrapStyle}>
+                <img src={img.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '6px', border: '1px solid #cbd5e1' }} />
+                <button
+                  type="button"
+                  disabled={deletingImageId === img.id}
+                  onClick={() => onDeleteExistingImage(img.id)}
+                  title="Xoá ảnh này"
+                  style={{ ...badgeStyle('#dc2626'), cursor: deletingImageId === img.id ? 'default' : 'pointer', opacity: deletingImageId === img.id ? 0.6 : 1 }}
+                >
+                  <X size={12} />
+                </button>
+              </div>
+            ))}
+            {(pendingFiles || []).map((file, idx) => (
+              <div key={`pending-${idx}`} style={thumbWrapStyle}>
+                <img src={URL.createObjectURL(file)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '6px', border: '1px solid #93c5fd' }} />
+                <button type="button" onClick={() => onRemovePendingFile(idx)} title="Bỏ ảnh này" style={badgeStyle('#475569')}>
+                  <X size={12} />
+                </button>
+              </div>
+            ))}
+            {totalGalleryCount < MAX_GALLERY_IMAGES && (
+              <label
+                htmlFor="product-gallery-input"
+                title="Thêm ảnh phụ"
+                style={{
+                  flexShrink: 0, width: GALLERY_THUMB_SIZE, height: GALLERY_THUMB_SIZE, borderRadius: '6px', border: '2px dashed #cbd5e1',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', backgroundColor: '#f8fafc'
+                }}
+              >
+                <Plus size={20} style={{ color: '#94a3b8' }} />
+              </label>
+            )}
+          </div>
+          <input
+            id="product-gallery-input"
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/gif"
+            multiple
+            onChange={(e) => { if (e.target.files?.length) onAddFiles(e.target.files); e.target.value = ''; }}
+            style={{ display: 'none' }}
+          />
+          <div style={{ fontSize: '0.68rem', fontWeight: 600, color: '#64748b', marginTop: '0.4rem' }}>Ảnh Phụ ({totalGalleryCount}/{MAX_GALLERY_IMAGES})</div>
+        </div>
+      </div>
+    </div>
+  );
 };
 
 const DEFAULT_SAMPLE_MOVEMENTS = [
@@ -1507,6 +1618,8 @@ export default function Warehouse() {
     try { localStorage.setItem('erp_inventory', JSON.stringify(items)); } catch (e) {}
   };
   const updateProduct = useInventoryStore(state => state.updateProduct);
+  const createProduct = useInventoryStore(state => state.createProduct);
+  const deleteProductImage = useInventoryStore(state => state.deleteProductImage);
   const products = useInventoryStore(state => state.products) || [];
 
   const orders = useSalesStore(state => state.orders) || [];
@@ -1605,7 +1718,7 @@ export default function Warehouse() {
 
   // Add Product Modal
   const [showAddProduct, setShowAddProduct] = useState(false);
-  const [newProdForm, setNewProdForm] = useState({ name: '', category: 'CPU', stock: '', price: '', supplier: 'Intel Vietnam', threshold: '5', location: 'ZONE-A/SHELF-01/BIN-01' });
+  const [newProdForm, setNewProdForm] = useState({ name: '', category: 'CPU', stock: '', price: '', supplier: 'Intel Vietnam', supplierCode: '', threshold: '5', location: 'ZONE-A/SHELF-01/BIN-01', available: true, description: '', imageFile: null, imageFiles: [] });
 
   // Edit Product Modal — opened either read-only (clicking the product name: "xem chi
   // tiết") or editable (the Hành Động button, managers only: "chỉnh sửa"). Same modal,
@@ -1816,6 +1929,23 @@ export default function Warehouse() {
 
   useEffect(() => {
     fetchReceipts();
+  }, []);
+
+  // Real Supplier directory (Purchasing's Danh Bạ NCC) — the product edit form used
+  // to offer a hardcoded list of supplier NAMES (STANDARD_SUPPLIERS) with no relation
+  // to any actual Supplier row, so "saving" a NCC never matched a real code and could
+  // never actually persist. Fetched once; ACTIVE only, since assigning a product to a
+  // supplier Purchasing has stopped working with would be misleading.
+  const [realSuppliers, setRealSuppliers] = useState([]);
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await api.get('/purchasing/suppliers');
+        if (res?.success && Array.isArray(res.data)) {
+          setRealSuppliers(res.data.filter(s => s.status !== 'INACTIVE'));
+        }
+      } catch (_) {}
+    })();
   }, []);
 
   // Validate receipt intake
@@ -2155,39 +2285,41 @@ export default function Warehouse() {
   };
 
   // Add Product Submit
-  const handleAddProductSubmit = (e) => {
+  const handleAddProductSubmit = async (e) => {
     e.preventDefault();
+    if (!isManager) {
+      notify('Bạn không có quyền thêm sản phẩm mới.', 'error');
+      return;
+    }
     if (!newProdForm.name.trim() || !newProdForm.stock) {
       notify('Vui lòng nhập tên sản phẩm và số lượng tồn kho!', 'error');
       return;
     }
 
-    const newProd = {
-      id: Date.now(),
-      name: newProdForm.name.trim(),
-      category: newProdForm.category,
-      stock: parseInt(newProdForm.stock, 10) || 0,
-      price: parseFloat(newProdForm.price) || 0,
-      supplier: newProdForm.supplier,
-      threshold: parseInt(newProdForm.threshold, 10) || 5,
-      location: newProdForm.location || 'ZONE-A/SHELF-01/BIN-01',
-      specs: {},
-      createdAt: new Date().toISOString()
-    };
-
-    const updated = [newProd, ...(inventory || [])];
-    setInventory(updated);
     try {
-      localStorage.setItem('erp_inventory', JSON.stringify(updated));
-    } catch (_) {}
+      await createProduct({
+        name: newProdForm.name.trim(),
+        category: newProdForm.category,
+        stockQuantity: parseInt(newProdForm.stock, 10) || 0,
+        threshold: parseInt(newProdForm.threshold, 10) || 5,
+        price: parseFloat(newProdForm.price) || 0,
+        available: newProdForm.available !== false,
+        description: newProdForm.description || '',
+        ...(newProdForm.imageFile && { imageFile: newProdForm.imageFile }),
+        ...(newProdForm.imageFiles?.length > 0 && { imageFiles: newProdForm.imageFiles }),
+        ...(newProdForm.supplierCode && { supplierCode: newProdForm.supplierCode })
+      });
 
-    setShowAddProduct(false);
-    setNewProdForm({ name: '', category: 'CPU', stock: '', price: '', supplier: 'Intel Vietnam', threshold: '5', location: 'ZONE-A/SHELF-01/BIN-01' });
-    notify(`Đã thêm sản phẩm ${newProd.name} vào sổ kho thành công!`, 'success');
+      setShowAddProduct(false);
+      setNewProdForm({ name: '', category: 'CPU', stock: '', price: '', supplier: 'Intel Vietnam', supplierCode: '', threshold: '5', location: 'ZONE-A/SHELF-01/BIN-01', available: true, description: '', imageFile: null, imageFiles: [] });
+      notify(`Đã thêm sản phẩm ${newProdForm.name.trim()} vào cơ sở dữ liệu thành công!`, 'success');
+    } catch (err) {
+      notify(err?.message || 'Không thể lưu sản phẩm mới vào cơ sở dữ liệu. Vui lòng thử lại.', 'error');
+    }
   };
 
   // Edit Product Submit
-  const handleEditProductSubmit = (e) => {
+  const handleEditProductSubmit = async (e) => {
     if (e && e.preventDefault) e.preventDefault();
     if (!editingProd) return;
     if (!isManager || productViewOnly) {
@@ -2196,6 +2328,10 @@ export default function Warehouse() {
     }
 
     const targetId = editingProd.id;
+    // name/price/stock/supplierCode are real Product columns the backend persists
+    // (see product.controller.js updateProduct); category/location/threshold live in
+    // Inventory/WarehouseLocation and aren't accepted by that endpoint yet, so they
+    // still only update local state below, same as before this fix.
     const fieldsToUpdate = {
       name: editingProd.name,
       category: editingProd.category,
@@ -2203,18 +2339,47 @@ export default function Warehouse() {
       location: editingProd.location,
       stock: editingProd.stock !== undefined ? (parseInt(editingProd.stock, 10) || 0) : 0,
       price: editingProd.price !== undefined ? (parseFloat(editingProd.price) || 0) : 0,
-      threshold: editingProd.threshold !== undefined ? (parseInt(editingProd.threshold, 10) || 5) : 5
+      threshold: editingProd.threshold !== undefined ? (parseInt(editingProd.threshold, 10) || 5) : 5,
+      available: editingProd.available !== false,
+      description: editingProd.description || '',
+      ...(editingProd.imageFile && { imageFile: editingProd.imageFile }),
+      ...(editingProd.imageFiles?.length > 0 && { imageFiles: editingProd.imageFiles }),
+      ...(editingProd.supplierCode && { supplierCode: editingProd.supplierCode })
     };
 
-    if (updateProduct) {
-      updateProduct(targetId, fieldsToUpdate);
-    } else if (setInventory) {
-      setInventory(prev => (prev || []).map(p => String(p.id) === String(targetId) ? { ...p, ...fieldsToUpdate } : p));
-    }
+    try {
+      if (updateProduct) {
+        await updateProduct(targetId, fieldsToUpdate);
+      } else if (setInventory) {
+        setInventory(prev => (prev || []).map(p => String(p.id) === String(targetId) ? { ...p, ...fieldsToUpdate } : p));
+      }
 
-    const savedId = editingProd.id;
-    setEditingProd(null);
-    notify(`Đã cập nhật thành công thông tin sản phẩm #${savedId}!`, 'success');
+      const savedId = editingProd.id;
+      setEditingProd(null);
+      notify(`Đã cập nhật thành công thông tin sản phẩm #${savedId}!`, 'success');
+    } catch (err) {
+      notify(err?.message || 'Không thể lưu thay đổi vào cơ sở dữ liệu. Vui lòng thử lại.', 'error');
+    }
+  };
+
+  // Delete one already-saved gallery photo — separate from the Lưu Cập Nhật save
+  // action above, takes effect immediately (matches the trash icon's implied "this is
+  // permanent now" affordance rather than queuing it behind the next full form save).
+  const [deletingGalleryImageId, setDeletingGalleryImageId] = useState(null);
+  const handleDeleteGalleryImage = async (imageId) => {
+    if (!editingProd) return;
+    const confirmed = window.confirm('Xoá ảnh này khỏi sản phẩm?');
+    if (!confirmed) return;
+    setDeletingGalleryImageId(imageId);
+    try {
+      await deleteProductImage(editingProd.id, imageId);
+      setEditingProd(prev => prev ? { ...prev, gallery: (prev.gallery || []).filter(img => img.id !== imageId) } : prev);
+      notify('Đã xoá ảnh.', 'success');
+    } catch (err) {
+      notify(err?.message || 'Không thể xoá ảnh. Vui lòng thử lại.', 'error');
+    } finally {
+      setDeletingGalleryImageId(null);
+    }
   };
 
   // Direct Intake Submit
@@ -4462,21 +4627,23 @@ export default function Warehouse() {
                 Quản lý danh mục tất cả linh kiện máy tính, giá niêm yết, vị trí kệ và ngưỡng Min-Max
               </p>
             </div>
-            <button
-              onClick={() => setShowAddProduct(true)}
-              style={{
-                backgroundColor: '#2563eb',
-                color: '#ffffff',
-                border: 'none',
-                borderRadius: '6px',
-                padding: '0.55rem 1.25rem',
-                fontSize: '0.85rem',
-                fontWeight: 700,
-                cursor: 'pointer'
-              }}
-            >
-              + Thêm Sản Phẩm Mới
-            </button>
+            {isManager && (
+              <button
+                onClick={() => setShowAddProduct(true)}
+                style={{
+                  backgroundColor: '#2563eb',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '6px',
+                  padding: '0.55rem 1.25rem',
+                  fontSize: '0.85rem',
+                  fontWeight: 700,
+                  cursor: 'pointer'
+                }}
+              >
+                + Thêm Sản Phẩm Mới
+              </button>
+            )}
           </div>
 
           {/* Enhanced Filter Toolbar */}
@@ -5058,12 +5225,12 @@ export default function Warehouse() {
       {/* Add Product Modal */}
       {showAddProduct && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.65)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000, padding: '1rem' }}>
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', maxWidth: '600px', width: '100%', border: '1px solid #cbd5e1', overflow: 'hidden' }}>
-            <div style={{ padding: '1.25rem 1.5rem', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', maxWidth: '600px', width: '100%', maxHeight: '90vh', border: '1px solid #cbd5e1', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            <div style={{ padding: '1.25rem 1.5rem', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
               <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#0f172a' }}>Thêm Sản Phẩm Mới Vào Sổ Kho</h3>
               <button onClick={() => setShowAddProduct(false)} style={{ background: 'none', border: '1px solid #cbd5e1', borderRadius: '4px', padding: '0.2rem 0.5rem', cursor: 'pointer' }}>Đóng</button>
             </div>
-            <form onSubmit={handleAddProductSubmit} style={{ padding: '1.5rem' }}>
+            <form onSubmit={handleAddProductSubmit} style={{ padding: '1.5rem', overflowY: 'auto', flex: 1, minHeight: 0 }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: '0.35rem' }}>Tên Sản Phẩm *</label>
@@ -5097,6 +5264,37 @@ export default function Warehouse() {
                     <input type="number" min="1" value={newProdForm.threshold} onChange={(e) => setNewProdForm({ ...newProdForm, threshold: e.target.value })} style={{ width: '100%', padding: '0.55rem 0.85rem', border: '1px solid #cbd5e1', borderRadius: '6px' }} />
                   </div>
                 </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: '0.35rem' }}>Nhà Cung Cấp</label>
+                  <select value={newProdForm.supplierCode} onChange={(e) => { const sup = realSuppliers.find(s => s.code === e.target.value); setNewProdForm({ ...newProdForm, supplierCode: e.target.value, supplier: sup ? sup.name : newProdForm.supplier }); }} style={{ width: '100%', padding: '0.55rem 0.85rem', border: '1px solid #cbd5e1', borderRadius: '6px' }}>
+                    <option value="">-- Chọn Nhà Cung Cấp (không bắt buộc) --</option>
+                    {realSuppliers.map(s => (
+                      <option key={s.code} value={s.code}>{s.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <ProductGalleryField
+                  coverFile={newProdForm.imageFile}
+                  coverUrl={null}
+                  onCoverSelect={(file) => setNewProdForm({ ...newProdForm, imageFile: file })}
+                  existingImages={[]}
+                  pendingFiles={newProdForm.imageFiles || []}
+                  onAddFiles={(fileList) => {
+                    const room = MAX_GALLERY_IMAGES - (newProdForm.imageFiles || []).length;
+                    setNewProdForm({ ...newProdForm, imageFiles: [...(newProdForm.imageFiles || []), ...Array.from(fileList).slice(0, room)] });
+                  }}
+                  onRemovePendingFile={(idx) => setNewProdForm({ ...newProdForm, imageFiles: (newProdForm.imageFiles || []).filter((_, i) => i !== idx) })}
+                  onDeleteExistingImage={() => {}}
+                  deletingImageId={null}
+                />
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: '0.35rem' }}>Mô Tả Sản Phẩm</label>
+                  <textarea rows={3} value={newProdForm.description || ''} onChange={(e) => setNewProdForm({ ...newProdForm, description: e.target.value })} style={{ width: '100%', padding: '0.55rem 0.85rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontFamily: 'inherit', fontSize: '0.83rem', resize: 'vertical', boxSizing: 'border-box' }} />
+                </div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.83rem', fontWeight: 600, color: '#334155', cursor: 'pointer' }}>
+                  <input type="checkbox" checked={newProdForm.available !== false} onChange={(e) => setNewProdForm({ ...newProdForm, available: e.target.checked })} />
+                  Hiển thị trên trang bán hàng
+                </label>
               </div>
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
                 <button type="button" onClick={() => setShowAddProduct(false)} style={{ padding: '0.5rem 1rem', border: '1px solid #cbd5e1', borderRadius: '6px', background: '#fff' }}>Hủy</button>
@@ -5131,25 +5329,33 @@ export default function Warehouse() {
         );
         return (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.65)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000, padding: '1rem' }}>
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', maxWidth: '560px', width: '100%', border: '1px solid #cbd5e1', overflow: 'hidden', boxShadow: '0 20px 40px rgba(0,0,0,0.2)' }}>
-            <div style={{ padding: '1.25rem 1.5rem', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', maxWidth: '560px', width: '100%', maxHeight: '90vh', border: '1px solid #cbd5e1', boxShadow: '0 20px 40px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            <div style={{ padding: '1.25rem 1.5rem', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
               <div>
                 <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#0f172a' }}>{isReadOnlyView ? 'Thông Tin Sản Phẩm' : 'Chỉnh Sửa Thông Tin Sản Phẩm'}</h3>
                 <span style={{ fontSize: '0.78rem', color: '#64748b' }}>Mã định danh: <strong style={{ color: '#2563eb' }}>#{editingProd.id}</strong></span>
               </div>
-              <button onClick={closeModal} style={{ background: 'none', border: '1px solid #cbd5e1', borderRadius: '4px', padding: '0.2rem 0.6rem', cursor: 'pointer', color: '#475569', fontWeight: 600 }}>Đóng</button>
+              <button onClick={closeModal} style={{ background: 'none', border: '1px solid #cbd5e1', borderRadius: '4px', padding: '0.2rem 0.6rem', cursor: 'pointer', color: '#475569', fontWeight: 600, flexShrink: 0 }}>Đóng</button>
             </div>
 
             {isReadOnlyView ? (
               // Simple read-only detail card — plain text, no form controls.
-              <div style={{ padding: '1.5rem' }}>
-                <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0f172a', marginBottom: '1.1rem' }}>{editingProd.name}</div>
+              <div style={{ padding: '1.5rem', overflowY: 'auto', flex: 1, minHeight: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', marginBottom: '1.1rem' }}>
+                  {editingProd.image && (
+                    <img src={editingProd.image} alt={editingProd.name} style={{ width: '56px', height: '56px', objectFit: 'cover', borderRadius: '6px', border: '1px solid #cbd5e1', flexShrink: 0 }} />
+                  )}
+                  <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0f172a' }}>{editingProd.name}</div>
+                </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.1rem', marginBottom: '1.1rem' }}>
                   {infoRow('Phân Nhóm', editingProd.category)}
                   {infoRow('Nhà Cung Cấp', editingProd.supplier || 'Chưa rõ')}
                   {infoRow('Vị Trí Kệ', editingProd.location || 'Chưa xếp kệ')}
                   {infoRow('Đơn Giá Niêm Yết', safeFormatPrice(editingProd.price))}
                   {infoRow('Ngưỡng An Toàn', `${threshNum} sản phẩm`)}
+                  {infoRow('Trên Trang Bán Hàng', editingProd.available !== false
+                    ? <span style={{ color: '#15803d' }}>Đang hiển thị</span>
+                    : <span style={{ color: '#dc2626' }}>Đang ẩn</span>)}
                   <div>
                     <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.03em', marginBottom: '0.3rem' }}>Tồn Kho Hiện Tại</div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -5158,6 +5364,22 @@ export default function Warehouse() {
                     </div>
                   </div>
                 </div>
+                {editingProd.gallery?.length > 0 && (
+                  <div style={{ marginBottom: '1.1rem' }}>
+                    <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.03em', marginBottom: '0.3rem' }}>Ảnh Phụ ({editingProd.gallery.length})</div>
+                    <div style={{ display: 'flex', gap: '0.5rem', overflowX: 'auto', paddingBottom: '0.2rem' }}>
+                      {editingProd.gallery.map(img => (
+                        <img key={img.id} src={img.url} alt="" style={{ width: '56px', height: '56px', objectFit: 'cover', borderRadius: '6px', border: '1px solid #cbd5e1', flexShrink: 0 }} />
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {editingProd.description && (
+                  <div style={{ marginBottom: '1.1rem' }}>
+                    <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.03em', marginBottom: '0.3rem' }}>Mô Tả Sản Phẩm</div>
+                    <div style={{ fontSize: '0.85rem', color: '#334155', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{editingProd.description}</div>
+                  </div>
+                )}
                 {!isManager && (
                   <div style={{ backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '8px', padding: '0.65rem 0.9rem', display: 'flex', alignItems: 'center', gap: '0.6rem', fontSize: '0.78rem', color: '#1e40af', fontWeight: 600 }}>
                     <AlertCircle size={15} style={{ flexShrink: 0 }} />
@@ -5173,7 +5395,7 @@ export default function Warehouse() {
               </div>
             ) : (
               // Edit form — only reachable by a manager who explicitly chose to edit.
-              <form onSubmit={handleEditProductSubmit} style={{ padding: '1.5rem' }}>
+              <form onSubmit={handleEditProductSubmit} style={{ padding: '1.5rem', overflowY: 'auto', flex: 1, minHeight: 0 }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem', marginBottom: '1.5rem' }}>
                   <div>
                     <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.35rem' }}>Tên Linh Kiện / Sản Phẩm *</label>
@@ -5197,9 +5419,17 @@ export default function Warehouse() {
                     </div>
                     <div>
                       <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.35rem' }}>Nhà Cung Cấp</label>
-                      <select value={editingProd.supplier || 'Intel Vietnam'} onChange={(e) => setEditingProd({ ...editingProd, supplier: e.target.value })} style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px', backgroundColor: '#ffffff', color: '#0f172a' }}>
-                        {STANDARD_SUPPLIERS.map(s => (
-                          <option key={s} value={s}>{s}</option>
+                      <select
+                        value={editingProd.supplierCode || realSuppliers.find(s => s.name === editingProd.supplier)?.code || ''}
+                        onChange={(e) => {
+                          const sup = realSuppliers.find(s => s.code === e.target.value);
+                          setEditingProd({ ...editingProd, supplierCode: e.target.value, supplier: sup ? sup.name : editingProd.supplier });
+                        }}
+                        style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px', backgroundColor: '#ffffff', color: '#0f172a' }}
+                      >
+                        <option value="">-- Chọn Nhà Cung Cấp --</option>
+                        {realSuppliers.map(s => (
+                          <option key={s.code} value={s.code}>{s.name}</option>
                         ))}
                       </select>
                     </div>
@@ -5231,6 +5461,30 @@ export default function Warehouse() {
                       <input type="number" min="1" value={editingProd.threshold || 5} onChange={(e) => setEditingProd({ ...editingProd, threshold: parseInt(e.target.value, 10) || 5 })} style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.85rem', border: '1px solid #cbd5e1', borderRadius: '6px', backgroundColor: '#ffffff', color: '#0f172a' }} />
                     </div>
                   </div>
+
+                  <ProductGalleryField
+                    coverFile={editingProd.imageFile}
+                    coverUrl={editingProd.image}
+                    onCoverSelect={(file) => setEditingProd({ ...editingProd, imageFile: file })}
+                    existingImages={editingProd.gallery || []}
+                    pendingFiles={editingProd.imageFiles || []}
+                    onAddFiles={(fileList) => {
+                      const room = MAX_GALLERY_IMAGES - (editingProd.gallery || []).length - (editingProd.imageFiles || []).length;
+                      setEditingProd({ ...editingProd, imageFiles: [...(editingProd.imageFiles || []), ...Array.from(fileList).slice(0, room)] });
+                    }}
+                    onRemovePendingFile={(idx) => setEditingProd({ ...editingProd, imageFiles: (editingProd.imageFiles || []).filter((_, i) => i !== idx) })}
+                    onDeleteExistingImage={handleDeleteGalleryImage}
+                    deletingImageId={deletingGalleryImageId}
+                  />
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.35rem' }}>Mô Tả Sản Phẩm</label>
+                    <textarea rows={3} value={editingProd.description || ''} onChange={(e) => setEditingProd({ ...editingProd, description: e.target.value })} style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.85rem', border: '1px solid #cbd5e1', borderRadius: '6px', backgroundColor: '#ffffff', color: '#0f172a', fontFamily: 'inherit', resize: 'vertical', boxSizing: 'border-box' }} />
+                  </div>
+
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.83rem', fontWeight: 600, color: '#334155', cursor: 'pointer' }}>
+                    <input type="checkbox" checked={editingProd.available !== false} onChange={(e) => setEditingProd({ ...editingProd, available: e.target.checked })} />
+                    Hiển thị trên trang bán hàng
+                  </label>
                 </div>
 
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', borderTop: '1px solid #e2e8f0', paddingTop: '1rem' }}>
