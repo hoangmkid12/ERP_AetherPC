@@ -1,4 +1,4 @@
-﻿import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useCart } from '../../context/CartContext';
@@ -159,7 +159,7 @@ export default function Header() {
           </Link>
 
           {/* Desktop Navigation */}
-          <nav ref={dropdownRef} style={{
+          <nav ref={dropdownRef} className="header-desktop-nav" style={{
             display: 'flex',
             alignItems: 'center',
             gap: '0.25rem',
@@ -304,9 +304,8 @@ export default function Header() {
             </Link>
 
             {/* Wishlist Trigger Button */}
-            <button onClick={() => setWishlistOpen(true)} style={{
+            <button className="desktop-only" onClick={() => setWishlistOpen(true)} style={{
               position: 'relative',
-              display: 'flex',
               alignItems: 'center',
               gap: '0.35rem',
               height: '38px',
@@ -831,6 +830,27 @@ export default function Header() {
                 Đăng Nhập
               </Link>
             )}
+
+            {/* Mobile Hamburger Menu Toggle Button */}
+            <button
+              className="header-mobile-toggle"
+              onClick={() => setMobileMenuOpen(true)}
+              aria-label="Mở Menu Điều Hướng"
+              style={{
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '38px',
+                height: '38px',
+                borderRadius: 'var(--radius-md)',
+                backgroundColor: 'var(--bg-tertiary)',
+                border: '1px solid var(--border-glass)',
+                color: 'var(--text-primary)',
+                cursor: 'pointer',
+                flexShrink: 0,
+              }}
+            >
+              <Menu size={20} />
+            </button>
           </div>
         </div>
       </header>
@@ -1141,6 +1161,240 @@ export default function Header() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Mobile Navigation Drawer */}
+      {mobileMenuOpen && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 99999999 }}>
+          {/* Backdrop */}
+          <div
+            onClick={() => setMobileMenuOpen(false)}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(15, 23, 42, 0.5)',
+              backdropFilter: 'blur(4px)',
+              WebkitBackdropFilter: 'blur(4px)',
+            }}
+          />
+
+          {/* Drawer Panel */}
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            right: 0,
+            bottom: 0,
+            width: '300px',
+            maxWidth: '85vw',
+            background: '#ffffff',
+            boxShadow: '-8px 0 24px rgba(0, 0, 0, 0.2)',
+            display: 'flex',
+            flexDirection: 'column',
+            zIndex: 100000000,
+          }}>
+            {/* Drawer Header */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '1.25rem 1rem',
+              borderBottom: '1px solid #e2e8f0',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 800, fontSize: '1.2rem', color: 'var(--primary)' }}>
+                <Cpu size={22} color="var(--primary)" />
+                <span>AetherPC</span>
+              </div>
+              <button
+                onClick={() => setMobileMenuOpen(false)}
+                style={{
+                  background: '#f1f5f9',
+                  border: 'none',
+                  borderRadius: '8px',
+                  width: '32px',
+                  height: '32px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  color: '#64748b',
+                }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Drawer Content */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '1rem' }}>
+              {/* User Section or Login */}
+              {isAuthenticated ? (
+                <div style={{
+                  padding: '0.85rem',
+                  backgroundColor: '#f8fafc',
+                  borderRadius: '12px',
+                  border: '1px solid #e2e8f0',
+                  marginBottom: '1rem',
+                }}>
+                  <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#0f172a' }}>{user.fullname || user.name}</div>
+                  <div style={{ fontSize: '0.75rem', color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user.email}</div>
+                  {showAdminLink && (
+                    <Link
+                      to="/admin"
+                      onClick={() => setMobileMenuOpen(false)}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        marginTop: '0.75rem',
+                        padding: '0.5rem 0.75rem',
+                        borderRadius: '8px',
+                        backgroundColor: '#eff6ff',
+                        color: '#2563eb',
+                        fontSize: '0.82rem',
+                        fontWeight: 700,
+                        textDecoration: 'none',
+                        border: '1px solid #bfdbfe',
+                      }}
+                    >
+                      <LayoutDashboard size={15} />
+                      Vào Trang Quản Trị ERP
+                    </Link>
+                  )}
+                </div>
+              ) : (
+                <div style={{ marginBottom: '1rem' }}>
+                  <Link
+                    to="/login"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="btn btn-primary"
+                    style={{ width: '100%', justifyContent: 'center' }}
+                  >
+                    <LogIn size={16} />
+                    Đăng Nhập / Đăng Ký
+                  </Link>
+                </div>
+              )}
+
+              {/* Navigation Links */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                <Link
+                  to="/"
+                  onClick={() => setMobileMenuOpen(false)}
+                  style={{
+                    padding: '0.75rem 0.85rem',
+                    borderRadius: '8px',
+                    fontWeight: 600,
+                    fontSize: '0.9rem',
+                    color: '#1e293b',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.65rem',
+                    textDecoration: 'none',
+                  }}
+                >
+                  Trang Chủ
+                </Link>
+
+                {NAV_ITEMS.map((item) => (
+                  <Link
+                    key={item.label}
+                    to={item.path}
+                    onClick={() => setMobileMenuOpen(false)}
+                    style={{
+                      padding: '0.75rem 0.85rem',
+                      borderRadius: '8px',
+                      fontWeight: 600,
+                      fontSize: '0.9rem',
+                      color: item.highlight ? 'var(--danger)' : '#1e293b',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.65rem',
+                      textDecoration: 'none',
+                    }}
+                  >
+                    {item.icon}
+                    {item.label}
+                  </Link>
+                ))}
+
+                <div style={{ height: '1px', backgroundColor: '#e2e8f0', margin: '0.5rem 0' }} />
+
+                <button
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    setWishlistOpen(true);
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.65rem',
+                    padding: '0.75rem 0.85rem',
+                    borderRadius: '8px',
+                    border: 'none',
+                    background: 'none',
+                    color: '#1e293b',
+                    fontSize: '0.9rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    width: '100%',
+                    textAlign: 'left',
+                  }}
+                >
+                  <Heart size={16} style={{ color: wishlist?.length > 0 ? 'var(--danger)' : '#64748b' }} />
+                  Danh Sách Yêu Thích ({wishlist?.length || 0})
+                </button>
+
+                {isAuthenticated && user.role === 'CUSTOMER' && (
+                  <Link
+                    to="/my-orders"
+                    onClick={() => setMobileMenuOpen(false)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.65rem',
+                      padding: '0.75rem 0.85rem',
+                      borderRadius: '8px',
+                      color: '#1e293b',
+                      fontSize: '0.9rem',
+                      fontWeight: 600,
+                      textDecoration: 'none',
+                    }}
+                  >
+                    <Package size={16} color="#64748b" />
+                    Đơn hàng của tôi
+                  </Link>
+                )}
+
+                {isAuthenticated && (
+                  <button
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      handleLogout();
+                    }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.65rem',
+                      padding: '0.75rem 0.85rem',
+                      borderRadius: '8px',
+                      border: 'none',
+                      background: 'none',
+                      color: '#dc2626',
+                      fontSize: '0.9rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      width: '100%',
+                      textAlign: 'left',
+                      marginTop: '0.5rem',
+                    }}
+                  >
+                    <LogOut size={16} color="#dc2626" />
+                    Đăng Xuất
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       )}

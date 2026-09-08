@@ -28,7 +28,7 @@ import {
   Settings
 } from 'lucide-react';
 
-export default function Sidebar() {
+export default function Sidebar({ isOpen = false, onClose }) {
   const { user, logout, isCEO, isSales, isSalesManager, isWarehouse, isWarehouseManager, isAssembly, isHR, isAccountant, isPurchasing, isAdmin } = useAuth();
   const { can, canDo, canRead } = usePermission();
   const inventory = useInventoryStore(state => state.inventory) || [];
@@ -542,7 +542,7 @@ export default function Sidebar() {
 
   return (
     <>
-    <aside style={{
+    <aside className={`admin-sidebar-drawer ${isOpen ? 'open' : ''}`} style={{
       width: '260px',
       backgroundColor: '#ffffff',
       borderRight: '1px solid #e2e8f0',
@@ -586,31 +586,52 @@ export default function Sidebar() {
           </div>
         </div>
 
-        {/* Notification Bell Button */}
-        <button
-          onClick={() => setShowNotifDrawer(!showNotifDrawer)}
-          style={{
-            position: 'relative', background: '#f8fafc', border: '1px solid #cbd5e1',
-            color: notifications.filter(n => !dismissedNotifIds.includes(n.id)).length > 0 ? '#d97706' : '#64748b',
-            borderRadius: '9px', width: '34px', height: '34px',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
-            transition: 'all 0.2s'
-          }}
-          title="Thông báo hệ thống ERP"
-        >
-          <Bell size={17} />
-          {notifications.filter(n => !dismissedNotifIds.includes(n.id)).length > 0 && (
-            <span style={{
-              position: 'absolute', top: '-5px', right: '-5px',
-              backgroundColor: '#dc2626', color: '#fff',
-              borderRadius: '10px', padding: '1px 6px', fontSize: '0.65rem', fontWeight: 800,
-              boxShadow: '0 0 8px rgba(220,38,38,0.5)'
-            }}>
-              {notifications.filter(n => !dismissedNotifIds.includes(n.id)).length}
-            </span>
-          )}
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+          {/* Notification Bell Button */}
+          <button
+            onClick={() => setShowNotifDrawer(!showNotifDrawer)}
+            style={{
+              position: 'relative', background: '#f8fafc', border: '1px solid #cbd5e1',
+              color: notifications.filter(n => !dismissedNotifIds.includes(n.id)).length > 0 ? '#d97706' : '#64748b',
+              borderRadius: '9px', width: '34px', height: '34px',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+              transition: 'all 0.2s'
+            }}
+            title="Thông báo hệ thống ERP"
+          >
+            <Bell size={17} />
+            {notifications.filter(n => !dismissedNotifIds.includes(n.id)).length > 0 && (
+              <span style={{
+                position: 'absolute', top: '-5px', right: '-5px',
+                backgroundColor: '#dc2626', color: '#fff',
+                borderRadius: '10px', padding: '1px 6px', fontSize: '0.65rem', fontWeight: 800,
+                boxShadow: '0 0 8px rgba(220,38,38,0.5)'
+              }}>
+                {notifications.filter(n => !dismissedNotifIds.includes(n.id)).length}
+              </span>
+            )}
+          </button>
 
+          {/* Close button for mobile drawer */}
+          <button
+            className="mobile-only"
+            onClick={onClose}
+            aria-label="Đóng Menu"
+            style={{
+              background: '#f1f5f9',
+              border: 'none',
+              borderRadius: '9px',
+              width: '34px',
+              height: '34px',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              color: '#64748b',
+            }}
+          >
+            <X size={18} />
+          </button>
+        </div>
       </div>
 
       {/* Nav Menu */}
@@ -632,6 +653,7 @@ export default function Sidebar() {
               <React.Fragment key={item.path}>
                 <NavLink
                   to={item.path}
+                  onClick={() => onClose?.()}
                   style={({ isActive }) => {
                     const currentFull = location.pathname + location.search;
                     const isTabMatch = item.path.includes('?')

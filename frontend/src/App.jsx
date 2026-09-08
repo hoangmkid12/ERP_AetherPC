@@ -1,5 +1,5 @@
-import React, { useEffect, Suspense, lazy } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate, Outlet, useLocation, Link } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
 import { NotificationProvider } from './context/NotificationContext';
@@ -72,6 +72,13 @@ const StorefrontLayout = () => {
 // 2. Layout for Admin Panel Views
 const AdminLayout = () => {
   const { isAuthenticated, user, loading } = useAuth();
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const location = useLocation();
+
+  // Close mobile sidebar on route transition
+  useEffect(() => {
+    setMobileSidebarOpen(false);
+  }, [location.pathname, location.search]);
 
   if (loading) {
     return (
@@ -103,9 +110,87 @@ const AdminLayout = () => {
   }
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: 'var(--bg-app)' }}>
-      <Sidebar />
-      <main style={{ flex: 1, overflowY: 'auto', maxHeight: '100vh', minHeight: '100vh', backgroundColor: 'var(--bg-app)' }}>
+    <div className="admin-layout-container" style={{ display: 'flex', minHeight: '100vh', backgroundColor: 'var(--bg-app)' }}>
+      {/* Top Mobile Bar for Admin ERP on screens <= 1024px */}
+      <header
+        className="admin-mobile-topbar"
+        style={{
+          height: '56px',
+          backgroundColor: '#ffffff',
+          borderBottom: '1px solid #e2e8f0',
+          padding: '0 1rem',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          position: 'sticky',
+          top: 0,
+          zIndex: 9999,
+          boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <button
+            type="button"
+            onClick={() => setMobileSidebarOpen(true)}
+            aria-label="Mở Menu Quản Trị"
+            style={{
+              background: '#f1f5f9',
+              border: 'none',
+              borderRadius: '8px',
+              width: '38px',
+              height: '38px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#0f172a',
+              cursor: 'pointer',
+            }}
+          >
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="3" y1="12" x2="21" y2="12"></line>
+              <line x1="3" y1="6" x2="21" y2="6"></line>
+              <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+            <span style={{ fontWeight: 800, fontSize: '1rem', color: '#0f172a' }}>AetherPC</span>
+            <span style={{ fontSize: '0.7rem', fontWeight: 800, background: '#eff6ff', color: '#2563eb', padding: '2px 6px', borderRadius: '4px', border: '1px solid #bfdbfe' }}>
+              {user?.role || 'ERP'}
+            </span>
+          </div>
+        </div>
+
+        <Link
+          to="/"
+          style={{
+            fontSize: '0.8rem',
+            fontWeight: 600,
+            color: '#64748b',
+            textDecoration: 'none',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.25rem',
+          }}
+        >
+          <span>Ra Cửa Hàng</span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="9 18 15 12 9 6"></polyline>
+          </svg>
+        </Link>
+      </header>
+
+      {/* Backdrop overlay for mobile drawer */}
+      {mobileSidebarOpen && (
+        <div
+          className="admin-sidebar-backdrop"
+          onClick={() => setMobileSidebarOpen(false)}
+        />
+      )}
+
+      {/* Sidebar (Drawer on mobile, sticky fixed column on desktop) */}
+      <Sidebar isOpen={mobileSidebarOpen} onClose={() => setMobileSidebarOpen(false)} />
+
+      {/* Main ERP Content View */}
+      <main className="admin-main-content" style={{ flex: 1, overflowY: 'auto', maxHeight: '100vh', minHeight: '100vh', backgroundColor: 'var(--bg-app)' }}>
         <Outlet />
       </main>
     </div>

@@ -1,0 +1,359 @@
+// ============================================================================
+// Sơ đồ quan hệ thực thể (ERD) - CSDL AetherPC ERP
+// Nguồn: backend/prisma/schema.prisma (đối chiếu trực tiếp từng model/field).
+// Phạm vi: đúng tập bảng đã liệt kê ở mục 2.4.1 "Các Nhóm Bảng Dữ Liệu Chính"
+// (5 nhóm), cộng bảng Warehouse (bắt buộc phải có để Inventory/GoodsReceipt
+// tham chiếu tới, dù không được liệt tên riêng ở 2.4.1). Category/Brand/
+// ProductVariant/ProductImage, WorkOrder/Bom/BomItem, VendorPayment,
+// WarehouseLocation, CustomerSegment, AuditLog, RolePermission bị lược bỏ để
+// giữ sơ đồ dễ đọc - đây là các bảng phụ trợ không nằm trong 5 nhóm chính.
+// Mỗi entity chỉ liệt PK, FK và vài field nghiệp vụ chính, không liệt hết cột.
+// ============================================================================
+digraph ERD_AetherPC {
+  charset="UTF-8";
+  newrank=true;
+  graph [rankdir=TB, splines=ortho, overlap=false, nodesep=0.55, ranksep=1.3,
+         fontname="Arial", bgcolor=white, compound=true,
+         label="Sơ Đồ Quan Hệ Thực Thể (ERD) - Cơ Sở Dữ Liệu AetherPC ERP",
+         labelloc=t, fontsize=20, fontcolor="#111111"];
+  node [shape=plain, fontname="Arial", fontsize=11];
+  // Ký hiệu cardinality kép: chữ "1:N" (xlabel - loại nhãn duy nhất
+  // splines=ortho hỗ trợ được, không dùng taillabel/headlabel/label thường)
+  // kèm chân quạ (đuôi "tee" = 1, đầu "crow" = N) để giữ đường kẻ vuông góc
+  // hoàn toàn, đúng yêu cầu giữ nguyên dạng đường thẳng vuông góc.
+  edge [color="#333333", fontname="Arial", fontsize=9, dir=both,
+        arrowtail=tee, arrowhead=crow, arrowsize=0.8, penwidth=0.9];
+
+  // ---------- Macro giả lập bằng cách viết trực tiếp HTML-like label ----------
+  // Header entity: nền trắng, viền đen, chữ đậm. Field: PK gạch chân, FK có
+  // tiền tố "FK".
+
+  // ============================================================
+  // NHÓM 1 - BÁN HÀNG & CSKH (Sales)
+  // ============================================================
+  subgraph cluster_sales {
+    label="Nhóm Bán Hàng";
+    fontsize=14; fontname="Arial Bold"; labelloc=t; style=solid; color="#333333"; margin=20;
+
+    Customer [label=<
+      <TABLE BORDER="1" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="white">
+        <TR><TD BGCOLOR="#EFEFEF"><B>Customer</B></TD></TR>
+        <TR><TD ALIGN="LEFT"><U>customer_id</U> (PK)</TD></TR>
+        <TR><TD ALIGN="LEFT">email, username</TD></TR>
+        <TR><TD ALIGN="LEFT">name, tier</TD></TR>
+      </TABLE>>];
+
+    CustomerAddress [label=<
+      <TABLE BORDER="1" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="white">
+        <TR><TD BGCOLOR="#EFEFEF"><B>CustomerAddress</B></TD></TR>
+        <TR><TD ALIGN="LEFT"><U>id</U> (PK)</TD></TR>
+        <TR><TD ALIGN="LEFT">customer_id (FK)</TD></TR>
+        <TR><TD ALIGN="LEFT">city, is_default</TD></TR>
+      </TABLE>>];
+
+    Order [label=<
+      <TABLE BORDER="1" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="white">
+        <TR><TD BGCOLOR="#EFEFEF"><B>Order</B></TD></TR>
+        <TR><TD ALIGN="LEFT"><U>order_id</U> (PK)</TD></TR>
+        <TR><TD ALIGN="LEFT">customer_id (FK)</TD></TR>
+        <TR><TD ALIGN="LEFT">assigned_shipper_id (FK)</TD></TR>
+        <TR><TD ALIGN="LEFT">status, total_amount</TD></TR>
+      </TABLE>>];
+
+    OrderItem [label=<
+      <TABLE BORDER="1" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="white">
+        <TR><TD BGCOLOR="#EFEFEF"><B>OrderItem</B></TD></TR>
+        <TR><TD ALIGN="LEFT"><U>order_item_id</U> (PK)</TD></TR>
+        <TR><TD ALIGN="LEFT">order_id (FK)</TD></TR>
+        <TR><TD ALIGN="LEFT">product_id (FK)</TD></TR>
+        <TR><TD ALIGN="LEFT">quantity, total_price</TD></TR>
+      </TABLE>>];
+
+    OrderStatusHistory [label=<
+      <TABLE BORDER="1" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="white">
+        <TR><TD BGCOLOR="#EFEFEF"><B>OrderStatusHistory</B></TD></TR>
+        <TR><TD ALIGN="LEFT"><U>id</U> (PK)</TD></TR>
+        <TR><TD ALIGN="LEFT">order_id (FK)</TD></TR>
+        <TR><TD ALIGN="LEFT">status, timestamp</TD></TR>
+      </TABLE>>];
+
+    ReturnRequest [label=<
+      <TABLE BORDER="1" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="white">
+        <TR><TD BGCOLOR="#EFEFEF"><B>ReturnRequest</B></TD></TR>
+        <TR><TD ALIGN="LEFT"><U>id</U> (PK)</TD></TR>
+        <TR><TD ALIGN="LEFT">order_id (FK)</TD></TR>
+        <TR><TD ALIGN="LEFT">customer_id (FK)</TD></TR>
+        <TR><TD ALIGN="LEFT">type, status</TD></TR>
+      </TABLE>>];
+
+    Complaint [label=<
+      <TABLE BORDER="1" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="white">
+        <TR><TD BGCOLOR="#EFEFEF"><B>Complaint</B></TD></TR>
+        <TR><TD ALIGN="LEFT"><U>id</U> (PK)</TD></TR>
+        <TR><TD ALIGN="LEFT">customer_id (FK)</TD></TR>
+        <TR><TD ALIGN="LEFT">order_id (tham chiếu mềm)</TD></TR>
+        <TR><TD ALIGN="LEFT">assigned_to_id (FK)</TD></TR>
+        <TR><TD ALIGN="LEFT">status, priority</TD></TR>
+      </TABLE>>];
+
+    ProductReview [label=<
+      <TABLE BORDER="1" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="white">
+        <TR><TD BGCOLOR="#EFEFEF"><B>ProductReview</B></TD></TR>
+        <TR><TD ALIGN="LEFT"><U>id</U> (PK)</TD></TR>
+        <TR><TD ALIGN="LEFT">product_id (FK)</TD></TR>
+        <TR><TD ALIGN="LEFT">customer_id (FK)</TD></TR>
+        <TR><TD ALIGN="LEFT">rating</TD></TR>
+      </TABLE>>];
+  }
+
+  // ============================================================
+  // NHÓM 2 - MUA HÀNG (Purchasing)
+  // ============================================================
+  subgraph cluster_purchasing {
+    label="Nhóm Mua Hàng";
+    fontsize=14; fontname="Arial Bold"; labelloc=t; style=solid; color="#333333"; margin=20;
+
+    Supplier [label=<
+      <TABLE BORDER="1" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="white">
+        <TR><TD BGCOLOR="#EFEFEF"><B>Supplier</B></TD></TR>
+        <TR><TD ALIGN="LEFT"><U>code</U> (PK)</TD></TR>
+        <TR><TD ALIGN="LEFT">name, status</TD></TR>
+      </TABLE>>];
+
+    PurchaseOrder [label=<
+      <TABLE BORDER="1" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="white">
+        <TR><TD BGCOLOR="#EFEFEF"><B>PurchaseOrder</B></TD></TR>
+        <TR><TD ALIGN="LEFT"><U>id</U> (PK)</TD></TR>
+        <TR><TD ALIGN="LEFT">po_number</TD></TR>
+        <TR><TD ALIGN="LEFT">supplier_code (FK)</TD></TR>
+        <TR><TD ALIGN="LEFT">status, total_amount</TD></TR>
+      </TABLE>>];
+
+    PurchaseOrderItem [label=<
+      <TABLE BORDER="1" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="white">
+        <TR><TD BGCOLOR="#EFEFEF"><B>PurchaseOrderItem</B></TD></TR>
+        <TR><TD ALIGN="LEFT"><U>id</U> (PK)</TD></TR>
+        <TR><TD ALIGN="LEFT">po_id (FK)</TD></TR>
+        <TR><TD ALIGN="LEFT">product_id (FK)</TD></TR>
+        <TR><TD ALIGN="LEFT">quantity, unit_cost</TD></TR>
+      </TABLE>>];
+
+    PurchaseOrderStatusHistory [label=<
+      <TABLE BORDER="1" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="white">
+        <TR><TD BGCOLOR="#EFEFEF"><B>PurchaseOrderStatusHistory</B></TD></TR>
+        <TR><TD ALIGN="LEFT"><U>id</U> (PK)</TD></TR>
+        <TR><TD ALIGN="LEFT">po_id (FK)</TD></TR>
+        <TR><TD ALIGN="LEFT">status, timestamp</TD></TR>
+      </TABLE>>];
+
+    GoodsReceipt [label=<
+      <TABLE BORDER="1" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="white">
+        <TR><TD BGCOLOR="#EFEFEF"><B>GoodsReceipt</B></TD></TR>
+        <TR><TD ALIGN="LEFT"><U>id</U> (PK)</TD></TR>
+        <TR><TD ALIGN="LEFT">po_id (FK)</TD></TR>
+        <TR><TD ALIGN="LEFT">received_warehouse_id (FK)</TD></TR>
+        <TR><TD ALIGN="LEFT">status</TD></TR>
+      </TABLE>>];
+
+    QcInspection [label=<
+      <TABLE BORDER="1" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="white">
+        <TR><TD BGCOLOR="#EFEFEF"><B>QcInspection</B></TD></TR>
+        <TR><TD ALIGN="LEFT"><U>id</U> (PK)</TD></TR>
+        <TR><TD ALIGN="LEFT">receipt_id (FK)</TD></TR>
+        <TR><TD ALIGN="LEFT">inspector_id (FK)</TD></TR>
+        <TR><TD ALIGN="LEFT">status</TD></TR>
+      </TABLE>>];
+
+    VendorBill [label=<
+      <TABLE BORDER="1" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="white">
+        <TR><TD BGCOLOR="#EFEFEF"><B>VendorBill</B></TD></TR>
+        <TR><TD ALIGN="LEFT"><U>id</U> (PK)</TD></TR>
+        <TR><TD ALIGN="LEFT">po_id (FK)</TD></TR>
+        <TR><TD ALIGN="LEFT">supplier_code (FK)</TD></TR>
+        <TR><TD ALIGN="LEFT">status, amount_due</TD></TR>
+      </TABLE>>];
+  }
+
+  // ============================================================
+  // NHÓM 3 - KHO & LẮP RÁP (Warehouse & Assembly)
+  // ============================================================
+  subgraph cluster_warehouse {
+    label="Nhóm Kho & Lắp Ráp";
+    fontsize=14; fontname="Arial Bold"; labelloc=t; style=solid; color="#333333"; margin=20;
+
+    Product [label=<
+      <TABLE BORDER="1" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="white">
+        <TR><TD BGCOLOR="#EFEFEF"><B>Product</B></TD></TR>
+        <TR><TD ALIGN="LEFT"><U>product_id</U> (PK)</TD></TR>
+        <TR><TD ALIGN="LEFT">name, price</TD></TR>
+        <TR><TD ALIGN="LEFT">stock_quantity</TD></TR>
+      </TABLE>>];
+
+    Warehouse [label=<
+      <TABLE BORDER="1" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="white">
+        <TR><TD BGCOLOR="#EFEFEF"><B>Warehouse</B></TD></TR>
+        <TR><TD ALIGN="LEFT"><U>id</U> (PK)</TD></TR>
+        <TR><TD ALIGN="LEFT">name, address</TD></TR>
+      </TABLE>>];
+
+    Inventory [label=<
+      <TABLE BORDER="1" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="white">
+        <TR><TD BGCOLOR="#EFEFEF"><B>Inventory</B></TD></TR>
+        <TR><TD ALIGN="LEFT"><U>id</U> (PK)</TD></TR>
+        <TR><TD ALIGN="LEFT">product_id (FK)</TD></TR>
+        <TR><TD ALIGN="LEFT">warehouse_id (FK)</TD></TR>
+        <TR><TD ALIGN="LEFT">quantity_on_hand</TD></TR>
+      </TABLE>>];
+
+    SerialNumber [label=<
+      <TABLE BORDER="1" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="white">
+        <TR><TD BGCOLOR="#EFEFEF"><B>SerialNumber</B></TD></TR>
+        <TR><TD ALIGN="LEFT"><U>id</U> (PK)</TD></TR>
+        <TR><TD ALIGN="LEFT">product_id (FK)</TD></TR>
+        <TR><TD ALIGN="LEFT">order_id (FK, nullable)</TD></TR>
+        <TR><TD ALIGN="LEFT">serial, status</TD></TR>
+      </TABLE>>];
+
+    StockMovement [label=<
+      <TABLE BORDER="1" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="white">
+        <TR><TD BGCOLOR="#EFEFEF"><B>StockMovement</B></TD></TR>
+        <TR><TD ALIGN="LEFT"><U>id</U> (PK)</TD></TR>
+        <TR><TD ALIGN="LEFT">product_id (FK)</TD></TR>
+        <TR><TD ALIGN="LEFT">from/to_warehouse_id (FK)</TD></TR>
+        <TR><TD ALIGN="LEFT">type, quantity</TD></TR>
+      </TABLE>>];
+
+    AssemblyJob [label=<
+      <TABLE BORDER="1" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="white">
+        <TR><TD BGCOLOR="#EFEFEF"><B>AssemblyJob</B></TD></TR>
+        <TR><TD ALIGN="LEFT"><U>job_code</U> (PK)</TD></TR>
+        <TR><TD ALIGN="LEFT">order_id (tham chiếu mềm)</TD></TR>
+        <TR><TD ALIGN="LEFT">status, checklist</TD></TR>
+      </TABLE>>];
+  }
+
+  // ============================================================
+  // NHÓM 4 - NHÂN SỰ & KẾ TOÁN (HR & Accounting)
+  // ============================================================
+  subgraph cluster_hr {
+    label="Nhóm Nhân Sự & Kế Toán";
+    fontsize=14; fontname="Arial Bold"; labelloc=t; style=solid; color="#333333"; margin=20;
+
+    Employee [label=<
+      <TABLE BORDER="1" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="white">
+        <TR><TD BGCOLOR="#EFEFEF"><B>Employee</B></TD></TR>
+        <TR><TD ALIGN="LEFT"><U>id</U> (PK)</TD></TR>
+        <TR><TD ALIGN="LEFT">employee_code</TD></TR>
+        <TR><TD ALIGN="LEFT">full_name, role</TD></TR>
+      </TABLE>>];
+
+    Attendance [label=<
+      <TABLE BORDER="1" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="white">
+        <TR><TD BGCOLOR="#EFEFEF"><B>Attendance</B></TD></TR>
+        <TR><TD ALIGN="LEFT"><U>id</U> (PK)</TD></TR>
+        <TR><TD ALIGN="LEFT">employee_id (FK)</TD></TR>
+        <TR><TD ALIGN="LEFT">date, status</TD></TR>
+      </TABLE>>];
+
+    Payroll [label=<
+      <TABLE BORDER="1" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="white">
+        <TR><TD BGCOLOR="#EFEFEF"><B>Payroll</B></TD></TR>
+        <TR><TD ALIGN="LEFT"><U>id</U> (PK)</TD></TR>
+        <TR><TD ALIGN="LEFT">employee_id (FK)</TD></TR>
+        <TR><TD ALIGN="LEFT">period, net_salary, status</TD></TR>
+      </TABLE>>];
+
+    LedgerEntry [label=<
+      <TABLE BORDER="1" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="white">
+        <TR><TD BGCOLOR="#EFEFEF"><B>LedgerEntry</B></TD></TR>
+        <TR><TD ALIGN="LEFT"><U>id</U> (PK)</TD></TR>
+        <TR><TD ALIGN="LEFT">type, amount</TD></TR>
+        <TR><TD ALIGN="LEFT">reference_id (tham chiếu mềm)</TD></TR>
+      </TABLE>>];
+
+    CompanySettings [label=<
+      <TABLE BORDER="1" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="white">
+        <TR><TD BGCOLOR="#EFEFEF"><B>CompanySettings</B></TD></TR>
+        <TR><TD ALIGN="LEFT"><U>id</U> (PK = 1)</TD></TR>
+        <TR><TD ALIGN="LEFT">sales_commission_flat</TD></TR>
+        <TR><TD ALIGN="LEFT">assembly_bonus</TD></TR>
+      </TABLE>>];
+  }
+
+  // ============================================================
+  // NHÓM 5 - CSKH (Customer Service)
+  // ============================================================
+  subgraph cluster_cskh {
+    label="Nhóm CSKH";
+    fontsize=14; fontname="Arial Bold"; labelloc=t; style=solid; color="#333333"; margin=20;
+
+    ChatSession [label=<
+      <TABLE BORDER="1" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="white">
+        <TR><TD BGCOLOR="#EFEFEF"><B>ChatSession</B></TD></TR>
+        <TR><TD ALIGN="LEFT"><U>session_id</U> (PK)</TD></TR>
+        <TR><TD ALIGN="LEFT">customer_name, status</TD></TR>
+      </TABLE>>];
+
+    ChatMessage [label=<
+      <TABLE BORDER="1" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="white">
+        <TR><TD BGCOLOR="#EFEFEF"><B>ChatMessage</B></TD></TR>
+        <TR><TD ALIGN="LEFT"><U>id</U> (PK)</TD></TR>
+        <TR><TD ALIGN="LEFT">session_id (FK)</TD></TR>
+        <TR><TD ALIGN="LEFT">sender, timestamp</TD></TR>
+      </TABLE>>];
+  }
+
+  // ============================================================
+  // QUAN HỆ (edges) - ký hiệu kép: xlabel "1:N" (loại nhãn duy nhất tương
+  // thích splines=ortho) kèm chân quạ (đuôi "tee" = 1, đầu "crow" = N).
+  // Đường liền = khóa ngoại thật; đường đứt nét = tham chiếu mềm.
+  // ============================================================
+
+  // --- Nội bộ nhóm Bán Hàng ---
+  Customer -> CustomerAddress [xlabel="1:N"];
+  Customer -> Order [xlabel="1:N"];
+  Customer -> ReturnRequest [xlabel="1:N"];
+  Customer -> Complaint [xlabel="1:N"];
+  Customer -> ProductReview [xlabel="1:N"];
+  Order -> OrderItem [xlabel="1:N"];
+  Order -> OrderStatusHistory [xlabel="1:N"];
+  Order -> ReturnRequest [xlabel="1:N"];
+
+  // --- Nội bộ nhóm Mua Hàng ---
+  Supplier -> PurchaseOrder [xlabel="1:N"];
+  Supplier -> VendorBill [xlabel="1:N"];
+  PurchaseOrder -> PurchaseOrderItem [xlabel="1:N"];
+  PurchaseOrder -> PurchaseOrderStatusHistory [xlabel="1:N"];
+  PurchaseOrder -> GoodsReceipt [xlabel="1:N"];
+  PurchaseOrder -> VendorBill [xlabel="1:N"];
+  GoodsReceipt -> QcInspection [xlabel="1:N"];
+
+  // --- Nội bộ nhóm Kho & Lắp Ráp ---
+  Product -> Inventory [xlabel="1:N"];
+  Product -> SerialNumber [xlabel="1:N"];
+  Product -> StockMovement [xlabel="1:N"];
+  Warehouse -> Inventory [xlabel="1:N"];
+  Warehouse -> StockMovement [xlabel="1:N"];
+  Warehouse -> GoodsReceipt [xlabel="1:N"];
+
+  // --- Nội bộ nhóm Nhân Sự ---
+  Employee -> Attendance [xlabel="1:N"];
+  Employee -> Payroll [xlabel="1:N"];
+
+  // --- Nội bộ nhóm CSKH ---
+  ChatSession -> ChatMessage [xlabel="1:N"];
+
+  // --- Quan hệ CHÉO giữa các nhóm (khóa ngoại thật) ---
+  Product -> OrderItem [xlabel="1:N", color="#888888"];
+  Product -> PurchaseOrderItem [xlabel="1:N", color="#888888"];
+  Product -> ProductReview [xlabel="1:N", color="#888888"];
+  Employee -> Order [xlabel="1:N Shipper", color="#888888"];
+  Employee -> QcInspection [xlabel="1:N Inspector", color="#888888"];
+  Employee -> Complaint [xlabel="1:N Xử lý", color="#888888"];
+  Order -> SerialNumber [xlabel="1:N", color="#888888"];
+
+  // --- Tham chiếu mềm (không phải khóa ngoại DB thật) ---
+  Order -> AssemblyJob [xlabel="tham chiếu mềm", style=dashed, color="#999999", dir=forward, arrowhead=vee];
+  Order -> Complaint [xlabel="tham chiếu mềm", style=dashed, color="#999999", dir=forward, arrowhead=vee];
+  Order -> LedgerEntry [xlabel="tham chiếu mềm", style=dashed, color="#999999", dir=forward, arrowhead=vee];
+}
