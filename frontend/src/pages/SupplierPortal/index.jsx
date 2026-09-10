@@ -759,9 +759,23 @@ export default function SupplierPortal() {
                         </div>
                         <p style={{ fontSize: '0.73rem', color: 'var(--text-muted)', marginTop: '0.2rem', margin: '0.2rem 0 0' }}>Ngày tạo: {po.createdAt ? new Date(po.createdAt).toLocaleDateString('vi-VN') : 'N/A'}</p>
                         {po.cancelReason && (
-                          <p style={{ fontSize: '0.72rem', color: 'var(--danger)', marginTop: '0.15rem', fontStyle: 'italic' }}>
-                            Lý do từ chối: {po.cancelReason}
-                          </p>
+                          (() => {
+                            const r = po.cancelReason;
+                            const isCompleted = ['DONE', 'COMPLETED', 'RECEIVED'].includes(po.status);
+                            const isQaNotice = r.startsWith('[THÔNG BÁO QA/QC') || r.startsWith('[THÔNG BÁO HOÀN TRẢ') || r.startsWith('[THÔNG BÁO TỪ CHỐI');
+                            if (!isQaNotice) return null;
+                            const isReturn = !isCompleted && (r.startsWith('[THÔNG BÁO HOÀN TRẢ') || r.startsWith('[THÔNG BÁO TỪ CHỐI'));
+                            const cleanMsg = r.replace(/^\[[^\]]*\]:\s*/, '');
+                            return isReturn ? (
+                              <p style={{ fontSize: '0.72rem', color: '#c2410c', marginTop: '0.15rem', fontStyle: 'italic' }}>
+                                ⚠️ {cleanMsg}
+                              </p>
+                            ) : (
+                              <p style={{ fontSize: '0.72rem', color: '#15803d', marginTop: '0.15rem', fontStyle: 'italic' }}>
+                                ✅ {cleanMsg}
+                              </p>
+                            );
+                          })()
                         )}
                       </div>
                       <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.35rem' }}>
@@ -1276,9 +1290,27 @@ export default function SupplierPortal() {
             )}
 
             {selectedPO.cancelReason && (
-              <div style={{ padding: '0.75rem 1rem', backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', marginBottom: '1.5rem', fontSize: '0.85rem', color: '#dc2626' }}>
-                Lý do từ chối: <strong>{selectedPO.cancelReason}</strong>
-              </div>
+              (() => {
+                const r = selectedPO.cancelReason;
+                const isCompleted = ['DONE', 'COMPLETED', 'RECEIVED'].includes(selectedPO.status);
+                const isQaNotice = r.startsWith('[THÔNG BÁO QA/QC') || r.startsWith('[THÔNG BÁO HOÀN TRẢ') || r.startsWith('[THÔNG BÁO TỪ CHỐI');
+                const isReturn = !isCompleted && (r.startsWith('[THÔNG BÁO HOÀN TRẢ') || r.startsWith('[THÔNG BÁO TỪ CHỐI'));
+                const label = isReturn ? 'Thông báo hoàn trả NCC' : 'Thông báo QA/QC - Đạt chuẩn';
+                const bgColor = isReturn ? '#fff7ed' : '#f0fdf4';
+                const borderColor = isReturn ? '#fed7aa' : '#86efac';
+                const textColor = isReturn ? '#c2410c' : '#15803d';
+                const cleanMsg = r.replace(/^\[[^\]]*\]:\s*/, '');
+                return isQaNotice ? (
+                  <div style={{ padding: '0.75rem 1rem', backgroundColor: bgColor, border: `1px solid ${borderColor}`, borderRadius: '8px', marginBottom: '1.5rem', fontSize: '0.85rem', color: textColor, display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
+                    <span>{isReturn ? '⚠️' : '✅'}</span>
+                    <span><strong>{label}:</strong> {cleanMsg}</span>
+                  </div>
+                ) : (
+                  <div style={{ padding: '0.75rem 1rem', backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', marginBottom: '1.5rem', fontSize: '0.85rem', color: '#dc2626' }}>
+                    Lý do từ chối: <strong>{r}</strong>
+                  </div>
+                );
+              })()
             )}
 
             {/* Modal Actions */}

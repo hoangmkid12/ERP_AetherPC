@@ -8,10 +8,10 @@ frontend/dist/
 dist/
 build/
 
-# Local environment variables and secrets
-backend/.env
-frontend/.env
-.env
+# Local environment variables and secrets (uncommented to push with project)
+# backend/.env
+# frontend/.env
+# .env
 .env.local
 .env.development.local
 .env.test.local
@@ -62,10 +62,6 @@ scratch/
 backend/logs/
 backend/email_logs.json
 
-# Database backups (pg_dump) — real data, not source; keep the file on disk for
-# zip/manual transfer between machines, but don't let it bloat git history.
-# No leading slash + slash in the middle would otherwise anchor this to the
-# repo root only (backup-db.ps1 actually writes to backend/backups/) — the
-# leading **/ makes it match backups/ at any depth.
-**/backups/*.dump
+# Database backups (pg_dump) — included in git to preserve database state across clones
+# **/backups/*.dump
 

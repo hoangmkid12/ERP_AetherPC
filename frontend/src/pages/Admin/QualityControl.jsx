@@ -431,7 +431,11 @@ export default function QualityControl() {
         ? `Lô hàng ${selectedPO.poNumber || poId} nghiệm thu NHẬP MỘT PHẦN: Đã nhận ${passedQty}/${totalQty} SP đạt chuẩn. Phát hiện ${failedQty}/${totalQty} SP lỗi (${DEFECT_LABELS[defectCategory] || defectCategory}). Đề nghị NCC nhận lại ${failedQty} SP lỗi!`
         : `Lô hàng ${selectedPO.poNumber || poId} KHÔNG ĐẠT CHẤT LƯỢNG (${failedQty}/${totalQty} SP lỗi: ${DEFECT_LABELS[defectCategory] || defectCategory}). Yêu cầu NCC nhận lại 100% lô hàng!`;
 
-    const supplierNote = `[THÔNG BÁO HOÀN TRẢ NCC - QA/QC]: ${nccNoticeText}`;
+    const supplierNote = targetStatus === 'QA_PASSED'
+      ? `[THÔNG BÁO QA/QC - ĐẠT CHUẨN]: ${nccNoticeText}`
+      : targetStatus === 'QA_PARTIAL'
+        ? `[THÔNG BÁO HOÀN TRẢ NCC - QA/QC]: ${nccNoticeText}`
+        : `[THÔNG BÁO TỪ CHỐI LÔ HÀNG - QA/QC]: ${nccNoticeText}`;
     const updatedPO = { 
       ...selectedPO, 
       status: targetStatus, 

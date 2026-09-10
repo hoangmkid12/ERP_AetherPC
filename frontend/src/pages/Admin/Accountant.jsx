@@ -49,18 +49,23 @@ export default function Accountant() {
   };
 
   const orders = useSalesStore(state => state.orders) || [];
+  const getOrders = useSalesStore(state => state.getOrders);
   const ledger = useFinanceStore(state => state.ledger) || [];
+  const getLedger = useFinanceStore(state => state.getLedger);
   const purchaseOrders = useFinanceStore(state => state.purchaseOrders) || [];
   const addLedgerEntry = useFinanceStore(state => state.addLedgerEntry);
   const disbursePayroll = useFinanceStore(state => state.disbursePayroll);
   const disburseAllPayrolls = useFinanceStore(state => state.disburseAllPayrolls);
   const employees = useHRStore(state => state.employees) || [];
+  const getEmployees = useHRStore(state => state.getEmployees);
   const payrolls = useHRStore(state => state.payrolls) || [];
+  const getPayrolls = useHRStore(state => state.getPayrolls);
   const returnRequests = useSalesStore(state => state.returnRequests) || [];
   const updateReturnStatus = useSalesStore(state => state.updateReturnStatus);
   const getReturnRequests = useSalesStore(state => state.getReturnRequests);
 
   const [allPOs, setAllPOs] = useState([]);
+  const [loadingLedger, setLoadingLedger] = useState(false);
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('ALL');
   
@@ -98,9 +103,53 @@ export default function Accountant() {
     }
   };
 
+  const fetchLedgerData = async () => {
+    if (typeof getLedger !== 'function') return;
+    setLoadingLedger(true);
+    try {
+      await getLedger();
+    } catch (e) {
+      console.warn('Accountant ledger fetch error:', e);
+    } finally {
+      setLoadingLedger(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchBackendPOs();
+    fetchLedgerData();
+    if (typeof getOrders === 'function') getOrders().catch(() => {});
+    if (typeof getReturnRequests === 'function') getReturnRequests().catch(() => {});
+    if (typeof getPayrolls === 'function') getPayrolls().catch(() => {});
+    if (typeof getEmployees === 'function') getEmployees().catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === 'ledger') {
+      fetchLedgerData();
+    }
+  }, [activeTab]);
+
   useEffect(() => {
     fetchBackendPOs();
   }, [purchaseOrders]);
+
+  const formatLedgerDate = (dateStr) => {
+    if (!dateStr) return '—';
+    try {
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return dateStr;
+      return d.toLocaleString('vi-VN', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch (_) {
+      return dateStr;
+    }
+  };
 
   const fmt = (price) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price || 0);
 
@@ -252,7 +301,17 @@ export default function Accountant() {
         tx.description?.toLowerCase().includes(q) || 
         tx.referenceId?.toLowerCase().includes(q) || 
         tx.type?.toLowerCase().includes(q);
-      const matchType = typeFilter === 'ALL' || tx.type === typeFilter;
+      
+      let matchType = true;
+      if (typeFilter === 'INCOME') {
+        matchType = tx.type === 'INCOME';
+      } else if (typeFilter === 'EXPENSE') {
+        matchType = tx.type === 'EXPENSE' || tx.type === 'REFUND';
+      } else if (typeFilter === 'EXPENSE_PAYROLL') {
+        matchType = tx.type === 'EXPENSE' && (tx.referenceId?.startsWith('PAYROLL-') || tx.description?.toLowerCase().includes('lương'));
+      } else if (typeFilter === 'REFUND') {
+        matchType = tx.type === 'REFUND' || tx.referenceId?.startsWith('REFUND-') || tx.description?.toLowerCase().includes('hoàn tiền');
+      }
       return matchSearch && matchType;
     });
   }, [ledger, search, typeFilter]);
@@ -325,6 +384,7 @@ export default function Accountant() {
       if (res?.success) {
         notify(`Đã giải ngân thành công cho hóa đơn ${bill.billNumber}. Bút toán đã được ghi nhận vào Sổ Cái.`, 'success');
         await fetchBackendPOs();
+        await fetchLedgerData();
       } else {
         notify(res?.message || 'Không thể ghi nhận thanh toán — máy chủ từ chối yêu cầu.', 'error');
       }
@@ -454,6 +514,7 @@ export default function Accountant() {
       // Gọi thêm addLedgerEntry ở đây sẽ ghi trùng 2 lần cho cùng 1 lần hoàn tiền.
 
       notify(`Đã hoàn tiền và ghi sổ cái thành công. Số tiền: ${fmt(finalAmount)}. Người nhận: ${refundModalItem.customerName}. Mã GD: ${txnCode}. Bút toán chi phí đã được ghi nhận tự động vào Sổ Cái Kế Toán.`, 'success');
+      await fetchLedgerData();
       setRefundModalItem(null);
       setRefundTxnCode('');
       setRefundNote('');
@@ -501,25 +562,48 @@ export default function Accountant() {
         </div>
 
         {activeTab === 'ledger' && (
-          <button
-            onClick={() => setShowManualModal(true)}
-            style={{
-              backgroundColor: '#2563eb',
-              color: '#ffffff',
-              border: 'none',
-              borderRadius: '6px',
-              padding: '0.45rem 1rem',
-              fontSize: '0.8rem',
-              fontWeight: 700,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.35rem'
-            }}
-          >
-            <PlusCircle size={16} />
-            <span>Thêm Phiếu Thu / Chi</span>
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <button
+              onClick={fetchLedgerData}
+              disabled={loadingLedger}
+              title="Tải lại toàn bộ dữ liệu sổ cái từ máy chủ"
+              style={{
+                backgroundColor: '#ffffff',
+                color: '#334155',
+                border: '1px solid #cbd5e1',
+                borderRadius: '6px',
+                padding: '0.45rem 0.85rem',
+                fontSize: '0.8rem',
+                fontWeight: 600,
+                cursor: loadingLedger ? 'default' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.35rem'
+              }}
+            >
+              <RefreshCw size={14} style={{ animation: loadingLedger ? 'spin 1s linear infinite' : 'none' }} />
+              <span>{loadingLedger ? 'Đang tải...' : 'Làm Mới'}</span>
+            </button>
+            <button
+              onClick={() => setShowManualModal(true)}
+              style={{
+                backgroundColor: '#2563eb',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '6px',
+                padding: '0.45rem 1rem',
+                fontSize: '0.8rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.35rem'
+              }}
+            >
+              <PlusCircle size={16} />
+              <span>Thêm Phiếu Thu / Chi</span>
+            </button>
+          </div>
         )}
 
         {activeTab === 'reports' && (
@@ -1026,60 +1110,110 @@ export default function Accountant() {
                 <option value="INCOME">Thu tiền (+) (Bán hàng, Khác)</option>
                 <option value="EXPENSE">Chi tiền (-) (Mua hàng, Vận hành)</option>
                 <option value="EXPENSE_PAYROLL">Chi lương nhân viên (-)</option>
+                <option value="REFUND">Chi hoàn tiền khách hàng (-)</option>
               </select>
             </div>
           </div>
 
-          <div style={{ overflowX: 'auto' }}>
+          <div style={{ overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
               <thead>
                 <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569' }}>
-                  <th style={{ padding: '0.65rem 0.85rem' }}>Mã Bút Toán</th>
-                  <th style={{ padding: '0.65rem 0.85rem' }}>Thời Gian</th>
-                  <th style={{ padding: '0.65rem 0.85rem' }}>Loại Giao Dịch</th>
-                  <th style={{ padding: '0.65rem 0.85rem' }}>Nội Dung Thu / Chi</th>
-                  <th style={{ padding: '0.65rem 0.85rem', textAlign: 'right' }}>Số Tiền</th>
-                  <th style={{ padding: '0.65rem 0.85rem', textAlign: 'center' }}>Thao Tác</th>
+                  <th style={{ padding: '0.75rem 1rem', width: '160px', whiteSpace: 'nowrap' }}>Mã Bút Toán</th>
+                  <th style={{ padding: '0.75rem 1rem', width: '150px', whiteSpace: 'nowrap' }}>Thời Gian</th>
+                  <th style={{ padding: '0.75rem 1rem', width: '130px', whiteSpace: 'nowrap', textAlign: 'center' }}>Loại Giao Dịch</th>
+                  <th style={{ padding: '0.75rem 1rem', minWidth: '320px' }}>Nội Dung Thu / Chi</th>
+                  <th style={{ padding: '0.75rem 1rem', width: '160px', textAlign: 'right', whiteSpace: 'nowrap' }}>Số Tiền</th>
+                  <th style={{ padding: '0.75rem 1rem', width: '110px', textAlign: 'center', whiteSpace: 'nowrap' }}>Thao Tác</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredLedger.map((tx, tIdx) => {
-                  const isIncome = tx.type === 'INCOME';
-                  return (
-                    <tr key={tx.id || tIdx} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                      <td style={{ padding: '0.65rem 0.85rem', fontWeight: 700, color: '#2563eb' }}>
-                        #{tx.referenceId || tx.id || `TX-${tIdx + 100}`}
-                      </td>
-                      <td style={{ padding: '0.65rem 0.85rem', color: '#64748b' }}>{tx.date || '18/08/2026'}</td>
-                      <td style={{ padding: '0.65rem 0.85rem' }}>
-                        <span style={{
-                          padding: '2px 8px',
-                          borderRadius: '4px',
-                          fontSize: '0.7rem',
-                          fontWeight: 800,
-                          backgroundColor: isIncome ? '#f0fdf4' : '#fef2f2',
-                          color: isIncome ? '#16a34a' : '#dc2626'
-                        }}>
-                          {isIncome ? '▲ Thu Tiền' : '▼ Chi Tiền'}
-                        </span>
-                      </td>
-                      <td style={{ padding: '0.65rem 0.85rem', color: '#0f172a', fontWeight: 500 }}>
-                        {tx.description || 'Giao dịch thu chi'}
-                      </td>
-                      <td style={{ padding: '0.65rem 0.85rem', textAlign: 'right', fontWeight: 800, color: isIncome ? '#16a34a' : '#dc2626', fontSize: '0.88rem' }}>
-                        {isIncome ? `+${fmt(tx.amount)}` : `-${fmt(tx.amount)}`}
-                      </td>
-                      <td style={{ padding: '0.65rem 0.85rem', textAlign: 'center' }}>
-                        <button
-                          onClick={() => setViewingTxDetail(tx)}
-                          style={{ backgroundColor: '#ffffff', color: '#2563eb', border: '1px solid #bfdbfe', borderRadius: '4px', padding: '0.25rem 0.5rem', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}
-                        >
-                          Chứng Từ
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
+                {loadingLedger ? (
+                  <tr>
+                    <td colSpan={6} style={{ textAlign: 'center', padding: '2.5rem', color: '#64748b' }}>
+                      <RefreshCw size={24} style={{ display: 'block', margin: '0 auto 0.5rem', animation: 'spin 1s linear infinite' }} />
+                      Đang tải danh sách bút toán sổ cái...
+                    </td>
+                  </tr>
+                ) : filteredLedger.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} style={{ textAlign: 'center', padding: '2.5rem', color: '#64748b' }}>
+                      <FileText size={32} style={{ color: '#94a3b8', display: 'block', margin: '0 auto 0.5rem' }} />
+                      Không tìm thấy bút toán nào trong sổ cái kế toán
+                    </td>
+                  </tr>
+                ) : (
+                  filteredLedger.map((tx, tIdx) => {
+                    const isIncome = tx.type === 'INCOME';
+                    const isRefund = tx.type === 'REFUND';
+                    const amt = parseFloat(tx.amount || 0);
+                    const displayCode = tx.referenceId 
+                      ? (tx.referenceId.startsWith('#') ? tx.referenceId : `#${tx.referenceId}`)
+                      : (tx.id?.length > 12 ? `#BT-${tx.id.slice(0, 8).toUpperCase()}` : `#${tx.id || `TX-${tIdx + 100}`}`);
+
+                    return (
+                      <tr
+                        key={tx.id || tIdx}
+                        style={{ borderBottom: '1px solid #f1f5f9', transition: 'background-color 0.15s ease' }}
+                        onMouseEnter={e => e.currentTarget.style.backgroundColor = '#f8fafc'}
+                        onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                      >
+                        <td style={{ padding: '0.75rem 1rem', whiteSpace: 'nowrap', verticalAlign: 'middle' }}>
+                          <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#2563eb', fontSize: '0.82rem', backgroundColor: '#eff6ff', padding: '3px 8px', borderRadius: '4px', border: '1px solid #dbeafe', display: 'inline-block' }}>
+                            {displayCode}
+                          </span>
+                        </td>
+                        <td style={{ padding: '0.75rem 1rem', color: '#475569', whiteSpace: 'nowrap', verticalAlign: 'middle', fontSize: '0.8rem' }}>
+                          {formatLedgerDate(tx.date || tx.createdAt)}
+                        </td>
+                        <td style={{ padding: '0.75rem 1rem', textAlign: 'center', whiteSpace: 'nowrap', verticalAlign: 'middle' }}>
+                          <span style={{
+                            padding: '3px 8px',
+                            borderRadius: '4px',
+                            fontSize: '0.7rem',
+                            fontWeight: 800,
+                            display: 'inline-block',
+                            backgroundColor: isIncome ? '#f0fdf4' : isRefund ? '#fff7ed' : '#fef2f2',
+                            color: isIncome ? '#16a34a' : isRefund ? '#ea580c' : '#dc2626',
+                            border: `1px solid ${isIncome ? '#bbf7d0' : isRefund ? '#fed7aa' : '#fecaca'}`
+                          }}>
+                            {isIncome ? '▲ Thu Tiền' : isRefund ? '▼ Hoàn Tiền' : '▼ Chi Tiền'}
+                          </span>
+                        </td>
+                        <td style={{ padding: '0.75rem 1rem', color: '#0f172a', fontWeight: 500, verticalAlign: 'middle', lineHeight: '1.45' }}>
+                          {tx.description || 'Giao dịch thu chi'}
+                        </td>
+                        <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 800, color: isIncome ? '#16a34a' : isRefund ? '#ea580c' : '#dc2626', fontSize: '0.9rem', whiteSpace: 'nowrap', verticalAlign: 'middle' }}>
+                          {isIncome ? `+${fmt(amt)}` : `-${fmt(amt)}`}
+                        </td>
+                        <td style={{ padding: '0.75rem 1rem', textAlign: 'center', whiteSpace: 'nowrap', verticalAlign: 'middle' }}>
+                          <button
+                            onClick={() => setViewingTxDetail(tx)}
+                            style={{
+                              backgroundColor: '#ffffff',
+                              color: '#2563eb',
+                              border: '1px solid #bfdbfe',
+                              borderRadius: '6px',
+                              padding: '0.3rem 0.65rem',
+                              fontSize: '0.74rem',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.3rem',
+                              transition: 'all 0.15s ease'
+                            }}
+                            onMouseEnter={e => { e.currentTarget.style.backgroundColor = '#eff6ff'; e.currentTarget.style.borderColor = '#93c5fd'; }}
+                            onMouseLeave={e => { e.currentTarget.style.backgroundColor = '#ffffff'; e.currentTarget.style.borderColor = '#bfdbfe'; }}
+                          >
+                            <FileText size={13} />
+                            <span>Chứng Từ</span>
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
               </tbody>
             </table>
           </div>
@@ -1432,30 +1566,157 @@ export default function Accountant() {
 
       {/* ================= MODAL: XEM CHỨNG TỪ SỔ CÁI ================= */}
       {viewingTxDetail && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(6px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', width: '100%', maxWidth: '520px', padding: '1.75rem', maxHeight: '90vh', overflowY: 'auto' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.75rem' }}>
-              <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>Chứng Từ Kế Toán #{viewingTxDetail.id || 'TX-101'}</h3>
-              <button onClick={() => setViewingTxDetail(null)} style={{ background: '#f1f5f9', border: 'none', padding: '0.4rem', borderRadius: '6px', cursor: 'pointer' }}><X size={18} /></button>
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(6px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', width: '100%', maxWidth: '560px', padding: '1.75rem', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)' }}>
+            
+            {/* Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #e2e8f0', paddingBottom: '0.85rem', marginBottom: '1.25rem' }}>
+              <div>
+                <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  CÔNG TY TNHH CÔNG NGHỆ AETHERPC • PHÒNG TÀI CHÍNH KẾ TOÁN
+                </div>
+                <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#0f172a', margin: '0.2rem 0 0' }}>
+                  CHỨNG TỪ KẾ TOÁN
+                </h3>
+                <div style={{ fontSize: '0.78rem', color: '#2563eb', fontWeight: 700, marginTop: '2px' }}>
+                  Số bút toán: <span style={{ fontFamily: 'monospace' }}>#{viewingTxDetail.referenceId || (viewingTxDetail.id?.length > 12 ? `BT-${viewingTxDetail.id.slice(0, 8).toUpperCase()}` : viewingTxDetail.id || 'TX-101')}</span>
+                </div>
+              </div>
+              <button
+                onClick={() => setViewingTxDetail(null)}
+                style={{ background: '#f1f5f9', border: 'none', padding: '0.4rem', borderRadius: '6px', cursor: 'pointer', color: '#64748b' }}
+                title="Đóng"
+              >
+                <X size={18} />
+              </button>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', fontSize: '0.82rem' }}>
-              <div><strong>Mã tham chiếu:</strong> <code style={{ color: '#2563eb' }}>{viewingTxDetail.referenceId || viewingTxDetail.id}</code></div>
-              <div><strong>Ngày hạch toán:</strong> {viewingTxDetail.date || '18/08/2026'}</div>
-              <div><strong>Loại nghiệp vụ:</strong> <span style={{ fontWeight: 800, color: viewingTxDetail.type === 'INCOME' ? '#16a34a' : '#dc2626' }}>{viewingTxDetail.type}</span></div>
-              <div><strong>Nội dung:</strong> {viewingTxDetail.description}</div>
-              <div><strong>Số tiền ghi sổ:</strong> <strong style={{ fontSize: '1.1rem', color: viewingTxDetail.type === 'INCOME' ? '#16a34a' : '#dc2626' }}>{fmt(viewingTxDetail.amount)}</strong></div>
-              <div><strong>Người lập biểu:</strong> Kế Toán Viên (AetherPC Accounting)</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', fontSize: '0.82rem' }}>
+              
+              {/* Highlight Amount Banner */}
+              {(() => {
+                const isIncome = viewingTxDetail.type === 'INCOME';
+                const isRefund = viewingTxDetail.type === 'REFUND';
+                const amt = parseFloat(viewingTxDetail.amount || 0);
+                const bannerBg = isIncome ? '#f0fdf4' : isRefund ? '#fff7ed' : '#fef2f2';
+                const bannerBorder = isIncome ? '#86efac' : isRefund ? '#fed7aa' : '#fca5a5';
+                const textColor = isIncome ? '#16a34a' : isRefund ? '#ea580c' : '#dc2626';
+                const badgeLabel = isIncome ? '▲ Thu Tiền (INCOME)' : isRefund ? '▼ Hoàn Tiền (REFUND)' : '▼ Chi Tiền (EXPENSE)';
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
+                return (
+                  <div style={{
+                    padding: '0.9rem 1.1rem',
+                    backgroundColor: bannerBg,
+                    border: `1px solid ${bannerBorder}`,
+                    borderRadius: '8px',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                  }}>
+                    <div>
+                      <div style={{ fontSize: '0.72rem', fontWeight: 800, color: isIncome ? '#15803d' : isRefund ? '#c2410c' : '#991b1b', textTransform: 'uppercase' }}>
+                        {isIncome ? 'Số Tiền Thực Thu (+)' : isRefund ? 'Số Tiền Hoàn Trả (-)' : 'Số Tiền Thực Chi (-)'}
+                      </div>
+                      <div style={{ fontSize: '1.4rem', fontWeight: 900, color: textColor, marginTop: '0.15rem' }}>
+                        {isIncome ? `+${fmt(amt)}` : `-${fmt(amt)}`}
+                      </div>
+                    </div>
+                    <span style={{
+                      padding: '4px 10px',
+                      borderRadius: '6px',
+                      fontSize: '0.75rem',
+                      fontWeight: 800,
+                      backgroundColor: '#ffffff',
+                      border: `1px solid ${bannerBorder}`,
+                      color: textColor
+                    }}>
+                      {badgeLabel}
+                    </span>
+                  </div>
+                );
+              })()}
+
+              {/* Information Grid */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: '0.75rem 1rem',
+                backgroundColor: '#f8fafc',
+                padding: '1rem',
+                borderRadius: '8px',
+                border: '1px solid #e2e8f0'
+              }}>
+                <div>
+                  <span style={{ color: '#64748b', display: 'block', fontSize: '0.75rem' }}>Mã tham chiếu nghiệp vụ:</span>
+                  <code style={{ color: '#2563eb', fontWeight: 800, fontSize: '0.85rem' }}>{viewingTxDetail.referenceId || 'N/A'}</code>
+                </div>
+                <div>
+                  <span style={{ color: '#64748b', display: 'block', fontSize: '0.75rem' }}>Thời gian hạch toán:</span>
+                  <strong style={{ color: '#0f172a' }}>{formatLedgerDate(viewingTxDetail.date || viewingTxDetail.createdAt)}</strong>
+                </div>
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <span style={{ color: '#64748b', display: 'block', fontSize: '0.75rem' }}>Diễn giải nội dung thu / chi:</span>
+                  <div style={{ color: '#0f172a', fontWeight: 600, marginTop: '0.25rem', lineHeight: '1.45', backgroundColor: '#ffffff', padding: '0.5rem 0.75rem', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+                    {viewingTxDetail.description || 'Giao dịch thu chi kế toán'}
+                  </div>
+                </div>
+                <div>
+                  <span style={{ color: '#64748b', display: 'block', fontSize: '0.75rem' }}>Người lập biểu:</span>
+                  <strong style={{ color: '#0f172a' }}>Kế Toán Viên (AetherPC Accounting)</strong>
+                </div>
+                <div>
+                  <span style={{ color: '#64748b', display: 'block', fontSize: '0.75rem' }}>Trạng thái ghi sổ:</span>
+                  <span style={{ color: '#16a34a', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                    <CheckCircle size={14} /> Đã Hạch Toán Sổ Cái
+                  </span>
+                </div>
+                {viewingTxDetail.id && viewingTxDetail.id.length > 12 && (
+                  <div style={{ gridColumn: '1 / -1', borderTop: '1px dashed #cbd5e1', paddingTop: '0.5rem', fontSize: '0.72rem', color: '#94a3b8' }}>
+                    Mã định danh hệ thống (UUID): <span style={{ fontFamily: 'monospace' }}>{viewingTxDetail.id}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Action Buttons */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.5rem', borderTop: '1px solid #e2e8f0', paddingTop: '0.85rem' }}>
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  style={{
+                    backgroundColor: '#ffffff',
+                    color: '#0f172a',
+                    border: '1px solid #cbd5e1',
+                    borderRadius: '6px',
+                    padding: '0.45rem 0.85rem',
+                    fontSize: '0.78rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.35rem'
+                  }}
+                >
+                  <Printer size={15} />
+                  <span>In Chứng Từ</span>
+                </button>
                 <button
                   type="button"
                   onClick={() => setViewingTxDetail(null)}
-                  style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.45rem 1.25rem', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}
+                  style={{
+                    backgroundColor: '#2563eb',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '6px',
+                    padding: '0.45rem 1.25rem',
+                    fontSize: '0.8rem',
+                    fontWeight: 700,
+                    cursor: 'pointer'
+                  }}
                 >
                   Đóng
                 </button>
               </div>
+
             </div>
 
           </div>

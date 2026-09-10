@@ -1,5 +1,6 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import { api } from '../services/api';
+import { initializeAllStores } from '../stores';
 
 const AuthContext = createContext(null);
 
@@ -17,6 +18,7 @@ export const AuthProvider = ({ children }) => {
         const response = await api.get('/auth/me');
         if (active && response && response.user) {
           setUser(response.user);
+          initializeAllStores().catch(() => {});
         }
       } catch (e) {
         if (active) setUser(null);
@@ -89,6 +91,7 @@ export const AuthProvider = ({ children }) => {
         : { ...response.user, role: response.user.role || 'CUSTOMER' };
 
       setUser(userObj);
+      initializeAllStores().catch(() => {});
       setLoading(false);
       return userObj;
     } catch (error) {

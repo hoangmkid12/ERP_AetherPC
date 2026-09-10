@@ -146,7 +146,7 @@ export default function Login() {
       alignItems: 'center',
       justifyContent: 'center',
       padding: '2.5rem 1.5rem',
-      backgroundColor: '#f8fafc',
+      backgroundColor: '#f1f5f9',
       backgroundImage: 'radial-gradient(#cbd5e1 1px, transparent 1px)',
       backgroundSize: '24px 24px',
       position: 'relative'
@@ -190,68 +190,57 @@ export default function Login() {
       </button>
 
       {/* Main Container */}
-      <div style={{ width: '100%', maxWidth: '980px', zIndex: 1 }}>
+      <div style={{ width: '100%', maxWidth: isRegister ? '900px' : '460px', zIndex: 1 }}>
         
-        {/* Clean Outer Card */}
+        {/* Card */}
         <div style={{ 
           backgroundColor: '#ffffff', 
-          border: '1px solid #cbd5e1', 
+          border: '1px solid #e2e8f0', 
           borderRadius: '24px', 
           overflow: 'hidden',
-          boxShadow: '0 20px 45px -10px rgba(15, 23, 42, 0.1)' 
+          boxShadow: '0 24px 60px -10px rgba(15, 23, 42, 0.13)' 
         }}>
-          <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', flexDirection: 'row' }}>
             
             {/* ── LEFT COLUMN: Form ── */}
             <div style={{ flex: '1 1 420px', padding: '2.5rem', minWidth: '300px' }}>
               
-              {/* Brand Center */}
+              {/* Brand */}
               <div style={{ marginBottom: '2rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', marginBottom: '0.5rem' }}>
-                  <div style={{ width: '34px', height: '34px', borderRadius: '10px', backgroundColor: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 10px rgba(37, 99, 235, 0.3)' }}>
-                    <ShieldAlert size={18} color="#fff" />
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', marginBottom: '0.75rem' }}>
+                  <div style={{ width: '38px', height: '38px', borderRadius: '12px', background: 'linear-gradient(135deg, #2563eb, #1d4ed8)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 14px rgba(37, 99, 235, 0.35)' }}>
+                    <ShieldAlert size={20} color="#fff" />
                   </div>
-                  <span style={{ fontSize: '1.125rem', fontWeight: 800, color: '#0f172a', fontFamily: 'var(--font-title)', letterSpacing: '-0.02em' }}>AETHER PC ERP</span>
+                  <span style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', fontFamily: 'var(--font-title)', letterSpacing: '-0.02em' }}>AETHER PC</span>
                 </div>
-
-                <h2 style={{
-                  fontSize: '1.625rem',
-                  fontFamily: 'var(--font-title)',
-                  color: '#0f172a',
-                  fontWeight: 800,
-                  margin: '0.25rem 0'
-                }}>
-                  {isRegister ? 'Đăng Ký Khách Hàng' : 'Đăng Nhập Hệ Thống'}
+                <h2 style={{ fontSize: '1.75rem', fontFamily: 'var(--font-title)', color: '#0f172a', fontWeight: 800, margin: '0 0 0.3rem' }}>
+                  {isRegister ? 'Đăng Ký Khách Hàng' : 'Đăng Nhập'}
                 </h2>
-                <p style={{ color: '#64748b', fontSize: '0.85rem', margin: 0 }}>
-                  Hệ thống ERP & Lắp ráp PC Thông minh
+                <p style={{ color: '#64748b', fontSize: '0.875rem', margin: 0, lineHeight: 1.5 }}>
+                  {isRegister ? 'Tạo tài khoản để trải nghiệm dịch vụ lắp ráp PC' : 'Chào mừng quay lại! Vui lòng đăng nhập để tiếp tục.'}
                 </p>
               </div>
 
               {/* Tabs Switcher */}
               <div style={{ 
                 display: 'flex', 
-                borderRadius: '10px', 
+                borderRadius: '12px', 
                 backgroundColor: '#f1f5f9', 
-                border: '1px solid #cbd5e1',
+                border: '1px solid #e2e8f0',
                 padding: '4px',
-                marginBottom: '1.5rem'
+                marginBottom: '1.75rem'
               }}>
                 <button
                   type="button"
                   onClick={() => { setIsRegister(false); setError(null); }}
                   style={{
-                    flex: 1,
-                    padding: '0.55rem',
+                    flex: 1, padding: '0.6rem',
                     backgroundColor: !isRegister ? '#2563eb' : 'transparent',
-                    border: 'none',
-                    borderRadius: '8px',
-                    color: !isRegister ? '#ffffff' : '#475569',
-                    fontWeight: 700,
-                    fontSize: '0.85rem',
-                    cursor: 'pointer',
+                    border: 'none', borderRadius: '9px',
+                    color: !isRegister ? '#ffffff' : '#64748b',
+                    fontWeight: 700, fontSize: '0.875rem', cursor: 'pointer',
                     transition: 'all 0.2s',
-                    boxShadow: !isRegister ? '0 2px 6px rgba(37, 99, 235, 0.25)' : 'none',
+                    boxShadow: !isRegister ? '0 2px 8px rgba(37, 99, 235, 0.3)' : 'none',
                     fontFamily: 'var(--font-sans)'
                   }}
                 >
@@ -261,17 +250,13 @@ export default function Login() {
                   type="button"
                   onClick={() => { setIsRegister(true); setError(null); }}
                   style={{
-                    flex: 1,
-                    padding: '0.55rem',
+                    flex: 1, padding: '0.6rem',
                     backgroundColor: isRegister ? '#2563eb' : 'transparent',
-                    border: 'none',
-                    borderRadius: '8px',
-                    color: isRegister ? '#ffffff' : '#475569',
-                    fontWeight: 700,
-                    fontSize: '0.85rem',
-                    cursor: 'pointer',
+                    border: 'none', borderRadius: '9px',
+                    color: isRegister ? '#ffffff' : '#64748b',
+                    fontWeight: 700, fontSize: '0.875rem', cursor: 'pointer',
                     transition: 'all 0.2s',
-                    boxShadow: isRegister ? '0 2px 6px rgba(37, 99, 235, 0.25)' : 'none',
+                    boxShadow: isRegister ? '0 2px 8px rgba(37, 99, 235, 0.3)' : 'none',
                     fontFamily: 'var(--font-sans)'
                   }}
                 >
@@ -279,19 +264,13 @@ export default function Login() {
                 </button>
               </div>
 
+              {/* Error */}
               {error && (
                 <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.75rem',
-                  backgroundColor: '#ffe4e6',
-                  border: '1px solid #fecdd3',
-                  borderRadius: '10px',
-                  padding: '0.625rem 0.875rem',
-                  color: '#be123c',
-                  fontSize: '0.85rem',
-                  marginBottom: '1.25rem',
-                  fontWeight: 600
+                  display: 'flex', alignItems: 'center', gap: '0.75rem',
+                  backgroundColor: '#fff1f2', border: '1px solid #fecdd3',
+                  borderRadius: '10px', padding: '0.75rem 1rem',
+                  color: '#be123c', fontSize: '0.85rem', marginBottom: '1.25rem', fontWeight: 600
                 }}>
                   <AlertTriangle size={16} style={{ flexShrink: 0 }} />
                   <span>{error}</span>
@@ -302,39 +281,33 @@ export default function Login() {
                 {!isRegister ? (
                   /* LOGIN FORM */
                   <>
-                    <div className="form-group" style={{ marginBottom: '1.25rem' }}>
-                      <label className="form-label" htmlFor="username" style={{ color: '#334155', fontWeight: 700, fontSize: '0.85rem', marginBottom: '0.35rem', display: 'block' }}>
+                    <div style={{ marginBottom: '1.25rem' }}>
+                      <label htmlFor="username" style={{ color: '#374151', fontWeight: 600, fontSize: '0.85rem', marginBottom: '0.4rem', display: 'block' }}>
                         Email hoặc Tên đăng nhập
                       </label>
                       <div style={{ position: 'relative' }}>
-                        <UserIcon size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
+                        <UserIcon size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
                         <input
-                          id="username"
-                          type="text"
-                          className="input-field"
+                          id="username" type="text" className="input-field"
                           placeholder="Nhập tên đăng nhập..."
-                          value={username}
-                          onChange={(e) => setUsername(e.target.value)}
-                          style={{ paddingLeft: '2.4rem', height: '42px', fontSize: '0.875rem', backgroundColor: '#ffffff', border: '1px solid #cbd5e1', color: '#0f172a', borderRadius: '10px' }}
+                          value={username} onChange={(e) => setUsername(e.target.value)}
+                          style={{ paddingLeft: '2.5rem', height: '46px', fontSize: '0.9rem', backgroundColor: '#f8fafc', border: '1.5px solid #e2e8f0', color: '#0f172a', borderRadius: '12px', width: '100%', boxSizing: 'border-box' }}
                           required
                         />
                       </div>
                     </div>
 
-                    <div className="form-group" style={{ marginBottom: '1.75rem' }}>
-                      <label className="form-label" htmlFor="password" style={{ color: '#334155', fontWeight: 700, fontSize: '0.85rem', marginBottom: '0.35rem', display: 'block' }}>
+                    <div style={{ marginBottom: '1.75rem' }}>
+                      <label htmlFor="password" style={{ color: '#374151', fontWeight: 600, fontSize: '0.85rem', marginBottom: '0.4rem', display: 'block' }}>
                         Mật khẩu
                       </label>
                       <div style={{ position: 'relative' }}>
-                        <Key size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
+                        <Key size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
                         <input
-                          id="password"
-                          type="password"
-                          className="input-field"
+                          id="password" type="password" className="input-field"
                           placeholder="Nhập mật khẩu..."
-                          value={password}
-                          onChange={(e) => setPassword(e.target.value)}
-                          style={{ paddingLeft: '2.4rem', height: '42px', fontSize: '0.875rem', backgroundColor: '#ffffff', border: '1px solid #cbd5e1', color: '#0f172a', borderRadius: '10px' }}
+                          value={password} onChange={(e) => setPassword(e.target.value)}
+                          style={{ paddingLeft: '2.5rem', height: '46px', fontSize: '0.9rem', backgroundColor: '#f8fafc', border: '1.5px solid #e2e8f0', color: '#0f172a', borderRadius: '12px', width: '100%', boxSizing: 'border-box' }}
                           required
                         />
                       </div>
@@ -342,19 +315,15 @@ export default function Login() {
 
                     <button
                       type="submit"
-                      className="btn btn-primary"
                       style={{ 
-                        width: '100%', 
-                        padding: '0.625rem', 
-                        gap: '0.5rem', 
-                        fontSize: '0.95rem', 
-                        fontWeight: 700, 
-                        height: '44px',
-                        backgroundColor: '#2563eb',
-                        color: '#ffffff',
-                        borderRadius: '10px',
-                        boxShadow: '0 4px 14px rgba(37, 99, 235, 0.3)',
-                        border: 'none'
+                        width: '100%', padding: '0.75rem',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
+                        fontSize: '0.95rem', fontWeight: 700, height: '48px',
+                        background: 'linear-gradient(135deg, #2563eb, #1d4ed8)',
+                        color: '#ffffff', borderRadius: '12px',
+                        boxShadow: '0 4px 16px rgba(37, 99, 235, 0.35)',
+                        border: 'none', cursor: 'pointer',
+                        fontFamily: 'var(--font-sans)'
                       }}
                       disabled={loading}
                     >
@@ -365,78 +334,60 @@ export default function Login() {
                 ) : (
                   /* REGISTER FORM */
                   <>
-                    <div className="form-group" style={{ marginBottom: '0.875rem' }}>
-                      <label className="form-label" htmlFor="regUsername" style={{ color: '#334155', fontWeight: 700, fontSize: '0.85rem' }}>Tên đăng nhập *</label>
+                    <div style={{ marginBottom: '1rem' }}>
+                      <label htmlFor="regUsername" style={{ color: '#374151', fontWeight: 600, fontSize: '0.85rem', marginBottom: '0.4rem', display: 'block' }}>Tên đăng nhập *</label>
                       <input
-                        id="regUsername"
-                        type="text"
-                        className="input-field"
-                        placeholder="vd: nguyenvana (dùng để đăng nhập)"
-                        value={regUsername}
-                        onChange={(e) => setRegUsername(e.target.value)}
-                        style={{ height: '40px', fontSize: '0.85rem', backgroundColor: '#ffffff', border: '1px solid #cbd5e1', color: '#0f172a', borderRadius: '10px' }}
+                        id="regUsername" type="text" className="input-field"
+                        placeholder="vd: nguyenvana (viết liền không dấu)"
+                        value={regUsername} onChange={(e) => setRegUsername(e.target.value)}
+                        style={{ height: '42px', fontSize: '0.875rem', backgroundColor: '#f8fafc', border: '1.5px solid #e2e8f0', color: '#0f172a', borderRadius: '12px', width: '100%', boxSizing: 'border-box' }}
                         pattern="^[a-zA-Z0-9_]{3,30}$"
                         title="3-30 ký tự, chỉ gồm chữ, số và dấu gạch dưới"
                         required
                       />
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.875rem', marginBottom: '0.875rem' }}>
-                      <div className="form-group">
-                        <label className="form-label" htmlFor="regName" style={{ color: '#334155', fontWeight: 700, fontSize: '0.85rem' }}>Họ và Tên *</label>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                      <div>
+                        <label htmlFor="regName" style={{ color: '#374151', fontWeight: 600, fontSize: '0.85rem', marginBottom: '0.4rem', display: 'block' }}>Họ và Tên *</label>
                         <input
-                          id="regName"
-                          type="text"
-                          className="input-field"
+                          id="regName" type="text" className="input-field"
                           placeholder="Nguyễn Văn A..."
-                          value={name}
-                          onChange={(e) => setName(e.target.value)}
-                          style={{ height: '40px', fontSize: '0.85rem', backgroundColor: '#ffffff', border: '1px solid #cbd5e1', color: '#0f172a', borderRadius: '10px' }}
+                          value={name} onChange={(e) => setName(e.target.value)}
+                          style={{ height: '42px', fontSize: '0.875rem', backgroundColor: '#f8fafc', border: '1.5px solid #e2e8f0', color: '#0f172a', borderRadius: '12px', width: '100%', boxSizing: 'border-box' }}
                           required
                         />
                       </div>
-
-                      <div className="form-group">
-                        <label className="form-label" htmlFor="regEmail" style={{ color: '#334155', fontWeight: 700, fontSize: '0.85rem' }}>Email *</label>
+                      <div>
+                        <label htmlFor="regEmail" style={{ color: '#374151', fontWeight: 600, fontSize: '0.85rem', marginBottom: '0.4rem', display: 'block' }}>Email *</label>
                         <input
-                          id="regEmail"
-                          type="email"
-                          className="input-field"
+                          id="regEmail" type="email" className="input-field"
                           placeholder="name@example.com"
-                          value={email}
-                          onChange={(e) => setEmail(e.target.value)}
-                          style={{ height: '40px', fontSize: '0.85rem', backgroundColor: '#ffffff', border: '1px solid #cbd5e1', color: '#0f172a', borderRadius: '10px' }}
+                          value={email} onChange={(e) => setEmail(e.target.value)}
+                          style={{ height: '42px', fontSize: '0.875rem', backgroundColor: '#f8fafc', border: '1.5px solid #e2e8f0', color: '#0f172a', borderRadius: '12px', width: '100%', boxSizing: 'border-box' }}
                           required
                         />
                       </div>
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.875rem', marginBottom: '1.5rem' }}>
-                      <div className="form-group">
-                        <label className="form-label" htmlFor="regPassword" style={{ color: '#334155', fontWeight: 700, fontSize: '0.85rem' }}>Mật khẩu *</label>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+                      <div>
+                        <label htmlFor="regPassword" style={{ color: '#374151', fontWeight: 600, fontSize: '0.85rem', marginBottom: '0.4rem', display: 'block' }}>Mật khẩu *</label>
                         <input
-                          id="regPassword"
-                          type="password"
-                          className="input-field"
-                          placeholder="Nhập mật khẩu (tối thiểu 6 ký tự)..."
-                          value={registerPassword}
-                          onChange={(e) => setRegisterPassword(e.target.value)}
-                          style={{ height: '40px', fontSize: '0.85rem', backgroundColor: '#ffffff', border: '1px solid #cbd5e1', color: '#0f172a', borderRadius: '10px' }}
-                          minLength={6}
-                          required
+                          id="regPassword" type="password" className="input-field"
+                          placeholder="Tối thiểu 6 ký tự"
+                          value={registerPassword} onChange={(e) => setRegisterPassword(e.target.value)}
+                          style={{ height: '42px', fontSize: '0.875rem', backgroundColor: '#f8fafc', border: '1.5px solid #e2e8f0', color: '#0f172a', borderRadius: '12px', width: '100%', boxSizing: 'border-box' }}
+                          minLength={6} required
                         />
                       </div>
-
-                      <div className="form-group">
-                        <label className="form-label" htmlFor="regPhone" style={{ color: '#334155', fontWeight: 700, fontSize: '0.85rem' }}>Số điện thoại *</label>
+                      <div>
+                        <label htmlFor="regPhone" style={{ color: '#374151', fontWeight: 600, fontSize: '0.85rem', marginBottom: '0.4rem', display: 'block' }}>Số điện thoại *</label>
                         <input
-                          id="regPhone"
-                          type="tel"
-                          className="input-field"
+                          id="regPhone" type="tel" className="input-field"
                           placeholder="09xxxxxxxx"
-                          value={phone}
-                          onChange={(e) => setPhone(e.target.value)}
-                          style={{ height: '40px', fontSize: '0.85rem', backgroundColor: '#ffffff', border: '1px solid #cbd5e1', color: '#0f172a', borderRadius: '10px' }}
+                          value={phone} onChange={(e) => setPhone(e.target.value)}
+                          style={{ height: '42px', fontSize: '0.875rem', backgroundColor: '#f8fafc', border: '1.5px solid #e2e8f0', color: '#0f172a', borderRadius: '12px', width: '100%', boxSizing: 'border-box' }}
                           pattern="^0[3|5|7|8|9]\d{8}$"
                           title="Vui lòng nhập 10 chữ số bắt đầu bằng số 0 (Ví dụ: 0912345678)"
                           required
@@ -446,19 +397,15 @@ export default function Login() {
 
                     <button
                       type="submit"
-                      className="btn btn-primary"
                       style={{ 
-                        width: '100%', 
-                        padding: '0.625rem', 
-                        gap: '0.5rem', 
-                        fontSize: '0.95rem', 
-                        fontWeight: 700, 
-                        height: '44px',
-                        backgroundColor: '#2563eb',
-                        color: '#ffffff',
-                        borderRadius: '10px',
-                        boxShadow: '0 4px 14px rgba(37, 99, 235, 0.3)',
-                        border: 'none'
+                        width: '100%', padding: '0.75rem',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
+                        fontSize: '0.95rem', fontWeight: 700, height: '48px',
+                        background: 'linear-gradient(135deg, #2563eb, #1d4ed8)',
+                        color: '#ffffff', borderRadius: '12px',
+                        boxShadow: '0 4px 16px rgba(37, 99, 235, 0.35)',
+                        border: 'none', cursor: 'pointer',
+                        fontFamily: 'var(--font-sans)'
                       }}
                       disabled={loading}
                     >
@@ -470,196 +417,71 @@ export default function Login() {
               </form>
             </div>
 
-            {/* ── RIGHT COLUMN: Consistent 2-Column Side Panel ── */}
-            {isRegister ? (
-              /* Register Mode: Customer Member Benefits Panel */
+            {/* ── RIGHT COLUMN: Chỉ hiện ở Register mode ── */}
+            {isRegister && (
               <div style={{ 
-                flex: '1 1 440px', 
-                padding: '2.5rem', 
-                backgroundColor: '#eff6ff', 
+                flex: '0 0 340px',
+                background: 'linear-gradient(160deg, #eff6ff 0%, #dbeafe 100%)',
                 borderLeft: '1px solid #bfdbfe',
+                padding: '3rem 2.5rem',
                 display: 'flex',
                 flexDirection: 'column',
                 justifyContent: 'center',
-                gap: '1.5rem'
+                gap: '2rem',
+                position: 'relative',
+                overflow: 'hidden'
               }}>
-                <div>
-                  <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', margin: 0, letterSpacing: '-0.01em' }}>
-                    Quyền Lợi Thành Viên AETHER PC
+                {/* Decorative circles */}
+                <div style={{ position: 'absolute', top: '-50px', right: '-50px', width: '220px', height: '220px', borderRadius: '50%', backgroundColor: 'rgba(37,99,235,0.06)' }} />
+                <div style={{ position: 'absolute', bottom: '-70px', left: '-40px', width: '260px', height: '260px', borderRadius: '50%', backgroundColor: 'rgba(37,99,235,0.04)' }} />
+
+                <div style={{ position: 'relative', zIndex: 1 }}>
+                  <h3 style={{ fontSize: '1.3rem', fontWeight: 800, color: '#1e3a8a', margin: '0 0 0.6rem', letterSpacing: '-0.02em', fontFamily: 'var(--font-title)' }}>
+                    Quyền Lợi Thành Viên
                   </h3>
-                  <p style={{ fontSize: '0.825rem', color: '#475569', marginTop: '0.35rem', margin: 0, lineHeight: 1.45 }}>
-                    Đăng ký tài khoản để trải nghiệm dịch vụ lắp ráp PC và theo dõi đơn hàng tức thì.
+                  <p style={{ fontSize: '0.875rem', color: '#475569', margin: 0, lineHeight: 1.6 }}>
+                    Đăng ký tài khoản để trải nghiệm dịch vụ lắp ráp PC chuyên nghiệp và theo dõi đơn hàng tức thì.
                   </p>
                 </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
-                  <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
-                    <div style={{ padding: '0.5rem', backgroundColor: '#ffffff', borderRadius: '10px', color: '#2563eb', boxShadow: '0 2px 6px rgba(0,0,0,0.05)', display: 'flex', alignItems: 'center', flexShrink: 0 }}>
-                      <LogIn size={18} />
-                    </div>
-                    <div>
-                      <strong style={{ fontSize: '0.875rem', color: '#0f172a', display: 'block', marginBottom: '2px', fontWeight: 700 }}>Theo Dõi Đơn Hàng Realtime</strong>
-                      <span style={{ fontSize: '0.78rem', color: '#475569', lineHeight: 1.4, display: 'block' }}>Theo dõi sát sao lộ trình từ lúc duyệt linh kiện đến khi đóng gói xuất xưởng.</span>
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
-                    <div style={{ padding: '0.5rem', backgroundColor: '#ffffff', borderRadius: '10px', color: '#16a34a', boxShadow: '0 2px 6px rgba(0,0,0,0.05)', display: 'flex', alignItems: 'center', flexShrink: 0 }}>
-                      <ShieldAlert size={18} />
-                    </div>
-                    <div>
-                      <strong style={{ fontSize: '0.875rem', color: '#0f172a', display: 'block', marginBottom: '2px', fontWeight: 700 }}>Bảo Hành Định Danh S/N</strong>
-                      <span style={{ fontSize: '0.78rem', color: '#475569', lineHeight: 1.4, display: 'block' }}>100% linh kiện máy tính được quản lý và bảo hành theo mã Serial Number chính hãng.</span>
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
-                    <div style={{ padding: '0.5rem', backgroundColor: '#ffffff', borderRadius: '10px', color: '#d97706', boxShadow: '0 2px 6px rgba(0,0,0,0.05)', display: 'flex', alignItems: 'center', flexShrink: 0 }}>
-                      <UserPlus size={18} />
-                    </div>
-                    <div>
-                      <strong style={{ fontSize: '0.875rem', color: '#0f172a', display: 'block', marginBottom: '2px', fontWeight: 700 }}>Tích Điểm VIP & Ưu Đãi</strong>
-                      <span style={{ fontSize: '0.78rem', color: '#475569', lineHeight: 1.4, display: 'block' }}>Tự động tích lũy điểm thưởng giao dịch và nhận voucher bảo trì vệ sinh PC định kỳ.</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              /* Login Mode: Demo Roles Panel */
-              <div style={{ 
-                flex: '1 1 440px', 
-                padding: '2.5rem', 
-                backgroundColor: '#f8fafc', 
-                borderLeft: '1px solid #e2e8f0',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'center'
-              }}>
-                <div style={{ marginBottom: '1.25rem' }}>
-                  <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0f172a', margin: 0, letterSpacing: '-0.01em' }}>
-                    Tài Khoản Demo Hệ Thống
-                  </h3>
-                  <p style={{ fontSize: '0.8rem', color: '#475569', marginTop: '0.25rem', marginBottom: '0.85rem' }}>
-                    Danh sách tài khoản demo dùng để trải nghiệm nhanh các vai trò trong hệ thống.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => setShowDemoAccounts(v => !v)}
-                    style={{
-                      width: '100%',
-                      backgroundColor: '#ffffff',
-                      border: '1px solid #cbd5e1',
-                      borderRadius: '10px',
-                      padding: '0.6rem 0.9rem',
-                      fontSize: '0.85rem',
-                      fontWeight: 700,
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', position: 'relative', zIndex: 1 }}>
+                  {[
+                    {
+                      icon: <LogIn size={20} />,
+                      bg: '#dbeafe',
                       color: '#2563eb',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between'
-                    }}
-                  >
-                    <span>{showDemoAccounts ? 'Ẩn danh sách tài khoản demo' : 'Xem danh sách tài khoản demo'}</span>
-                    <span>{showDemoAccounts ? '▲' : '▼'}</span>
-                  </button>
-                </div>
-
-                {showDemoAccounts && (
-                  <>
-                    <p style={{ fontSize: '0.8rem', color: '#475569', marginTop: '-0.5rem', marginBottom: '0.85rem' }}>
-                      Chọn vai trò để đăng nhập nhanh (Mật khẩu: <code style={{ color: '#2563eb', fontWeight: 700, backgroundColor: '#eff6ff', padding: '1px 6px', borderRadius: '4px', border: '1px solid #bfdbfe' }}>123456</code>)
-                    </p>
-
-                    <div style={{ maxHeight: '380px', overflowY: 'auto', padding: '4px 4px 4px 2px' }}>
-                    <div style={{
-                      display: 'grid',
-                      gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
-                      gap: '0.55rem',
-                      padding: '0'
-                    }}>
-                      {DEMO_ACCOUNTS.map(demo => (
-                        <button
-                          key={demo.role}
-                          onClick={() => fillCredentials(demo.role)}
-                          style={{
-                            backgroundColor: '#ffffff',
-                            border: '1px solid #cbd5e1',
-                            borderRadius: '10px',
-                            padding: '0.65rem 0.85rem',
-                            textAlign: 'left',
-                            cursor: 'pointer',
-                            transition: 'all 0.15s',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '0.15rem',
-                            boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
-                          }}
-                          onMouseOver={(e) => {
-                            e.currentTarget.style.backgroundColor = '#eff6ff';
-                            e.currentTarget.style.borderColor = '#2563eb';
-                            e.currentTarget.style.transform = 'translateY(-1px)';
-                          }}
-                          onMouseOut={(e) => {
-                            e.currentTarget.style.backgroundColor = '#ffffff';
-                            e.currentTarget.style.borderColor = '#cbd5e1';
-                            e.currentTarget.style.transform = 'none';
-                          }}
-                        >
-                          <strong style={{ fontSize: '0.85rem', color: '#0f172a', fontFamily: 'monospace', fontWeight: 700 }}>
-                            {demo.role}
-                          </strong>
-                          <span style={{ fontSize: '0.75rem', color: '#475569', fontWeight: 500 }}>
-                            {demo.label}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                    <div style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid #cbd5e1' }}>
-                      <h4 style={{ fontSize: '0.92rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>Tài Khoản Nhà Cung Cấp</h4>
-                      <p style={{ fontSize: '0.75rem', color: '#64748b', margin: '0.25rem 0 0.7rem' }}>
-                        Mỗi tài khoản chỉ quản lý đơn hàng được gán cho đúng nhà cung cấp.
-                      </p>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '0.55rem' }}>
-                        {SUPPLIER_LOGIN_ACCOUNTS.map(demo => (
-                          <button
-                            key={demo.role}
-                            onClick={() => fillCredentials(demo.role)}
-                            style={{
-                              backgroundColor: '#f8fafc',
-                              border: '1px solid #bfdbfe',
-                              borderRadius: '10px',
-                              padding: '0.65rem 0.85rem',
-                              textAlign: 'left',
-                              cursor: 'pointer',
-                              transition: 'all 0.15s',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              gap: '0.15rem',
-                              boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
-                            }}
-                            onMouseOver={(e) => {
-                              e.currentTarget.style.backgroundColor = '#eff6ff';
-                              e.currentTarget.style.borderColor = '#2563eb';
-                              e.currentTarget.style.transform = 'translateY(-1px)';
-                            }}
-                            onMouseOut={(e) => {
-                              e.currentTarget.style.backgroundColor = '#f8fafc';
-                              e.currentTarget.style.borderColor = '#bfdbfe';
-                              e.currentTarget.style.transform = 'none';
-                            }}
-                          >
-                            <strong style={{ fontSize: '0.85rem', color: '#0f172a', fontFamily: 'monospace', fontWeight: 700 }}>{demo.role}</strong>
-                            <span style={{ fontSize: '0.75rem', color: '#475569', fontWeight: 500 }}>{demo.label}</span>
-                          </button>
-                        ))}
+                      title: 'Theo Dõi Đơn Hàng Realtime',
+                      desc: 'Theo dõi sát sao lộ trình từ lúc duyệt linh kiện đến khi đóng gói xuất xưởng.'
+                    },
+                    {
+                      icon: <ShieldAlert size={20} />,
+                      bg: '#dcfce7',
+                      color: '#16a34a',
+                      title: 'Bảo Hành Định Danh S/N',
+                      desc: '100% linh kiện máy tính được quản lý và bảo hành theo mã Serial Number chính hãng.'
+                    },
+                    {
+                      icon: <UserPlus size={20} />,
+                      bg: '#fef3c7',
+                      color: '#d97706',
+                      title: 'Tích Điểm VIP & Ưu Đãi',
+                      desc: 'Tự động tích lũy điểm thưởng giao dịch và nhận voucher bảo trì vệ sinh PC định kỳ.'
+                    }
+                  ].map((item, i) => (
+                    <div key={i} style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
+                      <div style={{ padding: '0.6rem', backgroundColor: item.bg, borderRadius: '12px', color: item.color, display: 'flex', alignItems: 'center', flexShrink: 0, boxShadow: '0 2px 6px rgba(0,0,0,0.07)' }}>
+                        {item.icon}
+                      </div>
+                      <div>
+                        <strong style={{ fontSize: '0.9rem', color: '#0f172a', display: 'block', marginBottom: '4px', fontWeight: 700 }}>{item.title}</strong>
+                        <span style={{ fontSize: '0.8rem', color: '#64748b', lineHeight: 1.5, display: 'block' }}>{item.desc}</span>
                       </div>
                     </div>
-                    </div>
-                  </>
-                )}
+                  ))}
+                </div>
               </div>
             )}
+
           </div>
         </div>
       </div>
