@@ -30,4 +30,4 @@ RUN npx prisma generate
 EXPOSE 5000
 
 # Chạy lệnh cập nhật database schema, seed nếu trống, sau đó khởi chạy server ở chế độ ổn định
-CMD ["sh", "-c", "npx prisma db push && node prisma/seed-if-empty.js && node prisma/sync-supplier-accounts.js && node prisma/seed-rbac-if-empty.js && node prisma/rebalance-warehouse-locations.js && node prisma/rename-categories.js && node prisma/fix-payroll-settings.js && node prisma/seed-sample-leaves.js && npm start"]
+CMD ["sh", "-c", "npx prisma db push && node prisma/seed-if-empty.js && node prisma/sync-supplier-accounts.js && node prisma/seed-rbac-if-empty.js && node prisma/rebalance-warehouse-locations.js && node prisma/rename-categories.js && node prisma/fix-payroll-settings.js && node prisma/seed-sample-leaves.js && node prisma/seed-promotions-if-empty.js && npm start"]

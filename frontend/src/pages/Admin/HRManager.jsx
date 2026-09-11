@@ -1257,6 +1257,8 @@ export default function HRManager() {
 
           </div>
         </div>
+      )}
+
       {/* ================= MODAL: TẠO ĐƠN XIN NGHỈ PHÉP ================= */}
       {showCreateLeaveModal && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.5)', backdropFilter: 'blur(4px)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
