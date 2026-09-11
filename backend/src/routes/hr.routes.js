@@ -33,7 +33,10 @@ router.get('/leaves', authMiddleware(['CEO', 'ADMIN', 'HR', 'SALES', 'SALES_MANA
 // POST /api/v1/hr/leaves – nhân viên tạo đơn nghỉ
 router.post('/leaves', authMiddleware(['CEO', 'ADMIN', 'HR', 'SALES', 'SALES_MANAGER', 'WAREHOUSE', 'WAREHOUSE_MANAGER', 'ASSEMBLY', 'ACCOUNTANT', 'PURCHASING', 'CSKH', 'DELIVERY', ...QC_ROLES]), async (req, res, next) => {
   try {
-    const employeeId = parseInt(req.user.id);
+    let employeeId = parseInt(req.user.id);
+    if (['HR', 'CEO', 'ADMIN'].includes(req.user.role) && req.body.employeeId) {
+      employeeId = parseInt(req.body.employeeId);
+    }
     const { type, startDate, endDate, reason } = req.body;
 
     if (!type || !startDate || !endDate) {
@@ -48,6 +51,9 @@ router.post('/leaves', authMiddleware(['CEO', 'ADMIN', 'HR', 'SALES', 'SALES_MAN
         endDate: new Date(endDate),
         reason: reason || null,
         status: 'PENDING'
+      },
+      include: {
+        employee: { select: { fullName: true, department: true, role: true } }
       }
     });
     res.status(201).json({ success: true, data: leave });

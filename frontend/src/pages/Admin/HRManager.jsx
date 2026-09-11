@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useHRStore, useUtilityStore } from '../../stores';
 import { useAuth } from '../../context/AuthContext';
@@ -69,12 +69,14 @@ export default function HRManager() {
   const setEmployeeStatus = useHRStore(state => state.setEmployeeStatus);
   const resetEmployeePassword = useHRStore(state => state.resetEmployeePassword);
   const leaveRequests = useHRStore(state => state.leaveRequests) || [];
+  const getLeaveRequests = useHRStore(state => state.getLeaveRequests);
+  const createMyLeaveRequest = useHRStore(state => state.createMyLeaveRequest);
   const approveLeaveRequest = useHRStore(state => state.approveLeaveRequest);
   const rejectLeaveRequest = useHRStore(state => state.rejectLeaveRequest);
   const payrolls = useHRStore(state => state.payrolls) || [];
   const submitPayrolls = useHRStore(state => state.submitPayrolls);
   const assemblyJobs = useUtilityStore(state => state.assemblyJobs) || [];
-  const { isCEO } = useAuth();
+  const { isCEO, user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
 
   // Active Tab from URL (?tab=overview|attendance|employees|leaves|payroll)
@@ -82,6 +84,45 @@ export default function HRManager() {
   const setTab = (tKey) => {
     setSearchParams({ tab: tKey });
     setSearch('');
+  };
+
+  // State for creating leave request modal
+  const [showCreateLeaveModal, setShowCreateLeaveModal] = useState(false);
+  const [leaveModalForm, setLeaveModalForm] = useState({
+    employeeId: '',
+    type: 'Phép Năm',
+    startDate: '',
+    endDate: '',
+    reason: ''
+  });
+  const [submittingLeaveModal, setSubmittingLeaveModal] = useState(false);
+
+  useEffect(() => {
+    if (activeTab === 'leaves' && typeof getLeaveRequests === 'function') {
+      getLeaveRequests().catch(() => {});
+    }
+  }, [activeTab]);
+
+  const handleCreateLeaveModalSubmit = async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    if (!leaveModalForm.startDate || !leaveModalForm.endDate) {
+      notify('Vui lòng chọn ngày bắt đầu và ngày kết thúc.', 'error');
+      return;
+    }
+    setSubmittingLeaveModal(true);
+    try {
+      await createMyLeaveRequest(leaveModalForm);
+      notify('Đã tạo đơn xin nghỉ phép thành công.', 'success');
+      setShowCreateLeaveModal(false);
+      setLeaveModalForm({ employeeId: '', type: 'Phép Năm', startDate: '', endDate: '', reason: '' });
+      if (typeof getLeaveRequests === 'function') {
+        getLeaveRequests().catch(() => {});
+      }
+    } catch (err) {
+      notify(err.message || 'Không thể tạo đơn nghỉ phép.', 'error');
+    } finally {
+      setSubmittingLeaveModal(false);
+    }
   };
 
   // New employee form state
@@ -756,13 +797,37 @@ export default function HRManager() {
       {/* ========================================================================= */}
       {activeTab === 'leaves' && (
         <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem' }}>
-          <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-            <CalendarCheck size={18} style={{ color: '#8b5cf6' }} />
-            <span>Danh Sách Đơn Xin Nghỉ Phép Của Nhân Sự</span>
-          </h3>
-          <p style={{ color: '#64748b', fontSize: '0.78rem', marginBottom: '1.25rem' }}>
-            Phê duyệt chế độ nghỉ phép năm, nghỉ ốm và việc riêng cho cán bộ nhân viên
-          </p>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+            <div>
+              <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <CalendarCheck size={18} style={{ color: '#8b5cf6' }} />
+                <span>Danh Sách Đơn Xin Nghỉ Phép Của Nhân Sự</span>
+              </h3>
+              <p style={{ color: '#64748b', fontSize: '0.78rem', margin: '0.2rem 0 0 0' }}>
+                Phê duyệt chế độ nghỉ phép năm, nghỉ ốm và việc riêng cho cán bộ nhân viên
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowCreateLeaveModal(true)}
+              style={{
+                backgroundColor: '#2563eb',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '6px',
+                padding: '0.55rem 1.25rem',
+                fontSize: '0.82rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+              }}
+            >
+              + Tạo Đơn Nghỉ Phép
+            </button>
+          </div>
 
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
@@ -826,6 +891,22 @@ export default function HRManager() {
                     </td>
                   </tr>
                 ))}
+                {leaveRequests.length === 0 && (
+                  <tr>
+                    <td colSpan={6} style={{ padding: '3.5rem 1rem', textAlign: 'center', color: '#94a3b8' }}>
+                      <CalendarCheck size={38} style={{ margin: '0 auto 0.6rem', display: 'block', opacity: 0.35 }} />
+                      <div style={{ fontWeight: 700, fontSize: '0.92rem', color: '#64748b' }}>Hiện chưa có đơn xin nghỉ phép nào</div>
+                      <div style={{ fontSize: '0.78rem', marginTop: '0.25rem' }}>Các đơn xin nghỉ phép của cán bộ nhân sự gửi lên sẽ xuất hiện tại đây để HR/CEO xét duyệt.</div>
+                      <button
+                        type="button"
+                        onClick={() => setShowCreateLeaveModal(true)}
+                        style={{ marginTop: '0.85rem', backgroundColor: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', borderRadius: '6px', padding: '0.45rem 1.1rem', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}
+                      >
+                        + Tạo Đơn Xin Nghỉ Mới
+                      </button>
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -1174,6 +1255,95 @@ export default function HRManager() {
               </div>
             </div>
 
+          </div>
+        </div>
+      {/* ================= MODAL: TẠO ĐƠN XIN NGHỈ PHÉP ================= */}
+      {showCreateLeaveModal && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.5)', backdropFilter: 'blur(4px)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', padding: '1.5rem', width: '100%', maxWidth: '480px', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.75rem' }}>
+              <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <CalendarCheck size={20} style={{ color: '#8b5cf6' }} />
+                <span>Tạo Đơn Xin Nghỉ Phép</span>
+              </h3>
+              <button onClick={() => setShowCreateLeaveModal(false)} style={{ background: '#f1f5f9', border: 'none', padding: '0.4rem', borderRadius: '6px', cursor: 'pointer' }}><X size={18} /></button>
+            </div>
+            <form onSubmit={handleCreateLeaveModalSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#334155', marginBottom: '0.3rem' }}>Nhân Viên Xin Nghỉ</label>
+                <select
+                  value={leaveModalForm.employeeId}
+                  onChange={e => setLeaveModalForm({ ...leaveModalForm, employeeId: e.target.value })}
+                  style={{ width: '100%', padding: '0.55rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.82rem', backgroundColor: '#fff' }}
+                >
+                  <option value="">-- Chính tôi ({user?.fullname || user?.username || 'HR'}) --</option>
+                  {employees.filter(e => e.status === 'ACTIVE').map(emp => (
+                    <option key={emp.id} value={emp.id}>{emp.fullname || emp.fullName} ({emp.department} - {emp.role})</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#334155', marginBottom: '0.3rem' }}>Loại Nghỉ Phép *</label>
+                <select
+                  value={leaveModalForm.type}
+                  onChange={e => setLeaveModalForm({ ...leaveModalForm, type: e.target.value })}
+                  style={{ width: '100%', padding: '0.55rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.82rem', backgroundColor: '#fff' }}
+                >
+                  <option value="Phép Năm">Nghỉ Phép Năm</option>
+                  <option value="Nghỉ Ốm">Nghỉ Ốm / Điều Trị Y Tế</option>
+                  <option value="Việc Riêng">Việc Riêng (Có lương / Không lương)</option>
+                  <option value="Nghỉ Thai Sản">Chế Độ Thai Sản</option>
+                </select>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#334155', marginBottom: '0.3rem' }}>Từ Ngày *</label>
+                  <input
+                    type="date"
+                    required
+                    value={leaveModalForm.startDate}
+                    onChange={e => setLeaveModalForm({ ...leaveModalForm, startDate: e.target.value })}
+                    style={{ width: '100%', padding: '0.55rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.82rem', boxSizing: 'border-box' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#334155', marginBottom: '0.3rem' }}>Đến Ngày *</label>
+                  <input
+                    type="date"
+                    required
+                    value={leaveModalForm.endDate}
+                    onChange={e => setLeaveModalForm({ ...leaveModalForm, endDate: e.target.value })}
+                    style={{ width: '100%', padding: '0.55rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.82rem', boxSizing: 'border-box' }}
+                  />
+                </div>
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#334155', marginBottom: '0.3rem' }}>Lý Do Xin Nghỉ</label>
+                <textarea
+                  rows={3}
+                  placeholder="Nhập lý do cụ thể..."
+                  value={leaveModalForm.reason}
+                  onChange={e => setLeaveModalForm({ ...leaveModalForm, reason: e.target.value })}
+                  style={{ width: '100%', padding: '0.55rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.82rem', boxSizing: 'border-box', resize: 'vertical' }}
+                />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.5rem' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowCreateLeaveModal(false)}
+                  style={{ padding: '0.5rem 1rem', border: '1px solid #cbd5e1', backgroundColor: '#fff', borderRadius: '6px', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer', color: '#64748b' }}
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingLeaveModal}
+                  style={{ padding: '0.5rem 1.25rem', backgroundColor: '#2563eb', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '0.82rem', fontWeight: 700, cursor: submittingLeaveModal ? 'not-allowed' : 'pointer' }}
+                >
+                  {submittingLeaveModal ? 'Đang gửi...' : 'Gửi Đơn'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

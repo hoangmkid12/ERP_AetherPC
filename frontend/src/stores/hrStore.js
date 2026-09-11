@@ -459,9 +459,18 @@ export const useHRStore = create((set, get) => ({
    * real endpoint POST /hr/leaves đã có sẵn từ lâu nhưng trước đây không có
    * bất kỳ giao diện nào trong toàn bộ frontend gọi tới nó.
    */
-  createMyLeaveRequest: async ({ type, startDate, endDate, reason }) => {
-    const res = await api.post('/hr/leaves', { type, startDate, endDate, reason });
+  createMyLeaveRequest: async ({ type, startDate, endDate, reason, employeeId }) => {
+    const payload = { type, startDate, endDate, reason };
+    if (employeeId) payload.employeeId = employeeId;
+    const res = await api.post('/hr/leaves', payload);
     if (!res?.success) throw new Error(res?.message || 'Không thể gửi đơn xin nghỉ phép.');
+    if (res.data) {
+      set(state => ({ leaveRequests: [res.data, ...(state.leaveRequests || []).filter(r => r.id !== res.data.id)] }));
+      try {
+        localStorage.setItem(STORAGE_KEYS.leaveRequests, JSON.stringify(get().leaveRequests));
+      } catch (e) {}
+    }
+    get().getLeaveRequests().catch(() => {});
     return res.data;
   },
 
