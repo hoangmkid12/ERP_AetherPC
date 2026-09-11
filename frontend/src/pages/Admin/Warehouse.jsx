@@ -4660,40 +4660,41 @@ export default function Warehouse() {
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
                   <thead>
                     <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569' }}>
-                      <th style={{ padding: '0.6rem 0.85rem' }}>Mã Phiếu</th>
-                      <th style={{ padding: '0.6rem 0.85rem' }}>Sản Phẩm</th>
-                      <th style={{ padding: '0.6rem 0.85rem', textAlign: 'center' }}>SL Đề Xuất</th>
-                      <th style={{ padding: '0.6rem 0.85rem' }}>Lý Do</th>
-                      <th style={{ padding: '0.6rem 0.85rem' }}>Người Đề Xuất</th>
-                      <th style={{ padding: '0.6rem 0.85rem', textAlign: 'center' }}>Trạng Thái</th>
-                      {canApprovePr && <th style={{ padding: '0.6rem 0.85rem', textAlign: 'center' }}>Thao Tác</th>}
+                      <th style={{ padding: '0.75rem 1rem', width: '130px', whiteSpace: 'nowrap' }}>Mã Phiếu</th>
+                      <th style={{ padding: '0.75rem 1rem', minWidth: '220px' }}>Sản Phẩm</th>
+                      <th style={{ padding: '0.75rem 1rem', textAlign: 'center', width: '110px', whiteSpace: 'nowrap' }}>SL Đề Xuất</th>
+                      <th style={{ padding: '0.75rem 1rem', minWidth: '180px' }}>Lý Do</th>
+                      <th style={{ padding: '0.75rem 1rem', width: '180px', whiteSpace: 'nowrap' }}>Người Đề Xuất</th>
+                      <th style={{ padding: '0.75rem 1rem', textAlign: 'center', width: '130px', whiteSpace: 'nowrap' }}>Trạng Thái</th>
+                      {canApprovePr && <th style={{ padding: '0.75rem 1rem', textAlign: 'center', width: '140px', whiteSpace: 'nowrap' }}>Thao Tác</th>}
                     </tr>
                   </thead>
                   <tbody>
                     {purchaseRequests.map(pr => {
                       const isBusy = prBusyId === pr.id;
-                      const statusColor = pr.status === 'APPROVED' ? '#16a34a' : pr.status === 'REJECTED' ? '#dc2626' : '#d97706';
+                      const statusColor = pr.status === 'APPROVED' ? '#15803d' : pr.status === 'REJECTED' ? '#dc2626' : '#b45309';
                       const statusBg = pr.status === 'APPROVED' ? '#f0fdf4' : pr.status === 'REJECTED' ? '#fef2f2' : '#fffbeb';
+                      const statusBorder = pr.status === 'APPROVED' ? '#bbf7d0' : pr.status === 'REJECTED' ? '#fecaca' : '#fde68a';
                       const statusLabel = pr.status === 'APPROVED' ? 'Đã Duyệt' : pr.status === 'REJECTED' ? 'Từ Chối' : 'Chờ Duyệt';
                       return (
                         <tr key={pr.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                          <td style={{ padding: '0.6rem 0.85rem', fontWeight: 700, color: '#0f172a' }}>{pr.prCode}</td>
-                          <td style={{ padding: '0.6rem 0.85rem', color: '#334155' }}>{pr.product?.name}</td>
-                          <td style={{ padding: '0.6rem 0.85rem', textAlign: 'center', fontWeight: 700 }}>{pr.quantity}</td>
-                          <td style={{ padding: '0.6rem 0.85rem', color: '#64748b' }}>{pr.reason || '-'}</td>
-                          <td style={{ padding: '0.6rem 0.85rem', color: '#64748b', fontSize: '0.75rem' }}>{pr.requestedBy}</td>
-                          <td style={{ padding: '0.6rem 0.85rem', textAlign: 'center' }}>
-                            <span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 800, backgroundColor: statusBg, color: statusColor }}>{statusLabel}</span>
+                          <td style={{ padding: '0.75rem 1rem', fontWeight: 700, color: '#2563eb', whiteSpace: 'nowrap' }}>{pr.prCode}</td>
+                          <td style={{ padding: '0.75rem 1rem', color: '#1e293b', fontWeight: 600 }}>{pr.product?.name}</td>
+                          <td style={{ padding: '0.75rem 1rem', textAlign: 'center', fontWeight: 700, color: '#0f172a', whiteSpace: 'nowrap' }}>{pr.quantity}</td>
+                          <td style={{ padding: '0.75rem 1rem', color: '#64748b' }}>{pr.reason || '-'}</td>
+                          <td style={{ padding: '0.75rem 1rem', color: '#64748b', fontSize: '0.78rem', whiteSpace: 'nowrap' }}>{pr.requestedBy}</td>
+                          <td style={{ padding: '0.75rem 1rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                            <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: '12px', fontSize: '0.72rem', fontWeight: 700, backgroundColor: statusBg, color: statusColor, border: `1px solid ${statusBorder}`, whiteSpace: 'nowrap' }}>{statusLabel}</span>
                           </td>
                           {canApprovePr && (
-                            <td style={{ padding: '0.6rem 0.85rem', textAlign: 'center' }}>
+                            <td style={{ padding: '0.75rem 1rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
                               {pr.status === 'PENDING' ? (
                                 <div style={{ display: 'flex', gap: '0.35rem', justifyContent: 'center' }}>
-                                  <button disabled={isBusy} onClick={() => handleDecidePr(pr, 'approve')} style={{ backgroundColor: '#16a34a', color: '#fff', border: 'none', borderRadius: '4px', padding: '0.3rem 0.6rem', fontSize: '0.72rem', fontWeight: 700, cursor: isBusy ? 'default' : 'pointer' }}>Duyệt</button>
-                                  <button disabled={isBusy} onClick={() => handleDecidePr(pr, 'reject')} style={{ backgroundColor: '#fff', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '4px', padding: '0.3rem 0.6rem', fontSize: '0.72rem', fontWeight: 700, cursor: isBusy ? 'default' : 'pointer' }}>Từ Chối</button>
+                                  <button disabled={isBusy} onClick={() => handleDecidePr(pr, 'approve')} style={{ backgroundColor: '#16a34a', color: '#fff', border: 'none', borderRadius: '4px', padding: '0.35rem 0.65rem', fontSize: '0.75rem', fontWeight: 700, cursor: isBusy ? 'default' : 'pointer', whiteSpace: 'nowrap' }}>Duyệt</button>
+                                  <button disabled={isBusy} onClick={() => handleDecidePr(pr, 'reject')} style={{ backgroundColor: '#fff', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '4px', padding: '0.35rem 0.65rem', fontSize: '0.75rem', fontWeight: 700, cursor: isBusy ? 'default' : 'pointer', whiteSpace: 'nowrap' }}>Từ Chối</button>
                                 </div>
                               ) : (
-                                <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>{pr.approvedBy}</span>
+                                <span style={{ fontSize: '0.74rem', color: '#94a3b8', whiteSpace: 'nowrap' }}>{pr.approvedBy}</span>
                               )}
                             </td>
                           )}
@@ -4741,12 +4742,12 @@ export default function Warehouse() {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.83rem' }}>
               <thead>
                 <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569' }}>
-                  <th style={{ padding: '0.75rem 1rem' }}>Sản Phẩm</th>
-                  <th style={{ padding: '0.75rem 1rem' }}>Nhà Cung Cấp</th>
-                  <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Tồn Hiện Tại</th>
-                  <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Ngưỡng An Toàn</th>
-                  <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Trạng Thái</th>
-                  <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Hành Động</th>
+                  <th style={{ padding: '0.75rem 1rem', minWidth: '220px' }}>Sản Phẩm</th>
+                  <th style={{ padding: '0.75rem 1rem', minWidth: '180px', whiteSpace: 'nowrap' }}>Nhà Cung Cấp</th>
+                  <th style={{ padding: '0.75rem 1rem', textAlign: 'center', width: '120px', whiteSpace: 'nowrap' }}>Tồn Hiện Tại</th>
+                  <th style={{ padding: '0.75rem 1rem', textAlign: 'center', width: '130px', whiteSpace: 'nowrap' }}>Ngưỡng An Toàn</th>
+                  <th style={{ padding: '0.75rem 1rem', textAlign: 'center', width: '130px', whiteSpace: 'nowrap' }}>Trạng Thái</th>
+                  <th style={{ padding: '0.75rem 1rem', textAlign: 'center', width: '150px', whiteSpace: 'nowrap' }}>Hành Động</th>
                 </tr>
               </thead>
               <tbody>
@@ -4762,21 +4763,24 @@ export default function Warehouse() {
                   filteredRfqItems.map(item => (
                     <tr key={item.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
                       <td style={{ padding: '0.75rem 1rem', fontWeight: 700, color: '#0f172a' }}>{item.name}</td>
-                      <td style={{ padding: '0.75rem 1rem', color: '#475569' }}>{item.supplier}</td>
-                      <td style={{ padding: '0.75rem 1rem', textAlign: 'center', fontWeight: 800, color: Number(item.stock) === 0 ? '#ef4444' : '#d97706' }}>
+                      <td style={{ padding: '0.75rem 1rem', color: '#475569', whiteSpace: 'nowrap' }}>{item.supplier}</td>
+                      <td style={{ padding: '0.75rem 1rem', textAlign: 'center', fontWeight: 800, color: Number(item.stock) === 0 ? '#ef4444' : '#d97706', whiteSpace: 'nowrap' }}>
                         {item.stock} SP
                       </td>
-                      <td style={{ padding: '0.75rem 1rem', textAlign: 'center', color: '#64748b' }}>{item.threshold || 5} SP</td>
-                      <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
+                      <td style={{ padding: '0.75rem 1rem', textAlign: 'center', color: '#64748b', whiteSpace: 'nowrap' }}>{item.threshold || 5} SP</td>
+                      <td style={{ padding: '0.75rem 1rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
                         <span style={{
-                          padding: '2px 8px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 700,
+                          display: 'inline-block',
+                          padding: '3px 10px', borderRadius: '12px', fontSize: '0.72rem', fontWeight: 700,
                           backgroundColor: Number(item.stock) === 0 ? '#ffe4e6' : '#fef3c7',
-                          color: Number(item.stock) === 0 ? '#e11d48' : '#d97706'
+                          color: Number(item.stock) === 0 ? '#e11d48' : '#d97706',
+                          border: `1px solid ${Number(item.stock) === 0 ? '#fecdd3' : '#fde68a'}`,
+                          whiteSpace: 'nowrap'
                         }}>
                           {Number(item.stock) === 0 ? 'Hết Hàng' : 'Cảnh Báo Tồn'}
                         </span>
                       </td>
-                      <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
+                      <td style={{ padding: '0.75rem 1rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
                         <button
                           onClick={() => setLowStockRfqModalData({ item, qty: (item.threshold || 5) * 2, reason: 'Tồn kho chạm ngưỡng tối thiểu' })}
                           style={{
@@ -4787,7 +4791,8 @@ export default function Warehouse() {
                             padding: '0.35rem 0.85rem',
                             fontSize: '0.78rem',
                             fontWeight: 700,
-                            cursor: 'pointer'
+                            cursor: 'pointer',
+                            whiteSpace: 'nowrap'
                           }}
                         >
                           Gửi Cảnh Báo RFQ
