@@ -84,6 +84,7 @@ export default function Sidebar({ isOpen = false, onClose }) {
     { tab: 'overview', label: 'Tổng Quan Tài Chính' },
     { tab: 'ledger', label: 'Sổ Cái Dòng Tiền (Ledger)' },
     { tab: 'po_payments', label: 'Thanh Toán Đơn PO', badgeKey: 'pendingQuotedPOs' },
+    { tab: 'cod_settlement', label: 'Đối Soát COD Shipper' },
     { tab: 'payroll_disbursement', label: 'Chi Trả Bảng Lương', badgeKey: 'pendingPayrollApproval' },
     { tab: 'reports', label: 'Báo Cáo P&L & VAT' }
   ];

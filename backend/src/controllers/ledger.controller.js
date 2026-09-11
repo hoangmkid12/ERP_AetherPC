@@ -1,4 +1,5 @@
 const prisma = require('../config/database');
+const { logAudit } = require('../utils/auditLog');
 
 const VALID_TYPES = ['INCOME', 'EXPENSE', 'EXPENSE_PROJECTED', 'SHIPPING', 'REFUND'];
 
@@ -107,4 +108,95 @@ const deleteLedgerEntry = async (req, res, next) => {
   }
 };
 
-module.exports = { getLedger, createLedgerEntry, updateLedgerEntry, deleteLedgerEntry };
+// GET /api/v1/ledger/cod-settlement — tiền mặt COD shipper đang giữ, nhóm
+// theo shipper, chưa được Kế Toán đối soát/thu hồi (OrderPayment.settledAt
+// còn null). Chỉ tính đơn có shipper thật (giao hàng COD), không tính bán
+// lẻ tại quầy (không qua shipper nào để thu hồi).
+const getCodSettlement = async (req, res, next) => {
+  try {
+    const unsettled = await prisma.orderPayment.findMany({
+      where: {
+        method: 'CASH',
+        status: 'SUCCESS',
+        settledAt: null,
+        order: { assignedShipperId: { not: null } }
+      },
+      include: {
+        order: {
+          select: {
+            orderId: true,
+            deliveredAt: true,
+            shippingAddress: true,
+            assignedShipperId: true,
+            assignedShipper: { select: { id: true, fullName: true, employeeCode: true } },
+            customer: { select: { name: true } }
+          }
+        }
+      },
+      orderBy: { createdAt: 'asc' }
+    });
+
+    const byShipper = {};
+    for (const payment of unsettled) {
+      const shipper = payment.order?.assignedShipper;
+      const shipperId = shipper?.id;
+      if (!shipperId) continue;
+      if (!byShipper[shipperId]) {
+        byShipper[shipperId] = {
+          shipperId,
+          shipperName: shipper.fullName,
+          shipperCode: shipper.employeeCode,
+          totalAmount: 0,
+          orders: []
+        };
+      }
+      byShipper[shipperId].totalAmount += Number(payment.amount);
+      byShipper[shipperId].orders.push({
+        paymentId: payment.id,
+        orderId: payment.order.orderId,
+        customerName: payment.order.customer?.name,
+        amount: Number(payment.amount),
+        deliveredAt: payment.order.deliveredAt,
+        shippingAddress: payment.order.shippingAddress
+      });
+    }
+
+    res.json({ success: true, data: Object.values(byShipper) });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// POST /api/v1/ledger/cod-settlement/:shipperId/settle — Kế Toán xác nhận đã
+// thu hồi tiền mặt COD từ 1 shipper cụ thể, đóng toàn bộ khoản còn nợ của
+// shipper đó tại thời điểm này.
+const settleCodForShipper = async (req, res, next) => {
+  try {
+    const shipperId = parseInt(req.params.shipperId, 10);
+    if (!Number.isInteger(shipperId)) {
+      return res.status(400).json({ success: false, message: 'Mã shipper không hợp lệ.' });
+    }
+
+    const settledBy = req.user?.email || req.user?.code || 'Kế toán';
+    const result = await prisma.orderPayment.updateMany({
+      where: {
+        method: 'CASH',
+        status: 'SUCCESS',
+        settledAt: null,
+        order: { assignedShipperId: shipperId }
+      },
+      data: { settledAt: new Date(), settledBy }
+    });
+
+    if (result.count === 0) {
+      return res.status(409).json({ success: false, message: 'Không có khoản COD nào đang chờ đối soát cho shipper này.' });
+    }
+
+    logAudit({ req, action: 'SETTLE_COD', module: 'Kế Toán', targetId: shipperId, note: `${result.count} đơn` });
+    res.json({ success: true, message: `Đã đối soát ${result.count} đơn COD.`, data: { count: result.count } });
+  } catch (err) {
+    next(err);
+  }
+};
+
+module.exports = { getLedger, createLedgerEntry, updateLedgerEntry, deleteLedgerEntry, getCodSettlement, settleCodForShipper };

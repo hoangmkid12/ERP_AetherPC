@@ -6,9 +6,9 @@ import { api } from '../../services/api';
 import { notify, confirm } from '../../context/NotificationContext';
 import { PO_STATUS, VENDOR_BILL_STATUS, getStatusInfo } from '../../utils/statusLabels';
 import { 
-  DollarSign, ArrowUpRight, ArrowDownLeft, FileText, CheckCircle, ShoppingBag, 
-  Search, PlusCircle, Download, X, Eye, Printer, Calendar, CreditCard, Users, 
-  Building2, ArrowRightLeft, ShieldCheck, Check, RefreshCw, FileCheck, PieChart, TrendingUp, Filter, AlertTriangle, Send
+  DollarSign, ArrowUpRight, ArrowDownLeft, FileText, CheckCircle, ShoppingBag,
+  Search, PlusCircle, Download, X, Eye, Printer, Calendar, CreditCard, Users,
+  Building2, ArrowRightLeft, ShieldCheck, Check, RefreshCw, FileCheck, PieChart, TrendingUp, Filter, AlertTriangle, Send, Truck
 } from 'lucide-react';
 import { Bar, Doughnut, Line } from 'react-chartjs-2';
 import { 
@@ -66,6 +66,38 @@ export default function Accountant() {
 
   const [allPOs, setAllPOs] = useState([]);
   const [loadingLedger, setLoadingLedger] = useState(false);
+
+  // Đối soát COD từ Shipper (accounting_settle_cod) — tiền mặt khách trả khi
+  // nhận hàng, shipper đang giữ tới khi Kế Toán thu hồi thật.
+  const [codGroups, setCodGroups] = useState([]);
+  const [loadingCod, setLoadingCod] = useState(false);
+  const [settlingShipperId, setSettlingShipperId] = useState(null);
+
+  const loadCodSettlement = async () => {
+    setLoadingCod(true);
+    try {
+      const res = await api.get('/ledger/cod-settlement');
+      setCodGroups(res.data || []);
+    } catch (err) {
+      notify(err?.message || 'Không thể tải danh sách đối soát COD.', 'error');
+    } finally {
+      setLoadingCod(false);
+    }
+  };
+
+  const handleSettleCod = async (group) => {
+    if (!(await confirm(`Xác nhận đã thu hồi ${fmt(group.totalAmount)} tiền mặt COD từ shipper "${group.shipperName}" (${group.orders.length} đơn)?`))) return;
+    setSettlingShipperId(group.shipperId);
+    try {
+      const res = await api.post(`/ledger/cod-settlement/${group.shipperId}/settle`);
+      notify(res.message || 'Đã đối soát COD thành công.', 'success');
+      loadCodSettlement();
+    } catch (err) {
+      notify(err?.message || 'Không thể đối soát COD.', 'error');
+    } finally {
+      setSettlingShipperId(null);
+    }
+  };
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('ALL');
   
@@ -122,11 +154,15 @@ export default function Accountant() {
     if (typeof getReturnRequests === 'function') getReturnRequests().catch(() => {});
     if (typeof getPayrolls === 'function') getPayrolls().catch(() => {});
     if (typeof getEmployees === 'function') getEmployees().catch(() => {});
+    loadCodSettlement();
   }, []);
 
   useEffect(() => {
     if (activeTab === 'ledger') {
       fetchLedgerData();
+    }
+    if (activeTab === 'cod_settlement') {
+      loadCodSettlement();
     }
   }, [activeTab]);
 
@@ -553,6 +589,7 @@ export default function Accountant() {
             {activeTab === 'refunds' && 'Chi Hoàn Tiền Đổi Trả Khách Hàng'}
             {activeTab === 'ledger' && 'Sổ Cái Kế Toán & Lịch Sử Dòng Tiền'}
             {activeTab === 'po_payments' && 'Thanh Toán Đơn Mua Hàng Nhà Cung Cấp'}
+            {activeTab === 'cod_settlement' && 'Đối Soát Tiền Mặt COD Từ Shipper'}
             {activeTab === 'payroll_disbursement' && 'Chi Trả & Giải Ngân Bảng Lương'}
             {activeTab === 'reports' && 'Báo Cáo Tài Chính P&L & Thuế GTGT'}
           </h2>
@@ -636,6 +673,7 @@ export default function Accountant() {
           { key: 'refunds', label: 'Chi Hoàn Tiền RMA', badge: pendingRefunds.length },
           { key: 'ledger', label: 'Sổ Cái Kế Toán' },
           { key: 'po_payments', label: 'Thanh Toán PO NCC', badge: unpaidPOs.length },
+          { key: 'cod_settlement', label: 'Đối Soát COD Shipper', badge: codGroups.length },
           { key: 'payroll_disbursement', label: 'Chi Trả Lương' },
           { key: 'reports', label: 'Báo Cáo P&L & VAT' }
         ].map(tabItem => {
@@ -1318,6 +1356,89 @@ export default function Accountant() {
       )}
 
       {/* ========================================================================= */}
+      {/* TAB: ĐỐI SOÁT COD TỪ SHIPPER (accounting_settle_cod) */}
+      {/* ========================================================================= */}
+      {activeTab === 'cod_settlement' && (
+        <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+            <p style={{ color: '#64748b', fontSize: '0.82rem', margin: 0 }}>
+              Tiền mặt khách trả trực tiếp cho Shipper khi nhận hàng (COD) — Kế Toán xác nhận đã thu hồi tiền mặt thật từ từng shipper.
+            </p>
+            <button
+              onClick={loadCodSettlement}
+              disabled={loadingCod}
+              style={{ backgroundColor: '#ffffff', color: '#334155', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.45rem 0.85rem', fontSize: '0.8rem', fontWeight: 600, cursor: loadingCod ? 'default' : 'pointer', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+            >
+              <RefreshCw size={14} style={{ animation: loadingCod ? 'spin 1s linear infinite' : 'none' }} />
+              <span>{loadingCod ? 'Đang tải...' : 'Làm Mới'}</span>
+            </button>
+          </div>
+
+          {loadingCod ? (
+            <div style={{ textAlign: 'center', padding: '2.5rem', color: '#94a3b8' }}>Đang tải...</div>
+          ) : codGroups.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '2.5rem', color: '#94a3b8' }}>
+              Không có khoản COD nào đang chờ đối soát — mọi shipper đã bàn giao đủ tiền mặt.
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {codGroups.map(group => {
+                const isBusy = settlingShipperId === group.shipperId;
+                return (
+                  <div key={group.shipperId} style={{ border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.85rem 1rem', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', flexWrap: 'wrap', gap: '0.75rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                        <Truck size={17} style={{ color: '#0ea5e9' }} />
+                        <div>
+                          <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.9rem' }}>{group.shipperName}</div>
+                          <div style={{ fontSize: '0.72rem', color: '#64748b' }}>{group.orders.length} đơn COD chưa đối soát</div>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{ fontSize: '0.72rem', color: '#64748b' }}>Tổng tiền mặt đang giữ</div>
+                          <div style={{ fontWeight: 800, color: '#b45309', fontSize: '1rem' }}>{fmt(group.totalAmount)}</div>
+                        </div>
+                        <button
+                          disabled={isBusy}
+                          onClick={() => handleSettleCod(group)}
+                          style={{ backgroundColor: '#16a34a', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.5rem 1rem', fontSize: '0.8rem', fontWeight: 800, cursor: isBusy ? 'default' : 'pointer', opacity: isBusy ? 0.6 : 1, whiteSpace: 'nowrap' }}
+                        >
+                          {isBusy ? 'Đang xử lý...' : 'Xác Nhận Đã Thu'}
+                        </button>
+                      </div>
+                    </div>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
+                      <thead>
+                        <tr style={{ textAlign: 'left', color: '#94a3b8', fontSize: '0.72rem' }}>
+                          <th style={{ padding: '0.5rem 1rem' }}>Mã Đơn</th>
+                          <th style={{ padding: '0.5rem 1rem' }}>Khách Hàng</th>
+                          <th style={{ padding: '0.5rem 1rem' }}>Địa Chỉ Giao</th>
+                          <th style={{ padding: '0.5rem 1rem' }}>Ngày Giao</th>
+                          <th style={{ padding: '0.5rem 1rem', textAlign: 'right' }}>Số Tiền</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {group.orders.map(o => (
+                          <tr key={o.paymentId} style={{ borderTop: '1px solid #f1f5f9' }}>
+                            <td style={{ padding: '0.55rem 1rem', fontWeight: 700, color: '#0f172a' }}>#{o.orderId}</td>
+                            <td style={{ padding: '0.55rem 1rem', color: '#475569' }}>{o.customerName || 'Khách hàng'}</td>
+                            <td style={{ padding: '0.55rem 1rem', color: '#64748b', fontSize: '0.75rem' }}>{o.shippingAddress}</td>
+                            <td style={{ padding: '0.55rem 1rem', color: '#64748b', fontSize: '0.75rem' }}>{o.deliveredAt ? new Date(o.deliveredAt).toLocaleDateString('vi-VN') : '-'}</td>
+                            <td style={{ padding: '0.55rem 1rem', textAlign: 'right', fontWeight: 700, color: '#0f172a' }}>{fmt(o.amount)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ========================================================================= */}
       {/* TAB 4: PAYROLL DISBURSEMENT (CHI TRẢ BẢNG LƯƠNG) */}
       {/* ========================================================================= */}
       {activeTab === 'payroll_disbursement' && (
@@ -1357,7 +1478,11 @@ export default function Accountant() {
               <tbody>
                 {payrolls.map((p, pIdx) => {
                   const isPaid = p.status === 'PAID';
-                  const isReady = p.status === 'APPROVED_BY_CEO' || p.status === 'SUBMITTED_TO_ACCOUNTING';
+                  // SUBMITTED_TO_ACCOUNTING means HR just filed it — CEO hasn't approved
+                  // yet. Treating that as "ready" let Chi Lương disburse real money before
+                  // the approval step ever ran (the button's own tooltip below already
+                  // claimed CEO approval was required, so this was purely a logic bug).
+                  const isReady = p.status === 'APPROVED_BY_CEO';
                   const isBusy = disbursingPayrollId === p.id;
                   const netAdjust = (parseFloat(p.bonuses) || 0) - (parseFloat(p.deductions) || 0);
                   return (

@@ -292,6 +292,12 @@ model OrderPayment {
   transactionId String?  @map("transaction_id") @db.VarChar(100)
   status        String   @db.VarChar(20)
   createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  // COD cash sits with the shipper until Kế Toán physically collects it —
+  // null means still outstanding, a timestamp means reconciled. Used by the
+  // COD settlement screen (accounting_settle_cod) to know what's still owed
+  // per shipper for CASH-method rows on delivered orders.
+  settledAt     DateTime? @map("settled_at") @db.Timestamptz()
+  settledBy     String?   @map("settled_by") @db.VarChar(100)
 
   order         Order    @relation(fields: [orderId], references: [orderId], onDelete: Cascade)
 

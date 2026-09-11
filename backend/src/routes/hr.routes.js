@@ -361,6 +361,12 @@ router.post('/payrolls/:id/disburse', authMiddleware(['ACCOUNTANT', 'CEO', 'ADMI
     if (payroll.status === 'PAID') {
       return res.status(409).json({ success: false, message: 'Bảng lương này đã được chi trả.' });
     }
+    // Trước đây chỉ chặn 'PAID', nghĩa là 1 bảng lương vừa được HR lập
+    // (SUBMITTED_TO_ACCOUNTING) — CHƯA qua CEO duyệt — vẫn giải ngân được thẳng,
+    // bỏ qua hoàn toàn bước kiểm soát tài chính bắt buộc.
+    if (payroll.status !== 'APPROVED_BY_CEO') {
+      return res.status(409).json({ success: false, message: 'Bảng lương này chưa được Ban Giám Đốc phê duyệt, không thể giải ngân.' });
+    }
 
     const result = await prisma.$transaction(async (tx) => {
       const updated = await tx.payroll.update({
@@ -385,11 +391,15 @@ router.post('/payrolls/:id/disburse', authMiddleware(['ACCOUNTANT', 'CEO', 'ADMI
 });
 
 // POST /api/v1/hr/payrolls/disburse-all – Kế toán giải ngân toàn bộ bảng
-// lương đã CEO duyệt (hoặc đang chờ) trong 1 giao dịch, ghi 1 bút toán/nhân viên.
+// lương đã CEO duyệt trong 1 giao dịch, ghi 1 bút toán/nhân viên.
 router.post('/payrolls/disburse-all', authMiddleware(['ACCOUNTANT', 'CEO', 'ADMIN']), checkOperationalPermission('accounting_disburse_payroll'), async (req, res, next) => {
   try {
+    // 'SUBMITTED_TO_ACCOUNTING' trước đây cũng được coi là "đang chờ" và bị
+    // giải ngân hàng loạt cùng APPROVED_BY_CEO — nghĩa là bảng lương HR vừa
+    // lập, CEO còn chưa xem, vẫn bị chi trả thật. Chỉ APPROVED_BY_CEO mới
+    // được giải ngân.
     const eligible = await prisma.payroll.findMany({
-      where: { status: { in: ['APPROVED_BY_CEO', 'SUBMITTED_TO_ACCOUNTING'] } },
+      where: { status: 'APPROVED_BY_CEO' },
       include: { employee: { select: { fullName: true } } }
     });
     if (eligible.length === 0) {
