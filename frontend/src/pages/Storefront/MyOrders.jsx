@@ -730,39 +730,6 @@ export default function MyOrders() {
             Tra Cứu
           </button>
         </form>
-
-        {/* Quick Suggestion Chips */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap', marginTop: '0.85rem', fontSize: '0.75rem', color: '#64748b' }}>
-          <span style={{ fontWeight: 600 }}>Gợi ý tra cứu nhanh:</span>
-          {[
-            { label: 'Tất cả đơn', val: '' },
-            { label: '0901234567 (Hùng)', val: '0901234567' },
-            { label: '0987654321 (Hoa)', val: '0987654321' },
-            { label: '1231231231 (Hiếu)', val: '1231231231' },
-            { label: '123123 (sang)', val: '123123' }
-          ].map(chip => (
-            <button
-              key={chip.label}
-              type="button"
-              onClick={() => {
-                setPhoneQuery(chip.val);
-                setSearched(true);
-              }}
-              style={{
-                border: '1px solid #cbd5e1',
-                borderRadius: '6px',
-                backgroundColor: phoneQuery === chip.val ? '#eff6ff' : '#f8fafc',
-                color: phoneQuery === chip.val ? '#2563eb' : '#475569',
-                padding: '2px 8px',
-                fontSize: '0.72rem',
-                cursor: 'pointer',
-                fontWeight: 600
-              }}
-            >
-              {chip.label}
-            </button>
-          ))}
-        </div>
       </div>
 
       {searched && matchedOrders.length === 0 && (
