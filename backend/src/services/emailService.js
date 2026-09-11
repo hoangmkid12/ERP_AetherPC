@@ -115,6 +115,92 @@ const getSenderEmail = () => {
   return process.env.GMAIL_USER || process.env.SMTP_USER || 'noreply@aether-erp.vn';
 };
 
+/**
+ * Unified email sender supporting:
+ * 1. Resend HTTP API (HTTPS port 443 - recommended on Railway)
+ * 2. Brevo HTTP API (HTTPS port 443 - recommended on Railway)
+ * 3. Fallback to Nodemailer SMTP (Note: Railway blocks outbound SMTP ports 465/587)
+ */
+const dispatchEmail = async ({ toEmail, customerName, subject, html, attachments = [] }) => {
+  // Option 1: Resend HTTP API (Port 443 HTTPS)
+  if (process.env.RESEND_API_KEY) {
+    const fromAddress = process.env.RESEND_FROM || 'AetherPC <onboarding@resend.dev>';
+    const resendAttachments = attachments.map(att => ({
+      filename: att.filename,
+      content: Buffer.isBuffer(att.content) ? att.content.toString('base64') : att.content
+    }));
+
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.RESEND_API_KEY.trim()}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        from: fromAddress,
+        to: [toEmail],
+        subject,
+        html,
+        ...(resendAttachments.length ? { attachments: resendAttachments } : {})
+      })
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(`Resend API Error: ${data.message || JSON.stringify(data)}`);
+    }
+    return { provider: 'Resend API', id: data.id };
+  }
+
+  // Option 2: Brevo HTTP API (Port 443 HTTPS)
+  if (process.env.BREVO_API_KEY) {
+    const senderEmail = process.env.BREVO_SENDER_EMAIL || process.env.GMAIL_USER || 'support@aetherpc.site';
+    const senderName = process.env.BREVO_SENDER_NAME || 'AetherPC - Hệ Thống ERP';
+    const brevoAttachments = attachments.map(att => ({
+      name: att.filename,
+      content: Buffer.isBuffer(att.content) ? att.content.toString('base64') : att.content
+    }));
+
+    const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: {
+        'api-key': process.env.BREVO_API_KEY.trim(),
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify({
+        sender: { name: senderName, email: senderEmail },
+        to: [{ email: toEmail, name: customerName || 'Khách hàng' }],
+        subject,
+        htmlContent: html,
+        ...(brevoAttachments.length ? { attachment: brevoAttachments } : {})
+      })
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(`Brevo API Error: ${data.message || JSON.stringify(data)}`);
+    }
+    return { provider: 'Brevo API', id: data.messageId };
+  }
+
+  // Option 3: Fallback to Nodemailer SMTP
+  const transporter = getTransporter();
+  if (!transporter) {
+    throw new Error('Chưa cấu hình dịch vụ email (Cần RESEND_API_KEY, BREVO_API_KEY hoặc GMAIL_USER + GMAIL_APP_PASSWORD)');
+  }
+
+  const senderEmail = getSenderEmail();
+  const info = await transporter.sendMail({
+    from: `"AetherPC - Hệ Thống ERP" <${senderEmail}>`,
+    to: toEmail,
+    subject,
+    html,
+    attachments
+  });
+  return { provider: 'Gmail/SMTP', id: info.messageId };
+};
+
 const BRAND = {
   siteUrl: 'https://www.aetherpc.site',
   hotline: '1900 6868',
@@ -386,25 +472,19 @@ const sendOrderConfirmationEmail = async ({ toEmail, customerName, orderId, item
 
   logEmail(emailData);
 
-  const transporter = getTransporter();
-  if (transporter) {
-    try {
-      const senderEmail = getSenderEmail();
-      await transporter.sendMail({
-        from: `"AetherPC - Hệ Thống ERP" <${senderEmail}>`,
-        to: emailData.toEmail,
-        subject: emailData.subject,
-        html
-      });
-      console.log(`[EmailService] ✅ Gửi email xác nhận đơn hàng #${orderId} tới ${emailData.toEmail} thành công!`);
-    } catch (err) {
-      console.error('[EmailService] ❌ Lỗi gửi email:', err.message);
-      if (err.message.includes('Invalid login') || err.message.includes('Username and Password')) {
-        console.error('[EmailService] Gợi ý: Hãy kiểm tra lại GMAIL_USER và GMAIL_APP_PASSWORD trong file .env');
-      }
+  try {
+    const result = await dispatchEmail({
+      toEmail: emailData.toEmail,
+      customerName: emailData.customerName,
+      subject: emailData.subject,
+      html
+    });
+    console.log(`[EmailService] ✅ Gửi email xác nhận đơn hàng #${orderId} tới ${emailData.toEmail} thành công qua ${result.provider}!`);
+  } catch (err) {
+    console.error(`[EmailService] ❌ Lỗi gửi email xác nhận đơn hàng #${orderId}:`, err.message);
+    if (err.message.includes('Connection timeout')) {
+      console.error('[EmailService] 💡 Gợi ý: Railway chặn cổng SMTP 465/587. Thêm biến RESEND_API_KEY hoặc BREVO_API_KEY trên Railway để gửi qua cổng HTTPS 443.');
     }
-  } else {
-    console.log(`[EmailService] ⚠️ Chưa cài SMTP. Email xác nhận đơn hàng ${orderId} đã được log vào file.`);
   }
 
   return emailData;
@@ -476,36 +556,35 @@ const sendOrderStatusUpdateEmail = async ({ toEmail, customerName, orderId, stat
 
   logEmail(emailData);
 
-  const transporter = getTransporter();
-  if (transporter) {
-    try {
-      const senderEmail = getSenderEmail();
-      const mailOptions = {
-        from: `"AetherPC - Hệ Thống ERP" <${senderEmail}>`,
-        to: emailData.toEmail,
-        subject: emailData.subject,
-        html
-      };
-      if (isDelivered && isBase64Proof && rawProofPhoto) {
-        const matches = rawProofPhoto.match(/^data:image\/(\w+);base64,(.+)$/);
-        if (matches) {
-          const ext = matches[1];
-          const base64Data = matches[2];
-          mailOptions.attachments = [{
-            filename: `proof_delivery_${orderId}.${ext}`,
-            content: Buffer.from(base64Data, 'base64'),
-            cid: 'proofimage',
-            contentType: `image/${ext}`
-          }];
-        }
+  try {
+    const attachments = [];
+    if (isDelivered && isBase64Proof && rawProofPhoto) {
+      const matches = rawProofPhoto.match(/^data:image\/(\w+);base64,(.+)$/);
+      if (matches) {
+        const ext = matches[1];
+        const base64Data = matches[2];
+        attachments.push({
+          filename: `proof_delivery_${orderId}.${ext}`,
+          content: Buffer.from(base64Data, 'base64'),
+          cid: 'proofimage',
+          contentType: `image/${ext}`
+        });
       }
-      await transporter.sendMail(mailOptions);
-      console.log(`[EmailService] ✅ Gửi email cập nhật trạng thái #${orderId} → ${statusVN} tới ${emailData.toEmail} thành công!${isBase64Proof ? ' (Kèm ảnh proof CID attachment)' : ''}`);
-    } catch (err) {
-      console.error('[EmailService] ❌ Lỗi gửi email cập nhật trạng thái:', err.message);
     }
-  } else {
-    console.log(`[EmailService] ⚠️ Chưa cài SMTP. Email cập nhật trạng thái đơn ${orderId} đã được log.`);
+
+    const result = await dispatchEmail({
+      toEmail: emailData.toEmail,
+      customerName: emailData.customerName,
+      subject: emailData.subject,
+      html,
+      attachments
+    });
+    console.log(`[EmailService] ✅ Gửi email cập nhật trạng thái #${orderId} → ${statusVN} tới ${emailData.toEmail} thành công qua ${result.provider}!${isBase64Proof ? ' (Kèm ảnh proof CID attachment)' : ''}`);
+  } catch (err) {
+    console.error('[EmailService] ❌ Lỗi gửi email cập nhật trạng thái:', err.message);
+    if (err.message.includes('Connection timeout')) {
+      console.error('[EmailService] 💡 Gợi ý: Railway chặn cổng SMTP 465/587. Thêm biến RESEND_API_KEY hoặc BREVO_API_KEY trên Railway để gửi qua cổng HTTPS 443.');
+    }
   }
 
   return emailData;
@@ -577,24 +656,20 @@ const sendWelcomeEmail = async ({ toEmail, customerName }) => {
 
   logEmail(emailData);
 
-  const transporter = getTransporter();
-  if (transporter) {
-    console.log(`[EmailService] ⏳ Đang kết nối Gmail và gửi thư chào mừng tới ${emailData.toEmail}...`);
-    try {
-      const senderEmail = getSenderEmail();
-      const info = await transporter.sendMail({
-        from: `"AetherPC - Hệ Thống ERP" <${senderEmail}>`,
-        to: emailData.toEmail,
-        subject: emailData.subject,
-        html
-      });
-      console.log(`[EmailService] ✅ Gửi email chào mừng thành công tới ${emailData.toEmail} (ID: ${info?.messageId || 'OK'})`);
-    } catch (err) {
-      console.error('[EmailService] ❌ Lỗi gửi email chào mừng:', err.message || err);
-      if (err.response) console.error('[EmailService] Chi tiết phản hồi từ máy chủ mail:', err.response);
+  try {
+    console.log(`[EmailService] ⏳ Đang gửi email chào mừng tới ${emailData.toEmail}...`);
+    const result = await dispatchEmail({
+      toEmail: emailData.toEmail,
+      customerName: emailData.customerName,
+      subject: emailData.subject,
+      html
+    });
+    console.log(`[EmailService] ✅ Gửi email chào mừng thành công tới ${emailData.toEmail} qua ${result.provider}! (ID: ${result.id})`);
+  } catch (err) {
+    console.error('[EmailService] ❌ Lỗi gửi email chào mừng:', err.message || err);
+    if (err.message && err.message.includes('Connection timeout')) {
+      console.error('[EmailService] 💡 Gợi ý: Railway chặn kết nối SMTP qua cổng 465/587. Vui lòng thêm biến RESEND_API_KEY hoặc BREVO_API_KEY trên Railway Variables để gửi qua cổng HTTPS 443.');
     }
-  } else {
-    console.warn(`[EmailService] ⚠️ Chưa cài SMTP/Gmail App Password (GMAIL_USER: ${process.env.GMAIL_USER ? 'ĐÃ CÓ' : 'CHƯA CÓ'}, GMAIL_APP_PASSWORD: ${process.env.GMAIL_APP_PASSWORD ? 'ĐÃ CÓ' : 'CHƯA CÓ'}). Email chào mừng không được gửi.`);
   }
 
   return emailData;
