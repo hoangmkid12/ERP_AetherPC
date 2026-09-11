@@ -49,6 +49,10 @@ const loginCustomer = async (req, res, next) => {
       return res.status(401).json({ success: false, message: 'Invalid credentials' });
     }
 
+    if (customer.status && customer.status !== 'ACTIVE') {
+      return res.status(403).json({ success: false, message: 'Tài khoản của bạn đã bị vô hiệu hóa. Vui lòng liên hệ CSKH để được hỗ trợ.' });
+    }
+
     const token = jwt.sign(
       { id: customer.customerId, email: customer.email, role: 'CUSTOMER', tier: customer.tier },
       getJWTSecret(),
