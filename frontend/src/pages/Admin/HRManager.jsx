@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useHRStore, useUtilityStore } from '../../stores';
 import { useAuth } from '../../context/AuthContext';
 import { DELIVERY_REGIONS } from '../../utils/deliveryRegions';
-import { ATTENDANCE_STATUS, LEAVE_STATUS, getStatusInfo, getStatusLabel } from '../../utils/statusLabels';
+import { ATTENDANCE_STATUS, LEAVE_STATUS, PAYROLL_STATUS, getStatusInfo, getStatusLabel } from '../../utils/statusLabels';
 import { notify } from '../../context/NotificationContext';
 import { 
   Users, UserPlus, CheckCircle, Clock, XCircle, DollarSign, CalendarCheck, 
@@ -66,6 +66,8 @@ export default function HRManager() {
   const addEmployee = useHRStore(state => state.addEmployee);
   const updateEmployee = useHRStore(state => state.updateEmployee);
   const deleteEmployee = useHRStore(state => state.deleteEmployee);
+  const setEmployeeStatus = useHRStore(state => state.setEmployeeStatus);
+  const resetEmployeePassword = useHRStore(state => state.resetEmployeePassword);
   const leaveRequests = useHRStore(state => state.leaveRequests) || [];
   const approveLeaveRequest = useHRStore(state => state.approveLeaveRequest);
   const rejectLeaveRequest = useHRStore(state => state.rejectLeaveRequest);
@@ -96,7 +98,68 @@ export default function HRManager() {
 
   // Edit employee state
   const [editingEmp, setEditingEmp] = useState(null);
+  const [editForm, setEditForm] = useState(null);
+  const [savingEdit, setSavingEdit] = useState(false);
   const [viewingEmpDetail, setViewingEmpDetail] = useState(null);
+  const [togglingStatusId, setTogglingStatusId] = useState(null);
+
+  const openEditModal = (emp) => {
+    setEditingEmp(emp);
+    setEditForm({
+      fullName: emp.fullname || emp.fullName || '',
+      department: emp.department || 'Kinh Doanh',
+      role: emp.role || 'SALES',
+      phone: emp.phone || '',
+      deliveryRegion: emp.deliveryRegion || 'HCM_KV1',
+      baseSalary: emp.salary || emp.baseSalary || 0
+    });
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingEmp || typeof updateEmployee !== 'function') return;
+    setSavingEdit(true);
+    try {
+      await updateEmployee(editingEmp.id, {
+        fullName: editForm.fullName,
+        department: editForm.department,
+        role: editForm.role,
+        phone: editForm.role === 'DELIVERY' ? editForm.phone : editForm.phone,
+        deliveryRegion: editForm.role === 'DELIVERY' ? editForm.deliveryRegion : null,
+        baseSalary: editForm.baseSalary
+      });
+      notify('Đã cập nhật hồ sơ nhân viên.', 'success');
+      setEditingEmp(null);
+      setEditForm(null);
+    } catch (err) {
+      notify(`Cập nhật thất bại: ${err.message || 'lỗi kết nối máy chủ'}.`, 'error');
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  const handleToggleStatus = async (emp) => {
+    if (typeof setEmployeeStatus !== 'function') return;
+    const nextStatus = emp.status === 'INACTIVE' ? 'ACTIVE' : 'INACTIVE';
+    setTogglingStatusId(emp.id);
+    try {
+      await setEmployeeStatus(emp.id, nextStatus);
+      notify(nextStatus === 'INACTIVE' ? `Đã vô hiệu hóa tài khoản ${emp.fullname}.` : `Đã kích hoạt lại tài khoản ${emp.fullname}.`, 'success');
+    } catch (err) {
+      notify(err.message || 'Không thể cập nhật trạng thái.', 'error');
+    } finally {
+      setTogglingStatusId(null);
+    }
+  };
+
+  const handleResetPassword = async (emp) => {
+    if (typeof resetEmployeePassword !== 'function') return;
+    try {
+      const res = await resetEmployeePassword(emp.id);
+      notify(res?.message || `Đã đặt lại mật khẩu cho ${emp.fullname} về mặc định.`, 'success');
+    } catch (err) {
+      notify(err.message || 'Không thể đặt lại mật khẩu.', 'error');
+    }
+  };
 
   // Search & Filter
   const [search, setSearch] = useState('');
@@ -213,30 +276,14 @@ export default function HRManager() {
     });
   }, [employees, search, roleFilter]);
 
-  // Payroll Calculation
-  const calculatedPayrolls = useMemo(() => {
-    return employees.map((emp, idx) => {
-      const baseSalary = parseInt(emp.salary || emp.baseSalary || 8500000);
-      const commission = emp.role === 'SALES' ? 1250000 : 0;
-      const assemblyBonus = emp.role === 'ASSEMBLY' ? 750000 : 0;
-      const penalty = 50000;
-      const netSalary = baseSalary + commission + assemblyBonus - penalty;
-      return {
-        id: emp.id || idx + 1,
-        empId: emp.id,
-        fullname: emp.fullname,
-        username: emp.username,
-        role: emp.role,
-        department: emp.department || 'Kinh Doanh',
-        baseSalary,
-        commission,
-        assemblyBonus,
-        penalty,
-        netSalary,
-        status: payrolls[0]?.status || 'DRAFT'
-      };
+  // Bảng lương thật — sắp xếp mới nhất trước, theo đúng dữ liệu server tính
+  // (26 ngày công, khấu trừ bảo hiểm 10.5%, hoa hồng/thưởng lắp ráp thật).
+  const sortedPayrolls = useMemo(() => {
+    return [...payrolls].sort((a, b) => {
+      if (a.period !== b.period) return String(b.period).localeCompare(String(a.period));
+      return (a.empName || '').localeCompare(b.empName || '');
     });
-  }, [employees, payrolls]);
+  }, [payrolls]);
 
   const [creatingEmployee, setCreatingEmployee] = useState(false);
   const handleAddEmployee = async () => {
@@ -660,7 +707,7 @@ export default function HRManager() {
                       {fmt(emp.salary || emp.baseSalary)}
                     </td>
                     <td style={{ padding: '0.65rem 0.85rem', textAlign: 'center' }}>
-                      <div style={{ display: 'flex', justifyContent: 'center', gap: '0.35rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'center', gap: '0.3rem', flexWrap: 'wrap' }}>
                         <button
                           onClick={() => setViewingEmpDetail(emp)}
                           style={{ backgroundColor: '#ffffff', color: '#2563eb', border: '1px solid #bfdbfe', borderRadius: '4px', padding: '0.3rem 0.5rem', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}
@@ -668,10 +715,30 @@ export default function HRManager() {
                           Hồ Sơ
                         </button>
                         <button
-                          onClick={() => setEditingEmp(emp)}
+                          onClick={() => openEditModal(emp)}
                           style={{ backgroundColor: '#ffffff', color: '#d97706', border: '1px solid #fde68a', borderRadius: '4px', padding: '0.3rem 0.5rem', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}
                         >
                           Sửa
+                        </button>
+                        <button
+                          onClick={() => handleResetPassword(emp)}
+                          title="Đặt lại mật khẩu về mặc định (123456)"
+                          style={{ backgroundColor: '#ffffff', color: '#7c3aed', border: '1px solid #ddd6fe', borderRadius: '4px', padding: '0.3rem 0.5rem', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}
+                        >
+                          Reset MK
+                        </button>
+                        <button
+                          onClick={() => handleToggleStatus(emp)}
+                          disabled={togglingStatusId === emp.id}
+                          style={{
+                            backgroundColor: '#ffffff',
+                            color: emp.status === 'INACTIVE' ? '#16a34a' : '#dc2626',
+                            border: `1px solid ${emp.status === 'INACTIVE' ? '#bbf7d0' : '#fecaca'}`,
+                            borderRadius: '4px', padding: '0.3rem 0.5rem', fontSize: '0.72rem', fontWeight: 700,
+                            cursor: togglingStatusId === emp.id ? 'default' : 'pointer'
+                          }}
+                        >
+                          {emp.status === 'INACTIVE' ? 'Kích Hoạt' : 'Vô Hiệu Hóa'}
                         </button>
                       </div>
                     </td>
@@ -770,13 +837,13 @@ export default function HRManager() {
       {/* ========================================================================= */}
       {activeTab === 'payroll' && (
         <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
             <div>
               <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
-                Bảng Tính Lương Tháng Tự Động (Kỳ Lương Tháng {today.getMonth() + 1}/{today.getFullYear()})
+                Bảng Lương Thật (Kỳ {today.getMonth() + 1}/{today.getFullYear()} và các kỳ trước)
               </h3>
               <p style={{ color: '#64748b', fontSize: '0.78rem', margin: '0.2rem 0 0' }}>
-                Bao gồm lương cứng, hoa hồng Sales 1%, thưởng ráp PC 150K/bộ và trừ phạt đi muộn
+                Theo 26 ngày công, khấu trừ 10.5% bảo hiểm (BHXH+BHYT+BHTN), hoa hồng Sales theo doanh số thật, thưởng lắp ráp theo số máy đã hoàn thành thật
               </p>
             </div>
 
@@ -785,7 +852,7 @@ export default function HRManager() {
               disabled={submittingPayroll}
               style={{ backgroundColor: submittingPayroll ? '#9ca3af' : '#16a34a', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.45rem 1.1rem', fontSize: '0.8rem', fontWeight: 800, cursor: submittingPayroll ? 'default' : 'pointer', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
             >
-              <Send size={15} /> {submittingPayroll ? 'Đang xử lý...' : 'Gửi Bảng Lương Trình CEO'}
+              <Send size={15} /> {submittingPayroll ? 'Đang xử lý...' : `Lập Bảng Lương Kỳ ${today.getMonth() + 1}/${today.getFullYear()}`}
             </button>
           </div>
 
@@ -793,39 +860,50 @@ export default function HRManager() {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
               <thead>
                 <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569' }}>
+                  <th style={{ padding: '0.65rem 0.85rem' }}>Kỳ Lương</th>
                   <th style={{ padding: '0.65rem 0.85rem' }}>Họ và Tên</th>
                   <th style={{ padding: '0.65rem 0.85rem' }}>Chức Danh</th>
-                  <th style={{ padding: '0.65rem 0.85rem', textAlign: 'right' }}>Lương Cơ Bản</th>
-                  <th style={{ padding: '0.65rem 0.85rem', textAlign: 'right' }}>Hoa Hồng Sales</th>
-                  <th style={{ padding: '0.65rem 0.85rem', textAlign: 'right' }}>Thưởng Ráp PC</th>
-                  <th style={{ padding: '0.65rem 0.85rem', textAlign: 'right' }}>Phạt Đi Muộn</th>
+                  <th style={{ padding: '0.65rem 0.85rem', textAlign: 'right' }}>Lương Theo Công</th>
+                  <th style={{ padding: '0.65rem 0.85rem', textAlign: 'right' }}>Thưởng/Phụ Cấp</th>
+                  <th style={{ padding: '0.65rem 0.85rem', textAlign: 'right' }}>Khấu Trừ BH</th>
                   <th style={{ padding: '0.65rem 0.85rem', textAlign: 'right' }}>Thực Lĩnh (Net)</th>
                   <th style={{ padding: '0.65rem 0.85rem', textAlign: 'center' }}>Trạng Thái</th>
                 </tr>
               </thead>
               <tbody>
-                {calculatedPayrolls.map((p, pIdx) => (
+                {sortedPayrolls.map((p, pIdx) => (
                   <tr key={p.id || pIdx} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                    <td style={{ padding: '0.65rem 0.85rem', fontWeight: 700, color: '#0f172a' }}>{p.fullname}</td>
+                    <td style={{ padding: '0.65rem 0.85rem', color: '#475569', fontWeight: 700 }}>{p.period}</td>
+                    <td style={{ padding: '0.65rem 0.85rem', fontWeight: 700, color: '#0f172a' }}>{p.empName || `NV #${p.empId}`}</td>
                     <td style={{ padding: '0.65rem 0.85rem' }}>
-                      <span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 800, backgroundColor: `${ROLE_COLORS[p.role] || '#6366f1'}15`, color: ROLE_COLORS[p.role] || '#6366f1' }}>
-                        {p.role}
+                      <span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 800, backgroundColor: `${ROLE_COLORS[p.employee?.role] || '#6366f1'}15`, color: ROLE_COLORS[p.employee?.role] || '#6366f1' }}>
+                        {p.employee?.role || '---'}
                       </span>
                     </td>
-                    <td style={{ padding: '0.65rem 0.85rem', textAlign: 'right', color: '#475569' }}>{fmt(p.baseSalary)}</td>
-                    <td style={{ padding: '0.65rem 0.85rem', textAlign: 'right', color: '#16a34a', fontWeight: 600 }}>+{fmt(p.commission)}</td>
-                    <td style={{ padding: '0.65rem 0.85rem', textAlign: 'right', color: '#0ea5e9', fontWeight: 600 }}>+{fmt(p.assemblyBonus)}</td>
-                    <td style={{ padding: '0.65rem 0.85rem', textAlign: 'right', color: '#ef4444', fontWeight: 600 }}>-{fmt(p.penalty)}</td>
+                    <td style={{ padding: '0.65rem 0.85rem', textAlign: 'right', color: '#475569' }}>{fmt(p.salary)}</td>
+                    <td style={{ padding: '0.65rem 0.85rem', textAlign: 'right', color: '#16a34a', fontWeight: 600 }}>+{fmt(p.bonuses)}</td>
+                    <td style={{ padding: '0.65rem 0.85rem', textAlign: 'right', color: '#ef4444', fontWeight: 600 }}>-{fmt(p.deductions)}</td>
                     <td style={{ padding: '0.65rem 0.85rem', textAlign: 'right', fontWeight: 800, color: '#0f172a', fontSize: '0.88rem' }}>
-                      {fmt(p.netSalary)}
+                      {fmt(p.netAmount)}
                     </td>
                     <td style={{ padding: '0.65rem 0.85rem', textAlign: 'center' }}>
-                      <span style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 800, backgroundColor: '#f1f5f9', color: '#475569' }}>
-                        Dự Thảo
+                      <span style={{
+                        padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 800,
+                        backgroundColor: getStatusInfo(PAYROLL_STATUS, p.status).bg,
+                        color: getStatusInfo(PAYROLL_STATUS, p.status).color
+                      }}>
+                        {getStatusLabel(PAYROLL_STATUS, p.status)}
                       </span>
                     </td>
                   </tr>
                 ))}
+                {sortedPayrolls.length === 0 && (
+                  <tr>
+                    <td colSpan={8} style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8', fontSize: '0.85rem' }}>
+                      Chưa có bảng lương nào — bấm "Lập Bảng Lương Kỳ {today.getMonth() + 1}/{today.getFullYear()}" để tạo mới.
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -964,6 +1042,105 @@ export default function HRManager() {
               </div>
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL: SỬA HỒ SƠ NHÂN VIÊN ================= */}
+      {editingEmp && editForm && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(6px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', width: '100%', maxWidth: '480px', padding: '1.75rem', maxHeight: '90vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+              <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>Sửa Hồ Sơ: {editingEmp.fullname}</h3>
+              <button onClick={() => { setEditingEmp(null); setEditForm(null); }} style={{ background: '#f1f5f9', border: 'none', padding: '0.4rem', borderRadius: '6px', cursor: 'pointer' }}><X size={18} /></button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', fontSize: '0.82rem' }}>
+              <div>
+                <label style={{ display: 'block', fontWeight: 700, color: '#0f172a', marginBottom: '0.3rem' }}>Họ và tên</label>
+                <input
+                  type="text"
+                  value={editForm.fullName}
+                  onChange={e => setEditForm(p => ({ ...p, fullName: e.target.value }))}
+                  style={{ width: '100%', padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontWeight: 700, color: '#0f172a', marginBottom: '0.3rem' }}>Chức danh</label>
+                <select
+                  value={editForm.role}
+                  onChange={e => setEditForm(p => ({ ...p, role: e.target.value }))}
+                  style={{ width: '100%', padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
+                >
+                  {Object.keys(ROLE_COLORS).map(r => <option key={r} value={r}>{r}</option>)}
+                </select>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontWeight: 700, color: '#0f172a', marginBottom: '0.3rem' }}>Phòng ban</label>
+                <select
+                  value={editForm.department}
+                  onChange={e => setEditForm(p => ({ ...p, department: e.target.value }))}
+                  style={{ width: '100%', padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
+                >
+                  {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
+                </select>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontWeight: 700, color: '#0f172a', marginBottom: '0.3rem' }}>Số điện thoại</label>
+                <input
+                  type="text"
+                  value={editForm.phone}
+                  onChange={e => setEditForm(p => ({ ...p, phone: e.target.value }))}
+                  style={{ width: '100%', padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
+                />
+              </div>
+
+              {editForm.role === 'DELIVERY' && (
+                <div>
+                  <label style={{ display: 'block', fontWeight: 700, color: '#0f172a', marginBottom: '0.3rem' }}>Khu Vực Giao Hàng</label>
+                  <select
+                    value={editForm.deliveryRegion}
+                    onChange={e => setEditForm(p => ({ ...p, deliveryRegion: e.target.value }))}
+                    style={{ width: '100%', padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
+                  >
+                    {DELIVERY_REGIONS.map(reg => (
+                      <option key={reg.code} value={reg.code}>{reg.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div>
+                <label style={{ display: 'block', fontWeight: 700, color: '#0f172a', marginBottom: '0.3rem' }}>Lương cơ bản (VNĐ)</label>
+                <input
+                  type="number"
+                  value={editForm.baseSalary}
+                  onChange={e => setEditForm(p => ({ ...p, baseSalary: e.target.value }))}
+                  style={{ width: '100%', padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.6rem', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
+                <button
+                  type="button"
+                  onClick={() => { setEditingEmp(null); setEditForm(null); }}
+                  style={{ backgroundColor: '#ffffff', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.45rem 1rem', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}
+                >
+                  Hủy
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveEdit}
+                  disabled={savingEdit}
+                  style={{ backgroundColor: savingEdit ? '#9ca3af' : '#2563eb', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.45rem 1.1rem', fontSize: '0.8rem', fontWeight: 800, cursor: savingEdit ? 'default' : 'pointer' }}
+                >
+                  {savingEdit ? 'Đang lưu...' : 'Lưu Thay Đổi'}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

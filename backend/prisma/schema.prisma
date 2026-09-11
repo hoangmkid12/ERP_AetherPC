@@ -237,9 +237,15 @@ model Order {
   paymentProofPhoto   String?         @map("payment_proof_photo") @db.Text
   receivedByType      String?         @default("DIRECT_CUSTOMER") @map("received_by_type") @db.VarChar(30)
   receiverNameActual  String?         @map("receiver_name_actual") @db.VarChar(150)
+  // Nhân viên Sales đứng quầy POS thực hiện đơn — null cho đơn khách tự đặt ở
+  // storefront. Dùng để tính hoa hồng Sales 1% doanh số thật trong bảng lương
+  // (trước đây createPosOrder ghi đè hẳn req.user thành khách WALK-IN trước
+  // khi tới đây, nên không còn dấu vết nhân viên nào đã bán đơn này).
+  soldById            Int?            @map("sold_by_id")
 
   customer            Customer        @relation(fields: [customerId], references: [customerId])
   assignedShipper Employee?          @relation("ShipperOrders", fields: [assignedShipperId], references: [id])
+  soldBy         Employee?          @relation("SoldOrders", fields: [soldById], references: [id])
   items          OrderItem[]
   statusHistory  OrderStatusHistory[]
   payments       OrderPayment[]
@@ -646,6 +652,7 @@ model Employee {
   leaves         LeaveRequest[] @relation("EmployeeLeaves")
   payrolls       Payroll[]
   deliveredOrders Order[]       @relation("ShipperOrders")
+  soldOrders      Order[]       @relation("SoldOrders")
   handledComplaints Complaint[] @relation("HandledComplaints")
   qcInspections  QcInspection[]
 

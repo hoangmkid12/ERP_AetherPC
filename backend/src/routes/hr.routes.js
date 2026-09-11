@@ -274,13 +274,29 @@ router.get('/payrolls', authMiddleware(['HR', 'CEO', 'ADMIN', 'ACCOUNTANT']), as
   } catch (err) { next(err); }
 });
 
+// GET /api/v1/hr/payrolls/mine – bất kỳ nhân viên nào tự tra cứu phiếu lương
+// CỦA CHÍNH MÌNH (cổng MyPayroll — README §7 nhắc tới nhưng trước đây chưa
+// có route/trang nào thật sự tồn tại; GET /payrolls ở trên chỉ dành riêng
+// cho HR/CEO/Kế Toán xem toàn công ty).
+router.get('/payrolls/mine', authMiddleware(['CEO', 'ADMIN', 'HR', 'SALES', 'SALES_MANAGER', 'WAREHOUSE', 'WAREHOUSE_MANAGER', 'ASSEMBLY', 'ACCOUNTANT', 'PURCHASING', 'CSKH', 'DELIVERY', ...QC_ROLES]), async (req, res, next) => {
+  try {
+    const employeeId = parseInt(req.user.id, 10);
+    const payrolls = await prisma.payroll.findMany({
+      where: { employeeId },
+      include: { employee: { select: { fullName: true, role: true, department: true } } },
+      orderBy: { period: 'desc' }
+    });
+    res.json({ success: true, data: payrolls.map(serializePayroll) });
+  } catch (err) { next(err); }
+});
+
 // POST /api/v1/hr/payrolls – HR lập bảng lương kỳ mới cho toàn bộ nhân viên
 // ACTIVE (body: { period }). Bỏ qua nhân viên đã có bảng lương kỳ đó rồi.
 router.post('/payrolls', authMiddleware(['HR', 'CEO', 'ADMIN']), async (req, res, next) => {
   try {
     const { period } = req.body;
-    if (!period || !String(period).trim()) {
-      return res.status(400).json({ success: false, message: 'Vui lòng nhập kỳ lương (VD: 2026-09).' });
+    if (!period || !/^\d{4}-\d{2}$/.test(String(period).trim())) {
+      return res.status(400).json({ success: false, message: 'Vui lòng nhập kỳ lương đúng định dạng YYYY-MM (VD: 2026-09).' });
     }
 
     const employees = await prisma.employee.findMany({ where: { status: 'ACTIVE' } });
@@ -292,30 +308,96 @@ router.post('/payrolls', authMiddleware(['HR', 'CEO', 'ADMIN']), async (req, res
       return res.status(409).json({ success: false, message: `Bảng lương kỳ ${period} đã được lập cho toàn bộ nhân viên.` });
     }
 
-    // Khớp đúng công thức đã hiển thị ở HRManager.jsx tab "Bảng Lương" (preview
-    // "Dự Thảo" trước khi có route thật): hoa hồng bán hàng cho SALES, thưởng
-    // lắp ráp cho ASSEMBLY, khấu trừ cố định cho mọi nhân viên. Hai mức đầu giờ
-    // đọc từ CompanySettings (Admin > Cấu Hình) thay vì hardcode — quản trị viên
-    // đổi được thật, không còn là hằng số cứng không ai chỉnh nổi.
+    // Công thức theo đúng chuẩn README §6.2 (quy chuẩn 26 ngày công VN):
+    // - Lương ngày công = lương cơ bản / 26 × số ngày công thực nhận trong kỳ.
+    //   Chỉ trừ những ngày CÓ chấm công ghi nhận Vắng/Trễ — ngày chưa chấm
+    //   công (HR không ghi nhận) mặc định coi như đi làm đủ, để tránh phạt oan
+    //   nhân viên chỉ vì HR chưa/không chấm công ngày đó.
+    // - Tăng ca: (lương cơ bản / 26 / 8 giờ) × tổng giờ OT trong kỳ × 150%
+    //   (hệ số tăng ca ngày thường theo Bộ luật Lao động).
+    // - Khấu trừ bảo hiểm bắt buộc 10.5% lương cơ bản (8% BHXH + 1.5% BHYT + 1% BHTN).
+    // - Hoa hồng Sales = % doanh số thật (đơn POS có soldById = nhân viên này,
+    //   trong tháng, chưa hủy/giao thất bại) — không còn là số tiền cố định.
+    // - Thưởng lắp ráp = đơn giá/bộ × số WorkOrder đã COMPLETED thật trong kỳ.
+    const STANDARD_WORKDAYS = 26;
+    const INSURANCE_RATE = 0.105; // 8% BHXH + 1.5% BHYT + 1% BHTN
+    const OVERTIME_MULTIPLIER = 1.5;
+
     const settings = await prisma.companySettings.findUnique({ where: { id: 1 } });
-    const SALES_COMMISSION = settings ? parseFloat(settings.salesCommissionFlat) : 1250000;
-    const ASSEMBLY_BONUS = settings ? parseFloat(settings.assemblyBonus) : 750000;
-    const FLAT_DEDUCTION = 50000;
+    const SALES_COMMISSION_PERCENT = settings ? parseFloat(settings.salesCommissionFlat) : 1;
+    const ASSEMBLY_BONUS_PER_UNIT = settings ? parseFloat(settings.assemblyBonus) : 150000;
+
+    const [year, month] = period.split('-').map(Number);
+    const periodStart = new Date(Date.UTC(year, month - 1, 1));
+    const periodEnd = new Date(Date.UTC(year, month, 1)); // đầu tháng kế tiếp (exclusive)
+
+    const empIds = toCreate.map(e => e.id);
+
+    const attendanceRows = await prisma.attendance.findMany({
+      where: { employeeId: { in: empIds }, date: { gte: periodStart, lt: periodEnd } }
+    });
+    const attendanceByEmp = {};
+    for (const a of attendanceRows) {
+      (attendanceByEmp[a.employeeId] ||= []).push(a);
+    }
+
+    const salesEmpIds = toCreate.filter(e => e.role === 'SALES').map(e => e.id);
+    const revenueByEmp = {};
+    if (salesEmpIds.length > 0) {
+      const revenueGroups = await prisma.order.groupBy({
+        by: ['soldById'],
+        where: {
+          soldById: { in: salesEmpIds },
+          createdAt: { gte: periodStart, lt: periodEnd },
+          status: { notIn: ['CANCELLED', 'FAILED_DELIVERY'] }
+        },
+        _sum: { totalAmount: true }
+      });
+      for (const g of revenueGroups) revenueByEmp[g.soldById] = parseFloat(g._sum.totalAmount) || 0;
+    }
+
+    const assemblyEmpIds = toCreate.filter(e => e.role === 'ASSEMBLY').map(e => e.id);
+    const assembledByEmp = {};
+    if (assemblyEmpIds.length > 0) {
+      const assemblyGroups = await prisma.workOrder.groupBy({
+        by: ['employeeId'],
+        where: {
+          employeeId: { in: assemblyEmpIds },
+          status: 'COMPLETED',
+          completedAt: { gte: periodStart, lt: periodEnd }
+        },
+        _count: { id: true }
+      });
+      for (const g of assemblyGroups) assembledByEmp[g.employeeId] = g._count.id;
+    }
 
     await prisma.payroll.createMany({
       data: toCreate.map(e => {
         const base = parseFloat(e.baseSalary) || 0;
-        const commission = e.role === 'SALES' ? SALES_COMMISSION : 0;
-        const assemblyBonus = e.role === 'ASSEMBLY' ? ASSEMBLY_BONUS : 0;
-        const bonuses = commission + assemblyBonus;
-        const netSalary = base + bonuses - FLAT_DEDUCTION;
+        const dailyRate = base / STANDARD_WORKDAYS;
+        const logs = attendanceByEmp[e.id] || [];
+        const absentDays = logs.filter(l => l.status === 'ABSENT').length;
+        const lateDays = logs.filter(l => l.status === 'LATE').length;
+        const workedDays = Math.max(0, STANDARD_WORKDAYS - absentDays - lateDays * 0.5);
+        const proratedBase = Math.round(dailyRate * workedDays);
+
+        const overtimeHours = logs.reduce((sum, l) => sum + (parseFloat(l.overtimeHours) || 0), 0);
+        const overtimePay = Math.round((dailyRate / 8) * overtimeHours * OVERTIME_MULTIPLIER);
+
+        const commission = e.role === 'SALES' ? Math.round((revenueByEmp[e.id] || 0) * (SALES_COMMISSION_PERCENT / 100)) : 0;
+        const assemblyBonus = e.role === 'ASSEMBLY' ? (assembledByEmp[e.id] || 0) * ASSEMBLY_BONUS_PER_UNIT : 0;
+        const bonuses = overtimePay + commission + assemblyBonus;
+
+        const insuranceDeduction = Math.round(base * INSURANCE_RATE);
+        const netSalary = proratedBase + bonuses - insuranceDeduction;
+
         return {
           employeeId: e.id,
           period,
-          baseSalary: base,
+          baseSalary: proratedBase,
           allowances: 0,
           bonuses,
-          deductions: FLAT_DEDUCTION,
+          deductions: insuranceDeduction,
           netSalary,
           status: 'SUBMITTED_TO_ACCOUNTING'
         };

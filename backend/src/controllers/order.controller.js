@@ -48,6 +48,11 @@ const adjustLoyaltyForOrder = async (tx, customerId, totalAmount, direction) => 
 const createOrder = async (req, res, next) => {
   try {
     const customerId = req.user.id; // Lấy từ authMiddleware JWT
+    // Gắn bởi createPosOrder trước khi nó ghi đè req.user thành khách
+    // WALK-IN — cho biết nhân viên Sales nào đã đứng quầy bán đơn này, dùng
+    // để tính hoa hồng doanh số thật trong bảng lương. null cho đơn khách tự
+    // đặt ở storefront.
+    const soldById = Number.isInteger(req.posEmployeeId) ? req.posEmployeeId : null;
     const { items, paymentMethod, shippingAddress, shippingCity, notes } = req.body;
 
     if (!items || items.length === 0) {
@@ -159,6 +164,7 @@ const createOrder = async (req, res, next) => {
           shippingCity: shippingCity || 'TP. Hồ Chí Minh',
           notes,
           status: initialStatus,
+          soldById,
           items: {
             create: orderItemsData
           }
@@ -313,6 +319,8 @@ const createPosOrder = async (req, res, next) => {
       update: {},
       create: { customerId: 'WALK-IN', email: 'walk-in@aetherpc.local', name: 'Khách mua tại quầy', customerType: 'B2C', tier: 'BRONZE', passwordHash: null }
     });
+    const employeeId = parseInt(req.user?.id, 10);
+    req.posEmployeeId = Number.isInteger(employeeId) ? employeeId : null;
     req.user = { ...req.user, id: 'WALK-IN', role: 'CUSTOMER' };
     return createOrder(req, res, next);
   } catch (err) {

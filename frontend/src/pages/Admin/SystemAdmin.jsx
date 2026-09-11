@@ -1859,17 +1859,23 @@ export default function SystemAdmin() {
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', fontSize: '0.82rem' }}>
                 <div>
-                  <label style={labelStyle}>Hoa Hồng Sales (VNĐ/kỳ lương):</label>
+                  <label style={labelStyle}>Hoa Hồng Sales (% Doanh Số Thực Bán):</label>
                   <input
                     type="number"
+                    step="0.1"
+                    min="0"
+                    max="100"
                     value={companyConfig.salesCommissionFlat}
                     onChange={e => setCompanyConfig(p => ({ ...p, salesCommissionFlat: Number(e.target.value) }))}
                     style={inputStyle}
                   />
+                  <p style={{ margin: '0.3rem 0 0', fontSize: '0.72rem', color: '#94a3b8' }}>
+                    Tính trên tổng giá trị đơn hàng POS nhân viên Sales trực tiếp bán trong kỳ.
+                  </p>
                 </div>
 
                 <div>
-                  <label style={labelStyle}>Thưởng Ráp PC (VNĐ/bộ):</label>
+                  <label style={labelStyle}>Thưởng Ráp PC (VNĐ/bộ đã lắp xong):</label>
                   <input
                     type="number"
                     value={companyConfig.assemblyBonus}

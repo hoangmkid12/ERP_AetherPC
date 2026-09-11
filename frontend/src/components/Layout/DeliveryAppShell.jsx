@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { useSalesStore } from '../../stores';
-import { Home, Package, Truck, Undo2, History, Bell, LogOut } from 'lucide-react';
+import { useSalesStore, useHRStore } from '../../stores';
+import { notify } from '../../context/NotificationContext';
+import { LEAVE_STATUS, getStatusInfo, getStatusLabel } from '../../utils/statusLabels';
+import { Home, Package, Truck, Undo2, History, Bell, LogOut, CalendarCheck, X, Send, Wallet } from 'lucide-react';
 
 const TABS = [
   { id: 'overview', label: 'Tổng Quan', icon: Home },
@@ -34,6 +36,50 @@ export default function DeliveryAppShell({ children }) {
   const orders = useSalesStore(state => state.orders) || [];
 
   const [shipperStatus, setShipperStatus] = useState(() => getInitialShipperStatus(user));
+
+  // Shipper tự xin nghỉ phép của chính mình — cùng API self-service /hr/leaves
+  // đã dùng ở Sidebar.jsx cho các actor khác, vì DeliveryAppShell là shell
+  // riêng (không dùng Sidebar) nên phải khai báo lại ở đây.
+  const createMyLeaveRequest = useHRStore(state => state.createMyLeaveRequest);
+  const getMyLeaveRequests = useHRStore(state => state.getMyLeaveRequests);
+  const [showLeaveModal, setShowLeaveModal] = useState(false);
+  const [myLeaves, setMyLeaves] = useState([]);
+  const [loadingMyLeaves, setLoadingMyLeaves] = useState(false);
+  const [submittingLeave, setSubmittingLeave] = useState(false);
+  const [leaveForm, setLeaveForm] = useState({ type: 'Phép Năm', startDate: '', endDate: '', reason: '' });
+
+  const openLeaveModal = async () => {
+    setShowLeaveModal(true);
+    if (typeof getMyLeaveRequests !== 'function') return;
+    setLoadingMyLeaves(true);
+    try {
+      const data = await getMyLeaveRequests();
+      setMyLeaves(Array.isArray(data) ? data : []);
+    } catch (err) {
+      notify(err.message || 'Không thể tải đơn nghỉ phép của bạn.', 'error');
+    } finally {
+      setLoadingMyLeaves(false);
+    }
+  };
+
+  const handleSubmitLeaveRequest = async () => {
+    if (!leaveForm.startDate || !leaveForm.endDate) {
+      notify('Vui lòng chọn ngày bắt đầu và kết thúc.', 'error');
+      return;
+    }
+    if (typeof createMyLeaveRequest !== 'function') return;
+    setSubmittingLeave(true);
+    try {
+      const created = await createMyLeaveRequest(leaveForm);
+      setMyLeaves(prev => [created, ...prev]);
+      setLeaveForm({ type: 'Phép Năm', startDate: '', endDate: '', reason: '' });
+      notify('Đã gửi đơn xin nghỉ phép, chờ HR/CEO phê duyệt.', 'success');
+    } catch (err) {
+      notify(err.message || 'Không thể gửi đơn xin nghỉ phép.', 'error');
+    } finally {
+      setSubmittingLeave(false);
+    }
+  };
 
   const toggleShipperStatus = () => {
     const online = !shipperStatus.isOnline;
@@ -114,6 +160,22 @@ export default function DeliveryAppShell({ children }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
             <button
               type="button"
+              onClick={openLeaveModal}
+              className="delivery-icon-btn"
+              title="Nghỉ phép của tôi"
+            >
+              <CalendarCheck size={18} />
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate('/admin/my-payroll')}
+              className="delivery-icon-btn"
+              title="Phiếu lương của tôi"
+            >
+              <Wallet size={18} />
+            </button>
+            <button
+              type="button"
               onClick={() => navigate('/admin/delivery?tab=pending')}
               className="delivery-icon-btn"
               title="Thông báo"
@@ -163,6 +225,77 @@ export default function DeliveryAppShell({ children }) {
           })}
         </div>
       </div>
+
+      {showLeaveModal && (
+        <div
+          style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(6px)', zIndex: 100000001, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
+          onClick={() => setShowLeaveModal(false)}
+        >
+          <div
+            style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', width: '100%', maxWidth: '420px', padding: '1.25rem', maxHeight: '85vh', overflowY: 'auto' }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <CalendarCheck size={17} style={{ color: '#7c3aed' }} />
+                Nghỉ Phép Của Tôi
+              </h3>
+              <button onClick={() => setShowLeaveModal(false)} style={{ background: '#f1f5f9', border: 'none', padding: '0.4rem', borderRadius: '6px', cursor: 'pointer' }}><X size={16} /></button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', fontSize: '0.8rem', marginBottom: '1rem', padding: '0.75rem', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+              <select
+                value={leaveForm.type}
+                onChange={e => setLeaveForm(p => ({ ...p, type: e.target.value }))}
+                style={{ width: '100%', padding: '0.4rem 0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1', boxSizing: 'border-box', fontSize: '0.8rem' }}
+              >
+                <option value="Phép Năm">Phép Năm</option>
+                <option value="Nghỉ Ốm">Nghỉ Ốm</option>
+                <option value="Việc Riêng">Việc Riêng</option>
+                <option value="Không Lương">Không Lương</option>
+              </select>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                <input type="date" value={leaveForm.startDate} onChange={e => setLeaveForm(p => ({ ...p, startDate: e.target.value }))} style={{ width: '100%', padding: '0.4rem 0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1', boxSizing: 'border-box', fontSize: '0.8rem' }} />
+                <input type="date" value={leaveForm.endDate} onChange={e => setLeaveForm(p => ({ ...p, endDate: e.target.value }))} style={{ width: '100%', padding: '0.4rem 0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1', boxSizing: 'border-box', fontSize: '0.8rem' }} />
+              </div>
+              <input type="text" placeholder="Lý do xin nghỉ" value={leaveForm.reason} onChange={e => setLeaveForm(p => ({ ...p, reason: e.target.value }))} style={{ width: '100%', padding: '0.4rem 0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1', boxSizing: 'border-box', fontSize: '0.8rem' }} />
+              <button
+                onClick={handleSubmitLeaveRequest}
+                disabled={submittingLeave}
+                style={{ backgroundColor: submittingLeave ? '#9ca3af' : '#7c3aed', color: '#fff', border: 'none', borderRadius: '6px', padding: '0.5rem', fontSize: '0.8rem', fontWeight: 800, cursor: submittingLeave ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}
+              >
+                <Send size={14} /> {submittingLeave ? 'Đang gửi...' : 'Gửi Đơn Xin Nghỉ'}
+              </button>
+            </div>
+
+            {loadingMyLeaves ? (
+              <p style={{ fontSize: '0.8rem', color: '#64748b' }}>Đang tải...</p>
+            ) : myLeaves.length === 0 ? (
+              <p style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Bạn chưa gửi đơn xin nghỉ phép nào.</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                {myLeaves.map((lv, idx) => (
+                  <div key={lv.id || idx} style={{ padding: '0.55rem 0.7rem', borderRadius: '6px', border: '1px solid #e2e8f0', backgroundColor: '#fff', fontSize: '0.76rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <strong style={{ color: '#0f172a' }}>{lv.type || 'Phép Năm'}</strong>
+                      <span style={{
+                        padding: '2px 8px', borderRadius: '10px', fontSize: '0.66rem', fontWeight: 800,
+                        backgroundColor: getStatusInfo(LEAVE_STATUS, ['APPROVED', 'REJECTED'].includes(lv.status) ? lv.status : 'PENDING').bg,
+                        color: getStatusInfo(LEAVE_STATUS, ['APPROVED', 'REJECTED'].includes(lv.status) ? lv.status : 'PENDING').color
+                      }}>
+                        {getStatusLabel(LEAVE_STATUS, ['APPROVED', 'REJECTED'].includes(lv.status) ? lv.status : 'PENDING')}
+                      </span>
+                    </div>
+                    <span style={{ color: '#64748b' }}>
+                      {lv.startDate ? new Date(lv.startDate).toLocaleDateString('vi-VN') : '---'} → {lv.endDate ? new Date(lv.endDate).toLocaleDateString('vi-VN') : '---'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

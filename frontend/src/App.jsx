@@ -42,6 +42,7 @@ const HRManager = lazy(() => import('./pages/Admin/HRManager'));
 const Accountant = lazy(() => import('./pages/Admin/Accountant'));
 const Purchasing = lazy(() => import('./pages/Admin/Purchasing'));
 const SystemAdmin = lazy(() => import('./pages/Admin/SystemAdmin'));
+const MyPayroll = lazy(() => import('./pages/Admin/MyPayroll'));
 const SupplierPortal = lazy(() => import('./pages/SupplierPortal'));
 const CustomerService = lazy(() => import('./pages/Admin/CustomerService'));
 const Delivery = lazy(() => import('./pages/Admin/Delivery'));
@@ -374,6 +375,13 @@ export default function App() {
                       <Delivery />
                     </ProtectedRoute>
                   } />
+
+                  {/* Cổng tự tra cứu phiếu lương — mở cho MỌI nhân viên (không
+                      theo ma trận RBAC module như các trang trên), vì đây là
+                      dữ liệu cá nhân của chính người xem, không phải một
+                      nghiệp vụ theo phòng ban. AdminLayout đã tự kiểm tra
+                      isEmployee ở tầng ngoài. */}
+                  <Route path="my-payroll" element={<MyPayroll />} />
 
                 </Route>
 
