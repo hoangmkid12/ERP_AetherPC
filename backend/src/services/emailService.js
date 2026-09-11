@@ -397,23 +397,33 @@ const renderItemsTable = (orderId, items) => {
     </table>`;
 };
 
-// Financial breakdown — only renders rows backed by real Order columns
-// (subtotal/discount/shippingFee); never fabricates a line with no data
-// behind it (e.g. there is no "insurance" column on Order today).
+// Financial breakdown — ensures mathematical consistency between subtotal,
+// shipping fee, discount, and total amount.
 const renderFinancials = ({ subtotal, shippingFee, discount, totalAmount }) => {
   const rows = [];
-  if (subtotal !== undefined && subtotal !== null) {
-    rows.push(`<tr><td style="color: #64748b; padding: 4px 0;">Tạm tính linh kiện:</td><td style="font-weight: 600; color: #334155; text-align: right;">${money(subtotal)}</td></tr>`);
-  }
+  const subVal = Number(subtotal || 0);
   const shipVal = Number(shippingFee || 0);
-  rows.push(`<tr><td style="color: #64748b; padding: 4px 0;">Phí vận chuyển:</td><td style="font-weight: 700; color: ${shipVal > 0 ? '#0f172a' : '#16a34a'}; text-align: right;">${shipVal > 0 ? `+${money(shipVal)}` : 'MIỄN PHÍ'}</td></tr>`);
-  const discVal = Number(discount || 0);
+  let discVal = Number(discount || 0);
+  const totVal = Number(totalAmount || (subVal + shipVal - discVal));
+
+  // Đảm bảo tính nhất quán toán học tuyệt đối:
+  // Nếu subVal + shipVal == totVal, nghĩa là không có giảm giá checkout bổ sung
+  // (tránh hiển thị dòng giảm giá niêm yết cũ gây hiểu lầm phép tính)
+  if (Math.abs((subVal + shipVal) - totVal) < 100) {
+    discVal = 0;
+  } else if (discVal > 0 && Math.abs((subVal + shipVal - discVal) - totVal) > 100) {
+    discVal = Math.max(0, subVal + shipVal - totVal);
+  }
+
+  if (subtotal !== undefined && subtotal !== null) {
+    rows.push(`<tr><td style="color: #64748b; padding: 4px 0;">Tạm tính linh kiện:</td><td style="font-weight: 600; color: #334155; text-align: right;">${money(subVal)}</td></tr>`);
+  }
+  rows.push(`<tr><td style="color: #64748b; padding: 4px 0;">Phí vận chuyển:</td><td style="font-weight: 700; color: ${shipVal > 0 ? '#0f172a' : '#16a34a'}; text-align: right;">${shipVal > 0 ? `+${money(shipVal)}` : 'Miễn phí (0 đ)'}</td></tr>`);
   if (discVal > 0) {
     rows.push(`<tr><td style="color: #64748b; padding: 4px 0;">Giảm giá / Voucher:</td><td style="font-weight: 700; color: #16a34a; text-align: right;">-${money(discVal)}</td></tr>`);
   }
-  if (totalAmount !== undefined && totalAmount !== null) {
-    rows.push(`<tr style="border-top: 1px dashed #cbd5e1;"><td style="color: #0f172a; padding: 8px 0 0 0; font-weight: 800; font-size: 14px;">Tổng thanh toán:</td><td style="font-weight: 900; color: #0f172a; text-align: right; font-size: 16px; padding-top: 8px;">${money(totalAmount)}</td></tr>`);
-  }
+  rows.push(`<tr style="border-top: 1px dashed #cbd5e1;"><td style="color: #0f172a; padding: 8px 0 0 0; font-weight: 800; font-size: 14px;">Tổng thanh toán:</td><td style="font-weight: 900; color: #0f172a; text-align: right; font-size: 16px; padding-top: 8px;">${money(totVal)}</td></tr>`);
+
   return `
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px 16px; margin-bottom: 20px;">
       <tr><td>

@@ -1017,12 +1017,20 @@ export default function MyOrders() {
                           <div style={{ fontSize: '0.85rem', color: '#475569', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                               <span>Tạm tính ({orderItems.length} sản phẩm):</span>
-                              <span>{formatPrice(selectedOrder.totalAmount)}</span>
+                              <span>{formatPrice(selectedOrder.subtotal || orderItems.reduce((s, it) => s + ((it.price || 0) * (it.quantity || 1)), 0) || selectedOrder.totalAmount)}</span>
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                               <span>Phí vận chuyển:</span>
-                              <span style={{ color: '#16a34a' }}>Miễn phí (0 ₫)</span>
+                              <span style={{ color: Number(selectedOrder.shippingFee || 0) > 0 ? '#0f172a' : '#16a34a', fontWeight: 600 }}>
+                                {Number(selectedOrder.shippingFee || 0) > 0 ? `+${formatPrice(selectedOrder.shippingFee)}` : 'Miễn phí (0 ₫)'}
+                              </span>
                             </div>
+                            {Number(selectedOrder.discount || 0) > 0 && (
+                              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <span>Giảm giá / Voucher:</span>
+                                <span style={{ color: '#16a34a', fontWeight: 600 }}>-{formatPrice(selectedOrder.discount)}</span>
+                              </div>
+                            )}
                             <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #e2e8f0', paddingTop: '0.6rem', marginTop: '0.3rem' }}>
                               <strong style={{ color: '#0f172a' }}>Tổng cộng:</strong>
                               <strong style={{ color: '#ef4444', fontSize: '1.1rem' }}>{formatPrice(selectedOrder.totalAmount)}</strong>

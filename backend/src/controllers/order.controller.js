@@ -119,11 +119,28 @@ const createOrder = async (req, res, next) => {
         else if (tier === 'PLATINUM') tierDiscountPercent = 0.10;
       }
 
+      // Tính toán chiết khấu hạng thành viên & voucher
       const memberDiscount = Math.round(subtotal * tierDiscountPercent);
-      const discountedSubtotal = subtotal - memberDiscount;
+      const couponDiscount = Math.max(0, parseFloat(req.body.couponDiscount || req.body.discountAmount || 0));
+      const orderDiscount = memberDiscount + couponDiscount;
+      const discountedSubtotal = Math.max(0, subtotal - orderDiscount);
 
-      // Phí vận chuyển: Miễn phí cho đơn >= 5.000.000 VNĐ
-      const shippingFee = discountedSubtotal >= 5000000 ? 0 : 30000;
+      // Phí vận chuyển: Đồng bộ chính xác với chính sách Storefront
+      // Miễn phí khi:
+      // 1. Địa chỉ nhận hàng tại Hà Nội hoặc TP. Hồ Chí Minh
+      // 2. Hoặc giá trị đơn hàng sau chiết khấu >= 5.000.000 VNĐ
+      // 3. Hoặc có mã FREESHIP / frontend truyền shippingFee = 0
+      const fullAddressStr = `${shippingAddress || ''} ${shippingCity || ''}`.toLowerCase();
+      const isFreeShipRegion = fullAddressStr.includes('hà nội') || fullAddressStr.includes('ha noi') ||
+                               fullAddressStr.includes('hồ chí minh') || fullAddressStr.includes('ho chi minh') ||
+                               fullAddressStr.includes('tphcm') || fullAddressStr.includes('tp hcm');
+
+      let shippingFee = 30000;
+      if (req.body.shippingFee !== undefined && req.body.shippingFee !== null) {
+        shippingFee = Math.max(0, parseInt(req.body.shippingFee) || 0);
+      } else if (discountedSubtotal >= 5000000 || isFreeShipRegion || req.body.couponCode === 'FREESHIP') {
+        shippingFee = 0;
+      }
       const totalAmount = discountedSubtotal + shippingFee;
 
       // Sinh mã đơn hàng dạng ORD-YYMMDD-XXXX
@@ -147,7 +164,7 @@ const createOrder = async (req, res, next) => {
           orderId: ordCode,
           customerId,
           subtotal,
-          discount: discount + memberDiscount,
+          discount: orderDiscount,
           shippingFee,
           totalAmount,
           paymentMethod,

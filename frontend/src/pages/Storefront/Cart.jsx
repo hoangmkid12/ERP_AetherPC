@@ -582,7 +582,21 @@ export default function Cart() {
         : baseAddress;
 
       const targetEmail = customerEmail || user?.email || '';
-      const orderId = await processCheckout(customerName, phone, itemsForERP, 'ONLINE', finalTotal, fullAddress, paymentMethod, targetEmail);
+      const orderId = await processCheckout(
+        customerName,
+        phone,
+        itemsForERP,
+        'ONLINE',
+        finalTotal,
+        fullAddress,
+        paymentMethod,
+        targetEmail,
+        {
+          shippingFee,
+          discount: (couponDiscount || 0) + (memberDiscountAmount || 0),
+          shippingCity: selectedProvince
+        }
+      );
 
       const invoiceData = {
         customerName,

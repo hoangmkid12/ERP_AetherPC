@@ -175,10 +175,13 @@ export const useSalesStore = create((set, get) => ({
   /**
    * Process checkout for Online & POS orders
    */
-  processCheckout: (customerName, phone, items, type = 'ONLINE', customTotal = null, shippingAddress = '', paymentMethod = 'COD', customerEmail = '') => {
+  processCheckout: (customerName, phone, items, type = 'ONLINE', customTotal = null, shippingAddress = '', paymentMethod = 'COD', customerEmail = '', options = {}) => {
     const dateStr = new Date().toLocaleDateString('vi-VN');
     const newOrderId = `ORD-${Math.floor(100000 + Math.random() * 900000)}`;
-    const totalAmount = customTotal !== null ? customTotal : items.reduce((sum, item) => sum + ((item.price || 0) * (item.quantity || 1)), 0);
+    const subtotalCalc = items.reduce((sum, item) => sum + ((item.price || 0) * (item.quantity || 1)), 0);
+    const shippingFee = options.shippingFee !== undefined ? Number(options.shippingFee) : 0;
+    const discount = options.discount !== undefined ? Number(options.discount) : 0;
+    const totalAmount = customTotal !== null ? customTotal : Math.max(0, subtotalCalc + shippingFee - discount);
 
     let orderStatus = 'PENDING';
     
@@ -224,12 +227,18 @@ export const useSalesStore = create((set, get) => ({
       } catch (e) {}
     }
 
+    const addrStr = (shippingAddress || '').toLowerCase();
+    const inferredCity = options.shippingCity || (addrStr.includes('hà nội') || addrStr.includes('ha noi') ? 'Hà Nội' : 'Hồ Chí Minh');
+
     const newOrder = {
       orderId: newOrderId,
       customerName,
       phone,
       email: userEmail,
       shippingAddress: shippingAddress || (type === 'POS' ? 'Bán tại cửa hàng (POS)' : 'Địa chỉ giao hàng mặc định'),
+      subtotal: subtotalCalc,
+      shippingFee,
+      discount,
       totalAmount,
       date: dateStr,
       status: orderStatus,
@@ -254,7 +263,10 @@ export const useSalesStore = create((set, get) => ({
       items: items.map(it => ({ productId: it.productId || it.id, quantity: it.quantity || 1 })),
       paymentMethod: paymentMethod === 'BANK_TRANSFER' ? 'BANK_TRANSFER' : 'COD',
       shippingAddress: shippingAddress || (type === 'POS' ? 'Bán tại cửa hàng (POS)' : 'Hồ Chí Minh'),
-      shippingCity: 'Hồ Chí Minh',
+      shippingCity: inferredCity,
+      shippingFee,
+      couponDiscount: discount,
+      totalAmount,
       notes: type === 'POS' ? 'Đơn bán lẻ tại quầy (POS)' : 'Đặt hàng online (Đồng bộ)',
       type
     }).catch(err => console.warn('[SalesStore] Checkout sync notice:', err.message));
