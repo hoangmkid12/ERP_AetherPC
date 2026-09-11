@@ -3,6 +3,8 @@ import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { usePermission } from '../../hooks/usePermission';
 import { useInventoryStore, useSalesStore, useFinanceStore, useHRStore, useUtilityStore } from '../../stores';
+import { notify } from '../../context/NotificationContext';
+import { LEAVE_STATUS, getStatusInfo, getStatusLabel } from '../../utils/statusLabels';
 import { 
   BarChart2, 
   ShoppingCart, 
@@ -25,7 +27,10 @@ import {
   ArrowRight,
   MessageSquare,
   RefreshCw,
-  Settings
+  Settings,
+  CalendarCheck,
+  Send,
+  Wallet
 } from 'lucide-react';
 
 export default function Sidebar({ isOpen = false, onClose }) {
@@ -47,6 +52,50 @@ export default function Sidebar({ isOpen = false, onClose }) {
   const [showNotifDrawer, setShowNotifDrawer] = useState(false);
   const [notifFilter, setNotifFilter] = useState('ALL');
   const [dismissedNotifIds, setDismissedNotifIds] = useState([]);
+
+  // Mọi nhân viên (không riêng HR/CEO) tự xin nghỉ phép của chính mình —
+  // backend POST/GET /hr/leaves đã hỗ trợ mọi role từ lâu nhưng trước đây
+  // không có giao diện nào trong toàn bộ frontend gọi tới nó.
+  const createMyLeaveRequest = useHRStore(state => state.createMyLeaveRequest);
+  const getMyLeaveRequests = useHRStore(state => state.getMyLeaveRequests);
+  const [showLeaveModal, setShowLeaveModal] = useState(false);
+  const [myLeaves, setMyLeaves] = useState([]);
+  const [loadingMyLeaves, setLoadingMyLeaves] = useState(false);
+  const [submittingLeave, setSubmittingLeave] = useState(false);
+  const [leaveForm, setLeaveForm] = useState({ type: 'Phép Năm', startDate: '', endDate: '', reason: '' });
+
+  const openLeaveModal = async () => {
+    setShowLeaveModal(true);
+    if (typeof getMyLeaveRequests !== 'function') return;
+    setLoadingMyLeaves(true);
+    try {
+      const data = await getMyLeaveRequests();
+      setMyLeaves(Array.isArray(data) ? data : []);
+    } catch (err) {
+      notify(err.message || 'Không thể tải đơn nghỉ phép của bạn.', 'error');
+    } finally {
+      setLoadingMyLeaves(false);
+    }
+  };
+
+  const handleSubmitLeaveRequest = async () => {
+    if (!leaveForm.startDate || !leaveForm.endDate) {
+      notify('Vui lòng chọn ngày bắt đầu và kết thúc.', 'error');
+      return;
+    }
+    if (typeof createMyLeaveRequest !== 'function') return;
+    setSubmittingLeave(true);
+    try {
+      const created = await createMyLeaveRequest(leaveForm);
+      setMyLeaves(prev => [created, ...prev]);
+      setLeaveForm({ type: 'Phép Năm', startDate: '', endDate: '', reason: '' });
+      notify('Đã gửi đơn xin nghỉ phép, chờ HR/CEO phê duyệt.', 'success');
+    } catch (err) {
+      notify(err.message || 'Không thể gửi đơn xin nghỉ phép.', 'error');
+    } finally {
+      setSubmittingLeave(false);
+    }
+  };
 
   const ceoSubItems = [
     { tab: 'overview', label: 'Tổng Quan Điều Hành' },
@@ -84,6 +133,7 @@ export default function Sidebar({ isOpen = false, onClose }) {
     { tab: 'overview', label: 'Tổng Quan Tài Chính' },
     { tab: 'ledger', label: 'Sổ Cái Dòng Tiền (Ledger)' },
     { tab: 'po_payments', label: 'Thanh Toán Đơn PO', badgeKey: 'pendingQuotedPOs' },
+    { tab: 'cod_settlement', label: 'Đối Soát COD Shipper' },
     { tab: 'payroll_disbursement', label: 'Chi Trả Bảng Lương', badgeKey: 'pendingPayrollApproval' },
     { tab: 'reports', label: 'Báo Cáo P&L & VAT' }
   ];
@@ -106,7 +156,7 @@ export default function Sidebar({ isOpen = false, onClose }) {
 
   const warehouseSubItems = [
     { tab: 'overview', label: 'Tổng Quan Tồn Kho' },
-    { tab: 'backorders', label: 'Đơn Chờ Hàng (Nợ Khách)', badgeKey: 'backordersCount' },
+    { tab: 'backorders', label: 'Đơn Chờ Hàng', badgeKey: 'backordersCount' },
     { tab: 'grn', label: 'Phiếu Nhập Kho', badgeKey: 'pendingReceipts' },
     { tab: 'delivery', label: 'Lệnh Giao Hàng', badgeKey: 'pendingExportCount' },
     { tab: 'intake', label: 'Nhập Trực Tiếp' },
@@ -336,8 +386,10 @@ export default function Sidebar({ isOpen = false, onClose }) {
       }
     }
 
-    // 3. KHO HÀNG (WAREHOUSE): Chỉ nhận cảnh báo tồn kho & đơn hàng cần xuất kho
-    if (['WAREHOUSE', 'ADMIN'].includes(role)) {
+    // 3. KHO HÀNG (WAREHOUSE/WAREHOUSE_MANAGER): Cảnh báo tồn kho & đơn hàng cần xuất kho
+    // — quản lý kho trước đây không nằm trong danh sách này nên không nhận được
+    // cảnh báo gì dù cùng chịu trách nhiệm vận hành kho với thủ kho.
+    if (['WAREHOUSE', 'WAREHOUSE_MANAGER', 'ADMIN'].includes(role)) {
       const lowStock = (inventory || []).filter(item => Number(item.stock) <= Number(item.threshold));
       if (lowStock.length > 0) {
         list.push({
@@ -463,15 +515,18 @@ export default function Sidebar({ isOpen = false, onClose }) {
       });
     }
 
-    // 7. CHĂM SÓC KHÁCH HÀNG (CUSTOMER SERVICE): Chỉ nhận RMA & yêu cầu khách
-    if (['CUSTOMER_SERVICE', 'ADMIN'].includes(role)) {
+    // 7. CHĂM SÓC KHÁCH HÀNG: mã vai trò thật là 'CSKH' (không phải
+    // 'CUSTOMER_SERVICE' — giá trị đó không tồn tại trong hệ thống), nên khối
+    // này trước đây không bao giờ khớp và CSKH không hề nhận được thông báo.
+    // SALES_MANAGER cũng được cấp quyền cskh_handle_tickets nên gộp chung.
+    if (['CSKH', 'SALES_MANAGER', 'ADMIN'].includes(role)) {
       const pendingRMA = (returnRequests || []).filter(r => r.status === 'PENDING' || r.status === 'NEW');
       if (pendingRMA.length > 0) {
         list.push({
           id: 'NOTIF-CSKH-RMA',
           title: `Tiếp nhận ${pendingRMA.length} hồ sơ Đổi trả / Bảo hành (RMA)`,
           desc: `Khách hàng gửi yêu cầu hỗ trợ lỗi linh kiện. CSKH cần đối chiếu hóa đơn và hướng dẫn thu hồi.`,
-          link: '/admin/cskh?tab=rma',
+          link: '/admin/cskh?tab=returns',
           badge: 'CSKH & Bảo Hành',
           badgeColor: '#ea580c',
           category: 'URGENT',
@@ -481,19 +536,57 @@ export default function Sidebar({ isOpen = false, onClose }) {
       }
     }
 
-    // 8. KIỂM ĐỊNH CHẤT LƯỢNG (QA/QC): Lô hàng nhập khẩu cần nghiệm thu
-    if (['QA_QC', 'ADMIN'].includes(role)) {
-      list.push({
-        id: 'NOTIF-QAQC-INSPECTION',
-        title: `Kiểm định chất lượng lô hàng PO mới về`,
-        desc: `Lô hàng linh kiện từ NCC đã về kho. QA/QC cần lấy mẫu ngẫu nhiên kiểm tra tiêu chuẩn AQL trước khi nhập kho.`,
-        link: '/admin/quality-control',
-        badge: 'Kiểm Định QA/QC',
-        badgeColor: '#0284c7',
-        category: 'URGENT',
-        actionText: 'Nghiệm Thu',
-        time: 'Chờ kiểm định'
-      });
+    // 8. KIỂM ĐỊNH CHẤT LƯỢNG: mã vai trò thật là 'QC' (không phải 'QA_QC' —
+    // cũng không tồn tại), nên khối này trước đây không bao giờ khớp. Đồng
+    // thời đổi từ 1 thông báo hiển thị cố định (luôn hiện bất kể có việc hay
+    // không) sang dựa trên số liệu thật (pendingQaCount/pendingReturnsCount,
+    // đã tính sẵn ở trên cho badge sidebar) để đúng "chỉ xem thông báo liên
+    // quan" — QC rảnh việc thì không nên thấy thông báo khẩn cấp giả.
+    if (['QC', 'ADMIN'].includes(role)) {
+      if (pendingQaCount > 0) {
+        list.push({
+          id: 'NOTIF-QC-INSPECTION',
+          title: `Kiểm định chất lượng ${pendingQaCount} lô hàng PO mới về`,
+          desc: `Lô hàng linh kiện từ NCC đã về kho. QC cần lấy mẫu ngẫu nhiên kiểm tra tiêu chuẩn AQL trước khi nhập kho.`,
+          link: '/admin/quality-control?tab=inbound',
+          badge: 'Kiểm Định QA/QC',
+          badgeColor: '#0284c7',
+          category: 'URGENT',
+          actionText: 'Nghiệm Thu',
+          time: 'Chờ kiểm định'
+        });
+      }
+      if (pendingReturnsCount > 0) {
+        list.push({
+          id: 'NOTIF-QC-RMA',
+          title: `Thẩm định ${pendingReturnsCount} hồ sơ đổi trả/bảo hành`,
+          desc: `CSKH đã chuyển hồ sơ RMA — QC cần kiểm tra lỗi kỹ thuật thực tế để kết luận Đạt/Lỗi.`,
+          link: '/admin/quality-control?tab=returns',
+          badge: 'Kiểm Định QA/QC',
+          badgeColor: '#0284c7',
+          category: 'URGENT',
+          actionText: 'Thẩm Định',
+          time: 'Chờ xử lý'
+        });
+      }
+    }
+
+    // 9. LẮP RÁP (ASSEMBLY): Lệnh lắp ráp đang chờ/đang xử lý được bàn giao
+    if (['ASSEMBLY', 'ADMIN'].includes(role)) {
+      const myAssemblyJobs = (assemblyJobs || []).filter(j => j && ['PENDING', 'ASSEMBLING'].includes(j.status));
+      if (myAssemblyJobs.length > 0) {
+        list.push({
+          id: 'NOTIF-ASSEMBLY-JOBS',
+          title: `Có ${myAssemblyJobs.length} lệnh lắp ráp đang chờ xử lý`,
+          desc: `Kho đã bàn giao linh kiện — tiến hành lắp ráp, chạy stress test và dán tem niêm phong trước khi xuất xưởng.`,
+          link: '/admin/assembly?tab=jobs',
+          badge: 'Lắp Ráp',
+          badgeColor: '#0ea5e9',
+          category: 'URGENT',
+          actionText: 'Xem Lệnh Lắp Ráp',
+          time: 'Đang chờ'
+        });
+      }
     }
 
     // Helper for formatting notification timestamp
@@ -861,6 +954,7 @@ export default function Sidebar({ isOpen = false, onClose }) {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', paddingLeft: '1rem', marginTop: '0.25rem', marginBottom: '0.5rem' }}>
                     {[
                       { tab: 'overview', label: 'Tổng Quan Mua Hàng' },
+                      { tab: 'requests', label: 'Yêu Cầu Mua Hàng (PR)', badgeKey: 'prCount' },
                       { tab: 'rfq', label: 'Yêu Cầu Báo Giá (RFQ)', badgeKey: 'rfqCount' },
                       { tab: 'orders', label: 'Đơn Mua Hàng (PO)', badgeKey: 'quotedPoCount' },
                       { tab: 'suppliers', label: 'Nhà Cung Cấp' },
@@ -872,6 +966,13 @@ export default function Sidebar({ isOpen = false, onClose }) {
                       const isSubActive = currentTab === sub.tab;
                       
                       let badgeVal = 0;
+                      if (sub.badgeKey === 'prCount') {
+                        try {
+                          const rawAlerts = JSON.parse(localStorage.getItem('erp_rfq_alert_logs') || '[]');
+                          const unhandled = rawAlerts.filter(a => !a.handled && a.status !== 'HANDLED' && a.status !== 'DONE').length;
+                          badgeVal = unhandled > 0 ? unhandled : 0;
+                        } catch (_) {}
+                      }
                       if (sub.badgeKey === 'rfqCount') {
                         badgeVal = (purchaseOrders || []).filter(p => ['RFQ', 'RFQ_SENT', 'QUOTED', 'QUOTED_PENDING_CEO'].includes(p.status)).length;
                       }
@@ -1268,8 +1369,8 @@ export default function Sidebar({ isOpen = false, onClose }) {
 
         {/* Action Buttons */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-          <button 
-            onClick={() => navigate('/')} 
+          <button
+            onClick={() => navigate('/')}
             className="btn" 
             style={{ 
               padding: '0.5rem 0.4rem', 
@@ -1565,6 +1666,93 @@ export default function Sidebar({ isOpen = false, onClose }) {
         </div>
       );
     })()}
+
+    {/* Modal: Xin Nghỉ Phép Của Tôi (tự phục vụ, mọi role) */}
+    {showLeaveModal && (
+      <div
+        style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(6px)', zIndex: 100000001, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
+        onClick={() => setShowLeaveModal(false)}
+      >
+        <div
+          style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', width: '100%', maxWidth: '480px', padding: '1.5rem', maxHeight: '85vh', overflowY: 'auto' }}
+          onClick={e => e.stopPropagation()}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+            <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <CalendarCheck size={18} style={{ color: '#7c3aed' }} />
+              Nghỉ Phép Của Tôi
+            </h3>
+            <button onClick={() => setShowLeaveModal(false)} style={{ background: '#f1f5f9', border: 'none', padding: '0.4rem', borderRadius: '6px', cursor: 'pointer' }}><X size={16} /></button>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', fontSize: '0.82rem', marginBottom: '1.25rem', padding: '0.85rem', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+              <div>
+                <label style={{ display: 'block', fontWeight: 700, color: '#0f172a', marginBottom: '0.25rem', fontSize: '0.75rem' }}>Loại nghỉ phép</label>
+                <select
+                  value={leaveForm.type}
+                  onChange={e => setLeaveForm(p => ({ ...p, type: e.target.value }))}
+                  style={{ width: '100%', padding: '0.4rem 0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1', boxSizing: 'border-box', fontSize: '0.8rem' }}
+                >
+                  <option value="Phép Năm">Phép Năm</option>
+                  <option value="Nghỉ Ốm">Nghỉ Ốm</option>
+                  <option value="Việc Riêng">Việc Riêng</option>
+                  <option value="Không Lương">Không Lương</option>
+                </select>
+              </div>
+              <div />
+              <div>
+                <label style={{ display: 'block', fontWeight: 700, color: '#0f172a', marginBottom: '0.25rem', fontSize: '0.75rem' }}>Từ ngày</label>
+                <input type="date" value={leaveForm.startDate} onChange={e => setLeaveForm(p => ({ ...p, startDate: e.target.value }))} style={{ width: '100%', padding: '0.4rem 0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1', boxSizing: 'border-box', fontSize: '0.8rem' }} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontWeight: 700, color: '#0f172a', marginBottom: '0.25rem', fontSize: '0.75rem' }}>Đến ngày</label>
+                <input type="date" value={leaveForm.endDate} onChange={e => setLeaveForm(p => ({ ...p, endDate: e.target.value }))} style={{ width: '100%', padding: '0.4rem 0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1', boxSizing: 'border-box', fontSize: '0.8rem' }} />
+              </div>
+            </div>
+            <div>
+              <label style={{ display: 'block', fontWeight: 700, color: '#0f172a', marginBottom: '0.25rem', fontSize: '0.75rem' }}>Lý do</label>
+              <input type="text" placeholder="VD: Về quê giỗ tổ" value={leaveForm.reason} onChange={e => setLeaveForm(p => ({ ...p, reason: e.target.value }))} style={{ width: '100%', padding: '0.4rem 0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1', boxSizing: 'border-box', fontSize: '0.8rem' }} />
+            </div>
+            <button
+              onClick={handleSubmitLeaveRequest}
+              disabled={submittingLeave}
+              style={{ backgroundColor: submittingLeave ? '#9ca3af' : '#7c3aed', color: '#fff', border: 'none', borderRadius: '6px', padding: '0.5rem', fontSize: '0.8rem', fontWeight: 800, cursor: submittingLeave ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}
+            >
+              <Send size={14} /> {submittingLeave ? 'Đang gửi...' : 'Gửi Đơn Xin Nghỉ'}
+            </button>
+          </div>
+
+          <h4 style={{ fontSize: '0.82rem', fontWeight: 800, color: '#0f172a', margin: '0 0 0.6rem' }}>Lịch sử đơn của bạn</h4>
+          {loadingMyLeaves ? (
+            <p style={{ fontSize: '0.8rem', color: '#64748b' }}>Đang tải...</p>
+          ) : myLeaves.length === 0 ? (
+            <p style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Bạn chưa gửi đơn xin nghỉ phép nào.</p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              {myLeaves.map((lv, idx) => (
+                <div key={lv.id || idx} style={{ padding: '0.6rem 0.75rem', borderRadius: '6px', border: '1px solid #e2e8f0', backgroundColor: '#fff', fontSize: '0.78rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <strong style={{ color: '#0f172a' }}>{lv.type || 'Phép Năm'}</strong>
+                    <span style={{
+                      padding: '2px 8px', borderRadius: '10px', fontSize: '0.68rem', fontWeight: 800,
+                      backgroundColor: getStatusInfo(LEAVE_STATUS, ['APPROVED', 'REJECTED'].includes(lv.status) ? lv.status : 'PENDING').bg,
+                      color: getStatusInfo(LEAVE_STATUS, ['APPROVED', 'REJECTED'].includes(lv.status) ? lv.status : 'PENDING').color
+                    }}>
+                      {getStatusLabel(LEAVE_STATUS, ['APPROVED', 'REJECTED'].includes(lv.status) ? lv.status : 'PENDING')}
+                    </span>
+                  </div>
+                  <span style={{ color: '#64748b' }}>
+                    {lv.startDate ? new Date(lv.startDate).toLocaleDateString('vi-VN') : '---'} → {lv.endDate ? new Date(lv.endDate).toLocaleDateString('vi-VN') : '---'}
+                    {lv.reason ? ` — "${lv.reason}"` : ''}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    )}
     </>
   );
 }

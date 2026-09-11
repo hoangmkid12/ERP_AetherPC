@@ -48,6 +48,12 @@ const adjustLoyaltyForOrder = async (tx, customerId, totalAmount, direction) => 
 const createOrder = async (req, res, next) => {
   try {
     const customerId = req.user.id; // Lấy từ authMiddleware JWT
+    // Gắn bởi createPosOrder trước khi nó ghi đè req.user thành khách
+    // WALK-IN — cho biết nhân viên Sales nào đã đứng quầy bán đơn này, dùng
+    // để tính hoa hồng doanh số thật trong bảng lương. null cho đơn khách tự
+    // đặt ở storefront.
+    const soldById = Number.isInteger(req.posEmployeeId) ? req.posEmployeeId : null;
+    const posEmployeeRole = req.posEmployeeRole || null;
     const { items, paymentMethod, shippingAddress, shippingCity, notes } = req.body;
 
     if (!items || items.length === 0) {
@@ -119,12 +125,29 @@ const createOrder = async (req, res, next) => {
         else if (tier === 'PLATINUM') tierDiscountPercent = 0.10;
       }
 
+      // Tính toán chiết khấu hạng thành viên & voucher
       const memberDiscount = Math.round(subtotal * tierDiscountPercent);
-      const discountedSubtotal = subtotal - memberDiscount;
+      const couponDiscount = Math.max(0, parseFloat(req.body.couponDiscount || req.body.discountAmount || 0));
 
-      // Phí vận chuyển: Miễn phí cho đơn >= 5.000.000 VNĐ
-      const shippingFee = discountedSubtotal >= 5000000 ? 0 : 30000;
-      const totalAmount = discountedSubtotal + shippingFee;
+      // Hạn mức chiết khấu bán lẻ tại quầy (POS) — trước đây chỉ chặn ở UI
+      // (SalesPOS.jsx), nhân viên Sales có thể gọi thẳng API để vượt hạn mức
+      // 10% mà không ai duyệt. Chỉ áp dụng cho đơn POS thật (có posEmployeeRole);
+      // khách tự đặt ở storefront không đi qua nhân viên Sales nên không tính.
+      if (posEmployeeRole && couponDiscount > subtotal * 0.10) {
+        const allowed = await hasOperationalPermission(posEmployeeRole, 'sales_approve_discount');
+        if (!allowed) {
+          const error = new Error('Mức chiết khấu vượt quá 10% cần được Quản Lý Bán Hàng hoặc CEO duyệt (quyền "Duyệt chiết khấu bán lẻ vượt hạn mức" trong Ma Trận Phân Quyền).');
+          error.statusCode = 403;
+          throw error;
+        }
+      }
+
+      const orderDiscount = memberDiscount + couponDiscount;
+      const discountedSubtotal = Math.max(0, subtotal - orderDiscount);
+
+      // Phí vận chuyển: Miễn phí vận chuyển 100% toàn quốc cho toàn bộ đơn hàng
+      const shippingFee = 0;
+      const totalAmount = discountedSubtotal;
 
       // Sinh mã đơn hàng dạng ORD-YYMMDD-XXXX
       const dateStr = new Date().toISOString().slice(2, 10).replace(/-/g, '');
@@ -160,7 +183,7 @@ const createOrder = async (req, res, next) => {
           orderId: ordCode,
           customerId,
           subtotal,
-          discount: discount + memberDiscount,
+          discount: orderDiscount,
           shippingFee,
           totalAmount,
           paymentMethod,
@@ -169,12 +192,13 @@ const createOrder = async (req, res, next) => {
           shippingCity: shippingCity || 'TP. Hồ Chí Minh',
           notes,
           status: initialStatus,
+          soldById,
           items: {
             create: orderItemsData
           }
         },
         include: {
-          items: true
+          items: { include: { product: true } }
         }
       });
 
@@ -295,6 +319,9 @@ const createOrder = async (req, res, next) => {
         customerName: customer.name,
         orderId: order.orderId,
         items: order.items,
+        subtotal: order.subtotal,
+        discount: order.discount,
+        shippingFee: order.shippingFee,
         totalAmount: order.totalAmount,
         paymentMethod: order.paymentMethod,
         shippingAddress: order.shippingAddress
@@ -320,6 +347,12 @@ const createPosOrder = async (req, res, next) => {
       update: {},
       create: { customerId: 'WALK-IN', email: 'walk-in@aetherpc.local', name: 'Khách mua tại quầy', customerType: 'B2C', tier: 'BRONZE', passwordHash: null }
     });
+    const employeeId = parseInt(req.user?.id, 10);
+    req.posEmployeeId = Number.isInteger(employeeId) ? employeeId : null;
+    // Vai trò thật của nhân viên đứng quầy, giữ lại trước khi ghi đè req.user
+    // — dùng để kiểm tra quyền sales_approve_discount ở createOrder bên dưới
+    // (không thể dùng req.user.role sau dòng kế tiếp vì lúc đó đã là CUSTOMER).
+    req.posEmployeeRole = req.user?.role || null;
     req.user = { ...req.user, id: 'WALK-IN', role: 'CUSTOMER' };
     return createOrder(req, res, next);
   } catch (err) {
@@ -646,6 +679,16 @@ const updateOrderStatus = async (req, res, next) => {
       const receivedType = req.body.receivedByType || 'DIRECT_CUSTOMER';
       const receiverName = req.body.receiverNameActual || (receivedType === 'DIRECT_CUSTOMER' ? (existingOrder.customer?.name || 'Khách hàng') : 'Người nhận thay');
 
+      // Kho "Xác Nhận Xuất Kho" gửi kèm assignedShipperId/deliveryRegion khi
+      // chuyển SHIPPED (Warehouse.jsx -> salesStore.updateOrderStatus), nhưng
+      // route này trước đây bỏ qua hoàn toàn 2 field đó — Order.assignedShipperId
+      // không bao giờ được ghi thật, nên Delivery.jsx (lọc đơn theo shipper) và
+      // tính năng Đối Soát COD (lọc theo assignedShipperId) không hoạt động.
+      // Chỉ nhận khi là ID nhân viên nội bộ hợp lệ (số nguyên) — shipper ngoài
+      // hệ thống (chọn tự do bằng tên) không có Employee thật để gắn FK vào.
+      const shipperIdRaw = req.body.assignedShipperId;
+      const assignedShipperIdInt = /^\d+$/.test(String(shipperIdRaw ?? '')) ? parseInt(shipperIdRaw, 10) : null;
+
       const updatedOrder = await tx.order.update({
         where: { orderId: id },
         data: {
@@ -664,7 +707,9 @@ const updateOrderStatus = async (req, res, next) => {
           ...(status === 'SHIPPED' ? {
             shippedAt: new Date(),
             failReason: null,
-            failNote: null
+            failNote: null,
+            ...(assignedShipperIdInt !== null ? { assignedShipperId: assignedShipperIdInt } : {}),
+            ...(req.body.deliveryRegion !== undefined ? { deliveryRegion: req.body.deliveryRegion } : {})
           } : {}),
           ...(status === 'CONFIRMED' ? { confirmedAt: new Date() } : {}),
           ...(status === 'CANCELLED' ? {
@@ -730,7 +775,7 @@ const updateOrderStatus = async (req, res, next) => {
     // Gửi email cập nhật trạng thái cho khách hàng
     const updatedOrderFull = await prisma.order.findUnique({
       where: { orderId: id },
-      include: { customer: true, items: true }
+      include: { customer: true, items: { include: { product: true } } }
     });
     if (updatedOrderFull?.customer?.email) {
       sendOrderStatusUpdateEmail({
@@ -740,9 +785,13 @@ const updateOrderStatus = async (req, res, next) => {
         status,
         note: note || req.body.receiverNote || req.body.failReason || null,
         items: updatedOrderFull.items,
+        subtotal: updatedOrderFull.subtotal,
+        discount: updatedOrderFull.discount,
+        shippingFee: updatedOrderFull.shippingFee,
         totalAmount: updatedOrderFull.totalAmount,
-        proofPhoto: req.body.proofPhoto || req.body.proofUrl || null,
-        receiverNote: req.body.receiverNote || null
+        proofPhoto: req.body.proofPhoto || req.body.proofUrl || updatedOrderFull.proofPhoto || null,
+        receiverNote: req.body.receiverNote || updatedOrderFull.receiverNote || null,
+        deliveredTime: updatedOrderFull.deliveredAt || new Date()
       }).catch(err => console.warn('[Email] Lỗi gửi email cập nhật trạng thái:', err.message));
     }
 

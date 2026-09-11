@@ -220,6 +220,21 @@ export default function QualityControl() {
     return raw || '';
   };
 
+  // Resilient PO/RFQ code matching helper (handles PO- vs RFQ- prefixes and IDs)
+  const matchesPoRef = (ref1, ref2) => {
+    if (!ref1 || !ref2) return false;
+    const s1 = String(ref1).trim();
+    const s2 = String(ref2).trim();
+    if (s1 === s2) return true;
+    const d1 = s1.replace(/^(?:PO|RFQ|PR)-/i, '');
+    const d2 = s2.replace(/^(?:PO|RFQ|PR)-/i, '');
+    if (d1 === d2) return true;
+    const m1 = s1.match(/\d+$/);
+    const m2 = s2.match(/\d+$/);
+    if (m1 && m2 && m1[0] === m2[0]) return true;
+    return false;
+  };
+
   const fetchData = async () => {
     setLoading(true);
     let list = [];
@@ -246,7 +261,7 @@ export default function QualityControl() {
     const allPool = [...list];
     if (list.length === 0) {
       [...localOrders, ...purchaseOrders].forEach(po => {
-        const exists = allPool.find(c => String(c.poNumber) === String(po.poNumber) || String(c.id) === String(po.id));
+        const exists = allPool.find(c => matchesPoRef(c.poNumber, po.poNumber) || String(c.id) === String(po.id));
         if (!exists) {
           allPool.push(po);
         }
@@ -255,7 +270,11 @@ export default function QualityControl() {
 
     const finalCombined = allPool.map(po => {
       const targetPoNum = po.poNumber || po.id;
-      const localMatch = localOrders.find(l => String(l.poNumber) === String(targetPoNum) || String(l.id) === String(po.id));
+      const localMatch = localOrders.find(l => 
+        matchesPoRef(l.poNumber, targetPoNum) || 
+        matchesPoRef(l.poNumber, po.id) || 
+        String(l.id) === String(po.id)
+      );
       // When the real API returned data, `po` here is guaranteed to be a real
       // backend order (see the `list.length === 0` gate above) — never let a
       // stale/unrecognized local-cache status overwrite its real status.
@@ -263,11 +282,20 @@ export default function QualityControl() {
         ? { ...po, ...localMatch, status: list.length > 0 ? po.status : (localMatch.status || po.status) }
         : po;
       
-      const log = storedQaLogs.find(l => String(l.poNumber) === String(targetPoNum) || String(l.poNumber) === String(po.id) || String(l.id) === String(po.id));
-      if (log && log.status) {
+      const log = storedQaLogs.find(l => 
+        matchesPoRef(l.poNumber, targetPoNum) || 
+        matchesPoRef(l.poNumber, po.id) || 
+        matchesPoRef(l.poNumber, po.poNumber) || 
+        String(l.id) === String(po.id)
+      );
+      if (log && (log.status || log.decision)) {
+        const isLogPassed = log.status === 'QA_PASSED' || log.decision === 'ACCEPT_ALL' || (Number(log.totalQty) > 0 && Number(log.passedQty) === Number(log.totalQty));
+        const isLogRejected = log.status === 'QA_REJECTED' || log.decision === 'REJECT_ALL';
+        const effectiveStatus = isLogPassed ? 'QA_PASSED' : isLogRejected ? 'QA_REJECTED' : 'QA_PARTIAL';
         merged = {
           ...merged,
-          status: log.status,
+          status: effectiveStatus,
+          decision: log.decision || (isLogPassed ? 'ACCEPT_ALL' : isLogRejected ? 'REJECT_ALL' : 'ACCEPT_PARTIAL'),
           supplierNote: log.notes || merged.supplierNote,
           passedQty: log.passedQty,
           failedQty: log.failedQty
@@ -301,10 +329,51 @@ export default function QualityControl() {
   const PASSED_QA_STATUSES = ['QA_PASSED', 'DONE', 'COMPLETED', 'RECEIVED'];
   const REJECTED_QA_STATUSES = ['QA_REJECTED', 'QA_PARTIAL'];
 
-  const pendingQaPOs = orders.filter(po => PENDING_QA_STATUSES.includes(po.status));
-  const passedQaPOs = orders.filter(po => PASSED_QA_STATUSES.includes(po.status));
-  const partialQaPOs = orders.filter(po => po.status === 'QA_PARTIAL');
-  const rejectedQaPOs = orders.filter(po => po.status === 'QA_REJECTED');
+  const getPoQaStatus = (po) => {
+    if (!po) return 'PENDING';
+    const targetPoNum = po.poNumber || po.id;
+    const log = qaLogs.find(l => 
+      matchesPoRef(l.poNumber, targetPoNum) || 
+      matchesPoRef(l.poNumber, po.id) || 
+      matchesPoRef(l.id, targetPoNum) || 
+      String(l.id) === String(po.id)
+    );
+
+    if (log) {
+      if (log.status === 'QA_PASSED' || log.decision === 'ACCEPT_ALL' || (Number(log.totalQty) > 0 && Number(log.passedQty) === Number(log.totalQty))) {
+        return 'PASSED';
+      }
+      if (log.status === 'QA_REJECTED' || log.decision === 'REJECT_ALL') {
+        return 'REJECTED';
+      }
+      if (log.status === 'QA_PARTIAL' || log.decision === 'ACCEPT_PARTIAL' || (Number(log.failedQty) > 0 && Number(log.passedQty) > 0)) {
+        return 'PARTIAL';
+      }
+    }
+
+    if (PENDING_QA_STATUSES.includes(po.status)) {
+      return 'PENDING';
+    }
+    if (po.status === 'QA_PASSED' || po.decision === 'ACCEPT_ALL' || PASSED_QA_STATUSES.includes(po.status)) {
+      return 'PASSED';
+    }
+    if (po.status === 'QA_REJECTED' || po.decision === 'REJECT_ALL') {
+      return 'REJECTED';
+    }
+    if (po.status === 'QA_PARTIAL' || po.decision === 'ACCEPT_PARTIAL' || (Number(po.failedQty) > 0 && Number(po.passedQty) > 0)) {
+      return 'PARTIAL';
+    }
+    // If not pending and no failed items, treat as passed
+    if (Number(po.failedQty) === 0 || po.failedQty === undefined || po.failedQty === null) {
+      return 'PASSED';
+    }
+    return 'PARTIAL';
+  };
+
+  const pendingQaPOs = orders.filter(po => getPoQaStatus(po) === 'PENDING');
+  const passedQaPOs = orders.filter(po => getPoQaStatus(po) === 'PASSED');
+  const partialQaPOs = orders.filter(po => getPoQaStatus(po) === 'PARTIAL');
+  const rejectedQaPOs = orders.filter(po => getPoQaStatus(po) === 'REJECTED');
 
   const totalInspected = passedQaPOs.length + partialQaPOs.length + rejectedQaPOs.length;
   const passRate = totalInspected > 0 ? Math.round(((passedQaPOs.length + partialQaPOs.length * 0.8) / totalInspected) * 100) : 98;
@@ -486,7 +555,16 @@ export default function QualityControl() {
         qcNotes
       });
     } catch (err) {
-      console.warn('API sync warn:', err);
+      // Previously swallowed silently — the optimistic local update above already
+      // showed "Biên Bản QA/QC Đã Phát Hành" as if it succeeded, while the real
+      // PurchaseOrder.status in the DB stayed unchanged. Kho would then get a
+      // 409 from GRN validateReceipt with no visible reason, since QC's screen
+      // had already reported success. Surface the real error and resync from
+      // the server so the UI reflects the actual (failed) status.
+      notify(err?.message || 'Không thể lưu biên bản QA/QC lên hệ thống — vui lòng thử lại.', 'error');
+      fetchData();
+      setSubmitting(false);
+      return;
     }
 
     if (typeof sendSystemNotification === 'function') {
@@ -1028,17 +1106,23 @@ export default function QualityControl() {
                         <span style={{ color: '#16a34a' }}>{log.passedQty}</span> / {log.totalQty}
                       </td>
                       <td style={{ padding: '0.5rem 0.65rem' }}>
-                        <span style={{
-                          backgroundColor: log.status === 'QA_PASSED' ? '#f0fdf4' : log.status === 'QA_PARTIAL' ? '#fff7ed' : '#fef2f2',
-                          color: log.status === 'QA_PASSED' ? '#15803d' : log.status === 'QA_PARTIAL' ? '#c2410c' : '#dc2626',
-                          border: `1px solid ${log.status === 'QA_PASSED' ? '#bbf7d0' : log.status === 'QA_PARTIAL' ? '#fed7aa' : '#fecaca'}`,
-                          padding: '2px 8px',
-                          borderRadius: '10px',
-                          fontSize: '0.7rem',
-                          fontWeight: 700
-                        }}>
-                          {log.status === 'QA_PASSED' ? 'CHO NHẬP KHO 100%' : log.status === 'QA_PARTIAL' ? 'NHẬP 1 PHẦN' : 'HOÀN TRẢ NCC'}
-                        </span>
+                        {(() => {
+                          const isLogPassed = log.status === 'QA_PASSED' || log.decision === 'ACCEPT_ALL' || (Number(log.totalQty) > 0 && Number(log.passedQty) === Number(log.totalQty));
+                          const isLogRejected = log.status === 'QA_REJECTED' || log.decision === 'REJECT_ALL';
+                          return (
+                            <span style={{
+                              backgroundColor: isLogPassed ? '#f0fdf4' : isLogRejected ? '#fef2f2' : '#fff7ed',
+                              color: isLogPassed ? '#15803d' : isLogRejected ? '#dc2626' : '#c2410c',
+                              border: `1px solid ${isLogPassed ? '#bbf7d0' : isLogRejected ? '#fecaca' : '#fed7aa'}`,
+                              padding: '2px 8px',
+                              borderRadius: '10px',
+                              fontSize: '0.7rem',
+                              fontWeight: 700
+                            }}>
+                              {isLogPassed ? 'CHO NHẬP KHO 100%' : isLogRejected ? 'HOÀN TRẢ NCC' : 'NHẬP 1 PHẦN'}
+                            </span>
+                          );
+                        })()}
                       </td>
                     </tr>
                   ))}
@@ -1113,13 +1197,18 @@ export default function QualityControl() {
                 {orders
                   .filter(po => {
                     const matchesSearch = !searchTerm || (po.poNumber || '').toLowerCase().includes(searchTerm.toLowerCase()) || (po.supplier?.name || po.supplierCode || '').toLowerCase().includes(searchTerm.toLowerCase());
-                    if (statusFilter === 'PENDING') return matchesSearch && PENDING_QA_STATUSES.includes(po.status);
-                    if (statusFilter === 'PASSED') return matchesSearch && PASSED_QA_STATUSES.includes(po.status);
+                    const qaStatus = getPoQaStatus(po);
+                    if (statusFilter === 'PENDING') return matchesSearch && qaStatus === 'PENDING';
+                    if (statusFilter === 'PASSED') return matchesSearch && qaStatus === 'PASSED';
                     return matchesSearch;
                   })
                   .map(po => {
                     const totalQty = po.items?.reduce((s, i) => s + (parseInt(i.quantity) || 1), 0) || po.quantity || 1;
-                    const isPending = PENDING_QA_STATUSES.includes(po.status);
+                    const qaStatus = getPoQaStatus(po);
+                    const isPending = qaStatus === 'PENDING';
+                    const isPassed = qaStatus === 'PASSED';
+                    const isRejected = qaStatus === 'REJECTED';
+                    const isPartial = qaStatus === 'PARTIAL';
                     const formattedDate = po.createdAt 
                       ? new Date(po.createdAt).toLocaleDateString('vi-VN') 
                       : (po.date || po.orderDate || '18/08/2026');
@@ -1143,15 +1232,15 @@ export default function QualityControl() {
                         </td>
                         <td style={{ padding: '0.65rem 0.85rem', textAlign: 'center' }}>
                           <span style={{
-                            backgroundColor: isPending ? '#fffbeb' : po.status === 'QA_PASSED' ? '#f0fdf4' : po.status === 'QA_REJECTED' ? '#fef2f2' : '#fff7ed',
-                            color: isPending ? '#b45309' : po.status === 'QA_PASSED' ? '#15803d' : po.status === 'QA_REJECTED' ? '#dc2626' : '#c2410c',
-                            border: `1px solid ${isPending ? '#fde68a' : po.status === 'QA_PASSED' ? '#bbf7d0' : po.status === 'QA_REJECTED' ? '#fecaca' : '#fed7aa'}`,
+                            backgroundColor: isPending ? '#fffbeb' : isPassed ? '#f0fdf4' : isRejected ? '#fef2f2' : '#fff7ed',
+                            color: isPending ? '#b45309' : isPassed ? '#15803d' : isRejected ? '#dc2626' : '#c2410c',
+                            border: `1px solid ${isPending ? '#fde68a' : isPassed ? '#bbf7d0' : isRejected ? '#fecaca' : '#fed7aa'}`,
                             padding: '2px 8px',
                             borderRadius: '10px',
                             fontSize: '0.72rem',
                             fontWeight: 700
                           }}>
-                            {isPending ? 'CHỜ NGHIỆM THU' : po.status === 'QA_PASSED' ? 'CHO NHẬP KHO 100%' : po.status === 'QA_REJECTED' ? 'TỪ CHỐI QC' : 'NHẬP 1 PHẦN'}
+                            {isPending ? 'CHỜ NGHIỆM THU' : isPassed ? 'CHO NHẬP KHO 100%' : isRejected ? 'TỪ CHỐI QC' : 'NHẬP 1 PHẦN'}
                           </span>
                         </td>
                         <td style={{ padding: '0.65rem 0.85rem', textAlign: 'center' }}>
@@ -1172,13 +1261,16 @@ export default function QualityControl() {
                             <button
                               onClick={() => {
                                 const targetPoNum = po.poNumber || po.id;
-                                const log = qaLogs.find(l => String(l.poNumber) === String(targetPoNum) || String(l.poNumber) === String(po.id) || String(l.id) === String(po.id));
+                                const log = qaLogs.find(l => 
+                                  matchesPoRef(l.poNumber, targetPoNum) || 
+                                  matchesPoRef(l.poNumber, po.id) || 
+                                  matchesPoRef(l.id, targetPoNum) || 
+                                  String(l.id) === String(po.id)
+                                );
                                 if (log) {
                                   setViewingLog(log);
                                 } else {
                                   const totalQty = po.items?.reduce((s, i) => s + (parseInt(i.quantity) || 1), 0) || po.quantity || 1;
-                                  const isRejected = po.status === 'QA_REJECTED';
-                                  const isPartial = po.status === 'QA_PARTIAL';
                                   setViewingLog({
                                     id: `QA-LOG-${targetPoNum}`,
                                     type: 'INBOUND_PO',
@@ -1192,7 +1284,7 @@ export default function QualityControl() {
                                     decision: isRejected ? 'REJECT_ALL' : (isPartial ? 'ACCEPT_PARTIAL' : 'ACCEPT_ALL'),
                                     defectCategory: isRejected || isPartial ? 'PACKAGE_DAMAGED' : 'NONE',
                                     notes: po.supplierNote || 'Lô hàng đã được nghiệm thu kỹ thuật và đối soát tiêu chuẩn chất lượng.',
-                                    status: po.status || 'QA_PASSED'
+                                    status: isRejected ? 'QA_REJECTED' : (isPartial ? 'QA_PARTIAL' : 'QA_PASSED')
                                   });
                                 }
                               }}

@@ -302,9 +302,10 @@ export default function MyOrders() {
       case 'AWAITING_STOCK':
         return { text: 'Chờ hàng về', color: '#f97316', bg: 'rgba(249,115,22,0.1)', border: 'rgba(249,115,22,0.3)' };
       case 'CONFIRMED':
+        return { text: 'Đã xác nhận', color: '#2563eb', bg: 'rgba(37,99,235,0.1)', border: 'rgba(37,99,235,0.3)' };
       case 'PROCESSING':
       case 'PACKED':
-        return { text: 'Chờ lấy hàng', color: '#6366f1', bg: 'rgba(99,102,241,0.1)', border: 'rgba(99,102,241,0.3)' };
+        return { text: 'Chuẩn bị hàng', color: '#6366f1', bg: 'rgba(99,102,241,0.1)', border: 'rgba(99,102,241,0.3)' };
       case 'READY_TO_SHIP':
         return { text: 'Chờ giao hàng', color: '#818cf8', bg: 'rgba(129,140,248,0.1)', border: 'rgba(129,140,248,0.3)' };
       case 'SHIPPED':
@@ -547,7 +548,7 @@ export default function MyOrders() {
 
     // Case 3: Trạng thái Đang Chờ Hàng Về Kho (AWAITING_STOCK)
     if (status === 'AWAITING_STOCK') {
-      const awaitingSteps = ['Chờ xác nhận', 'Chờ hàng về kho', 'Chờ lấy hàng', 'Chờ giao hàng', 'Đang giao hàng', 'Đã giao'];
+      const awaitingSteps = ['Đã đặt hàng', 'Chờ hàng về kho', 'Chuẩn bị hàng', 'Đang giao hàng', 'Đã giao'];
       return (
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative', width: '100%', padding: '0.5rem 0' }}>
           {awaitingSteps.map((stepName, idx) => {
@@ -595,15 +596,19 @@ export default function MyOrders() {
       );
     }
 
-    // Case 5: Quy trình Giao Hàng Tiêu Chuẩn 5 bước
-    const steps = ['Chờ xác nhận', 'Chờ lấy hàng', 'Chờ giao hàng', 'Đang giao hàng', 'Đã giao'];
+    // Case 5: Quy trình Giao Hàng Tiêu Chuẩn 5 bước chuẩn Shopee / TMĐT
+    const steps = [
+      'Đã đặt hàng',
+      status === 'PENDING' ? 'Chờ xác nhận' : 'Đã xác nhận',
+      'Chuẩn bị hàng',
+      'Đang giao hàng',
+      'Đã giao'
+    ];
     
-    let activeIdx = 0;
-    if (status === 'PENDING') {
-      activeIdx = 0;
-    } else if (['CONFIRMED', 'PROCESSING', 'PACKED'].includes(status)) {
+    let activeIdx = 1;
+    if (status === 'PENDING' || status === 'WAITING_PAYMENT') {
       activeIdx = 1;
-    } else if (status === 'READY_TO_SHIP') {
+    } else if (['CONFIRMED', 'PROCESSING', 'PACKED', 'READY_TO_SHIP'].includes(status)) {
       activeIdx = 2;
     } else if (['SHIPPED', 'SHIPPING_FAILED'].includes(status)) {
       activeIdx = 3;
@@ -746,39 +751,6 @@ export default function MyOrders() {
             Tra Cứu
           </button>
         </form>
-
-        {/* Quick Suggestion Chips */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap', marginTop: '0.85rem', fontSize: '0.75rem', color: '#64748b' }}>
-          <span style={{ fontWeight: 600 }}>Gợi ý tra cứu nhanh:</span>
-          {[
-            { label: 'Tất cả đơn', val: '' },
-            { label: '0901234567 (Hùng)', val: '0901234567' },
-            { label: '0987654321 (Hoa)', val: '0987654321' },
-            { label: '1231231231 (Hiếu)', val: '1231231231' },
-            { label: '123123 (sang)', val: '123123' }
-          ].map(chip => (
-            <button
-              key={chip.label}
-              type="button"
-              onClick={() => {
-                setPhoneQuery(chip.val);
-                setSearched(true);
-              }}
-              style={{
-                border: '1px solid #cbd5e1',
-                borderRadius: '6px',
-                backgroundColor: phoneQuery === chip.val ? '#eff6ff' : '#f8fafc',
-                color: phoneQuery === chip.val ? '#2563eb' : '#475569',
-                padding: '2px 8px',
-                fontSize: '0.72rem',
-                cursor: 'pointer',
-                fontWeight: 600
-              }}
-            >
-              {chip.label}
-            </button>
-          ))}
-        </div>
       </div>
 
       {searched && matchedOrders.length === 0 && (
@@ -1033,12 +1005,20 @@ export default function MyOrders() {
                           <div style={{ fontSize: '0.85rem', color: '#475569', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                               <span>Tạm tính ({orderItems.length} sản phẩm):</span>
-                              <span>{formatPrice(selectedOrder.totalAmount)}</span>
+                              <span>{formatPrice(selectedOrder.subtotal || orderItems.reduce((s, it) => s + ((it.price || 0) * (it.quantity || 1)), 0) || selectedOrder.totalAmount)}</span>
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                               <span>Phí vận chuyển:</span>
-                              <span style={{ color: '#16a34a' }}>Miễn phí (0 ₫)</span>
+                              <span style={{ color: '#16a34a', fontWeight: 600 }}>
+                                Miễn phí (0 ₫)
+                              </span>
                             </div>
+                            {Number(selectedOrder.discount || 0) > 0 && (
+                              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <span>Giảm giá / Voucher:</span>
+                                <span style={{ color: '#16a34a', fontWeight: 600 }}>-{formatPrice(selectedOrder.discount)}</span>
+                              </div>
+                            )}
                             <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #e2e8f0', paddingTop: '0.6rem', marginTop: '0.3rem' }}>
                               <strong style={{ color: '#0f172a' }}>Tổng cộng:</strong>
                               <strong style={{ color: '#ef4444', fontSize: '1.1rem' }}>{formatPrice(selectedOrder.totalAmount)}</strong>

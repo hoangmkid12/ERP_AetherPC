@@ -4,6 +4,7 @@ import { useInventoryStore, useSalesStore } from '../../stores';
 import { useAuth } from '../../context/AuthContext';
 import { usePermission } from '../../hooks/usePermission';
 import { useNotification, notify } from '../../context/NotificationContext';
+import { api } from '../../services/api';
 import { ORDER_STATUS, getStatusInfo } from '../../utils/statusLabels';
 import ActorNotificationBar from '../../components/ActorNotificationBar';
 import { 
@@ -87,6 +88,10 @@ const formatCurrency = (amount) => {
   return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount || 0);
 };
 
+// Trạng thái còn có thể hủy trực tiếp từ Bán Hàng — SHIPPED trở đi phải đi
+// qua luồng Đổi/Trả (return request) chứ không hủy thẳng, vì hàng đã rời kho.
+const CANCELLABLE_ORDER_STATUSES = ['PENDING', 'WAITING_PAYMENT', 'AWAITING_STOCK', 'CONFIRMED', 'PACKED', 'PROCESSING', 'READY_TO_SHIP'];
+
 const formatDate = (dateStr) => {
   if (!dateStr) return 'Chưa rõ';
   const d = parseDateVal(dateStr);
@@ -151,6 +156,151 @@ export default function SalesPOS() {
   const [customerSearch, setCustomerSearch] = useState('');
   const [customerTierFilter, setCustomerTierFilter] = useState('ALL');
 
+  // Real customer ACCOUNT management (add/edit/deactivate/delete) — separate
+  // from the order-derived CRM stats above, backed by the real Customer table
+  // via /api/v1/customer-accounts. Write actions are backend-gated to
+  // CEO/ADMIN/SALES_MANAGER; plain SALES/CSKH only get read access.
+  const canManageCustomerAccounts = canDo('sales_manage_customers') || isCEO || isAdmin || isSalesManager;
+  const [customerStatusFilter, setCustomerStatusFilter] = useState('ALL');
+  const [customerAccounts, setCustomerAccounts] = useState([]);
+  const [customerAccountsLoading, setCustomerAccountsLoading] = useState(false);
+  const [customerPage, setCustomerPage] = useState(1);
+  const [customerTotalPages, setCustomerTotalPages] = useState(1);
+  const [customerTotalCount, setCustomerTotalCount] = useState(0);
+  const CUSTOMER_ITEMS_PER_PAGE = 12;
+  const [showCustomerFormModal, setShowCustomerFormModal] = useState(false);
+  const [editingCustomer, setEditingCustomer] = useState(null); // null = create mode
+  const [customerFormData, setCustomerFormData] = useState({});
+  const [customerFormSaving, setCustomerFormSaving] = useState(false);
+  const [customerActionBusyId, setCustomerActionBusyId] = useState(null);
+  const [orderActionBusyId, setOrderActionBusyId] = useState(null);
+
+  const loadCustomerAccounts = async () => {
+    setCustomerAccountsLoading(true);
+    try {
+      const params = new URLSearchParams({
+        page: String(customerPage),
+        limit: String(CUSTOMER_ITEMS_PER_PAGE)
+      });
+      if (customerSearch.trim()) params.set('search', customerSearch.trim());
+      if (customerStatusFilter !== 'ALL') params.set('status', customerStatusFilter);
+      const res = await api.get(`/customer-accounts?${params.toString()}`);
+      setCustomerAccounts(res.data || []);
+      setCustomerTotalPages(res.pagination?.totalPages || 1);
+      setCustomerTotalCount(res.pagination?.total || 0);
+    } catch (err) {
+      notify(err?.message || 'Không thể tải danh sách khách hàng.', 'error');
+    } finally {
+      setCustomerAccountsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab !== 'customers') return;
+    const timer = setTimeout(() => { loadCustomerAccounts(); }, 300);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, customerPage, customerSearch, customerStatusFilter]);
+
+  // Tier filter is applied client-side on the current page (real Customer.tier
+  // values: BRONZE/SILVER/GOLD/PLATINUM/B2B) — search/status filter server-side.
+  const filteredCustomerAccounts = useMemo(() => {
+    if (customerTierFilter === 'ALL') return customerAccounts;
+    return customerAccounts.filter(c => c.tier === customerTierFilter);
+  }, [customerAccounts, customerTierFilter]);
+
+  const openCreateCustomerModal = () => {
+    setEditingCustomer(null);
+    setCustomerFormData({ name: '', email: '', username: '', phone: '', address: '', city: '', tier: 'BRONZE', password: '' });
+    setShowCustomerFormModal(true);
+  };
+
+  const openEditCustomerModal = (cust) => {
+    setEditingCustomer(cust);
+    setCustomerFormData({
+      name: cust.name || '', email: cust.email || '', phone: cust.phone || '',
+      address: cust.address || '', city: cust.city || '', tier: cust.tier || 'BRONZE'
+    });
+    setShowCustomerFormModal(true);
+  };
+
+  const handleSaveCustomer = async () => {
+    if (!customerFormData.name?.trim() || !customerFormData.email?.trim()) {
+      notify('Vui lòng nhập đầy đủ Họ tên và Email.', 'error');
+      return;
+    }
+    setCustomerFormSaving(true);
+    try {
+      if (editingCustomer) {
+        await api.put(`/customer-accounts/${editingCustomer.customerId}`, {
+          name: customerFormData.name,
+          email: customerFormData.email,
+          phone: customerFormData.phone,
+          address: customerFormData.address,
+          city: customerFormData.city,
+          tier: customerFormData.tier
+        });
+        notify(`Đã cập nhật thông tin khách hàng "${customerFormData.name}".`, 'success');
+      } else {
+        await api.post('/customer-accounts', customerFormData);
+        notify(`Đã tạo tài khoản khách hàng "${customerFormData.name}" thành công.`, 'success');
+      }
+      setShowCustomerFormModal(false);
+      loadCustomerAccounts();
+    } catch (err) {
+      notify(err?.message || 'Không thể lưu thông tin khách hàng.', 'error');
+    } finally {
+      setCustomerFormSaving(false);
+    }
+  };
+
+  const handleToggleCustomerStatus = async (cust) => {
+    const nextStatus = cust.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
+    const label = nextStatus === 'INACTIVE' ? 'vô hiệu hóa' : 'kích hoạt lại';
+    if (!window.confirm(`Xác nhận ${label} tài khoản "${cust.name}"?`)) return;
+    setCustomerActionBusyId(cust.customerId);
+    try {
+      await api.patch(`/customer-accounts/${cust.customerId}/status`, { status: nextStatus });
+      notify(`Đã ${label} tài khoản "${cust.name}".`, 'success');
+      loadCustomerAccounts();
+    } catch (err) {
+      notify(err?.message || 'Không thể cập nhật trạng thái.', 'error');
+    } finally {
+      setCustomerActionBusyId(null);
+    }
+  };
+
+  const handleResetCustomerPassword = async (cust) => {
+    if (!window.confirm(`Đặt lại mật khẩu của "${cust.name}" về mặc định (123456)?`)) return;
+    setCustomerActionBusyId(cust.customerId);
+    try {
+      const res = await api.patch(`/customer-accounts/${cust.customerId}/reset-password`);
+      notify(res.message || 'Đã đặt lại mật khẩu.', 'success');
+    } catch (err) {
+      notify(err?.message || 'Không thể đặt lại mật khẩu.', 'error');
+    } finally {
+      setCustomerActionBusyId(null);
+    }
+  };
+
+  const handleDeleteCustomer = async (cust) => {
+    if (cust.orderCount > 0) {
+      notify(`Khách hàng "${cust.name}" đã có ${cust.orderCount} đơn hàng — hãy vô hiệu hóa thay vì xóa.`, 'error');
+      return;
+    }
+    if (!window.confirm(`Xóa VĨNH VIỄN tài khoản "${cust.name}"? Hành động này không thể hoàn tác.`)) return;
+    setCustomerActionBusyId(cust.customerId);
+    try {
+      await api.delete(`/customer-accounts/${cust.customerId}`);
+      notify(`Đã xóa tài khoản "${cust.name}".`, 'success');
+      loadCustomerAccounts();
+    } catch (err) {
+      notify(err?.message || 'Không thể xóa tài khoản.', 'error');
+    } finally {
+      setCustomerActionBusyId(null);
+    }
+  };
+
   // Catalog (Danh Mục Sản Phẩm) State — Sales Manager toggles storefront visibility here,
   // scoped to the narrow PATCH .../visibility endpoint (can't touch price/stock/NCC).
   const [catalogSearch, setCatalogSearch] = useState('');
@@ -176,13 +326,92 @@ export default function SalesPOS() {
     }
   };
 
-  // Promotions State
-  const [promotionsList, setPromotionsList] = useState([
-    { code: 'SUMMER2026', title: 'Khuyến mãi Hè Rực Rỡ', discount: 10, type: 'PERCENT', minSpend: 5000000, expiry: '30/08/2026', status: 'ACTIVE' },
-    { code: 'VIPGAMING', title: 'Tri Ân Khách Hàng VIP PC Gaming', discount: 500000, type: 'FIXED', minSpend: 15000000, expiry: '31/12/2026', status: 'ACTIVE' },
-    { code: 'BUILDPC', title: 'Ưu đãi giảm giá khi Build trọn bộ PC', discount: 8, type: 'PERCENT', minSpend: 10000000, expiry: '15/09/2026', status: 'ACTIVE' },
-    { code: 'FREESHIP', title: 'Miễn phí vận chuyển hỏa tốc nội thành', discount: 100000, type: 'FIXED', minSpend: 2000000, expiry: '31/10/2026', status: 'ACTIVE' }
-  ]);
+  // Promotions State — trước đây chỉ là 4 mã hardcode trong state, không CRUD
+  // được gì (sales_manage_promotions là quyền "ma"). Giờ nối API thật.
+  const [promotionsList, setPromotionsList] = useState([]);
+  const [promotionsLoading, setPromotionsLoading] = useState(false);
+  const [showPromoFormModal, setShowPromoFormModal] = useState(false);
+  const [editingPromo, setEditingPromo] = useState(null); // null = create mode
+  const [promoFormData, setPromoFormData] = useState({});
+  const [promoFormSaving, setPromoFormSaving] = useState(false);
+  const [promoActionBusyId, setPromoActionBusyId] = useState(null);
+
+  const loadPromotions = async () => {
+    setPromotionsLoading(true);
+    try {
+      const res = await api.get('/promotions');
+      setPromotionsList(res.data || []);
+    } catch (err) {
+      notify(err?.message || 'Không thể tải danh sách khuyến mãi.', 'error');
+    } finally {
+      setPromotionsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab !== 'promotions') return;
+    loadPromotions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
+
+  const openCreatePromoModal = () => {
+    setEditingPromo(null);
+    setPromoFormData({ code: '', title: '', type: 'PERCENT', discount: '', minSpend: '', expiresAt: '' });
+    setShowPromoFormModal(true);
+  };
+
+  const openEditPromoModal = (promo) => {
+    setEditingPromo(promo);
+    setPromoFormData({
+      title: promo.title || '',
+      type: promo.type || 'PERCENT',
+      discount: promo.discount ?? '',
+      minSpend: promo.minSpend ?? '',
+      expiresAt: promo.expiresAt ? String(promo.expiresAt).slice(0, 10) : ''
+    });
+    setShowPromoFormModal(true);
+  };
+
+  const handleSavePromo = async () => {
+    if (!editingPromo && !promoFormData.code?.trim()) {
+      notify('Vui lòng nhập mã khuyến mãi.', 'error');
+      return;
+    }
+    if (!promoFormData.title?.trim() || !promoFormData.discount) {
+      notify('Vui lòng nhập đầy đủ Tên chương trình và Mức giảm.', 'error');
+      return;
+    }
+    setPromoFormSaving(true);
+    try {
+      if (editingPromo) {
+        await api.put(`/promotions/${editingPromo.id}`, promoFormData);
+        notify(`Đã cập nhật khuyến mãi "${editingPromo.code}".`, 'success');
+      } else {
+        await api.post('/promotions', promoFormData);
+        notify(`Đã tạo khuyến mãi "${promoFormData.code}" thành công.`, 'success');
+      }
+      setShowPromoFormModal(false);
+      loadPromotions();
+    } catch (err) {
+      notify(err?.message || 'Không thể lưu khuyến mãi.', 'error');
+    } finally {
+      setPromoFormSaving(false);
+    }
+  };
+
+  const handleDeletePromo = async (promo) => {
+    if (!window.confirm(`Xóa VĨNH VIỄN khuyến mãi "${promo.code}"? Hành động này không thể hoàn tác.`)) return;
+    setPromoActionBusyId(promo.id);
+    try {
+      await api.delete(`/promotions/${promo.id}`);
+      notify(`Đã xóa khuyến mãi "${promo.code}".`, 'success');
+      loadPromotions();
+    } catch (err) {
+      notify(err?.message || 'Không thể xóa khuyến mãi.', 'error');
+    } finally {
+      setPromoActionBusyId(null);
+    }
+  };
 
   // POS Add to Cart
   const handleAddToCart = (product) => {
@@ -257,17 +486,27 @@ export default function SalesPOS() {
     // Call ERP Context Checkout
     let orderId = `POS-${Date.now().toString().slice(-6)}`;
     if (typeof processCheckout === 'function') {
-      const resId = await processCheckout(
-        posCustomerName || 'Khách Mua Tại Quầy', 
-        posCustomerPhone || '0901234567', 
-        itemsForERP, 
-        'POS',
-        finalTotal,
-        'Bán tại cửa hàng (POS)',
-        posPaymentMethod || 'CASH',
-        ''
-      );
-      if (resId) orderId = resId;
+      try {
+        const resId = await processCheckout(
+          posCustomerName || 'Khách Mua Tại Quầy',
+          posCustomerPhone || '0901234567',
+          itemsForERP,
+          'POS',
+          finalTotal,
+          'Bán tại cửa hàng (POS)',
+          posPaymentMethod || 'CASH',
+          '',
+          // Mức chiết khấu thật (VNĐ) — trước đây không truyền options nên
+          // couponDiscount luôn gửi lên backend bằng 0 dù nhân viên đã nhập %
+          // giảm giá, khiến đơn thật (một khi hết bị 403 âm thầm) sẽ tính
+          // tiền đầy đủ, sai lệch với số tiền in trên hóa đơn giấy.
+          { discount: (subTotal * posDiscountPercent) / 100 }
+        );
+        if (resId) orderId = resId;
+      } catch (err) {
+        notify(err.message || 'Không thể tạo đơn bán lẻ — vui lòng thử lại.', 'error');
+        return;
+      }
     }
 
     const receiptData = {
@@ -383,19 +622,6 @@ export default function SalesPOS() {
     return Object.values(custMap).sort((a, b) => b.totalSpent - a.totalSpent);
   }, [orders]);
 
-  const getCustomerTier = (c) => (c.totalSpent >= 20000000 ? 'VIP' : c.totalSpent >= 5000000 ? 'LOYAL' : 'REGULAR');
-
-  const filteredCustomers = useMemo(() => {
-    return derivedCustomers.filter(c => {
-      const matchSearch = !customerSearch.trim() ||
-        c.name.toLowerCase().includes(customerSearch.toLowerCase()) ||
-        c.phone.includes(customerSearch) ||
-        c.email.toLowerCase().includes(customerSearch.toLowerCase());
-      const matchTier = customerTierFilter === 'ALL' || getCustomerTier(c) === customerTierFilter;
-      return matchSearch && matchTier;
-    });
-  }, [derivedCustomers, customerSearch, customerTierFilter]);
-
   // Order Status Change Action
   const handleUpdateOrderStatus = async (orderId, newStatus) => {
     if (!orderId || updatingOrderId) return; // prevent double-click
@@ -412,6 +638,27 @@ export default function SalesPOS() {
       notify(`Không thể cập nhật đơn hàng #${orderId}: ${err?.message || 'Lỗi kết nối máy chủ'}`, 'error');
     } finally {
       setUpdatingOrderId(null);
+    }
+  };
+
+  // Hủy đơn hàng — quyền sales_cancel_order đã được backend chặn đúng từ
+  // lâu (order.controller.js), nhưng chưa hề có nút thao tác nào gọi tới ở
+  // bất kỳ trang nào trong toàn bộ ứng dụng. Chờ backend xác nhận trước khi
+  // cập nhật UI (không lạc quan cập nhật trước như handleUpdateOrderStatus ở
+  // trên), để không hiện toast "thành công" giả khi bị chặn quyền.
+  const handleCancelOrder = async (orderId) => {
+    if (!window.confirm(`Xác nhận hủy đơn hàng #${orderId}? Thao tác này không thể hoàn tác.`)) return;
+    setOrderActionBusyId(orderId);
+    try {
+      await updateOrderStatus(orderId, 'CANCELLED', 'Hủy bởi nhân viên bán hàng');
+      if (selectedDetailOrder && (selectedDetailOrder.orderId === orderId || selectedDetailOrder.id === orderId)) {
+        setSelectedDetailOrder(prev => ({ ...prev, status: 'CANCELLED' }));
+      }
+      notify(`Đã hủy đơn hàng #${orderId}.`, 'success');
+    } catch (err) {
+      notify(err.message || 'Không thể hủy đơn hàng này.', 'error');
+    } finally {
+      setOrderActionBusyId(null);
     }
   };
 
@@ -1140,6 +1387,15 @@ export default function SalesPOS() {
                                 ) : 'Xác Nhận'}
                               </button>
                             )}
+                            {canCancelOrder && CANCELLABLE_ORDER_STATUSES.includes(o.status) && (
+                              <button
+                                onClick={() => handleCancelOrder(o.orderId || o.id)}
+                                disabled={orderActionBusyId === (o.orderId || o.id)}
+                                style={{ backgroundColor: '#ffffff', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '4px', padding: '0.3rem 0.6rem', fontSize: '0.75rem', fontWeight: 700, cursor: orderActionBusyId === (o.orderId || o.id) ? 'not-allowed' : 'pointer', opacity: orderActionBusyId === (o.orderId || o.id) ? 0.6 : 1 }}
+                              >
+                                {orderActionBusyId === (o.orderId || o.id) ? 'Đang hủy...' : 'Hủy Đơn'}
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -1160,15 +1416,24 @@ export default function SalesPOS() {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '1rem' }}>
             <div>
               <h2 style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                <span>Hồ Sơ & Danh Bạ Khách Hàng</span>
+                <span>Tài Khoản & Hồ Sơ Khách Hàng</span>
                 <span style={{ fontSize: '0.78rem', padding: '2px 10px', borderRadius: '12px', fontWeight: 800, backgroundColor: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe' }}>
-                  Tổng {derivedCustomers.length} Khách Hàng
+                  Tổng {customerTotalCount} Khách Hàng
                 </span>
               </h2>
               <p style={{ color: '#64748b', fontSize: '0.85rem', margin: '0.25rem 0 0' }}>
-                Quản lý lịch sử giao dịch, tổng chi tiêu tích lũy và chăm sóc khách hàng thân thiết — đang hiển thị {filteredCustomers.length}/{derivedCustomers.length} khách hàng
+                Quản lý tài khoản khách hàng thật trong hệ thống — thêm mới, chỉnh sửa, vô hiệu hóa hoặc xóa.
               </p>
             </div>
+            {canManageCustomerAccounts && (
+              <button
+                onClick={openCreateCustomerModal}
+                style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '8px', padding: '0.65rem 1.1rem', fontSize: '0.83rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+              >
+                <Plus size={16} />
+                <span>Thêm Khách Hàng Mới</span>
+              </button>
+            )}
           </div>
 
           {/* Filter bar */}
@@ -1179,15 +1444,15 @@ export default function SalesPOS() {
             border: '1px solid #cbd5e1',
             marginBottom: '1.25rem',
             display: 'grid',
-            gridTemplateColumns: 'minmax(220px, 2fr) minmax(180px, 1fr)',
+            gridTemplateColumns: 'minmax(220px, 2fr) minmax(160px, 1fr) minmax(160px, 1fr)',
             gap: '0.75rem',
             alignItems: 'center'
           }}>
             <input
               type="text"
-              placeholder="Tìm theo tên, SĐT, email khách..."
+              placeholder="Tìm theo tên, SĐT, email, tên đăng nhập..."
               value={customerSearch}
-              onChange={(e) => setCustomerSearch(e.target.value)}
+              onChange={(e) => { setCustomerPage(1); setCustomerSearch(e.target.value); }}
               style={{ width: '100%', height: '38px', padding: '0 0.85rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px', boxSizing: 'border-box' }}
             />
             <select
@@ -1195,101 +1460,157 @@ export default function SalesPOS() {
               onChange={(e) => setCustomerTierFilter(e.target.value)}
               style={{ width: '100%', height: '38px', padding: '0 0.65rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px', color: '#0f172a', boxSizing: 'border-box', backgroundColor: '#ffffff', cursor: 'pointer' }}
             >
-              <option value="ALL">Tất cả hạng khách hàng</option>
-              <option value="VIP">Hạng Vàng (VIP)</option>
-              <option value="LOYAL">Thành Viên Bạc</option>
-              <option value="REGULAR">Khách Thường</option>
+              <option value="ALL">Tất cả hạng thành viên</option>
+              <option value="BRONZE">Hạng Đồng</option>
+              <option value="SILVER">Hạng Bạc</option>
+              <option value="GOLD">Hạng Vàng</option>
+              <option value="PLATINUM">Hạng Kim Cương</option>
+            </select>
+            <select
+              value={customerStatusFilter}
+              onChange={(e) => { setCustomerPage(1); setCustomerStatusFilter(e.target.value); }}
+              style={{ width: '100%', height: '38px', padding: '0 0.65rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px', color: '#0f172a', boxSizing: 'border-box', backgroundColor: '#ffffff', cursor: 'pointer' }}
+            >
+              <option value="ALL">Tất cả trạng thái</option>
+              <option value="ACTIVE">Đang hoạt động</option>
+              <option value="INACTIVE">Đã vô hiệu hóa</option>
             </select>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.25rem' }}>
-            {filteredCustomers.length === 0 ? (
-              <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '3rem', color: '#94a3b8', backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
-                Không tìm thấy khách hàng nào phù hợp với bộ lọc.
-              </div>
-            ) : filteredCustomers.map((cust, idx) => {
-              const tier = getCustomerTier(cust);
-              const isVIP = tier === 'VIP';
-              const isLoyal = tier === 'LOYAL';
-
-              return (
-                <div key={idx} style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                  <div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-                        <div style={{ width: '38px', height: '38px', borderRadius: '8px', backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2563eb', fontWeight: 800, fontSize: '0.9rem' }}>
-                          {cust.name ? cust.name[0]?.toUpperCase() : 'K'}
-                        </div>
-                        <div>
-                          <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: '#0f172a' }}>{cust.name}</h4>
-                          <span style={{ fontSize: '0.72rem', color: '#64748b' }}>Đơn gần nhất: {formatDate(cust.lastOrderDate)}</span>
-                        </div>
-                      </div>
-                      <span style={{
-                        fontSize: '0.68rem',
-                        fontWeight: 800,
-                        padding: '2px 8px',
-                        borderRadius: '10px',
-                        backgroundColor: isVIP ? '#fef3c7' : isLoyal ? '#eff6ff' : '#f1f5f9',
-                        color: isVIP ? '#b45309' : isLoyal ? '#2563eb' : '#64748b',
-                        border: `1px solid ${isVIP ? '#fde68a' : isLoyal ? '#bfdbfe' : '#e2e8f0'}`
-                      }}>
-                        {isVIP ? 'Hạng Vàng (VIP)' : isLoyal ? 'Thành Viên Bạc' : 'Khách Thường'}
-                      </span>
-                    </div>
-
-                    <div style={{ fontSize: '0.8rem', color: '#475569', display: 'flex', flexDirection: 'column', gap: '0.35rem', marginBottom: '1rem' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                        <Phone size={13} style={{ color: '#64748b' }} /> {cust.phone}
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                        <MapPin size={13} style={{ color: '#64748b' }} /> {cust.address}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div>
-                    <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '0.75rem', marginBottom: '0.85rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div>
-                        <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block' }}>Giao dịch</span>
-                        <strong style={{ fontSize: '0.85rem', color: '#0f172a' }}>{cust.orderCount} Đơn Hàng</strong>
-                      </div>
-                      <div style={{ textAlign: 'right' }}>
-                        <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block' }}>Tổng Tích Lũy</span>
-                        <strong style={{ fontSize: '0.85rem', color: '#16a34a' }}>{formatCurrency(cust.totalSpent)}</strong>
-                      </div>
-                    </div>
-
-                    <button
-                      onClick={() => {
-                        setPosCustomerName(cust.name);
-                        setPosCustomerPhone(cust.phone);
-                        setTab('pos');
-                      }}
-                      style={{
-                        width: '100%',
-                        backgroundColor: '#eff6ff',
-                        color: '#2563eb',
-                        border: '1px solid #bfdbfe',
-                        borderRadius: '6px',
-                        padding: '0.45rem',
-                        fontSize: '0.78rem',
-                        fontWeight: 700,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '0.3rem'
-                      }}
-                    >
-                      <Plus size={14} />
-                      <span>Tạo Đơn POS Cho Khách Này</span>
-                    </button>
-                  </div>
+          {customerAccountsLoading ? (
+            <div style={{ textAlign: 'center', padding: '3rem', color: '#94a3b8' }}>Đang tải danh sách khách hàng...</div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.25rem' }}>
+              {filteredCustomerAccounts.length === 0 ? (
+                <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '3rem', color: '#94a3b8', backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
+                  Không tìm thấy khách hàng nào phù hợp với bộ lọc.
                 </div>
-              );
-            })}
-          </div>
+              ) : filteredCustomerAccounts.map((cust) => {
+                const isInactive = cust.status !== 'ACTIVE';
+                const isBusy = customerActionBusyId === cust.customerId;
+                const tierLabels = { BRONZE: 'Hạng Đồng', SILVER: 'Hạng Bạc', GOLD: 'Hạng Vàng', PLATINUM: 'Hạng Kim Cương' };
+
+                return (
+                  <div key={cust.customerId} style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: `1px solid ${isInactive ? '#fecaca' : '#cbd5e1'}`, padding: '1.25rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', opacity: isInactive ? 0.75 : 1 }}>
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                          <div style={{ width: '38px', height: '38px', borderRadius: '8px', backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2563eb', fontWeight: 800, fontSize: '0.9rem' }}>
+                            {cust.name ? cust.name[0]?.toUpperCase() : 'K'}
+                          </div>
+                          <div>
+                            <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: '#0f172a' }}>{cust.name}</h4>
+                            <span style={{ fontSize: '0.72rem', color: '#64748b' }}>Tham gia: {formatDate(cust.createdAt)}</span>
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', alignItems: 'flex-end' }}>
+                          <span style={{ fontSize: '0.68rem', fontWeight: 800, padding: '2px 8px', borderRadius: '10px', backgroundColor: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe' }}>
+                            {tierLabels[cust.tier] || cust.tier || 'Khách Thường'}
+                          </span>
+                          <span style={{ fontSize: '0.68rem', fontWeight: 800, padding: '2px 8px', borderRadius: '10px', backgroundColor: isInactive ? '#fef2f2' : '#f0fdf4', color: isInactive ? '#dc2626' : '#16a34a', border: `1px solid ${isInactive ? '#fecaca' : '#bbf7d0'}` }}>
+                            {isInactive ? 'Đã vô hiệu hóa' : 'Đang hoạt động'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div style={{ fontSize: '0.8rem', color: '#475569', display: 'flex', flexDirection: 'column', gap: '0.35rem', marginBottom: '1rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                          <Phone size={13} style={{ color: '#64748b' }} /> {cust.phone || 'Chưa cập nhật'}
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                          <MapPin size={13} style={{ color: '#64748b' }} /> {cust.address || cust.city || 'Chưa cập nhật'}
+                        </div>
+                        <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{cust.email}</div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '0.75rem', marginBottom: '0.85rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div>
+                          <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block' }}>Giao dịch</span>
+                          <strong style={{ fontSize: '0.85rem', color: '#0f172a' }}>{cust.orderCount} Đơn Hàng</strong>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block' }}>Tổng Tích Lũy</span>
+                          <strong style={{ fontSize: '0.85rem', color: '#16a34a' }}>{formatCurrency(cust.totalSpent)}</strong>
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() => {
+                          setPosCustomerName(cust.name);
+                          setPosCustomerPhone(cust.phone);
+                          setTab('pos');
+                        }}
+                        style={{ width: '100%', backgroundColor: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', borderRadius: '6px', padding: '0.45rem', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem', marginBottom: canManageCustomerAccounts ? '0.5rem' : 0 }}
+                      >
+                        <Plus size={14} />
+                        <span>Tạo Đơn POS Cho Khách Này</span>
+                      </button>
+
+                      {canManageCustomerAccounts && (
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.4rem' }}>
+                          <button
+                            disabled={isBusy}
+                            onClick={() => openEditCustomerModal(cust)}
+                            style={{ backgroundColor: '#f8fafc', color: '#334155', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.4rem', fontSize: '0.75rem', fontWeight: 700, cursor: isBusy ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem' }}
+                          >
+                            <FileText size={13} /> Sửa
+                          </button>
+                          <button
+                            disabled={isBusy}
+                            onClick={() => handleToggleCustomerStatus(cust)}
+                            style={{ backgroundColor: isInactive ? '#f0fdf4' : '#fff7ed', color: isInactive ? '#16a34a' : '#c2410c', border: `1px solid ${isInactive ? '#bbf7d0' : '#fed7aa'}`, borderRadius: '6px', padding: '0.4rem', fontSize: '0.75rem', fontWeight: 700, cursor: isBusy ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem' }}
+                          >
+                            <Lock size={13} /> {isInactive ? 'Kích hoạt' : 'Vô hiệu hóa'}
+                          </button>
+                          <button
+                            disabled={isBusy}
+                            onClick={() => handleResetCustomerPassword(cust)}
+                            style={{ backgroundColor: '#f8fafc', color: '#334155', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.4rem', fontSize: '0.75rem', fontWeight: 700, cursor: isBusy ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem' }}
+                          >
+                            <RefreshCw size={13} /> Reset MK
+                          </button>
+                          <button
+                            disabled={isBusy || cust.orderCount > 0}
+                            title={cust.orderCount > 0 ? 'Khách đã có đơn hàng — vô hiệu hóa thay vì xóa' : 'Xóa vĩnh viễn'}
+                            onClick={() => handleDeleteCustomer(cust)}
+                            style={{ backgroundColor: cust.orderCount > 0 ? '#f8fafc' : '#fef2f2', color: cust.orderCount > 0 ? '#94a3b8' : '#dc2626', border: `1px solid ${cust.orderCount > 0 ? '#e2e8f0' : '#fecaca'}`, borderRadius: '6px', padding: '0.4rem', fontSize: '0.75rem', fontWeight: 700, cursor: (isBusy || cust.orderCount > 0) ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem' }}
+                          >
+                            <Trash2 size={13} /> Xóa
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Pagination Controls */}
+          {customerTotalPages > 1 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1.25rem', borderTop: '1px solid #e2e8f0', paddingTop: '0.75rem' }}>
+              <span style={{ fontSize: '0.78rem', color: '#64748b' }}>Trang {customerPage}/{customerTotalPages} — Tổng {customerTotalCount} khách hàng</span>
+              <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
+                <button
+                  disabled={customerPage <= 1}
+                  onClick={() => setCustomerPage(p => Math.max(p - 1, 1))}
+                  style={{ padding: '0.25rem 0.5rem', backgroundColor: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: customerPage <= 1 ? 'not-allowed' : 'pointer' }}
+                >
+                  <ChevronLeft size={14} />
+                </button>
+                <span style={{ fontSize: '0.78rem', fontWeight: 700 }}>Trang {customerPage}/{customerTotalPages}</span>
+                <button
+                  disabled={customerPage >= customerTotalPages}
+                  onClick={() => setCustomerPage(p => Math.min(p + 1, customerTotalPages))}
+                  style={{ padding: '0.25rem 0.5rem', backgroundColor: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: customerPage >= customerTotalPages ? 'not-allowed' : 'pointer' }}
+                >
+                  <ChevronRight size={14} />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -1426,49 +1747,201 @@ export default function SalesPOS() {
                 Danh sách mã giảm giá, voucher quà tặng dành cho nhân viên kinh doanh áp dụng tại quầy
               </p>
             </div>
+            {canManagePromotions && (
+              <button
+                onClick={openCreatePromoModal}
+                style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.55rem 1rem', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+              >
+                <Plus size={15} /> Thêm Khuyến Mãi
+              </button>
+            )}
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
-            {promotionsList.map((promo, idx) => (
-              <div key={idx} style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem', position: 'relative' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                  <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#2563eb', backgroundColor: '#eff6ff', border: '1px dashed #bfdbfe', padding: '3px 8px', borderRadius: '4px' }}>
-                    {promo.code}
-                  </span>
-                  <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#16a34a', backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', padding: '2px 6px', borderRadius: '10px' }}>
-                    Đang Áp Dụng
-                  </span>
-                </div>
+          {promotionsLoading ? (
+            <div style={{ textAlign: 'center', padding: '3rem', color: '#64748b' }}>Đang tải danh sách khuyến mãi...</div>
+          ) : promotionsList.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '3rem', color: '#64748b', backgroundColor: '#fff', border: '1px dashed #cbd5e1', borderRadius: '8px' }}>
+              Chưa có chương trình khuyến mãi nào.
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
+              {promotionsList.map((promo) => {
+                const isExpired = promo.expiresAt && new Date(promo.expiresAt) < new Date();
+                const isActive = promo.status === 'ACTIVE' && !isExpired;
+                const busy = promoActionBusyId === promo.id;
+                return (
+                  <div key={promo.id} style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem', position: 'relative' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                      <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#2563eb', backgroundColor: '#eff6ff', border: '1px dashed #bfdbfe', padding: '3px 8px', borderRadius: '4px' }}>
+                        {promo.code}
+                      </span>
+                      <span style={{
+                        fontSize: '0.7rem', fontWeight: 800, padding: '2px 6px', borderRadius: '10px',
+                        color: isActive ? '#16a34a' : '#94a3b8',
+                        backgroundColor: isActive ? '#f0fdf4' : '#f1f5f9',
+                        border: `1px solid ${isActive ? '#bbf7d0' : '#e2e8f0'}`
+                      }}>
+                        {isExpired ? 'Hết Hạn' : isActive ? 'Đang Áp Dụng' : 'Đã Tắt'}
+                      </span>
+                    </div>
 
-                <h4 style={{ fontSize: '0.9rem', fontWeight: 800, color: '#0f172a', margin: '0 0 0.5rem' }}>{promo.title}</h4>
-                <div style={{ fontSize: '0.8rem', color: '#475569', display: 'flex', flexDirection: 'column', gap: '0.25rem', marginBottom: '1rem' }}>
-                  <div>Mức giảm: <strong style={{ color: '#ef4444' }}>{promo.type === 'PERCENT' ? `${promo.discount}%` : formatCurrency(promo.discount)}</strong></div>
-                  <div>Đơn tối thiểu: <strong>{formatCurrency(promo.minSpend)}</strong></div>
-                  <div>Hạn áp dụng: <strong>{promo.expiry}</strong></div>
-                </div>
+                    <h4 style={{ fontSize: '0.9rem', fontWeight: 800, color: '#0f172a', margin: '0 0 0.5rem' }}>{promo.title}</h4>
+                    <div style={{ fontSize: '0.8rem', color: '#475569', display: 'flex', flexDirection: 'column', gap: '0.25rem', marginBottom: '1rem' }}>
+                      <div>Mức giảm: <strong style={{ color: '#ef4444' }}>{promo.type === 'PERCENT' ? `${promo.discount}%` : formatCurrency(promo.discount)}</strong></div>
+                      <div>Đơn tối thiểu: <strong>{formatCurrency(promo.minSpend)}</strong></div>
+                      <div>Hạn áp dụng: <strong>{promo.expiry || 'Không giới hạn'}</strong></div>
+                    </div>
 
-                <button
-                  onClick={() => {
-                    setPosDiscountPercent(promo.type === 'PERCENT' ? promo.discount : 5);
-                    setTab('pos');
-                    notify(`Đã áp dụng mã "${promo.code}" vào Quầy POS!`, 'success');
-                  }}
-                  style={{
-                    width: '100%',
-                    backgroundColor: '#2563eb',
-                    color: '#ffffff',
-                    border: 'none',
-                    borderRadius: '6px',
-                    padding: '0.45rem',
-                    fontSize: '0.78rem',
-                    fontWeight: 700,
-                    cursor: 'pointer'
-                  }}
-                >
-                  Áp Dụng Mã Này Vào POS
-                </button>
+                    <button
+                      onClick={() => {
+                        const sub = calculateSubtotal();
+                        if (sub < (promo.minSpend || 0)) {
+                          notify(`Đơn hàng cần tối thiểu ${formatCurrency(promo.minSpend)} để áp dụng mã "${promo.code}" (giỏ hàng hiện tại: ${formatCurrency(sub)}).`, 'error');
+                          return;
+                        }
+                        const pct = promo.type === 'PERCENT' ? promo.discount : (sub > 0 ? Math.min(100, (promo.discount / sub) * 100) : 0);
+                        setPosDiscountPercent(Number(pct.toFixed(2)));
+                        setTab('pos');
+                        notify(`Đã áp dụng mã "${promo.code}" vào Quầy POS!`, 'success');
+                      }}
+                      disabled={!isActive}
+                      style={{
+                        width: '100%',
+                        backgroundColor: isActive ? '#2563eb' : '#e2e8f0',
+                        color: isActive ? '#ffffff' : '#94a3b8',
+                        border: 'none',
+                        borderRadius: '6px',
+                        padding: '0.45rem',
+                        fontSize: '0.78rem',
+                        fontWeight: 700,
+                        cursor: isActive ? 'pointer' : 'not-allowed',
+                        marginBottom: canManagePromotions ? '0.5rem' : 0
+                      }}
+                    >
+                      Áp Dụng Mã Này Vào POS
+                    </button>
+
+                    {canManagePromotions && (
+                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <button
+                          onClick={() => openEditPromoModal(promo)}
+                          style={{ flex: 1, backgroundColor: '#ffffff', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.4rem', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer' }}
+                        >
+                          Sửa
+                        </button>
+                        <button
+                          onClick={() => handleDeletePromo(promo)}
+                          disabled={busy}
+                          style={{ flex: 1, backgroundColor: '#ffffff', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '6px', padding: '0.4rem', fontSize: '0.75rem', fontWeight: 700, cursor: busy ? 'not-allowed' : 'pointer', opacity: busy ? 0.6 : 1 }}
+                        >
+                          {busy ? 'Đang xóa...' : 'Xóa'}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ================= MODAL TẠO/SỬA KHUYẾN MÃI ================= */}
+      {showPromoFormModal && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem' }}>
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '10px', padding: '1.5rem', width: '100%', maxWidth: '440px', maxHeight: '90vh', overflowY: 'auto' }}>
+            <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0f172a', margin: '0 0 1rem' }}>
+              {editingPromo ? `Sửa Khuyến Mãi "${editingPromo.code}"` : 'Thêm Khuyến Mãi Mới'}
+            </h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+              {!editingPromo && (
+                <div>
+                  <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '0.3rem' }}>Mã Khuyến Mãi *</label>
+                  <input
+                    value={promoFormData.code || ''}
+                    onChange={(e) => setPromoFormData(prev => ({ ...prev, code: e.target.value.toUpperCase() }))}
+                    placeholder="VD: SUMMER2026"
+                    style={{ width: '100%', padding: '0.55rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.85rem', boxSizing: 'border-box' }}
+                  />
+                </div>
+              )}
+              <div>
+                <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '0.3rem' }}>Tên Chương Trình *</label>
+                <input
+                  value={promoFormData.title || ''}
+                  onChange={(e) => setPromoFormData(prev => ({ ...prev, title: e.target.value }))}
+                  style={{ width: '100%', padding: '0.55rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.85rem', boxSizing: 'border-box' }}
+                />
               </div>
-            ))}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div>
+                  <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '0.3rem' }}>Loại Giảm Giá</label>
+                  <select
+                    value={promoFormData.type || 'PERCENT'}
+                    onChange={(e) => setPromoFormData(prev => ({ ...prev, type: e.target.value }))}
+                    style={{ width: '100%', padding: '0.55rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.85rem', boxSizing: 'border-box' }}
+                  >
+                    <option value="PERCENT">Theo % (Phần trăm)</option>
+                    <option value="FIXED">Số Tiền Cố Định (VNĐ)</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '0.3rem' }}>Mức Giảm *</label>
+                  <input
+                    type="number"
+                    value={promoFormData.discount ?? ''}
+                    onChange={(e) => setPromoFormData(prev => ({ ...prev, discount: e.target.value }))}
+                    style={{ width: '100%', padding: '0.55rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.85rem', boxSizing: 'border-box' }}
+                  />
+                </div>
+              </div>
+              <div>
+                <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '0.3rem' }}>Đơn Tối Thiểu (VNĐ)</label>
+                <input
+                  type="number"
+                  value={promoFormData.minSpend ?? ''}
+                  onChange={(e) => setPromoFormData(prev => ({ ...prev, minSpend: e.target.value }))}
+                  style={{ width: '100%', padding: '0.55rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.85rem', boxSizing: 'border-box' }}
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '0.3rem' }}>Ngày Hết Hạn</label>
+                <input
+                  type="date"
+                  value={promoFormData.expiresAt || ''}
+                  onChange={(e) => setPromoFormData(prev => ({ ...prev, expiresAt: e.target.value }))}
+                  style={{ width: '100%', padding: '0.55rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.85rem', boxSizing: 'border-box' }}
+                />
+              </div>
+              {editingPromo && (
+                <div>
+                  <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '0.3rem' }}>Trạng Thái</label>
+                  <select
+                    value={promoFormData.status || editingPromo.status || 'ACTIVE'}
+                    onChange={(e) => setPromoFormData(prev => ({ ...prev, status: e.target.value }))}
+                    style={{ width: '100%', padding: '0.55rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.85rem', boxSizing: 'border-box' }}
+                  >
+                    <option value="ACTIVE">Đang Áp Dụng</option>
+                    <option value="INACTIVE">Tắt</option>
+                  </select>
+                </div>
+              )}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem', marginTop: '1.4rem' }}>
+              <button
+                onClick={() => setShowPromoFormModal(false)}
+                style={{ backgroundColor: '#ffffff', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.5rem 1rem', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
+              >
+                Hủy
+              </button>
+              <button
+                onClick={handleSavePromo}
+                disabled={promoFormSaving}
+                style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.5rem 1.1rem', fontSize: '0.82rem', fontWeight: 700, cursor: promoFormSaving ? 'not-allowed' : 'pointer', opacity: promoFormSaving ? 0.7 : 1 }}
+              >
+                {promoFormSaving ? 'Đang lưu...' : 'Lưu'}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -1768,6 +2241,16 @@ export default function SalesPOS() {
                   Đơn hàng đã chuyển sang Bộ phận Kho để Đóng gói & Bàn giao Shipper
                 </div>
               )}
+
+              {canCancelOrder && CANCELLABLE_ORDER_STATUSES.includes(selectedDetailOrder.status) && (
+                <button
+                  onClick={() => handleCancelOrder(selectedDetailOrder.orderId || selectedDetailOrder.id)}
+                  disabled={orderActionBusyId === (selectedDetailOrder.orderId || selectedDetailOrder.id)}
+                  style={{ backgroundColor: '#ffffff', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '6px', padding: '0.5rem 1.1rem', fontSize: '0.82rem', fontWeight: 700, cursor: orderActionBusyId === (selectedDetailOrder.orderId || selectedDetailOrder.id) ? 'not-allowed' : 'pointer', opacity: orderActionBusyId === (selectedDetailOrder.orderId || selectedDetailOrder.id) ? 0.6 : 1 }}
+                >
+                  {orderActionBusyId === (selectedDetailOrder.orderId || selectedDetailOrder.id) ? 'Đang hủy...' : 'Hủy Đơn Hàng'}
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -1839,6 +2322,125 @@ export default function SalesPOS() {
                 style={{ flex: 1, backgroundColor: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.6rem', fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer' }}
               >
                 Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL THÊM / SỬA TÀI KHOẢN KHÁCH HÀNG ================= */}
+      {showCustomerFormModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(6px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '1.5rem' }}>
+          <div style={{ width: '100%', maxWidth: '480px', maxHeight: '90vh', overflowY: 'auto', padding: '2rem', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+              <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                {editingCustomer ? 'Chỉnh Sửa Khách Hàng' : 'Thêm Khách Hàng Mới'}
+              </h3>
+              <button onClick={() => setShowCustomerFormModal(false)} style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#475569', cursor: 'pointer', padding: '0.4rem', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <X size={18} />
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
+              <div>
+                <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '0.3rem' }}>Họ Tên *</label>
+                <input
+                  type="text"
+                  value={customerFormData.name || ''}
+                  onChange={(e) => setCustomerFormData(f => ({ ...f, name: e.target.value }))}
+                  style={{ width: '100%', height: '38px', padding: '0 0.75rem', fontSize: '0.85rem', border: '1px solid #cbd5e1', borderRadius: '6px', boxSizing: 'border-box' }}
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '0.3rem' }}>Email *</label>
+                <input
+                  type="email"
+                  value={customerFormData.email || ''}
+                  onChange={(e) => setCustomerFormData(f => ({ ...f, email: e.target.value }))}
+                  style={{ width: '100%', height: '38px', padding: '0 0.75rem', fontSize: '0.85rem', border: '1px solid #cbd5e1', borderRadius: '6px', boxSizing: 'border-box' }}
+                />
+              </div>
+              {!editingCustomer && (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                  <div>
+                    <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '0.3rem' }}>Tên Đăng Nhập</label>
+                    <input
+                      type="text"
+                      placeholder="Tự động nếu để trống"
+                      value={customerFormData.username || ''}
+                      onChange={(e) => setCustomerFormData(f => ({ ...f, username: e.target.value }))}
+                      style={{ width: '100%', height: '38px', padding: '0 0.75rem', fontSize: '0.85rem', border: '1px solid #cbd5e1', borderRadius: '6px', boxSizing: 'border-box' }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '0.3rem' }}>Mật Khẩu</label>
+                    <input
+                      type="text"
+                      placeholder="Mặc định: 123456"
+                      value={customerFormData.password || ''}
+                      onChange={(e) => setCustomerFormData(f => ({ ...f, password: e.target.value }))}
+                      style={{ width: '100%', height: '38px', padding: '0 0.75rem', fontSize: '0.85rem', border: '1px solid #cbd5e1', borderRadius: '6px', boxSizing: 'border-box' }}
+                    />
+                  </div>
+                </div>
+              )}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div>
+                  <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '0.3rem' }}>Số Điện Thoại</label>
+                  <input
+                    type="text"
+                    value={customerFormData.phone || ''}
+                    onChange={(e) => setCustomerFormData(f => ({ ...f, phone: e.target.value }))}
+                    style={{ width: '100%', height: '38px', padding: '0 0.75rem', fontSize: '0.85rem', border: '1px solid #cbd5e1', borderRadius: '6px', boxSizing: 'border-box' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '0.3rem' }}>Hạng Thành Viên</label>
+                  <select
+                    value={customerFormData.tier || 'BRONZE'}
+                    onChange={(e) => setCustomerFormData(f => ({ ...f, tier: e.target.value }))}
+                    style={{ width: '100%', height: '38px', padding: '0 0.65rem', fontSize: '0.85rem', border: '1px solid #cbd5e1', borderRadius: '6px', backgroundColor: '#ffffff', cursor: 'pointer', boxSizing: 'border-box' }}
+                  >
+                    <option value="BRONZE">Hạng Đồng</option>
+                    <option value="SILVER">Hạng Bạc</option>
+                    <option value="GOLD">Hạng Vàng</option>
+                    <option value="PLATINUM">Hạng Kim Cương</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '0.3rem' }}>Địa Chỉ</label>
+                <input
+                  type="text"
+                  value={customerFormData.address || ''}
+                  onChange={(e) => setCustomerFormData(f => ({ ...f, address: e.target.value }))}
+                  style={{ width: '100%', height: '38px', padding: '0 0.75rem', fontSize: '0.85rem', border: '1px solid #cbd5e1', borderRadius: '6px', boxSizing: 'border-box' }}
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '0.3rem' }}>Tỉnh/Thành Phố</label>
+                <input
+                  type="text"
+                  value={customerFormData.city || ''}
+                  onChange={(e) => setCustomerFormData(f => ({ ...f, city: e.target.value }))}
+                  style={{ width: '100%', height: '38px', padding: '0 0.75rem', fontSize: '0.85rem', border: '1px solid #cbd5e1', borderRadius: '6px', boxSizing: 'border-box' }}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.65rem', marginTop: '1.5rem', borderTop: '1px solid #f1f5f9', paddingTop: '1rem' }}>
+              <button
+                onClick={() => setShowCustomerFormModal(false)}
+                style={{ backgroundColor: '#ffffff', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.55rem 1.1rem', fontSize: '0.83rem', fontWeight: 700, cursor: 'pointer' }}
+              >
+                Hủy
+              </button>
+              <button
+                disabled={customerFormSaving}
+                onClick={handleSaveCustomer}
+                style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.55rem 1.3rem', fontSize: '0.83rem', fontWeight: 700, cursor: customerFormSaving ? 'not-allowed' : 'pointer' }}
+              >
+                {customerFormSaving ? 'Đang lưu...' : (editingCustomer ? 'Lưu Thay Đổi' : 'Tạo Tài Khoản')}
               </button>
             </div>
           </div>

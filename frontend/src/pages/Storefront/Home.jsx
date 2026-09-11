@@ -40,7 +40,7 @@ const HERO_SLIDES = [
     id: 2,
     image: '/promo_banner.png',
     badge: 'Khuyến Mãi',
-    title: 'Flash Sale Tháng 6',
+    title: 'Flash Sale Tháng 10',
     titleHighlight: 'Giảm Đến 30%',
     subtitle: 'Hàng trăm sản phẩm giảm giá sốc. Chỉ có tại AetherPC trong thời gian có hạn.',
     cta: { label: 'Xem Khuyến Mãi', path: '/promotions' },

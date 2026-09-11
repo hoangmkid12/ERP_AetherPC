@@ -204,10 +204,13 @@ export const useSalesStore = create((set, get) => ({
   /**
    * Process checkout for Online & POS orders
    */
-  processCheckout: async (customerName, phone, items, type = 'ONLINE', customTotal = null, shippingAddress = '', paymentMethod = 'COD', customerEmail = '') => {
+  processCheckout: async (customerName, phone, items, type = 'ONLINE', customTotal = null, shippingAddress = '', paymentMethod = 'COD', customerEmail = '', options = {}) => {
     const dateStr = new Date().toLocaleDateString('vi-VN');
     const newOrderId = `ORD-${Math.floor(100000 + Math.random() * 900000)}`;
-    const totalAmount = customTotal !== null ? customTotal : items.reduce((sum, item) => sum + ((item.price || 0) * (item.quantity || 1)), 0);
+    const subtotalCalc = items.reduce((sum, item) => sum + ((item.price || 0) * (item.quantity || 1)), 0);
+    const shippingFee = 0; // Miễn phí vận chuyển toàn bộ
+    const discount = options.discount !== undefined ? Number(options.discount) : 0;
+    const totalAmount = customTotal !== null ? customTotal : Math.max(0, subtotalCalc - discount);
 
     let orderStatus = 'PENDING';
     
@@ -253,12 +256,18 @@ export const useSalesStore = create((set, get) => ({
       } catch (e) {}
     }
 
+    const addrStr = (shippingAddress || '').toLowerCase();
+    const inferredCity = options.shippingCity || (addrStr.includes('hà nội') || addrStr.includes('ha noi') ? 'Hà Nội' : 'Hồ Chí Minh');
+
     const newOrder = {
       orderId: newOrderId,
       customerName,
       phone,
       email: userEmail,
       shippingAddress: shippingAddress || (type === 'POS' ? 'Bán tại cửa hàng (POS)' : 'Địa chỉ giao hàng mặc định'),
+      subtotal: subtotalCalc,
+      shippingFee,
+      discount,
       totalAmount,
       date: dateStr,
       status: orderStatus,
@@ -268,48 +277,46 @@ export const useSalesStore = create((set, get) => ({
       createdAtTime: Date.now()
     };
     
+    // Đơn tại quầy (POS) do NHÂN VIÊN đứng bán (JWT role SALES/SALES_MANAGER),
+    // còn "/orders" ở đây chỉ nhận role CUSTOMER (order.routes.js) — trước
+    // đây mọi đơn POS đều gọi nhầm "/orders" nên luôn bị 403, bị .catch nuốt
+    // âm thầm, và đơn chỉ tồn tại "ảo" trong localStorage của trình duyệt:
+    // không trừ kho thật, không vào được luồng lắp ráp/kho/vận chuyển, và
+    // không gắn soldById nên hoa hồng Sales trong bảng lương luôn bằng 0.
+    const endpoint = type === 'POS' ? '/orders/pos' : '/orders';
+    let persistedOrder = null;
+    try {
+      const res = await api.post(endpoint, {
+        orderId: newOrderId,
+        customerName,
+        phone,
+        email: userEmail,
+        items: items.map(it => ({ productId: it.productId || it.id, quantity: it.quantity || 1 })),
+        paymentMethod: paymentMethod === 'BANK_TRANSFER' ? 'BANK_TRANSFER' : 'COD',
+        shippingAddress: shippingAddress || (type === 'POS' ? 'Bán tại cửa hàng (POS)' : 'Hồ Chí Minh'),
+        shippingCity: inferredCity,
+        shippingFee,
+        couponDiscount: discount,
+        totalAmount,
+        notes: type === 'POS' ? 'Đơn bán lẻ tại quầy (POS)' : 'Đặt hàng online (Đồng bộ)',
+        type
+      });
+      persistedOrder = res?.data || null;
+    } catch (err) {
+      console.error('[SalesStore] Checkout FAILED to reach backend — order only exists locally:', err.message);
+      throw err;
+    }
+
+    const finalOrderId = persistedOrder?.orderId || newOrderId;
     set(state => {
-      const orders = [newOrder, ...state.orders];
+      const orders = [{ ...newOrder, orderId: finalOrderId, status: persistedOrder?.status || newOrder.status }, ...state.orders];
       try {
         localStorage.setItem(STORAGE_KEYS.orders, JSON.stringify(orders));
       } catch (e) {}
       return { orders };
     });
 
-    // Sync to backend — await so the order is persisted before any subsequent
-    // getOrders() call (e.g. on page reload) can overwrite the local state.
-    try {
-      const serverResponse = await api.post('/orders', {
-        orderId: newOrderId,
-        customerName,
-        phone,
-        email: userEmail,
-        items: items.map(it => ({ productId: it.productId || it.id, quantity: it.quantity || 1 })),
-        paymentMethod: paymentMethod === 'BANK_TRANSFER' ? 'BANK_TRANSFER' : 'CASH',
-        shippingAddress: shippingAddress || (type === 'POS' ? 'Bán tại cửa hàng (POS)' : 'Hồ Chí Minh'),
-        shippingCity: 'Hồ Chí Minh',
-        notes: type === 'POS' ? 'Đơn bán lẻ tại quầy (POS)' : 'Đặt hàng online (Đồng bộ)',
-        type
-      });
-
-      // If the server returns enriched order data, merge it into the local store
-      const serverOrder = serverResponse?.data || serverResponse;
-      if (serverOrder && (serverOrder.id || serverOrder.orderId)) {
-        set(state => {
-          const orders = state.orders.map(o =>
-            (o.orderId === newOrderId) ? { ...o, ...serverOrder, orderId: newOrderId } : o
-          );
-          try { localStorage.setItem(STORAGE_KEYS.orders, JSON.stringify(orders)); } catch (e) {}
-          return { orders };
-        });
-      }
-    } catch (err) {
-      // Backend sync failed — the order already exists locally so the customer
-      // won't lose their data. Log for diagnostics only.
-      console.warn('[SalesStore] Backend sync notice (order kept locally):', err.message);
-    }
-
-    return newOrderId;
+    return finalOrderId;
   },
 
   /**

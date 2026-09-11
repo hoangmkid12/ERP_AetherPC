@@ -252,9 +252,8 @@ export default function Cart() {
     return p.includes('ho chi minh') || p.includes('ha noi');
   };
 
-  // Shipping calculation (Free shipping for Hà Nội & TP.HCM or FREESHIP coupon, otherwise 30.000đ)
-  const isFreeShipEligible = (selectedProvince && isFreeShipCity(selectedProvince)) || activeCoupon?.code === 'FREESHIP';
-  const shippingFee = selectedCartItems.length > 0 ? (isFreeShipEligible ? 0 : 30000) : 0;
+  // Shipping calculation: 100% Miễn phí vận chuyển toàn quốc cho mọi đơn hàng
+  const shippingFee = 0;
 
   const handleApplyCoupon = (e) => {
     e.preventDefault();
@@ -375,7 +374,21 @@ export default function Cart() {
         : baseAddress;
 
       const targetEmail = customerEmail || user?.email || '';
-      const orderId = await processCheckout(customerName, phone, itemsForERP, 'ONLINE', finalTotal, fullAddress, paymentMethod, targetEmail);
+      const orderId = await processCheckout(
+        customerName,
+        phone,
+        itemsForERP,
+        'ONLINE',
+        finalTotal,
+        fullAddress,
+        paymentMethod,
+        targetEmail,
+        {
+          shippingFee,
+          discount: (couponDiscount || 0) + (memberDiscountAmount || 0),
+          shippingCity: selectedProvince
+        }
+      );
 
       const invoiceData = {
         customerName,
@@ -391,44 +404,9 @@ export default function Cart() {
       setInvoice(invoiceData);
       addNotification(`Đơn hàng #${orderId} đã đặt thành công!`, 'success', '/my-orders');
 
-      // Gửi email xác nhận thật qua backend /orders/email-notify
-      if (targetEmail) {
-        try {
-          await api.post('/orders/email-notify', {
-            type: 'ORDER_CONFIRMATION',
-            toEmail: targetEmail,
-            customerName: customerName,
-            orderId,
-            items: itemsForERP,
-            totalAmount: finalTotal,
-            paymentMethod,
-            shippingAddress: fullAddress
-          });
-          console.log(`[EmailService] ✅ Đã phát lệnh gửi email xác nhận thành công tới ${targetEmail}`);
-        } catch (emailErr) {
-          console.warn('[EmailService] ❌ Lỗi gửi email xác nhận:', emailErr.message);
-        }
-
-        const emailLog = {
-          id: `MAIL-${Date.now()}`,
-          type: 'ORDER_CONFIRMATION',
-          toEmail: targetEmail,
-          customerName: customerName,
-          orderId,
-          subject: `[Aether ERP] Xác nhận đơn hàng thành công #${orderId}`,
-          sentAt: new Date().toISOString(),
-          items: itemsForERP,
-          totalAmount: finalTotal,
-          paymentMethod,
-          shippingAddress: fullAddress
-        };
-        try {
-          const existingLogs = JSON.parse(localStorage.getItem('erp_email_logs') || '[]');
-          existingLogs.unshift(emailLog);
-          if (existingLogs.length > 50) existingLogs.length = 50;
-          localStorage.setItem('erp_email_logs', JSON.stringify(existingLogs));
-        } catch (e) {}
-      }
+      // Email xác nhận đơn hàng được backend tự gửi ngay khi tạo đơn (POST /orders,
+      // xem order.controller.js) với đầy đủ dữ liệu thật từ DB — gọi thêm
+      // /orders/email-notify ở đây trước kia khiến khách nhận 2 email trùng nội dung.
 
       removeSelectedFromCart(selectedCartItems.map(getItemKey));
     } catch (err) {

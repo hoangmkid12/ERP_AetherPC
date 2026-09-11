@@ -100,6 +100,7 @@ const badgeStyle = (variant = 'neutral') => {
 };
 
 export default function SystemAdmin() {
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const employees = useHRStore(state => state.employees) || [];
   const addEmployee = useHRStore(state => state.addEmployee);
@@ -119,6 +120,182 @@ export default function SystemAdmin() {
   const [roleFilter, setRoleFilter] = useState('ALL');
   const [showAdd, setShowAdd] = useState(false);
   const [editingEmp, setEditingEmp] = useState(null);
+
+  // Tài khoản khách hàng (real Customer accounts, /api/v1/customer-accounts) —
+  // hiển thị trong cùng tab "Tài Khoản & Người Dùng" bên cạnh nhân viên, cho
+  // phép Admin giám sát/khóa nhanh mà không cần sang tab Bán Hàng. Tạo mới/sửa
+  // chi tiết vẫn ở tab Khách Hàng (CRM) trong Bán Hàng để tránh trùng lặp modal.
+  const [custSearch, setCustSearch] = useState('');
+  const [custList, setCustList] = useState([]);
+  const [custLoading, setCustLoading] = useState(false);
+  const [custPage, setCustPage] = useState(1);
+  const [custTotalPages, setCustTotalPages] = useState(1);
+  const [custTotal, setCustTotal] = useState(0);
+  const [custActionBusyId, setCustActionBusyId] = useState(null);
+  const CUST_PAGE_SIZE = 8;
+
+  const loadSysCustomers = async () => {
+    setCustLoading(true);
+    try {
+      const params = new URLSearchParams({ page: String(custPage), limit: String(CUST_PAGE_SIZE) });
+      if (custSearch.trim()) params.set('search', custSearch.trim());
+      const res = await api.get(`/customer-accounts?${params.toString()}`);
+      setCustList(res.data || []);
+      setCustTotalPages(res.pagination?.totalPages || 1);
+      setCustTotal(res.pagination?.total || 0);
+    } catch (err) {
+      notify(err?.message || 'Không thể tải danh sách khách hàng.', 'error');
+    } finally {
+      setCustLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab !== 'users') return;
+    const timer = setTimeout(() => { loadSysCustomers(); }, 300);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, custPage, custSearch]);
+
+  // Customer Detail & Management Modal State
+  const [selectedCust, setSelectedCust] = useState(null);
+  const [custModalLoading, setCustModalLoading] = useState(false);
+  const [custDetail, setCustDetail] = useState(null);
+  const [isEditingCust, setIsEditingCust] = useState(false);
+  const [custEditForm, setCustEditForm] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    address: '',
+    city: '',
+    tier: 'BRONZE'
+  });
+  const [savingCust, setSavingCust] = useState(false);
+
+  const handleOpenCustDetail = async (cust) => {
+    setSelectedCust(cust);
+    setCustModalLoading(true);
+    setIsEditingCust(false);
+    try {
+      const res = await api.get(`/customer-accounts/${cust.customerId}`);
+      const data = res.data || cust;
+      setCustDetail(data);
+      setCustEditForm({
+        name: data.name || '',
+        email: data.email || '',
+        phone: data.phone || '',
+        address: data.address || '',
+        city: data.city || '',
+        tier: data.tier || 'BRONZE'
+      });
+    } catch (err) {
+      notify(err?.message || 'Không thể tải chi tiết khách hàng.', 'error');
+      setCustDetail(cust);
+      setCustEditForm({
+        name: cust.name || '',
+        email: cust.email || '',
+        phone: cust.phone || '',
+        address: cust.address || '',
+        city: cust.city || '',
+        tier: cust.tier || 'BRONZE'
+      });
+    } finally {
+      setCustModalLoading(false);
+    }
+  };
+
+  const handleCloseCustDetail = () => {
+    setSelectedCust(null);
+    setCustDetail(null);
+    setIsEditingCust(false);
+  };
+
+  const handleSaveCustEdit = async () => {
+    if (!custEditForm.name.trim()) {
+      notify('Vui lòng nhập họ và tên khách hàng.', 'error');
+      return;
+    }
+    if (!custEditForm.email.trim()) {
+      notify('Vui lòng nhập email khách hàng.', 'error');
+      return;
+    }
+    setSavingCust(true);
+    try {
+      const res = await api.put(`/customer-accounts/${selectedCust.customerId}`, custEditForm);
+      notify('Cập nhật thông tin khách hàng thành công!', 'success');
+      setIsEditingCust(false);
+      setCustDetail(prev => ({ ...prev, ...res.data }));
+      setCustList(prev => prev.map(c => c.customerId === selectedCust.customerId ? { ...c, ...res.data } : c));
+    } catch (err) {
+      notify(err?.message || 'Cập nhật thông tin thất bại.', 'error');
+    } finally {
+      setSavingCust(false);
+    }
+  };
+
+  const handleToggleCustStatus = async (cust) => {
+    const currentStatus = (custDetail && custDetail.customerId === cust.customerId) ? custDetail.status : cust.status;
+    const nextStatus = currentStatus === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
+    const label = nextStatus === 'INACTIVE' ? 'vô hiệu hóa' : 'kích hoạt lại';
+    if (!(await confirm(`Xác nhận ${label} tài khoản khách hàng "${cust.name}"?`, { danger: nextStatus === 'INACTIVE' }))) return;
+    setCustActionBusyId(cust.customerId);
+    try {
+      await api.patch(`/customer-accounts/${cust.customerId}/status`, { status: nextStatus });
+      notify(`Đã ${label} tài khoản "${cust.name}".`, 'success');
+      if (custDetail && custDetail.customerId === cust.customerId) {
+        setCustDetail(prev => ({ ...prev, status: nextStatus }));
+      }
+      loadSysCustomers();
+    } catch (err) {
+      notify(err?.message || 'Không thể cập nhật trạng thái.', 'error');
+    } finally {
+      setCustActionBusyId(null);
+    }
+  };
+
+  const handleResetCustPassword = async (cust) => {
+    if (!(await confirm(`Đặt lại mật khẩu của "${cust.name}" về mặc định (123456)?`))) return;
+    setCustActionBusyId(cust.customerId);
+    try {
+      const res = await api.patch(`/customer-accounts/${cust.customerId}/reset-password`);
+      notify(res.message || 'Đã đặt lại mật khẩu về 123456.', 'success');
+    } catch (err) {
+      notify(err?.message || 'Không thể đặt lại mật khẩu.', 'error');
+    } finally {
+      setCustActionBusyId(null);
+    }
+  };
+
+  const handleDeleteCustomer = async (cust) => {
+    const custId = cust.customerId;
+    const custName = cust.name;
+    const orderCount = cust.orderCount ?? custDetail?.orderCount ?? 0;
+
+    if (orderCount > 0) {
+      const wantDisable = await confirm(
+        `Khách hàng "${custName}" đã có ${orderCount} đơn hàng trong hệ thống — không thể xóa vĩnh viễn vì ràng buộc chứng từ. Bạn có muốn VÔ HIỆU HÓA tài khoản thay vì xóa không?`,
+        { danger: true }
+      );
+      if (wantDisable) {
+        handleToggleCustStatus(cust);
+      }
+      return;
+    }
+
+    if (!(await confirm(`Xác nhận XÓA VĨNH VIỄN tài khoản khách hàng "${custName}"? Hành động này không thể hoàn tác!`, { danger: true }))) return;
+
+    setCustActionBusyId(custId);
+    try {
+      const res = await api.delete(`/customer-accounts/${custId}`);
+      notify(res.message || `Đã xóa tài khoản "${custName}".`, 'success');
+      handleCloseCustDetail();
+      loadSysCustomers();
+    } catch (err) {
+      notify(err?.message || 'Không thể xóa tài khoản.', 'error');
+    } finally {
+      setCustActionBusyId(null);
+    }
+  };
 
   // RBAC Selected Role & Matrix State
   const [selectedRbacRole, setSelectedRbacRole] = useState('SALES_MANAGER');
@@ -727,7 +904,9 @@ export default function SystemAdmin() {
       {/* TAB 2: USERS (QUẢN LÝ TÀI KHOẢN) */}
       {/* ========================================================================= */}
       {activeTab === 'users' && (
+        <>
         <div style={cardStyle}>
+          <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', margin: '0 0 1rem 0' }}>Tài Khoản Nhân Viên</h3>
           
           {/* Filter Toolbar */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1.25rem' }}>
@@ -851,6 +1030,188 @@ export default function SystemAdmin() {
           </div>
 
         </div>
+
+        {/* Tài Khoản Khách Hàng — dữ liệu thật từ /api/v1/customer-accounts */}
+        <div style={{ ...cardStyle, marginTop: '1.25rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1rem' }}>
+            <div>
+              <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                Tài Khoản Khách Hàng <span style={{ fontWeight: 700, color: '#64748b', fontSize: '0.8rem' }}>({custTotal})</span>
+              </h3>
+              <p style={{ fontSize: '0.78rem', color: '#94a3b8', margin: '0.2rem 0 0' }}>
+                Giám sát &amp; khóa nhanh tài khoản khách hàng. Tạo mới / chỉnh sửa chi tiết tại{' '}
+                <span style={{ color: '#2563eb', fontWeight: 700, cursor: 'pointer' }} onClick={() => navigate('/admin/sales?tab=customers')}>
+                  Bán Hàng → Khách Hàng (CRM)
+                </span>.
+              </p>
+            </div>
+            <div style={{ position: 'relative', width: '280px' }}>
+              <input
+                type="text"
+                placeholder="Tìm theo tên, SĐT, email..."
+                value={custSearch}
+                onChange={e => { setCustPage(1); setCustSearch(e.target.value); }}
+                style={{ width: '100%', padding: '0.45rem 0.65rem 0.45rem 2rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem', boxSizing: 'border-box' }}
+              />
+              <Search size={15} style={{ position: 'absolute', left: '0.6rem', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+            </div>
+          </div>
+
+          {custLoading ? (
+            <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8', fontSize: '0.85rem' }}>Đang tải...</div>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+                <thead>
+                  <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569' }}>
+                    <th style={{ padding: '0.65rem 0.85rem' }}>Khách Hàng</th>
+                    <th style={{ padding: '0.65rem 0.85rem' }}>Liên Hệ</th>
+                    <th style={{ padding: '0.65rem 0.85rem', textAlign: 'center', width: '90px' }}>Đơn Hàng</th>
+                    <th style={{ padding: '0.65rem 0.85rem', textAlign: 'center', width: '110px' }}>Trạng Thái</th>
+                    <th style={{ padding: '0.65rem 0.85rem', textAlign: 'center', width: '330px' }}>Thao Tác</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {custList.length === 0 ? (
+                    <tr><td colSpan={5} style={{ padding: '1.5rem', textAlign: 'center', color: '#94a3b8' }}>Không tìm thấy khách hàng nào.</td></tr>
+                  ) : custList.map(cust => {
+                    const isInactive = cust.status !== 'ACTIVE';
+                    const isBusy = custActionBusyId === cust.customerId;
+                    return (
+                      <tr key={cust.customerId} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                        <td 
+                          style={{ padding: '0.65rem 0.85rem', fontWeight: 700, color: '#0f172a', cursor: 'pointer' }}
+                          onClick={() => handleOpenCustDetail(cust)}
+                          title="Nhấn để xem chi tiết tài khoản"
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                            <span style={{ color: '#2563eb' }}>{cust.name}</span>
+                          </div>
+                          <div style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 500 }}>#{cust.customerId}</div>
+                        </td>
+                        <td style={{ padding: '0.65rem 0.85rem', color: '#475569' }}>
+                          <div>{cust.email}</div>
+                          <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{cust.phone || 'Chưa cập nhật'}</div>
+                        </td>
+                        <td style={{ padding: '0.65rem 0.85rem', textAlign: 'center', fontWeight: 700, color: '#0f172a' }}>{cust.orderCount}</td>
+                        <td style={{ padding: '0.65rem 0.85rem', textAlign: 'center' }}>
+                          <span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 800, backgroundColor: isInactive ? '#fef2f2' : '#f0fdf4', color: isInactive ? '#dc2626' : '#16a34a' }}>
+                            {isInactive ? 'Vô hiệu hóa' : 'Hoạt động'}
+                          </span>
+                        </td>
+                        <td style={{ padding: '0.65rem 0.85rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                          <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}>
+                            <button
+                              disabled={isBusy}
+                              onClick={() => handleOpenCustDetail(cust)}
+                              title="Xem chi tiết hồ sơ & quản lý"
+                              style={{
+                                width: '78px',
+                                height: '28px',
+                                backgroundColor: '#eff6ff',
+                                color: '#2563eb',
+                                border: '1px solid #bfdbfe',
+                                borderRadius: '6px',
+                                fontSize: '0.72rem',
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '0.25rem',
+                                boxSizing: 'border-box'
+                              }}
+                            >
+                              <Eye size={12} /> Chi tiết
+                            </button>
+                            <button
+                              disabled={isBusy}
+                              onClick={() => handleResetCustPassword(cust)}
+                              title="Đặt lại mật khẩu về 123456"
+                              style={{
+                                width: '96px',
+                                height: '28px',
+                                backgroundColor: '#ffffff',
+                                color: '#d97706',
+                                border: '1px solid #fde68a',
+                                borderRadius: '6px',
+                                fontSize: '0.72rem',
+                                fontWeight: 700,
+                                cursor: isBusy ? 'not-allowed' : 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '0.25rem',
+                                boxSizing: 'border-box'
+                              }}
+                            >
+                              <Key size={12} /> Reset Pass
+                            </button>
+                            <button
+                              disabled={isBusy}
+                              onClick={() => handleToggleCustStatus(cust)}
+                              title={isInactive ? 'Kích hoạt lại tài khoản' : 'Vô hiệu hóa tài khoản'}
+                              style={{
+                                width: '98px',
+                                height: '28px',
+                                backgroundColor: isInactive ? '#f0fdf4' : '#ffffff',
+                                color: isInactive ? '#16a34a' : '#ef4444',
+                                border: `1px solid ${isInactive ? '#bbf7d0' : '#fca5a5'}`,
+                                borderRadius: '6px',
+                                fontSize: '0.72rem',
+                                fontWeight: 700,
+                                cursor: isBusy ? 'not-allowed' : 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '0.25rem',
+                                boxSizing: 'border-box'
+                              }}
+                            >
+                              <Lock size={12} /> {isInactive ? 'Kích hoạt' : 'Vô hiệu hóa'}
+                            </button>
+                            <button
+                              disabled={isBusy}
+                              onClick={() => handleDeleteCustomer(cust)}
+                              title="Xóa tài khoản khách hàng"
+                              style={{
+                                width: '28px',
+                                height: '28px',
+                                backgroundColor: '#ffffff',
+                                color: '#dc2626',
+                                border: '1px solid #fca5a5',
+                                borderRadius: '6px',
+                                cursor: isBusy ? 'not-allowed' : 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                padding: 0,
+                                boxSizing: 'border-box'
+                              }}
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {custTotalPages > 1 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1rem', borderTop: '1px solid #e2e8f0', paddingTop: '0.75rem' }}>
+              <span style={{ fontSize: '0.76rem', color: '#64748b' }}>Trang {custPage}/{custTotalPages}</span>
+              <div style={{ display: 'flex', gap: '0.3rem' }}>
+                <button disabled={custPage <= 1} onClick={() => setCustPage(p => Math.max(p - 1, 1))} style={{ padding: '0.25rem 0.5rem', backgroundColor: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: custPage <= 1 ? 'not-allowed' : 'pointer' }}>‹</button>
+                <button disabled={custPage >= custTotalPages} onClick={() => setCustPage(p => Math.min(p + 1, custTotalPages))} style={{ padding: '0.25rem 0.5rem', backgroundColor: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: custPage >= custTotalPages ? 'not-allowed' : 'pointer' }}>›</button>
+              </div>
+            </div>
+          )}
+        </div>
+        </>
       )}
 
       {/* ========================================================================= */}
@@ -888,18 +1249,19 @@ export default function SystemAdmin() {
             {/* Phần lớn ma trận này vẫn chỉ điều khiển việc ẨN/HIỆN menu và khoá/mở
                 nút trên giao diện — quyền gọi API cho đa số tác vụ vẫn do
                 authMiddleware() ở từng route backend quyết định độc lập, không
-                đọc ma trận này. Ngoại lệ: 5 tác vụ rủi ro cao nhất (duyệt PO,
+                đọc ma trận này. Ngoại lệ: 6 tác vụ rủi ro cao nhất (duyệt PO,
                 CEO duyệt lương, giải ngân lương, hủy đơn & hoàn tiền, vô hiệu
-                hóa nhân viên) ĐÃ được backend thực sự kiểm tra qua bảng này
-                (checkOperationalPermission, xem rbac.middleware.js) — tắt 1
-                trong 5 quyền đó sẽ chặn thật API tương ứng, không chỉ ẩn nút. */}
+                hóa nhân viên, quản lý tài khoản khách hàng) ĐÃ được backend
+                thực sự kiểm tra qua bảng này (checkOperationalPermission, xem
+                rbac.middleware.js) — tắt 1 trong 6 quyền đó sẽ chặn thật API
+                tương ứng, không chỉ ẩn nút. */}
             <div style={{ backgroundColor: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px', padding: '0.75rem 1rem', fontSize: '0.8rem', color: '#92400e', display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
               <AlertTriangle size={16} style={{ flexShrink: 0, marginTop: '1px' }} />
               <span>
                 Phần lớn đây là cấu hình <strong>hiển thị giao diện</strong> (ẩn/hiện menu, khoá nút) theo vai trò —
                 quyền gọi API cho đa số tác vụ vẫn do backend kiểm soát độc lập theo vai trò đăng nhập.
-                Riêng <strong>5 tác vụ rủi ro cao</strong> (Ký duyệt Báo Giá/PO, Phê duyệt Bảng lương, Giải ngân lương,
-                Duyệt hủy đơn & hoàn tiền, Quản lý hồ sơ nhân viên) đã được backend <strong>thực sự chặn API</strong> theo đúng thiết lập ở đây.
+                Riêng <strong>6 tác vụ rủi ro cao</strong> (Ký duyệt Báo Giá/PO, Phê duyệt Bảng lương, Giải ngân lương,
+                Duyệt hủy đơn & hoàn tiền, Quản lý hồ sơ nhân viên, Quản lý tài khoản khách hàng) đã được backend <strong>thực sự chặn API</strong> theo đúng thiết lập ở đây.
               </span>
             </div>
 
@@ -1497,17 +1859,23 @@ export default function SystemAdmin() {
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', fontSize: '0.82rem' }}>
                 <div>
-                  <label style={labelStyle}>Hoa Hồng Sales (VNĐ/kỳ lương):</label>
+                  <label style={labelStyle}>Hoa Hồng Sales (% Doanh Số Thực Bán):</label>
                   <input
                     type="number"
+                    step="0.1"
+                    min="0"
+                    max="100"
                     value={companyConfig.salesCommissionFlat}
                     onChange={e => setCompanyConfig(p => ({ ...p, salesCommissionFlat: Number(e.target.value) }))}
                     style={inputStyle}
                   />
+                  <p style={{ margin: '0.3rem 0 0', fontSize: '0.72rem', color: '#94a3b8' }}>
+                    Tính trên tổng giá trị đơn hàng POS nhân viên Sales trực tiếp bán trong kỳ.
+                  </p>
                 </div>
 
                 <div>
-                  <label style={labelStyle}>Thưởng Ráp PC (VNĐ/bộ):</label>
+                  <label style={labelStyle}>Thưởng Ráp PC (VNĐ/bộ đã lắp xong):</label>
                   <input
                     type="number"
                     value={companyConfig.assemblyBonus}
@@ -1844,6 +2212,300 @@ export default function SystemAdmin() {
                   Lưu Thay Đổi
                 </button>
               </div>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL: CHI TIẾT & QUẢN LÝ TÀI KHOẢN KHÁCH HÀNG ================= */}
+      {selectedCust && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(6px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', width: '100%', maxWidth: '640px', padding: '1.75rem', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)' }}>
+            
+            {/* Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.25rem', borderBottom: '1px solid #f1f5f9', paddingBottom: '0.75rem' }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                    {custDetail?.name || selectedCust.name}
+                  </h3>
+                  <span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 800, backgroundColor: (custDetail?.status || selectedCust.status) === 'INACTIVE' ? '#fef2f2' : '#f0fdf4', color: (custDetail?.status || selectedCust.status) === 'INACTIVE' ? '#dc2626' : '#16a34a' }}>
+                    {(custDetail?.status || selectedCust.status) === 'INACTIVE' ? 'Vô hiệu hóa' : 'Đang hoạt động'}
+                  </span>
+                  <span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 800, backgroundColor: '#f5f3ff', color: '#7c3aed', border: '1px solid #ddd6fe' }}>
+                    Hạng: {custDetail?.tier || selectedCust.tier || 'BRONZE'}
+                  </span>
+                </div>
+                <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '0.2rem' }}>
+                  Mã tài khoản: <code style={{ color: '#2563eb', fontWeight: 700 }}>#{selectedCust.customerId}</code>
+                  {custDetail?.username && <span> • Username: <strong>{custDetail.username}</strong></span>}
+                </div>
+              </div>
+              <button onClick={handleCloseCustDetail} style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#475569', cursor: 'pointer', padding: '0.4rem', borderRadius: '6px' }}>
+                <X size={18} />
+              </button>
+            </div>
+
+            {custModalLoading ? (
+              <div style={{ textAlign: 'center', padding: '3rem', color: '#94a3b8' }}>
+                <RefreshCw size={24} style={{ animation: 'spin 1s linear infinite' }} />
+                <div style={{ marginTop: '0.5rem', fontSize: '0.85rem' }}>Đang tải dữ liệu tài khoản...</div>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                
+                {/* 4 Thẻ KPI */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.65rem' }}>
+                  <div style={{ padding: '0.65rem 0.75rem', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
+                    <div style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 600 }}>Đơn Hàng</div>
+                    <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', marginTop: '0.15rem' }}>{custDetail?.orderCount ?? selectedCust.orderCount ?? 0}</div>
+                  </div>
+                  <div style={{ padding: '0.65rem 0.75rem', backgroundColor: '#f0fdf4', borderRadius: '8px', border: '1px solid #bbf7d0', textAlign: 'center' }}>
+                    <div style={{ fontSize: '0.7rem', color: '#16a34a', fontWeight: 600 }}>Tổng Chi Tiêu</div>
+                    <div style={{ fontSize: '1rem', fontWeight: 800, color: '#15803d', marginTop: '0.15rem' }}>{fmt(custDetail?.totalSpent || 0)} ₫</div>
+                  </div>
+                  <div style={{ padding: '0.65rem 0.75rem', backgroundColor: '#fffbeb', borderRadius: '8px', border: '1px solid #fde68a', textAlign: 'center' }}>
+                    <div style={{ fontSize: '0.7rem', color: '#d97706', fontWeight: 600 }}>Điểm Thưởng</div>
+                    <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#b45309', marginTop: '0.15rem' }}>{custDetail?.loyaltyPoints ?? 0}</div>
+                  </div>
+                  <div style={{ padding: '0.65rem 0.75rem', backgroundColor: '#eff6ff', borderRadius: '8px', border: '1px solid #bfdbfe', textAlign: 'center' }}>
+                    <div style={{ fontSize: '0.7rem', color: '#2563eb', fontWeight: 600 }}>Ngày Đăng Ký</div>
+                    <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#1d4ed8', marginTop: '0.25rem' }}>
+                      {custDetail?.createdAt ? new Date(custDetail.createdAt).toLocaleDateString('vi-VN') : '—'}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Thanh tác vụ nhanh */}
+                <div style={{ padding: '0.75rem', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      onClick={() => setIsEditingCust(!isEditingCust)}
+                      style={{ backgroundColor: isEditingCust ? '#e0e7ff' : '#ffffff', color: '#4338ca', border: '1px solid #c7d2fe', borderRadius: '6px', padding: '0.4rem 0.65rem', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+                    >
+                      <Edit size={13} /> {isEditingCust ? 'Hủy chỉnh sửa' : 'Sửa thông tin'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleResetCustPassword(custDetail || selectedCust)}
+                      style={{ backgroundColor: '#ffffff', color: '#d97706', border: '1px solid #fde68a', borderRadius: '6px', padding: '0.4rem 0.65rem', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+                    >
+                      <Key size={13} /> Reset Pass
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleToggleCustStatus(custDetail || selectedCust)}
+                      style={{ backgroundColor: '#ffffff', color: (custDetail?.status || selectedCust.status) === 'INACTIVE' ? '#16a34a' : '#d97706', border: `1px solid ${(custDetail?.status || selectedCust.status) === 'INACTIVE' ? '#bbf7d0' : '#fed7aa'}`, borderRadius: '6px', padding: '0.4rem 0.65rem', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+                    >
+                      <Lock size={13} /> {(custDetail?.status || selectedCust.status) === 'INACTIVE' ? 'Kích hoạt tài khoản' : 'Vô hiệu hóa'}
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteCustomer(custDetail || selectedCust)}
+                    style={{ backgroundColor: '#fef2f2', color: '#dc2626', border: '1px solid #fca5a5', borderRadius: '6px', padding: '0.4rem 0.65rem', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+                  >
+                    <Trash2 size={13} /> Xóa tài khoản
+                  </button>
+                </div>
+
+                {/* Nội dung chi tiết hoặc Form chỉnh sửa */}
+                {isEditingCust ? (
+                  <div style={{ backgroundColor: '#ffffff', border: '1.5px solid #2563eb', borderRadius: '8px', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    <div style={{ fontWeight: 800, color: '#1e40af', fontSize: '0.85rem', marginBottom: '0.25rem' }}>
+                      ✏️ Cập Nhật Thông Tin Tài Khoản
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                      <div>
+                        <label style={labelStyle}>Họ và tên *</label>
+                        <input
+                          type="text"
+                          value={custEditForm.name}
+                          onChange={e => setCustEditForm(p => ({ ...p, name: e.target.value }))}
+                          style={inputStyle}
+                        />
+                      </div>
+                      <div>
+                        <label style={labelStyle}>Email đăng nhập *</label>
+                        <input
+                          type="email"
+                          value={custEditForm.email}
+                          onChange={e => setCustEditForm(p => ({ ...p, email: e.target.value }))}
+                          style={inputStyle}
+                        />
+                      </div>
+                      <div>
+                        <label style={labelStyle}>Số điện thoại</label>
+                        <input
+                          type="text"
+                          value={custEditForm.phone}
+                          onChange={e => setCustEditForm(p => ({ ...p, phone: e.target.value }))}
+                          style={inputStyle}
+                        />
+                      </div>
+                      <div>
+                        <label style={labelStyle}>Hạng thành viên</label>
+                        <select
+                          value={custEditForm.tier}
+                          onChange={e => setCustEditForm(p => ({ ...p, tier: e.target.value }))}
+                          style={inputStyle}
+                        >
+                          <option value="REGULAR">REGULAR</option>
+                          <option value="BRONZE">BRONZE (Đồng)</option>
+                          <option value="SILVER">SILVER (Bạc)</option>
+                          <option value="GOLD">GOLD (Vàng)</option>
+                          <option value="PLATINUM">PLATINUM (Bạch Kim)</option>
+                          <option value="VIP">VIP</option>
+                        </select>
+                      </div>
+                      <div style={{ gridColumn: 'span 2' }}>
+                        <label style={labelStyle}>Địa chỉ</label>
+                        <input
+                          type="text"
+                          placeholder="Số nhà, tên đường, phường/xã..."
+                          value={custEditForm.address}
+                          onChange={e => setCustEditForm(p => ({ ...p, address: e.target.value }))}
+                          style={inputStyle}
+                        />
+                      </div>
+                      <div>
+                        <label style={labelStyle}>Tỉnh / Thành phố</label>
+                        <input
+                          type="text"
+                          placeholder="Ví dụ: TP. Hồ Chí Minh"
+                          value={custEditForm.city}
+                          onChange={e => setCustEditForm(p => ({ ...p, city: e.target.value }))}
+                          style={inputStyle}
+                        />
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.5rem' }}>
+                      <button
+                        type="button"
+                        onClick={() => setIsEditingCust(false)}
+                        style={secondaryBtnStyle}
+                      >
+                        Hủy
+                      </button>
+                      <button
+                        type="button"
+                        disabled={savingCust}
+                        onClick={handleSaveCustEdit}
+                        style={{ ...primaryBtnStyle, display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+                      >
+                        <Check size={14} /> {savingCust ? 'Đang lưu...' : 'Lưu Thay Đổi'}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                    <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e2e8f0', padding: '0.85rem' }}>
+                      <h4 style={{ margin: '0 0 0.65rem 0', fontSize: '0.85rem', fontWeight: 800, color: '#334155' }}>Thông Tin Liên Hệ & Địa Chỉ</h4>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.65rem', fontSize: '0.8rem' }}>
+                        <div>
+                          <span style={{ color: '#64748b' }}>Họ và tên:</span>
+                          <strong style={{ display: 'block', color: '#0f172a' }}>{custDetail?.name || '—'}</strong>
+                        </div>
+                        <div>
+                          <span style={{ color: '#64748b' }}>Email:</span>
+                          <strong style={{ display: 'block', color: '#0f172a' }}>{custDetail?.email || '—'}</strong>
+                        </div>
+                        <div>
+                          <span style={{ color: '#64748b' }}>Số điện thoại:</span>
+                          <strong style={{ display: 'block', color: '#0f172a' }}>{custDetail?.phone || 'Chưa cập nhật'}</strong>
+                        </div>
+                        <div>
+                          <span style={{ color: '#64748b' }}>Tỉnh / Thành phố:</span>
+                          <strong style={{ display: 'block', color: '#0f172a' }}>{custDetail?.city || 'Chưa cập nhật'}</strong>
+                        </div>
+                        <div style={{ gridColumn: 'span 2' }}>
+                          <span style={{ color: '#64748b' }}>Địa chỉ giao hàng:</span>
+                          <div style={{ color: '#0f172a', fontWeight: 600, marginTop: '0.15rem' }}>{custDetail?.address || 'Chưa cập nhật'}</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Sổ địa chỉ giao hàng phụ (nếu có) */}
+                    {custDetail?.addresses && custDetail.addresses.length > 0 && (
+                      <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e2e8f0', padding: '0.85rem' }}>
+                        <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.85rem', fontWeight: 800, color: '#334155' }}>
+                          Sổ Địa Chỉ Giao Hàng ({custDetail.addresses.length})
+                        </h4>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', fontSize: '0.78rem' }}>
+                          {custDetail.addresses.map((addr, idx) => (
+                            <div key={addr.id || idx} style={{ padding: '0.45rem 0.65rem', backgroundColor: '#f8fafc', borderRadius: '6px', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <div>
+                                <strong>{addr.recipientName}</strong> ({addr.recipientPhone}) — {addr.addressLine}, {addr.ward ? `${addr.ward}, ` : ''}{addr.district ? `${addr.district}, ` : ''}{addr.city}
+                              </div>
+                              {addr.isDefault && (
+                                <span style={{ padding: '1px 6px', borderRadius: '4px', fontSize: '0.65rem', fontWeight: 800, backgroundColor: '#eff6ff', color: '#2563eb' }}>Mặc định</span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Đơn hàng gần nhất */}
+                    {custDetail?.orders && custDetail.orders.length > 0 && (
+                      <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e2e8f0', padding: '0.85rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                          <h4 style={{ margin: 0, fontSize: '0.85rem', fontWeight: 800, color: '#334155' }}>
+                            Đơn Hàng Gần Đây ({custDetail.orders.length})
+                          </h4>
+                          <span 
+                            style={{ fontSize: '0.75rem', color: '#2563eb', fontWeight: 700, cursor: 'pointer' }}
+                            onClick={() => {
+                              handleCloseCustDetail();
+                              navigate(`/admin/sales?tab=orders&search=${encodeURIComponent(custDetail.customerId)}`);
+                            }}
+                          >
+                            Xem tất cả đơn →
+                          </span>
+                        </div>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.76rem' }}>
+                          <thead>
+                            <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', textAlign: 'left', color: '#64748b' }}>
+                              <th style={{ padding: '0.4rem 0.5rem' }}>Mã Đơn</th>
+                              <th style={{ padding: '0.4rem 0.5rem' }}>Ngày Đặt</th>
+                              <th style={{ padding: '0.4rem 0.5rem', textAlign: 'center' }}>Trạng Thái</th>
+                              <th style={{ padding: '0.4rem 0.5rem', textAlign: 'right' }}>Tổng Tiền</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {custDetail.orders.map(o => (
+                              <tr key={o.orderId} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                <td style={{ padding: '0.4rem 0.5rem', fontWeight: 700, color: '#2563eb' }}>{o.orderId}</td>
+                                <td style={{ padding: '0.4rem 0.5rem', color: '#64748b' }}>{new Date(o.createdAt).toLocaleDateString('vi-VN')}</td>
+                                <td style={{ padding: '0.4rem 0.5rem', textAlign: 'center' }}>
+                                  <span style={{ padding: '2px 6px', borderRadius: '4px', fontSize: '0.68rem', fontWeight: 700, backgroundColor: '#f1f5f9', color: '#475569' }}>
+                                    {o.status}
+                                  </span>
+                                </td>
+                                <td style={{ padding: '0.4rem 0.5rem', textAlign: 'right', fontWeight: 700, color: '#0f172a' }}>{fmt(o.totalAmount)} ₫</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+
+                  </div>
+                )}
+
+              </div>
+            )}
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1.25rem', borderTop: '1px solid #f1f5f9', paddingTop: '0.75rem' }}>
+              <button
+                type="button"
+                onClick={handleCloseCustDetail}
+                style={secondaryBtnStyle}
+              >
+                Đóng
+              </button>
             </div>
 
           </div>

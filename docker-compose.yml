@@ -1,23 +1,23 @@
 services:
-  # 1. Database Service (PostgreSQL)
-  db:
-    image: postgres:15-alpine
-    container_name: kltn_postgres
-    restart: always
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: kltn_erp
-    ports:
-      - "5432:5432"
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-      - ./backups/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
+# 1. Database Service (PostgreSQL) — TẠM TẮT VÌ ĐANG DÙNG TRỰC TIẾP POSTGRESQL TRÊN RAILWAY
+  # db:
+  #   image: postgres:15-alpine
+  #   container_name: kltn_postgres
+  #   restart: always
+  #   environment:
+  #     POSTGRES_USER: postgres
+  #     POSTGRES_PASSWORD: postgres
+  #     POSTGRES_DB: kltn_erp
+  #   ports:
+  #     - "5432:5432"
+  #   volumes:
+  #     - pgdata:/var/lib/postgresql/data
+  #     - ./backups/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U postgres"]
+  #     interval: 5s
+  #     timeout: 5s
+  #     retries: 5
 
   # 2. Redis Service — cần cho hàng đợi xử lý đơn hàng (orderQueue.js/
   # orderWorker.js dùng ioredis qua REDIS_URL). Trước đây không có service này
@@ -46,9 +46,9 @@ services:
     # Tải biến môi trường từ tệp tin cục bộ .env để lấy GEMINI_API_KEY, v.v.
     env_file:
       - ./backend/.env
-    # Ghi đè DATABASE_URL để kết nối tới DB container thay vì localhost của host machine
+    # Kết nối trực tiếp tới PostgreSQL trên Railway
     environment:
-      - DATABASE_URL=postgresql://postgres:postgres@db:5432/kltn_erp?schema=public
+      - DATABASE_URL=postgresql://postgres:IvbTmfcNYDKhQzmByEELqONGmayojNiv@altaria.proxy.rlwy.net:48710/railway
       - REDIS_URL=redis://redis:6379
       - NODE_ENV=development
     volumes:
@@ -57,8 +57,6 @@ services:
       # Ánh xạ thư mục cào dữ liệu để chạy seed script
       - ./scraper:/scraper
     depends_on:
-      db:
-        condition: service_healthy
       redis:
         condition: service_healthy
 
@@ -77,15 +75,13 @@ services:
     env_file:
       - ./backend/.env
     environment:
-      - DATABASE_URL=postgresql://postgres:postgres@db:5432/kltn_erp?schema=public
+      - DATABASE_URL=postgresql://postgres:IvbTmfcNYDKhQzmByEELqONGmayojNiv@altaria.proxy.rlwy.net:48710/railway
       - REDIS_URL=redis://redis:6379
       - NODE_ENV=development
     volumes:
       - ./backend:/app
       - /app/node_modules
     depends_on:
-      db:
-        condition: service_healthy
       redis:
         condition: service_healthy
 
@@ -111,6 +107,6 @@ services:
     depends_on:
       - backend
 
-volumes:
-  pgdata:
-    driver: local
+# volumes:
+#   pgdata:
+#     driver: local

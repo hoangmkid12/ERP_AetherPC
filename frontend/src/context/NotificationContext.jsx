@@ -19,6 +19,14 @@ export const notify = (messageOrObj, type, link) => notifyRef(messageOrObj, type
 export const confirm = (message, options) => confirmRef(message, options);
 export const promptText = (message, defaultValue = '') => promptRef(message, defaultValue);
 
+// One shared "aether_notifications" localStorage key meant every account
+// that ever logged in on a given browser read and wrote the same history —
+// a customer logging in after someone else on a shared/public machine saw
+// that other person's order confirmations, and a staff account saw whatever
+// a customer had triggered earlier. Key the list to the logged-in identity
+// instead so each account only ever sees its own notifications.
+const storageKeyFor = (user) => `aether_notifications_${user?.id ?? 'guest'}`;
+
 export const NotificationProvider = ({ children }) => {
   const { user, loading: authLoading } = useAuth() || {};
 

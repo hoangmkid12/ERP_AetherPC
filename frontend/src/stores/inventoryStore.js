@@ -52,18 +52,33 @@ const STORAGE_KEYS = {
 // which was blowing out that column's width.
 const CATEGORY_SLUG_TO_CODE = {
   cpu: 'CPU',
+  'bo-vi-xu-ly': 'CPU',
   gpu: 'VGA',
+  'card-man-hinh': 'VGA',
   ram: 'RAM',
+  'ram-pc': 'RAM',
+  'bo-nho-ram-pc': 'RAM',
   ram_laptop: 'RAM',
+  'ram-laptop': 'RAM',
+  'bo-nho-ram-laptop': 'RAM',
   ssd: 'STORAGE',
+  'o-cung-ssd': 'STORAGE',
   hdd: 'STORAGE',
+  'o-cung-hdd': 'STORAGE',
   mainboard: 'MAINBOARD',
+  'bo-mach-chu': 'MAINBOARD',
   case: 'CASE',
+  'vo-may-tinh': 'CASE',
   psu: 'PSU',
+  'nguon-may-tinh': 'PSU',
   cooler: 'COOLER',
+  'tan-nhiet': 'COOLER',
   monitor: 'MONITOR',
+  'man-hinh': 'MONITOR',
   keyboard: 'KEYBOARD',
+  'ban-phim': 'KEYBOARD',
   mouse: 'MOUSE',
+  'chuot-may-tinh': 'MOUSE',
 };
 
 // createProduct/updateProduct accept a plain object as before for every existing
@@ -172,6 +187,11 @@ export const useInventoryStore = create((set, get) => ({
         id: row.productId ?? row.product?.productId ?? row.id,
         name: row.product?.name || row.name || 'Sản phẩm',
         category: CATEGORY_SLUG_TO_CODE[row.product?.category?.slug] || row.category || 'STORAGE',
+        // Mã code ở trên gộp ram+ram_laptop và ssd+hdd làm một để tab Danh Sách Sản
+        // Phẩm lọc gọn — nhưng khiến "Xem Sản Phẩm" từ tab Danh Mục (13 danh mục
+        // thật, tách riêng ram_laptop/hdd) hiện số sai lệch so với badge đã bấm.
+        // Giữ nguyên slug thật để lọc chính xác 1-1 khi cần.
+        categorySlug: row.product?.category?.slug || null,
         stock: row.quantityOnHand ?? row.product?.stockQuantity ?? 0,
         threshold: row.reorderPoint ?? 5,
         // Backend `supplierName`: the product's most recent fulfilled-PO supplier if it

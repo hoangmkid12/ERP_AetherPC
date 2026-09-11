@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useInventoryStore, useSalesStore, useFinanceStore, useUtilityStore, useHRStore } from '../../stores';
 import { useAuth } from '../../context/AuthContext';
 import { usePermission } from '../../hooks/usePermission';
-import { useNotification, notify, promptText } from '../../context/NotificationContext';
+import { useNotification, notify, confirm } from '../../context/NotificationContext';
 import { DELIVERY_REGIONS, detectDeliveryRegion } from '../../utils/deliveryRegions';
 import { QC_STATUS, getStatusInfo } from '../../utils/statusLabels';
 import { api } from '../../services/api';
@@ -321,6 +321,270 @@ const isDateInRange = (dateVal, startDate, endDate) => {
   if (endDate && itemYMD > endDate) return false;
   return true;
 };
+
+// ──── Sub-Component: Location Products Detail Modal ────
+function LocationProductsModal({ location, onClose, safeFormatPrice, activeInventory }) {
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+
+  useEffect(() => {
+    if (!location) return;
+    let isMounted = true;
+    setLoading(true);
+
+    const locCode = `${location.zone}-${location.shelf}-${location.bin}`.toUpperCase();
+
+    // 1. Initial fallback from activeInventory
+    const localMatches = (activeInventory || []).filter(item => {
+      const itemLoc = String(item.location || '').toUpperCase();
+      return itemLoc.includes(locCode) || itemLoc.includes(location.zone?.toUpperCase());
+    }).map(item => ({
+      productId: item.id || item.productId,
+      productName: item.name || item.productName || 'Linh Kiện',
+      sku: item.sku || item.id,
+      category: item.category || '',
+      price: item.price || 0,
+      stock: item.stock || 0,
+      reserved: item.reserved || 0,
+      available: Math.max(0, (item.stock || 0) - (item.reserved || 0)),
+      image: item.image || null
+    }));
+
+    // 2. Fetch authoritative list from backend
+    api.get(`/warehouse/locations/${location.id}/products`)
+      .then(res => {
+        if (isMounted) {
+          const items = res?.data?.items || [];
+          if (items.length > 0) {
+            setProducts(items);
+          } else if (localMatches.length > 0) {
+            setProducts(localMatches);
+          } else {
+            setProducts([]);
+          }
+        }
+      })
+      .catch(err => {
+        console.warn('Could not fetch location products from server, using local data:', err);
+        if (isMounted) {
+          setProducts(localMatches);
+        }
+      })
+      .finally(() => {
+        if (isMounted) setLoading(false);
+      });
+
+    return () => { isMounted = false; };
+  }, [location, activeInventory]);
+
+  if (!location) return null;
+
+  const filtered = products.filter(p => {
+    if (!searchTerm.trim()) return true;
+    const term = searchTerm.toLowerCase();
+    return (p.productName || '').toLowerCase().includes(term) ||
+           (p.sku || '').toLowerCase().includes(term) ||
+           (p.productId || '').toLowerCase().includes(term) ||
+           (p.category || '').toLowerCase().includes(term);
+  });
+
+  const totalQty = products.reduce((sum, p) => sum + (Number(p.stock) || 0), 0);
+
+  return (
+    <div style={{
+      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+      backgroundColor: 'rgba(15, 23, 42, 0.65)',
+      backdropFilter: 'blur(4px)',
+      zIndex: 10000,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      padding: '1rem'
+    }}
+      onClick={onClose}
+    >
+      <div style={{
+        backgroundColor: '#ffffff',
+        borderRadius: '12px',
+        maxWidth: '860px',
+        width: '100%',
+        maxHeight: '90vh',
+        boxShadow: '0 20px 45px rgba(0, 0, 0, 0.25)',
+        border: '1px solid #cbd5e1',
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden'
+      }}
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Modal Header */}
+        <div style={{
+          padding: '1.25rem 1.5rem',
+          backgroundColor: '#f8fafc',
+          borderBottom: '1px solid #e2e8f0',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          gap: '1rem', flexWrap: 'wrap'
+        }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+              <span style={{
+                backgroundColor: '#eff6ff',
+                color: '#2563eb',
+                border: '1px solid #bfdbfe',
+                borderRadius: '6px',
+                padding: '0.25rem 0.65rem',
+                fontSize: '0.85rem',
+                fontWeight: 800
+              }}>
+                {location.zone}-{location.shelf}-{location.bin}
+              </span>
+              <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#0f172a' }}>
+                Danh Sách Sản Phẩm Trong Kệ
+              </h3>
+            </div>
+            <p style={{ margin: '0.35rem 0 0 0', fontSize: '0.8rem', color: '#64748b' }}>
+              Thuộc kho: <strong style={{ color: '#0f172a' }}>{location.warehouse?.name || 'Kho Tổng TP.HCM'}</strong> · Sức chứa thiết kế: <strong>{location.capacity || 100}</strong> · Đã gán: <strong style={{ color: '#2563eb' }}>{products.length}</strong> sản phẩm ({totalQty} đơn vị tồn)
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              backgroundColor: '#ffffff',
+              border: '1px solid #cbd5e1',
+              borderRadius: '6px',
+              padding: '0.35rem 0.75rem',
+              fontSize: '0.8rem',
+              fontWeight: 700,
+              color: '#475569',
+              cursor: 'pointer'
+            }}
+          >
+            Đóng
+          </button>
+        </div>
+
+        {/* Modal Search Toolbar */}
+        <div style={{ padding: '0.85rem 1.5rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#ffffff', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem' }}>
+          <input
+            type="text"
+            placeholder="Tìm sản phẩm theo tên, mã SKU, phân loại..."
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+            style={{
+              flex: 1,
+              padding: '0.5rem 0.85rem',
+              fontSize: '0.83rem',
+              border: '1px solid #cbd5e1',
+              borderRadius: '6px'
+            }}
+          />
+          <div style={{ fontSize: '0.8rem', color: '#64748b', whiteSpace: 'nowrap' }}>
+            Hiển thị <strong>{filtered.length}</strong> / {products.length} mặt hàng
+          </div>
+        </div>
+
+        {/* Modal Table Content */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '0' }}>
+          {loading ? (
+            <div style={{ padding: '3.5rem 1rem', textAlign: 'center', color: '#64748b' }}>
+              <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>Đang tải danh sách sản phẩm...</div>
+            </div>
+          ) : filtered.length === 0 ? (
+            <div style={{ padding: '3.5rem 1rem', textAlign: 'center', color: '#64748b' }}>
+              <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#0f172a' }}>
+                {searchTerm ? 'Không tìm thấy sản phẩm phù hợp với từ khóa.' : 'Kệ này hiện chưa có sản phẩm nào.'}
+              </div>
+              <div style={{ fontSize: '0.8rem', marginTop: '0.25rem' }}>
+                Sản phẩm sẽ được xếp vào kệ này khi nhập kho (GRN) hoặc điều chuyển kho.
+              </div>
+            </div>
+          ) : (
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+              <thead>
+                <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569' }}>
+                  <th style={{ padding: '0.65rem 1rem', width: '50px', textAlign: 'center' }}>#</th>
+                  <th style={{ padding: '0.65rem 1rem', width: '130px' }}>Mã SP / SKU</th>
+                  <th style={{ padding: '0.65rem 1rem' }}>Tên Sản Phẩm</th>
+                  <th style={{ padding: '0.65rem 1rem', width: '110px' }}>Phân Loại</th>
+                  <th style={{ padding: '0.65rem 1rem', width: '90px', textAlign: 'center' }}>Tồn Kho</th>
+                  <th style={{ padding: '0.65rem 1rem', width: '90px', textAlign: 'center' }}>Khả Dụng</th>
+                  <th style={{ padding: '0.65rem 1rem', width: '120px', textAlign: 'right' }}>Đơn Giá</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((prod, pIdx) => (
+                  <tr key={pIdx} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                    <td style={{ padding: '0.65rem 1rem', textAlign: 'center', color: '#94a3b8', fontSize: '0.78rem' }}>
+                      {pIdx + 1}
+                    </td>
+                    <td style={{ padding: '0.65rem 1rem', fontWeight: 700, color: '#2563eb', fontSize: '0.8rem' }}>
+                      {prod.sku || prod.productId}
+                    </td>
+                    <td style={{ padding: '0.65rem 1rem', fontWeight: 600, color: '#0f172a', lineHeight: 1.35 }}>
+                      {prod.productName}
+                    </td>
+                    <td style={{ padding: '0.65rem 1rem', color: '#64748b' }}>
+                      <span style={{
+                        padding: '2px 7px',
+                        borderRadius: '4px',
+                        fontSize: '0.72rem',
+                        fontWeight: 600,
+                        backgroundColor: '#f1f5f9',
+                        color: '#475569'
+                      }}>
+                        {prod.category || 'Linh Kiện'}
+                      </span>
+                    </td>
+                    <td style={{ padding: '0.65rem 1rem', textAlign: 'center', fontWeight: 800, color: '#0f172a' }}>
+                      {prod.stock}
+                    </td>
+                    <td style={{ padding: '0.65rem 1rem', textAlign: 'center', fontWeight: 800, color: '#16a34a' }}>
+                      {prod.available}
+                    </td>
+                    <td style={{ padding: '0.65rem 1rem', textAlign: 'right', fontWeight: 700, color: '#0f172a' }}>
+                      {safeFormatPrice(prod.price)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        {/* Modal Footer */}
+        <div style={{
+          padding: '0.85rem 1.5rem',
+          backgroundColor: '#f8fafc',
+          borderTop: '1px solid #e2e8f0',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
+        }}>
+          <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
+            Tổng số lượng đang có trên kệ: <strong style={{ color: '#0f172a' }}>{totalQty}</strong> đơn vị
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              backgroundColor: '#2563eb',
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: '6px',
+              padding: '0.45rem 1.1rem',
+              fontSize: '0.8rem',
+              fontWeight: 700,
+              cursor: 'pointer'
+            }}
+          >
+            Đóng
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // ──── Sub-Component: Stock Movement Detail Modal ────
 function MovementDetailModal({ movement, onClose, formatDateTime }) {
@@ -1007,6 +1271,17 @@ function RfqAlertModal({ rfqModalData, setRfqModalData, sendSystemNotification, 
       return;
     }
 
+    // Ghi thành 1 Phiếu Yêu Cầu Mua Hàng (PurchaseRequest) THẬT trong CSDL để
+    // Quản Lý Kho có gì để ký duyệt (tab "Bổ Sung Hàng" > Phiếu Yêu Cầu) —
+    // trước đây bước này chỉ ghi localStorage + gửi thông báo, không để lại
+    // hồ sơ nào thật sự chờ duyệt.
+    const realProductId = item.productId || item.id;
+    if (realProductId) {
+      api.post('/warehouse/purchase-requests', { productId: realProductId, quantity: finalQty, reason }).catch(err => {
+        console.warn('[RFQ Alert] Không thể tạo Phiếu Yêu Cầu Mua Hàng thật:', err.message);
+      });
+    }
+
     const newLog = {
       id: 'RFQ-ALT-' + Date.now(),
       sentAt: new Date().toISOString(),
@@ -1612,6 +1887,241 @@ export default function Warehouse() {
   const canStockIntake = canDo('warehouse_stock_intake') || isWarehouse || isAdmin;
   const canApprovePr = canDo('warehouse_approve_pr') || isCEO || isAdmin;
   const canAuditAdjust = canDo('warehouse_audit_adjust') || isCEO || isAdmin;
+  const canCreatePr = canDo('warehouse_create_pr') || isWarehouse || isWarehouseManager || isCEO || isAdmin;
+  const canManageLocations = canDo('warehouse_manage_locations') || isWarehouseManager || isCEO || isAdmin;
+  const canManageCategories = isWarehouseManager || isCEO || isAdmin;
+
+  // Danh Mục Sản Phẩm (Category) — trước đây tab này so khớp tên hiển thị
+  // bằng regex thủ công (VD alias 'VGA' không khớp tên thật "GPU - Card màn
+  // hình" nên luôn đếm ra 0), và nút "+ Thêm Danh Mục Mới" chỉ hiện toast giả,
+  // không lưu gì. Giờ dùng API thật /api/v1/categories qua đúng categoryId.
+  const [realCategories, setRealCategories] = useState([]);
+  const [loadingCategories, setLoadingCategories] = useState(false);
+  const [showCreateCategoryForm, setShowCreateCategoryForm] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+
+
+  const VIETNAMESE_CATEGORY_MAP = {
+    'case': { name: 'Vỏ Máy Tính', slug: 'vo-may-tinh' },
+    'vo-may-tinh': { name: 'Vỏ Máy Tính', slug: 'vo-may-tinh' },
+    'cooler': { name: 'Tản Nhiệt', slug: 'tan-nhiet' },
+    'tan-nhiet': { name: 'Tản Nhiệt', slug: 'tan-nhiet' },
+    'cpu': { name: 'Bộ Vi Xử Lý', slug: 'bo-vi-xu-ly' },
+    'bo-vi-xu-ly': { name: 'Bộ Vi Xử Lý', slug: 'bo-vi-xu-ly' },
+    'gpu': { name: 'Card Màn Hình', slug: 'card-man-hinh' },
+    'card-man-hinh': { name: 'Card Màn Hình', slug: 'card-man-hinh' },
+    'vga': { name: 'Card Màn Hình', slug: 'card-man-hinh' },
+    'hdd': { name: 'Ổ Cứng HDD', slug: 'o-cung-hdd' },
+    'o-cung-hdd': { name: 'Ổ Cứng HDD', slug: 'o-cung-hdd' },
+    'o-cung-co': { name: 'Ổ Cứng HDD', slug: 'o-cung-hdd' },
+    'keyboard': { name: 'Bàn Phím', slug: 'ban-phim' },
+    'ban-phim': { name: 'Bàn Phím', slug: 'ban-phim' },
+    'mainboard': { name: 'Bo Mạch Chủ', slug: 'bo-mach-chu' },
+    'bo-mach-chu': { name: 'Bo Mạch Chủ', slug: 'bo-mach-chu' },
+    'monitor': { name: 'Màn Hình', slug: 'man-hinh' },
+    'man-hinh': { name: 'Màn Hình', slug: 'man-hinh' },
+    'mouse': { name: 'Chuột Máy Tính', slug: 'chuot-may-tinh' },
+    'chuot-may-tinh': { name: 'Chuột Máy Tính', slug: 'chuot-may-tinh' },
+    'psu': { name: 'Nguồn Máy Tính', slug: 'nguon-may-tinh' },
+    'nguon-may-tinh': { name: 'Nguồn Máy Tính', slug: 'nguon-may-tinh' },
+    'ram': { name: 'RAM PC', slug: 'ram-pc' },
+    'ram-pc': { name: 'RAM PC', slug: 'ram-pc' },
+    'ram_laptop': { name: 'RAM Laptop', slug: 'ram-laptop' },
+    'ram-laptop': { name: 'RAM Laptop', slug: 'ram-laptop' },
+    'ssd': { name: 'Ổ Cứng SSD', slug: 'o-cung-ssd' },
+    'o-cung-ssd': { name: 'Ổ Cứng SSD', slug: 'o-cung-ssd' },
+  };
+
+  const normalizeCategory = (cat) => {
+    const slugKey = String(cat?.slug || '').toLowerCase().trim();
+    const mapped = VIETNAMESE_CATEGORY_MAP[slugKey];
+    let name = mapped?.name || cat?.name || '';
+    if (name.includes(' - ')) {
+      const parts = name.split(' - ');
+      name = parts[parts.length - 1].trim();
+    }
+    const slug = mapped?.slug || cat?.slug || '';
+    return { ...cat, name, slug };
+  };
+
+  const loadCategories = async () => {
+    setLoadingCategories(true);
+    try {
+      const res = await api.get('/categories');
+      const raw = res.data || [];
+      setRealCategories(raw.map(normalizeCategory));
+    } catch (err) {
+      notify(err?.message || 'Không thể tải danh sách danh mục.', 'error');
+    } finally {
+      setLoadingCategories(false);
+    }
+  };
+
+  const handleCreateCategory = async () => {
+    if (!newCategoryName.trim()) {
+      notify('Vui lòng nhập tên danh mục.', 'error');
+      return;
+    }
+    try {
+      await api.post('/categories', { name: newCategoryName.trim() });
+      notify(`Đã tạo danh mục "${newCategoryName.trim()}".`, 'success');
+      setShowCreateCategoryForm(false);
+      setNewCategoryName('');
+      loadCategories();
+    } catch (err) {
+      notify(err?.message || 'Không thể tạo danh mục.', 'error');
+    }
+  };
+
+  const handleDeleteCategory = async (cat) => {
+    if (!(await confirm(`Xóa danh mục "${cat.name}"?`, { danger: true }))) return;
+    try {
+      await api.delete(`/categories/${cat.id}`);
+      notify(`Đã xóa danh mục "${cat.name}".`, 'success');
+      loadCategories();
+    } catch (err) {
+      notify(err?.message || 'Không thể xóa danh mục.', 'error');
+    }
+  };
+
+  // Phiếu Yêu Cầu Mua Hàng nội bộ (PR) — warehouse_create_pr / warehouse_approve_pr
+  const [purchaseRequests, setPurchaseRequests] = useState([]);
+  const [loadingPRs, setLoadingPRs] = useState(false);
+  const [prBusyId, setPrBusyId] = useState(null);
+  const [showCreatePrForm, setShowCreatePrForm] = useState(false);
+  const [prForm, setPrForm] = useState({ productId: '', quantity: '', reason: '' });
+
+  const loadPurchaseRequests = async () => {
+    setLoadingPRs(true);
+    try {
+      const res = await api.get('/warehouse/purchase-requests');
+      setPurchaseRequests(res.data || []);
+    } catch (err) {
+      notify(err?.message || 'Không thể tải danh sách Phiếu Yêu Cầu Mua Hàng.', 'error');
+    } finally {
+      setLoadingPRs(false);
+    }
+  };
+
+  const handleCreatePr = async () => {
+    const qty = parseInt(prForm.quantity, 10);
+    if (!prForm.productId || !Number.isInteger(qty) || qty <= 0) {
+      notify('Vui lòng chọn sản phẩm và nhập số lượng đề xuất hợp lệ.', 'error');
+      return;
+    }
+    try {
+      await api.post('/warehouse/purchase-requests', { productId: prForm.productId, quantity: qty, reason: prForm.reason });
+      notify('Đã gửi Phiếu Yêu Cầu Mua Hàng, chờ Quản Lý Kho ký duyệt.', 'success');
+      setShowCreatePrForm(false);
+      setPrForm({ productId: '', quantity: '', reason: '' });
+      loadPurchaseRequests();
+    } catch (err) {
+      notify(err?.message || 'Không thể tạo Phiếu Yêu Cầu Mua Hàng.', 'error');
+    }
+  };
+
+  const handleDecidePr = async (pr, decision) => {
+    const label = decision === 'approve' ? 'duyệt' : 'từ chối';
+    if (!(await confirm(`Xác nhận ${label} phiếu ${pr.prCode} (${pr.product?.name}, SL ${pr.quantity})?`, { danger: decision === 'reject' }))) return;
+    setPrBusyId(pr.id);
+    try {
+      await api.patch(`/warehouse/purchase-requests/${pr.id}/${decision}`);
+      notify(`Đã ${label} phiếu ${pr.prCode}.`, 'success');
+      loadPurchaseRequests();
+    } catch (err) {
+      notify(err?.message || `Không thể ${label} phiếu.`, 'error');
+    } finally {
+      setPrBusyId(null);
+    }
+  };
+
+  // Vị Trí Kệ Kho (WarehouseLocation) — warehouse_manage_locations
+  const [warehouseLocations, setWarehouseLocations] = useState([]);
+  const [loadingLocations, setLoadingLocations] = useState(false);
+  const [showCreateLocationForm, setShowCreateLocationForm] = useState(false);
+  const [locationForm, setLocationForm] = useState({ warehouseId: '1', zone: '', shelf: '', bin: '', capacity: '100' });
+  const [viewingLocationProducts, setViewingLocationProducts] = useState(null);
+
+  const loadWarehouseLocations = async () => {
+    setLoadingLocations(true);
+    try {
+      const res = await api.get('/warehouse/locations');
+      setWarehouseLocations(res.data || []);
+    } catch (err) {
+      notify(err?.message || 'Không thể tải danh sách vị trí kệ kho.', 'error');
+    } finally {
+      setLoadingLocations(false);
+    }
+  };
+
+  const handleCreateLocation = async () => {
+    if (!locationForm.zone.trim() || !locationForm.shelf.trim() || !locationForm.bin.trim()) {
+      notify('Vui lòng nhập đủ Zone / Shelf / Bin.', 'error');
+      return;
+    }
+    try {
+      await api.post('/warehouse/locations', locationForm);
+      notify(`Đã tạo vị trí ${locationForm.zone}-${locationForm.shelf}-${locationForm.bin}.`, 'success');
+      setShowCreateLocationForm(false);
+      setLocationForm({ warehouseId: '1', zone: '', shelf: '', bin: '', capacity: '100' });
+      loadWarehouseLocations();
+    } catch (err) {
+      notify(err?.message || 'Không thể tạo vị trí kệ.', 'error');
+    }
+  };
+
+  const handleDeleteLocation = async (loc) => {
+    if (!(await confirm(`Xóa vị trí ${loc.zone}-${loc.shelf}-${loc.bin}?`, { danger: true }))) return;
+    try {
+      await api.delete(`/warehouse/locations/${loc.id}`);
+      notify('Đã xóa vị trí kệ.', 'success');
+      loadWarehouseLocations();
+    } catch (err) {
+      notify(err?.message || 'Không thể xóa vị trí kệ.', 'error');
+    }
+  };
+
+  // Kiểm kê điều chỉnh GIẢM tồn kho — warehouse_audit_adjust (chỉ Quản Lý Kho)
+  const [showAuditForm, setShowAuditForm] = useState(false);
+  const [auditForm, setAuditForm] = useState({ productId: '', quantity: '', warehouseId: '1', reason: '', note: '', serials: '' });
+  const [submittingAudit, setSubmittingAudit] = useState(false);
+
+  const handleSubmitAudit = async () => {
+    const qty = parseInt(auditForm.quantity, 10);
+    const serialsArr = auditForm.serials.split(/[\n,]/).map(s => s.trim()).filter(Boolean);
+    if (!auditForm.productId || !Number.isInteger(qty) || qty <= 0) {
+      notify('Vui lòng chọn sản phẩm và nhập số lượng điều chỉnh giảm hợp lệ.', 'error');
+      return;
+    }
+    if (!auditForm.reason.trim()) {
+      notify('Vui lòng nhập lý do kiểm kê (thất lạc, hư hỏng...).', 'error');
+      return;
+    }
+    if (serialsArr.length !== qty) {
+      notify(`Cần nhập đủ ${qty} Serial Number đang tồn kho thực tế (mỗi dòng 1 mã) — hiện có ${serialsArr.length}.`, 'error');
+      return;
+    }
+    setSubmittingAudit(true);
+    try {
+      await api.post('/warehouse/inventory/audit-adjust', {
+        productId: auditForm.productId,
+        quantity: qty,
+        warehouseId: parseInt(auditForm.warehouseId, 10) || 1,
+        reason: auditForm.reason,
+        note: auditForm.note,
+        serials: serialsArr
+      });
+      notify(`Đã ghi nhận điều chỉnh giảm ${qty} sản phẩm.`, 'success');
+      setShowAuditForm(false);
+      setAuditForm({ productId: '', quantity: '', warehouseId: '1', reason: '', note: '', serials: '' });
+      if (typeof refreshInventoryFromServer === 'function') refreshInventoryFromServer();
+    } catch (err) {
+      notify(err?.message || 'Không thể ghi nhận điều chỉnh giảm.', 'error');
+    } finally {
+      setSubmittingAudit(false);
+    }
+  };
+
   const inventory = useInventoryStore(state => state.inventory) || [];
   const setInventory = (items) => {
     useInventoryStore.setState({ inventory: items });
@@ -1620,7 +2130,7 @@ export default function Warehouse() {
   const updateProduct = useInventoryStore(state => state.updateProduct);
   const createProduct = useInventoryStore(state => state.createProduct);
   const deleteProductImage = useInventoryStore(state => state.deleteProductImage);
-  const products = useInventoryStore(state => state.products) || [];
+  const refreshInventoryFromServer = useInventoryStore(state => state.getInventory);
 
   const orders = useSalesStore(state => state.orders) || [];
   const setOrders = (items) => {
@@ -1930,6 +2440,12 @@ export default function Warehouse() {
   useEffect(() => {
     fetchReceipts();
   }, []);
+
+  useEffect(() => {
+    if (activeTab === 'rfq') loadPurchaseRequests();
+    if (activeTab === 'locations') loadWarehouseLocations();
+    if (activeTab === 'categories') loadCategories();
+  }, [activeTab]);
 
   // Real Supplier directory (Purchasing's Danh Bạ NCC) — the product edit form used
   // to offer a hardcoded list of supplier NAMES (STANDARD_SUPPLIERS) with no relation
@@ -2493,26 +3009,71 @@ export default function Warehouse() {
   const pendingDeliveriesCount = orders.filter(o => PENDING_DELIVERY_STATUSES.includes(o.status)).length;
 
   const CAT_ALIASES = {
-    'CPU': ['CPU', 'PROCESSOR', 'BỘ XỬ LÝ'],
+    'CPU': ['CPU', 'PROCESSOR', 'BỘ XỬ LÝ', 'BỘ VI XỬ LÝ'],
     'VGA': ['VGA', 'GPU', 'GRAPHICS', 'CARD MÀN HÌNH', 'VIDEO CARD'],
     'MAINBOARD': ['MAINBOARD', 'MOTHERBOARD', 'BO MẠCH CHỦ', 'MAIN'],
     'RAM': ['RAM', 'MEMORY', 'BỘ NHỚ'],
     'STORAGE': ['STORAGE', 'HDD', 'SSD', 'Ổ CỨNG', 'O CUNG'],
     'PSU': ['PSU', 'POWER SUPPLY', 'NGUỒN', 'NGUON'],
-    'CASE': ['CASE', 'CHASSIS', 'VỎ CASE', 'THÙNG MÁY'],
+    'CASE': ['CASE', 'CHASSIS', 'VỎ CASE', 'THÙNG MÁY', 'VỎ MÁY TÍNH'],
     'COOLER': ['COOLER', 'TẢN NHIỆT', 'FAN', 'COOLING'],
     'MONITOR': ['MONITOR', 'MÀN HÌNH', 'MAN HINH', 'SCREEN', 'DISPLAY'],
     'KEYBOARD': ['KEYBOARD', 'BÀN PHÍM', 'BAN PHIM', 'PHÍM'],
-    'MOUSE': ['MOUSE', 'CHUỘT', 'CHUOT']
+    'MOUSE': ['MOUSE', 'CHUỘT', 'CHUOT', 'CHUỘT MÁY TÍNH']
+  };
+
+  const SLUG_ALIASES = {
+    'bo-vi-xu-ly': ['cpu', 'bo-vi-xu-ly'],
+    'cpu': ['cpu', 'bo-vi-xu-ly'],
+    'card-man-hinh': ['gpu', 'vga', 'card-man-hinh'],
+    'gpu': ['gpu', 'vga', 'card-man-hinh'],
+    'vga': ['gpu', 'vga', 'card-man-hinh'],
+    'ram-pc': ['ram', 'ram-pc', 'bo-nho-ram-pc'],
+    'ram': ['ram', 'ram-pc', 'bo-nho-ram-pc'],
+    'ram-laptop': ['ram_laptop', 'ram-laptop', 'bo-nho-ram-laptop'],
+    'ram_laptop': ['ram_laptop', 'ram-laptop', 'bo-nho-ram-laptop'],
+    'o-cung-ssd': ['ssd', 'o-cung-ssd'],
+    'ssd': ['ssd', 'o-cung-ssd'],
+    'o-cung-hdd': ['hdd', 'o-cung-hdd', 'o-cung-co'],
+    'hdd': ['hdd', 'o-cung-hdd', 'o-cung-co'],
+    'bo-mach-chu': ['mainboard', 'bo-mach-chu'],
+    'mainboard': ['mainboard', 'bo-mach-chu'],
+    'nguon-may-tinh': ['psu', 'nguon-may-tinh'],
+    'psu': ['psu', 'nguon-may-tinh'],
+    'vo-may-tinh': ['case', 'vo-may-tinh'],
+    'case': ['case', 'vo-may-tinh'],
+    'tan-nhiet': ['cooler', 'tan-nhiet'],
+    'cooler': ['cooler', 'tan-nhiet'],
+    'man-hinh': ['monitor', 'man-hinh'],
+    'monitor': ['monitor', 'man-hinh'],
+    'ban-phim': ['keyboard', 'ban-phim'],
+    'keyboard': ['keyboard', 'ban-phim'],
+    'chuot-may-tinh': ['mouse', 'chuot-may-tinh'],
+    'mouse': ['mouse', 'chuot-may-tinh']
+  };
+
+  // CAT_ALIASES matches against the coarse short-code (`item.category`), which
+  // deliberately merges ram+ram_laptop and ssd+hdd into one bucket each for the
+  // manual dropdown filter — clicking "Xem Sản Phẩm" from the 13-way real
+  // Category tab needs an exact 1:1 match instead, or e.g. "RAM Laptop (15)"
+  // would land here showing the merged RAM+RAM Laptop count instead. Prefer an
+  // exact `categorySlug` match (the real, ungrouped Category.slug) when present.
+  const matchesCategoryFilter = (item, selectedCat) => {
+    if (selectedCat === 'ALL') return true;
+    if (item.categorySlug) {
+      if (item.categorySlug === selectedCat) return true;
+      const equivalentSlugs = SLUG_ALIASES[selectedCat];
+      if (equivalentSlugs && equivalentSlugs.includes(item.categorySlug)) return true;
+    }
+    const itemCatUpper = String(item.category || '').toUpperCase().trim();
+    const selCatKey = String(selectedCat || '').toLowerCase();
+    const aliases = CAT_ALIASES[selectedCat] || CAT_ALIASES[selectedCat?.toUpperCase()] || (SLUG_ALIASES[selCatKey] ? CAT_ALIASES[selectedCat] : null) || [selectedCat];
+    return aliases.some(a => itemCatUpper === a || itemCatUpper.includes(a));
   };
 
   const filteredProducts = activeInventory.filter(item => {
     const matchSearch = !searchQuery.trim() || item.name.toLowerCase().includes(searchQuery.toLowerCase()) || (item.supplier && item.supplier.toLowerCase().includes(searchQuery.toLowerCase()));
-    const itemCatUpper = String(item.category || '').toUpperCase().trim();
-    const matchCat = selectedCategory === 'ALL' || (() => {
-      const aliases = CAT_ALIASES[selectedCategory] || [selectedCategory];
-      return aliases.some(a => itemCatUpper === a || itemCatUpper.includes(a));
-    })();
+    const matchCat = matchesCategoryFilter(item, selectedCategory);
     const matchLoc = selectedLocationStatus === 'ALL' || (selectedLocationStatus === 'ASSIGNED' ? (!!item.location && item.location !== 'Chưa xếp kệ') : (!item.location || item.location === 'Chưa xếp kệ'));
     const matchSup = selectedSupplier === 'ALL' || item.supplier === selectedSupplier;
 
@@ -2525,22 +3086,13 @@ export default function Warehouse() {
   });
 
   // Dynamic suppliers available for current selected category
-  const categoryMatchedInventory = activeInventory.filter(item => {
-    if (selectedCategory === 'ALL') return true;
-    const itemCatUpper = String(item.category || '').toUpperCase().trim();
-    const aliases = CAT_ALIASES[selectedCategory] || [selectedCategory];
-    return aliases.some(a => itemCatUpper === a || itemCatUpper.includes(a));
-  });
+  const categoryMatchedInventory = activeInventory.filter(item => matchesCategoryFilter(item, selectedCategory));
   const availableSuppliers = [...new Set(categoryMatchedInventory.map(i => i.supplier).filter(Boolean))].sort();
 
   // Stock status counts computed in context of category/supplier/location/search filters
   const baseForStockStatus = activeInventory.filter(item => {
     const matchSearch = !searchQuery.trim() || item.name.toLowerCase().includes(searchQuery.toLowerCase()) || (item.supplier && item.supplier.toLowerCase().includes(searchQuery.toLowerCase()));
-    const itemCatUpper = String(item.category || '').toUpperCase().trim();
-    const matchCat = selectedCategory === 'ALL' || (() => {
-      const aliases = CAT_ALIASES[selectedCategory] || [selectedCategory];
-      return aliases.some(a => itemCatUpper === a || itemCatUpper.includes(a));
-    })();
+    const matchCat = matchesCategoryFilter(item, selectedCategory);
     const matchLoc = selectedLocationStatus === 'ALL' || (selectedLocationStatus === 'ASSIGNED' ? (!!item.location && item.location !== 'Chưa xếp kệ') : (!item.location || item.location === 'Chưa xếp kệ'));
     const matchSup = selectedSupplier === 'ALL' || item.supplier === selectedSupplier;
     return matchSearch && matchCat && matchLoc && matchSup;
@@ -2991,7 +3543,7 @@ export default function Warehouse() {
           <div style={{ marginBottom: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
             <div>
               <h2 style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
-                Quản Lý Đơn Hàng Chờ Nhập Kho
+                Quản Lý Đơn Chờ Hàng
               </h2>
               <p style={{ fontSize: '0.82rem', color: '#64748b', margin: '0.25rem 0 0 0' }}>
                 Danh sách các đơn hàng tạm giữ chỗ do thiếu tồn kho. Hệ thống tự động giải phóng đơn sang Chờ xuất kho khi hoàn tất nhập hàng PO.
@@ -3935,6 +4487,84 @@ export default function Warehouse() {
             </form>
             </fieldset>
           </div>
+
+          {/* Kiểm Kê Điều Chỉnh GIẢM Tồn Kho — warehouse_audit_adjust, chỉ Quản Lý Kho */}
+          {canAuditAdjust && (
+            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #fecaca', padding: '1.5rem', marginTop: '1.5rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+                <div>
+                  <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#b91c1c', margin: 0 }}>Kiểm Kê Điều Chỉnh Giảm Tồn Kho</h3>
+                  <p style={{ fontSize: '0.8rem', color: '#64748b', margin: '0.2rem 0 0 0' }}>
+                    Ghi nhận hàng thất lạc/hư hỏng phát hiện khi kiểm kê thực tế — trừ tồn kho thật, có dấu vết Serial Number.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowAuditForm(v => !v)}
+                  style={{ backgroundColor: '#fef2f2', color: '#b91c1c', border: '1px solid #fecaca', borderRadius: '6px', padding: '0.5rem 1rem', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
+                >
+                  {showAuditForm ? 'Đóng' : '+ Ghi Nhận Kiểm Kê'}
+                </button>
+              </div>
+
+              {showAuditForm && (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.25rem' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.35rem' }}>Sản phẩm *</label>
+                    <select
+                      value={auditForm.productId}
+                      onChange={(e) => setAuditForm(f => ({ ...f, productId: e.target.value }))}
+                      style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px' }}
+                    >
+                      <option value="">-- Chọn sản phẩm --</option>
+                      {activeInventory.map(prod => (
+                        <option key={prod.id} value={prod.id}>{prod.name} (Tồn hiện tại: {prod.stock})</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.35rem' }}>Số lượng điều chỉnh giảm *</label>
+                    <input
+                      type="number" min="1"
+                      value={auditForm.quantity}
+                      onChange={(e) => setAuditForm(f => ({ ...f, quantity: e.target.value }))}
+                      style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px' }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.35rem' }}>Lý do *</label>
+                    <input
+                      type="text" placeholder="Thất lạc, hư hỏng, sai lệch kiểm kê..."
+                      value={auditForm.reason}
+                      onChange={(e) => setAuditForm(f => ({ ...f, reason: e.target.value }))}
+                      style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px' }}
+                    />
+                  </div>
+                  <div style={{ gridColumn: '1 / -1' }}>
+                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.35rem' }}>
+                      Serial Number cần loại bỏ (mỗi dòng 1 mã, phải đang tồn kho) *
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={auditForm.serials}
+                      onChange={(e) => setAuditForm(f => ({ ...f, serials: e.target.value }))}
+                      style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontFamily: 'monospace' }}
+                    />
+                  </div>
+                  <div style={{ gridColumn: '1 / -1' }}>
+                    <button
+                      type="button"
+                      disabled={submittingAudit}
+                      onClick={handleSubmitAudit}
+                      style={{ backgroundColor: '#dc2626', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.6rem 1.5rem', fontSize: '0.88rem', fontWeight: 700, cursor: submittingAudit ? 'default' : 'pointer', opacity: submittingAudit ? 0.6 : 1 }}
+                    >
+                      {submittingAudit ? 'Đang xử lý...' : 'Xác Nhận Điều Chỉnh Giảm'}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -3965,6 +4595,116 @@ export default function Warehouse() {
             >
               Lịch Sử Cảnh Báo ({rfqAlertLogs.length})
             </button>
+          </div>
+
+          {/* Phiếu Yêu Cầu Mua Hàng nội bộ (PurchaseRequest) — warehouse_create_pr / warehouse_approve_pr.
+              Trước đây "Đề xuất bổ sung" chỉ gửi thông báo + log localStorage, không có
+              hồ sơ thật nào để Quản Lý Kho ký duyệt. */}
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem', marginBottom: '1.25rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+              <div>
+                <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>Phiếu Yêu Cầu Mua Hàng Nội Bộ (PR)</h3>
+                <p style={{ fontSize: '0.8rem', color: '#64748b', margin: '0.2rem 0 0 0' }}>
+                  {canApprovePr ? 'Ký duyệt đề xuất bổ sung hàng trước khi Mua Hàng lập RFQ gửi NCC.' : 'Đề xuất bổ sung hàng — chờ Quản Lý Kho ký duyệt.'}
+                </p>
+              </div>
+              {canCreatePr && (
+                <button
+                  onClick={() => setShowCreatePrForm(v => !v)}
+                  style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.5rem 1rem', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
+                >
+                  {showCreatePrForm ? 'Đóng' : '+ Lập Phiếu Yêu Cầu'}
+                </button>
+              )}
+            </div>
+
+            {showCreatePrForm && (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1.25rem', padding: '1rem', backgroundColor: '#f8fafc', borderRadius: '8px' }}>
+                <select
+                  value={prForm.productId}
+                  onChange={(e) => setPrForm(f => ({ ...f, productId: e.target.value }))}
+                  style={{ padding: '0.55rem 0.75rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px' }}
+                >
+                  <option value="">-- Chọn sản phẩm --</option>
+                  {activeInventory.map(prod => (
+                    <option key={prod.id} value={prod.id}>{prod.name} (Tồn: {prod.stock})</option>
+                  ))}
+                </select>
+                <input
+                  type="number" min="1" placeholder="Số lượng đề xuất"
+                  value={prForm.quantity}
+                  onChange={(e) => setPrForm(f => ({ ...f, quantity: e.target.value }))}
+                  style={{ padding: '0.55rem 0.75rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px' }}
+                />
+                <input
+                  type="text" placeholder="Lý do đề xuất"
+                  value={prForm.reason}
+                  onChange={(e) => setPrForm(f => ({ ...f, reason: e.target.value }))}
+                  style={{ padding: '0.55rem 0.75rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px' }}
+                />
+                <button
+                  onClick={handleCreatePr}
+                  style={{ backgroundColor: '#16a34a', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.55rem 1rem', fontSize: '0.83rem', fontWeight: 700, cursor: 'pointer' }}
+                >
+                  Gửi Đề Xuất
+                </button>
+              </div>
+            )}
+
+            {loadingPRs ? (
+              <div style={{ textAlign: 'center', padding: '1.5rem', color: '#94a3b8' }}>Đang tải...</div>
+            ) : purchaseRequests.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '1.5rem', color: '#94a3b8', fontSize: '0.85rem' }}>Chưa có Phiếu Yêu Cầu Mua Hàng nào.</div>
+            ) : (
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+                  <thead>
+                    <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569' }}>
+                      <th style={{ padding: '0.75rem 1rem', width: '130px', whiteSpace: 'nowrap' }}>Mã Phiếu</th>
+                      <th style={{ padding: '0.75rem 1rem', minWidth: '220px' }}>Sản Phẩm</th>
+                      <th style={{ padding: '0.75rem 1rem', textAlign: 'center', width: '110px', whiteSpace: 'nowrap' }}>SL Đề Xuất</th>
+                      <th style={{ padding: '0.75rem 1rem', minWidth: '180px' }}>Lý Do</th>
+                      <th style={{ padding: '0.75rem 1rem', width: '180px', whiteSpace: 'nowrap' }}>Người Đề Xuất</th>
+                      <th style={{ padding: '0.75rem 1rem', textAlign: 'center', width: '130px', whiteSpace: 'nowrap' }}>Trạng Thái</th>
+                      {canApprovePr && <th style={{ padding: '0.75rem 1rem', textAlign: 'center', width: '140px', whiteSpace: 'nowrap' }}>Thao Tác</th>}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {purchaseRequests.map(pr => {
+                      const isBusy = prBusyId === pr.id;
+                      const statusColor = pr.status === 'APPROVED' ? '#15803d' : pr.status === 'REJECTED' ? '#dc2626' : '#b45309';
+                      const statusBg = pr.status === 'APPROVED' ? '#f0fdf4' : pr.status === 'REJECTED' ? '#fef2f2' : '#fffbeb';
+                      const statusBorder = pr.status === 'APPROVED' ? '#bbf7d0' : pr.status === 'REJECTED' ? '#fecaca' : '#fde68a';
+                      const statusLabel = pr.status === 'APPROVED' ? 'Đã Duyệt' : pr.status === 'REJECTED' ? 'Từ Chối' : 'Chờ Duyệt';
+                      return (
+                        <tr key={pr.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                          <td style={{ padding: '0.75rem 1rem', fontWeight: 700, color: '#2563eb', whiteSpace: 'nowrap' }}>{pr.prCode}</td>
+                          <td style={{ padding: '0.75rem 1rem', color: '#1e293b', fontWeight: 600 }}>{pr.product?.name}</td>
+                          <td style={{ padding: '0.75rem 1rem', textAlign: 'center', fontWeight: 700, color: '#0f172a', whiteSpace: 'nowrap' }}>{pr.quantity}</td>
+                          <td style={{ padding: '0.75rem 1rem', color: '#64748b' }}>{pr.reason || '-'}</td>
+                          <td style={{ padding: '0.75rem 1rem', color: '#64748b', fontSize: '0.78rem', whiteSpace: 'nowrap' }}>{pr.requestedBy}</td>
+                          <td style={{ padding: '0.75rem 1rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                            <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: '12px', fontSize: '0.72rem', fontWeight: 700, backgroundColor: statusBg, color: statusColor, border: `1px solid ${statusBorder}`, whiteSpace: 'nowrap' }}>{statusLabel}</span>
+                          </td>
+                          {canApprovePr && (
+                            <td style={{ padding: '0.75rem 1rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                              {pr.status === 'PENDING' ? (
+                                <div style={{ display: 'flex', gap: '0.35rem', justifyContent: 'center' }}>
+                                  <button disabled={isBusy} onClick={() => handleDecidePr(pr, 'approve')} style={{ backgroundColor: '#16a34a', color: '#fff', border: 'none', borderRadius: '4px', padding: '0.35rem 0.65rem', fontSize: '0.75rem', fontWeight: 700, cursor: isBusy ? 'default' : 'pointer', whiteSpace: 'nowrap' }}>Duyệt</button>
+                                  <button disabled={isBusy} onClick={() => handleDecidePr(pr, 'reject')} style={{ backgroundColor: '#fff', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '4px', padding: '0.35rem 0.65rem', fontSize: '0.75rem', fontWeight: 700, cursor: isBusy ? 'default' : 'pointer', whiteSpace: 'nowrap' }}>Từ Chối</button>
+                                </div>
+                              ) : (
+                                <span style={{ fontSize: '0.74rem', color: '#94a3b8', whiteSpace: 'nowrap' }}>{pr.approvedBy}</span>
+                              )}
+                            </td>
+                          )}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
 
           {/* Filter bar */}
@@ -4002,12 +4742,12 @@ export default function Warehouse() {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.83rem' }}>
               <thead>
                 <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569' }}>
-                  <th style={{ padding: '0.75rem 1rem' }}>Sản Phẩm</th>
-                  <th style={{ padding: '0.75rem 1rem' }}>Nhà Cung Cấp</th>
-                  <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Tồn Hiện Tại</th>
-                  <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Ngưỡng An Toàn</th>
-                  <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Trạng Thái</th>
-                  <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Hành Động</th>
+                  <th style={{ padding: '0.75rem 1rem', minWidth: '220px' }}>Sản Phẩm</th>
+                  <th style={{ padding: '0.75rem 1rem', minWidth: '180px', whiteSpace: 'nowrap' }}>Nhà Cung Cấp</th>
+                  <th style={{ padding: '0.75rem 1rem', textAlign: 'center', width: '120px', whiteSpace: 'nowrap' }}>Tồn Hiện Tại</th>
+                  <th style={{ padding: '0.75rem 1rem', textAlign: 'center', width: '130px', whiteSpace: 'nowrap' }}>Ngưỡng An Toàn</th>
+                  <th style={{ padding: '0.75rem 1rem', textAlign: 'center', width: '130px', whiteSpace: 'nowrap' }}>Trạng Thái</th>
+                  <th style={{ padding: '0.75rem 1rem', textAlign: 'center', width: '150px', whiteSpace: 'nowrap' }}>Hành Động</th>
                 </tr>
               </thead>
               <tbody>
@@ -4023,21 +4763,24 @@ export default function Warehouse() {
                   filteredRfqItems.map(item => (
                     <tr key={item.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
                       <td style={{ padding: '0.75rem 1rem', fontWeight: 700, color: '#0f172a' }}>{item.name}</td>
-                      <td style={{ padding: '0.75rem 1rem', color: '#475569' }}>{item.supplier}</td>
-                      <td style={{ padding: '0.75rem 1rem', textAlign: 'center', fontWeight: 800, color: Number(item.stock) === 0 ? '#ef4444' : '#d97706' }}>
+                      <td style={{ padding: '0.75rem 1rem', color: '#475569', whiteSpace: 'nowrap' }}>{item.supplier}</td>
+                      <td style={{ padding: '0.75rem 1rem', textAlign: 'center', fontWeight: 800, color: Number(item.stock) === 0 ? '#ef4444' : '#d97706', whiteSpace: 'nowrap' }}>
                         {item.stock} SP
                       </td>
-                      <td style={{ padding: '0.75rem 1rem', textAlign: 'center', color: '#64748b' }}>{item.threshold || 5} SP</td>
-                      <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
+                      <td style={{ padding: '0.75rem 1rem', textAlign: 'center', color: '#64748b', whiteSpace: 'nowrap' }}>{item.threshold || 5} SP</td>
+                      <td style={{ padding: '0.75rem 1rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
                         <span style={{
-                          padding: '2px 8px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 700,
+                          display: 'inline-block',
+                          padding: '3px 10px', borderRadius: '12px', fontSize: '0.72rem', fontWeight: 700,
                           backgroundColor: Number(item.stock) === 0 ? '#ffe4e6' : '#fef3c7',
-                          color: Number(item.stock) === 0 ? '#e11d48' : '#d97706'
+                          color: Number(item.stock) === 0 ? '#e11d48' : '#d97706',
+                          border: `1px solid ${Number(item.stock) === 0 ? '#fecdd3' : '#fde68a'}`,
+                          whiteSpace: 'nowrap'
                         }}>
                           {Number(item.stock) === 0 ? 'Hết Hàng' : 'Cảnh Báo Tồn'}
                         </span>
                       </td>
-                      <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
+                      <td style={{ padding: '0.75rem 1rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
                         <button
                           onClick={() => setLowStockRfqModalData({ item, qty: (item.threshold || 5) * 2, reason: 'Tồn kho chạm ngưỡng tối thiểu' })}
                           style={{
@@ -4048,7 +4791,8 @@ export default function Warehouse() {
                             padding: '0.35rem 0.85rem',
                             fontSize: '0.78rem',
                             fontWeight: 700,
-                            cursor: 'pointer'
+                            cursor: 'pointer',
+                            whiteSpace: 'nowrap'
                           }}
                         >
                           Gửi Cảnh Báo RFQ
@@ -4928,7 +5672,7 @@ export default function Warehouse() {
               onChange={(e) => setMovementTypeFilter(e.target.value)}
               style={{ padding: '0.55rem 0.85rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px' }}
             >
-              <option value="ALL">Tất cả loại dịch chuyển</option>
+              <option value="ALL">Tất cả loại biến động</option>
               <option value="IN">Nhập Kho (IN)</option>
               <option value="OUT">Xuất Kho (OUT)</option>
             </select>
@@ -4939,13 +5683,13 @@ export default function Warehouse() {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.83rem' }}>
               <thead>
                 <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569' }}>
-                  <th style={{ padding: '0.75rem 1rem' }}>Thời Gian</th>
-                  <th style={{ padding: '0.75rem 1rem' }}>Loại Biến Động</th>
-                  <th style={{ padding: '0.75rem 1rem' }}>Mã Chứng Từ</th>
-                  <th style={{ padding: '0.75rem 1rem' }}>Sản Phẩm</th>
-                  <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Số Lượng</th>
-                  <th style={{ padding: '0.75rem 1rem' }}>Người Thực Hiện</th>
-                  <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Thao Tác</th>
+                  <th style={{ padding: '0.75rem 0.75rem 0.75rem 1rem', width: '10%', whiteSpace: 'nowrap' }}>Thời Gian</th>
+                  <th style={{ padding: '0.75rem 0.75rem', width: '10%', textAlign: 'left', whiteSpace: 'nowrap' }}>Loại Biến Động</th>
+                  <th style={{ padding: '0.75rem 0.75rem', width: '12%', whiteSpace: 'nowrap' }}>Mã Chứng Từ</th>
+                  <th style={{ padding: '0.75rem 0.75rem', width: '40%' }}>Sản Phẩm</th>
+                  <th style={{ padding: '0.75rem 0.75rem', width: '8%', textAlign: 'center', whiteSpace: 'nowrap' }}>Số Lượng</th>
+                  <th style={{ padding: '0.75rem 0.75rem', width: '10%', whiteSpace: 'nowrap' }}>Người Thực Hiện</th>
+                  <th style={{ padding: '0.75rem 1rem 0.75rem 0.75rem', width: '10%', textAlign: 'center', whiteSpace: 'nowrap' }}>Thao Tác</th>
                 </tr>
               </thead>
               <tbody>
@@ -4964,25 +5708,40 @@ export default function Warehouse() {
                       onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
                       onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                     >
-                      <td style={{ padding: '0.75rem 1rem', color: '#64748b' }}>
-                        {formatDateTime ? formatDateTime(mv.timestamp) : new Date(mv.timestamp).toLocaleString('vi-VN')}
+                      <td style={{ padding: '0.75rem 0.75rem 0.75rem 1rem', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+                        <div style={{ fontWeight: 600, color: '#0f172a', fontSize: '0.82rem' }}>
+                          {new Date(mv.timestamp).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                        </div>
+                        <div style={{ fontSize: '0.73rem', color: '#64748b', marginTop: '2px' }}>
+                          {new Date(mv.timestamp).toLocaleDateString('vi-VN')}
+                        </div>
                       </td>
-                      <td style={{ padding: '0.75rem 1rem' }}>
+                      <td style={{ padding: '0.75rem 0.75rem', textAlign: 'left', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
                         <span style={{
-                          padding: '2px 8px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 700,
-                          backgroundColor: mv.type === 'IN' ? '#dcfce7' : '#ffe4e6',
-                          color: mv.type === 'IN' ? '#15803d' : '#e11d48'
+                          display: 'inline-block',
+                          padding: '3px 9px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 800,
+                          letterSpacing: '0.02em',
+                          whiteSpace: 'nowrap',
+                          backgroundColor: mv.type === 'IN' ? '#dcfce7' : '#fee2e2',
+                          color: mv.type === 'IN' ? '#15803d' : '#b91c1c',
+                          border: `1px solid ${mv.type === 'IN' ? '#bbf7d0' : '#fca5a5'}`
                         }}>
                           {mv.type === 'IN' ? 'NHẬP KHO' : 'XUẤT KHO'}
                         </span>
                       </td>
-                      <td style={{ padding: '0.75rem 1rem', fontWeight: 700, color: '#2563eb' }}>{mv.reference}</td>
-                      <td style={{ padding: '0.75rem 1rem', fontWeight: 600, color: '#0f172a' }}>{mv.productName}</td>
-                      <td style={{ padding: '0.75rem 1rem', textAlign: 'center', fontWeight: 800, color: mv.type === 'IN' ? '#16a34a' : '#e11d48' }}>
+                      <td style={{ padding: '0.75rem 0.75rem', verticalAlign: 'middle', whiteSpace: 'nowrap', fontWeight: 700, color: '#2563eb' }}>
+                        {mv.reference}
+                      </td>
+                      <td style={{ padding: '0.75rem 0.75rem', verticalAlign: 'middle', fontWeight: 600, color: '#0f172a', lineHeight: 1.4 }}>
+                        {mv.productName}
+                      </td>
+                      <td style={{ padding: '0.75rem 0.75rem', textAlign: 'center', verticalAlign: 'middle', whiteSpace: 'nowrap', fontWeight: 800, fontSize: '0.88rem', color: mv.type === 'IN' ? '#16a34a' : '#dc2626' }}>
                         {mv.type === 'IN' ? `+${mv.quantity}` : `-${mv.quantity}`}
                       </td>
-                      <td style={{ padding: '0.75rem 1rem', color: '#475569' }}>{mv.actor || 'Thủ Kho'}</td>
-                      <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
+                      <td style={{ padding: '0.75rem 0.75rem', verticalAlign: 'middle', whiteSpace: 'nowrap', color: '#475569' }}>
+                        {mv.actor || 'Thủ Kho'}
+                      </td>
+                      <td style={{ padding: '0.75rem 1rem 0.75rem 0.75rem', textAlign: 'center', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
                         <button
                           type="button"
                           onClick={(e) => { e.stopPropagation(); setSelectedMovementLog(mv); }}
@@ -4991,10 +5750,11 @@ export default function Warehouse() {
                             color: '#2563eb',
                             border: '1px solid #cbd5e1',
                             borderRadius: '4px',
-                            padding: '0.3rem 0.65rem',
+                            padding: '0.35rem 0.75rem',
                             fontSize: '0.75rem',
                             fontWeight: 700,
-                            cursor: 'pointer'
+                            cursor: 'pointer',
+                            whiteSpace: 'nowrap'
                           }}
                         >
                           Xem Chi Tiết
@@ -5012,157 +5772,247 @@ export default function Warehouse() {
       {/* 11. VIEW: CẤU HÌNH > KHO HÀNG & VỊ TRÍ KỆ (LOCATIONS) */}
       {activeTab === 'locations' && (
         <div>
-          <div style={{ marginBottom: '1.25rem' }}>
-            <h2 style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
-              Cấu Hình / Kho Hàng & Vị Trí Kệ
-            </h2>
-            <p style={{ fontSize: '0.82rem', color: '#64748b', margin: '0.2rem 0 0 0' }}>
-              Danh sách khu vực kệ kho cố định trong nhà kho
-            </p>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+            <div>
+              <h2 style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                Cấu Hình / Kho Hàng & Vị Trí Kệ
+              </h2>
+              <p style={{ fontSize: '0.82rem', color: '#64748b', margin: '0.2rem 0 0 0' }}>
+                Sơ đồ vị trí kệ thật (Zone / Shelf / Bin) — {canManageLocations ? 'tạo mới hoặc xóa vị trí chưa gán hàng.' : 'chỉ Quản Lý Kho mới có thể chỉnh sửa.'}
+              </p>
+            </div>
+            {canManageLocations && (
+              <button
+                onClick={() => setShowCreateLocationForm(v => !v)}
+                style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.5rem 1rem', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
+              >
+                {showCreateLocationForm ? 'Đóng' : '+ Thêm Vị Trí Mới'}
+              </button>
+            )}
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
-            {PREDEFINED_LOCATIONS.map(loc => {
-              const count = activeInventory.filter(i => i.location === loc).length;
-              return (
-                <div key={loc} style={{ backgroundColor: '#ffffff', padding: '1.25rem', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
-                  <h4 style={{ margin: '0 0 0.5rem 0', color: '#2563eb', fontSize: '1rem', fontWeight: 800 }}>{loc}</h4>
-                  <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748b' }}>
-                    Số sản phẩm gán vị trí này: <strong style={{ color: '#0f172a' }}>{count}</strong> sản phẩm
-                  </p>
+          {showCreateLocationForm && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '1rem', marginBottom: '1.25rem', padding: '1rem', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
+              <select
+                value={locationForm.warehouseId}
+                onChange={(e) => setLocationForm(f => ({ ...f, warehouseId: e.target.value }))}
+                style={{ padding: '0.55rem 0.75rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px' }}
+              >
+                <option value="1">Kho Tổng TP.HCM</option>
+                <option value="2">Kho Chi Nhánh Hà Nội</option>
+              </select>
+              <input type="text" placeholder="Zone (VD: A)" value={locationForm.zone} onChange={(e) => setLocationForm(f => ({ ...f, zone: e.target.value }))} style={{ padding: '0.55rem 0.75rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px' }} />
+              <input type="text" placeholder="Shelf (VD: 01)" value={locationForm.shelf} onChange={(e) => setLocationForm(f => ({ ...f, shelf: e.target.value }))} style={{ padding: '0.55rem 0.75rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px' }} />
+              <input type="text" placeholder="Bin (VD: 01)" value={locationForm.bin} onChange={(e) => setLocationForm(f => ({ ...f, bin: e.target.value }))} style={{ padding: '0.55rem 0.75rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px' }} />
+              <input type="number" placeholder="Sức chứa" value={locationForm.capacity} onChange={(e) => setLocationForm(f => ({ ...f, capacity: e.target.value }))} style={{ padding: '0.55rem 0.75rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px' }} />
+              <button onClick={handleCreateLocation} style={{ backgroundColor: '#16a34a', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.55rem 1rem', fontSize: '0.83rem', fontWeight: 700, cursor: 'pointer' }}>Tạo Vị Trí</button>
+            </div>
+          )}
+
+          {loadingLocations ? (
+            <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>Đang tải...</div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1.25rem' }}>
+              {warehouseLocations.map(loc => (
+                <div key={loc.id}
+                  onClick={() => setViewingLocationProducts(loc)}
+                  style={{
+                    backgroundColor: '#ffffff',
+                    padding: '1.25rem',
+                    borderRadius: '8px',
+                    border: '1px solid #cbd5e1',
+                    cursor: 'pointer',
+                    transition: 'all 0.18s ease',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = '#93c5fd';
+                    e.currentTarget.style.boxShadow = '0 6px 16px rgba(37,99,235,0.12)';
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = '#cbd5e1';
+                    e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.04)';
+                    e.currentTarget.style.transform = 'none';
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div>
+                      <h4
+                        title="Nhấn để xem danh sách sản phẩm trong kệ"
+                        style={{
+                          margin: '0 0 0.2rem 0',
+                          color: '#2563eb',
+                          fontSize: '1rem',
+                          fontWeight: 800,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.35rem'
+                        }}
+                      >
+                        <span>{loc.zone}-{loc.shelf}-{loc.bin}</span>
+                      </h4>
+                      <div style={{ fontSize: '0.72rem', color: '#64748b' }}>{loc.warehouse?.name}</div>
+                    </div>
+                    {canManageLocations && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleDeleteLocation(loc); }}
+                        title="Xóa vị trí (chỉ khi chưa gán hàng)"
+                        style={{ backgroundColor: '#fff', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '4px', padding: '0.3rem 0.5rem', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}
+                      >
+                        Xóa
+                      </button>
+                    )}
+                  </div>
+                  <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    marginTop: '0.85rem',
+                    borderTop: '1px solid #f1f5f9',
+                    paddingTop: '0.65rem',
+                    gap: '0.5rem'
+                  }}>
+                    <div style={{ margin: 0, fontSize: '0.8rem', color: '#64748b', whiteSpace: 'nowrap' }}>
+                      Đã gán: <strong style={{ color: '#0f172a' }}>{loc.assignedCount}</strong> / {loc.capacity}
+                    </div>
+                    <span style={{
+                      fontSize: '0.74rem',
+                      color: '#2563eb',
+                      fontWeight: 700,
+                      whiteSpace: 'nowrap',
+                      flexShrink: 0,
+                      backgroundColor: '#eff6ff',
+                      border: '1px solid #dbeafe',
+                      padding: '3px 8px',
+                      borderRadius: '4px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '3px'
+                    }}>
+                      Xem hàng &rarr;
+                    </span>
+                  </div>
                 </div>
-              );
-            })}
-          </div>
+              ))}
+              {warehouseLocations.length === 0 && (
+                <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>Chưa có vị trí kệ nào được tạo.</div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
       {/* 12. VIEW: CẤU HÌNH > DANH MỤC SẢN PHẨM (CATEGORIES) */}
       {activeTab === 'categories' && (
         <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
             <div>
               <h2 style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
                 Cấu Hình / Danh Mục Sản Phẩm
               </h2>
-              <p style={{ fontSize: '0.82rem', color: '#64748b', margin: '0.2rem 0 0 0' }}>
-                Quản lý phân nhóm danh mục linh kiện, tổng mã sản phẩm, số lượng tồn thực tế và giá trị tài sản
-              </p>
             </div>
-            <button
-              type="button"
-              onClick={async () => {
-                const name = await promptText('Nhập tên danh mục linh kiện mới (ví dụ: NETWORKING, PERIPHERALS...):');
-                if (name && name.trim()) {
-                  notify(`Đã thêm danh mục quy chuẩn ${name.trim().toUpperCase()} vào hệ thống!`, 'success');
-                }
-              }}
-              style={{
-                backgroundColor: '#2563eb',
-                color: '#ffffff',
-                border: 'none',
-                borderRadius: '6px',
-                padding: '0.55rem 1.25rem',
-                fontSize: '0.85rem',
-                fontWeight: 700,
-                cursor: 'pointer'
-              }}
-            >
-              + Thêm Danh Mục Mới
-            </button>
+            {canManageCategories && (
+              <button
+                type="button"
+                onClick={() => setShowCreateCategoryForm(v => !v)}
+                style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.55rem 1.25rem', fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer' }}
+              >
+                {showCreateCategoryForm ? 'Đóng' : '+ Thêm Danh Mục Mới'}
+              </button>
+            )}
           </div>
 
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', overflow: 'hidden' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.83rem' }}>
-              <thead>
-                <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569' }}>
-                  <th style={{ padding: '0.75rem 1rem' }}>Mã Danh Mục</th>
-                  <th style={{ padding: '0.75rem 1rem' }}>Mô Tả Phân Nhóm</th>
-                  <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Tổng Sản Phẩm</th>
-                  <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Tổng Trị Giá Tồn</th>
-                  <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Hành Động</th>
-                </tr>
-              </thead>
-              <tbody>
-                {[
-                  { code: 'CPU', desc: 'Bộ vi xử lý trung tâm Intel / AMD' },
-                  { code: 'VGA', desc: 'Card màn hình & Xử lý đồ họa NVIDIA / AMD' },
-                  { code: 'MAINBOARD', desc: 'Bo mạch chủ máy tính các chuẩn ATX / MATX / ITX' },
-                  { code: 'RAM', desc: 'Bộ nhớ trong DDR4 / DDR5' },
-                  { code: 'STORAGE', desc: 'Ổ cứng SSD NVMe / SATA & HDD' },
-                  { code: 'PSU', desc: 'Nguồn máy tính chuẩn 80 Plus Gold / Platinum' },
-                  { code: 'CASE', desc: 'Vỏ thùng máy tính Gaming & Workstation Server' },
-                  { code: 'COOLER', desc: 'Tản nhiệt khí & Tản nhiệt nước All-In-One' },
-                  { code: 'MONITOR', desc: 'Màn hình máy tính đồ họa 2K / 4K / Gaming' },
-                  { code: 'KEYBOARD', desc: 'Bàn phím cơ Custom & Chuẩn văn phòng', aliases: ['KEYBOARD', 'BÀN PHÍM', 'BANPHIM'] },
-                  { code: 'MOUSE', desc: 'Chuột Gaming & Chuột không dây', aliases: ['MOUSE', 'CHUỘT'] }
-                ].map(cat => {
-                  const aliases = cat.aliases || [cat.code];
-                  // Use all products (from backend) for total count
-                  const allProdsInCat = products.filter(p => {
-                    const c = String(typeof p.category === 'object' ? p.category?.name : p.category || '').toUpperCase().trim();
-                    return aliases.some(a => c === a || c.includes(a));
-                  });
-                  // Get matching IDs from backend products, then look up in activeInventory
-                  const matchedIds = new Set(allProdsInCat.map(p => String(p.id || p.productId)));
-                  const invProdsInCat = activeInventory.filter(i => {
-                    // Match by ID first (most reliable), then fallback to category string
-                    if (matchedIds.has(String(i.id))) return true;
-                    const c = String(i.category || '').toUpperCase().trim();
-                    return aliases.some(a => c === a || c.includes(a));
-                  });
+          {showCreateCategoryForm && (
+            <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.25rem', padding: '1rem', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #cbd5e1', flexWrap: 'wrap' }}>
+              <input
+                type="text"
+                placeholder="Tên danh mục mới (VD: Thiết bị mạng)"
+                value={newCategoryName}
+                onChange={(e) => setNewCategoryName(e.target.value)}
+                style={{ flex: '1 1 260px', padding: '0.55rem 0.85rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px' }}
+              />
+              <button onClick={handleCreateCategory} style={{ backgroundColor: '#16a34a', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.55rem 1.25rem', fontSize: '0.83rem', fontWeight: 700, cursor: 'pointer' }}>
+                Tạo Danh Mục
+              </button>
+            </div>
+          )}
 
-                  const totalSkus = allProdsInCat.length || invProdsInCat.length;
-                  const totalValue = invProdsInCat.reduce((sum, item) => sum + ((Number(item.stock) || 0) * (Number(item.price) || 0)), 0);
-
-                  return (
-                    <tr key={cat.code} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                      <td style={{ padding: '0.75rem 1rem', fontWeight: 800, color: '#2563eb' }}>{cat.code}</td>
-                      <td style={{ padding: '0.75rem 1rem', color: '#475569' }}>{cat.desc}</td>
-                      <td style={{ padding: '0.75rem 1rem', textAlign: 'center', fontWeight: 700, color: '#0f172a' }}>
-                        {totalSkus}
-                      </td>
-                      <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 700, color: totalValue > 0 ? '#2563eb' : '#64748b' }}>
-                        {safeFormatPrice(totalValue)}
+          {loadingCategories ? (
+            <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>Đang tải...</div>
+          ) : (
+            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', overflow: 'hidden' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.83rem' }}>
+                <thead>
+                  <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569' }}>
+                    <th style={{ padding: '0.75rem 1rem' }}>Tên Danh Mục</th>
+                    <th style={{ padding: '0.75rem 1rem' }}>Đường Dẫn</th>
+                    <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Tổng Sản Phẩm</th>
+                    <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Tổng Trị Giá Tồn</th>
+                    <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Hành Động</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {realCategories.map(cat => (
+                    <tr key={cat.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                      <td style={{ padding: '0.75rem 1rem', fontWeight: 800, color: '#2563eb' }}>{cat.name}</td>
+                      <td style={{ padding: '0.75rem 1rem', color: '#94a3b8', fontFamily: 'monospace', fontSize: '0.78rem' }}>{cat.slug}</td>
+                      <td style={{ padding: '0.75rem 1rem', textAlign: 'center', fontWeight: 700, color: '#0f172a' }}>{cat.productCount}</td>
+                      <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 700, color: cat.totalInventoryValue > 0 ? '#2563eb' : '#64748b' }}>
+                        {safeFormatPrice(cat.totalInventoryValue)}
                       </td>
                       <td style={{ padding: '0.75rem 1rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSelectedCategory(cat.code);
-                            setSelectedSupplier('ALL');
-                            setStockStatusFilter('ALL');
-                            setSelectedLocationStatus('ALL');
-                            setSearchQuery('');
-                            setActiveTab('inventory');
-                          }}
-                          style={{
-                            backgroundColor: '#eff6ff',
-                            color: '#2563eb',
-                            border: '1px solid #bfdbfe',
-                            borderRadius: '6px',
-                            padding: '0.4rem 1rem',
-                            fontSize: '0.78rem',
-                            fontWeight: 600,
-                            cursor: 'pointer',
-                            minWidth: '160px',
-                            display: 'inline-block',
-                            textAlign: 'center'
-                          }}
-                        >
-                          Xem Sản Phẩm ({totalSkus})
-                        </button>
+                        <div style={{ display: 'inline-flex', gap: '0.4rem', alignItems: 'center' }}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedCategory(cat.slug);
+                              setSelectedSupplier('ALL');
+                              setStockStatusFilter('ALL');
+                              setSelectedLocationStatus('ALL');
+                              setSearchQuery('');
+                              setActiveTab('inventory');
+                            }}
+                            style={{ backgroundColor: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', borderRadius: '6px', padding: '0.4rem 1rem', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer' }}
+                          >
+                            Xem Sản Phẩm ({cat.productCount})
+                          </button>
+                          {canManageCategories && (
+                            <button
+                              type="button"
+                              disabled={cat.productCount > 0}
+                              title={cat.productCount > 0 ? 'Còn sản phẩm gán vào — không thể xóa' : 'Xóa danh mục'}
+                              onClick={() => handleDeleteCategory(cat)}
+                              style={{ backgroundColor: cat.productCount > 0 ? '#f8fafc' : '#fef2f2', color: cat.productCount > 0 ? '#94a3b8' : '#dc2626', border: `1px solid ${cat.productCount > 0 ? '#e2e8f0' : '#fecaca'}`, borderRadius: '6px', padding: '0.4rem 0.7rem', fontSize: '0.78rem', fontWeight: 600, cursor: cat.productCount > 0 ? 'not-allowed' : 'pointer' }}
+                            >
+                              Xóa
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                  ))}
+                  {realCategories.length === 0 && (
+                    <tr><td colSpan={5} style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>Chưa có danh mục nào.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
 
       {/* ──── MODALS ──── */}
+
+      {/* Location Products Detail Modal */}
+      {viewingLocationProducts && (
+        <LocationProductsModal
+          location={viewingLocationProducts}
+          onClose={() => setViewingLocationProducts(null)}
+          safeFormatPrice={safeFormatPrice}
+          activeInventory={activeInventory}
+        />
+      )}
 
       {/* Stock Movement Log Detail Modal */}
       {selectedMovementLog && (

@@ -89,6 +89,7 @@ model Product {
   poItems         PurchaseOrderItem[]
   bomItems        BomItem[]
   serialNumbers   SerialNumber[]
+  purchaseRequests PurchaseRequest[]
 
   // Search & Filtering Indexes
   @@index([name]) // For LIKE/contains searches
@@ -199,6 +200,24 @@ model ProductReview {
   @@map("product_reviews")
 }
 
+// Mã giảm giá / chương trình khuyến mãi thật cho SalesPOS.jsx tab "Khuyến
+// Mãi" — trước đây chỉ là 1 mảng useState hardcode (sales_manage_promotions
+// là quyền "ma": khai báo trong RBAC nhưng không CRUD được gì cả).
+model Promotion {
+  id            Int       @id @default(autoincrement())
+  code          String    @unique @db.VarChar(50)
+  title         String    @db.VarChar(200)
+  discountType  String    @map("discount_type") @db.VarChar(10) // PERCENT | FIXED
+  discountValue Decimal   @map("discount_value") @db.Decimal(15, 2)
+  minSpend      Decimal   @default(0.00) @map("min_spend") @db.Decimal(15, 2)
+  expiresAt     DateTime? @map("expires_at") @db.Timestamptz()
+  status        String    @default("ACTIVE") @db.VarChar(20) // ACTIVE | INACTIVE
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt     DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  @@map("promotions")
+}
+
 // ============================================================================
 //   2. NHÓM MODEL ĐƠN HÀNG & GIAO DỊCH
 // ============================================================================
@@ -235,15 +254,20 @@ model Order {
   bankRefCode         String?         @map("bank_ref_code") @db.VarChar(100)
   paymentProofPhoto   String?         @map("payment_proof_photo") @db.Text
   receivedByType      String?         @default("DIRECT_CUSTOMER") @map("received_by_type") @db.VarChar(30)
-  receiverNameActual  String?         @map("receiver_name_actual") @db.VarChar(150)
   // Ảnh minh chứng kiện hàng khi Shipper chuyển hoàn về kho (chụp lúc bấm
   // "Xác Nhận Hoàn Kho") — cùng cơ chế với proofPhoto của POD nhưng cho
   // chiều ngược lại, để Thủ Kho/QC đối chiếu tình trạng kiện hàng lúc nhận.
   returnProofPhoto    String?         @map("return_proof_photo") @db.Text
   returnNote          String?         @map("return_note")
+  // Nhân viên Sales đứng quầy POS thực hiện đơn — null cho đơn khách tự đặt ở
+  // storefront. Dùng để tính hoa hồng Sales 1% doanh số thật trong bảng lương
+  // (trước đây createPosOrder ghi đè hẳn req.user thành khách WALK-IN trước
+  // khi tới đây, nên không còn dấu vết nhân viên nào đã bán đơn này).
+  soldById            Int?            @map("sold_by_id")
 
   customer            Customer        @relation(fields: [customerId], references: [customerId])
   assignedShipper Employee?          @relation("ShipperOrders", fields: [assignedShipperId], references: [id])
+  soldBy         Employee?          @relation("SoldOrders", fields: [soldById], references: [id])
   items          OrderItem[]
   statusHistory  OrderStatusHistory[]
   payments       OrderPayment[]
@@ -297,6 +321,12 @@ model OrderPayment {
   transactionId String?  @map("transaction_id") @db.VarChar(100)
   status        String   @db.VarChar(20)
   createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  // COD cash sits with the shipper until Kế Toán physically collects it —
+  // null means still outstanding, a timestamp means reconciled. Used by the
+  // COD settlement screen (accounting_settle_cod) to know what's still owed
+  // per shipper for CASH-method rows on delivered orders.
+  settledAt     DateTime? @map("settled_at") @db.Timestamptz()
+  settledBy     String?   @map("settled_by") @db.VarChar(100)
 
   order         Order    @relation(fields: [orderId], references: [orderId], onDelete: Cascade)
 
@@ -336,6 +366,28 @@ model WarehouseLocation {
 
   @@unique([warehouseId, zone, shelf, bin])
   @@map("warehouse_locations")
+}
+
+// Đề xuất mua hàng nội bộ (warehouse_create_pr) do Thủ Kho lập khi tồn kho
+// chạm ngưỡng an toàn — Quản Lý Kho ký duyệt (warehouse_approve_pr) trước khi
+// Mua Hàng lập RFQ gửi NCC. Trước đây chỉ có 1 thông báo in-app + log
+// localStorage, không có bản ghi nào để "duyệt" thật.
+model PurchaseRequest {
+  id          Int       @id @default(autoincrement())
+  prCode      String    @unique @map("pr_code") @db.VarChar(50)
+  productId   String    @map("product_id") @db.VarChar(50)
+  quantity    Int
+  reason      String?
+  status      String    @default("PENDING") @db.VarChar(20) // PENDING, APPROVED, REJECTED
+  requestedBy String?   @map("requested_by") @db.VarChar(100)
+  approvedBy  String?   @map("approved_by") @db.VarChar(100)
+  approvedAt  DateTime? @map("approved_at") @db.Timestamptz()
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+
+  product     Product   @relation(fields: [productId], references: [productId])
+
+  @@index([status])
+  @@map("purchase_requests")
 }
 
 model Inventory {
@@ -622,6 +674,7 @@ model Employee {
   leaves         LeaveRequest[] @relation("EmployeeLeaves")
   payrolls       Payroll[]
   deliveredOrders Order[]       @relation("ShipperOrders")
+  soldOrders      Order[]       @relation("SoldOrders")
   handledComplaints Complaint[] @relation("HandledComplaints")
   qcInspections  QcInspection[]
 

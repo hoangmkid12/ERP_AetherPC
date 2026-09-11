@@ -4,9 +4,9 @@ import { notify, confirm } from '../../context/NotificationContext';
 import { PO_STATUS, getStatusLabel } from '../../utils/statusLabels';
 import { useFinanceStore } from '../../stores';
 import { api } from '../../services/api';
-import { 
-  PackageOpen, Clock, FileText, CheckCircle, LogOut, AlertCircle, 
-  Eye, X, Check, Building, Calendar, Package, DollarSign, XCircle, Truck, CreditCard
+import {
+  PackageOpen, Clock, FileText, CheckCircle, LogOut, AlertCircle,
+  Eye, X, Check, Building, Calendar, Package, DollarSign, XCircle, Truck, CreditCard, Boxes
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -492,8 +492,39 @@ export default function SupplierPortal() {
     }
   };
 
-  const [activeTab, setActiveTab] = useState('orders'); // 'orders' or 'finance'
+  const [activeTab, setActiveTab] = useState('orders'); // 'orders', 'products', or 'finance'
   const [statusFilter, setStatusFilter] = useState('ALL');
+
+  // Danh sách sản phẩm NCC đang là nhà phân phối mặc định (Product.defaultSupplierCode)
+  // — trước đây Cổng NCC chỉ thấy từng RFQ/PO riêng lẻ, không có cái nhìn tổng quan
+  // danh mục sản phẩm mình phụ trách.
+  const [myProducts, setMyProducts] = useState([]);
+  const [productsLoading, setProductsLoading] = useState(false);
+  const [productSearch, setProductSearch] = useState('');
+
+  const fetchMyProducts = async () => {
+    setProductsLoading(true);
+    try {
+      const res = await api.get('/purchasing/suppliers/me/products');
+      setMyProducts(res.data || []);
+    } catch (err) {
+      notify(err?.message || 'Không thể tải danh sách sản phẩm đang cung cấp.', 'error');
+    } finally {
+      setProductsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab !== 'products') return;
+    fetchMyProducts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
+
+  const filteredMyProducts = myProducts.filter(p => {
+    const term = productSearch.trim().toLowerCase();
+    if (!term) return true;
+    return (p.name || '').toLowerCase().includes(term) || (p.sku || '').toLowerCase().includes(term);
+  });
 
   // Financial calculations for supplier — must cover the FULL post-quote lifecycle
   // (QUOTED -> PO -> CONFIRMED_BY_SUPPLIER -> PENDING_QA -> QA_PASSED/PARTIAL -> RECEIVED
@@ -620,6 +651,18 @@ export default function SupplierPortal() {
           <PackageOpen size={16} /> Quản Lý Yêu Cầu & Báo Giá
         </button>
         <button
+          onClick={() => setActiveTab('products')}
+          style={{
+            padding: '0.5rem 1.15rem', fontSize: '0.85rem', fontWeight: 700,
+            borderRadius: '8px', cursor: 'pointer', transition: 'all 0.2s', border: 'none',
+            backgroundColor: activeTab === 'products' ? 'var(--primary)' : 'transparent',
+            color: activeTab === 'products' ? '#fff' : 'var(--text-secondary)',
+            display: 'flex', alignItems: 'center', gap: '0.4rem'
+          }}
+        >
+          <Boxes size={16} /> Sản Phẩm Đang Cung Cấp
+        </button>
+        <button
           onClick={() => setActiveTab('finance')}
           style={{
             padding: '0.5rem 1.15rem', fontSize: '0.85rem', fontWeight: 700,
@@ -677,17 +720,17 @@ export default function SupplierPortal() {
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.4rem' }}>
                           <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>Chưa báo giá</span>
-                          <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
+                          <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center', flexWrap: 'nowrap' }}>
                             <button
                               onClick={() => handleSelectPO(po)}
                               className="btn btn-primary"
-                              style={{ padding: '0.25rem 0.55rem', fontSize: '0.72rem', borderRadius: '4px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '3px' }}
+                              style={{ padding: '0.3rem 0.65rem', fontSize: '0.74rem', borderRadius: '5px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '3px', whiteSpace: 'nowrap', flexShrink: 0 }}
                             >
                               <DollarSign size={12} /> Báo Giá
                             </button>
                             <button
                               onClick={() => { setCancelModalPO(po); setCancelReason(''); }}
-                              style={{ padding: '0.25rem 0.5rem', fontSize: '0.72rem', borderRadius: '4px', background: 'rgba(239,68,68,0.15)', border: '1px solid var(--danger)', color: 'var(--danger)', cursor: 'pointer', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '2px' }}
+                              style={{ padding: '0.3rem 0.6rem', fontSize: '0.74rem', borderRadius: '5px', background: 'rgba(239,68,68,0.1)', border: '1px solid var(--danger)', color: 'var(--danger)', cursor: 'pointer', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '2px', whiteSpace: 'nowrap', flexShrink: 0 }}
                             >
                               <X size={12} /> Từ Chối
                             </button>
@@ -739,25 +782,45 @@ export default function SupplierPortal() {
                   const totalQty = po.items?.reduce((s, i) => s + (parseInt(i.quantity) || 1), 0) || po.quantity || 1;
                   const itemNames = po.items?.map(i => i.product?.name || i.name).filter(Boolean).join(', ') || po.productName || 'Linh kiện';
                   const poTotal = po.totalAmount || 0;
+                  const isPendingQuote = ['RFQ', 'RFQ_SENT', 'SENT'].includes(po.status);
+
                   return (
                     <div key={po.id || po.poNumber} style={{ 
                       display: 'flex', 
                       justifyContent: 'space-between', 
                       alignItems: 'center',
-                      padding: '0.85rem 1rem',
+                      padding: '0.95rem 1.15rem',
                       backgroundColor: 'rgba(255, 255, 255, 0.02)',
-                      borderRadius: '10px',
-                      border: '1px solid var(--border-glass)',
-                      transition: 'background-color 0.2s'
+                      borderRadius: '12px',
+                      border: '1px solid var(--border-glass, #e2e8f0)',
+                      transition: 'all 0.2s ease',
+                      gap: '1rem'
                     }}>
-                      <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <h4 style={{ fontWeight: 700, color: '#818cf8', fontSize: '0.9rem', margin: 0 }}>{po.poNumber || formatPurchaseReference(po)}</h4>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                          <h4 style={{ fontWeight: 700, color: '#6366f1', fontSize: '0.9rem', margin: 0, fontFamily: 'monospace' }}>
+                            {po.poNumber || formatPurchaseReference(po)}
+                          </h4>
                         </div>
-                        <div style={{ fontSize: '0.82rem', color: '#0f172a', marginTop: '0.25rem', fontWeight: 600 }}>
-                          {itemNames} ({totalQty} sản phẩm{itemCount > 1 ? ` • ${itemCount} loại` : ''})
+                        <div style={{ fontSize: '0.84rem', color: '#0f172a', marginTop: '0.3rem', fontWeight: 600, lineHeight: 1.35 }}>
+                          {itemNames}
+                          <span style={{
+                            marginLeft: '0.45rem',
+                            display: 'inline-block',
+                            padding: '1px 6px',
+                            borderRadius: '4px',
+                            backgroundColor: 'rgba(99,102,241,0.08)',
+                            color: '#4f46e5',
+                            fontSize: '0.73rem',
+                            fontWeight: 700,
+                            border: '1px solid rgba(99,102,241,0.2)'
+                          }}>
+                            {totalQty} sản phẩm{itemCount > 1 ? ` • ${itemCount} loại` : ''}
+                          </span>
                         </div>
-                        <p style={{ fontSize: '0.73rem', color: 'var(--text-muted)', marginTop: '0.2rem', margin: '0.2rem 0 0' }}>Ngày tạo: {po.createdAt ? new Date(po.createdAt).toLocaleDateString('vi-VN') : 'N/A'}</p>
+                        <p style={{ fontSize: '0.73rem', color: 'var(--text-muted)', marginTop: '0.25rem', margin: '0.25rem 0 0' }}>
+                          Ngày tạo: {po.createdAt ? new Date(po.createdAt).toLocaleDateString('vi-VN') : 'N/A'}
+                        </p>
                         {po.cancelReason && (
                           (() => {
                             const r = po.cancelReason;
@@ -767,65 +830,132 @@ export default function SupplierPortal() {
                             const isReturn = !isCompleted && (r.startsWith('[THÔNG BÁO HOÀN TRẢ') || r.startsWith('[THÔNG BÁO TỪ CHỐI'));
                             const cleanMsg = r.replace(/^\[[^\]]*\]:\s*/, '');
                             return isReturn ? (
-                              <p style={{ fontSize: '0.72rem', color: '#c2410c', marginTop: '0.15rem', fontStyle: 'italic' }}>
+                              <p style={{ fontSize: '0.72rem', color: '#c2410c', marginTop: '0.2rem', fontStyle: 'italic', margin: '0.2rem 0 0' }}>
                                 ⚠️ {cleanMsg}
                               </p>
                             ) : (
-                              <p style={{ fontSize: '0.72rem', color: '#15803d', marginTop: '0.15rem', fontStyle: 'italic' }}>
+                              <p style={{ fontSize: '0.72rem', color: '#15803d', marginTop: '0.2rem', fontStyle: 'italic', margin: '0.2rem 0 0' }}>
                                 ✅ {cleanMsg}
                               </p>
                             );
                           })()
                         )}
                       </div>
-                      <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.35rem' }}>
+
+                      <div style={{ 
+                        flexShrink: 0,
+                        textAlign: 'right', 
+                        display: 'flex', 
+                        flexDirection: 'column', 
+                        alignItems: 'flex-end', 
+                        justifyContent: 'center',
+                        gap: '0.35rem',
+                        minWidth: '220px'
+                      }}>
                         <div>
                           {getStatusBadge(po.status)}
                         </div>
-                        {['RFQ', 'RFQ_SENT', 'SENT'].includes(po.status) ? (
-                          <span style={{ fontSize: '0.78rem', color: '#94a3b8', fontStyle: 'italic', fontWeight: 600, marginTop: '2px' }}>Chờ NCC báo giá</span>
+
+                        {isPendingQuote ? (
+                          <span style={{ fontSize: '0.76rem', color: '#64748b', fontStyle: 'italic', fontWeight: 600 }}>
+                            Chờ NCC báo giá
+                          </span>
                         ) : (
                           poTotal > 0 && (
-                            <p style={{ fontWeight: 700, color: 'var(--success)', fontSize: '0.88rem', margin: 0 }}>{formatPrice(poTotal)}</p>
+                            <p style={{ fontWeight: 800, color: 'var(--success, #16a34a)', fontSize: '0.95rem', margin: 0 }}>
+                              {formatPrice(poTotal)}
+                            </p>
                           )
                         )}
-                        <div style={{ display: 'flex', gap: '0.3rem', marginTop: '0.1rem' }}>
-                          <button
-                            onClick={() => handleSelectPO(po)}
-                            style={{
-                              background: 'rgba(99,102,241,0.15)',
-                              border: '1px solid rgba(99,102,241,0.3)',
-                              color: '#818cf8',
-                              borderRadius: '4px',
-                              padding: '3px 8px',
-                              fontSize: '0.73rem',
-                              fontWeight: 600,
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '3px'
-                            }}
-                          >
-                            <Eye size={12} /> Chi tiết
-                          </button>
-                          {['RFQ', 'RFQ_SENT', 'SENT'].includes(po.status) && (
+
+                        <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center', flexWrap: 'nowrap', marginTop: '0.15rem' }}>
+                          {isPendingQuote ? (
+                            <>
+                              <button
+                                onClick={() => handleSelectPO(po)}
+                                title="Nhập đơn giá và gửi báo giá cho AetherPC"
+                                style={{
+                                  background: '#2563eb',
+                                  color: '#ffffff',
+                                  border: 'none',
+                                  borderRadius: '5px',
+                                  padding: '4px 10px',
+                                  fontSize: '0.74rem',
+                                  fontWeight: 700,
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '3px',
+                                  whiteSpace: 'nowrap',
+                                  flexShrink: 0,
+                                  boxShadow: '0 1px 3px rgba(37,99,235,0.25)'
+                                }}
+                              >
+                                <DollarSign size={13} /> Báo Giá
+                              </button>
+                              <button
+                                onClick={() => handleSelectPO(po)}
+                                title="Xem chi tiết yêu cầu"
+                                style={{
+                                  background: 'rgba(99,102,241,0.1)',
+                                  border: '1px solid rgba(99,102,241,0.3)',
+                                  color: '#6366f1',
+                                  borderRadius: '5px',
+                                  padding: '4px 9px',
+                                  fontSize: '0.74rem',
+                                  fontWeight: 600,
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '3px',
+                                  whiteSpace: 'nowrap',
+                                  flexShrink: 0
+                                }}
+                              >
+                                <Eye size={13} /> Chi tiết
+                              </button>
+                              <button
+                                onClick={() => { setCancelModalPO(po); setCancelReason(''); }}
+                                title="Từ chối yêu cầu báo giá"
+                                style={{
+                                  background: 'rgba(239,68,68,0.1)',
+                                  border: '1px solid rgba(239,68,68,0.3)',
+                                  color: 'var(--danger, #dc2626)',
+                                  borderRadius: '5px',
+                                  padding: '4px 8px',
+                                  fontSize: '0.74rem',
+                                  fontWeight: 600,
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '2px',
+                                  whiteSpace: 'nowrap',
+                                  flexShrink: 0
+                                }}
+                              >
+                                <X size={13} /> Từ chối
+                              </button>
+                            </>
+                          ) : (
                             <button
-                              onClick={() => { setCancelModalPO(po); setCancelReason(''); }}
+                              onClick={() => handleSelectPO(po)}
                               style={{
-                                background: 'rgba(239,68,68,0.15)',
-                                border: '1px solid var(--danger)',
-                                color: 'var(--danger)',
-                                borderRadius: '4px',
-                                padding: '3px 8px',
-                                fontSize: '0.73rem',
+                                background: 'rgba(99,102,241,0.1)',
+                                border: '1px solid rgba(99,102,241,0.3)',
+                                color: '#6366f1',
+                                borderRadius: '5px',
+                                padding: '4px 10px',
+                                fontSize: '0.74rem',
                                 fontWeight: 600,
                                 cursor: 'pointer',
-                                display: 'flex',
+                                display: 'inline-flex',
                                 alignItems: 'center',
-                                gap: '3px'
+                                gap: '3px',
+                                whiteSpace: 'nowrap',
+                                flexShrink: 0
                               }}
                             >
-                              <X size={12} /> Từ chối
+                              <Eye size={13} /> Chi tiết
                             </button>
                           )}
                         </div>
@@ -837,6 +967,95 @@ export default function SupplierPortal() {
             </div>
           </div>
           
+        </div>
+      )}
+
+      {/* TAB: PRODUCTS CURRENTLY SUPPLIED */}
+      {activeTab === 'products' && (
+        <div className="card-glass" style={{ padding: '1.5rem', borderRadius: '14px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+            <div>
+              <h3 style={{ fontSize: '1.15rem', fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Boxes size={20} color="var(--primary)" />
+                Sản Phẩm Đang Cung Cấp
+              </h3>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '0.3rem 0 0' }}>
+                Các sản phẩm mà quý công ty đang là nhà phân phối mặc định trong hệ thống AetherPC ERP ({myProducts.length} sản phẩm)
+              </p>
+            </div>
+            <input
+              value={productSearch}
+              onChange={(e) => setProductSearch(e.target.value)}
+              placeholder="Tìm theo tên hoặc SKU..."
+              style={{ padding: '0.5rem 0.85rem', border: '1px solid var(--border-glass)', borderRadius: '8px', fontSize: '0.83rem', minWidth: '220px', backgroundColor: 'rgba(255,255,255,0.02)', color: 'inherit' }}
+            />
+          </div>
+
+          <div className="table-container" style={{ overflowX: 'auto', borderRadius: '10px', border: '1px solid var(--border-glass)' }}>
+            <table className="erp-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ background: 'rgba(255,255,255,0.02)' }}>
+                  <th style={{ padding: '0.75rem 1rem', textAlign: 'left' }}>Sản Phẩm</th>
+                  <th style={{ padding: '0.75rem 1rem', textAlign: 'left' }}>SKU</th>
+                  <th style={{ padding: '0.75rem 1rem', textAlign: 'left' }}>Danh Mục</th>
+                  <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Tồn Kho ERP</th>
+                  <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Trạng Thái Bán</th>
+                  <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Giá Bán Lẻ Niêm Yết</th>
+                </tr>
+              </thead>
+              <tbody>
+                {productsLoading ? (
+                  <tr>
+                    <td colSpan="6" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.88rem' }}>
+                      Đang tải danh sách sản phẩm...
+                    </td>
+                  </tr>
+                ) : filteredMyProducts.length === 0 ? (
+                  <tr>
+                    <td colSpan="6" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.88rem' }}>
+                      {myProducts.length === 0
+                        ? 'Hệ thống chưa ghi nhận sản phẩm nào do quý công ty là nhà phân phối mặc định.'
+                        : 'Không tìm thấy sản phẩm phù hợp.'}
+                    </td>
+                  </tr>
+                ) : (
+                  filteredMyProducts.map(p => {
+                    const stock = Number(p.stockQuantity) || 0;
+                    const isActive = p.status === 'ACTIVE' && p.available !== false;
+                    return (
+                      <tr key={p.productId} className="hover-row">
+                        <td style={{ padding: '0.75rem 1rem', fontSize: '0.85rem', color: '#0f172a', fontWeight: 700, maxWidth: '320px' }}>
+                          {p.name}
+                          {p.brand?.name && (
+                            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 400, marginTop: '2px' }}>{p.brand.name}</div>
+                          )}
+                        </td>
+                        <td style={{ padding: '0.75rem 1rem', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{p.sku || '—'}</td>
+                        <td style={{ padding: '0.75rem 1rem', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{p.category?.name || '—'}</td>
+                        <td style={{ padding: '0.75rem 1rem', textAlign: 'center', fontWeight: 800, fontSize: '0.88rem', color: stock === 0 ? '#ef4444' : (stock <= 5 ? '#d97706' : 'inherit') }}>
+                          {stock}
+                        </td>
+                        <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
+                          {isActive ? (
+                            <span className="badge badge-success" style={{ backgroundColor: 'rgba(16,185,129,0.15)', color: 'var(--success)', padding: '0.3rem 0.65rem', borderRadius: '12px', fontSize: '0.72rem', fontWeight: 700 }}>
+                              Đang Bán
+                            </span>
+                          ) : (
+                            <span className="badge badge-secondary" style={{ padding: '0.3rem 0.65rem', borderRadius: '12px', fontSize: '0.72rem', fontWeight: 700 }}>
+                              Ngừng Bán
+                            </span>
+                          )}
+                        </td>
+                        <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 700, fontSize: '0.85rem' }}>
+                          {formatPrice(p.price)}
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 

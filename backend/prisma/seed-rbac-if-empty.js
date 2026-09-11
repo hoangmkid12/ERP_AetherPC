@@ -15,7 +15,13 @@ const DEFAULT_GRANTS = [
   { role: 'CEO', operationId: 'hr_approve_payroll_ceo' },
   { role: 'ACCOUNTANT', operationId: 'accounting_disburse_payroll' },
   { role: 'SALES_MANAGER', operationId: 'sales_cancel_order' },
-  { role: 'HR', operationId: 'hr_manage_employees' }
+  { role: 'HR', operationId: 'hr_manage_employees' },
+  { role: 'CEO', operationId: 'sales_manage_customers' },
+  { role: 'SALES_MANAGER', operationId: 'sales_manage_customers' },
+  { role: 'CEO', operationId: 'sales_approve_discount' },
+  { role: 'SALES_MANAGER', operationId: 'sales_approve_discount' },
+  { role: 'CEO', operationId: 'sales_manage_promotions' },
+  { role: 'SALES_MANAGER', operationId: 'sales_manage_promotions' }
 ];
 
 async function run() {

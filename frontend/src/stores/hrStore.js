@@ -147,7 +147,15 @@ export const useHRStore = create((set, get) => ({
   getAttendanceLogs: async () => {
     try {
       set({ error: null });
-      const data = await api.get('/attendance');
+      // Route thật là /hr/attendance (hr.routes.js) — /attendance trần trước
+      // đây luôn 404 vì app.js không mount router nào ở gốc /api/v1/attendance,
+      // khiến lịch sử chấm công không bao giờ tải lại được sau khi refresh.
+      let data;
+      try {
+        data = await api.get('/hr/attendance');
+      } catch (_) {
+        data = await api.get('/attendance');
+      }
       const attendanceLogs = Array.isArray(data) ? data : (data?.data || []);
       
       set({ attendanceLogs });
@@ -209,7 +217,16 @@ export const useHRStore = create((set, get) => ({
   getPayrolls: async () => {
     try {
       set({ error: null });
-      const data = await api.get('/payrolls');
+      // Route thật là /hr/payrolls — /payrolls trần trước đây luôn 404, khiến
+      // HRManager (Bảng Lương) hiện toàn dữ liệu giả tính ở client, và tab
+      // Giải Ngân của Kế Toán (Accountant.jsx dùng chung store này) luôn nhận
+      // mảng rỗng dù bảng lương thật đã tồn tại trong DB.
+      let data;
+      try {
+        data = await api.get('/hr/payrolls');
+      } catch (_) {
+        data = await api.get('/payrolls');
+      }
       const payrolls = Array.isArray(data) ? data : (data?.data || []);
       
       set({ payrolls });
@@ -365,6 +382,37 @@ export const useHRStore = create((set, get) => ({
   },
 
   /**
+   * Set an employee's account status (ACTIVE/INACTIVE) — real endpoint is
+   * PATCH /hr/employees/:id/status. Used for both deactivating and
+   * re-activating from the HR module itself (previously only reachable from
+   * the System Admin page, which the HR role has no permission to open).
+   */
+  setEmployeeStatus: async (employeeId, status) => {
+    const res = await api.patch(`/hr/employees/${employeeId}/status`, { status });
+    const updatedEmp = res?.data;
+    if (!updatedEmp) throw new Error(res?.message || 'Không thể cập nhật trạng thái nhân viên.');
+
+    set(state => {
+      const employees = state.employees.map(e => (e.id === employeeId ? { ...e, ...updatedEmp, status } : e));
+      try {
+        localStorage.setItem(STORAGE_KEYS.employees, JSON.stringify(employees));
+      } catch (e) {}
+      return { employees };
+    });
+    return updatedEmp;
+  },
+
+  /**
+   * Reset an employee's password back to the "123456" default — real
+   * endpoint is PATCH /hr/employees/:id/reset-password.
+   */
+  resetEmployeePassword: async (employeeId) => {
+    const res = await api.patch(`/hr/employees/${employeeId}/reset-password`);
+    if (!res?.success) throw new Error(res?.message || 'Không thể đặt lại mật khẩu.');
+    return res;
+  },
+
+  /**
    * Mark attendance for 1 employee/1 day — awaits the real upsert endpoint
    * (POST /hr/attendance) and only applies the change locally on confirmed
    * server success. Throws on failure so the caller (HRManager.jsx) can show
@@ -395,6 +443,44 @@ export const useHRStore = create((set, get) => ({
     });
 
     return savedLog;
+  },
+
+  /**
+   * Cổng MyPayroll — nhân viên tự tra cứu phiếu lương của chính mình.
+   * Real endpoint: GET /hr/payrolls/mine.
+   */
+  getMyPayrolls: async () => {
+    const res = await api.get('/hr/payrolls/mine');
+    return Array.isArray(res) ? res : (res?.data || []);
+  },
+
+  /**
+   * Nhân viên (bất kỳ role nào) tự tạo đơn xin nghỉ phép của chính mình —
+   * real endpoint POST /hr/leaves đã có sẵn từ lâu nhưng trước đây không có
+   * bất kỳ giao diện nào trong toàn bộ frontend gọi tới nó.
+   */
+  createMyLeaveRequest: async ({ type, startDate, endDate, reason, employeeId }) => {
+    const payload = { type, startDate, endDate, reason };
+    if (employeeId) payload.employeeId = employeeId;
+    const res = await api.post('/hr/leaves', payload);
+    if (!res?.success) throw new Error(res?.message || 'Không thể gửi đơn xin nghỉ phép.');
+    if (res.data) {
+      set(state => ({ leaveRequests: [res.data, ...(state.leaveRequests || []).filter(r => r.id !== res.data.id)] }));
+      try {
+        localStorage.setItem(STORAGE_KEYS.leaveRequests, JSON.stringify(get().leaveRequests));
+      } catch (e) {}
+    }
+    get().getLeaveRequests().catch(() => {});
+    return res.data;
+  },
+
+  /**
+   * Nhân viên xem lại các đơn xin nghỉ phép CỦA CHÍNH MÌNH — real endpoint
+   * GET /hr/leaves (tự động lọc theo employeeId trong JWT ở backend).
+   */
+  getMyLeaveRequests: async () => {
+    const res = await api.get('/hr/leaves');
+    return Array.isArray(res) ? res : (res?.data || []);
   },
 
   /**

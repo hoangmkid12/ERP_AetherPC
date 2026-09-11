@@ -120,6 +120,17 @@ export default function Purchasing() {
   const [productPage, setProductPage] = useState(1);
   const ITEMS_PER_PAGE = 25;
   
+  // Purchase Requests (PR) State — Yêu Cầu Mua Hàng Nội Bộ từ Kho
+  const [purchaseRequests, setPurchaseRequests] = useState([]);
+  const [loadingPRs, setLoadingPRs] = useState(false);
+  const [prSearchTerm, setPrSearchTerm] = useState('');
+  const [prStatusFilter, setPrStatusFilter] = useState('ALL');
+  const [selectedViewPR, setSelectedViewPR] = useState(null);
+  const [selectedProcessPR, setSelectedProcessPR] = useState(null);
+  const [processQty, setProcessQty] = useState(1);
+  const [rejectReason, setRejectReason] = useState('');
+  const [isRejecting, setIsRejecting] = useState(false);
+
   // Modal State
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showCompareModal, setShowCompareModal] = useState(false);
@@ -604,9 +615,224 @@ export default function Purchasing() {
     }
   };
 
+  const loadPurchaseRequests = async () => {
+    setLoadingPRs(true);
+    let dbReqs = [];
+    try {
+      const res = await api.get('/purchasing/requests');
+      if (res?.data && Array.isArray(res.data)) {
+        dbReqs = res.data;
+      }
+    } catch (_) {
+      try {
+        const wRes = await api.get('/warehouse/purchase-requests');
+        if (wRes?.data && Array.isArray(wRes.data)) {
+          dbReqs = wRes.data;
+        }
+      } catch (e) {
+        console.warn('Cannot fetch purchase requests from API:', e);
+      }
+    }
+
+    let alertLogs = [];
+    try {
+      alertLogs = JSON.parse(localStorage.getItem('erp_rfq_alert_logs') || '[]');
+    } catch (_) {}
+
+    let localPRs = [];
+    try {
+      localPRs = JSON.parse(localStorage.getItem('erp_purchase_requests') || '[]');
+    } catch (_) {}
+
+    const map = new Map();
+
+    // 1. Put DB records
+    dbReqs.forEach(r => {
+      const key = r.prCode || String(r.id);
+      map.set(key, {
+        id: r.id,
+        prCode: r.prCode || `PR-${r.id}`,
+        productId: r.productId,
+        productName: r.product?.name || r.productName || 'Linh kiện',
+        sku: r.product?.sku || '',
+        stock: r.product?.stockQuantity !== undefined ? r.product.stockQuantity : null,
+        quantity: r.quantity,
+        reason: r.reason || 'Tồn kho chạm ngưỡng tối thiểu',
+        status: r.status || 'PENDING',
+        requestedBy: r.requestedBy || 'Thủ Kho AetherPC',
+        approvedBy: r.approvedBy || null,
+        approvedAt: r.approvedAt || null,
+        createdAt: r.createdAt || new Date().toISOString(),
+        source: 'PR_INTERNAL'
+      });
+    });
+
+    // 2. Put local PR records
+    localPRs.forEach(r => {
+      const key = r.prCode || String(r.id);
+      if (!map.has(key)) {
+        map.set(key, {
+          id: r.id || key,
+          prCode: r.prCode || key,
+          productId: r.productId,
+          productName: r.productName || r.product?.name || 'Linh kiện',
+          sku: r.sku || '',
+          stock: r.stock !== undefined ? r.stock : null,
+          quantity: r.quantity || 10,
+          reason: r.reason || 'Đề xuất bổ sung hàng',
+          status: r.status || 'PENDING',
+          requestedBy: r.requestedBy || 'Thủ Kho AetherPC',
+          approvedBy: r.approvedBy || null,
+          approvedAt: r.approvedAt || null,
+          createdAt: r.createdAt || new Date().toISOString(),
+          source: 'PR_INTERNAL'
+        });
+      }
+    });
+
+    // 3. Put Alert logs
+    alertLogs.forEach((log, idx) => {
+      const code = log.prCode || `PR-ALERT-${String(log.timestamp || (Date.now() - idx * 86400000)).slice(-6)}`;
+      const key = log.id || code;
+      if (!map.has(key)) {
+        map.set(key, {
+          id: key,
+          prCode: code,
+          productId: log.productId || log.id,
+          productName: log.productName || log.name || 'Linh kiện cảnh báo',
+          sku: log.sku || '',
+          stock: log.currentStock !== undefined ? log.currentStock : log.stock,
+          threshold: log.threshold || 5,
+          quantity: log.requestedQty || log.quantity || 14,
+          reason: log.reason || log.alertReason || 'Tồn kho chạm ngưỡng tối thiểu',
+          status: log.status === 'HANDLED' || log.handled ? 'APPROVED' : 'PENDING',
+          requestedBy: log.requestedBy || 'Thủ Kho (Cảnh Báo Tồn)',
+          approvedBy: log.handledBy || null,
+          approvedAt: null,
+          createdAt: log.createdAt || log.timestamp || new Date().toISOString(),
+          source: 'STOCK_ALERT'
+        });
+      }
+    });
+
+    const list = Array.from(map.values()).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    setPurchaseRequests(list);
+    setLoadingPRs(false);
+  };
+
+  const handleApprovePR = async (pr, showNotification = true) => {
+    try {
+      if (typeof pr.id === 'number') {
+        try {
+          await api.patch(`/purchasing/requests/${pr.id}/approve`);
+        } catch (_) {
+          await api.patch(`/warehouse/purchase-requests/${pr.id}/approve`);
+        }
+      }
+    } catch (e) {
+      console.warn('API approve failed, local fallback:', e);
+    }
+
+    const approverName = user?.name || user?.fullname || user?.email || 'Phòng Mua Hàng';
+    const nowISO = new Date().toISOString();
+
+    // Local PR storage
+    try {
+      const local = JSON.parse(localStorage.getItem('erp_purchase_requests') || '[]');
+      const updated = local.map(item => (item.id === pr.id || item.prCode === pr.prCode) ? { ...item, status: 'APPROVED', approvedBy: approverName, approvedAt: nowISO } : item);
+      localStorage.setItem('erp_purchase_requests', JSON.stringify(updated));
+    } catch (_) {}
+
+    // Alert logs
+    try {
+      const alerts = JSON.parse(localStorage.getItem('erp_rfq_alert_logs') || '[]');
+      const updatedAlerts = alerts.map(item => (item.id === pr.id || item.prCode === pr.prCode) ? { ...item, status: 'HANDLED', handled: true, handledBy: approverName } : item);
+      localStorage.setItem('erp_rfq_alert_logs', JSON.stringify(updatedAlerts));
+    } catch (_) {}
+
+    // State
+    setPurchaseRequests(prev => prev.map(item => (item.id === pr.id || item.prCode === pr.prCode) ? {
+      ...item,
+      status: 'APPROVED',
+      approvedBy: approverName,
+      approvedAt: nowISO
+    } : item));
+
+    setSelectedProcessPR(null);
+    if (showNotification) {
+      notify ? notify(`Đã phê duyệt Yêu Cầu Mua Hàng ${pr.prCode} thành công!`, 'success') : alert(`Đã phê duyệt Yêu Cầu Mua Hàng ${pr.prCode} thành công!`);
+    }
+  };
+
+  const handleRejectPR = async (pr, customReason) => {
+    const finalReason = (customReason || rejectReason || 'Không duyệt ngân sách / Đã đủ tồn kho').trim();
+    try {
+      if (typeof pr.id === 'number') {
+        try {
+          await api.patch(`/purchasing/requests/${pr.id}/reject`, { reason: finalReason });
+        } catch (_) {
+          await api.patch(`/warehouse/purchase-requests/${pr.id}/reject`, { reason: finalReason });
+        }
+      }
+    } catch (e) {
+      console.warn('API reject failed, local fallback:', e);
+    }
+
+    const approverName = user?.name || user?.fullname || user?.email || 'Phòng Mua Hàng';
+
+    // Local PR storage
+    try {
+      const local = JSON.parse(localStorage.getItem('erp_purchase_requests') || '[]');
+      const updated = local.map(item => (item.id === pr.id || item.prCode === pr.prCode) ? { ...item, status: 'REJECTED', rejectReason: finalReason, approvedBy: approverName } : item);
+      localStorage.setItem('erp_purchase_requests', JSON.stringify(updated));
+    } catch (_) {}
+
+    // Alert logs
+    try {
+      const alerts = JSON.parse(localStorage.getItem('erp_rfq_alert_logs') || '[]');
+      const updatedAlerts = alerts.map(item => (item.id === pr.id || item.prCode === pr.prCode) ? { ...item, status: 'REJECTED', handled: true, rejectReason: finalReason, handledBy: approverName } : item);
+      localStorage.setItem('erp_rfq_alert_logs', JSON.stringify(updatedAlerts));
+    } catch (_) {}
+
+    // State
+    setPurchaseRequests(prev => prev.map(item => (item.id === pr.id || item.prCode === pr.prCode) ? {
+      ...item,
+      status: 'REJECTED',
+      rejectReason: finalReason,
+      approvedBy: approverName
+    } : item));
+
+    setSelectedProcessPR(null);
+    setIsRejecting(false);
+    setRejectReason('');
+    notify ? notify(`Đã từ chối Yêu Cầu Mua Hàng ${pr.prCode}.`, 'info') : alert(`Đã từ chối Yêu Cầu Mua Hàng ${pr.prCode}.`);
+  };
+
+  const handleCreateRfqFromPR = (pr, overrideQty) => {
+    const qtyToUse = overrideQty || pr.quantity || 1;
+    const matchedProd = effectiveCatalog.find(p => 
+      String(p.productId || p.id) === String(pr.productId) || 
+      (p.name && pr.productName && p.name.toLowerCase() === pr.productName.toLowerCase()) ||
+      (p.sku && pr.sku && p.sku === pr.sku)
+    ) || {
+      productId: pr.productId,
+      name: pr.productName,
+      stock: pr.stock,
+      stockQuantity: pr.stock,
+      sku: pr.sku
+    };
+    // Mark PR as approved/processed silently
+    handleApprovePR(pr, false);
+    handleOpenRFQForProduct(matchedProd, qtyToUse);
+  };
+
   useEffect(() => {
     fetchData();
-    const handlePoUpdate = () => fetchData();
+    loadPurchaseRequests();
+    const handlePoUpdate = () => {
+      fetchData();
+      loadPurchaseRequests();
+    };
     window.addEventListener('erp-po-updated', handlePoUpdate);
     window.addEventListener('erp-notification-sent', handlePoUpdate);
     window.addEventListener('storage', handlePoUpdate);
@@ -1328,9 +1554,495 @@ export default function Purchasing() {
                 </button>
               </div>
             </div>
+
+            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                  Yêu Cầu Mua Hàng Nội Bộ (PR)
+                </h3>
+                <button
+                  onClick={() => navigate('/admin/purchasing?tab=requests')}
+                  style={{ backgroundColor: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', borderRadius: '6px', padding: '0.35rem 0.8rem', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer' }}
+                >
+                  Xem Tất Cả ({purchaseRequests.length}) →
+                </button>
+              </div>
+              <p style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '1rem' }}>
+                Đề xuất bổ sung hàng từ kho: có <strong style={{ color: '#d97706' }}>{purchaseRequests.filter(r => r.status === 'PENDING').length} yêu cầu mới</strong> cần khảo sát giá và lên đơn.
+              </p>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button
+                  onClick={() => navigate('/admin/purchasing?tab=requests')}
+                  style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.45rem 0.9rem', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer' }}
+                >
+                  Xử Lý Yêu Cầu PR
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
+
+      {/* ========================================================================= */}
+      {/* TAB: REQUESTS (DANH SÁCH YÊU CẦU MUA HÀNG - PR) */}
+      {/* ========================================================================= */}
+      {activeTab === 'requests' && (() => {
+        const pendingCount = purchaseRequests.filter(r => r.status === 'PENDING').length;
+        const approvedCount = purchaseRequests.filter(r => r.status === 'APPROVED').length;
+        const rejectedCount = purchaseRequests.filter(r => r.status === 'REJECTED').length;
+
+        const filteredRequests = purchaseRequests.filter(r => {
+          const matchSearch = !prSearchTerm || 
+            (r.prCode || '').toLowerCase().includes(prSearchTerm.toLowerCase()) ||
+            (r.productName || '').toLowerCase().includes(prSearchTerm.toLowerCase()) ||
+            (r.reason || '').toLowerCase().includes(prSearchTerm.toLowerCase()) ||
+            (r.requestedBy || '').toLowerCase().includes(prSearchTerm.toLowerCase());
+          
+          if (prStatusFilter === 'PENDING') return matchSearch && r.status === 'PENDING';
+          if (prStatusFilter === 'APPROVED') return matchSearch && r.status === 'APPROVED';
+          if (prStatusFilter === 'REJECTED') return matchSearch && r.status === 'REJECTED';
+          return matchSearch;
+        });
+
+        return (
+          <div>
+            {/* Header Title & Actions */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '1rem' }}>
+              <div>
+                <h2 style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span>Danh Sách Yêu Cầu Mua Hàng Nội Bộ (PR)</span>
+                  <span style={{ fontSize: '0.78rem', padding: '2px 8px', borderRadius: '12px', fontWeight: 800, backgroundColor: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe' }}>
+                    {purchaseRequests.length} Yêu Cầu
+                  </span>
+                </h2>
+                <p style={{ color: '#64748b', fontSize: '0.85rem', margin: '0.25rem 0 0' }}>
+                  Theo dõi tất cả đề xuất bổ sung linh kiện từ kho (bao gồm phiếu mới cần xử lý và lịch sử trước đây), hỗ trợ tạo nhanh YCBG gửi NCC.
+                </p>
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+                <button
+                  onClick={() => { fetchData(); loadPurchaseRequests(); }}
+                  style={{
+                    backgroundColor: '#ffffff',
+                    color: '#475569',
+                    border: '1px solid #cbd5e1',
+                    borderRadius: '6px',
+                    padding: '0.5rem 0.9rem',
+                    fontSize: '0.82rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.35rem'
+                  }}
+                >
+                  <RefreshCw size={14} className={loadingPRs ? 'animate-spin' : ''} />
+                  <span>Làm Mới</span>
+                </button>
+
+                <button
+                  onClick={handleOpenCreateModal}
+                  style={{
+                    backgroundColor: '#2563eb',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '6px',
+                    padding: '0.5rem 1.1rem',
+                    fontSize: '0.82rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.4rem'
+                  }}
+                >
+                  <Plus size={16} />
+                  <span>+ Tạo RFQ Mới</span>
+                </button>
+              </div>
+            </div>
+
+            {/* 4 KPI Cards */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1.25rem' }}>
+              <div style={{ backgroundColor: '#ffffff', padding: '1rem 1.25rem', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#64748b' }}>Tổng Yêu Cầu (Mới & Cũ)</div>
+                    <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#0f172a', marginTop: '0.2rem' }}>{purchaseRequests.length}</div>
+                  </div>
+                  <div style={{ width: '38px', height: '38px', borderRadius: '8px', backgroundColor: '#f1f5f9', color: '#475569', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <FileText size={20} />
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ backgroundColor: '#fffbeb', padding: '1rem 1.25rem', borderRadius: '8px', border: '1px solid #fde68a' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#b45309' }}>Chờ Xử Lý (Mới)</div>
+                    <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#b45309', marginTop: '0.2rem' }}>{pendingCount}</div>
+                  </div>
+                  <div style={{ width: '38px', height: '38px', borderRadius: '8px', backgroundColor: '#fef3c7', color: '#d97706', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Clock size={20} />
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ backgroundColor: '#f0fdf4', padding: '1rem 1.25rem', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#15803d' }}>Đã Duyệt / Sẵn Sàng Mua</div>
+                    <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#15803d', marginTop: '0.2rem' }}>{approvedCount}</div>
+                  </div>
+                  <div style={{ width: '38px', height: '38px', borderRadius: '8px', backgroundColor: '#dcfce7', color: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <CheckCircle2 size={20} />
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ backgroundColor: '#fef2f2', padding: '1rem 1.25rem', borderRadius: '8px', border: '1px solid #fecaca' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#dc2626' }}>Từ Chối / Đã Đóng</div>
+                    <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#dc2626', marginTop: '0.2rem' }}>{rejectedCount}</div>
+                  </div>
+                  <div style={{ width: '38px', height: '38px', borderRadius: '8px', backgroundColor: '#fee2e2', color: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <X size={20} />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Filter & Search Bar */}
+            <div style={{ backgroundColor: '#ffffff', padding: '1rem', borderRadius: '8px', border: '1px solid #cbd5e1', marginBottom: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.85rem' }}>
+              <div style={{ position: 'relative', flex: 1, minWidth: '260px' }}>
+                <Search size={16} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                <input
+                  type="text"
+                  placeholder="Tìm theo mã phiếu PR, tên sản phẩm, lý do, người đề xuất..."
+                  value={prSearchTerm}
+                  onChange={e => setPrSearchTerm(e.target.value)}
+                  style={{ width: '100%', padding: '0.5rem 0.85rem 0.5rem 2.2rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
+                {[
+                  { key: 'ALL', label: `Tất cả (${purchaseRequests.length})` },
+                  { key: 'PENDING', label: `Chờ xử lý / Mới (${pendingCount})` },
+                  { key: 'APPROVED', label: `Đã duyệt (${approvedCount})` },
+                  { key: 'REJECTED', label: `Từ chối (${rejectedCount})` }
+                ].map(f => (
+                  <button
+                    key={f.key}
+                    onClick={() => setPrStatusFilter(f.key)}
+                    style={{
+                      padding: '0.45rem 0.85rem',
+                      borderRadius: '6px',
+                      border: prStatusFilter === f.key ? '1px solid #2563eb' : '1px solid #cbd5e1',
+                      backgroundColor: prStatusFilter === f.key ? '#2563eb' : '#ffffff',
+                      color: prStatusFilter === f.key ? '#ffffff' : '#475569',
+                      fontSize: '0.78rem',
+                      fontWeight: 700,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Table Container */}
+            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, fontSize: '0.82rem' }}>
+                  <thead>
+                    <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569' }}>
+                      <th style={{ padding: '0.75rem 0.85rem', width: '120px', whiteSpace: 'nowrap', borderBottom: '2px solid #e2e8f0' }}>Mã Phiếu</th>
+                      <th style={{ padding: '0.75rem 0.85rem', width: '95px', whiteSpace: 'nowrap', borderBottom: '2px solid #e2e8f0' }}>Ngày Tạo</th>
+                      <th style={{ padding: '0.75rem 0.85rem', minWidth: '220px', maxWidth: '300px', borderBottom: '2px solid #e2e8f0' }}>Linh Kiện Cần Mua</th>
+                      <th style={{ padding: '0.75rem 0.85rem', textAlign: 'center', width: '90px', whiteSpace: 'nowrap', borderBottom: '2px solid #e2e8f0' }}>Tồn Kho</th>
+                      <th style={{ padding: '0.75rem 0.85rem', textAlign: 'center', width: '95px', whiteSpace: 'nowrap', borderBottom: '2px solid #e2e8f0' }}>SL Cần Mua</th>
+                      <th style={{ padding: '0.75rem 0.85rem', minWidth: '160px', maxWidth: '240px', borderBottom: '2px solid #e2e8f0' }}>Lý Do Đề Xuất</th>
+                      <th style={{ padding: '0.75rem 0.85rem', width: '130px', whiteSpace: 'nowrap', borderBottom: '2px solid #e2e8f0' }}>Người Gửi</th>
+                      <th style={{ padding: '0.75rem 0.85rem', textAlign: 'center', width: '115px', whiteSpace: 'nowrap', borderBottom: '2px solid #e2e8f0' }}>Trạng Thái</th>
+                      <th style={{ 
+                        padding: '0.75rem 0.85rem', 
+                        textAlign: 'center', 
+                        width: '145px', 
+                        whiteSpace: 'nowrap',
+                        borderBottom: '2px solid #e2e8f0',
+                        position: 'sticky',
+                        right: 0,
+                        backgroundColor: '#f8fafc',
+                        boxShadow: '-3px 0 6px rgba(0,0,0,0.05)',
+                        zIndex: 2
+                      }}>
+                        Thao Tác / Xử Lý
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {loadingPRs ? (
+                      <tr>
+                        <td colSpan="9" style={{ textAlign: 'center', padding: '2.5rem', color: '#94a3b8' }}>
+                          Đang tải danh sách Yêu Cầu Mua Hàng...
+                        </td>
+                      </tr>
+                    ) : filteredRequests.length === 0 ? (
+                      <tr>
+                        <td colSpan="9" style={{ textAlign: 'center', padding: '3rem', color: '#64748b' }}>
+                          {purchaseRequests.length === 0 
+                            ? 'Chưa có Phiếu Yêu Cầu Mua Hàng (PR) nào từ bộ phận Kho.'
+                            : 'Không tìm thấy phiếu yêu cầu nào khớp với bộ lọc tìm kiếm.'}
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredRequests.map(pr => {
+                        const isApproved = pr.status === 'APPROVED';
+                        const isRejected = pr.status === 'REJECTED';
+
+                        const badgeBg = isApproved ? '#f0fdf4' : isRejected ? '#fef2f2' : '#fffbeb';
+                        const badgeColor = isApproved ? '#15803d' : isRejected ? '#dc2626' : '#b45309';
+                        const badgeBorder = isApproved ? '#bbf7d0' : isRejected ? '#fecaca' : '#fde68a';
+                        const badgeText = isApproved ? 'Đã Ký Duyệt' : isRejected ? 'Từ Chối' : 'Chờ Duyệt / Mới';
+
+                        return (
+                          <tr key={pr.id || pr.prCode} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                            <td style={{ padding: '0.65rem 0.85rem', fontWeight: 700, color: '#2563eb', whiteSpace: 'nowrap', borderBottom: '1px solid #f1f5f9' }}>
+                              <span style={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>{pr.prCode}</span>
+                            </td>
+                            <td style={{ padding: '0.65rem 0.85rem', color: '#64748b', fontSize: '0.78rem', whiteSpace: 'nowrap', borderBottom: '1px solid #f1f5f9' }}>
+                              {formatDate(pr.createdAt)}
+                            </td>
+                            <td style={{ padding: '0.65rem 0.85rem', borderBottom: '1px solid #f1f5f9' }}>
+                              <div 
+                                style={{ 
+                                  fontWeight: 700, 
+                                  color: '#0f172a', 
+                                  lineHeight: 1.35, 
+                                  fontSize: '0.82rem',
+                                  display: '-webkit-box',
+                                  WebkitLineClamp: 2,
+                                  WebkitBoxOrient: 'vertical',
+                                  overflow: 'hidden'
+                                }}
+                                title={pr.productName}
+                              >
+                                {pr.productName}
+                              </div>
+                              {pr.sku && (
+                                <div style={{ marginTop: '2px' }}>
+                                  <span style={{ fontSize: '0.68rem', color: '#475569', backgroundColor: '#f1f5f9', padding: '1px 5px', borderRadius: '3px', border: '1px solid #e2e8f0', fontFamily: 'monospace' }}>
+                                    SKU: {pr.sku}
+                                  </span>
+                                </div>
+                              )}
+                            </td>
+                            <td style={{ padding: '0.65rem 0.85rem', textAlign: 'center', whiteSpace: 'nowrap', borderBottom: '1px solid #f1f5f9' }}>
+                              <span style={{
+                                display: 'inline-block',
+                                padding: '2px 8px',
+                                borderRadius: '6px',
+                                fontSize: '0.76rem',
+                                fontWeight: 700,
+                                backgroundColor: pr.stock === 0 ? '#fef2f2' : (pr.stock && pr.stock <= 5) ? '#fffbeb' : '#f0fdf4',
+                                color: pr.stock === 0 ? '#dc2626' : (pr.stock && pr.stock <= 5) ? '#d97706' : '#15803d',
+                                border: `1px solid ${pr.stock === 0 ? '#fecaca' : (pr.stock && pr.stock <= 5) ? '#fde68a' : '#bbf7d0'}`
+                              }}>
+                                {pr.stock !== null && pr.stock !== undefined ? `${pr.stock} SP` : '-'}
+                              </span>
+                            </td>
+                            <td style={{ padding: '0.65rem 0.85rem', textAlign: 'center', whiteSpace: 'nowrap', borderBottom: '1px solid #f1f5f9' }}>
+                              <span style={{
+                                display: 'inline-block',
+                                padding: '2px 8px',
+                                borderRadius: '6px',
+                                fontSize: '0.8rem',
+                                fontWeight: 800,
+                                backgroundColor: '#eff6ff',
+                                color: '#1d4ed8',
+                                border: '1px solid #bfdbfe'
+                              }}>
+                                {pr.quantity} SP
+                              </span>
+                            </td>
+                            <td style={{ padding: '0.65rem 0.85rem', borderBottom: '1px solid #f1f5f9' }}>
+                              <div 
+                                style={{ 
+                                  color: '#475569', 
+                                  fontSize: '0.78rem',
+                                  lineHeight: 1.35,
+                                  display: '-webkit-box',
+                                  WebkitLineClamp: 2,
+                                  WebkitBoxOrient: 'vertical',
+                                  overflow: 'hidden'
+                                }}
+                                title={pr.reason || 'Tồn kho chạm ngưỡng tối thiểu'}
+                              >
+                                {pr.reason || 'Tồn kho chạm ngưỡng tối thiểu'}
+                              </div>
+                            </td>
+                            <td style={{ padding: '0.65rem 0.85rem', fontSize: '0.78rem', whiteSpace: 'nowrap', borderBottom: '1px solid #f1f5f9' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', color: '#475569' }}>
+                                <User size={13} style={{ color: '#94a3b8', flexShrink: 0 }} />
+                                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '105px' }} title={pr.requestedBy}>
+                                  {pr.requestedBy?.includes('@') ? pr.requestedBy.split('@')[0] : (pr.requestedBy || 'Thủ Kho')}
+                                </span>
+                              </div>
+                            </td>
+                            <td style={{ padding: '0.65rem 0.85rem', textAlign: 'center', whiteSpace: 'nowrap', borderBottom: '1px solid #f1f5f9' }}>
+                              <span style={{
+                                display: 'inline-block',
+                                padding: '3px 8px',
+                                borderRadius: '12px',
+                                fontSize: '0.72rem',
+                                fontWeight: 700,
+                                backgroundColor: badgeBg,
+                                color: badgeColor,
+                                border: `1px solid ${badgeBorder}`
+                              }}>
+                                {badgeText}
+                              </span>
+                            </td>
+                            <td style={{ 
+                              padding: '0.65rem 0.85rem', 
+                              textAlign: 'center', 
+                              whiteSpace: 'nowrap',
+                              position: 'sticky',
+                              right: 0,
+                              backgroundColor: '#ffffff',
+                              boxShadow: '-3px 0 6px rgba(0,0,0,0.05)',
+                              borderBottom: '1px solid #f1f5f9',
+                              zIndex: 1
+                            }}>
+                              <div style={{ display: 'flex', gap: '0.35rem', justifyContent: 'center', alignItems: 'center' }}>
+                                {pr.status === 'PENDING' ? (
+                                  <>
+                                    <button
+                                      onClick={() => {
+                                        setSelectedProcessPR(pr);
+                                        setProcessQty(pr.quantity || 1);
+                                        setIsRejecting(false);
+                                        setRejectReason('');
+                                      }}
+                                      title="Xử lý yêu cầu mua hàng (Tạo RFQ / Ký Duyệt / Từ Chối)"
+                                      style={{
+                                        backgroundColor: '#2563eb',
+                                        color: '#ffffff',
+                                        border: 'none',
+                                        borderRadius: '6px',
+                                        padding: '0.42rem 0.75rem',
+                                        fontSize: '0.76rem',
+                                        fontWeight: 700,
+                                        cursor: 'pointer',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '0.3rem',
+                                        boxShadow: '0 1px 3px rgba(37,99,235,0.25)',
+                                        whiteSpace: 'nowrap'
+                                      }}
+                                    >
+                                      <CheckCircle2 size={13} />
+                                      <span>Xử Lý</span>
+                                    </button>
+                                    <button
+                                      onClick={() => setSelectedViewPR(pr)}
+                                      title="Xem chi tiết phiếu"
+                                      style={{
+                                        backgroundColor: '#f8fafc',
+                                        color: '#475569',
+                                        border: '1px solid #cbd5e1',
+                                        borderRadius: '6px',
+                                        padding: '0.42rem 0.5rem',
+                                        cursor: 'pointer',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center'
+                                      }}
+                                    >
+                                      <Eye size={13} />
+                                    </button>
+                                  </>
+                                ) : pr.status === 'APPROVED' ? (
+                                  <>
+                                    <button
+                                      onClick={() => handleCreateRfqFromPR(pr)}
+                                      title="Tạo Yêu Cầu Báo Giá (RFQ)"
+                                      style={{
+                                        backgroundColor: '#059669',
+                                        color: '#ffffff',
+                                        border: 'none',
+                                        borderRadius: '6px',
+                                        padding: '0.42rem 0.75rem',
+                                        fontSize: '0.76rem',
+                                        fontWeight: 700,
+                                        cursor: 'pointer',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '0.3rem',
+                                        boxShadow: '0 1px 3px rgba(5,150,105,0.25)',
+                                        whiteSpace: 'nowrap'
+                                      }}
+                                    >
+                                      <ShoppingCart size={13} />
+                                      <span>Tạo RFQ</span>
+                                    </button>
+                                    <button
+                                      onClick={() => setSelectedViewPR(pr)}
+                                      title="Xem chi tiết phiếu"
+                                      style={{
+                                        backgroundColor: '#f8fafc',
+                                        color: '#475569',
+                                        border: '1px solid #cbd5e1',
+                                        borderRadius: '6px',
+                                        padding: '0.42rem 0.5rem',
+                                        cursor: 'pointer',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center'
+                                      }}
+                                    >
+                                      <Eye size={13} />
+                                    </button>
+                                  </>
+                                ) : (
+                                  <button
+                                    onClick={() => setSelectedViewPR(pr)}
+                                    title="Xem lý do từ chối"
+                                    style={{
+                                      backgroundColor: '#f8fafc',
+                                      color: '#64748b',
+                                      border: '1px solid #cbd5e1',
+                                      borderRadius: '6px',
+                                      padding: '0.42rem 0.65rem',
+                                      fontSize: '0.76rem',
+                                      fontWeight: 600,
+                                      cursor: 'pointer',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '0.25rem'
+                                    }}
+                                  >
+                                    <Eye size={13} />
+                                    <span>Chi Tiết</span>
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ========================================================================= */}
       {/* TAB 2 & TAB 3: RFQ (YÊU CẦU BÁO GIÁ) & ORDERS (ĐƠN MUA HÀNG) */}
@@ -2329,6 +3041,352 @@ export default function Purchasing() {
           </div>
         );
       })()}
+
+      {/* ================= MODAL XEM CHI TIẾT PHIẾU YÊU CẦU MUA HÀNG (PR) ================= */}
+      {selectedViewPR && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(4px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1050, padding: '1.5rem' }}>
+          <div style={{ width: '100%', maxWidth: '620px', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)', overflow: 'hidden' }}>
+            {/* Header */}
+            <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#f8fafc' }}>
+              <div>
+                <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                  Chi Tiết Phiếu Yêu Cầu Mua Hàng ({selectedViewPR.prCode})
+                </h3>
+                <p style={{ margin: '0.2rem 0 0', fontSize: '0.78rem', color: '#64748b' }}>
+                  Đề xuất mua hàng nội bộ tiếp nhận từ Quản Lý Kho & Thủ Kho
+                </p>
+              </div>
+              <button onClick={() => setSelectedViewPR(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}>
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', fontSize: '0.83rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', backgroundColor: '#f8fafc', padding: '1rem', borderRadius: '8px' }}>
+                <div>
+                  <span style={{ color: '#64748b', fontSize: '0.75rem' }}>Mã Phiếu:</span>
+                  <div style={{ fontWeight: 700, color: '#2563eb' }}>{selectedViewPR.prCode}</div>
+                </div>
+                <div>
+                  <span style={{ color: '#64748b', fontSize: '0.75rem' }}>Thời Gian Tạo:</span>
+                  <div style={{ fontWeight: 600 }}>{formatDate(selectedViewPR.createdAt)}</div>
+                </div>
+                <div>
+                  <span style={{ color: '#64748b', fontSize: '0.75rem' }}>Người Lập Phiếu:</span>
+                  <div style={{ fontWeight: 600 }}>{selectedViewPR.requestedBy}</div>
+                </div>
+                <div>
+                  <span style={{ color: '#64748b', fontSize: '0.75rem' }}>Trạng Thái:</span>
+                  <div>
+                    <span style={{
+                      display: 'inline-block',
+                      padding: '2px 8px',
+                      borderRadius: '10px',
+                      fontSize: '0.72rem',
+                      fontWeight: 700,
+                      backgroundColor: selectedViewPR.status === 'APPROVED' ? '#f0fdf4' : selectedViewPR.status === 'REJECTED' ? '#fef2f2' : '#fffbeb',
+                      color: selectedViewPR.status === 'APPROVED' ? '#15803d' : selectedViewPR.status === 'REJECTED' ? '#dc2626' : '#b45309'
+                    }}>
+                      {selectedViewPR.status === 'APPROVED' ? 'Đã Ký Duyệt' : selectedViewPR.status === 'REJECTED' ? 'Từ Chối' : 'Chờ Duyệt / Mới'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <span style={{ color: '#64748b', fontSize: '0.75rem' }}>Linh Kiện Cần Bổ Sung:</span>
+                <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', marginTop: '0.2rem' }}>{selectedViewPR.productName}</div>
+                {selectedViewPR.sku && <div style={{ color: '#64748b', fontSize: '0.75rem' }}>Mã SKU: {selectedViewPR.sku}</div>}
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div style={{ backgroundColor: '#f1f5f9', padding: '0.75rem 1rem', borderRadius: '6px' }}>
+                  <span style={{ color: '#64748b', fontSize: '0.75rem' }}>Tồn Kho Thực Tế:</span>
+                  <div style={{ fontWeight: 800, fontSize: '1.1rem', color: selectedViewPR.stock === 0 ? '#dc2626' : '#0f172a' }}>
+                    {selectedViewPR.stock !== null && selectedViewPR.stock !== undefined ? `${selectedViewPR.stock} SP` : '-'}
+                  </div>
+                </div>
+                <div style={{ backgroundColor: '#eff6ff', padding: '0.75rem 1rem', borderRadius: '6px', border: '1px solid #bfdbfe' }}>
+                  <span style={{ color: '#2563eb', fontSize: '0.75rem' }}>Số Lượng Đề Xuất Mua:</span>
+                  <div style={{ fontWeight: 800, fontSize: '1.1rem', color: '#1d4ed8' }}>
+                    {selectedViewPR.quantity} SP
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <span style={{ color: '#64748b', fontSize: '0.75rem' }}>Lý Do Đề Xuất:</span>
+                <div style={{ padding: '0.75rem', backgroundColor: '#f8fafc', borderRadius: '6px', border: '1px solid #e2e8f0', color: '#334155', marginTop: '0.25rem' }}>
+                  {selectedViewPR.reason || 'Tồn kho chạm ngưỡng an toàn, cần bổ sung hàng phục vụ kinh doanh.'}
+                </div>
+              </div>
+
+              {selectedViewPR.approvedBy && (
+                <div>
+                  <span style={{ color: '#64748b', fontSize: '0.75rem' }}>Người Ký Duyệt:</span>
+                  <div style={{ fontWeight: 600, color: '#15803d' }}>
+                    {selectedViewPR.approvedBy} {selectedViewPR.approvedAt ? `(lúc ${formatDate(selectedViewPR.approvedAt)})` : ''}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div style={{ padding: '1rem 1.5rem', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', backgroundColor: '#f8fafc' }}>
+              <button
+                onClick={() => setSelectedViewPR(null)}
+                style={{ backgroundColor: '#ffffff', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.5rem 1rem', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}
+              >
+                Đóng
+              </button>
+              <button
+                onClick={() => {
+                  const pr = selectedViewPR;
+                  setSelectedViewPR(null);
+                  handleCreateRfqFromPR(pr);
+                }}
+                style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.5rem 1.25rem', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+              >
+                <ShoppingCart size={15} />
+                <span>Chuyển Thành RFQ Ngay</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL XỬ LÝ YÊU CẦU MUA HÀNG (PR) ================= */}
+      {selectedProcessPR && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(4px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1100, padding: '1.25rem' }}>
+          <div style={{ width: '100%', maxWidth: '640px', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)', overflow: 'hidden' }}>
+            {/* Modal Header */}
+            <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#f8fafc' }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                    Xử Lý Yêu Cầu Mua Hàng
+                  </h3>
+                  <span style={{ backgroundColor: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', padding: '1px 8px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 700, fontFamily: 'monospace' }}>
+                    {selectedProcessPR.prCode}
+                  </span>
+                </div>
+                <p style={{ margin: '0.25rem 0 0', fontSize: '0.78rem', color: '#64748b' }}>
+                  Lựa chọn phương án xử lý đề xuất bổ sung hàng hóa từ bộ phận Kho
+                </p>
+              </div>
+              <button 
+                onClick={() => { setSelectedProcessPR(null); setIsRejecting(false); }} 
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', padding: '4px' }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div style={{ padding: '1.25rem 1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', fontSize: '0.83rem' }}>
+              
+              {/* Product & Stock Summary Box */}
+              <div style={{ backgroundColor: '#f8fafc', padding: '1rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600, textTransform: 'uppercase', marginBottom: '0.35rem' }}>
+                  Linh kiện đề xuất
+                </div>
+                <div style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a', lineHeight: 1.35 }}>
+                  {selectedProcessPR.productName}
+                </div>
+                {selectedProcessPR.sku && (
+                  <div style={{ marginTop: '0.25rem' }}>
+                    <span style={{ fontSize: '0.72rem', color: '#475569', backgroundColor: '#e2e8f0', padding: '1px 6px', borderRadius: '4px', fontFamily: 'monospace' }}>
+                      SKU: {selectedProcessPR.sku}
+                    </span>
+                  </div>
+                )}
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem', marginTop: '0.85rem' }}>
+                  <div style={{ backgroundColor: '#ffffff', padding: '0.75rem', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+                    <span style={{ fontSize: '0.72rem', color: '#64748b' }}>Tồn kho hiện tại:</span>
+                    <div style={{ fontSize: '1.15rem', fontWeight: 800, color: selectedProcessPR.stock === 0 ? '#dc2626' : (selectedProcessPR.stock && selectedProcessPR.stock <= 5) ? '#d97706' : '#15803d' }}>
+                      {selectedProcessPR.stock !== null && selectedProcessPR.stock !== undefined ? `${selectedProcessPR.stock} SP` : '-'}
+                    </div>
+                  </div>
+
+                  <div style={{ backgroundColor: '#ffffff', padding: '0.75rem', borderRadius: '6px', border: '1px solid #bfdbfe' }}>
+                    <label style={{ fontSize: '0.72rem', color: '#2563eb', fontWeight: 700, display: 'block' }}>
+                      Số lượng đặt mua:
+                    </label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', marginTop: '0.2rem' }}>
+                      <input 
+                        type="number" 
+                        min="1" 
+                        value={processQty} 
+                        onChange={e => setProcessQty(Math.max(1, parseInt(e.target.value) || 1))}
+                        style={{ width: '80px', padding: '0.3rem 0.5rem', fontWeight: 800, fontSize: '1.05rem', color: '#1d4ed8', borderRadius: '4px', border: '1px solid #93c5fd', textAlign: 'center' }}
+                      />
+                      <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b' }}>sản phẩm</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ marginTop: '0.75rem', fontSize: '0.78rem', color: '#475569', display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                  <div><strong>Người lập:</strong> {selectedProcessPR.requestedBy}</div>
+                  <div><strong>Ngày tạo:</strong> {formatDate(selectedProcessPR.createdAt)}</div>
+                </div>
+                <div style={{ marginTop: '0.35rem', fontSize: '0.78rem', color: '#475569' }}>
+                  <strong>Lý do:</strong> {selectedProcessPR.reason || 'Tồn kho chạm ngưỡng an toàn'}
+                </div>
+              </div>
+
+              {/* Action Selection Box */}
+              {!isRejecting ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#334155' }}>
+                    Chọn phương án xử lý:
+                  </div>
+
+                  {/* Option 1: Create RFQ */}
+                  <div 
+                    onClick={() => {
+                      const pr = selectedProcessPR;
+                      setSelectedProcessPR(null);
+                      handleCreateRfqFromPR(pr, processQty);
+                    }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '0.85rem 1rem',
+                      borderRadius: '8px',
+                      border: '1.5px solid #2563eb',
+                      backgroundColor: '#eff6ff',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                      <div style={{ width: '36px', height: '36px', borderRadius: '8px', backgroundColor: '#2563eb', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <ShoppingCart size={18} />
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: 800, color: '#1d4ed8', fontSize: '0.88rem' }}>
+                          Chuyển Thành RFQ Khảo Sát Giá (Khuyến nghị)
+                        </div>
+                        <div style={{ fontSize: '0.75rem', color: '#3b82f6', marginTop: '1px' }}>
+                          Tự động tạo phiếu RFQ gửi đến các nhà cung cấp phân phối linh kiện này
+                        </div>
+                      </div>
+                    </div>
+                    <ArrowRight size={18} style={{ color: '#2563eb' }} />
+                  </div>
+
+                  {/* Option 2: Approve directly */}
+                  <div 
+                    onClick={() => handleApprovePR(selectedProcessPR)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '0.85rem 1rem',
+                      borderRadius: '8px',
+                      border: '1px solid #cbd5e1',
+                      backgroundColor: '#ffffff',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                      <div style={{ width: '36px', height: '36px', borderRadius: '8px', backgroundColor: '#f0fdf4', color: '#16a34a', border: '1px solid #bbf7d0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Check size={18} />
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.85rem' }}>
+                          Ký Duyệt Yêu Cầu (Approve)
+                        </div>
+                        <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '1px' }}>
+                          Phê duyệt đề xuất mua hàng và lưu trạng thái sẵn sàng đặt hàng
+                        </div>
+                      </div>
+                    </div>
+                    <CheckCircle2 size={18} style={{ color: '#16a34a' }} />
+                  </div>
+
+                  {/* Option 3: Reject */}
+                  <div 
+                    onClick={() => setIsRejecting(true)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '0.75rem 1rem',
+                      borderRadius: '8px',
+                      border: '1px dashed #fca5a5',
+                      backgroundColor: '#fffaf0',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                      <div style={{ width: '36px', height: '36px', borderRadius: '8px', backgroundColor: '#fef2f2', color: '#dc2626', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <X size={18} />
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: 700, color: '#b91c1c', fontSize: '0.85rem' }}>
+                          Từ Chối Yêu Cầu Này
+                        </div>
+                        <div style={{ fontSize: '0.73rem', color: '#991b1b', marginTop: '1px' }}>
+                          Không mua thêm hoặc đã có nguồn cung khác
+                        </div>
+                      </div>
+                    </div>
+                    <span style={{ fontSize: '0.75rem', color: '#b91c1c', fontWeight: 600 }}>Nhập lý do &rarr;</span>
+                  </div>
+                </div>
+              ) : (
+                /* Rejection Sub-form */
+                <div style={{ backgroundColor: '#fef2f2', padding: '1rem', borderRadius: '8px', border: '1px solid #fecaca' }}>
+                  <div style={{ fontWeight: 700, color: '#991b1b', fontSize: '0.85rem', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                    <AlertCircle size={16} />
+                    <span>Xác nhận từ chối yêu cầu mua hàng</span>
+                  </div>
+                  <label style={{ fontSize: '0.75rem', color: '#7f1d1d', display: 'block', marginBottom: '0.25rem' }}>
+                    Lý do từ chối:
+                  </label>
+                  <input 
+                    type="text" 
+                    placeholder="VD: Đã có đơn PO đang giao / Chưa phê duyệt ngân sách đợt này"
+                    value={rejectReason}
+                    onChange={e => setRejectReason(e.target.value)}
+                    style={{ width: '100%', padding: '0.5rem 0.75rem', borderRadius: '6px', border: '1px solid #f87171', fontSize: '0.82rem', marginBottom: '0.75rem' }}
+                  />
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+                    <button
+                      onClick={() => setIsRejecting(false)}
+                      style={{ padding: '0.4rem 0.85rem', borderRadius: '5px', border: '1px solid #cbd5e1', backgroundColor: '#ffffff', color: '#475569', fontSize: '0.78rem', cursor: 'pointer' }}
+                    >
+                      Quay Lại
+                    </button>
+                    <button
+                      onClick={() => handleRejectPR(selectedProcessPR, rejectReason)}
+                      style={{ padding: '0.4rem 1rem', borderRadius: '5px', border: 'none', backgroundColor: '#dc2626', color: '#ffffff', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer' }}
+                    >
+                      Xác Nhận Từ Chối
+                    </button>
+                  </div>
+                </div>
+              )}
+
+            </div>
+
+            {/* Modal Footer */}
+            <div style={{ padding: '1rem 1.5rem', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end', backgroundColor: '#f8fafc' }}>
+              <button
+                onClick={() => { setSelectedProcessPR(null); setIsRejecting(false); }}
+                style={{ backgroundColor: '#ffffff', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.5rem 1.25rem', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ================= MODAL TẠO YCBG (RFQ) ================= */}
       {showCreateModal && (

@@ -39,6 +39,7 @@ export const OPERATIONAL_PERMISSIONS = [
   { id: 'sales_cancel_order', moduleId: 'sales', name: 'Duyệt hủy đơn hàng & hoàn tiền khách', desc: 'Xác nhận hủy đơn hàng và cho phép hoàn tiền theo quy định' },
   { id: 'sales_manage_promotions', moduleId: 'sales', name: 'Quản lý bảng giá & chương trình khuyến mãi', desc: 'Thêm sửa xóa các mã giảm giá và chiến dịch khuyến mãi' },
   { id: 'sales_view_orders', moduleId: 'sales', name: 'Xem danh sách và tra cứu lịch sử đơn hàng', desc: 'Tra cứu toàn bộ đơn hàng của cửa hàng và trạng thái xử lý' },
+  { id: 'sales_manage_customers', moduleId: 'sales', name: 'Thêm, sửa, vô hiệu hóa & xóa tài khoản khách hàng', desc: 'Quản lý tài khoản khách hàng thật trong hệ thống (tab Khách Hàng CRM)' },
 
   // 2. Phân Hệ Kho Vận & Tồn Kho
   { id: 'warehouse_pack_scan', moduleId: 'warehouse', name: 'Đóng gói & quét mã vạch niêm phong (Thủ kho)', desc: 'Thao tác vật lý: lấy linh kiện, kiểm tra seal và quét mã đóng gói kiện hàng' },
@@ -98,7 +99,7 @@ export const OPERATIONAL_PERMISSIONS = [
 export const DEFAULT_OPERATIONAL_MATRIX = {
   ADMIN: {
     // Admin có toàn bộ quyền
-    sales_pos_checkout: true, sales_approve_discount: true, sales_cancel_order: true, sales_manage_promotions: true, sales_view_orders: true,
+    sales_pos_checkout: true, sales_approve_discount: true, sales_cancel_order: true, sales_manage_promotions: true, sales_view_orders: true, sales_manage_customers: true,
     warehouse_pack_scan: true, warehouse_dispatch_shipper: true, warehouse_stock_intake: true, warehouse_create_pr: true, warehouse_approve_pr: true, warehouse_manage_locations: true, warehouse_audit_adjust: true, warehouse_view_inventory: true,
     purchasing_create_rfq: true, purchasing_compare_quotes: true, purchasing_approve_po: true, purchasing_issue_po: true, purchasing_manage_suppliers: true, purchasing_view_orders: true,
     qc_inspect_inbound: true, qc_inspect_rma: true, qc_inspect_restock: true, qc_view_logs: true,
@@ -113,6 +114,7 @@ export const DEFAULT_OPERATIONAL_MATRIX = {
     dashboard_view_kpi: true,
     sales_view_orders: true,
     sales_approve_discount: true,
+    sales_manage_customers: true,
     purchasing_approve_po: true,
     hr_approve_payroll_ceo: true,
     accounting_manage_invoices: true,
@@ -131,6 +133,7 @@ export const DEFAULT_OPERATIONAL_MATRIX = {
     sales_approve_discount: true,
     sales_cancel_order: true,
     sales_manage_promotions: true,
+    sales_manage_customers: true,
     cskh_handle_tickets: true,
     cskh_approve_exchange: true,
     warehouse_view_inventory: true,
