@@ -58,7 +58,7 @@ router.patch('/inventory/:id/location', authMiddleware(WAREHOUSE_ROLES), assignI
 // ─── Phiếu Yêu Cầu Mua Hàng nội bộ (PR) ─────────────────────────────────────
 
 // @route   GET /api/v1/warehouse/purchase-requests
-router.get('/purchase-requests', authMiddleware(WAREHOUSE_ROLES), listPurchaseRequests);
+router.get('/purchase-requests', authMiddleware(['PURCHASING', ...WAREHOUSE_ROLES]), listPurchaseRequests);
 
 // @route   POST /api/v1/warehouse/purchase-requests
 // @desc    Thủ Kho lập đề xuất (warehouse_create_pr)

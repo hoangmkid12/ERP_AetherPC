@@ -17,6 +17,11 @@ const {
   registerPayment,
   validateReceipt
 } = require('../controllers/purchase.controller');
+const { listPurchaseRequests } = require('../controllers/warehouse.controller');
+
+// @route   GET /api/v1/purchasing/requests
+// @desc    Lấy danh sách phiếu yêu cầu mua hàng nội bộ (PR)
+router.get('/requests', authMiddleware(['PURCHASING', 'WAREHOUSE_MANAGER', 'CEO', 'ADMIN']), listPurchaseRequests);
 
 // @route   GET /api/v1/purchasing/suppliers
 router.get('/suppliers', authMiddleware(['PURCHASING', 'WAREHOUSE_MANAGER', 'CEO', 'ADMIN', 'SUPPLIER']), getSuppliers);

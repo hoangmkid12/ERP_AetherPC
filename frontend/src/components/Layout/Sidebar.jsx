@@ -954,6 +954,7 @@ export default function Sidebar({ isOpen = false, onClose }) {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', paddingLeft: '1rem', marginTop: '0.25rem', marginBottom: '0.5rem' }}>
                     {[
                       { tab: 'overview', label: 'Tổng Quan Mua Hàng' },
+                      { tab: 'requests', label: 'Yêu Cầu Mua Hàng (PR)', badgeKey: 'prCount' },
                       { tab: 'rfq', label: 'Yêu Cầu Báo Giá (RFQ)', badgeKey: 'rfqCount' },
                       { tab: 'orders', label: 'Đơn Mua Hàng (PO)', badgeKey: 'quotedPoCount' },
                       { tab: 'suppliers', label: 'Nhà Cung Cấp' },
@@ -965,6 +966,13 @@ export default function Sidebar({ isOpen = false, onClose }) {
                       const isSubActive = currentTab === sub.tab;
                       
                       let badgeVal = 0;
+                      if (sub.badgeKey === 'prCount') {
+                        try {
+                          const rawAlerts = JSON.parse(localStorage.getItem('erp_rfq_alert_logs') || '[]');
+                          const unhandled = rawAlerts.filter(a => !a.handled && a.status !== 'HANDLED' && a.status !== 'DONE').length;
+                          badgeVal = unhandled > 0 ? unhandled : 0;
+                        } catch (_) {}
+                      }
                       if (sub.badgeKey === 'rfqCount') {
                         badgeVal = (purchaseOrders || []).filter(p => ['RFQ', 'RFQ_SENT', 'QUOTED', 'QUOTED_PENDING_CEO'].includes(p.status)).length;
                       }
