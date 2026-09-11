@@ -75,9 +75,9 @@ function formatPrice(p) {
 }
 
 const CAT_COLORS = {
-  review: { bg: 'rgba(99,102,241,0.12)', color: 'var(--primary)' },
-  guide: { bg: 'rgba(16,185,129,0.12)', color: 'var(--success)' },
-  news: { bg: 'rgba(14,165,233,0.12)', color: 'var(--secondary)' },
+  review: { bg: 'rgba(99,102,241,0.3)', color: '#a5b4fc', border: '1px solid rgba(165,180,252,0.35)' },
+  guide: { bg: 'rgba(16,185,129,0.3)', color: '#6ee7b7', border: '1px solid rgba(110,231,183,0.35)' },
+  news: { bg: 'rgba(14,165,233,0.3)', color: '#7dd3fc', border: '1px solid rgba(125,211,252,0.35)' },
 };
 
 export default function NewsDetail() {
@@ -106,15 +106,24 @@ export default function NewsDetail() {
         <img src={article.image} alt={article.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
         <div style={{
           position: 'absolute', inset: 0,
-          background: 'linear-gradient(to top, rgba(11,15,25,1) 0%, rgba(11,15,25,0.4) 60%, transparent 100%)',
+          background: 'linear-gradient(to top, rgba(11,15,25,0.95) 0%, rgba(11,15,25,0.65) 50%, rgba(11,15,25,0.3) 100%)',
         }} />
         <div className="container" style={{ position: 'absolute', bottom: '2.5rem', left: '50%', transform: 'translateX(-50%)', width: '100%' }}>
           <span style={{
             ...cat, fontSize: '0.75rem', fontWeight: 700,
-            padding: '0.3rem 0.875rem', borderRadius: '99px',
+            padding: '0.35rem 0.875rem', borderRadius: '99px',
             textTransform: 'uppercase', display: 'inline-block', marginBottom: '1rem',
+            backdropFilter: 'blur(8px)',
           }}>{article.categoryLabel}</span>
-          <h1 style={{ fontSize: 'clamp(1.5rem, 3.5vw, 2.25rem)', fontWeight: 800, lineHeight: 1.25, maxWidth: '780px' }}>
+          <h1 style={{
+            fontSize: 'clamp(1.75rem, 3.5vw, 2.35rem)',
+            fontWeight: 800,
+            lineHeight: 1.3,
+            maxWidth: '850px',
+            color: '#ffffff',
+            textShadow: '0 2px 16px rgba(0,0,0,0.85)',
+            margin: 0,
+          }}>
             {article.title}
           </h1>
         </div>
