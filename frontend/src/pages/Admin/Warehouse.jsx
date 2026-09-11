@@ -5272,7 +5272,7 @@ export default function Warehouse() {
               onChange={(e) => setMovementTypeFilter(e.target.value)}
               style={{ padding: '0.55rem 0.85rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px' }}
             >
-              <option value="ALL">Tất cả loại dịch chuyển</option>
+              <option value="ALL">Tất cả loại biến động</option>
               <option value="IN">Nhập Kho (IN)</option>
               <option value="OUT">Xuất Kho (OUT)</option>
             </select>
@@ -5283,13 +5283,13 @@ export default function Warehouse() {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.83rem' }}>
               <thead>
                 <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569' }}>
-                  <th style={{ padding: '0.75rem 1rem' }}>Thời Gian</th>
-                  <th style={{ padding: '0.75rem 1rem' }}>Loại Biến Động</th>
-                  <th style={{ padding: '0.75rem 1rem' }}>Mã Chứng Từ</th>
+                  <th style={{ padding: '0.75rem 1rem', width: '13%', whiteSpace: 'nowrap' }}>Thời Gian</th>
+                  <th style={{ padding: '0.75rem 1rem', width: '13%', textAlign: 'center', whiteSpace: 'nowrap' }}>Loại Biến Động</th>
+                  <th style={{ padding: '0.75rem 1rem', width: '13%', whiteSpace: 'nowrap' }}>Mã Chứng Từ</th>
                   <th style={{ padding: '0.75rem 1rem' }}>Sản Phẩm</th>
-                  <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Số Lượng</th>
-                  <th style={{ padding: '0.75rem 1rem' }}>Người Thực Hiện</th>
-                  <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Thao Tác</th>
+                  <th style={{ padding: '0.75rem 1rem', width: '9%', textAlign: 'center', whiteSpace: 'nowrap' }}>Số Lượng</th>
+                  <th style={{ padding: '0.75rem 1rem', width: '12%', whiteSpace: 'nowrap' }}>Người Thực Hiện</th>
+                  <th style={{ padding: '0.75rem 1rem', width: '11%', textAlign: 'center', whiteSpace: 'nowrap' }}>Thao Tác</th>
                 </tr>
               </thead>
               <tbody>
@@ -5308,25 +5308,40 @@ export default function Warehouse() {
                       onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
                       onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                     >
-                      <td style={{ padding: '0.75rem 1rem', color: '#64748b' }}>
-                        {formatDateTime ? formatDateTime(mv.timestamp) : new Date(mv.timestamp).toLocaleString('vi-VN')}
+                      <td style={{ padding: '0.75rem 1rem', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+                        <div style={{ fontWeight: 600, color: '#0f172a', fontSize: '0.82rem' }}>
+                          {new Date(mv.timestamp).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                        </div>
+                        <div style={{ fontSize: '0.73rem', color: '#64748b', marginTop: '2px' }}>
+                          {new Date(mv.timestamp).toLocaleDateString('vi-VN')}
+                        </div>
                       </td>
-                      <td style={{ padding: '0.75rem 1rem' }}>
+                      <td style={{ padding: '0.75rem 1rem', textAlign: 'center', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
                         <span style={{
-                          padding: '2px 8px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 700,
-                          backgroundColor: mv.type === 'IN' ? '#dcfce7' : '#ffe4e6',
-                          color: mv.type === 'IN' ? '#15803d' : '#e11d48'
+                          display: 'inline-block',
+                          padding: '3px 9px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 800,
+                          letterSpacing: '0.02em',
+                          whiteSpace: 'nowrap',
+                          backgroundColor: mv.type === 'IN' ? '#dcfce7' : '#fee2e2',
+                          color: mv.type === 'IN' ? '#15803d' : '#b91c1c',
+                          border: `1px solid ${mv.type === 'IN' ? '#bbf7d0' : '#fca5a5'}`
                         }}>
                           {mv.type === 'IN' ? 'NHẬP KHO' : 'XUẤT KHO'}
                         </span>
                       </td>
-                      <td style={{ padding: '0.75rem 1rem', fontWeight: 700, color: '#2563eb' }}>{mv.reference}</td>
-                      <td style={{ padding: '0.75rem 1rem', fontWeight: 600, color: '#0f172a' }}>{mv.productName}</td>
-                      <td style={{ padding: '0.75rem 1rem', textAlign: 'center', fontWeight: 800, color: mv.type === 'IN' ? '#16a34a' : '#e11d48' }}>
+                      <td style={{ padding: '0.75rem 1rem', verticalAlign: 'middle', whiteSpace: 'nowrap', fontWeight: 700, color: '#2563eb' }}>
+                        {mv.reference}
+                      </td>
+                      <td style={{ padding: '0.75rem 1rem', verticalAlign: 'middle', fontWeight: 600, color: '#0f172a', lineHeight: 1.4 }}>
+                        {mv.productName}
+                      </td>
+                      <td style={{ padding: '0.75rem 1rem', textAlign: 'center', verticalAlign: 'middle', whiteSpace: 'nowrap', fontWeight: 800, fontSize: '0.88rem', color: mv.type === 'IN' ? '#16a34a' : '#dc2626' }}>
                         {mv.type === 'IN' ? `+${mv.quantity}` : `-${mv.quantity}`}
                       </td>
-                      <td style={{ padding: '0.75rem 1rem', color: '#475569' }}>{mv.actor || 'Thủ Kho'}</td>
-                      <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
+                      <td style={{ padding: '0.75rem 1rem', verticalAlign: 'middle', whiteSpace: 'nowrap', color: '#475569' }}>
+                        {mv.actor || 'Thủ Kho'}
+                      </td>
+                      <td style={{ padding: '0.75rem 1rem', textAlign: 'center', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
                         <button
                           type="button"
                           onClick={(e) => { e.stopPropagation(); setSelectedMovementLog(mv); }}
@@ -5335,10 +5350,11 @@ export default function Warehouse() {
                             color: '#2563eb',
                             border: '1px solid #cbd5e1',
                             borderRadius: '4px',
-                            padding: '0.3rem 0.65rem',
+                            padding: '0.35rem 0.75rem',
                             fontSize: '0.75rem',
                             fontWeight: 700,
-                            cursor: 'pointer'
+                            cursor: 'pointer',
+                            whiteSpace: 'nowrap'
                           }}
                         >
                           Xem Chi Tiết
