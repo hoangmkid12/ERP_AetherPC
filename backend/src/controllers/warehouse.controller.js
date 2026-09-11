@@ -98,6 +98,11 @@ const getReceiptById = async (req, res, next) => {
 
 // POST /api/v1/warehouse/receipts/:id/validate
 // Xác nhận nhập kho - cập nhật Inventory, StockMovement, Product.stockQuantity
+//
+// ⚠️ DUPLICATED LOGIC: purchase.controller.js's validateReceipt (same name,
+// POST /api/v1/purchasing/receipts/:receiptId/validate) reimplements this
+// exact same transaction. See the matching warning there — keep both in
+// sync until they're deliberately consolidated.
 const validateReceipt = async (req, res, next) => {
   try {
     const { id } = req.params;

@@ -486,7 +486,16 @@ export default function QualityControl() {
         qcNotes
       });
     } catch (err) {
-      console.warn('API sync warn:', err);
+      // Previously swallowed silently — the optimistic local update above already
+      // showed "Biên Bản QA/QC Đã Phát Hành" as if it succeeded, while the real
+      // PurchaseOrder.status in the DB stayed unchanged. Kho would then get a
+      // 409 from GRN validateReceipt with no visible reason, since QC's screen
+      // had already reported success. Surface the real error and resync from
+      // the server so the UI reflects the actual (failed) status.
+      notify(err?.message || 'Không thể lưu biên bản QA/QC lên hệ thống — vui lòng thử lại.', 'error');
+      fetchData();
+      setSubmitting(false);
+      return;
     }
 
     if (typeof sendSystemNotification === 'function') {

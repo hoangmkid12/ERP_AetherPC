@@ -421,7 +421,10 @@ const updatePurchaseOrderStatus = async (req, res, next) => {
     const { id } = req.params;
     const { status, itemPrices, reason, expectedDeliveryDate, supplierNote, passedQty, failedQty, sampleRate, qcNotes } = req.body;
 
-    const validStatuses = ['RFQ', 'RFQ_SENT', 'SENT', 'QUOTED', 'PO', 'APPROVED', 'CONFIRMED_BY_SUPPLIER', 'PENDING_QA', 'QA_PASSED', 'QA_PARTIAL', 'QA_REJECTED', 'RECEIVED', 'DONE', 'COMPLETED', 'CANCELLED'];
+    // 'APPROVED' and 'PENDING_QA' deliberately excluded: no code path ever sets
+    // a PO to either — approval goes straight to 'PO', and a PO sits in
+    // 'CONFIRMED_BY_SUPPLIER' until QC files QA_PASSED/QA_PARTIAL/QA_REJECTED.
+    const validStatuses = ['RFQ', 'RFQ_SENT', 'SENT', 'QUOTED', 'PO', 'CONFIRMED_BY_SUPPLIER', 'QA_PASSED', 'QA_PARTIAL', 'QA_REJECTED', 'RECEIVED', 'DONE', 'COMPLETED', 'CANCELLED'];
     if (!validStatuses.includes(status)) {
       return res.status(400).json({ success: false, message: `Invalid status: ${status}. Must be one of: ${validStatuses.join(', ')}` });
     }
@@ -470,12 +473,14 @@ const updatePurchaseOrderStatus = async (req, res, next) => {
           error.statusCode = 403;
           throw error;
         }
+        // Approval always sets status straight to 'PO' (never a literal 'APPROVED')
+        // — there is no code path that produces that status, so no transition
+        // out of it belongs here.
         const allowedTransitions = {
           RFQ: ['QUOTED', 'CANCELLED'],
           RFQ_SENT: ['QUOTED', 'CANCELLED'],
           SENT: ['QUOTED', 'CANCELLED'],
-          PO: ['CONFIRMED_BY_SUPPLIER'],
-          APPROVED: ['CONFIRMED_BY_SUPPLIER']
+          PO: ['CONFIRMED_BY_SUPPLIER']
         };
         if (!isNoOpResubmit && !allowedTransitions[po.status]?.includes(status)) {
           const error = new Error('Nhà cung cấp không thể chuyển đơn hàng sang trạng thái này.');
@@ -864,6 +869,18 @@ const registerPayment = async (req, res, next) => {
 };
 
 // POST /api/v1/purchasing/receipts/:receiptId/validate
+//
+// ⚠️ DUPLICATED LOGIC: warehouse.controller.js's validateReceipt (same name,
+// POST /api/v1/warehouse/receipts/:id/validate) reimplements this exact same
+// transaction (claim receipt, gate QA_PASSED/QA_PARTIAL, scale intake by
+// passRatio, require serials, update Inventory/StockMovement/Product cost,
+// mark PO DONE). They currently match behavior-for-behavior — any change to
+// the receiving rules here (passRatio formula, serial validation, PO
+// completion check) MUST be mirrored there too, or the two routes will
+// silently diverge. Not consolidated into one shared function yet because
+// each returns a different response shape to a different screen
+// (Purchasing.jsx vs Warehouse.jsx) — do that consolidation deliberately,
+// with both consumers checked, rather than as a drive-by edit.
 const validateReceipt = async (req, res, next) => {
   try {
     const { receiptId } = req.params;
