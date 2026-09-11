@@ -215,6 +215,29 @@ const BRAND = {
 
 const money = (n) => Number(n || 0).toLocaleString('vi-VN') + ' đ';
 const escapeHtml = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+/**
+ * Định dạng ngày giờ chuẩn giờ Việt Nam (GMT+7, Asia/Ho_Chi_Minh)
+ * Đảm bảo hiển thị chính xác giờ Việt Nam trên mọi server deploy (Railway, Docker, AWS...)
+ */
+const formatVietnamDateTime = (date = new Date()) => {
+  try {
+    const d = (date instanceof Date) ? date : new Date(date);
+    if (isNaN(d.getTime())) return new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
+    return d.toLocaleString('vi-VN', {
+      timeZone: 'Asia/Ho_Chi_Minh',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour12: false
+    });
+  } catch (err) {
+    return new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
+  }
+};
 // Product.primaryImage on admin-uploaded items is a relative backend path
 // (e.g. "/api/uploads/products/xxx.jpg") — that resolves against nothing (or
 // the mail client's own origin) inside an email and shows as a broken image.
@@ -448,7 +471,7 @@ const sendOrderConfirmationEmail = async ({ toEmail, customerName, orderId, item
       <div style="font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; color: #0f172a; margin-bottom: 10px; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px;">Thông Tin Đơn Hàng</div>
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size: 13px;">
         <tr><td style="color: #64748b; padding: 4px 0; width: 42%;">Mã đơn hàng:</td><td style="font-weight: 700; color: #0f172a; text-align: right;">#${escapeHtml(orderId)}</td></tr>
-        <tr><td style="color: #64748b; padding: 4px 0;">Thời gian:</td><td style="font-weight: 600; color: #334155; text-align: right;">${new Date().toLocaleString('vi-VN')}</td></tr>
+        <tr><td style="color: #64748b; padding: 4px 0;">Thời gian:</td><td style="font-weight: 600; color: #334155; text-align: right;">${formatVietnamDateTime(new Date())}</td></tr>
         <tr><td style="color: #64748b; padding: 4px 0;">Hình thức thanh toán:</td><td style="font-weight: 700; color: #0f172a; text-align: right;">${paymentMethod === 'BANK_TRANSFER' ? 'Chuyển khoản VietQR' : 'COD (Tiền mặt khi nhận hàng)'}</td></tr>
         <tr><td style="color: #64748b; padding: 4px 0; vertical-align: top;">Địa chỉ giao hàng:</td><td style="font-weight: 600; color: #0f172a; text-align: right; word-break: break-word;">${escapeHtml(shippingAddress || 'TP. Hồ Chí Minh')}</td></tr>
       </table>
@@ -509,16 +532,25 @@ const sendOrderStatusUpdateEmail = async ({ toEmail, customerName, orderId, stat
   const isException = getStepIndex(status) === -1;
 
   const rawProofPhoto = proofPhoto || proofUrl || null;
-  // Gmail chặn <img src="data:..."> nên ảnh base64 phải đính kèm dạng CID attachment.
-  const isBase64Proof = rawProofPhoto && rawProofPhoto.startsWith('data:');
-  const activeProofPhoto = isBase64Proof ? 'cid:proofimage' : rawProofPhoto;
-  const deliveryTimestamp = deliveredTime || new Date().toLocaleString('vi-VN');
+  const hasProof = Boolean(rawProofPhoto);
 
-  const proofSectionHtml = (isDelivered && activeProofPhoto) ? `
+  // Link ảnh minh chứng công khai HTTPS để Gmail / webmail load qua Google Image Proxy
+  const publicProofUrl = `${BRAND.siteUrl}/api/v1/orders/${encodeURIComponent(orderId)}/proof-photo`;
+  // Nếu rawProofPhoto là URL ngoài (https://...) thì dùng trực tiếp, nếu là base64 thì dùng public endpoint
+  const activeProofPhoto = (rawProofPhoto && /^https?:\/\//i.test(rawProofPhoto)) ? rawProofPhoto : publicProofUrl;
+  const isBase64Proof = rawProofPhoto && rawProofPhoto.startsWith('data:');
+
+  // Ngày giờ giao hàng chuẩn giờ Việt Nam GMT+7
+  const deliveryTimestamp = formatVietnamDateTime(deliveredTime || new Date());
+
+  const proofSectionHtml = (isDelivered && hasProof) ? `
     <div style="background-color: #f0fdf4; border: 1.5px solid #a7f3d0; border-radius: 12px; padding: 18px; margin-bottom: 20px;">
       <div style="font-size: 12px; font-weight: 900; color: #166534; text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 12px; border-bottom: 1px dashed #6ee7b7; padding-bottom: 8px;">📸 Minh Chứng Giao Hàng Thành Công</div>
-      <div style="text-align: center; margin-bottom: 14px; background: #ffffff; padding: 10px; border-radius: 10px; border: 1px solid #cbd5e1;">
-        <img src="${activeProofPhoto}" alt="Minh chứng giao hàng #${escapeHtml(orderId)}" style="max-width: 100%; max-height: 280px; border-radius: 8px; object-fit: contain; display: block; margin: 0 auto;">
+      <div style="text-align: center; margin-bottom: 14px; background: #ffffff; padding: 12px; border-radius: 10px; border: 1px solid #cbd5e1;">
+        <a href="${activeProofPhoto}" target="_blank" style="text-decoration: none; display: block;">
+          <img src="${activeProofPhoto}" alt="Minh chứng giao hàng #${escapeHtml(orderId)}" style="max-width: 100%; max-height: 320px; border-radius: 8px; object-fit: contain; display: block; margin: 0 auto; border: 1px solid #e2e8f0;">
+        </a>
+        <div style="font-size: 11px; color: #2563eb; margin-top: 8px; font-weight: 700;">🔍 Nhấp vào ảnh để xem kích thước gốc</div>
       </div>
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size: 13px; background: #ffffff; border-radius: 8px; border: 1px solid #d1fae5;">
         <tr><td style="padding: 8px 12px; color: #64748b; font-weight: 600; width: 42%; border-bottom: 1px solid #f1f5f9;">🕒 Thời gian giao:</td><td style="padding: 8px 12px; color: #0f172a; font-weight: 700; text-align: right; border-bottom: 1px solid #f1f5f9;">${escapeHtml(deliveryTimestamp)}</td></tr>
@@ -571,12 +603,11 @@ const sendOrderStatusUpdateEmail = async ({ toEmail, customerName, orderId, stat
     if (isDelivered && isBase64Proof && rawProofPhoto) {
       const matches = rawProofPhoto.match(/^data:image\/(\w+);base64,(.+)$/);
       if (matches) {
-        const ext = matches[1];
+        const ext = matches[1].toLowerCase() === 'jpg' ? 'jpeg' : matches[1].toLowerCase();
         const base64Data = matches[2];
         attachments.push({
           filename: `proof_delivery_${orderId}.${ext}`,
           content: Buffer.from(base64Data, 'base64'),
-          cid: 'proofimage',
           contentType: `image/${ext}`
         });
       }

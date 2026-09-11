@@ -65,6 +65,38 @@ router.patch('/:id/return/receive', authMiddleware(['WAREHOUSE', 'WAREHOUSE_MANA
 router.patch('/returns/:id/refund', authMiddleware(['ACCOUNTANT', 'CEO', 'ADMIN']), processRefund);
 router.post('/:id/return/refund', authMiddleware(['ACCOUNTANT', 'CEO', 'ADMIN']), processRefund);
 
+// @route   GET /api/v1/orders/:id/proof-photo
+// @desc    Lấy ảnh minh chứng giao hàng (Công khai để email client như Gmail tải hiển thị)
+router.get('/:id/proof-photo', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const prisma = require('../config/database');
+    const order = await prisma.order.findUnique({
+      where: { orderId: id },
+      select: { proofPhoto: true, paymentProofPhoto: true }
+    });
+    const photo = order?.proofPhoto || order?.paymentProofPhoto;
+    if (!photo) {
+      return res.status(404).send('Không tìm thấy ảnh minh chứng giao hàng.');
+    }
+    const raw = photo.trim();
+    if (raw.startsWith('http://') || raw.startsWith('https://')) {
+      return res.redirect(raw);
+    }
+    const matches = raw.match(/^data:image\/(\w+);base64,(.+)$/);
+    if (matches) {
+      const ext = matches[1].toLowerCase() === 'jpg' ? 'jpeg' : matches[1].toLowerCase();
+      const imgBuffer = Buffer.from(matches[2], 'base64');
+      res.set('Content-Type', `image/${ext}`);
+      res.set('Cache-Control', 'public, max-age=604800, immutable');
+      return res.send(imgBuffer);
+    }
+    return res.status(400).send('Định dạng ảnh không hợp lệ.');
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
+});
+
 // @route   GET /api/v1/orders/email-logs
 // @desc    Xem nhật ký email gửi đơn hàng (CEO / Admin / CSKH)
 router.get('/email-logs', authMiddleware(['CEO', 'ADMIN', 'CSKH', 'SALES_MANAGER']), (req, res) => {

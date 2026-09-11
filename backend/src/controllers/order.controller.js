@@ -717,8 +717,9 @@ const updateOrderStatus = async (req, res, next) => {
         discount: updatedOrderFull.discount,
         shippingFee: updatedOrderFull.shippingFee,
         totalAmount: updatedOrderFull.totalAmount,
-        proofPhoto: req.body.proofPhoto || req.body.proofUrl || null,
-        receiverNote: req.body.receiverNote || null
+        proofPhoto: req.body.proofPhoto || req.body.proofUrl || updatedOrderFull.proofPhoto || null,
+        receiverNote: req.body.receiverNote || updatedOrderFull.receiverNote || null,
+        deliveredTime: updatedOrderFull.deliveredAt || new Date()
       }).catch(err => console.warn('[Email] Lỗi gửi email cập nhật trạng thái:', err.message));
     }
 
