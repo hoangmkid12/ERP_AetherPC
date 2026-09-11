@@ -418,7 +418,7 @@ const renderFinancials = ({ subtotal, shippingFee, discount, totalAmount }) => {
   if (subtotal !== undefined && subtotal !== null) {
     rows.push(`<tr><td style="color: #64748b; padding: 4px 0;">Tạm tính linh kiện:</td><td style="font-weight: 600; color: #334155; text-align: right;">${money(subVal)}</td></tr>`);
   }
-  rows.push(`<tr><td style="color: #64748b; padding: 4px 0;">Phí vận chuyển:</td><td style="font-weight: 700; color: ${shipVal > 0 ? '#0f172a' : '#16a34a'}; text-align: right;">${shipVal > 0 ? `+${money(shipVal)}` : 'Miễn phí (0 đ)'}</td></tr>`);
+  rows.push(`<tr><td style="color: #64748b; padding: 4px 0;">Phí vận chuyển:</td><td style="font-weight: 700; color: #16a34a; text-align: right;">Miễn phí (0 đ)</td></tr>`);
   if (discVal > 0) {
     rows.push(`<tr><td style="color: #64748b; padding: 4px 0;">Giảm giá / Voucher:</td><td style="font-weight: 700; color: #16a34a; text-align: right;">-${money(discVal)}</td></tr>`);
   }

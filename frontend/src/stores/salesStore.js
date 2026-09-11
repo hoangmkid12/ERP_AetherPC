@@ -179,9 +179,9 @@ export const useSalesStore = create((set, get) => ({
     const dateStr = new Date().toLocaleDateString('vi-VN');
     const newOrderId = `ORD-${Math.floor(100000 + Math.random() * 900000)}`;
     const subtotalCalc = items.reduce((sum, item) => sum + ((item.price || 0) * (item.quantity || 1)), 0);
-    const shippingFee = options.shippingFee !== undefined ? Number(options.shippingFee) : 0;
+    const shippingFee = 0; // Miễn phí vận chuyển toàn bộ
     const discount = options.discount !== undefined ? Number(options.discount) : 0;
-    const totalAmount = customTotal !== null ? customTotal : Math.max(0, subtotalCalc + shippingFee - discount);
+    const totalAmount = customTotal !== null ? customTotal : Math.max(0, subtotalCalc - discount);
 
     let orderStatus = 'PENDING';
     

@@ -1021,8 +1021,8 @@ export default function MyOrders() {
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                               <span>Phí vận chuyển:</span>
-                              <span style={{ color: Number(selectedOrder.shippingFee || 0) > 0 ? '#0f172a' : '#16a34a', fontWeight: 600 }}>
-                                {Number(selectedOrder.shippingFee || 0) > 0 ? `+${formatPrice(selectedOrder.shippingFee)}` : 'Miễn phí (0 ₫)'}
+                              <span style={{ color: '#16a34a', fontWeight: 600 }}>
+                                Miễn phí (0 ₫)
                               </span>
                             </div>
                             {Number(selectedOrder.discount || 0) > 0 && (

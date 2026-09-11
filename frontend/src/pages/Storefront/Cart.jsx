@@ -460,9 +460,8 @@ export default function Cart() {
     return p.includes('ho chi minh') || p.includes('ha noi');
   };
 
-  // Shipping calculation (Free shipping for Hà Nội & TP.HCM or FREESHIP coupon, otherwise 30.000đ)
-  const isFreeShipEligible = (selectedProvince && isFreeShipCity(selectedProvince)) || activeCoupon?.code === 'FREESHIP';
-  const shippingFee = selectedCartItems.length > 0 ? (isFreeShipEligible ? 0 : 30000) : 0;
+  // Shipping calculation: 100% Miễn phí vận chuyển toàn quốc cho mọi đơn hàng
+  const shippingFee = 0;
 
   const handleApplyCoupon = (e) => {
     e.preventDefault();

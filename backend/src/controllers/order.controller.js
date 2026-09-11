@@ -125,23 +125,9 @@ const createOrder = async (req, res, next) => {
       const orderDiscount = memberDiscount + couponDiscount;
       const discountedSubtotal = Math.max(0, subtotal - orderDiscount);
 
-      // Phí vận chuyển: Đồng bộ chính xác với chính sách Storefront
-      // Miễn phí khi:
-      // 1. Địa chỉ nhận hàng tại Hà Nội hoặc TP. Hồ Chí Minh
-      // 2. Hoặc giá trị đơn hàng sau chiết khấu >= 5.000.000 VNĐ
-      // 3. Hoặc có mã FREESHIP / frontend truyền shippingFee = 0
-      const fullAddressStr = `${shippingAddress || ''} ${shippingCity || ''}`.toLowerCase();
-      const isFreeShipRegion = fullAddressStr.includes('hà nội') || fullAddressStr.includes('ha noi') ||
-                               fullAddressStr.includes('hồ chí minh') || fullAddressStr.includes('ho chi minh') ||
-                               fullAddressStr.includes('tphcm') || fullAddressStr.includes('tp hcm');
-
-      let shippingFee = 30000;
-      if (req.body.shippingFee !== undefined && req.body.shippingFee !== null) {
-        shippingFee = Math.max(0, parseInt(req.body.shippingFee) || 0);
-      } else if (discountedSubtotal >= 5000000 || isFreeShipRegion || req.body.couponCode === 'FREESHIP') {
-        shippingFee = 0;
-      }
-      const totalAmount = discountedSubtotal + shippingFee;
+      // Phí vận chuyển: Miễn phí vận chuyển 100% toàn quốc cho toàn bộ đơn hàng
+      const shippingFee = 0;
+      const totalAmount = discountedSubtotal;
 
       // Sinh mã đơn hàng dạng ORD-YYMMDD-XXXX
       const dateStr = new Date().toISOString().slice(2, 10).replace(/-/g, '');
