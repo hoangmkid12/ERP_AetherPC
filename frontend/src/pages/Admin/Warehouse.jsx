@@ -322,6 +322,270 @@ const isDateInRange = (dateVal, startDate, endDate) => {
   return true;
 };
 
+// ──── Sub-Component: Location Products Detail Modal ────
+function LocationProductsModal({ location, onClose, safeFormatPrice, activeInventory }) {
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+
+  useEffect(() => {
+    if (!location) return;
+    let isMounted = true;
+    setLoading(true);
+
+    const locCode = `${location.zone}-${location.shelf}-${location.bin}`.toUpperCase();
+
+    // 1. Initial fallback from activeInventory
+    const localMatches = (activeInventory || []).filter(item => {
+      const itemLoc = String(item.location || '').toUpperCase();
+      return itemLoc.includes(locCode) || itemLoc.includes(location.zone?.toUpperCase());
+    }).map(item => ({
+      productId: item.id || item.productId,
+      productName: item.name || item.productName || 'Linh Kiện',
+      sku: item.sku || item.id,
+      category: item.category || '',
+      price: item.price || 0,
+      stock: item.stock || 0,
+      reserved: item.reserved || 0,
+      available: Math.max(0, (item.stock || 0) - (item.reserved || 0)),
+      image: item.image || null
+    }));
+
+    // 2. Fetch authoritative list from backend
+    api.get(`/warehouse/locations/${location.id}/products`)
+      .then(res => {
+        if (isMounted) {
+          const items = res?.data?.items || [];
+          if (items.length > 0) {
+            setProducts(items);
+          } else if (localMatches.length > 0) {
+            setProducts(localMatches);
+          } else {
+            setProducts([]);
+          }
+        }
+      })
+      .catch(err => {
+        console.warn('Could not fetch location products from server, using local data:', err);
+        if (isMounted) {
+          setProducts(localMatches);
+        }
+      })
+      .finally(() => {
+        if (isMounted) setLoading(false);
+      });
+
+    return () => { isMounted = false; };
+  }, [location, activeInventory]);
+
+  if (!location) return null;
+
+  const filtered = products.filter(p => {
+    if (!searchTerm.trim()) return true;
+    const term = searchTerm.toLowerCase();
+    return (p.productName || '').toLowerCase().includes(term) ||
+           (p.sku || '').toLowerCase().includes(term) ||
+           (p.productId || '').toLowerCase().includes(term) ||
+           (p.category || '').toLowerCase().includes(term);
+  });
+
+  const totalQty = products.reduce((sum, p) => sum + (Number(p.stock) || 0), 0);
+
+  return (
+    <div style={{
+      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+      backgroundColor: 'rgba(15, 23, 42, 0.65)',
+      backdropFilter: 'blur(4px)',
+      zIndex: 10000,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      padding: '1rem'
+    }}
+      onClick={onClose}
+    >
+      <div style={{
+        backgroundColor: '#ffffff',
+        borderRadius: '12px',
+        maxWidth: '860px',
+        width: '100%',
+        maxHeight: '90vh',
+        boxShadow: '0 20px 45px rgba(0, 0, 0, 0.25)',
+        border: '1px solid #cbd5e1',
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden'
+      }}
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Modal Header */}
+        <div style={{
+          padding: '1.25rem 1.5rem',
+          backgroundColor: '#f8fafc',
+          borderBottom: '1px solid #e2e8f0',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          gap: '1rem', flexWrap: 'wrap'
+        }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+              <span style={{
+                backgroundColor: '#eff6ff',
+                color: '#2563eb',
+                border: '1px solid #bfdbfe',
+                borderRadius: '6px',
+                padding: '0.25rem 0.65rem',
+                fontSize: '0.85rem',
+                fontWeight: 800
+              }}>
+                {location.zone}-{location.shelf}-{location.bin}
+              </span>
+              <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#0f172a' }}>
+                Danh Sách Sản Phẩm Trong Kệ
+              </h3>
+            </div>
+            <p style={{ margin: '0.35rem 0 0 0', fontSize: '0.8rem', color: '#64748b' }}>
+              Thuộc kho: <strong style={{ color: '#0f172a' }}>{location.warehouse?.name || 'Kho Tổng TP.HCM'}</strong> · Sức chứa thiết kế: <strong>{location.capacity || 100}</strong> · Đã gán: <strong style={{ color: '#2563eb' }}>{products.length}</strong> sản phẩm ({totalQty} đơn vị tồn)
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              backgroundColor: '#ffffff',
+              border: '1px solid #cbd5e1',
+              borderRadius: '6px',
+              padding: '0.35rem 0.75rem',
+              fontSize: '0.8rem',
+              fontWeight: 700,
+              color: '#475569',
+              cursor: 'pointer'
+            }}
+          >
+            Đóng
+          </button>
+        </div>
+
+        {/* Modal Search Toolbar */}
+        <div style={{ padding: '0.85rem 1.5rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#ffffff', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem' }}>
+          <input
+            type="text"
+            placeholder="Tìm sản phẩm theo tên, mã SKU, phân loại..."
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+            style={{
+              flex: 1,
+              padding: '0.5rem 0.85rem',
+              fontSize: '0.83rem',
+              border: '1px solid #cbd5e1',
+              borderRadius: '6px'
+            }}
+          />
+          <div style={{ fontSize: '0.8rem', color: '#64748b', whiteSpace: 'nowrap' }}>
+            Hiển thị <strong>{filtered.length}</strong> / {products.length} mặt hàng
+          </div>
+        </div>
+
+        {/* Modal Table Content */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '0' }}>
+          {loading ? (
+            <div style={{ padding: '3.5rem 1rem', textAlign: 'center', color: '#64748b' }}>
+              <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>Đang tải danh sách sản phẩm...</div>
+            </div>
+          ) : filtered.length === 0 ? (
+            <div style={{ padding: '3.5rem 1rem', textAlign: 'center', color: '#64748b' }}>
+              <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#0f172a' }}>
+                {searchTerm ? 'Không tìm thấy sản phẩm phù hợp với từ khóa.' : 'Kệ này hiện chưa có sản phẩm nào.'}
+              </div>
+              <div style={{ fontSize: '0.8rem', marginTop: '0.25rem' }}>
+                Sản phẩm sẽ được xếp vào kệ này khi nhập kho (GRN) hoặc điều chuyển kho.
+              </div>
+            </div>
+          ) : (
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+              <thead>
+                <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569' }}>
+                  <th style={{ padding: '0.65rem 1rem', width: '50px', textAlign: 'center' }}>#</th>
+                  <th style={{ padding: '0.65rem 1rem', width: '130px' }}>Mã SP / SKU</th>
+                  <th style={{ padding: '0.65rem 1rem' }}>Tên Sản Phẩm</th>
+                  <th style={{ padding: '0.65rem 1rem', width: '110px' }}>Phân Loại</th>
+                  <th style={{ padding: '0.65rem 1rem', width: '90px', textAlign: 'center' }}>Tồn Kho</th>
+                  <th style={{ padding: '0.65rem 1rem', width: '90px', textAlign: 'center' }}>Khả Dụng</th>
+                  <th style={{ padding: '0.65rem 1rem', width: '120px', textAlign: 'right' }}>Đơn Giá</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((prod, pIdx) => (
+                  <tr key={pIdx} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                    <td style={{ padding: '0.65rem 1rem', textAlign: 'center', color: '#94a3b8', fontSize: '0.78rem' }}>
+                      {pIdx + 1}
+                    </td>
+                    <td style={{ padding: '0.65rem 1rem', fontWeight: 700, color: '#2563eb', fontSize: '0.8rem' }}>
+                      {prod.sku || prod.productId}
+                    </td>
+                    <td style={{ padding: '0.65rem 1rem', fontWeight: 600, color: '#0f172a', lineHeight: 1.35 }}>
+                      {prod.productName}
+                    </td>
+                    <td style={{ padding: '0.65rem 1rem', color: '#64748b' }}>
+                      <span style={{
+                        padding: '2px 7px',
+                        borderRadius: '4px',
+                        fontSize: '0.72rem',
+                        fontWeight: 600,
+                        backgroundColor: '#f1f5f9',
+                        color: '#475569'
+                      }}>
+                        {prod.category || 'Linh Kiện'}
+                      </span>
+                    </td>
+                    <td style={{ padding: '0.65rem 1rem', textAlign: 'center', fontWeight: 800, color: '#0f172a' }}>
+                      {prod.stock}
+                    </td>
+                    <td style={{ padding: '0.65rem 1rem', textAlign: 'center', fontWeight: 800, color: '#16a34a' }}>
+                      {prod.available}
+                    </td>
+                    <td style={{ padding: '0.65rem 1rem', textAlign: 'right', fontWeight: 700, color: '#0f172a' }}>
+                      {safeFormatPrice(prod.price)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        {/* Modal Footer */}
+        <div style={{
+          padding: '0.85rem 1.5rem',
+          backgroundColor: '#f8fafc',
+          borderTop: '1px solid #e2e8f0',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
+        }}>
+          <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
+            Tổng số lượng đang có trên kệ: <strong style={{ color: '#0f172a' }}>{totalQty}</strong> đơn vị
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              backgroundColor: '#2563eb',
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: '6px',
+              padding: '0.45rem 1.1rem',
+              fontSize: '0.8rem',
+              fontWeight: 700,
+              cursor: 'pointer'
+            }}
+          >
+            Đóng
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ──── Sub-Component: Stock Movement Detail Modal ────
 function MovementDetailModal({ movement, onClose, formatDateTime }) {
   if (!movement) return null;
@@ -1740,6 +2004,7 @@ export default function Warehouse() {
   const [loadingLocations, setLoadingLocations] = useState(false);
   const [showCreateLocationForm, setShowCreateLocationForm] = useState(false);
   const [locationForm, setLocationForm] = useState({ warehouseId: '1', zone: '', shelf: '', bin: '', capacity: '100' });
+  const [viewingLocationProducts, setViewingLocationProducts] = useState(null);
 
   const loadWarehouseLocations = async () => {
     setLoadingLocations(true);
@@ -5472,15 +5737,49 @@ export default function Warehouse() {
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1.25rem' }}>
               {warehouseLocations.map(loc => (
-                <div key={loc.id} style={{ backgroundColor: '#ffffff', padding: '1.25rem', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
+                <div key={loc.id}
+                  onClick={() => setViewingLocationProducts(loc)}
+                  style={{
+                    backgroundColor: '#ffffff',
+                    padding: '1.25rem',
+                    borderRadius: '8px',
+                    border: '1px solid #cbd5e1',
+                    cursor: 'pointer',
+                    transition: 'all 0.18s ease',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = '#93c5fd';
+                    e.currentTarget.style.boxShadow = '0 6px 16px rgba(37,99,235,0.12)';
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = '#cbd5e1';
+                    e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.04)';
+                    e.currentTarget.style.transform = 'none';
+                  }}
+                >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <div>
-                      <h4 style={{ margin: '0 0 0.2rem 0', color: '#2563eb', fontSize: '1rem', fontWeight: 800 }}>{loc.zone}-{loc.shelf}-{loc.bin}</h4>
-                      <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>{loc.warehouse?.name}</span>
+                      <h4
+                        title="Nhấn để xem danh sách sản phẩm trong kệ"
+                        style={{
+                          margin: '0 0 0.2rem 0',
+                          color: '#2563eb',
+                          fontSize: '1rem',
+                          fontWeight: 800,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.35rem'
+                        }}
+                      >
+                        <span>{loc.zone}-{loc.shelf}-{loc.bin}</span>
+                      </h4>
+                      <div style={{ fontSize: '0.72rem', color: '#64748b' }}>{loc.warehouse?.name}</div>
                     </div>
                     {canManageLocations && (
                       <button
-                        onClick={() => handleDeleteLocation(loc)}
+                        onClick={(e) => { e.stopPropagation(); handleDeleteLocation(loc); }}
                         title="Xóa vị trí (chỉ khi chưa gán hàng)"
                         style={{ backgroundColor: '#fff', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '4px', padding: '0.3rem 0.5rem', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}
                       >
@@ -5488,9 +5787,14 @@ export default function Warehouse() {
                       </button>
                     )}
                   </div>
-                  <p style={{ margin: '0.75rem 0 0 0', fontSize: '0.82rem', color: '#64748b' }}>
-                    Đã gán: <strong style={{ color: '#0f172a' }}>{loc.assignedCount}</strong> / {loc.capacity} sức chứa
-                  </p>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.75rem', borderTop: '1px dashed #f1f5f9', paddingTop: '0.65rem' }}>
+                    <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748b' }}>
+                      Đã gán: <strong style={{ color: '#0f172a' }}>{loc.assignedCount}</strong> / {loc.capacity} sức chứa
+                    </p>
+                    <span style={{ fontSize: '0.75rem', color: '#2563eb', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
+                      Xem hàng &rarr;
+                    </span>
+                  </div>
                 </div>
               ))}
               {warehouseLocations.length === 0 && (
@@ -5604,6 +5908,16 @@ export default function Warehouse() {
       )}
 
       {/* ──── MODALS ──── */}
+
+      {/* Location Products Detail Modal */}
+      {viewingLocationProducts && (
+        <LocationProductsModal
+          location={viewingLocationProducts}
+          onClose={() => setViewingLocationProducts(null)}
+          safeFormatPrice={safeFormatPrice}
+          activeInventory={activeInventory}
+        />
+      )}
 
       {/* Stock Movement Log Detail Modal */}
       {selectedMovementLog && (

@@ -794,6 +794,63 @@ const assignInventoryLocation = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+// GET /api/v1/warehouse/locations/:id/products — xem danh sách sản phẩm trong kệ
+const getLocationProducts = async (req, res, next) => {
+  try {
+    const locId = parseInt(req.params.id, 10);
+    if (!Number.isInteger(locId)) {
+      return res.status(400).json({ success: false, message: 'ID vị trí không hợp lệ.' });
+    }
+    const location = await prisma.warehouseLocation.findUnique({
+      where: { id: locId },
+      include: { warehouse: { select: { id: true, name: true } } }
+    });
+    if (!location) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy vị trí kệ này.' });
+    }
+
+    const inventories = await prisma.inventory.findMany({
+      where: { locationId: locId },
+      include: {
+        product: {
+          select: {
+            productId: true,
+            productName: true,
+            sku: true,
+            sellingPrice: true,
+            costPrice: true,
+            imageUrl: true,
+            category: { select: { name: true, slug: true } }
+          }
+        }
+      },
+      orderBy: { product: { productName: 'asc' } }
+    });
+
+    res.json({
+      success: true,
+      data: {
+        location: {
+          ...location,
+          code: `${location.zone}-${location.shelf}-${location.bin}`,
+          warehouseName: location.warehouse?.name
+        },
+        items: inventories.map(inv => ({
+          productId: inv.productId,
+          productName: inv.product?.productName || 'Linh Kiện',
+          sku: inv.product?.sku || inv.productId,
+          category: inv.product?.category?.name || '',
+          price: Number(inv.product?.sellingPrice) || Number(inv.product?.costPrice) || 0,
+          quantityOnHand: inv.quantityOnHand,
+          quantityReserved: inv.quantityReserved,
+          availableQuantity: Math.max(0, inv.quantityOnHand - inv.quantityReserved),
+          imageUrl: inv.product?.imageUrl || null
+        }))
+      }
+    });
+  } catch (err) { next(err); }
+};
+
 module.exports = {
   getReceipts,
   getReceiptById,
@@ -807,6 +864,7 @@ module.exports = {
   approvePurchaseRequest,
   rejectPurchaseRequest,
   listWarehouseLocations,
+  getLocationProducts,
   createWarehouseLocation,
   updateWarehouseLocation,
   deleteWarehouseLocation,

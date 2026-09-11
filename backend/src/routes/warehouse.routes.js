@@ -15,6 +15,7 @@ const {
   approvePurchaseRequest,
   rejectPurchaseRequest,
   listWarehouseLocations,
+  getLocationProducts,
   createWarehouseLocation,
   updateWarehouseLocation,
   deleteWarehouseLocation,
@@ -74,6 +75,9 @@ router.patch('/purchase-requests/:id/reject', authMiddleware(WAREHOUSE_MANAGER_R
 
 // @route   GET /api/v1/warehouse/locations
 router.get('/locations', authMiddleware(WAREHOUSE_ROLES), listWarehouseLocations);
+
+// @route   GET /api/v1/warehouse/locations/:id/products
+router.get('/locations/:id/products', authMiddleware(WAREHOUSE_ROLES), getLocationProducts);
 
 // @route   POST /api/v1/warehouse/locations
 // @desc    Quản Lý Kho tạo vị trí kệ mới (warehouse_manage_locations)
