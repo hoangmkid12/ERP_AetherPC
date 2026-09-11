@@ -52,18 +52,33 @@ const STORAGE_KEYS = {
 // which was blowing out that column's width.
 const CATEGORY_SLUG_TO_CODE = {
   cpu: 'CPU',
+  'bo-vi-xu-ly': 'CPU',
   gpu: 'VGA',
+  'card-man-hinh': 'VGA',
   ram: 'RAM',
+  'ram-pc': 'RAM',
+  'bo-nho-ram-pc': 'RAM',
   ram_laptop: 'RAM',
+  'ram-laptop': 'RAM',
+  'bo-nho-ram-laptop': 'RAM',
   ssd: 'STORAGE',
+  'o-cung-ssd': 'STORAGE',
   hdd: 'STORAGE',
+  'o-cung-hdd': 'STORAGE',
   mainboard: 'MAINBOARD',
+  'bo-mach-chu': 'MAINBOARD',
   case: 'CASE',
+  'vo-may-tinh': 'CASE',
   psu: 'PSU',
+  'nguon-may-tinh': 'PSU',
   cooler: 'COOLER',
+  'tan-nhiet': 'COOLER',
   monitor: 'MONITOR',
+  'man-hinh': 'MONITOR',
   keyboard: 'KEYBOARD',
+  'ban-phim': 'KEYBOARD',
   mouse: 'MOUSE',
+  'chuot-may-tinh': 'MOUSE',
 };
 
 // createProduct/updateProduct accept a plain object as before for every existing

@@ -1901,11 +1901,55 @@ export default function Warehouse() {
   const [newCategoryName, setNewCategoryName] = useState('');
 
 
+  const VIETNAMESE_CATEGORY_MAP = {
+    'case': { name: 'Vỏ Máy Tính', slug: 'vo-may-tinh' },
+    'vo-may-tinh': { name: 'Vỏ Máy Tính', slug: 'vo-may-tinh' },
+    'cooler': { name: 'Tản Nhiệt', slug: 'tan-nhiet' },
+    'tan-nhiet': { name: 'Tản Nhiệt', slug: 'tan-nhiet' },
+    'cpu': { name: 'Bộ Vi Xử Lý', slug: 'bo-vi-xu-ly' },
+    'bo-vi-xu-ly': { name: 'Bộ Vi Xử Lý', slug: 'bo-vi-xu-ly' },
+    'gpu': { name: 'Card Màn Hình', slug: 'card-man-hinh' },
+    'card-man-hinh': { name: 'Card Màn Hình', slug: 'card-man-hinh' },
+    'vga': { name: 'Card Màn Hình', slug: 'card-man-hinh' },
+    'hdd': { name: 'Ổ Cứng HDD', slug: 'o-cung-hdd' },
+    'o-cung-hdd': { name: 'Ổ Cứng HDD', slug: 'o-cung-hdd' },
+    'o-cung-co': { name: 'Ổ Cứng HDD', slug: 'o-cung-hdd' },
+    'keyboard': { name: 'Bàn Phím', slug: 'ban-phim' },
+    'ban-phim': { name: 'Bàn Phím', slug: 'ban-phim' },
+    'mainboard': { name: 'Bo Mạch Chủ', slug: 'bo-mach-chu' },
+    'bo-mach-chu': { name: 'Bo Mạch Chủ', slug: 'bo-mach-chu' },
+    'monitor': { name: 'Màn Hình', slug: 'man-hinh' },
+    'man-hinh': { name: 'Màn Hình', slug: 'man-hinh' },
+    'mouse': { name: 'Chuột Máy Tính', slug: 'chuot-may-tinh' },
+    'chuot-may-tinh': { name: 'Chuột Máy Tính', slug: 'chuot-may-tinh' },
+    'psu': { name: 'Nguồn Máy Tính', slug: 'nguon-may-tinh' },
+    'nguon-may-tinh': { name: 'Nguồn Máy Tính', slug: 'nguon-may-tinh' },
+    'ram': { name: 'RAM PC', slug: 'ram-pc' },
+    'ram-pc': { name: 'RAM PC', slug: 'ram-pc' },
+    'ram_laptop': { name: 'RAM Laptop', slug: 'ram-laptop' },
+    'ram-laptop': { name: 'RAM Laptop', slug: 'ram-laptop' },
+    'ssd': { name: 'Ổ Cứng SSD', slug: 'o-cung-ssd' },
+    'o-cung-ssd': { name: 'Ổ Cứng SSD', slug: 'o-cung-ssd' },
+  };
+
+  const normalizeCategory = (cat) => {
+    const slugKey = String(cat?.slug || '').toLowerCase().trim();
+    const mapped = VIETNAMESE_CATEGORY_MAP[slugKey];
+    let name = mapped?.name || cat?.name || '';
+    if (name.includes(' - ')) {
+      const parts = name.split(' - ');
+      name = parts[parts.length - 1].trim();
+    }
+    const slug = mapped?.slug || cat?.slug || '';
+    return { ...cat, name, slug };
+  };
+
   const loadCategories = async () => {
     setLoadingCategories(true);
     try {
       const res = await api.get('/categories');
-      setRealCategories(res.data || []);
+      const raw = res.data || [];
+      setRealCategories(raw.map(normalizeCategory));
     } catch (err) {
       notify(err?.message || 'Không thể tải danh sách danh mục.', 'error');
     } finally {
@@ -2965,17 +3009,47 @@ export default function Warehouse() {
   const pendingDeliveriesCount = orders.filter(o => PENDING_DELIVERY_STATUSES.includes(o.status)).length;
 
   const CAT_ALIASES = {
-    'CPU': ['CPU', 'PROCESSOR', 'BỘ XỬ LÝ'],
+    'CPU': ['CPU', 'PROCESSOR', 'BỘ XỬ LÝ', 'BỘ VI XỬ LÝ'],
     'VGA': ['VGA', 'GPU', 'GRAPHICS', 'CARD MÀN HÌNH', 'VIDEO CARD'],
     'MAINBOARD': ['MAINBOARD', 'MOTHERBOARD', 'BO MẠCH CHỦ', 'MAIN'],
     'RAM': ['RAM', 'MEMORY', 'BỘ NHỚ'],
     'STORAGE': ['STORAGE', 'HDD', 'SSD', 'Ổ CỨNG', 'O CUNG'],
     'PSU': ['PSU', 'POWER SUPPLY', 'NGUỒN', 'NGUON'],
-    'CASE': ['CASE', 'CHASSIS', 'VỎ CASE', 'THÙNG MÁY'],
+    'CASE': ['CASE', 'CHASSIS', 'VỎ CASE', 'THÙNG MÁY', 'VỎ MÁY TÍNH'],
     'COOLER': ['COOLER', 'TẢN NHIỆT', 'FAN', 'COOLING'],
     'MONITOR': ['MONITOR', 'MÀN HÌNH', 'MAN HINH', 'SCREEN', 'DISPLAY'],
     'KEYBOARD': ['KEYBOARD', 'BÀN PHÍM', 'BAN PHIM', 'PHÍM'],
-    'MOUSE': ['MOUSE', 'CHUỘT', 'CHUOT']
+    'MOUSE': ['MOUSE', 'CHUỘT', 'CHUOT', 'CHUỘT MÁY TÍNH']
+  };
+
+  const SLUG_ALIASES = {
+    'bo-vi-xu-ly': ['cpu', 'bo-vi-xu-ly'],
+    'cpu': ['cpu', 'bo-vi-xu-ly'],
+    'card-man-hinh': ['gpu', 'vga', 'card-man-hinh'],
+    'gpu': ['gpu', 'vga', 'card-man-hinh'],
+    'vga': ['gpu', 'vga', 'card-man-hinh'],
+    'ram-pc': ['ram', 'ram-pc', 'bo-nho-ram-pc'],
+    'ram': ['ram', 'ram-pc', 'bo-nho-ram-pc'],
+    'ram-laptop': ['ram_laptop', 'ram-laptop', 'bo-nho-ram-laptop'],
+    'ram_laptop': ['ram_laptop', 'ram-laptop', 'bo-nho-ram-laptop'],
+    'o-cung-ssd': ['ssd', 'o-cung-ssd'],
+    'ssd': ['ssd', 'o-cung-ssd'],
+    'o-cung-hdd': ['hdd', 'o-cung-hdd', 'o-cung-co'],
+    'hdd': ['hdd', 'o-cung-hdd', 'o-cung-co'],
+    'bo-mach-chu': ['mainboard', 'bo-mach-chu'],
+    'mainboard': ['mainboard', 'bo-mach-chu'],
+    'nguon-may-tinh': ['psu', 'nguon-may-tinh'],
+    'psu': ['psu', 'nguon-may-tinh'],
+    'vo-may-tinh': ['case', 'vo-may-tinh'],
+    'case': ['case', 'vo-may-tinh'],
+    'tan-nhiet': ['cooler', 'tan-nhiet'],
+    'cooler': ['cooler', 'tan-nhiet'],
+    'man-hinh': ['monitor', 'man-hinh'],
+    'monitor': ['monitor', 'man-hinh'],
+    'ban-phim': ['keyboard', 'ban-phim'],
+    'keyboard': ['keyboard', 'ban-phim'],
+    'chuot-may-tinh': ['mouse', 'chuot-may-tinh'],
+    'mouse': ['mouse', 'chuot-may-tinh']
   };
 
   // CAT_ALIASES matches against the coarse short-code (`item.category`), which
@@ -2986,9 +3060,14 @@ export default function Warehouse() {
   // exact `categorySlug` match (the real, ungrouped Category.slug) when present.
   const matchesCategoryFilter = (item, selectedCat) => {
     if (selectedCat === 'ALL') return true;
-    if (item.categorySlug && item.categorySlug === selectedCat) return true;
+    if (item.categorySlug) {
+      if (item.categorySlug === selectedCat) return true;
+      const equivalentSlugs = SLUG_ALIASES[selectedCat];
+      if (equivalentSlugs && equivalentSlugs.includes(item.categorySlug)) return true;
+    }
     const itemCatUpper = String(item.category || '').toUpperCase().trim();
-    const aliases = CAT_ALIASES[selectedCat] || [selectedCat];
+    const selCatKey = String(selectedCat || '').toLowerCase();
+    const aliases = CAT_ALIASES[selectedCat] || CAT_ALIASES[selectedCat?.toUpperCase()] || (SLUG_ALIASES[selCatKey] ? CAT_ALIASES[selectedCat] : null) || [selectedCat];
     return aliases.some(a => itemCatUpper === a || itemCatUpper.includes(a));
   };
 

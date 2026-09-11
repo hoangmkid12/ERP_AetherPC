@@ -5,14 +5,17 @@ const BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
 const mapSlugToCategory = (slug) => {
   if (!slug) return 'OTHER';
   const s = slug.toLowerCase();
-  if (s === 'cpu' || s.includes('cpu')) return 'CPU';
-  if (s === 'mainboard' || s.includes('main')) return 'MAINBOARD';
+  if (s === 'cpu' || s.includes('cpu') || s.includes('bo-vi-xu-ly') || s.includes('xu-ly')) return 'CPU';
+  if (s === 'mainboard' || s.includes('main') || s.includes('bo-mach-chu')) return 'MAINBOARD';
   if (s === 'ram' || s.includes('ram')) return 'RAM';
-  if (s === 'gpu' || s === 'vga' || s.includes('vga') || s.includes('card')) return 'VGA';
+  if (s === 'gpu' || s === 'vga' || s.includes('vga') || s.includes('card') || s.includes('man-hinh')) return 'VGA';
   if (s === 'psu' || s === 'nguồn' || s.includes('psu') || s.includes('nguon')) return 'PSU';
   if (s.includes('ssd') || s.includes('hdd') || s === 'storage' || s.includes('o-cung')) return 'STORAGE';
-  if (s === 'case' || s.includes('case')) return 'CASE';
-  if (s === 'cooler' || s.includes('tản') || s.includes('cooler')) return 'COOLER';
+  if (s === 'case' || s.includes('case') || s.includes('vo-may-tinh')) return 'CASE';
+  if (s === 'cooler' || s.includes('tản') || s.includes('cooler') || s.includes('tan-nhiet')) return 'COOLER';
+  if (s.includes('man-hinh') || s === 'monitor') return 'MONITOR';
+  if (s.includes('ban-phim') || s === 'keyboard') return 'KEYBOARD';
+  if (s.includes('chuot') || s === 'mouse') return 'MOUSE';
   return s.toUpperCase();
 };
 

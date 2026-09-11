@@ -3,10 +3,10 @@ const { logAudit } = require('../utils/auditLog');
 
 const slugify = (name) => String(name)
   .toLowerCase()
-  .normalize('NFD').replace(/[̀-ͯ]/g, '') // strip Vietnamese diacritics
+  .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // strip Vietnamese diacritics
   .replace(/đ/g, 'd')
-  .replace(/[^a-z0-9]+/g, '_')
-  .replace(/^_+|_+$/g, '');
+  .replace(/[^a-z0-9]+/g, '-')
+  .replace(/^-+|-+$/g, '');
 
 // GET /api/v1/categories — danh mục thật kèm số sản phẩm & tổng giá trị tồn
 // thật (qua categoryId thật, không phải so khớp tên hiển thị bằng regex như
