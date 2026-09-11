@@ -336,8 +336,10 @@ export default function Sidebar({ isOpen = false, onClose }) {
       }
     }
 
-    // 3. KHO HÀNG (WAREHOUSE): Chỉ nhận cảnh báo tồn kho & đơn hàng cần xuất kho
-    if (['WAREHOUSE', 'ADMIN'].includes(role)) {
+    // 3. KHO HÀNG (WAREHOUSE/WAREHOUSE_MANAGER): Cảnh báo tồn kho & đơn hàng cần xuất kho
+    // — quản lý kho trước đây không nằm trong danh sách này nên không nhận được
+    // cảnh báo gì dù cùng chịu trách nhiệm vận hành kho với thủ kho.
+    if (['WAREHOUSE', 'WAREHOUSE_MANAGER', 'ADMIN'].includes(role)) {
       const lowStock = (inventory || []).filter(item => Number(item.stock) <= Number(item.threshold));
       if (lowStock.length > 0) {
         list.push({
@@ -463,15 +465,18 @@ export default function Sidebar({ isOpen = false, onClose }) {
       });
     }
 
-    // 7. CHĂM SÓC KHÁCH HÀNG (CUSTOMER SERVICE): Chỉ nhận RMA & yêu cầu khách
-    if (['CUSTOMER_SERVICE', 'ADMIN'].includes(role)) {
+    // 7. CHĂM SÓC KHÁCH HÀNG: mã vai trò thật là 'CSKH' (không phải
+    // 'CUSTOMER_SERVICE' — giá trị đó không tồn tại trong hệ thống), nên khối
+    // này trước đây không bao giờ khớp và CSKH không hề nhận được thông báo.
+    // SALES_MANAGER cũng được cấp quyền cskh_handle_tickets nên gộp chung.
+    if (['CSKH', 'SALES_MANAGER', 'ADMIN'].includes(role)) {
       const pendingRMA = (returnRequests || []).filter(r => r.status === 'PENDING' || r.status === 'NEW');
       if (pendingRMA.length > 0) {
         list.push({
           id: 'NOTIF-CSKH-RMA',
           title: `Tiếp nhận ${pendingRMA.length} hồ sơ Đổi trả / Bảo hành (RMA)`,
           desc: `Khách hàng gửi yêu cầu hỗ trợ lỗi linh kiện. CSKH cần đối chiếu hóa đơn và hướng dẫn thu hồi.`,
-          link: '/admin/cskh?tab=rma',
+          link: '/admin/cskh?tab=returns',
           badge: 'CSKH & Bảo Hành',
           badgeColor: '#ea580c',
           category: 'URGENT',
@@ -481,19 +486,57 @@ export default function Sidebar({ isOpen = false, onClose }) {
       }
     }
 
-    // 8. KIỂM ĐỊNH CHẤT LƯỢNG (QA/QC): Lô hàng nhập khẩu cần nghiệm thu
-    if (['QA_QC', 'ADMIN'].includes(role)) {
-      list.push({
-        id: 'NOTIF-QAQC-INSPECTION',
-        title: `Kiểm định chất lượng lô hàng PO mới về`,
-        desc: `Lô hàng linh kiện từ NCC đã về kho. QA/QC cần lấy mẫu ngẫu nhiên kiểm tra tiêu chuẩn AQL trước khi nhập kho.`,
-        link: '/admin/quality-control',
-        badge: 'Kiểm Định QA/QC',
-        badgeColor: '#0284c7',
-        category: 'URGENT',
-        actionText: 'Nghiệm Thu',
-        time: 'Chờ kiểm định'
-      });
+    // 8. KIỂM ĐỊNH CHẤT LƯỢNG: mã vai trò thật là 'QC' (không phải 'QA_QC' —
+    // cũng không tồn tại), nên khối này trước đây không bao giờ khớp. Đồng
+    // thời đổi từ 1 thông báo hiển thị cố định (luôn hiện bất kể có việc hay
+    // không) sang dựa trên số liệu thật (pendingQaCount/pendingReturnsCount,
+    // đã tính sẵn ở trên cho badge sidebar) để đúng "chỉ xem thông báo liên
+    // quan" — QC rảnh việc thì không nên thấy thông báo khẩn cấp giả.
+    if (['QC', 'ADMIN'].includes(role)) {
+      if (pendingQaCount > 0) {
+        list.push({
+          id: 'NOTIF-QC-INSPECTION',
+          title: `Kiểm định chất lượng ${pendingQaCount} lô hàng PO mới về`,
+          desc: `Lô hàng linh kiện từ NCC đã về kho. QC cần lấy mẫu ngẫu nhiên kiểm tra tiêu chuẩn AQL trước khi nhập kho.`,
+          link: '/admin/quality-control?tab=inbound',
+          badge: 'Kiểm Định QA/QC',
+          badgeColor: '#0284c7',
+          category: 'URGENT',
+          actionText: 'Nghiệm Thu',
+          time: 'Chờ kiểm định'
+        });
+      }
+      if (pendingReturnsCount > 0) {
+        list.push({
+          id: 'NOTIF-QC-RMA',
+          title: `Thẩm định ${pendingReturnsCount} hồ sơ đổi trả/bảo hành`,
+          desc: `CSKH đã chuyển hồ sơ RMA — QC cần kiểm tra lỗi kỹ thuật thực tế để kết luận Đạt/Lỗi.`,
+          link: '/admin/quality-control?tab=returns',
+          badge: 'Kiểm Định QA/QC',
+          badgeColor: '#0284c7',
+          category: 'URGENT',
+          actionText: 'Thẩm Định',
+          time: 'Chờ xử lý'
+        });
+      }
+    }
+
+    // 9. LẮP RÁP (ASSEMBLY): Lệnh lắp ráp đang chờ/đang xử lý được bàn giao
+    if (['ASSEMBLY', 'ADMIN'].includes(role)) {
+      const myAssemblyJobs = (assemblyJobs || []).filter(j => j && ['PENDING', 'ASSEMBLING'].includes(j.status));
+      if (myAssemblyJobs.length > 0) {
+        list.push({
+          id: 'NOTIF-ASSEMBLY-JOBS',
+          title: `Có ${myAssemblyJobs.length} lệnh lắp ráp đang chờ xử lý`,
+          desc: `Kho đã bàn giao linh kiện — tiến hành lắp ráp, chạy stress test và dán tem niêm phong trước khi xuất xưởng.`,
+          link: '/admin/assembly?tab=jobs',
+          badge: 'Lắp Ráp',
+          badgeColor: '#0ea5e9',
+          category: 'URGENT',
+          actionText: 'Xem Lệnh Lắp Ráp',
+          time: 'Đang chờ'
+        });
+      }
     }
 
     // Helper for formatting notification timestamp
