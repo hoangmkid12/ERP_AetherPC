@@ -5906,9 +5906,6 @@ export default function Warehouse() {
               <h2 style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
                 Cấu Hình / Danh Mục Sản Phẩm
               </h2>
-              <p style={{ fontSize: '0.82rem', color: '#64748b', margin: '0.2rem 0 0 0' }}>
-                Danh mục thật ({realCategories.length}) — số sản phẩm và giá trị tồn tính trực tiếp theo danh mục thật, không qua so khớp tên.
-              </p>
             </div>
             {canManageCategories && (
               <button
@@ -5925,7 +5922,7 @@ export default function Warehouse() {
             <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.25rem', padding: '1rem', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #cbd5e1', flexWrap: 'wrap' }}>
               <input
                 type="text"
-                placeholder="Tên danh mục mới (VD: Networking - Thiết bị mạng)"
+                placeholder="Tên danh mục mới (VD: Thiết bị mạng)"
                 value={newCategoryName}
                 onChange={(e) => setNewCategoryName(e.target.value)}
                 style={{ flex: '1 1 260px', padding: '0.55rem 0.85rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px' }}
@@ -5944,7 +5941,7 @@ export default function Warehouse() {
                 <thead>
                   <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569' }}>
                     <th style={{ padding: '0.75rem 1rem' }}>Tên Danh Mục</th>
-                    <th style={{ padding: '0.75rem 1rem' }}>Slug</th>
+                    <th style={{ padding: '0.75rem 1rem' }}>Đường Dẫn</th>
                     <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Tổng Sản Phẩm</th>
                     <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Tổng Trị Giá Tồn</th>
                     <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Hành Động</th>
