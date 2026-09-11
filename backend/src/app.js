@@ -79,6 +79,7 @@ app.use('/api/v1', (req, res, next) => {
 });
 app.use('/api/v1/auth', require('./routes/auth.routes')(authLimiter));
 app.use('/api/v1/products', require('./routes/product.routes'));
+app.use('/api/v1/categories', require('./routes/category.routes'));
 app.use('/api/v1/orders', require('./routes/order.routes'));
 app.use('/api/v1/chat', require('./routes/chat.routes'));
 app.use('/api/v1/purchasing', require('./routes/purchase.routes'));

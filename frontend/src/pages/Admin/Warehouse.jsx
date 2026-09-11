@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useInventoryStore, useSalesStore, useFinanceStore, useUtilityStore, useHRStore } from '../../stores';
 import { useAuth } from '../../context/AuthContext';
 import { usePermission } from '../../hooks/usePermission';
-import { useNotification, notify, promptText, confirm } from '../../context/NotificationContext';
+import { useNotification, notify, confirm } from '../../context/NotificationContext';
 import { DELIVERY_REGIONS, detectDeliveryRegion } from '../../utils/deliveryRegions';
 import { QC_STATUS, getStatusInfo } from '../../utils/statusLabels';
 import { api } from '../../services/api';
@@ -1625,6 +1625,64 @@ export default function Warehouse() {
   const canAuditAdjust = canDo('warehouse_audit_adjust') || isCEO || isAdmin;
   const canCreatePr = canDo('warehouse_create_pr') || isWarehouse || isWarehouseManager || isCEO || isAdmin;
   const canManageLocations = canDo('warehouse_manage_locations') || isWarehouseManager || isCEO || isAdmin;
+  const canManageCategories = isWarehouseManager || isCEO || isAdmin;
+
+  // Danh Mục Sản Phẩm (Category) — trước đây tab này so khớp tên hiển thị
+  // bằng regex thủ công (VD alias 'VGA' không khớp tên thật "GPU - Card màn
+  // hình" nên luôn đếm ra 0), và nút "+ Thêm Danh Mục Mới" chỉ hiện toast giả,
+  // không lưu gì. Giờ dùng API thật /api/v1/categories qua đúng categoryId.
+  const [realCategories, setRealCategories] = useState([]);
+  const [loadingCategories, setLoadingCategories] = useState(false);
+  const [showCreateCategoryForm, setShowCreateCategoryForm] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+
+  // Khớp với CATEGORY_SLUG_TO_CODE (frontend/src/stores/inventoryStore.js) —
+  // đó là mã ngắn item.category thật sự mang trên mỗi dòng tồn kho, dùng để
+  // bộ lọc tab "Danh Sách Sản Phẩm" hoạt động đúng khi bấm "Xem Sản Phẩm".
+  const CATEGORY_SLUG_TO_SHORT_CODE = {
+    cpu: 'CPU', gpu: 'VGA', ram: 'RAM', ram_laptop: 'RAM', ssd: 'STORAGE', hdd: 'STORAGE',
+    mainboard: 'MAINBOARD', case: 'CASE', psu: 'PSU', cooler: 'COOLER', monitor: 'MONITOR',
+    keyboard: 'KEYBOARD', mouse: 'MOUSE'
+  };
+
+  const loadCategories = async () => {
+    setLoadingCategories(true);
+    try {
+      const res = await api.get('/categories');
+      setRealCategories(res.data || []);
+    } catch (err) {
+      notify(err?.message || 'Không thể tải danh sách danh mục.', 'error');
+    } finally {
+      setLoadingCategories(false);
+    }
+  };
+
+  const handleCreateCategory = async () => {
+    if (!newCategoryName.trim()) {
+      notify('Vui lòng nhập tên danh mục.', 'error');
+      return;
+    }
+    try {
+      await api.post('/categories', { name: newCategoryName.trim() });
+      notify(`Đã tạo danh mục "${newCategoryName.trim()}".`, 'success');
+      setShowCreateCategoryForm(false);
+      setNewCategoryName('');
+      loadCategories();
+    } catch (err) {
+      notify(err?.message || 'Không thể tạo danh mục.', 'error');
+    }
+  };
+
+  const handleDeleteCategory = async (cat) => {
+    if (!(await confirm(`Xóa danh mục "${cat.name}"?`, { danger: true }))) return;
+    try {
+      await api.delete(`/categories/${cat.id}`);
+      notify(`Đã xóa danh mục "${cat.name}".`, 'success');
+      loadCategories();
+    } catch (err) {
+      notify(err?.message || 'Không thể xóa danh mục.', 'error');
+    }
+  };
 
   // Phiếu Yêu Cầu Mua Hàng nội bộ (PR) — warehouse_create_pr / warehouse_approve_pr
   const [purchaseRequests, setPurchaseRequests] = useState([]);
@@ -1772,7 +1830,6 @@ export default function Warehouse() {
   const createProduct = useInventoryStore(state => state.createProduct);
   const deleteProductImage = useInventoryStore(state => state.deleteProductImage);
   const refreshInventoryFromServer = useInventoryStore(state => state.getInventory);
-  const products = useInventoryStore(state => state.products) || [];
 
   const orders = useSalesStore(state => state.orders) || [];
   const setOrders = (items) => {
@@ -2086,6 +2143,7 @@ export default function Warehouse() {
   useEffect(() => {
     if (activeTab === 'rfq') loadPurchaseRequests();
     if (activeTab === 'locations') loadWarehouseLocations();
+    if (activeTab === 'categories') loadCategories();
   }, [activeTab]);
 
   // Real Supplier directory (Purchasing's Danh Bạ NCC) — the product edit form used
@@ -5446,125 +5504,102 @@ export default function Warehouse() {
       {/* 12. VIEW: CẤU HÌNH > DANH MỤC SẢN PHẨM (CATEGORIES) */}
       {activeTab === 'categories' && (
         <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
             <div>
               <h2 style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
                 Cấu Hình / Danh Mục Sản Phẩm
               </h2>
               <p style={{ fontSize: '0.82rem', color: '#64748b', margin: '0.2rem 0 0 0' }}>
-                Quản lý phân nhóm danh mục linh kiện, tổng mã sản phẩm, số lượng tồn thực tế và giá trị tài sản
+                Danh mục thật ({realCategories.length}) — số sản phẩm và giá trị tồn tính trực tiếp theo danh mục thật, không qua so khớp tên.
               </p>
             </div>
-            <button
-              type="button"
-              onClick={async () => {
-                const name = await promptText('Nhập tên danh mục linh kiện mới (ví dụ: NETWORKING, PERIPHERALS...):');
-                if (name && name.trim()) {
-                  notify(`Đã thêm danh mục quy chuẩn ${name.trim().toUpperCase()} vào hệ thống!`, 'success');
-                }
-              }}
-              style={{
-                backgroundColor: '#2563eb',
-                color: '#ffffff',
-                border: 'none',
-                borderRadius: '6px',
-                padding: '0.55rem 1.25rem',
-                fontSize: '0.85rem',
-                fontWeight: 700,
-                cursor: 'pointer'
-              }}
-            >
-              + Thêm Danh Mục Mới
-            </button>
+            {canManageCategories && (
+              <button
+                type="button"
+                onClick={() => setShowCreateCategoryForm(v => !v)}
+                style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.55rem 1.25rem', fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer' }}
+              >
+                {showCreateCategoryForm ? 'Đóng' : '+ Thêm Danh Mục Mới'}
+              </button>
+            )}
           </div>
 
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', overflow: 'hidden' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.83rem' }}>
-              <thead>
-                <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569' }}>
-                  <th style={{ padding: '0.75rem 1rem' }}>Mã Danh Mục</th>
-                  <th style={{ padding: '0.75rem 1rem' }}>Mô Tả Phân Nhóm</th>
-                  <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Tổng Sản Phẩm</th>
-                  <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Tổng Trị Giá Tồn</th>
-                  <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Hành Động</th>
-                </tr>
-              </thead>
-              <tbody>
-                {[
-                  { code: 'CPU', desc: 'Bộ vi xử lý trung tâm Intel / AMD' },
-                  { code: 'VGA', desc: 'Card màn hình & Xử lý đồ họa NVIDIA / AMD' },
-                  { code: 'MAINBOARD', desc: 'Bo mạch chủ máy tính các chuẩn ATX / MATX / ITX' },
-                  { code: 'RAM', desc: 'Bộ nhớ trong DDR4 / DDR5' },
-                  { code: 'STORAGE', desc: 'Ổ cứng SSD NVMe / SATA & HDD' },
-                  { code: 'PSU', desc: 'Nguồn máy tính chuẩn 80 Plus Gold / Platinum' },
-                  { code: 'CASE', desc: 'Vỏ thùng máy tính Gaming & Workstation Server' },
-                  { code: 'COOLER', desc: 'Tản nhiệt khí & Tản nhiệt nước All-In-One' },
-                  { code: 'MONITOR', desc: 'Màn hình máy tính đồ họa 2K / 4K / Gaming' },
-                  { code: 'KEYBOARD', desc: 'Bàn phím cơ Custom & Chuẩn văn phòng', aliases: ['KEYBOARD', 'BÀN PHÍM', 'BANPHIM'] },
-                  { code: 'MOUSE', desc: 'Chuột Gaming & Chuột không dây', aliases: ['MOUSE', 'CHUỘT'] }
-                ].map(cat => {
-                  const aliases = cat.aliases || [cat.code];
-                  // Use all products (from backend) for total count
-                  const allProdsInCat = products.filter(p => {
-                    const c = String(typeof p.category === 'object' ? p.category?.name : p.category || '').toUpperCase().trim();
-                    return aliases.some(a => c === a || c.includes(a));
-                  });
-                  // Get matching IDs from backend products, then look up in activeInventory
-                  const matchedIds = new Set(allProdsInCat.map(p => String(p.id || p.productId)));
-                  const invProdsInCat = activeInventory.filter(i => {
-                    // Match by ID first (most reliable), then fallback to category string
-                    if (matchedIds.has(String(i.id))) return true;
-                    const c = String(i.category || '').toUpperCase().trim();
-                    return aliases.some(a => c === a || c.includes(a));
-                  });
+          {showCreateCategoryForm && (
+            <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.25rem', padding: '1rem', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #cbd5e1', flexWrap: 'wrap' }}>
+              <input
+                type="text"
+                placeholder="Tên danh mục mới (VD: Networking - Thiết bị mạng)"
+                value={newCategoryName}
+                onChange={(e) => setNewCategoryName(e.target.value)}
+                style={{ flex: '1 1 260px', padding: '0.55rem 0.85rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px' }}
+              />
+              <button onClick={handleCreateCategory} style={{ backgroundColor: '#16a34a', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.55rem 1.25rem', fontSize: '0.83rem', fontWeight: 700, cursor: 'pointer' }}>
+                Tạo Danh Mục
+              </button>
+            </div>
+          )}
 
-                  const totalSkus = allProdsInCat.length || invProdsInCat.length;
-                  const totalValue = invProdsInCat.reduce((sum, item) => sum + ((Number(item.stock) || 0) * (Number(item.price) || 0)), 0);
-
-                  return (
-                    <tr key={cat.code} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                      <td style={{ padding: '0.75rem 1rem', fontWeight: 800, color: '#2563eb' }}>{cat.code}</td>
-                      <td style={{ padding: '0.75rem 1rem', color: '#475569' }}>{cat.desc}</td>
-                      <td style={{ padding: '0.75rem 1rem', textAlign: 'center', fontWeight: 700, color: '#0f172a' }}>
-                        {totalSkus}
-                      </td>
-                      <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 700, color: totalValue > 0 ? '#2563eb' : '#64748b' }}>
-                        {safeFormatPrice(totalValue)}
+          {loadingCategories ? (
+            <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>Đang tải...</div>
+          ) : (
+            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', overflow: 'hidden' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.83rem' }}>
+                <thead>
+                  <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569' }}>
+                    <th style={{ padding: '0.75rem 1rem' }}>Tên Danh Mục</th>
+                    <th style={{ padding: '0.75rem 1rem' }}>Slug</th>
+                    <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Tổng Sản Phẩm</th>
+                    <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Tổng Trị Giá Tồn</th>
+                    <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Hành Động</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {realCategories.map(cat => (
+                    <tr key={cat.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                      <td style={{ padding: '0.75rem 1rem', fontWeight: 800, color: '#2563eb' }}>{cat.name}</td>
+                      <td style={{ padding: '0.75rem 1rem', color: '#94a3b8', fontFamily: 'monospace', fontSize: '0.78rem' }}>{cat.slug}</td>
+                      <td style={{ padding: '0.75rem 1rem', textAlign: 'center', fontWeight: 700, color: '#0f172a' }}>{cat.productCount}</td>
+                      <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 700, color: cat.totalInventoryValue > 0 ? '#2563eb' : '#64748b' }}>
+                        {safeFormatPrice(cat.totalInventoryValue)}
                       </td>
                       <td style={{ padding: '0.75rem 1rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSelectedCategory(cat.code);
-                            setSelectedSupplier('ALL');
-                            setStockStatusFilter('ALL');
-                            setSelectedLocationStatus('ALL');
-                            setSearchQuery('');
-                            setActiveTab('inventory');
-                          }}
-                          style={{
-                            backgroundColor: '#eff6ff',
-                            color: '#2563eb',
-                            border: '1px solid #bfdbfe',
-                            borderRadius: '6px',
-                            padding: '0.4rem 1rem',
-                            fontSize: '0.78rem',
-                            fontWeight: 600,
-                            cursor: 'pointer',
-                            minWidth: '160px',
-                            display: 'inline-block',
-                            textAlign: 'center'
-                          }}
-                        >
-                          Xem Sản Phẩm ({totalSkus})
-                        </button>
+                        <div style={{ display: 'inline-flex', gap: '0.4rem', alignItems: 'center' }}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedCategory(CATEGORY_SLUG_TO_SHORT_CODE[cat.slug] || cat.name.toUpperCase());
+                              setSelectedSupplier('ALL');
+                              setStockStatusFilter('ALL');
+                              setSelectedLocationStatus('ALL');
+                              setSearchQuery('');
+                              setActiveTab('inventory');
+                            }}
+                            style={{ backgroundColor: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', borderRadius: '6px', padding: '0.4rem 1rem', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer' }}
+                          >
+                            Xem Sản Phẩm ({cat.productCount})
+                          </button>
+                          {canManageCategories && (
+                            <button
+                              type="button"
+                              disabled={cat.productCount > 0}
+                              title={cat.productCount > 0 ? 'Còn sản phẩm gán vào — không thể xóa' : 'Xóa danh mục'}
+                              onClick={() => handleDeleteCategory(cat)}
+                              style={{ backgroundColor: cat.productCount > 0 ? '#f8fafc' : '#fef2f2', color: cat.productCount > 0 ? '#94a3b8' : '#dc2626', border: `1px solid ${cat.productCount > 0 ? '#e2e8f0' : '#fecaca'}`, borderRadius: '6px', padding: '0.4rem 0.7rem', fontSize: '0.78rem', fontWeight: 600, cursor: cat.productCount > 0 ? 'not-allowed' : 'pointer' }}
+                            >
+                              Xóa
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                  ))}
+                  {realCategories.length === 0 && (
+                    <tr><td colSpan={5} style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>Chưa có danh mục nào.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
 
