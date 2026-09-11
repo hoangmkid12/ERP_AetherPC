@@ -99,12 +99,22 @@ const registerCustomer = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'Tên đăng nhập chỉ gồm chữ thường, số và dấu gạch dưới (3-30 ký tự)' });
     }
 
+    const phoneTrim = (phone || '').trim();
     const existingCustomer = await prisma.customer.findFirst({
-      where: { OR: [{ email }, { username: usernameTrim }] }
+      where: {
+        OR: [
+          { email },
+          { username: usernameTrim },
+          ...(phoneTrim ? [{ phone: phoneTrim }] : [])
+        ]
+      }
     });
 
     if (existingCustomer) {
-      const conflictField = existingCustomer.email === email ? 'Email' : 'Tên đăng nhập';
+      let conflictField = 'Thông tin đăng ký';
+      if (existingCustomer.email === email) conflictField = 'Email';
+      else if (existingCustomer.username === usernameTrim) conflictField = 'Tên đăng nhập';
+      else if (phoneTrim && existingCustomer.phone === phoneTrim) conflictField = 'Số điện thoại';
       return res.status(400).json({ success: false, message: `${conflictField} đã được sử dụng bởi tài khoản khác` });
     }
 
@@ -119,7 +129,7 @@ const registerCustomer = async (req, res, next) => {
         username: usernameTrim,
         passwordHash,
         name,
-        phone: phone || null,
+        phone: phoneTrim || null,
         address: address || null,
         city: city || null,
         loyaltyPoints: 0,
