@@ -10,6 +10,9 @@ const { UPLOAD_DIR } = require('./middlewares/upload.middleware');
 
 const app = express();
 
+// Trust reverse proxy (Railway / Cloudflare) so express-rate-limit correctly reads X-Forwarded-For
+app.set('trust proxy', 1);
+
 // Security Middlewares
 app.use(helmet());
 app.use(cors({
@@ -84,6 +87,7 @@ app.use('/api/v1/assembly-jobs', require('./routes/assembly.routes'));
 app.use('/api/v1/hr', require('./routes/hr.routes'));
 app.use('/api/v1/employees', require('./routes/hr.routes'));
 app.use('/api/v1/customers', require('./routes/customer.routes'));
+app.use('/api/v1/customer-accounts', require('./routes/customerAdmin.routes'));
 app.use('/api/v1/ledger', require('./routes/ledger.routes'));
 app.use('/api/v1/complaints', require('./routes/complaint.routes'));
 app.use('/api/v1/system', require('./routes/system.routes'));

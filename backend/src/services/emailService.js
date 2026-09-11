@@ -89,7 +89,10 @@ const getTransporter = () => {
       auth: {
         user: process.env.GMAIL_USER,
         pass: process.env.GMAIL_APP_PASSWORD.replace(/\s/g, '') // Remove spaces from App Password
-      }
+      },
+      connectionTimeout: 10000,
+      greetingTimeout: 10000,
+      socketTimeout: 15000
     });
   }
   // Option 2: Generic SMTP (SMTP_HOST + SMTP_USER)
@@ -576,17 +579,19 @@ const sendWelcomeEmail = async ({ toEmail, customerName }) => {
 
   const transporter = getTransporter();
   if (transporter) {
+    console.log(`[EmailService] ⏳ Đang kết nối Gmail và gửi thư chào mừng tới ${emailData.toEmail}...`);
     try {
       const senderEmail = getSenderEmail();
-      await transporter.sendMail({
+      const info = await transporter.sendMail({
         from: `"AetherPC - Hệ Thống ERP" <${senderEmail}>`,
         to: emailData.toEmail,
         subject: emailData.subject,
         html
       });
-      console.log(`[EmailService] ✅ Gửi email chào mừng thành công tới ${emailData.toEmail}`);
+      console.log(`[EmailService] ✅ Gửi email chào mừng thành công tới ${emailData.toEmail} (ID: ${info?.messageId || 'OK'})`);
     } catch (err) {
-      console.error('[EmailService] ❌ Lỗi gửi email chào mừng:', err.message);
+      console.error('[EmailService] ❌ Lỗi gửi email chào mừng:', err.message || err);
+      if (err.response) console.error('[EmailService] Chi tiết phản hồi từ máy chủ mail:', err.response);
     }
   } else {
     console.warn(`[EmailService] ⚠️ Chưa cài SMTP/Gmail App Password (GMAIL_USER: ${process.env.GMAIL_USER ? 'ĐÃ CÓ' : 'CHƯA CÓ'}, GMAIL_APP_PASSWORD: ${process.env.GMAIL_APP_PASSWORD ? 'ĐÃ CÓ' : 'CHƯA CÓ'}). Email chào mừng không được gửi.`);
