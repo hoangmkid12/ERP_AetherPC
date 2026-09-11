@@ -1066,9 +1066,9 @@ export default function SystemAdmin() {
                   <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569' }}>
                     <th style={{ padding: '0.65rem 0.85rem' }}>Khách Hàng</th>
                     <th style={{ padding: '0.65rem 0.85rem' }}>Liên Hệ</th>
-                    <th style={{ padding: '0.65rem 0.85rem', textAlign: 'center' }}>Đơn Hàng</th>
-                    <th style={{ padding: '0.65rem 0.85rem', textAlign: 'center' }}>Trạng Thái</th>
-                    <th style={{ padding: '0.65rem 0.85rem', textAlign: 'center' }}>Thao Tác</th>
+                    <th style={{ padding: '0.65rem 0.85rem', textAlign: 'center', width: '90px' }}>Đơn Hàng</th>
+                    <th style={{ padding: '0.65rem 0.85rem', textAlign: 'center', width: '110px' }}>Trạng Thái</th>
+                    <th style={{ padding: '0.65rem 0.85rem', textAlign: 'center', width: '330px' }}>Thao Tác</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1099,13 +1099,28 @@ export default function SystemAdmin() {
                             {isInactive ? 'Vô hiệu hóa' : 'Hoạt động'}
                           </span>
                         </td>
-                        <td style={{ padding: '0.65rem 0.85rem', textAlign: 'center' }}>
-                          <div style={{ display: 'flex', justifyContent: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
+                        <td style={{ padding: '0.65rem 0.85rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                          <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}>
                             <button
                               disabled={isBusy}
                               onClick={() => handleOpenCustDetail(cust)}
                               title="Xem chi tiết hồ sơ & quản lý"
-                              style={{ backgroundColor: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', borderRadius: '4px', padding: '0.3rem 0.5rem', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.2rem' }}
+                              style={{
+                                width: '78px',
+                                height: '28px',
+                                backgroundColor: '#eff6ff',
+                                color: '#2563eb',
+                                border: '1px solid #bfdbfe',
+                                borderRadius: '6px',
+                                fontSize: '0.72rem',
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '0.25rem',
+                                boxSizing: 'border-box'
+                              }}
                             >
                               <Eye size={12} /> Chi tiết
                             </button>
@@ -1113,7 +1128,22 @@ export default function SystemAdmin() {
                               disabled={isBusy}
                               onClick={() => handleResetCustPassword(cust)}
                               title="Đặt lại mật khẩu về 123456"
-                              style={{ backgroundColor: '#ffffff', color: '#d97706', border: '1px solid #fde68a', borderRadius: '4px', padding: '0.3rem 0.5rem', fontSize: '0.72rem', fontWeight: 700, cursor: isBusy ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '0.2rem' }}
+                              style={{
+                                width: '96px',
+                                height: '28px',
+                                backgroundColor: '#ffffff',
+                                color: '#d97706',
+                                border: '1px solid #fde68a',
+                                borderRadius: '6px',
+                                fontSize: '0.72rem',
+                                fontWeight: 700,
+                                cursor: isBusy ? 'not-allowed' : 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '0.25rem',
+                                boxSizing: 'border-box'
+                              }}
                             >
                               <Key size={12} /> Reset Pass
                             </button>
@@ -1121,7 +1151,22 @@ export default function SystemAdmin() {
                               disabled={isBusy}
                               onClick={() => handleToggleCustStatus(cust)}
                               title={isInactive ? 'Kích hoạt lại tài khoản' : 'Vô hiệu hóa tài khoản'}
-                              style={{ backgroundColor: '#ffffff', color: isInactive ? '#16a34a' : '#ef4444', border: `1px solid ${isInactive ? '#bbf7d0' : '#fca5a5'}`, borderRadius: '4px', padding: '0.3rem 0.5rem', fontSize: '0.72rem', fontWeight: 700, cursor: isBusy ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '0.2rem' }}
+                              style={{
+                                width: '98px',
+                                height: '28px',
+                                backgroundColor: isInactive ? '#f0fdf4' : '#ffffff',
+                                color: isInactive ? '#16a34a' : '#ef4444',
+                                border: `1px solid ${isInactive ? '#bbf7d0' : '#fca5a5'}`,
+                                borderRadius: '6px',
+                                fontSize: '0.72rem',
+                                fontWeight: 700,
+                                cursor: isBusy ? 'not-allowed' : 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '0.25rem',
+                                boxSizing: 'border-box'
+                              }}
                             >
                               <Lock size={12} /> {isInactive ? 'Kích hoạt' : 'Vô hiệu hóa'}
                             </button>
@@ -1129,9 +1174,22 @@ export default function SystemAdmin() {
                               disabled={isBusy}
                               onClick={() => handleDeleteCustomer(cust)}
                               title="Xóa tài khoản khách hàng"
-                              style={{ backgroundColor: '#ffffff', color: '#dc2626', border: '1px solid #fca5a5', borderRadius: '4px', padding: '0.3rem 0.45rem', fontSize: '0.72rem', fontWeight: 700, cursor: isBusy ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center' }}
+                              style={{
+                                width: '28px',
+                                height: '28px',
+                                backgroundColor: '#ffffff',
+                                color: '#dc2626',
+                                border: '1px solid #fca5a5',
+                                borderRadius: '6px',
+                                cursor: isBusy ? 'not-allowed' : 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                padding: 0,
+                                boxSizing: 'border-box'
+                              }}
                             >
-                              <Trash2 size={12} />
+                              <Trash2 size={13} />
                             </button>
                           </div>
                         </td>
