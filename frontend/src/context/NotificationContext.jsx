@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { X, CheckCircle, AlertCircle, Info } from 'lucide-react';
 import ConfirmDialog from '../components/ConfirmDialog';
+import { useAuth } from './AuthContext';
 
 const NotificationContext = createContext();
 
@@ -20,15 +21,38 @@ export const notify = (messageOrObj, type, link) => notifyRef(messageOrObj, type
 export const confirm = (message, options) => confirmRef(message, options);
 export const promptText = (message, defaultValue = '') => promptRef(message, defaultValue);
 
+// One shared "aether_notifications" localStorage key meant every account
+// that ever logged in on a given browser read and wrote the same history —
+// a customer logging in after someone else on a shared/public machine saw
+// that other person's order confirmations, and a staff account saw whatever
+// a customer had triggered earlier. Key the list to the logged-in identity
+// instead so each account only ever sees its own notifications.
+const storageKeyFor = (user) => `aether_notifications_${user?.id ?? 'guest'}`;
+
 export const NotificationProvider = ({ children }) => {
-  const [notifications, setNotifications] = useState(() => {
-    const saved = localStorage.getItem('aether_notifications');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const { user } = useAuth();
+  const [notifications, setNotifications] = useState([]);
   const [toasts, setToasts] = useState([]);
+  const activeStorageKey = useRef(storageKeyFor(user));
+
+  // Reload the notification history whenever the logged-in identity changes
+  // (login, logout, or switching accounts in the same tab) instead of only
+  // once on mount, so a fresh login never inherits the previous account's list.
+  useEffect(() => {
+    const key = storageKeyFor(user);
+    activeStorageKey.current = key;
+    try {
+      const saved = localStorage.getItem(key);
+      setNotifications(saved ? JSON.parse(saved) : []);
+    } catch (e) {
+      setNotifications([]);
+    }
+  }, [user?.id]);
 
   useEffect(() => {
-    localStorage.setItem('aether_notifications', JSON.stringify(notifications));
+    try {
+      localStorage.setItem(activeStorageKey.current, JSON.stringify(notifications));
+    } catch (e) {}
   }, [notifications]);
 
   const addNotification = (messageOrObj, type = 'success', link = null) => {
