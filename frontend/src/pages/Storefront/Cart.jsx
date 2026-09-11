@@ -598,44 +598,9 @@ export default function Cart() {
       setInvoice(invoiceData);
       addNotification(`Đơn hàng #${orderId} đã đặt thành công!`, 'success', '/my-orders');
 
-      // Gửi email xác nhận thật qua backend /orders/email-notify
-      if (targetEmail) {
-        try {
-          await api.post('/orders/email-notify', {
-            type: 'ORDER_CONFIRMATION',
-            toEmail: targetEmail,
-            customerName: customerName,
-            orderId,
-            items: itemsForERP,
-            totalAmount: finalTotal,
-            paymentMethod,
-            shippingAddress: fullAddress
-          });
-          console.log(`[EmailService] ✅ Đã phát lệnh gửi email xác nhận thành công tới ${targetEmail}`);
-        } catch (emailErr) {
-          console.warn('[EmailService] ❌ Lỗi gửi email xác nhận:', emailErr.message);
-        }
-
-        const emailLog = {
-          id: `MAIL-${Date.now()}`,
-          type: 'ORDER_CONFIRMATION',
-          toEmail: targetEmail,
-          customerName: customerName,
-          orderId,
-          subject: `[Aether ERP] Xác nhận đơn hàng thành công #${orderId}`,
-          sentAt: new Date().toISOString(),
-          items: itemsForERP,
-          totalAmount: finalTotal,
-          paymentMethod,
-          shippingAddress: fullAddress
-        };
-        try {
-          const existingLogs = JSON.parse(localStorage.getItem('erp_email_logs') || '[]');
-          existingLogs.unshift(emailLog);
-          if (existingLogs.length > 50) existingLogs.length = 50;
-          localStorage.setItem('erp_email_logs', JSON.stringify(existingLogs));
-        } catch (e) {}
-      }
+      // Email xác nhận đơn hàng được backend tự gửi ngay khi tạo đơn (POST /orders,
+      // xem order.controller.js) với đầy đủ dữ liệu thật từ DB — gọi thêm
+      // /orders/email-notify ở đây trước kia khiến khách nhận 2 email trùng nội dung.
 
       removeSelectedFromCart(selectedCartItems.map(getItemKey));
     } catch (err) {

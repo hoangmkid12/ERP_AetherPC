@@ -1,4 +1,5 @@
 const prisma = require('../config/database');
+const { sendOrderStatusUpdateEmail } = require('../services/emailService');
 
 const REQUIRED_CHECKLIST_KEYS = ['biosPost', 'osInstall', 'stressTest', 'qcSeal'];
 
@@ -131,6 +132,7 @@ const updateAssemblyJob = async (req, res, next) => {
       // Hoàn tất lắp ráp bàn giao đơn cho kho xuất hàng — chỉ đẩy Order thật
       // sang READY_TO_SHIP nếu nó đang ở trạng thái tự nhiên trước lắp ráp,
       // để không ghi đè 1 đơn đã tiến xa hơn vì lý do khác.
+      let readyToShipOrderId = null;
       if (isNewlyCompleted && job.orderId) {
         const order = await tx.order.findUnique({ where: { orderId: job.orderId } });
         if (order && ['CONFIRMED', 'PROCESSING'].includes(order.status)) {
@@ -143,13 +145,36 @@ const updateAssemblyJob = async (req, res, next) => {
               changedBy: req.user?.email || req.user?.code || 'Lắp ráp'
             }
           });
+          readyToShipOrderId = job.orderId;
         }
       }
 
-      return savedJob;
+      return { savedJob, readyToShipOrderId };
     });
 
-    res.json({ success: true, data: serializeJob(updated) });
+    // Gửi email báo khách hàng đơn đã sẵn sàng giao — ngoài transaction để lỗi mail
+    // (nếu có) không làm rollback việc lắp ráp đã hoàn tất.
+    if (updated.readyToShipOrderId) {
+      const readyOrder = await prisma.order.findUnique({
+        where: { orderId: updated.readyToShipOrderId },
+        include: { customer: true, items: { include: { product: true } } }
+      });
+      if (readyOrder?.customer?.email) {
+        sendOrderStatusUpdateEmail({
+          toEmail: readyOrder.customer.email,
+          customerName: readyOrder.customer.name,
+          orderId: readyOrder.orderId,
+          status: 'READY_TO_SHIP',
+          items: readyOrder.items,
+          subtotal: readyOrder.subtotal,
+          discount: readyOrder.discount,
+          shippingFee: readyOrder.shippingFee,
+          totalAmount: readyOrder.totalAmount
+        }).catch(err => console.warn('[Email] Lỗi gửi email sẵn sàng giao hàng:', err.message));
+      }
+    }
+
+    res.json({ success: true, data: serializeJob(updated.savedJob) });
   } catch (err) {
     next(err);
   }

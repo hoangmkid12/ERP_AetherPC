@@ -161,7 +161,7 @@ const createOrder = async (req, res, next) => {
           }
         },
         include: {
-          items: true
+          items: { include: { product: true } }
         }
       });
 
@@ -282,6 +282,9 @@ const createOrder = async (req, res, next) => {
         customerName: customer.name,
         orderId: order.orderId,
         items: order.items,
+        subtotal: order.subtotal,
+        discount: order.discount,
+        shippingFee: order.shippingFee,
         totalAmount: order.totalAmount,
         paymentMethod: order.paymentMethod,
         shippingAddress: order.shippingAddress
@@ -697,7 +700,7 @@ const updateOrderStatus = async (req, res, next) => {
     // Gửi email cập nhật trạng thái cho khách hàng
     const updatedOrderFull = await prisma.order.findUnique({
       where: { orderId: id },
-      include: { customer: true, items: true }
+      include: { customer: true, items: { include: { product: true } } }
     });
     if (updatedOrderFull?.customer?.email) {
       sendOrderStatusUpdateEmail({
@@ -707,6 +710,9 @@ const updateOrderStatus = async (req, res, next) => {
         status,
         note: note || req.body.receiverNote || req.body.failReason || null,
         items: updatedOrderFull.items,
+        subtotal: updatedOrderFull.subtotal,
+        discount: updatedOrderFull.discount,
+        shippingFee: updatedOrderFull.shippingFee,
         totalAmount: updatedOrderFull.totalAmount,
         proofPhoto: req.body.proofPhoto || req.body.proofUrl || null,
         receiverNote: req.body.receiverNote || null
