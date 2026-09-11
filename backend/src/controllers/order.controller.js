@@ -639,6 +639,16 @@ const updateOrderStatus = async (req, res, next) => {
       const receivedType = req.body.receivedByType || 'DIRECT_CUSTOMER';
       const receiverName = req.body.receiverNameActual || (receivedType === 'DIRECT_CUSTOMER' ? (existingOrder.customer?.name || 'Khách hàng') : 'Người nhận thay');
 
+      // Kho "Xác Nhận Xuất Kho" gửi kèm assignedShipperId/deliveryRegion khi
+      // chuyển SHIPPED (Warehouse.jsx -> salesStore.updateOrderStatus), nhưng
+      // route này trước đây bỏ qua hoàn toàn 2 field đó — Order.assignedShipperId
+      // không bao giờ được ghi thật, nên Delivery.jsx (lọc đơn theo shipper) và
+      // tính năng Đối Soát COD (lọc theo assignedShipperId) không hoạt động.
+      // Chỉ nhận khi là ID nhân viên nội bộ hợp lệ (số nguyên) — shipper ngoài
+      // hệ thống (chọn tự do bằng tên) không có Employee thật để gắn FK vào.
+      const shipperIdRaw = req.body.assignedShipperId;
+      const assignedShipperIdInt = /^\d+$/.test(String(shipperIdRaw ?? '')) ? parseInt(shipperIdRaw, 10) : null;
+
       const updatedOrder = await tx.order.update({
         where: { orderId: id },
         data: {
@@ -654,7 +664,11 @@ const updateOrderStatus = async (req, res, next) => {
             receivedByType: receivedType,
             receiverNameActual: receiverName
           } : {}),
-          ...(status === 'SHIPPED' ? { shippedAt: new Date() } : {}),
+          ...(status === 'SHIPPED' ? {
+            shippedAt: new Date(),
+            ...(assignedShipperIdInt !== null ? { assignedShipperId: assignedShipperIdInt } : {}),
+            ...(req.body.deliveryRegion !== undefined ? { deliveryRegion: req.body.deliveryRegion } : {})
+          } : {}),
           ...(status === 'CONFIRMED' ? { confirmedAt: new Date() } : {}),
           ...(status === 'CANCELLED' ? { cancelledAt: new Date() } : {})
         }
