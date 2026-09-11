@@ -10,6 +10,8 @@ const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`==================================================`);
   console.log(`  KLTN ERP Server is running on port ${PORT}`);
   console.log(`  Environment: ${process.env.NODE_ENV || 'development'}`);
+  const hasGmail = Boolean(process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD);
+  console.log(`  Email Service: ${hasGmail ? `Configured (Gmail: ${process.env.GMAIL_USER})` : `⚠️ NOT CONFIGURED (GMAIL_USER: ${process.env.GMAIL_USER ? 'SET' : 'MISSING'}, GMAIL_APP_PASSWORD: ${process.env.GMAIL_APP_PASSWORD ? 'SET' : 'MISSING'})`}`);
   console.log(`  Database status check pending connection...`);
   console.log(`==================================================`);
   

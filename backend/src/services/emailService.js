@@ -588,6 +588,8 @@ const sendWelcomeEmail = async ({ toEmail, customerName }) => {
     } catch (err) {
       console.error('[EmailService] ❌ Lỗi gửi email chào mừng:', err.message);
     }
+  } else {
+    console.warn(`[EmailService] ⚠️ Chưa cài SMTP/Gmail App Password (GMAIL_USER: ${process.env.GMAIL_USER ? 'ĐÃ CÓ' : 'CHƯA CÓ'}, GMAIL_APP_PASSWORD: ${process.env.GMAIL_APP_PASSWORD ? 'ĐÃ CÓ' : 'CHƯA CÓ'}). Email chào mừng không được gửi.`);
   }
 
   return emailData;
