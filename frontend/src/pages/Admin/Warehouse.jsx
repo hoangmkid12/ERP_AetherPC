@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useInventoryStore, useSalesStore, useFinanceStore, useUtilityStore, useHRStore } from '../../stores';
 import { useAuth } from '../../context/AuthContext';
 import { usePermission } from '../../hooks/usePermission';
-import { useNotification, notify, promptText } from '../../context/NotificationContext';
+import { useNotification, notify, promptText, confirm } from '../../context/NotificationContext';
 import { DELIVERY_REGIONS, detectDeliveryRegion } from '../../utils/deliveryRegions';
 import { QC_STATUS, getStatusInfo } from '../../utils/statusLabels';
 import { api } from '../../services/api';
@@ -1007,6 +1007,17 @@ function RfqAlertModal({ rfqModalData, setRfqModalData, sendSystemNotification, 
       return;
     }
 
+    // Ghi thành 1 Phiếu Yêu Cầu Mua Hàng (PurchaseRequest) THẬT trong CSDL để
+    // Quản Lý Kho có gì để ký duyệt (tab "Bổ Sung Hàng" > Phiếu Yêu Cầu) —
+    // trước đây bước này chỉ ghi localStorage + gửi thông báo, không để lại
+    // hồ sơ nào thật sự chờ duyệt.
+    const realProductId = item.productId || item.id;
+    if (realProductId) {
+      api.post('/warehouse/purchase-requests', { productId: realProductId, quantity: finalQty, reason }).catch(err => {
+        console.warn('[RFQ Alert] Không thể tạo Phiếu Yêu Cầu Mua Hàng thật:', err.message);
+      });
+    }
+
     const newLog = {
       id: 'RFQ-ALT-' + Date.now(),
       sentAt: new Date().toISOString(),
@@ -1612,6 +1623,146 @@ export default function Warehouse() {
   const canStockIntake = canDo('warehouse_stock_intake') || isWarehouse || isAdmin;
   const canApprovePr = canDo('warehouse_approve_pr') || isCEO || isAdmin;
   const canAuditAdjust = canDo('warehouse_audit_adjust') || isCEO || isAdmin;
+  const canCreatePr = canDo('warehouse_create_pr') || isWarehouse || isWarehouseManager || isCEO || isAdmin;
+  const canManageLocations = canDo('warehouse_manage_locations') || isWarehouseManager || isCEO || isAdmin;
+
+  // Phiếu Yêu Cầu Mua Hàng nội bộ (PR) — warehouse_create_pr / warehouse_approve_pr
+  const [purchaseRequests, setPurchaseRequests] = useState([]);
+  const [loadingPRs, setLoadingPRs] = useState(false);
+  const [prBusyId, setPrBusyId] = useState(null);
+  const [showCreatePrForm, setShowCreatePrForm] = useState(false);
+  const [prForm, setPrForm] = useState({ productId: '', quantity: '', reason: '' });
+
+  const loadPurchaseRequests = async () => {
+    setLoadingPRs(true);
+    try {
+      const res = await api.get('/warehouse/purchase-requests');
+      setPurchaseRequests(res.data || []);
+    } catch (err) {
+      notify(err?.message || 'Không thể tải danh sách Phiếu Yêu Cầu Mua Hàng.', 'error');
+    } finally {
+      setLoadingPRs(false);
+    }
+  };
+
+  const handleCreatePr = async () => {
+    const qty = parseInt(prForm.quantity, 10);
+    if (!prForm.productId || !Number.isInteger(qty) || qty <= 0) {
+      notify('Vui lòng chọn sản phẩm và nhập số lượng đề xuất hợp lệ.', 'error');
+      return;
+    }
+    try {
+      await api.post('/warehouse/purchase-requests', { productId: prForm.productId, quantity: qty, reason: prForm.reason });
+      notify('Đã gửi Phiếu Yêu Cầu Mua Hàng, chờ Quản Lý Kho ký duyệt.', 'success');
+      setShowCreatePrForm(false);
+      setPrForm({ productId: '', quantity: '', reason: '' });
+      loadPurchaseRequests();
+    } catch (err) {
+      notify(err?.message || 'Không thể tạo Phiếu Yêu Cầu Mua Hàng.', 'error');
+    }
+  };
+
+  const handleDecidePr = async (pr, decision) => {
+    const label = decision === 'approve' ? 'duyệt' : 'từ chối';
+    if (!(await confirm(`Xác nhận ${label} phiếu ${pr.prCode} (${pr.product?.name}, SL ${pr.quantity})?`, { danger: decision === 'reject' }))) return;
+    setPrBusyId(pr.id);
+    try {
+      await api.patch(`/warehouse/purchase-requests/${pr.id}/${decision}`);
+      notify(`Đã ${label} phiếu ${pr.prCode}.`, 'success');
+      loadPurchaseRequests();
+    } catch (err) {
+      notify(err?.message || `Không thể ${label} phiếu.`, 'error');
+    } finally {
+      setPrBusyId(null);
+    }
+  };
+
+  // Vị Trí Kệ Kho (WarehouseLocation) — warehouse_manage_locations
+  const [warehouseLocations, setWarehouseLocations] = useState([]);
+  const [loadingLocations, setLoadingLocations] = useState(false);
+  const [showCreateLocationForm, setShowCreateLocationForm] = useState(false);
+  const [locationForm, setLocationForm] = useState({ warehouseId: '1', zone: '', shelf: '', bin: '', capacity: '100' });
+
+  const loadWarehouseLocations = async () => {
+    setLoadingLocations(true);
+    try {
+      const res = await api.get('/warehouse/locations');
+      setWarehouseLocations(res.data || []);
+    } catch (err) {
+      notify(err?.message || 'Không thể tải danh sách vị trí kệ kho.', 'error');
+    } finally {
+      setLoadingLocations(false);
+    }
+  };
+
+  const handleCreateLocation = async () => {
+    if (!locationForm.zone.trim() || !locationForm.shelf.trim() || !locationForm.bin.trim()) {
+      notify('Vui lòng nhập đủ Zone / Shelf / Bin.', 'error');
+      return;
+    }
+    try {
+      await api.post('/warehouse/locations', locationForm);
+      notify(`Đã tạo vị trí ${locationForm.zone}-${locationForm.shelf}-${locationForm.bin}.`, 'success');
+      setShowCreateLocationForm(false);
+      setLocationForm({ warehouseId: '1', zone: '', shelf: '', bin: '', capacity: '100' });
+      loadWarehouseLocations();
+    } catch (err) {
+      notify(err?.message || 'Không thể tạo vị trí kệ.', 'error');
+    }
+  };
+
+  const handleDeleteLocation = async (loc) => {
+    if (!(await confirm(`Xóa vị trí ${loc.zone}-${loc.shelf}-${loc.bin}?`, { danger: true }))) return;
+    try {
+      await api.delete(`/warehouse/locations/${loc.id}`);
+      notify('Đã xóa vị trí kệ.', 'success');
+      loadWarehouseLocations();
+    } catch (err) {
+      notify(err?.message || 'Không thể xóa vị trí kệ.', 'error');
+    }
+  };
+
+  // Kiểm kê điều chỉnh GIẢM tồn kho — warehouse_audit_adjust (chỉ Quản Lý Kho)
+  const [showAuditForm, setShowAuditForm] = useState(false);
+  const [auditForm, setAuditForm] = useState({ productId: '', quantity: '', warehouseId: '1', reason: '', note: '', serials: '' });
+  const [submittingAudit, setSubmittingAudit] = useState(false);
+
+  const handleSubmitAudit = async () => {
+    const qty = parseInt(auditForm.quantity, 10);
+    const serialsArr = auditForm.serials.split(/[\n,]/).map(s => s.trim()).filter(Boolean);
+    if (!auditForm.productId || !Number.isInteger(qty) || qty <= 0) {
+      notify('Vui lòng chọn sản phẩm và nhập số lượng điều chỉnh giảm hợp lệ.', 'error');
+      return;
+    }
+    if (!auditForm.reason.trim()) {
+      notify('Vui lòng nhập lý do kiểm kê (thất lạc, hư hỏng...).', 'error');
+      return;
+    }
+    if (serialsArr.length !== qty) {
+      notify(`Cần nhập đủ ${qty} Serial Number đang tồn kho thực tế (mỗi dòng 1 mã) — hiện có ${serialsArr.length}.`, 'error');
+      return;
+    }
+    setSubmittingAudit(true);
+    try {
+      await api.post('/warehouse/inventory/audit-adjust', {
+        productId: auditForm.productId,
+        quantity: qty,
+        warehouseId: parseInt(auditForm.warehouseId, 10) || 1,
+        reason: auditForm.reason,
+        note: auditForm.note,
+        serials: serialsArr
+      });
+      notify(`Đã ghi nhận điều chỉnh giảm ${qty} sản phẩm.`, 'success');
+      setShowAuditForm(false);
+      setAuditForm({ productId: '', quantity: '', warehouseId: '1', reason: '', note: '', serials: '' });
+      if (typeof refreshInventoryFromServer === 'function') refreshInventoryFromServer();
+    } catch (err) {
+      notify(err?.message || 'Không thể ghi nhận điều chỉnh giảm.', 'error');
+    } finally {
+      setSubmittingAudit(false);
+    }
+  };
+
   const inventory = useInventoryStore(state => state.inventory) || [];
   const setInventory = (items) => {
     useInventoryStore.setState({ inventory: items });
@@ -1620,6 +1771,7 @@ export default function Warehouse() {
   const updateProduct = useInventoryStore(state => state.updateProduct);
   const createProduct = useInventoryStore(state => state.createProduct);
   const deleteProductImage = useInventoryStore(state => state.deleteProductImage);
+  const refreshInventoryFromServer = useInventoryStore(state => state.getInventory);
   const products = useInventoryStore(state => state.products) || [];
 
   const orders = useSalesStore(state => state.orders) || [];
@@ -1930,6 +2082,11 @@ export default function Warehouse() {
   useEffect(() => {
     fetchReceipts();
   }, []);
+
+  useEffect(() => {
+    if (activeTab === 'rfq') loadPurchaseRequests();
+    if (activeTab === 'locations') loadWarehouseLocations();
+  }, [activeTab]);
 
   // Real Supplier directory (Purchasing's Danh Bạ NCC) — the product edit form used
   // to offer a hardcoded list of supplier NAMES (STANDARD_SUPPLIERS) with no relation
@@ -3935,6 +4092,84 @@ export default function Warehouse() {
             </form>
             </fieldset>
           </div>
+
+          {/* Kiểm Kê Điều Chỉnh GIẢM Tồn Kho — warehouse_audit_adjust, chỉ Quản Lý Kho */}
+          {canAuditAdjust && (
+            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #fecaca', padding: '1.5rem', marginTop: '1.5rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+                <div>
+                  <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#b91c1c', margin: 0 }}>Kiểm Kê Điều Chỉnh Giảm Tồn Kho</h3>
+                  <p style={{ fontSize: '0.8rem', color: '#64748b', margin: '0.2rem 0 0 0' }}>
+                    Ghi nhận hàng thất lạc/hư hỏng phát hiện khi kiểm kê thực tế — trừ tồn kho thật, có dấu vết Serial Number.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowAuditForm(v => !v)}
+                  style={{ backgroundColor: '#fef2f2', color: '#b91c1c', border: '1px solid #fecaca', borderRadius: '6px', padding: '0.5rem 1rem', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
+                >
+                  {showAuditForm ? 'Đóng' : '+ Ghi Nhận Kiểm Kê'}
+                </button>
+              </div>
+
+              {showAuditForm && (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.25rem' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.35rem' }}>Sản phẩm *</label>
+                    <select
+                      value={auditForm.productId}
+                      onChange={(e) => setAuditForm(f => ({ ...f, productId: e.target.value }))}
+                      style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px' }}
+                    >
+                      <option value="">-- Chọn sản phẩm --</option>
+                      {activeInventory.map(prod => (
+                        <option key={prod.id} value={prod.id}>{prod.name} (Tồn hiện tại: {prod.stock})</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.35rem' }}>Số lượng điều chỉnh giảm *</label>
+                    <input
+                      type="number" min="1"
+                      value={auditForm.quantity}
+                      onChange={(e) => setAuditForm(f => ({ ...f, quantity: e.target.value }))}
+                      style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px' }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.35rem' }}>Lý do *</label>
+                    <input
+                      type="text" placeholder="Thất lạc, hư hỏng, sai lệch kiểm kê..."
+                      value={auditForm.reason}
+                      onChange={(e) => setAuditForm(f => ({ ...f, reason: e.target.value }))}
+                      style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px' }}
+                    />
+                  </div>
+                  <div style={{ gridColumn: '1 / -1' }}>
+                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.35rem' }}>
+                      Serial Number cần loại bỏ (mỗi dòng 1 mã, phải đang tồn kho) *
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={auditForm.serials}
+                      onChange={(e) => setAuditForm(f => ({ ...f, serials: e.target.value }))}
+                      style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontFamily: 'monospace' }}
+                    />
+                  </div>
+                  <div style={{ gridColumn: '1 / -1' }}>
+                    <button
+                      type="button"
+                      disabled={submittingAudit}
+                      onClick={handleSubmitAudit}
+                      style={{ backgroundColor: '#dc2626', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.6rem 1.5rem', fontSize: '0.88rem', fontWeight: 700, cursor: submittingAudit ? 'default' : 'pointer', opacity: submittingAudit ? 0.6 : 1 }}
+                    >
+                      {submittingAudit ? 'Đang xử lý...' : 'Xác Nhận Điều Chỉnh Giảm'}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -3965,6 +4200,115 @@ export default function Warehouse() {
             >
               Lịch Sử Cảnh Báo ({rfqAlertLogs.length})
             </button>
+          </div>
+
+          {/* Phiếu Yêu Cầu Mua Hàng nội bộ (PurchaseRequest) — warehouse_create_pr / warehouse_approve_pr.
+              Trước đây "Đề xuất bổ sung" chỉ gửi thông báo + log localStorage, không có
+              hồ sơ thật nào để Quản Lý Kho ký duyệt. */}
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem', marginBottom: '1.25rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+              <div>
+                <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>Phiếu Yêu Cầu Mua Hàng Nội Bộ (PR)</h3>
+                <p style={{ fontSize: '0.8rem', color: '#64748b', margin: '0.2rem 0 0 0' }}>
+                  {canApprovePr ? 'Ký duyệt đề xuất bổ sung hàng trước khi Mua Hàng lập RFQ gửi NCC.' : 'Đề xuất bổ sung hàng — chờ Quản Lý Kho ký duyệt.'}
+                </p>
+              </div>
+              {canCreatePr && (
+                <button
+                  onClick={() => setShowCreatePrForm(v => !v)}
+                  style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.5rem 1rem', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
+                >
+                  {showCreatePrForm ? 'Đóng' : '+ Lập Phiếu Yêu Cầu'}
+                </button>
+              )}
+            </div>
+
+            {showCreatePrForm && (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1.25rem', padding: '1rem', backgroundColor: '#f8fafc', borderRadius: '8px' }}>
+                <select
+                  value={prForm.productId}
+                  onChange={(e) => setPrForm(f => ({ ...f, productId: e.target.value }))}
+                  style={{ padding: '0.55rem 0.75rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px' }}
+                >
+                  <option value="">-- Chọn sản phẩm --</option>
+                  {activeInventory.map(prod => (
+                    <option key={prod.id} value={prod.id}>{prod.name} (Tồn: {prod.stock})</option>
+                  ))}
+                </select>
+                <input
+                  type="number" min="1" placeholder="Số lượng đề xuất"
+                  value={prForm.quantity}
+                  onChange={(e) => setPrForm(f => ({ ...f, quantity: e.target.value }))}
+                  style={{ padding: '0.55rem 0.75rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px' }}
+                />
+                <input
+                  type="text" placeholder="Lý do đề xuất"
+                  value={prForm.reason}
+                  onChange={(e) => setPrForm(f => ({ ...f, reason: e.target.value }))}
+                  style={{ padding: '0.55rem 0.75rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px' }}
+                />
+                <button
+                  onClick={handleCreatePr}
+                  style={{ backgroundColor: '#16a34a', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.55rem 1rem', fontSize: '0.83rem', fontWeight: 700, cursor: 'pointer' }}
+                >
+                  Gửi Đề Xuất
+                </button>
+              </div>
+            )}
+
+            {loadingPRs ? (
+              <div style={{ textAlign: 'center', padding: '1.5rem', color: '#94a3b8' }}>Đang tải...</div>
+            ) : purchaseRequests.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '1.5rem', color: '#94a3b8', fontSize: '0.85rem' }}>Chưa có Phiếu Yêu Cầu Mua Hàng nào.</div>
+            ) : (
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+                  <thead>
+                    <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569' }}>
+                      <th style={{ padding: '0.6rem 0.85rem' }}>Mã Phiếu</th>
+                      <th style={{ padding: '0.6rem 0.85rem' }}>Sản Phẩm</th>
+                      <th style={{ padding: '0.6rem 0.85rem', textAlign: 'center' }}>SL Đề Xuất</th>
+                      <th style={{ padding: '0.6rem 0.85rem' }}>Lý Do</th>
+                      <th style={{ padding: '0.6rem 0.85rem' }}>Người Đề Xuất</th>
+                      <th style={{ padding: '0.6rem 0.85rem', textAlign: 'center' }}>Trạng Thái</th>
+                      {canApprovePr && <th style={{ padding: '0.6rem 0.85rem', textAlign: 'center' }}>Thao Tác</th>}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {purchaseRequests.map(pr => {
+                      const isBusy = prBusyId === pr.id;
+                      const statusColor = pr.status === 'APPROVED' ? '#16a34a' : pr.status === 'REJECTED' ? '#dc2626' : '#d97706';
+                      const statusBg = pr.status === 'APPROVED' ? '#f0fdf4' : pr.status === 'REJECTED' ? '#fef2f2' : '#fffbeb';
+                      const statusLabel = pr.status === 'APPROVED' ? 'Đã Duyệt' : pr.status === 'REJECTED' ? 'Từ Chối' : 'Chờ Duyệt';
+                      return (
+                        <tr key={pr.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                          <td style={{ padding: '0.6rem 0.85rem', fontWeight: 700, color: '#0f172a' }}>{pr.prCode}</td>
+                          <td style={{ padding: '0.6rem 0.85rem', color: '#334155' }}>{pr.product?.name}</td>
+                          <td style={{ padding: '0.6rem 0.85rem', textAlign: 'center', fontWeight: 700 }}>{pr.quantity}</td>
+                          <td style={{ padding: '0.6rem 0.85rem', color: '#64748b' }}>{pr.reason || '-'}</td>
+                          <td style={{ padding: '0.6rem 0.85rem', color: '#64748b', fontSize: '0.75rem' }}>{pr.requestedBy}</td>
+                          <td style={{ padding: '0.6rem 0.85rem', textAlign: 'center' }}>
+                            <span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 800, backgroundColor: statusBg, color: statusColor }}>{statusLabel}</span>
+                          </td>
+                          {canApprovePr && (
+                            <td style={{ padding: '0.6rem 0.85rem', textAlign: 'center' }}>
+                              {pr.status === 'PENDING' ? (
+                                <div style={{ display: 'flex', gap: '0.35rem', justifyContent: 'center' }}>
+                                  <button disabled={isBusy} onClick={() => handleDecidePr(pr, 'approve')} style={{ backgroundColor: '#16a34a', color: '#fff', border: 'none', borderRadius: '4px', padding: '0.3rem 0.6rem', fontSize: '0.72rem', fontWeight: 700, cursor: isBusy ? 'default' : 'pointer' }}>Duyệt</button>
+                                  <button disabled={isBusy} onClick={() => handleDecidePr(pr, 'reject')} style={{ backgroundColor: '#fff', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '4px', padding: '0.3rem 0.6rem', fontSize: '0.72rem', fontWeight: 700, cursor: isBusy ? 'default' : 'pointer' }}>Từ Chối</button>
+                                </div>
+                              ) : (
+                                <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>{pr.approvedBy}</span>
+                              )}
+                            </td>
+                          )}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
 
           {/* Filter bar */}
@@ -5012,28 +5356,74 @@ export default function Warehouse() {
       {/* 11. VIEW: CẤU HÌNH > KHO HÀNG & VỊ TRÍ KỆ (LOCATIONS) */}
       {activeTab === 'locations' && (
         <div>
-          <div style={{ marginBottom: '1.25rem' }}>
-            <h2 style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
-              Cấu Hình / Kho Hàng & Vị Trí Kệ
-            </h2>
-            <p style={{ fontSize: '0.82rem', color: '#64748b', margin: '0.2rem 0 0 0' }}>
-              Danh sách khu vực kệ kho cố định trong nhà kho
-            </p>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+            <div>
+              <h2 style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                Cấu Hình / Kho Hàng & Vị Trí Kệ
+              </h2>
+              <p style={{ fontSize: '0.82rem', color: '#64748b', margin: '0.2rem 0 0 0' }}>
+                Sơ đồ vị trí kệ thật (Zone / Shelf / Bin) — {canManageLocations ? 'tạo mới hoặc xóa vị trí chưa gán hàng.' : 'chỉ Quản Lý Kho mới có thể chỉnh sửa.'}
+              </p>
+            </div>
+            {canManageLocations && (
+              <button
+                onClick={() => setShowCreateLocationForm(v => !v)}
+                style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.5rem 1rem', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
+              >
+                {showCreateLocationForm ? 'Đóng' : '+ Thêm Vị Trí Mới'}
+              </button>
+            )}
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
-            {PREDEFINED_LOCATIONS.map(loc => {
-              const count = activeInventory.filter(i => i.location === loc).length;
-              return (
-                <div key={loc} style={{ backgroundColor: '#ffffff', padding: '1.25rem', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
-                  <h4 style={{ margin: '0 0 0.5rem 0', color: '#2563eb', fontSize: '1rem', fontWeight: 800 }}>{loc}</h4>
-                  <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748b' }}>
-                    Số sản phẩm gán vị trí này: <strong style={{ color: '#0f172a' }}>{count}</strong> sản phẩm
+          {showCreateLocationForm && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '1rem', marginBottom: '1.25rem', padding: '1rem', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
+              <select
+                value={locationForm.warehouseId}
+                onChange={(e) => setLocationForm(f => ({ ...f, warehouseId: e.target.value }))}
+                style={{ padding: '0.55rem 0.75rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px' }}
+              >
+                <option value="1">Kho Tổng TP.HCM</option>
+                <option value="2">Kho Chi Nhánh Hà Nội</option>
+              </select>
+              <input type="text" placeholder="Zone (VD: A)" value={locationForm.zone} onChange={(e) => setLocationForm(f => ({ ...f, zone: e.target.value }))} style={{ padding: '0.55rem 0.75rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px' }} />
+              <input type="text" placeholder="Shelf (VD: 01)" value={locationForm.shelf} onChange={(e) => setLocationForm(f => ({ ...f, shelf: e.target.value }))} style={{ padding: '0.55rem 0.75rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px' }} />
+              <input type="text" placeholder="Bin (VD: 01)" value={locationForm.bin} onChange={(e) => setLocationForm(f => ({ ...f, bin: e.target.value }))} style={{ padding: '0.55rem 0.75rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px' }} />
+              <input type="number" placeholder="Sức chứa" value={locationForm.capacity} onChange={(e) => setLocationForm(f => ({ ...f, capacity: e.target.value }))} style={{ padding: '0.55rem 0.75rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px' }} />
+              <button onClick={handleCreateLocation} style={{ backgroundColor: '#16a34a', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.55rem 1rem', fontSize: '0.83rem', fontWeight: 700, cursor: 'pointer' }}>Tạo Vị Trí</button>
+            </div>
+          )}
+
+          {loadingLocations ? (
+            <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>Đang tải...</div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1.25rem' }}>
+              {warehouseLocations.map(loc => (
+                <div key={loc.id} style={{ backgroundColor: '#ffffff', padding: '1.25rem', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div>
+                      <h4 style={{ margin: '0 0 0.2rem 0', color: '#2563eb', fontSize: '1rem', fontWeight: 800 }}>{loc.zone}-{loc.shelf}-{loc.bin}</h4>
+                      <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>{loc.warehouse?.name}</span>
+                    </div>
+                    {canManageLocations && (
+                      <button
+                        onClick={() => handleDeleteLocation(loc)}
+                        title="Xóa vị trí (chỉ khi chưa gán hàng)"
+                        style={{ backgroundColor: '#fff', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '4px', padding: '0.3rem 0.5rem', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}
+                      >
+                        Xóa
+                      </button>
+                    )}
+                  </div>
+                  <p style={{ margin: '0.75rem 0 0 0', fontSize: '0.82rem', color: '#64748b' }}>
+                    Đã gán: <strong style={{ color: '#0f172a' }}>{loc.assignedCount}</strong> / {loc.capacity} sức chứa
                   </p>
                 </div>
-              );
-            })}
-          </div>
+              ))}
+              {warehouseLocations.length === 0 && (
+                <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>Chưa có vị trí kệ nào được tạo.</div>
+              )}
+            </div>
+          )}
         </div>
       )}
 

@@ -1,5 +1,6 @@
 const prisma = require('../config/database');
 const { computeBlendedAverageCost } = require('../utils/inventoryCosting');
+const { logAudit } = require('../utils/auditLog');
 
 // GET /api/v1/warehouse/receipts
 // Lấy danh sách phiếu nhận hàng (GoodsReceipt) kèm thông tin PO, items, product
@@ -491,11 +492,323 @@ const adjustInventory = async (req, res, next) => {
   }
 };
 
+// POST /api/v1/warehouse/inventory/audit-adjust
+// Kiểm kê phát hiện thiếu hụt/hư hỏng thực tế so với hệ thống — GIẢM tồn kho,
+// ngược chiều với adjustInventory (chỉ tăng). Chỉ Quản Lý Kho được duyệt việc
+// này (warehouse_audit_adjust) — khác adjustInventory dùng chung cho cả 2 vai
+// trò vì đó là thao tác nhập hàng hàng ngày.
+const auditDecreaseInventory = async (req, res, next) => {
+  try {
+    const { productId, quantity, warehouseId, reason, note, serials } = req.body;
+    const qty = parseInt(quantity, 10);
+    const whId = parseInt(warehouseId, 10) || 1;
+    const actor = req.user?.fullname || req.user?.email || req.user?.code || 'Quản Lý Kho';
+
+    if (!productId || !Number.isInteger(qty) || qty <= 0) {
+      return res.status(400).json({ success: false, message: 'Cần chọn sản phẩm và số lượng điều chỉnh giảm là số nguyên dương.' });
+    }
+    if (!reason || !String(reason).trim()) {
+      return res.status(400).json({ success: false, message: 'Cần nhập lý do kiểm kê (thất lạc, hư hỏng, sai lệch...).' });
+    }
+
+    // Serial bị loại phải là serial CÓ THẬT và đang AVAILABLE — không thể "kiểm
+    // kê mất" 1 serial đã bán cho khách hoặc đã dùng ở đơn khác.
+    const itemSerials = Array.isArray(serials) ? serials.map(s => String(s).trim()).filter(Boolean) : [];
+    if (itemSerials.length !== qty) {
+      return res.status(400).json({ success: false, message: `Cần chọn đủ ${qty} Serial Number đang tồn kho để điều chỉnh giảm, hiện chọn ${itemSerials.length}.` });
+    }
+    if (new Set(itemSerials).size !== itemSerials.length) {
+      return res.status(400).json({ success: false, message: 'Danh sách Serial Number có mã bị trùng lặp.' });
+    }
+
+    const result = await prisma.$transaction(async (tx) => {
+      const product = await tx.product.findUnique({ where: { productId: String(productId) } });
+      if (!product) {
+        const err = new Error(`Không tìm thấy sản phẩm với mã: ${productId}`);
+        err.statusCode = 404;
+        throw err;
+      }
+
+      const validSerials = await tx.serialNumber.findMany({
+        where: { serial: { in: itemSerials }, productId: product.productId, status: 'AVAILABLE' }
+      });
+      if (validSerials.length !== itemSerials.length) {
+        const err = new Error('Một hoặc nhiều Serial Number không tồn tại, không thuộc sản phẩm này, hoặc đã được bán/sử dụng — không thể điều chỉnh giảm.');
+        err.statusCode = 409;
+        throw err;
+      }
+
+      const inventory = await tx.inventory.findFirst({ where: { productId: product.productId, warehouseId: whId } });
+      if (!inventory || inventory.quantityOnHand < qty) {
+        const err = new Error(`Tồn kho thực tế tại kho chỉ còn ${inventory?.quantityOnHand || 0}, không đủ ${qty} để điều chỉnh giảm.`);
+        err.statusCode = 409;
+        throw err;
+      }
+      if (product.stockQuantity < qty) {
+        const err = new Error(`Tổng tồn kho sản phẩm chỉ còn ${product.stockQuantity}, không đủ ${qty} để điều chỉnh giảm.`);
+        err.statusCode = 409;
+        throw err;
+      }
+
+      await tx.serialNumber.updateMany({
+        where: { serial: { in: itemSerials } },
+        data: { status: 'DEFECTIVE' }
+      });
+
+      const updatedProduct = await tx.product.update({
+        where: { productId: product.productId },
+        data: { stockQuantity: { decrement: qty } }
+      });
+
+      const updatedInventory = await tx.inventory.update({
+        where: { id: inventory.id },
+        data: { quantityOnHand: { decrement: qty } }
+      });
+
+      const movement = await tx.stockMovement.create({
+        data: {
+          productId: product.productId,
+          fromWarehouseId: whId,
+          type: 'OUT',
+          quantity: qty,
+          referenceId: `AUDIT-${Date.now().toString().slice(-8)}`,
+          note: `Kiểm kê điều chỉnh giảm (${reason})${note ? ` — ${note}` : ''}. Serial: ${itemSerials.join(', ')}`,
+          createdBy: actor
+        }
+      });
+
+      return { product: updatedProduct, inventory: updatedInventory, movement };
+    });
+
+    logAudit({ req, action: 'AUDIT_ADJUST_INVENTORY', module: 'Kho Hàng', targetId: productId, note: `-${qty} (${reason})` });
+    res.json({ success: true, message: 'Đã ghi nhận điều chỉnh giảm tồn kho.', data: result });
+  } catch (err) {
+    if (err.statusCode) {
+      return res.status(err.statusCode).json({ success: false, message: err.message });
+    }
+    next(err);
+  }
+};
+
+// ─── Phiếu Yêu Cầu Mua Hàng nội bộ (PurchaseRequest) ───────────────────────
+
+// GET /api/v1/warehouse/purchase-requests
+const listPurchaseRequests = async (req, res, next) => {
+  try {
+    const { status } = req.query;
+    const where = status && status !== 'ALL' ? { status } : {};
+    const requests = await prisma.purchaseRequest.findMany({
+      where,
+      include: { product: { select: { name: true, sku: true, stockQuantity: true } } },
+      orderBy: { createdAt: 'desc' }
+    });
+    res.json({ success: true, data: requests });
+  } catch (err) { next(err); }
+};
+
+// POST /api/v1/warehouse/purchase-requests — Thủ Kho lập đề xuất (warehouse_create_pr)
+const createPurchaseRequest = async (req, res, next) => {
+  try {
+    const { productId, quantity, reason } = req.body;
+    const qty = parseInt(quantity, 10);
+    if (!productId || !Number.isInteger(qty) || qty <= 0) {
+      return res.status(400).json({ success: false, message: 'Cần chọn sản phẩm và số lượng đề xuất là số nguyên dương.' });
+    }
+    const product = await prisma.product.findUnique({ where: { productId: String(productId) } });
+    if (!product) {
+      return res.status(404).json({ success: false, message: `Không tìm thấy sản phẩm với mã: ${productId}` });
+    }
+
+    const prCode = `PR-${Date.now().toString().slice(-8)}`;
+    const request = await prisma.purchaseRequest.create({
+      data: {
+        prCode,
+        productId: product.productId,
+        quantity: qty,
+        reason: reason || null,
+        status: 'PENDING',
+        requestedBy: req.user?.fullname || req.user?.email || req.user?.code || 'Thủ Kho'
+      },
+      include: { product: { select: { name: true, sku: true } } }
+    });
+
+    logAudit({ req, action: 'CREATE_PURCHASE_REQUEST', module: 'Kho Hàng', targetId: request.id, note: `${request.prCode} — ${product.name} x${qty}` });
+    res.status(201).json({ success: true, data: request });
+  } catch (err) { next(err); }
+};
+
+// PATCH /api/v1/warehouse/purchase-requests/:id/approve — Quản Lý Kho ký duyệt (warehouse_approve_pr)
+const approvePurchaseRequest = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const existing = await prisma.purchaseRequest.findUnique({ where: { id: parseInt(id, 10) } });
+    if (!existing) return res.status(404).json({ success: false, message: `Không tìm thấy đề xuất: ${id}` });
+    if (existing.status !== 'PENDING') {
+      return res.status(409).json({ success: false, message: `Đề xuất này đã được xử lý (${existing.status}).` });
+    }
+
+    const request = await prisma.purchaseRequest.update({
+      where: { id: existing.id },
+      data: {
+        status: 'APPROVED',
+        approvedBy: req.user?.fullname || req.user?.email || req.user?.code || 'Quản Lý Kho',
+        approvedAt: new Date()
+      },
+      include: { product: { select: { name: true, sku: true } } }
+    });
+
+    logAudit({ req, action: 'APPROVE_PURCHASE_REQUEST', module: 'Kho Hàng', targetId: request.id, note: request.prCode });
+    res.json({ success: true, data: request });
+  } catch (err) { next(err); }
+};
+
+// PATCH /api/v1/warehouse/purchase-requests/:id/reject
+const rejectPurchaseRequest = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+    const existing = await prisma.purchaseRequest.findUnique({ where: { id: parseInt(id, 10) } });
+    if (!existing) return res.status(404).json({ success: false, message: `Không tìm thấy đề xuất: ${id}` });
+    if (existing.status !== 'PENDING') {
+      return res.status(409).json({ success: false, message: `Đề xuất này đã được xử lý (${existing.status}).` });
+    }
+
+    const request = await prisma.purchaseRequest.update({
+      where: { id: existing.id },
+      data: {
+        status: 'REJECTED',
+        approvedBy: req.user?.fullname || req.user?.email || req.user?.code || 'Quản Lý Kho',
+        approvedAt: new Date(),
+        reason: reason ? `${existing.reason || ''} [Từ chối: ${reason}]`.trim() : existing.reason
+      }
+    });
+
+    logAudit({ req, action: 'REJECT_PURCHASE_REQUEST', module: 'Kho Hàng', targetId: request.id, note: request.prCode });
+    res.json({ success: true, data: request });
+  } catch (err) { next(err); }
+};
+
+// ─── Vị Trí Kệ Kho (WarehouseLocation) ──────────────────────────────────────
+
+// GET /api/v1/warehouse/locations
+const listWarehouseLocations = async (req, res, next) => {
+  try {
+    const locations = await prisma.warehouseLocation.findMany({
+      include: {
+        warehouse: { select: { name: true } },
+        _count: { select: { inventories: true } }
+      },
+      orderBy: [{ warehouseId: 'asc' }, { zone: 'asc' }, { shelf: 'asc' }, { bin: 'asc' }]
+    });
+    res.json({
+      success: true,
+      data: locations.map(l => ({ ...l, assignedCount: l._count.inventories, _count: undefined }))
+    });
+  } catch (err) { next(err); }
+};
+
+// POST /api/v1/warehouse/locations — Quản Lý Kho tạo vị trí kệ mới (warehouse_manage_locations)
+const createWarehouseLocation = async (req, res, next) => {
+  try {
+    const { warehouseId, zone, shelf, bin, capacity } = req.body;
+    const whId = parseInt(warehouseId, 10);
+    if (!Number.isInteger(whId) || !zone || !shelf || !bin) {
+      return res.status(400).json({ success: false, message: 'Cần chọn kho và nhập đủ Zone / Shelf / Bin.' });
+    }
+
+    const existing = await prisma.warehouseLocation.findFirst({ where: { warehouseId: whId, zone, shelf, bin } });
+    if (existing) {
+      return res.status(400).json({ success: false, message: `Vị trí ${zone}-${shelf}-${bin} đã tồn tại tại kho này.` });
+    }
+
+    const location = await prisma.warehouseLocation.create({
+      data: { warehouseId: whId, zone: String(zone).trim(), shelf: String(shelf).trim(), bin: String(bin).trim(), capacity: parseInt(capacity, 10) || 100 }
+    });
+    logAudit({ req, action: 'CREATE_WAREHOUSE_LOCATION', module: 'Kho Hàng', targetId: location.id, note: `${zone}-${shelf}-${bin}` });
+    res.status(201).json({ success: true, data: location });
+  } catch (err) { next(err); }
+};
+
+// PUT /api/v1/warehouse/locations/:id
+const updateWarehouseLocation = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { capacity, zone, shelf, bin } = req.body;
+    const existing = await prisma.warehouseLocation.findUnique({ where: { id: parseInt(id, 10) } });
+    if (!existing) return res.status(404).json({ success: false, message: `Không tìm thấy vị trí: ${id}` });
+
+    const location = await prisma.warehouseLocation.update({
+      where: { id: existing.id },
+      data: {
+        ...(capacity !== undefined ? { capacity: parseInt(capacity, 10) || existing.capacity } : {}),
+        ...(zone !== undefined ? { zone: String(zone).trim() } : {}),
+        ...(shelf !== undefined ? { shelf: String(shelf).trim() } : {}),
+        ...(bin !== undefined ? { bin: String(bin).trim() } : {})
+      }
+    });
+    logAudit({ req, action: 'UPDATE_WAREHOUSE_LOCATION', module: 'Kho Hàng', targetId: location.id, note: `${location.zone}-${location.shelf}-${location.bin}` });
+    res.json({ success: true, data: location });
+  } catch (err) { next(err); }
+};
+
+// DELETE /api/v1/warehouse/locations/:id — chỉ xóa được khi chưa gán hàng nào
+const deleteWarehouseLocation = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const existing = await prisma.warehouseLocation.findUnique({
+      where: { id: parseInt(id, 10) },
+      include: { _count: { select: { inventories: true } } }
+    });
+    if (!existing) return res.status(404).json({ success: false, message: `Không tìm thấy vị trí: ${id}` });
+    if (existing._count.inventories > 0) {
+      return res.status(400).json({ success: false, message: `Vị trí này đang chứa ${existing._count.inventories} mã hàng — hãy chuyển hàng đi trước khi xóa.` });
+    }
+
+    await prisma.warehouseLocation.delete({ where: { id: existing.id } });
+    logAudit({ req, action: 'DELETE_WAREHOUSE_LOCATION', module: 'Kho Hàng', targetId: existing.id, note: `${existing.zone}-${existing.shelf}-${existing.bin}` });
+    res.json({ success: true, message: 'Đã xóa vị trí kệ.' });
+  } catch (err) { next(err); }
+};
+
+// PATCH /api/v1/warehouse/inventory/:id/location — gán 1 dòng tồn kho vào vị trí
+// kệ cụ thể (thao tác vận hành hàng ngày, không cần Quản Lý Kho duyệt riêng).
+const assignInventoryLocation = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { locationId } = req.body;
+    const inventory = await prisma.inventory.findUnique({ where: { id: parseInt(id, 10) } });
+    if (!inventory) return res.status(404).json({ success: false, message: `Không tìm thấy dòng tồn kho: ${id}` });
+
+    let targetLocationId = null;
+    if (locationId !== null && locationId !== undefined && locationId !== '') {
+      const location = await prisma.warehouseLocation.findUnique({ where: { id: parseInt(locationId, 10) } });
+      if (!location) return res.status(404).json({ success: false, message: `Không tìm thấy vị trí kệ: ${locationId}` });
+      if (location.warehouseId !== inventory.warehouseId) {
+        return res.status(400).json({ success: false, message: 'Vị trí kệ này không thuộc cùng kho với dòng tồn kho.' });
+      }
+      targetLocationId = location.id;
+    }
+
+    const updated = await prisma.inventory.update({ where: { id: inventory.id }, data: { locationId: targetLocationId } });
+    res.json({ success: true, data: updated });
+  } catch (err) { next(err); }
+};
+
 module.exports = {
   getReceipts,
   getReceiptById,
   validateReceipt,
   getStockMovements,
   getInventory,
-  adjustInventory
+  adjustInventory,
+  auditDecreaseInventory,
+  listPurchaseRequests,
+  createPurchaseRequest,
+  approvePurchaseRequest,
+  rejectPurchaseRequest,
+  listWarehouseLocations,
+  createWarehouseLocation,
+  updateWarehouseLocation,
+  deleteWarehouseLocation,
+  assignInventoryLocation
 };

@@ -89,6 +89,7 @@ model Product {
   poItems         PurchaseOrderItem[]
   bomItems        BomItem[]
   serialNumbers   SerialNumber[]
+  purchaseRequests PurchaseRequest[]
 
   // Search & Filtering Indexes
   @@index([name]) // For LIKE/contains searches
@@ -337,6 +338,28 @@ model WarehouseLocation {
 
   @@unique([warehouseId, zone, shelf, bin])
   @@map("warehouse_locations")
+}
+
+// Đề xuất mua hàng nội bộ (warehouse_create_pr) do Thủ Kho lập khi tồn kho
+// chạm ngưỡng an toàn — Quản Lý Kho ký duyệt (warehouse_approve_pr) trước khi
+// Mua Hàng lập RFQ gửi NCC. Trước đây chỉ có 1 thông báo in-app + log
+// localStorage, không có bản ghi nào để "duyệt" thật.
+model PurchaseRequest {
+  id          Int       @id @default(autoincrement())
+  prCode      String    @unique @map("pr_code") @db.VarChar(50)
+  productId   String    @map("product_id") @db.VarChar(50)
+  quantity    Int
+  reason      String?
+  status      String    @default("PENDING") @db.VarChar(20) // PENDING, APPROVED, REJECTED
+  requestedBy String?   @map("requested_by") @db.VarChar(100)
+  approvedBy  String?   @map("approved_by") @db.VarChar(100)
+  approvedAt  DateTime? @map("approved_at") @db.Timestamptz()
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+
+  product     Product   @relation(fields: [productId], references: [productId])
+
+  @@index([status])
+  @@map("purchase_requests")
 }
 
 model Inventory {
