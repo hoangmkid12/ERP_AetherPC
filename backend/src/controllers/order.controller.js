@@ -53,6 +53,7 @@ const createOrder = async (req, res, next) => {
     // để tính hoa hồng doanh số thật trong bảng lương. null cho đơn khách tự
     // đặt ở storefront.
     const soldById = Number.isInteger(req.posEmployeeId) ? req.posEmployeeId : null;
+    const posEmployeeRole = req.posEmployeeRole || null;
     const { items, paymentMethod, shippingAddress, shippingCity, notes } = req.body;
 
     if (!items || items.length === 0) {
@@ -127,6 +128,20 @@ const createOrder = async (req, res, next) => {
       // Tính toán chiết khấu hạng thành viên & voucher
       const memberDiscount = Math.round(subtotal * tierDiscountPercent);
       const couponDiscount = Math.max(0, parseFloat(req.body.couponDiscount || req.body.discountAmount || 0));
+
+      // Hạn mức chiết khấu bán lẻ tại quầy (POS) — trước đây chỉ chặn ở UI
+      // (SalesPOS.jsx), nhân viên Sales có thể gọi thẳng API để vượt hạn mức
+      // 10% mà không ai duyệt. Chỉ áp dụng cho đơn POS thật (có posEmployeeRole);
+      // khách tự đặt ở storefront không đi qua nhân viên Sales nên không tính.
+      if (posEmployeeRole && couponDiscount > subtotal * 0.10) {
+        const allowed = await hasOperationalPermission(posEmployeeRole, 'sales_approve_discount');
+        if (!allowed) {
+          const error = new Error('Mức chiết khấu vượt quá 10% cần được Quản Lý Bán Hàng hoặc CEO duyệt (quyền "Duyệt chiết khấu bán lẻ vượt hạn mức" trong Ma Trận Phân Quyền).');
+          error.statusCode = 403;
+          throw error;
+        }
+      }
+
       const orderDiscount = memberDiscount + couponDiscount;
       const discountedSubtotal = Math.max(0, subtotal - orderDiscount);
 
@@ -321,6 +336,10 @@ const createPosOrder = async (req, res, next) => {
     });
     const employeeId = parseInt(req.user?.id, 10);
     req.posEmployeeId = Number.isInteger(employeeId) ? employeeId : null;
+    // Vai trò thật của nhân viên đứng quầy, giữ lại trước khi ghi đè req.user
+    // — dùng để kiểm tra quyền sales_approve_discount ở createOrder bên dưới
+    // (không thể dùng req.user.role sau dòng kế tiếp vì lúc đó đã là CUSTOMER).
+    req.posEmployeeRole = req.user?.role || null;
     req.user = { ...req.user, id: 'WALK-IN', role: 'CUSTOMER' };
     return createOrder(req, res, next);
   } catch (err) {

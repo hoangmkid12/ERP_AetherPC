@@ -200,6 +200,24 @@ model ProductReview {
   @@map("product_reviews")
 }
 
+// Mã giảm giá / chương trình khuyến mãi thật cho SalesPOS.jsx tab "Khuyến
+// Mãi" — trước đây chỉ là 1 mảng useState hardcode (sales_manage_promotions
+// là quyền "ma": khai báo trong RBAC nhưng không CRUD được gì cả).
+model Promotion {
+  id            Int       @id @default(autoincrement())
+  code          String    @unique @db.VarChar(50)
+  title         String    @db.VarChar(200)
+  discountType  String    @map("discount_type") @db.VarChar(10) // PERCENT | FIXED
+  discountValue Decimal   @map("discount_value") @db.Decimal(15, 2)
+  minSpend      Decimal   @default(0.00) @map("min_spend") @db.Decimal(15, 2)
+  expiresAt     DateTime? @map("expires_at") @db.Timestamptz()
+  status        String    @default("ACTIVE") @db.VarChar(20) // ACTIVE | INACTIVE
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt     DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  @@map("promotions")
+}
+
 // ============================================================================
 //   2. NHÓM MODEL ĐƠN HÀNG & GIAO DỊCH
 // ============================================================================

@@ -88,6 +88,10 @@ const formatCurrency = (amount) => {
   return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount || 0);
 };
 
+// Trạng thái còn có thể hủy trực tiếp từ Bán Hàng — SHIPPED trở đi phải đi
+// qua luồng Đổi/Trả (return request) chứ không hủy thẳng, vì hàng đã rời kho.
+const CANCELLABLE_ORDER_STATUSES = ['PENDING', 'WAITING_PAYMENT', 'AWAITING_STOCK', 'CONFIRMED', 'PACKED', 'PROCESSING', 'READY_TO_SHIP'];
+
 const formatDate = (dateStr) => {
   if (!dateStr) return 'Chưa rõ';
   const d = parseDateVal(dateStr);
@@ -167,6 +171,7 @@ export default function SalesPOS() {
   const [customerFormData, setCustomerFormData] = useState({});
   const [customerFormSaving, setCustomerFormSaving] = useState(false);
   const [customerActionBusyId, setCustomerActionBusyId] = useState(null);
+  const [orderActionBusyId, setOrderActionBusyId] = useState(null);
 
   const loadCustomerAccounts = async () => {
     setCustomerAccountsLoading(true);
@@ -319,13 +324,92 @@ export default function SalesPOS() {
     }
   };
 
-  // Promotions State
-  const [promotionsList, setPromotionsList] = useState([
-    { code: 'SUMMER2026', title: 'Khuyến mãi Hè Rực Rỡ', discount: 10, type: 'PERCENT', minSpend: 5000000, expiry: '30/08/2026', status: 'ACTIVE' },
-    { code: 'VIPGAMING', title: 'Tri Ân Khách Hàng VIP PC Gaming', discount: 500000, type: 'FIXED', minSpend: 15000000, expiry: '31/12/2026', status: 'ACTIVE' },
-    { code: 'BUILDPC', title: 'Ưu đãi giảm giá khi Build trọn bộ PC', discount: 8, type: 'PERCENT', minSpend: 10000000, expiry: '15/09/2026', status: 'ACTIVE' },
-    { code: 'FREESHIP', title: 'Miễn phí vận chuyển hỏa tốc nội thành', discount: 100000, type: 'FIXED', minSpend: 2000000, expiry: '31/10/2026', status: 'ACTIVE' }
-  ]);
+  // Promotions State — trước đây chỉ là 4 mã hardcode trong state, không CRUD
+  // được gì (sales_manage_promotions là quyền "ma"). Giờ nối API thật.
+  const [promotionsList, setPromotionsList] = useState([]);
+  const [promotionsLoading, setPromotionsLoading] = useState(false);
+  const [showPromoFormModal, setShowPromoFormModal] = useState(false);
+  const [editingPromo, setEditingPromo] = useState(null); // null = create mode
+  const [promoFormData, setPromoFormData] = useState({});
+  const [promoFormSaving, setPromoFormSaving] = useState(false);
+  const [promoActionBusyId, setPromoActionBusyId] = useState(null);
+
+  const loadPromotions = async () => {
+    setPromotionsLoading(true);
+    try {
+      const res = await api.get('/promotions');
+      setPromotionsList(res.data || []);
+    } catch (err) {
+      notify(err?.message || 'Không thể tải danh sách khuyến mãi.', 'error');
+    } finally {
+      setPromotionsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab !== 'promotions') return;
+    loadPromotions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
+
+  const openCreatePromoModal = () => {
+    setEditingPromo(null);
+    setPromoFormData({ code: '', title: '', type: 'PERCENT', discount: '', minSpend: '', expiresAt: '' });
+    setShowPromoFormModal(true);
+  };
+
+  const openEditPromoModal = (promo) => {
+    setEditingPromo(promo);
+    setPromoFormData({
+      title: promo.title || '',
+      type: promo.type || 'PERCENT',
+      discount: promo.discount ?? '',
+      minSpend: promo.minSpend ?? '',
+      expiresAt: promo.expiresAt ? String(promo.expiresAt).slice(0, 10) : ''
+    });
+    setShowPromoFormModal(true);
+  };
+
+  const handleSavePromo = async () => {
+    if (!editingPromo && !promoFormData.code?.trim()) {
+      notify('Vui lòng nhập mã khuyến mãi.', 'error');
+      return;
+    }
+    if (!promoFormData.title?.trim() || !promoFormData.discount) {
+      notify('Vui lòng nhập đầy đủ Tên chương trình và Mức giảm.', 'error');
+      return;
+    }
+    setPromoFormSaving(true);
+    try {
+      if (editingPromo) {
+        await api.put(`/promotions/${editingPromo.id}`, promoFormData);
+        notify(`Đã cập nhật khuyến mãi "${editingPromo.code}".`, 'success');
+      } else {
+        await api.post('/promotions', promoFormData);
+        notify(`Đã tạo khuyến mãi "${promoFormData.code}" thành công.`, 'success');
+      }
+      setShowPromoFormModal(false);
+      loadPromotions();
+    } catch (err) {
+      notify(err?.message || 'Không thể lưu khuyến mãi.', 'error');
+    } finally {
+      setPromoFormSaving(false);
+    }
+  };
+
+  const handleDeletePromo = async (promo) => {
+    if (!window.confirm(`Xóa VĨNH VIỄN khuyến mãi "${promo.code}"? Hành động này không thể hoàn tác.`)) return;
+    setPromoActionBusyId(promo.id);
+    try {
+      await api.delete(`/promotions/${promo.id}`);
+      notify(`Đã xóa khuyến mãi "${promo.code}".`, 'success');
+      loadPromotions();
+    } catch (err) {
+      notify(err?.message || 'Không thể xóa khuyến mãi.', 'error');
+    } finally {
+      setPromoActionBusyId(null);
+    }
+  };
 
   // POS Add to Cart
   const handleAddToCart = (product) => {
@@ -400,17 +484,27 @@ export default function SalesPOS() {
     // Call ERP Context Checkout
     let orderId = `POS-${Date.now().toString().slice(-6)}`;
     if (typeof processCheckout === 'function') {
-      const resId = await processCheckout(
-        posCustomerName || 'Khách Mua Tại Quầy', 
-        posCustomerPhone || '0901234567', 
-        itemsForERP, 
-        'POS',
-        finalTotal,
-        'Bán tại cửa hàng (POS)',
-        posPaymentMethod || 'CASH',
-        ''
-      );
-      if (resId) orderId = resId;
+      try {
+        const resId = await processCheckout(
+          posCustomerName || 'Khách Mua Tại Quầy',
+          posCustomerPhone || '0901234567',
+          itemsForERP,
+          'POS',
+          finalTotal,
+          'Bán tại cửa hàng (POS)',
+          posPaymentMethod || 'CASH',
+          '',
+          // Mức chiết khấu thật (VNĐ) — trước đây không truyền options nên
+          // couponDiscount luôn gửi lên backend bằng 0 dù nhân viên đã nhập %
+          // giảm giá, khiến đơn thật (một khi hết bị 403 âm thầm) sẽ tính
+          // tiền đầy đủ, sai lệch với số tiền in trên hóa đơn giấy.
+          { discount: (subTotal * posDiscountPercent) / 100 }
+        );
+        if (resId) orderId = resId;
+      } catch (err) {
+        notify(err.message || 'Không thể tạo đơn bán lẻ — vui lòng thử lại.', 'error');
+        return;
+      }
     }
 
     const receiptData = {
@@ -534,6 +628,27 @@ export default function SalesPOS() {
         setSelectedDetailOrder(prev => ({ ...prev, status: newStatus }));
       }
       notify(`Đơn hàng #${orderId} đã được cập nhật sang trạng thái: ${getStatusBadge(newStatus).text}`, 'success');
+    }
+  };
+
+  // Hủy đơn hàng — quyền sales_cancel_order đã được backend chặn đúng từ
+  // lâu (order.controller.js), nhưng chưa hề có nút thao tác nào gọi tới ở
+  // bất kỳ trang nào trong toàn bộ ứng dụng. Chờ backend xác nhận trước khi
+  // cập nhật UI (không lạc quan cập nhật trước như handleUpdateOrderStatus ở
+  // trên), để không hiện toast "thành công" giả khi bị chặn quyền.
+  const handleCancelOrder = async (orderId) => {
+    if (!window.confirm(`Xác nhận hủy đơn hàng #${orderId}? Thao tác này không thể hoàn tác.`)) return;
+    setOrderActionBusyId(orderId);
+    try {
+      await updateOrderStatus(orderId, 'CANCELLED', 'Hủy bởi nhân viên bán hàng');
+      if (selectedDetailOrder && (selectedDetailOrder.orderId === orderId || selectedDetailOrder.id === orderId)) {
+        setSelectedDetailOrder(prev => ({ ...prev, status: 'CANCELLED' }));
+      }
+      notify(`Đã hủy đơn hàng #${orderId}.`, 'success');
+    } catch (err) {
+      notify(err.message || 'Không thể hủy đơn hàng này.', 'error');
+    } finally {
+      setOrderActionBusyId(null);
     }
   };
 
@@ -1246,6 +1361,15 @@ export default function SalesPOS() {
                                 Xác Nhận
                               </button>
                             )}
+                            {canCancelOrder && CANCELLABLE_ORDER_STATUSES.includes(o.status) && (
+                              <button
+                                onClick={() => handleCancelOrder(o.orderId || o.id)}
+                                disabled={orderActionBusyId === (o.orderId || o.id)}
+                                style={{ backgroundColor: '#ffffff', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '4px', padding: '0.3rem 0.6rem', fontSize: '0.75rem', fontWeight: 700, cursor: orderActionBusyId === (o.orderId || o.id) ? 'not-allowed' : 'pointer', opacity: orderActionBusyId === (o.orderId || o.id) ? 0.6 : 1 }}
+                              >
+                                {orderActionBusyId === (o.orderId || o.id) ? 'Đang hủy...' : 'Hủy Đơn'}
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -1597,49 +1721,201 @@ export default function SalesPOS() {
                 Danh sách mã giảm giá, voucher quà tặng dành cho nhân viên kinh doanh áp dụng tại quầy
               </p>
             </div>
+            {canManagePromotions && (
+              <button
+                onClick={openCreatePromoModal}
+                style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.55rem 1rem', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+              >
+                <Plus size={15} /> Thêm Khuyến Mãi
+              </button>
+            )}
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
-            {promotionsList.map((promo, idx) => (
-              <div key={idx} style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem', position: 'relative' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                  <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#2563eb', backgroundColor: '#eff6ff', border: '1px dashed #bfdbfe', padding: '3px 8px', borderRadius: '4px' }}>
-                    {promo.code}
-                  </span>
-                  <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#16a34a', backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', padding: '2px 6px', borderRadius: '10px' }}>
-                    Đang Áp Dụng
-                  </span>
-                </div>
+          {promotionsLoading ? (
+            <div style={{ textAlign: 'center', padding: '3rem', color: '#64748b' }}>Đang tải danh sách khuyến mãi...</div>
+          ) : promotionsList.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '3rem', color: '#64748b', backgroundColor: '#fff', border: '1px dashed #cbd5e1', borderRadius: '8px' }}>
+              Chưa có chương trình khuyến mãi nào.
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
+              {promotionsList.map((promo) => {
+                const isExpired = promo.expiresAt && new Date(promo.expiresAt) < new Date();
+                const isActive = promo.status === 'ACTIVE' && !isExpired;
+                const busy = promoActionBusyId === promo.id;
+                return (
+                  <div key={promo.id} style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem', position: 'relative' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                      <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#2563eb', backgroundColor: '#eff6ff', border: '1px dashed #bfdbfe', padding: '3px 8px', borderRadius: '4px' }}>
+                        {promo.code}
+                      </span>
+                      <span style={{
+                        fontSize: '0.7rem', fontWeight: 800, padding: '2px 6px', borderRadius: '10px',
+                        color: isActive ? '#16a34a' : '#94a3b8',
+                        backgroundColor: isActive ? '#f0fdf4' : '#f1f5f9',
+                        border: `1px solid ${isActive ? '#bbf7d0' : '#e2e8f0'}`
+                      }}>
+                        {isExpired ? 'Hết Hạn' : isActive ? 'Đang Áp Dụng' : 'Đã Tắt'}
+                      </span>
+                    </div>
 
-                <h4 style={{ fontSize: '0.9rem', fontWeight: 800, color: '#0f172a', margin: '0 0 0.5rem' }}>{promo.title}</h4>
-                <div style={{ fontSize: '0.8rem', color: '#475569', display: 'flex', flexDirection: 'column', gap: '0.25rem', marginBottom: '1rem' }}>
-                  <div>Mức giảm: <strong style={{ color: '#ef4444' }}>{promo.type === 'PERCENT' ? `${promo.discount}%` : formatCurrency(promo.discount)}</strong></div>
-                  <div>Đơn tối thiểu: <strong>{formatCurrency(promo.minSpend)}</strong></div>
-                  <div>Hạn áp dụng: <strong>{promo.expiry}</strong></div>
-                </div>
+                    <h4 style={{ fontSize: '0.9rem', fontWeight: 800, color: '#0f172a', margin: '0 0 0.5rem' }}>{promo.title}</h4>
+                    <div style={{ fontSize: '0.8rem', color: '#475569', display: 'flex', flexDirection: 'column', gap: '0.25rem', marginBottom: '1rem' }}>
+                      <div>Mức giảm: <strong style={{ color: '#ef4444' }}>{promo.type === 'PERCENT' ? `${promo.discount}%` : formatCurrency(promo.discount)}</strong></div>
+                      <div>Đơn tối thiểu: <strong>{formatCurrency(promo.minSpend)}</strong></div>
+                      <div>Hạn áp dụng: <strong>{promo.expiry || 'Không giới hạn'}</strong></div>
+                    </div>
 
-                <button
-                  onClick={() => {
-                    setPosDiscountPercent(promo.type === 'PERCENT' ? promo.discount : 5);
-                    setTab('pos');
-                    notify(`Đã áp dụng mã "${promo.code}" vào Quầy POS!`, 'success');
-                  }}
-                  style={{
-                    width: '100%',
-                    backgroundColor: '#2563eb',
-                    color: '#ffffff',
-                    border: 'none',
-                    borderRadius: '6px',
-                    padding: '0.45rem',
-                    fontSize: '0.78rem',
-                    fontWeight: 700,
-                    cursor: 'pointer'
-                  }}
-                >
-                  Áp Dụng Mã Này Vào POS
-                </button>
+                    <button
+                      onClick={() => {
+                        const sub = calculateSubtotal();
+                        if (sub < (promo.minSpend || 0)) {
+                          notify(`Đơn hàng cần tối thiểu ${formatCurrency(promo.minSpend)} để áp dụng mã "${promo.code}" (giỏ hàng hiện tại: ${formatCurrency(sub)}).`, 'error');
+                          return;
+                        }
+                        const pct = promo.type === 'PERCENT' ? promo.discount : (sub > 0 ? Math.min(100, (promo.discount / sub) * 100) : 0);
+                        setPosDiscountPercent(Number(pct.toFixed(2)));
+                        setTab('pos');
+                        notify(`Đã áp dụng mã "${promo.code}" vào Quầy POS!`, 'success');
+                      }}
+                      disabled={!isActive}
+                      style={{
+                        width: '100%',
+                        backgroundColor: isActive ? '#2563eb' : '#e2e8f0',
+                        color: isActive ? '#ffffff' : '#94a3b8',
+                        border: 'none',
+                        borderRadius: '6px',
+                        padding: '0.45rem',
+                        fontSize: '0.78rem',
+                        fontWeight: 700,
+                        cursor: isActive ? 'pointer' : 'not-allowed',
+                        marginBottom: canManagePromotions ? '0.5rem' : 0
+                      }}
+                    >
+                      Áp Dụng Mã Này Vào POS
+                    </button>
+
+                    {canManagePromotions && (
+                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <button
+                          onClick={() => openEditPromoModal(promo)}
+                          style={{ flex: 1, backgroundColor: '#ffffff', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.4rem', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer' }}
+                        >
+                          Sửa
+                        </button>
+                        <button
+                          onClick={() => handleDeletePromo(promo)}
+                          disabled={busy}
+                          style={{ flex: 1, backgroundColor: '#ffffff', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '6px', padding: '0.4rem', fontSize: '0.75rem', fontWeight: 700, cursor: busy ? 'not-allowed' : 'pointer', opacity: busy ? 0.6 : 1 }}
+                        >
+                          {busy ? 'Đang xóa...' : 'Xóa'}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ================= MODAL TẠO/SỬA KHUYẾN MÃI ================= */}
+      {showPromoFormModal && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem' }}>
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '10px', padding: '1.5rem', width: '100%', maxWidth: '440px', maxHeight: '90vh', overflowY: 'auto' }}>
+            <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0f172a', margin: '0 0 1rem' }}>
+              {editingPromo ? `Sửa Khuyến Mãi "${editingPromo.code}"` : 'Thêm Khuyến Mãi Mới'}
+            </h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+              {!editingPromo && (
+                <div>
+                  <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '0.3rem' }}>Mã Khuyến Mãi *</label>
+                  <input
+                    value={promoFormData.code || ''}
+                    onChange={(e) => setPromoFormData(prev => ({ ...prev, code: e.target.value.toUpperCase() }))}
+                    placeholder="VD: SUMMER2026"
+                    style={{ width: '100%', padding: '0.55rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.85rem', boxSizing: 'border-box' }}
+                  />
+                </div>
+              )}
+              <div>
+                <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '0.3rem' }}>Tên Chương Trình *</label>
+                <input
+                  value={promoFormData.title || ''}
+                  onChange={(e) => setPromoFormData(prev => ({ ...prev, title: e.target.value }))}
+                  style={{ width: '100%', padding: '0.55rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.85rem', boxSizing: 'border-box' }}
+                />
               </div>
-            ))}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div>
+                  <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '0.3rem' }}>Loại Giảm Giá</label>
+                  <select
+                    value={promoFormData.type || 'PERCENT'}
+                    onChange={(e) => setPromoFormData(prev => ({ ...prev, type: e.target.value }))}
+                    style={{ width: '100%', padding: '0.55rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.85rem', boxSizing: 'border-box' }}
+                  >
+                    <option value="PERCENT">Theo % (Phần trăm)</option>
+                    <option value="FIXED">Số Tiền Cố Định (VNĐ)</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '0.3rem' }}>Mức Giảm *</label>
+                  <input
+                    type="number"
+                    value={promoFormData.discount ?? ''}
+                    onChange={(e) => setPromoFormData(prev => ({ ...prev, discount: e.target.value }))}
+                    style={{ width: '100%', padding: '0.55rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.85rem', boxSizing: 'border-box' }}
+                  />
+                </div>
+              </div>
+              <div>
+                <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '0.3rem' }}>Đơn Tối Thiểu (VNĐ)</label>
+                <input
+                  type="number"
+                  value={promoFormData.minSpend ?? ''}
+                  onChange={(e) => setPromoFormData(prev => ({ ...prev, minSpend: e.target.value }))}
+                  style={{ width: '100%', padding: '0.55rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.85rem', boxSizing: 'border-box' }}
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '0.3rem' }}>Ngày Hết Hạn</label>
+                <input
+                  type="date"
+                  value={promoFormData.expiresAt || ''}
+                  onChange={(e) => setPromoFormData(prev => ({ ...prev, expiresAt: e.target.value }))}
+                  style={{ width: '100%', padding: '0.55rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.85rem', boxSizing: 'border-box' }}
+                />
+              </div>
+              {editingPromo && (
+                <div>
+                  <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '0.3rem' }}>Trạng Thái</label>
+                  <select
+                    value={promoFormData.status || editingPromo.status || 'ACTIVE'}
+                    onChange={(e) => setPromoFormData(prev => ({ ...prev, status: e.target.value }))}
+                    style={{ width: '100%', padding: '0.55rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.85rem', boxSizing: 'border-box' }}
+                  >
+                    <option value="ACTIVE">Đang Áp Dụng</option>
+                    <option value="INACTIVE">Tắt</option>
+                  </select>
+                </div>
+              )}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem', marginTop: '1.4rem' }}>
+              <button
+                onClick={() => setShowPromoFormModal(false)}
+                style={{ backgroundColor: '#ffffff', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.5rem 1rem', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
+              >
+                Hủy
+              </button>
+              <button
+                onClick={handleSavePromo}
+                disabled={promoFormSaving}
+                style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.5rem 1.1rem', fontSize: '0.82rem', fontWeight: 700, cursor: promoFormSaving ? 'not-allowed' : 'pointer', opacity: promoFormSaving ? 0.7 : 1 }}
+              >
+                {promoFormSaving ? 'Đang lưu...' : 'Lưu'}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -1922,6 +2198,16 @@ export default function SalesPOS() {
                 <div style={{ fontSize: '0.82rem', color: '#166534', fontWeight: 600, backgroundColor: '#f0fdf4', padding: '0.45rem 0.85rem', borderRadius: '6px', border: '1px solid #bbf7d0' }}>
                   Đơn hàng đã chuyển sang Bộ phận Kho để Đóng gói & Bàn giao Shipper
                 </div>
+              )}
+
+              {canCancelOrder && CANCELLABLE_ORDER_STATUSES.includes(selectedDetailOrder.status) && (
+                <button
+                  onClick={() => handleCancelOrder(selectedDetailOrder.orderId || selectedDetailOrder.id)}
+                  disabled={orderActionBusyId === (selectedDetailOrder.orderId || selectedDetailOrder.id)}
+                  style={{ backgroundColor: '#ffffff', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '6px', padding: '0.5rem 1.1rem', fontSize: '0.82rem', fontWeight: 700, cursor: orderActionBusyId === (selectedDetailOrder.orderId || selectedDetailOrder.id) ? 'not-allowed' : 'pointer', opacity: orderActionBusyId === (selectedDetailOrder.orderId || selectedDetailOrder.id) ? 0.6 : 1 }}
+                >
+                  {orderActionBusyId === (selectedDetailOrder.orderId || selectedDetailOrder.id) ? 'Đang hủy...' : 'Hủy Đơn Hàng'}
+                </button>
               )}
             </div>
           </div>

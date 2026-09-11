@@ -175,7 +175,7 @@ export const useSalesStore = create((set, get) => ({
   /**
    * Process checkout for Online & POS orders
    */
-  processCheckout: (customerName, phone, items, type = 'ONLINE', customTotal = null, shippingAddress = '', paymentMethod = 'COD', customerEmail = '', options = {}) => {
+  processCheckout: async (customerName, phone, items, type = 'ONLINE', customTotal = null, shippingAddress = '', paymentMethod = 'COD', customerEmail = '', options = {}) => {
     const dateStr = new Date().toLocaleDateString('vi-VN');
     const newOrderId = `ORD-${Math.floor(100000 + Math.random() * 900000)}`;
     const subtotalCalc = items.reduce((sum, item) => sum + ((item.price || 0) * (item.quantity || 1)), 0);
@@ -247,31 +247,46 @@ export const useSalesStore = create((set, get) => ({
       createdAtTime: Date.now()
     };
     
+    // Đơn tại quầy (POS) do NHÂN VIÊN đứng bán (JWT role SALES/SALES_MANAGER),
+    // còn "/orders" ở đây chỉ nhận role CUSTOMER (order.routes.js) — trước
+    // đây mọi đơn POS đều gọi nhầm "/orders" nên luôn bị 403, bị .catch nuốt
+    // âm thầm, và đơn chỉ tồn tại "ảo" trong localStorage của trình duyệt:
+    // không trừ kho thật, không vào được luồng lắp ráp/kho/vận chuyển, và
+    // không gắn soldById nên hoa hồng Sales trong bảng lương luôn bằng 0.
+    const endpoint = type === 'POS' ? '/orders/pos' : '/orders';
+    let persistedOrder = null;
+    try {
+      const res = await api.post(endpoint, {
+        orderId: newOrderId,
+        customerName,
+        phone,
+        email: userEmail,
+        items: items.map(it => ({ productId: it.productId || it.id, quantity: it.quantity || 1 })),
+        paymentMethod: paymentMethod === 'BANK_TRANSFER' ? 'BANK_TRANSFER' : 'COD',
+        shippingAddress: shippingAddress || (type === 'POS' ? 'Bán tại cửa hàng (POS)' : 'Hồ Chí Minh'),
+        shippingCity: inferredCity,
+        shippingFee,
+        couponDiscount: discount,
+        totalAmount,
+        notes: type === 'POS' ? 'Đơn bán lẻ tại quầy (POS)' : 'Đặt hàng online (Đồng bộ)',
+        type
+      });
+      persistedOrder = res?.data || null;
+    } catch (err) {
+      console.error('[SalesStore] Checkout FAILED to reach backend — order only exists locally:', err.message);
+      throw err;
+    }
+
+    const finalOrderId = persistedOrder?.orderId || newOrderId;
     set(state => {
-      const orders = [newOrder, ...state.orders];
+      const orders = [{ ...newOrder, orderId: finalOrderId, status: persistedOrder?.status || newOrder.status }, ...state.orders];
       try {
         localStorage.setItem(STORAGE_KEYS.orders, JSON.stringify(orders));
       } catch (e) {}
       return { orders };
     });
 
-    api.post('/orders', {
-      orderId: newOrderId,
-      customerName,
-      phone,
-      email: userEmail,
-      items: items.map(it => ({ productId: it.productId || it.id, quantity: it.quantity || 1 })),
-      paymentMethod: paymentMethod === 'BANK_TRANSFER' ? 'BANK_TRANSFER' : 'COD',
-      shippingAddress: shippingAddress || (type === 'POS' ? 'Bán tại cửa hàng (POS)' : 'Hồ Chí Minh'),
-      shippingCity: inferredCity,
-      shippingFee,
-      couponDiscount: discount,
-      totalAmount,
-      notes: type === 'POS' ? 'Đơn bán lẻ tại quầy (POS)' : 'Đặt hàng online (Đồng bộ)',
-      type
-    }).catch(err => console.warn('[SalesStore] Checkout sync notice:', err.message));
-
-    return newOrderId;
+    return finalOrderId;
   },
 
   /**
