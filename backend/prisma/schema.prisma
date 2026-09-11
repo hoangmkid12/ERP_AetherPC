@@ -259,6 +259,7 @@ model Order {
   // chiều ngược lại, để Thủ Kho/QC đối chiếu tình trạng kiện hàng lúc nhận.
   returnProofPhoto    String?         @map("return_proof_photo") @db.Text
   returnNote          String?         @map("return_note")
+  receiverNameActual  String?         @map("receiver_name_actual") @db.VarChar(150)
   // Nhân viên Sales đứng quầy POS thực hiện đơn — null cho đơn khách tự đặt ở
   // storefront. Dùng để tính hoa hồng Sales 1% doanh số thật trong bảng lương
   // (trước đây createPosOrder ghi đè hẳn req.user thành khách WALK-IN trước
