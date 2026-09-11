@@ -5283,13 +5283,13 @@ export default function Warehouse() {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.83rem' }}>
               <thead>
                 <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569' }}>
-                  <th style={{ padding: '0.75rem 1rem', width: '13%', whiteSpace: 'nowrap' }}>Thời Gian</th>
-                  <th style={{ padding: '0.75rem 1rem', width: '13%', textAlign: 'center', whiteSpace: 'nowrap' }}>Loại Biến Động</th>
-                  <th style={{ padding: '0.75rem 1rem', width: '13%', whiteSpace: 'nowrap' }}>Mã Chứng Từ</th>
-                  <th style={{ padding: '0.75rem 1rem' }}>Sản Phẩm</th>
-                  <th style={{ padding: '0.75rem 1rem', width: '9%', textAlign: 'center', whiteSpace: 'nowrap' }}>Số Lượng</th>
-                  <th style={{ padding: '0.75rem 1rem', width: '12%', whiteSpace: 'nowrap' }}>Người Thực Hiện</th>
-                  <th style={{ padding: '0.75rem 1rem', width: '11%', textAlign: 'center', whiteSpace: 'nowrap' }}>Thao Tác</th>
+                  <th style={{ padding: '0.75rem 0.75rem 0.75rem 1rem', width: '10%', whiteSpace: 'nowrap' }}>Thời Gian</th>
+                  <th style={{ padding: '0.75rem 0.75rem', width: '10%', textAlign: 'left', whiteSpace: 'nowrap' }}>Loại Biến Động</th>
+                  <th style={{ padding: '0.75rem 0.75rem', width: '12%', whiteSpace: 'nowrap' }}>Mã Chứng Từ</th>
+                  <th style={{ padding: '0.75rem 0.75rem', width: '40%' }}>Sản Phẩm</th>
+                  <th style={{ padding: '0.75rem 0.75rem', width: '8%', textAlign: 'center', whiteSpace: 'nowrap' }}>Số Lượng</th>
+                  <th style={{ padding: '0.75rem 0.75rem', width: '10%', whiteSpace: 'nowrap' }}>Người Thực Hiện</th>
+                  <th style={{ padding: '0.75rem 1rem 0.75rem 0.75rem', width: '10%', textAlign: 'center', whiteSpace: 'nowrap' }}>Thao Tác</th>
                 </tr>
               </thead>
               <tbody>
@@ -5308,7 +5308,7 @@ export default function Warehouse() {
                       onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
                       onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                     >
-                      <td style={{ padding: '0.75rem 1rem', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+                      <td style={{ padding: '0.75rem 0.75rem 0.75rem 1rem', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
                         <div style={{ fontWeight: 600, color: '#0f172a', fontSize: '0.82rem' }}>
                           {new Date(mv.timestamp).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                         </div>
@@ -5316,7 +5316,7 @@ export default function Warehouse() {
                           {new Date(mv.timestamp).toLocaleDateString('vi-VN')}
                         </div>
                       </td>
-                      <td style={{ padding: '0.75rem 1rem', textAlign: 'center', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+                      <td style={{ padding: '0.75rem 0.75rem', textAlign: 'left', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
                         <span style={{
                           display: 'inline-block',
                           padding: '3px 9px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 800,
@@ -5329,19 +5329,19 @@ export default function Warehouse() {
                           {mv.type === 'IN' ? 'NHẬP KHO' : 'XUẤT KHO'}
                         </span>
                       </td>
-                      <td style={{ padding: '0.75rem 1rem', verticalAlign: 'middle', whiteSpace: 'nowrap', fontWeight: 700, color: '#2563eb' }}>
+                      <td style={{ padding: '0.75rem 0.75rem', verticalAlign: 'middle', whiteSpace: 'nowrap', fontWeight: 700, color: '#2563eb' }}>
                         {mv.reference}
                       </td>
-                      <td style={{ padding: '0.75rem 1rem', verticalAlign: 'middle', fontWeight: 600, color: '#0f172a', lineHeight: 1.4 }}>
+                      <td style={{ padding: '0.75rem 0.75rem', verticalAlign: 'middle', fontWeight: 600, color: '#0f172a', lineHeight: 1.4 }}>
                         {mv.productName}
                       </td>
-                      <td style={{ padding: '0.75rem 1rem', textAlign: 'center', verticalAlign: 'middle', whiteSpace: 'nowrap', fontWeight: 800, fontSize: '0.88rem', color: mv.type === 'IN' ? '#16a34a' : '#dc2626' }}>
+                      <td style={{ padding: '0.75rem 0.75rem', textAlign: 'center', verticalAlign: 'middle', whiteSpace: 'nowrap', fontWeight: 800, fontSize: '0.88rem', color: mv.type === 'IN' ? '#16a34a' : '#dc2626' }}>
                         {mv.type === 'IN' ? `+${mv.quantity}` : `-${mv.quantity}`}
                       </td>
-                      <td style={{ padding: '0.75rem 1rem', verticalAlign: 'middle', whiteSpace: 'nowrap', color: '#475569' }}>
+                      <td style={{ padding: '0.75rem 0.75rem', verticalAlign: 'middle', whiteSpace: 'nowrap', color: '#475569' }}>
                         {mv.actor || 'Thủ Kho'}
                       </td>
-                      <td style={{ padding: '0.75rem 1rem', textAlign: 'center', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+                      <td style={{ padding: '0.75rem 1rem 0.75rem 0.75rem', textAlign: 'center', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
                         <button
                           type="button"
                           onClick={(e) => { e.stopPropagation(); setSelectedMovementLog(mv); }}
