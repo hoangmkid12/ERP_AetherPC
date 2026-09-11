@@ -157,14 +157,94 @@ export default function SystemAdmin() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, custPage, custSearch]);
 
+  // Customer Detail & Management Modal State
+  const [selectedCust, setSelectedCust] = useState(null);
+  const [custModalLoading, setCustModalLoading] = useState(false);
+  const [custDetail, setCustDetail] = useState(null);
+  const [isEditingCust, setIsEditingCust] = useState(false);
+  const [custEditForm, setCustEditForm] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    address: '',
+    city: '',
+    tier: 'BRONZE'
+  });
+  const [savingCust, setSavingCust] = useState(false);
+
+  const handleOpenCustDetail = async (cust) => {
+    setSelectedCust(cust);
+    setCustModalLoading(true);
+    setIsEditingCust(false);
+    try {
+      const res = await api.get(`/customer-accounts/${cust.customerId}`);
+      const data = res.data || cust;
+      setCustDetail(data);
+      setCustEditForm({
+        name: data.name || '',
+        email: data.email || '',
+        phone: data.phone || '',
+        address: data.address || '',
+        city: data.city || '',
+        tier: data.tier || 'BRONZE'
+      });
+    } catch (err) {
+      notify(err?.message || 'Không thể tải chi tiết khách hàng.', 'error');
+      setCustDetail(cust);
+      setCustEditForm({
+        name: cust.name || '',
+        email: cust.email || '',
+        phone: cust.phone || '',
+        address: cust.address || '',
+        city: cust.city || '',
+        tier: cust.tier || 'BRONZE'
+      });
+    } finally {
+      setCustModalLoading(false);
+    }
+  };
+
+  const handleCloseCustDetail = () => {
+    setSelectedCust(null);
+    setCustDetail(null);
+    setIsEditingCust(false);
+  };
+
+  const handleSaveCustEdit = async () => {
+    if (!custEditForm.name.trim()) {
+      notify('Vui lòng nhập họ và tên khách hàng.', 'error');
+      return;
+    }
+    if (!custEditForm.email.trim()) {
+      notify('Vui lòng nhập email khách hàng.', 'error');
+      return;
+    }
+    setSavingCust(true);
+    try {
+      const res = await api.put(`/customer-accounts/${selectedCust.customerId}`, custEditForm);
+      notify('Cập nhật thông tin khách hàng thành công!', 'success');
+      setIsEditingCust(false);
+      setCustDetail(prev => ({ ...prev, ...res.data }));
+      setCustList(prev => prev.map(c => c.customerId === selectedCust.customerId ? { ...c, ...res.data } : c));
+    } catch (err) {
+      notify(err?.message || 'Cập nhật thông tin thất bại.', 'error');
+    } finally {
+      setSavingCust(false);
+    }
+  };
+
   const handleToggleCustStatus = async (cust) => {
-    const nextStatus = cust.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
+    const currentStatus = (custDetail && custDetail.customerId === cust.customerId) ? custDetail.status : cust.status;
+    const nextStatus = currentStatus === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
     const label = nextStatus === 'INACTIVE' ? 'vô hiệu hóa' : 'kích hoạt lại';
     if (!(await confirm(`Xác nhận ${label} tài khoản khách hàng "${cust.name}"?`, { danger: nextStatus === 'INACTIVE' }))) return;
     setCustActionBusyId(cust.customerId);
     try {
       await api.patch(`/customer-accounts/${cust.customerId}/status`, { status: nextStatus });
       notify(`Đã ${label} tài khoản "${cust.name}".`, 'success');
+      if (custDetail && custDetail.customerId === cust.customerId) {
+        setCustDetail(prev => ({ ...prev, status: nextStatus }));
+      }
       loadSysCustomers();
     } catch (err) {
       notify(err?.message || 'Không thể cập nhật trạng thái.', 'error');
@@ -178,9 +258,40 @@ export default function SystemAdmin() {
     setCustActionBusyId(cust.customerId);
     try {
       const res = await api.patch(`/customer-accounts/${cust.customerId}/reset-password`);
-      notify(res.message || 'Đã đặt lại mật khẩu.', 'success');
+      notify(res.message || 'Đã đặt lại mật khẩu về 123456.', 'success');
     } catch (err) {
       notify(err?.message || 'Không thể đặt lại mật khẩu.', 'error');
+    } finally {
+      setCustActionBusyId(null);
+    }
+  };
+
+  const handleDeleteCustomer = async (cust) => {
+    const custId = cust.customerId;
+    const custName = cust.name;
+    const orderCount = cust.orderCount ?? custDetail?.orderCount ?? 0;
+
+    if (orderCount > 0) {
+      const wantDisable = await confirm(
+        `Khách hàng "${custName}" đã có ${orderCount} đơn hàng trong hệ thống — không thể xóa vĩnh viễn vì ràng buộc chứng từ. Bạn có muốn VÔ HIỆU HÓA tài khoản thay vì xóa không?`,
+        { danger: true }
+      );
+      if (wantDisable) {
+        handleToggleCustStatus(cust);
+      }
+      return;
+    }
+
+    if (!(await confirm(`Xác nhận XÓA VĨNH VIỄN tài khoản khách hàng "${custName}"? Hành động này không thể hoàn tác!`, { danger: true }))) return;
+
+    setCustActionBusyId(custId);
+    try {
+      const res = await api.delete(`/customer-accounts/${custId}`);
+      notify(res.message || `Đã xóa tài khoản "${custName}".`, 'success');
+      handleCloseCustDetail();
+      loadSysCustomers();
+    } catch (err) {
+      notify(err?.message || 'Không thể xóa tài khoản.', 'error');
     } finally {
       setCustActionBusyId(null);
     }
@@ -968,7 +1079,16 @@ export default function SystemAdmin() {
                     const isBusy = custActionBusyId === cust.customerId;
                     return (
                       <tr key={cust.customerId} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ padding: '0.65rem 0.85rem', fontWeight: 700, color: '#0f172a' }}>{cust.name}</td>
+                        <td 
+                          style={{ padding: '0.65rem 0.85rem', fontWeight: 700, color: '#0f172a', cursor: 'pointer' }}
+                          onClick={() => handleOpenCustDetail(cust)}
+                          title="Nhấn để xem chi tiết tài khoản"
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                            <span style={{ color: '#2563eb' }}>{cust.name}</span>
+                          </div>
+                          <div style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 500 }}>#{cust.customerId}</div>
+                        </td>
                         <td style={{ padding: '0.65rem 0.85rem', color: '#475569' }}>
                           <div>{cust.email}</div>
                           <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{cust.phone || 'Chưa cập nhật'}</div>
@@ -980,7 +1100,15 @@ export default function SystemAdmin() {
                           </span>
                         </td>
                         <td style={{ padding: '0.65rem 0.85rem', textAlign: 'center' }}>
-                          <div style={{ display: 'flex', justifyContent: 'center', gap: '0.35rem' }}>
+                          <div style={{ display: 'flex', justifyContent: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
+                            <button
+                              disabled={isBusy}
+                              onClick={() => handleOpenCustDetail(cust)}
+                              title="Xem chi tiết hồ sơ & quản lý"
+                              style={{ backgroundColor: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', borderRadius: '4px', padding: '0.3rem 0.5rem', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.2rem' }}
+                            >
+                              <Eye size={12} /> Chi tiết
+                            </button>
                             <button
                               disabled={isBusy}
                               onClick={() => handleResetCustPassword(cust)}
@@ -996,6 +1124,14 @@ export default function SystemAdmin() {
                               style={{ backgroundColor: '#ffffff', color: isInactive ? '#16a34a' : '#ef4444', border: `1px solid ${isInactive ? '#bbf7d0' : '#fca5a5'}`, borderRadius: '4px', padding: '0.3rem 0.5rem', fontSize: '0.72rem', fontWeight: 700, cursor: isBusy ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '0.2rem' }}
                             >
                               <Lock size={12} /> {isInactive ? 'Kích hoạt' : 'Vô hiệu hóa'}
+                            </button>
+                            <button
+                              disabled={isBusy}
+                              onClick={() => handleDeleteCustomer(cust)}
+                              title="Xóa tài khoản khách hàng"
+                              style={{ backgroundColor: '#ffffff', color: '#dc2626', border: '1px solid #fca5a5', borderRadius: '4px', padding: '0.3rem 0.45rem', fontSize: '0.72rem', fontWeight: 700, cursor: isBusy ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center' }}
+                            >
+                              <Trash2 size={12} />
                             </button>
                           </div>
                         </td>
@@ -2012,6 +2148,300 @@ export default function SystemAdmin() {
                   Lưu Thay Đổi
                 </button>
               </div>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL: CHI TIẾT & QUẢN LÝ TÀI KHOẢN KHÁCH HÀNG ================= */}
+      {selectedCust && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(6px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', width: '100%', maxWidth: '640px', padding: '1.75rem', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)' }}>
+            
+            {/* Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.25rem', borderBottom: '1px solid #f1f5f9', paddingBottom: '0.75rem' }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                    {custDetail?.name || selectedCust.name}
+                  </h3>
+                  <span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 800, backgroundColor: (custDetail?.status || selectedCust.status) === 'INACTIVE' ? '#fef2f2' : '#f0fdf4', color: (custDetail?.status || selectedCust.status) === 'INACTIVE' ? '#dc2626' : '#16a34a' }}>
+                    {(custDetail?.status || selectedCust.status) === 'INACTIVE' ? 'Vô hiệu hóa' : 'Đang hoạt động'}
+                  </span>
+                  <span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 800, backgroundColor: '#f5f3ff', color: '#7c3aed', border: '1px solid #ddd6fe' }}>
+                    Hạng: {custDetail?.tier || selectedCust.tier || 'BRONZE'}
+                  </span>
+                </div>
+                <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '0.2rem' }}>
+                  Mã tài khoản: <code style={{ color: '#2563eb', fontWeight: 700 }}>#{selectedCust.customerId}</code>
+                  {custDetail?.username && <span> • Username: <strong>{custDetail.username}</strong></span>}
+                </div>
+              </div>
+              <button onClick={handleCloseCustDetail} style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#475569', cursor: 'pointer', padding: '0.4rem', borderRadius: '6px' }}>
+                <X size={18} />
+              </button>
+            </div>
+
+            {custModalLoading ? (
+              <div style={{ textAlign: 'center', padding: '3rem', color: '#94a3b8' }}>
+                <RefreshCw size={24} style={{ animation: 'spin 1s linear infinite' }} />
+                <div style={{ marginTop: '0.5rem', fontSize: '0.85rem' }}>Đang tải dữ liệu tài khoản...</div>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                
+                {/* 4 Thẻ KPI */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.65rem' }}>
+                  <div style={{ padding: '0.65rem 0.75rem', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
+                    <div style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 600 }}>Đơn Hàng</div>
+                    <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', marginTop: '0.15rem' }}>{custDetail?.orderCount ?? selectedCust.orderCount ?? 0}</div>
+                  </div>
+                  <div style={{ padding: '0.65rem 0.75rem', backgroundColor: '#f0fdf4', borderRadius: '8px', border: '1px solid #bbf7d0', textAlign: 'center' }}>
+                    <div style={{ fontSize: '0.7rem', color: '#16a34a', fontWeight: 600 }}>Tổng Chi Tiêu</div>
+                    <div style={{ fontSize: '1rem', fontWeight: 800, color: '#15803d', marginTop: '0.15rem' }}>{fmt(custDetail?.totalSpent || 0)} ₫</div>
+                  </div>
+                  <div style={{ padding: '0.65rem 0.75rem', backgroundColor: '#fffbeb', borderRadius: '8px', border: '1px solid #fde68a', textAlign: 'center' }}>
+                    <div style={{ fontSize: '0.7rem', color: '#d97706', fontWeight: 600 }}>Điểm Thưởng</div>
+                    <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#b45309', marginTop: '0.15rem' }}>{custDetail?.loyaltyPoints ?? 0}</div>
+                  </div>
+                  <div style={{ padding: '0.65rem 0.75rem', backgroundColor: '#eff6ff', borderRadius: '8px', border: '1px solid #bfdbfe', textAlign: 'center' }}>
+                    <div style={{ fontSize: '0.7rem', color: '#2563eb', fontWeight: 600 }}>Ngày Đăng Ký</div>
+                    <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#1d4ed8', marginTop: '0.25rem' }}>
+                      {custDetail?.createdAt ? new Date(custDetail.createdAt).toLocaleDateString('vi-VN') : '—'}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Thanh tác vụ nhanh */}
+                <div style={{ padding: '0.75rem', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      onClick={() => setIsEditingCust(!isEditingCust)}
+                      style={{ backgroundColor: isEditingCust ? '#e0e7ff' : '#ffffff', color: '#4338ca', border: '1px solid #c7d2fe', borderRadius: '6px', padding: '0.4rem 0.65rem', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+                    >
+                      <Edit size={13} /> {isEditingCust ? 'Hủy chỉnh sửa' : 'Sửa thông tin'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleResetCustPassword(custDetail || selectedCust)}
+                      style={{ backgroundColor: '#ffffff', color: '#d97706', border: '1px solid #fde68a', borderRadius: '6px', padding: '0.4rem 0.65rem', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+                    >
+                      <Key size={13} /> Reset Pass
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleToggleCustStatus(custDetail || selectedCust)}
+                      style={{ backgroundColor: '#ffffff', color: (custDetail?.status || selectedCust.status) === 'INACTIVE' ? '#16a34a' : '#d97706', border: `1px solid ${(custDetail?.status || selectedCust.status) === 'INACTIVE' ? '#bbf7d0' : '#fed7aa'}`, borderRadius: '6px', padding: '0.4rem 0.65rem', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+                    >
+                      <Lock size={13} /> {(custDetail?.status || selectedCust.status) === 'INACTIVE' ? 'Kích hoạt tài khoản' : 'Vô hiệu hóa'}
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteCustomer(custDetail || selectedCust)}
+                    style={{ backgroundColor: '#fef2f2', color: '#dc2626', border: '1px solid #fca5a5', borderRadius: '6px', padding: '0.4rem 0.65rem', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+                  >
+                    <Trash2 size={13} /> Xóa tài khoản
+                  </button>
+                </div>
+
+                {/* Nội dung chi tiết hoặc Form chỉnh sửa */}
+                {isEditingCust ? (
+                  <div style={{ backgroundColor: '#ffffff', border: '1.5px solid #2563eb', borderRadius: '8px', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    <div style={{ fontWeight: 800, color: '#1e40af', fontSize: '0.85rem', marginBottom: '0.25rem' }}>
+                      ✏️ Cập Nhật Thông Tin Tài Khoản
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                      <div>
+                        <label style={labelStyle}>Họ và tên *</label>
+                        <input
+                          type="text"
+                          value={custEditForm.name}
+                          onChange={e => setCustEditForm(p => ({ ...p, name: e.target.value }))}
+                          style={inputStyle}
+                        />
+                      </div>
+                      <div>
+                        <label style={labelStyle}>Email đăng nhập *</label>
+                        <input
+                          type="email"
+                          value={custEditForm.email}
+                          onChange={e => setCustEditForm(p => ({ ...p, email: e.target.value }))}
+                          style={inputStyle}
+                        />
+                      </div>
+                      <div>
+                        <label style={labelStyle}>Số điện thoại</label>
+                        <input
+                          type="text"
+                          value={custEditForm.phone}
+                          onChange={e => setCustEditForm(p => ({ ...p, phone: e.target.value }))}
+                          style={inputStyle}
+                        />
+                      </div>
+                      <div>
+                        <label style={labelStyle}>Hạng thành viên</label>
+                        <select
+                          value={custEditForm.tier}
+                          onChange={e => setCustEditForm(p => ({ ...p, tier: e.target.value }))}
+                          style={inputStyle}
+                        >
+                          <option value="REGULAR">REGULAR</option>
+                          <option value="BRONZE">BRONZE (Đồng)</option>
+                          <option value="SILVER">SILVER (Bạc)</option>
+                          <option value="GOLD">GOLD (Vàng)</option>
+                          <option value="PLATINUM">PLATINUM (Bạch Kim)</option>
+                          <option value="VIP">VIP</option>
+                        </select>
+                      </div>
+                      <div style={{ gridColumn: 'span 2' }}>
+                        <label style={labelStyle}>Địa chỉ</label>
+                        <input
+                          type="text"
+                          placeholder="Số nhà, tên đường, phường/xã..."
+                          value={custEditForm.address}
+                          onChange={e => setCustEditForm(p => ({ ...p, address: e.target.value }))}
+                          style={inputStyle}
+                        />
+                      </div>
+                      <div>
+                        <label style={labelStyle}>Tỉnh / Thành phố</label>
+                        <input
+                          type="text"
+                          placeholder="Ví dụ: TP. Hồ Chí Minh"
+                          value={custEditForm.city}
+                          onChange={e => setCustEditForm(p => ({ ...p, city: e.target.value }))}
+                          style={inputStyle}
+                        />
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.5rem' }}>
+                      <button
+                        type="button"
+                        onClick={() => setIsEditingCust(false)}
+                        style={secondaryBtnStyle}
+                      >
+                        Hủy
+                      </button>
+                      <button
+                        type="button"
+                        disabled={savingCust}
+                        onClick={handleSaveCustEdit}
+                        style={{ ...primaryBtnStyle, display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+                      >
+                        <Check size={14} /> {savingCust ? 'Đang lưu...' : 'Lưu Thay Đổi'}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                    <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e2e8f0', padding: '0.85rem' }}>
+                      <h4 style={{ margin: '0 0 0.65rem 0', fontSize: '0.85rem', fontWeight: 800, color: '#334155' }}>Thông Tin Liên Hệ & Địa Chỉ</h4>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.65rem', fontSize: '0.8rem' }}>
+                        <div>
+                          <span style={{ color: '#64748b' }}>Họ và tên:</span>
+                          <strong style={{ display: 'block', color: '#0f172a' }}>{custDetail?.name || '—'}</strong>
+                        </div>
+                        <div>
+                          <span style={{ color: '#64748b' }}>Email:</span>
+                          <strong style={{ display: 'block', color: '#0f172a' }}>{custDetail?.email || '—'}</strong>
+                        </div>
+                        <div>
+                          <span style={{ color: '#64748b' }}>Số điện thoại:</span>
+                          <strong style={{ display: 'block', color: '#0f172a' }}>{custDetail?.phone || 'Chưa cập nhật'}</strong>
+                        </div>
+                        <div>
+                          <span style={{ color: '#64748b' }}>Tỉnh / Thành phố:</span>
+                          <strong style={{ display: 'block', color: '#0f172a' }}>{custDetail?.city || 'Chưa cập nhật'}</strong>
+                        </div>
+                        <div style={{ gridColumn: 'span 2' }}>
+                          <span style={{ color: '#64748b' }}>Địa chỉ giao hàng:</span>
+                          <div style={{ color: '#0f172a', fontWeight: 600, marginTop: '0.15rem' }}>{custDetail?.address || 'Chưa cập nhật'}</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Sổ địa chỉ giao hàng phụ (nếu có) */}
+                    {custDetail?.addresses && custDetail.addresses.length > 0 && (
+                      <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e2e8f0', padding: '0.85rem' }}>
+                        <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.85rem', fontWeight: 800, color: '#334155' }}>
+                          Sổ Địa Chỉ Giao Hàng ({custDetail.addresses.length})
+                        </h4>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', fontSize: '0.78rem' }}>
+                          {custDetail.addresses.map((addr, idx) => (
+                            <div key={addr.id || idx} style={{ padding: '0.45rem 0.65rem', backgroundColor: '#f8fafc', borderRadius: '6px', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <div>
+                                <strong>{addr.recipientName}</strong> ({addr.recipientPhone}) — {addr.addressLine}, {addr.ward ? `${addr.ward}, ` : ''}{addr.district ? `${addr.district}, ` : ''}{addr.city}
+                              </div>
+                              {addr.isDefault && (
+                                <span style={{ padding: '1px 6px', borderRadius: '4px', fontSize: '0.65rem', fontWeight: 800, backgroundColor: '#eff6ff', color: '#2563eb' }}>Mặc định</span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Đơn hàng gần nhất */}
+                    {custDetail?.orders && custDetail.orders.length > 0 && (
+                      <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e2e8f0', padding: '0.85rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                          <h4 style={{ margin: 0, fontSize: '0.85rem', fontWeight: 800, color: '#334155' }}>
+                            Đơn Hàng Gần Đây ({custDetail.orders.length})
+                          </h4>
+                          <span 
+                            style={{ fontSize: '0.75rem', color: '#2563eb', fontWeight: 700, cursor: 'pointer' }}
+                            onClick={() => {
+                              handleCloseCustDetail();
+                              navigate(`/admin/sales?tab=orders&search=${encodeURIComponent(custDetail.customerId)}`);
+                            }}
+                          >
+                            Xem tất cả đơn →
+                          </span>
+                        </div>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.76rem' }}>
+                          <thead>
+                            <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', textAlign: 'left', color: '#64748b' }}>
+                              <th style={{ padding: '0.4rem 0.5rem' }}>Mã Đơn</th>
+                              <th style={{ padding: '0.4rem 0.5rem' }}>Ngày Đặt</th>
+                              <th style={{ padding: '0.4rem 0.5rem', textAlign: 'center' }}>Trạng Thái</th>
+                              <th style={{ padding: '0.4rem 0.5rem', textAlign: 'right' }}>Tổng Tiền</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {custDetail.orders.map(o => (
+                              <tr key={o.orderId} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                <td style={{ padding: '0.4rem 0.5rem', fontWeight: 700, color: '#2563eb' }}>{o.orderId}</td>
+                                <td style={{ padding: '0.4rem 0.5rem', color: '#64748b' }}>{new Date(o.createdAt).toLocaleDateString('vi-VN')}</td>
+                                <td style={{ padding: '0.4rem 0.5rem', textAlign: 'center' }}>
+                                  <span style={{ padding: '2px 6px', borderRadius: '4px', fontSize: '0.68rem', fontWeight: 700, backgroundColor: '#f1f5f9', color: '#475569' }}>
+                                    {o.status}
+                                  </span>
+                                </td>
+                                <td style={{ padding: '0.4rem 0.5rem', textAlign: 'right', fontWeight: 700, color: '#0f172a' }}>{fmt(o.totalAmount)} ₫</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+
+                  </div>
+                )}
+
+              </div>
+            )}
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1.25rem', borderTop: '1px solid #f1f5f9', paddingTop: '0.75rem' }}>
+              <button
+                type="button"
+                onClick={handleCloseCustDetail}
+                style={secondaryBtnStyle}
+              >
+                Đóng
+              </button>
             </div>
 
           </div>

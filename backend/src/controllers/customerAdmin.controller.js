@@ -78,6 +78,17 @@ const getCustomer = async (req, res, next) => {
       where: { customerId: id },
       include: {
         addresses: true,
+        orders: {
+          take: 5,
+          orderBy: { createdAt: 'desc' },
+          select: {
+            orderId: true,
+            totalAmount: true,
+            status: true,
+            createdAt: true,
+            paymentMethod: true
+          }
+        },
         _count: { select: { orders: true } }
       }
     });
