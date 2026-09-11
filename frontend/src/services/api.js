@@ -8,7 +8,13 @@ const mapSlugToCategory = (slug) => {
   if (s === 'cpu' || s.includes('cpu') || s.includes('bo-vi-xu-ly') || s.includes('xu-ly')) return 'CPU';
   if (s === 'mainboard' || s.includes('main') || s.includes('bo-mach-chu')) return 'MAINBOARD';
   if (s === 'ram' || s.includes('ram')) return 'RAM';
-  if (s === 'gpu' || s === 'vga' || s.includes('vga') || s.includes('card') || s.includes('man-hinh')) return 'VGA';
+  // KHÔNG được thêm s.includes('man-hinh') ở đây — slug thật của Card Màn Hình là
+  // "card-man-hinh" (đã khớp qua includes('card') bên dưới), còn "man-hinh" trần là
+  // slug thật của Monitor (dòng bên dưới). Trước đây có includes('man-hinh') ở đây,
+  // khiến MỌI sản phẩm Monitor (slug "man-hinh") bị nhận nhầm thành VGA vì điều kiện
+  // này được xét trước dòng Monitor — bộ lọc "Card Màn Hình" hiện ra toàn màn hình,
+  // còn lọc "Màn Hình" thì trống trơn (đúng như người dùng báo cáo).
+  if (s === 'gpu' || s === 'vga' || s.includes('vga') || s.includes('card')) return 'VGA';
   if (s === 'psu' || s === 'nguồn' || s.includes('psu') || s.includes('nguon')) return 'PSU';
   if (s.includes('ssd') || s.includes('hdd') || s === 'storage' || s.includes('o-cung')) return 'STORAGE';
   if (s === 'case' || s.includes('case') || s.includes('vo-may-tinh')) return 'CASE';
