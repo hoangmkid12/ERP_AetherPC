@@ -287,9 +287,10 @@ export default function MyOrders() {
       case 'AWAITING_STOCK':
         return { text: 'Chờ hàng về', color: '#f97316', bg: 'rgba(249,115,22,0.1)', border: 'rgba(249,115,22,0.3)' };
       case 'CONFIRMED':
+        return { text: 'Đã xác nhận', color: '#2563eb', bg: 'rgba(37,99,235,0.1)', border: 'rgba(37,99,235,0.3)' };
       case 'PROCESSING':
       case 'PACKED':
-        return { text: 'Chờ lấy hàng', color: '#6366f1', bg: 'rgba(99,102,241,0.1)', border: 'rgba(99,102,241,0.3)' };
+        return { text: 'Chuẩn bị hàng', color: '#6366f1', bg: 'rgba(99,102,241,0.1)', border: 'rgba(99,102,241,0.3)' };
       case 'READY_TO_SHIP':
         return { text: 'Chờ giao hàng', color: '#818cf8', bg: 'rgba(129,140,248,0.1)', border: 'rgba(129,140,248,0.3)' };
       case 'SHIPPED':
@@ -531,7 +532,7 @@ export default function MyOrders() {
 
     // Case 3: Trạng thái Đang Chờ Hàng Về Kho (AWAITING_STOCK)
     if (status === 'AWAITING_STOCK') {
-      const awaitingSteps = ['Chờ xác nhận', 'Chờ hàng về kho', 'Chờ lấy hàng', 'Chờ giao hàng', 'Đang giao hàng', 'Đã giao'];
+      const awaitingSteps = ['Đã đặt hàng', 'Chờ hàng về kho', 'Chuẩn bị hàng', 'Đang giao hàng', 'Đã giao'];
       return (
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative', width: '100%', padding: '0.5rem 0' }}>
           {awaitingSteps.map((stepName, idx) => {
@@ -579,15 +580,19 @@ export default function MyOrders() {
       );
     }
 
-    // Case 5: Quy trình Giao Hàng Tiêu Chuẩn 5 bước
-    const steps = ['Chờ xác nhận', 'Chờ lấy hàng', 'Chờ giao hàng', 'Đang giao hàng', 'Đã giao'];
+    // Case 5: Quy trình Giao Hàng Tiêu Chuẩn 5 bước chuẩn Shopee / TMĐT
+    const steps = [
+      'Đã đặt hàng',
+      status === 'PENDING' ? 'Chờ xác nhận' : 'Đã xác nhận',
+      'Chuẩn bị hàng',
+      'Đang giao hàng',
+      'Đã giao'
+    ];
     
-    let activeIdx = 0;
-    if (status === 'PENDING') {
-      activeIdx = 0;
-    } else if (['CONFIRMED', 'PROCESSING', 'PACKED'].includes(status)) {
+    let activeIdx = 1;
+    if (status === 'PENDING' || status === 'WAITING_PAYMENT') {
       activeIdx = 1;
-    } else if (status === 'READY_TO_SHIP') {
+    } else if (['CONFIRMED', 'PROCESSING', 'PACKED', 'READY_TO_SHIP'].includes(status)) {
       activeIdx = 2;
     } else if (['SHIPPED', 'SHIPPING_FAILED'].includes(status)) {
       activeIdx = 3;
