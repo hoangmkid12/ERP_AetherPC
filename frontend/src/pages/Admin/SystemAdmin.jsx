@@ -100,6 +100,7 @@ const badgeStyle = (variant = 'neutral') => {
 };
 
 export default function SystemAdmin() {
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const employees = useHRStore(state => state.employees) || [];
   const addEmployee = useHRStore(state => state.addEmployee);
@@ -119,6 +120,71 @@ export default function SystemAdmin() {
   const [roleFilter, setRoleFilter] = useState('ALL');
   const [showAdd, setShowAdd] = useState(false);
   const [editingEmp, setEditingEmp] = useState(null);
+
+  // Tài khoản khách hàng (real Customer accounts, /api/v1/customer-accounts) —
+  // hiển thị trong cùng tab "Tài Khoản & Người Dùng" bên cạnh nhân viên, cho
+  // phép Admin giám sát/khóa nhanh mà không cần sang tab Bán Hàng. Tạo mới/sửa
+  // chi tiết vẫn ở tab Khách Hàng (CRM) trong Bán Hàng để tránh trùng lặp modal.
+  const [custSearch, setCustSearch] = useState('');
+  const [custList, setCustList] = useState([]);
+  const [custLoading, setCustLoading] = useState(false);
+  const [custPage, setCustPage] = useState(1);
+  const [custTotalPages, setCustTotalPages] = useState(1);
+  const [custTotal, setCustTotal] = useState(0);
+  const [custActionBusyId, setCustActionBusyId] = useState(null);
+  const CUST_PAGE_SIZE = 8;
+
+  const loadSysCustomers = async () => {
+    setCustLoading(true);
+    try {
+      const params = new URLSearchParams({ page: String(custPage), limit: String(CUST_PAGE_SIZE) });
+      if (custSearch.trim()) params.set('search', custSearch.trim());
+      const res = await api.get(`/customer-accounts?${params.toString()}`);
+      setCustList(res.data || []);
+      setCustTotalPages(res.pagination?.totalPages || 1);
+      setCustTotal(res.pagination?.total || 0);
+    } catch (err) {
+      notify(err?.message || 'Không thể tải danh sách khách hàng.', 'error');
+    } finally {
+      setCustLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab !== 'users') return;
+    const timer = setTimeout(() => { loadSysCustomers(); }, 300);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, custPage, custSearch]);
+
+  const handleToggleCustStatus = async (cust) => {
+    const nextStatus = cust.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
+    const label = nextStatus === 'INACTIVE' ? 'vô hiệu hóa' : 'kích hoạt lại';
+    if (!(await confirm(`Xác nhận ${label} tài khoản khách hàng "${cust.name}"?`, { danger: nextStatus === 'INACTIVE' }))) return;
+    setCustActionBusyId(cust.customerId);
+    try {
+      await api.patch(`/customer-accounts/${cust.customerId}/status`, { status: nextStatus });
+      notify(`Đã ${label} tài khoản "${cust.name}".`, 'success');
+      loadSysCustomers();
+    } catch (err) {
+      notify(err?.message || 'Không thể cập nhật trạng thái.', 'error');
+    } finally {
+      setCustActionBusyId(null);
+    }
+  };
+
+  const handleResetCustPassword = async (cust) => {
+    if (!(await confirm(`Đặt lại mật khẩu của "${cust.name}" về mặc định (123456)?`))) return;
+    setCustActionBusyId(cust.customerId);
+    try {
+      const res = await api.patch(`/customer-accounts/${cust.customerId}/reset-password`);
+      notify(res.message || 'Đã đặt lại mật khẩu.', 'success');
+    } catch (err) {
+      notify(err?.message || 'Không thể đặt lại mật khẩu.', 'error');
+    } finally {
+      setCustActionBusyId(null);
+    }
+  };
 
   // RBAC Selected Role & Matrix State
   const [selectedRbacRole, setSelectedRbacRole] = useState('SALES_MANAGER');
@@ -727,7 +793,9 @@ export default function SystemAdmin() {
       {/* TAB 2: USERS (QUẢN LÝ TÀI KHOẢN) */}
       {/* ========================================================================= */}
       {activeTab === 'users' && (
+        <>
         <div style={cardStyle}>
+          <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', margin: '0 0 1rem 0' }}>Tài Khoản Nhân Viên</h3>
           
           {/* Filter Toolbar */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1.25rem' }}>
@@ -851,6 +919,105 @@ export default function SystemAdmin() {
           </div>
 
         </div>
+
+        {/* Tài Khoản Khách Hàng — dữ liệu thật từ /api/v1/customer-accounts */}
+        <div style={{ ...cardStyle, marginTop: '1.25rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1rem' }}>
+            <div>
+              <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                Tài Khoản Khách Hàng <span style={{ fontWeight: 700, color: '#64748b', fontSize: '0.8rem' }}>({custTotal})</span>
+              </h3>
+              <p style={{ fontSize: '0.78rem', color: '#94a3b8', margin: '0.2rem 0 0' }}>
+                Giám sát &amp; khóa nhanh tài khoản khách hàng. Tạo mới / chỉnh sửa chi tiết tại{' '}
+                <span style={{ color: '#2563eb', fontWeight: 700, cursor: 'pointer' }} onClick={() => navigate('/admin/sales?tab=customers')}>
+                  Bán Hàng → Khách Hàng (CRM)
+                </span>.
+              </p>
+            </div>
+            <div style={{ position: 'relative', width: '280px' }}>
+              <input
+                type="text"
+                placeholder="Tìm theo tên, SĐT, email..."
+                value={custSearch}
+                onChange={e => { setCustPage(1); setCustSearch(e.target.value); }}
+                style={{ width: '100%', padding: '0.45rem 0.65rem 0.45rem 2rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem', boxSizing: 'border-box' }}
+              />
+              <Search size={15} style={{ position: 'absolute', left: '0.6rem', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+            </div>
+          </div>
+
+          {custLoading ? (
+            <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8', fontSize: '0.85rem' }}>Đang tải...</div>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+                <thead>
+                  <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569' }}>
+                    <th style={{ padding: '0.65rem 0.85rem' }}>Khách Hàng</th>
+                    <th style={{ padding: '0.65rem 0.85rem' }}>Liên Hệ</th>
+                    <th style={{ padding: '0.65rem 0.85rem', textAlign: 'center' }}>Đơn Hàng</th>
+                    <th style={{ padding: '0.65rem 0.85rem', textAlign: 'center' }}>Trạng Thái</th>
+                    <th style={{ padding: '0.65rem 0.85rem', textAlign: 'center' }}>Thao Tác</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {custList.length === 0 ? (
+                    <tr><td colSpan={5} style={{ padding: '1.5rem', textAlign: 'center', color: '#94a3b8' }}>Không tìm thấy khách hàng nào.</td></tr>
+                  ) : custList.map(cust => {
+                    const isInactive = cust.status !== 'ACTIVE';
+                    const isBusy = custActionBusyId === cust.customerId;
+                    return (
+                      <tr key={cust.customerId} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                        <td style={{ padding: '0.65rem 0.85rem', fontWeight: 700, color: '#0f172a' }}>{cust.name}</td>
+                        <td style={{ padding: '0.65rem 0.85rem', color: '#475569' }}>
+                          <div>{cust.email}</div>
+                          <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{cust.phone || 'Chưa cập nhật'}</div>
+                        </td>
+                        <td style={{ padding: '0.65rem 0.85rem', textAlign: 'center', fontWeight: 700, color: '#0f172a' }}>{cust.orderCount}</td>
+                        <td style={{ padding: '0.65rem 0.85rem', textAlign: 'center' }}>
+                          <span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 800, backgroundColor: isInactive ? '#fef2f2' : '#f0fdf4', color: isInactive ? '#dc2626' : '#16a34a' }}>
+                            {isInactive ? 'Vô hiệu hóa' : 'Hoạt động'}
+                          </span>
+                        </td>
+                        <td style={{ padding: '0.65rem 0.85rem', textAlign: 'center' }}>
+                          <div style={{ display: 'flex', justifyContent: 'center', gap: '0.35rem' }}>
+                            <button
+                              disabled={isBusy}
+                              onClick={() => handleResetCustPassword(cust)}
+                              title="Đặt lại mật khẩu về 123456"
+                              style={{ backgroundColor: '#ffffff', color: '#d97706', border: '1px solid #fde68a', borderRadius: '4px', padding: '0.3rem 0.5rem', fontSize: '0.72rem', fontWeight: 700, cursor: isBusy ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '0.2rem' }}
+                            >
+                              <Key size={12} /> Reset Pass
+                            </button>
+                            <button
+                              disabled={isBusy}
+                              onClick={() => handleToggleCustStatus(cust)}
+                              title={isInactive ? 'Kích hoạt lại tài khoản' : 'Vô hiệu hóa tài khoản'}
+                              style={{ backgroundColor: '#ffffff', color: isInactive ? '#16a34a' : '#ef4444', border: `1px solid ${isInactive ? '#bbf7d0' : '#fca5a5'}`, borderRadius: '4px', padding: '0.3rem 0.5rem', fontSize: '0.72rem', fontWeight: 700, cursor: isBusy ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '0.2rem' }}
+                            >
+                              <Lock size={12} /> {isInactive ? 'Kích hoạt' : 'Vô hiệu hóa'}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {custTotalPages > 1 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1rem', borderTop: '1px solid #e2e8f0', paddingTop: '0.75rem' }}>
+              <span style={{ fontSize: '0.76rem', color: '#64748b' }}>Trang {custPage}/{custTotalPages}</span>
+              <div style={{ display: 'flex', gap: '0.3rem' }}>
+                <button disabled={custPage <= 1} onClick={() => setCustPage(p => Math.max(p - 1, 1))} style={{ padding: '0.25rem 0.5rem', backgroundColor: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: custPage <= 1 ? 'not-allowed' : 'pointer' }}>‹</button>
+                <button disabled={custPage >= custTotalPages} onClick={() => setCustPage(p => Math.min(p + 1, custTotalPages))} style={{ padding: '0.25rem 0.5rem', backgroundColor: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: custPage >= custTotalPages ? 'not-allowed' : 'pointer' }}>›</button>
+              </div>
+            </div>
+          )}
+        </div>
+        </>
       )}
 
       {/* ========================================================================= */}
@@ -888,18 +1055,19 @@ export default function SystemAdmin() {
             {/* Phần lớn ma trận này vẫn chỉ điều khiển việc ẨN/HIỆN menu và khoá/mở
                 nút trên giao diện — quyền gọi API cho đa số tác vụ vẫn do
                 authMiddleware() ở từng route backend quyết định độc lập, không
-                đọc ma trận này. Ngoại lệ: 5 tác vụ rủi ro cao nhất (duyệt PO,
+                đọc ma trận này. Ngoại lệ: 6 tác vụ rủi ro cao nhất (duyệt PO,
                 CEO duyệt lương, giải ngân lương, hủy đơn & hoàn tiền, vô hiệu
-                hóa nhân viên) ĐÃ được backend thực sự kiểm tra qua bảng này
-                (checkOperationalPermission, xem rbac.middleware.js) — tắt 1
-                trong 5 quyền đó sẽ chặn thật API tương ứng, không chỉ ẩn nút. */}
+                hóa nhân viên, quản lý tài khoản khách hàng) ĐÃ được backend
+                thực sự kiểm tra qua bảng này (checkOperationalPermission, xem
+                rbac.middleware.js) — tắt 1 trong 6 quyền đó sẽ chặn thật API
+                tương ứng, không chỉ ẩn nút. */}
             <div style={{ backgroundColor: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px', padding: '0.75rem 1rem', fontSize: '0.8rem', color: '#92400e', display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
               <AlertTriangle size={16} style={{ flexShrink: 0, marginTop: '1px' }} />
               <span>
                 Phần lớn đây là cấu hình <strong>hiển thị giao diện</strong> (ẩn/hiện menu, khoá nút) theo vai trò —
                 quyền gọi API cho đa số tác vụ vẫn do backend kiểm soát độc lập theo vai trò đăng nhập.
-                Riêng <strong>5 tác vụ rủi ro cao</strong> (Ký duyệt Báo Giá/PO, Phê duyệt Bảng lương, Giải ngân lương,
-                Duyệt hủy đơn & hoàn tiền, Quản lý hồ sơ nhân viên) đã được backend <strong>thực sự chặn API</strong> theo đúng thiết lập ở đây.
+                Riêng <strong>6 tác vụ rủi ro cao</strong> (Ký duyệt Báo Giá/PO, Phê duyệt Bảng lương, Giải ngân lương,
+                Duyệt hủy đơn & hoàn tiền, Quản lý hồ sơ nhân viên, Quản lý tài khoản khách hàng) đã được backend <strong>thực sự chặn API</strong> theo đúng thiết lập ở đây.
               </span>
             </div>
 

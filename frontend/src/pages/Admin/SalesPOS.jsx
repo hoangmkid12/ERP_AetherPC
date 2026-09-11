@@ -154,7 +154,7 @@ export default function SalesPOS() {
   // from the order-derived CRM stats above, backed by the real Customer table
   // via /api/v1/customer-accounts. Write actions are backend-gated to
   // CEO/ADMIN/SALES_MANAGER; plain SALES/CSKH only get read access.
-  const canManageCustomerAccounts = isCEO || isAdmin || isSalesManager;
+  const canManageCustomerAccounts = canDo('sales_manage_customers') || isCEO || isAdmin || isSalesManager;
   const [customerStatusFilter, setCustomerStatusFilter] = useState('ALL');
   const [customerAccounts, setCustomerAccounts] = useState([]);
   const [customerAccountsLoading, setCustomerAccountsLoading] = useState(false);
