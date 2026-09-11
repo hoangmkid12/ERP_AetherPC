@@ -1359,54 +1359,6 @@ export default function Sidebar({ isOpen = false, onClose }) {
           </div>
         </div>
 
-        {/* Xin Nghỉ Phép / Phiếu Lương Của Tôi — mọi role đều thấy, tự phục vụ */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', marginBottom: '0.5rem' }}>
-          <button
-            onClick={openLeaveModal}
-            className="btn"
-            style={{
-              padding: '0.5rem 0.3rem',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '0.3rem',
-              fontSize: '0.75rem',
-              fontWeight: 700,
-              borderRadius: '8px',
-              backgroundColor: '#f5f3ff',
-              border: '1px solid #ddd6fe',
-              color: '#7c3aed',
-              cursor: 'pointer'
-            }}
-            title="Xin nghỉ phép của chính mình"
-          >
-            <CalendarCheck size={14} />
-            <span>Nghỉ Phép</span>
-          </button>
-          <button
-            onClick={() => navigate('/admin/my-payroll')}
-            className="btn"
-            style={{
-              padding: '0.5rem 0.3rem',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '0.3rem',
-              fontSize: '0.75rem',
-              fontWeight: 700,
-              borderRadius: '8px',
-              backgroundColor: '#eff6ff',
-              border: '1px solid #bfdbfe',
-              color: '#2563eb',
-              cursor: 'pointer'
-            }}
-            title="Xem phiếu lương của chính mình"
-          >
-            <Wallet size={14} />
-            <span>Phiếu Lương</span>
-          </button>
-        </div>
-
         {/* Action Buttons */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
           <button

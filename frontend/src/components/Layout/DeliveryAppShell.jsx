@@ -160,22 +160,6 @@ export default function DeliveryAppShell({ children }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
             <button
               type="button"
-              onClick={openLeaveModal}
-              className="delivery-icon-btn"
-              title="Nghỉ phép của tôi"
-            >
-              <CalendarCheck size={18} />
-            </button>
-            <button
-              type="button"
-              onClick={() => navigate('/admin/my-payroll')}
-              className="delivery-icon-btn"
-              title="Phiếu lương của tôi"
-            >
-              <Wallet size={18} />
-            </button>
-            <button
-              type="button"
               onClick={() => navigate('/admin/delivery?tab=pending')}
               className="delivery-icon-btn"
               title="Thông báo"
