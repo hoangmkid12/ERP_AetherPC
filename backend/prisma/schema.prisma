@@ -254,6 +254,7 @@ model Order {
   bankRefCode         String?         @map("bank_ref_code") @db.VarChar(100)
   paymentProofPhoto   String?         @map("payment_proof_photo") @db.Text
   receivedByType      String?         @default("DIRECT_CUSTOMER") @map("received_by_type") @db.VarChar(30)
+  receiverNameActual  String?         @map("receiver_name_actual") @db.VarChar(150)
   // Ảnh minh chứng kiện hàng khi Shipper chuyển hoàn về kho (chụp lúc bấm
   // "Xác Nhận Hoàn Kho") — cùng cơ chế với proofPhoto của POD nhưng cho
   // chiều ngược lại, để Thủ Kho/QC đối chiếu tình trạng kiện hàng lúc nhận.

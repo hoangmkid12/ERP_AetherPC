@@ -1777,7 +1777,6 @@ export default function Purchasing() {
                         position: 'sticky',
                         right: 0,
                         backgroundColor: '#f8fafc',
-                        boxShadow: '-3px 0 6px rgba(0,0,0,0.05)',
                         zIndex: 2
                       }}>
                         Thao Tác / Xử Lý
@@ -1914,7 +1913,6 @@ export default function Purchasing() {
                               position: 'sticky',
                               right: 0,
                               backgroundColor: '#ffffff',
-                              boxShadow: '-3px 0 6px rgba(0,0,0,0.05)',
                               borderBottom: '1px solid #f1f5f9',
                               zIndex: 1
                             }}>
