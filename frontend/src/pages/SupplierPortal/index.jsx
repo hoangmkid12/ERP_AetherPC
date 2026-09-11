@@ -4,9 +4,9 @@ import { notify, confirm } from '../../context/NotificationContext';
 import { PO_STATUS, getStatusLabel } from '../../utils/statusLabels';
 import { useFinanceStore } from '../../stores';
 import { api } from '../../services/api';
-import { 
-  PackageOpen, Clock, FileText, CheckCircle, LogOut, AlertCircle, 
-  Eye, X, Check, Building, Calendar, Package, DollarSign, XCircle, Truck, CreditCard
+import {
+  PackageOpen, Clock, FileText, CheckCircle, LogOut, AlertCircle,
+  Eye, X, Check, Building, Calendar, Package, DollarSign, XCircle, Truck, CreditCard, Boxes
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -492,8 +492,39 @@ export default function SupplierPortal() {
     }
   };
 
-  const [activeTab, setActiveTab] = useState('orders'); // 'orders' or 'finance'
+  const [activeTab, setActiveTab] = useState('orders'); // 'orders', 'products', or 'finance'
   const [statusFilter, setStatusFilter] = useState('ALL');
+
+  // Danh sách sản phẩm NCC đang là nhà phân phối mặc định (Product.defaultSupplierCode)
+  // — trước đây Cổng NCC chỉ thấy từng RFQ/PO riêng lẻ, không có cái nhìn tổng quan
+  // danh mục sản phẩm mình phụ trách.
+  const [myProducts, setMyProducts] = useState([]);
+  const [productsLoading, setProductsLoading] = useState(false);
+  const [productSearch, setProductSearch] = useState('');
+
+  const fetchMyProducts = async () => {
+    setProductsLoading(true);
+    try {
+      const res = await api.get('/purchasing/suppliers/me/products');
+      setMyProducts(res.data || []);
+    } catch (err) {
+      notify(err?.message || 'Không thể tải danh sách sản phẩm đang cung cấp.', 'error');
+    } finally {
+      setProductsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab !== 'products') return;
+    fetchMyProducts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
+
+  const filteredMyProducts = myProducts.filter(p => {
+    const term = productSearch.trim().toLowerCase();
+    if (!term) return true;
+    return (p.name || '').toLowerCase().includes(term) || (p.sku || '').toLowerCase().includes(term);
+  });
 
   // Financial calculations for supplier — must cover the FULL post-quote lifecycle
   // (QUOTED -> PO -> CONFIRMED_BY_SUPPLIER -> PENDING_QA -> QA_PASSED/PARTIAL -> RECEIVED
@@ -618,6 +649,18 @@ export default function SupplierPortal() {
           }}
         >
           <PackageOpen size={16} /> Quản Lý Yêu Cầu & Báo Giá
+        </button>
+        <button
+          onClick={() => setActiveTab('products')}
+          style={{
+            padding: '0.5rem 1.15rem', fontSize: '0.85rem', fontWeight: 700,
+            borderRadius: '8px', cursor: 'pointer', transition: 'all 0.2s', border: 'none',
+            backgroundColor: activeTab === 'products' ? 'var(--primary)' : 'transparent',
+            color: activeTab === 'products' ? '#fff' : 'var(--text-secondary)',
+            display: 'flex', alignItems: 'center', gap: '0.4rem'
+          }}
+        >
+          <Boxes size={16} /> Sản Phẩm Đang Cung Cấp
         </button>
         <button
           onClick={() => setActiveTab('finance')}
@@ -837,6 +880,95 @@ export default function SupplierPortal() {
             </div>
           </div>
           
+        </div>
+      )}
+
+      {/* TAB: PRODUCTS CURRENTLY SUPPLIED */}
+      {activeTab === 'products' && (
+        <div className="card-glass" style={{ padding: '1.5rem', borderRadius: '14px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+            <div>
+              <h3 style={{ fontSize: '1.15rem', fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Boxes size={20} color="var(--primary)" />
+                Sản Phẩm Đang Cung Cấp
+              </h3>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '0.3rem 0 0' }}>
+                Các sản phẩm mà quý công ty đang là nhà phân phối mặc định trong hệ thống AetherPC ERP ({myProducts.length} sản phẩm)
+              </p>
+            </div>
+            <input
+              value={productSearch}
+              onChange={(e) => setProductSearch(e.target.value)}
+              placeholder="Tìm theo tên hoặc SKU..."
+              style={{ padding: '0.5rem 0.85rem', border: '1px solid var(--border-glass)', borderRadius: '8px', fontSize: '0.83rem', minWidth: '220px', backgroundColor: 'rgba(255,255,255,0.02)', color: 'inherit' }}
+            />
+          </div>
+
+          <div className="table-container" style={{ overflowX: 'auto', borderRadius: '10px', border: '1px solid var(--border-glass)' }}>
+            <table className="erp-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ background: 'rgba(255,255,255,0.02)' }}>
+                  <th style={{ padding: '0.75rem 1rem', textAlign: 'left' }}>Sản Phẩm</th>
+                  <th style={{ padding: '0.75rem 1rem', textAlign: 'left' }}>SKU</th>
+                  <th style={{ padding: '0.75rem 1rem', textAlign: 'left' }}>Danh Mục</th>
+                  <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Tồn Kho ERP</th>
+                  <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Trạng Thái Bán</th>
+                  <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Giá Bán Lẻ Niêm Yết</th>
+                </tr>
+              </thead>
+              <tbody>
+                {productsLoading ? (
+                  <tr>
+                    <td colSpan="6" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.88rem' }}>
+                      Đang tải danh sách sản phẩm...
+                    </td>
+                  </tr>
+                ) : filteredMyProducts.length === 0 ? (
+                  <tr>
+                    <td colSpan="6" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.88rem' }}>
+                      {myProducts.length === 0
+                        ? 'Hệ thống chưa ghi nhận sản phẩm nào do quý công ty là nhà phân phối mặc định.'
+                        : 'Không tìm thấy sản phẩm phù hợp.'}
+                    </td>
+                  </tr>
+                ) : (
+                  filteredMyProducts.map(p => {
+                    const stock = Number(p.stockQuantity) || 0;
+                    const isActive = p.status === 'ACTIVE' && p.available !== false;
+                    return (
+                      <tr key={p.productId} className="hover-row">
+                        <td style={{ padding: '0.75rem 1rem', fontSize: '0.85rem', color: '#0f172a', fontWeight: 700, maxWidth: '320px' }}>
+                          {p.name}
+                          {p.brand?.name && (
+                            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 400, marginTop: '2px' }}>{p.brand.name}</div>
+                          )}
+                        </td>
+                        <td style={{ padding: '0.75rem 1rem', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{p.sku || '—'}</td>
+                        <td style={{ padding: '0.75rem 1rem', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{p.category?.name || '—'}</td>
+                        <td style={{ padding: '0.75rem 1rem', textAlign: 'center', fontWeight: 800, fontSize: '0.88rem', color: stock === 0 ? '#ef4444' : (stock <= 5 ? '#d97706' : 'inherit') }}>
+                          {stock}
+                        </td>
+                        <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
+                          {isActive ? (
+                            <span className="badge badge-success" style={{ backgroundColor: 'rgba(16,185,129,0.15)', color: 'var(--success)', padding: '0.3rem 0.65rem', borderRadius: '12px', fontSize: '0.72rem', fontWeight: 700 }}>
+                              Đang Bán
+                            </span>
+                          ) : (
+                            <span className="badge badge-secondary" style={{ padding: '0.3rem 0.65rem', borderRadius: '12px', fontSize: '0.72rem', fontWeight: 700 }}>
+                              Ngừng Bán
+                            </span>
+                          )}
+                        </td>
+                        <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 700, fontSize: '0.85rem' }}>
+                          {formatPrice(p.price)}
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 

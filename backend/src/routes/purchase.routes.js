@@ -9,6 +9,7 @@ const {
   deactivateSupplier,
   createSupplierEvaluation,
   getPurchasingProducts,
+  getMySuppliedProducts,
   getPurchaseOrders,
   createPurchaseOrder,
   updatePurchaseOrderStatus,
@@ -34,6 +35,10 @@ router.post('/suppliers/:code/evaluations', authMiddleware(['PURCHASING', 'CEO',
 
 // @route   GET /api/v1/purchasing/products
 router.get('/products', authMiddleware(['PURCHASING', 'WAREHOUSE_MANAGER', 'CEO', 'ADMIN']), getPurchasingProducts);
+
+// @route   GET /api/v1/purchasing/suppliers/me/products
+// @desc    NCC tự xem danh sách sản phẩm mình đang là nhà cung cấp mặc định
+router.get('/suppliers/me/products', authMiddleware(['SUPPLIER']), getMySuppliedProducts);
 
 // @route   GET /api/v1/purchasing/orders
 router.get('/orders', authMiddleware(['PURCHASING', 'WAREHOUSE_MANAGER', 'CEO', 'ADMIN', 'SUPPLIER', 'ACCOUNTANT', ...QC_ROLES]), getPurchaseOrders);

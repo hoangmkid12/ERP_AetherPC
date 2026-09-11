@@ -208,6 +208,36 @@ const getPurchasingProducts = async (req, res, next) => {
   }
 };
 
+// GET /api/v1/purchasing/suppliers/me/products — NCC tự xem danh sách sản phẩm
+// mình đang là nhà phân phối mặc định (Product.defaultSupplierCode), để biết
+// mình đang cung cấp những linh kiện nào và tồn kho thực tế hiện ra sao — trước
+// đây Cổng NCC chỉ thấy các RFQ/PO cụ thể, không có cái nhìn tổng quan danh mục
+// sản phẩm mình phụ trách.
+const getMySuppliedProducts = async (req, res, next) => {
+  try {
+    const supplierCode = req.user.id; // JWT payload: id = code = supplier.code (auth.controller.js)
+    const products = await prisma.product.findMany({
+      where: { defaultSupplierCode: supplierCode },
+      select: {
+        productId: true,
+        name: true,
+        sku: true,
+        price: true,
+        stockQuantity: true,
+        primaryImage: true,
+        status: true,
+        available: true,
+        category: { select: { name: true } },
+        brand: { select: { name: true } }
+      },
+      orderBy: { name: 'asc' }
+    });
+    res.json({ success: true, data: products });
+  } catch (err) {
+    next(err);
+  }
+};
+
 // GET /api/v1/purchasing/orders
 const getPurchaseOrders = async (req, res, next) => {
   try {
@@ -1040,6 +1070,7 @@ module.exports = {
   deactivateSupplier,
   createSupplierEvaluation,
   getPurchasingProducts,
+  getMySuppliedProducts,
   getPurchaseOrders,
   createPurchaseOrder,
   updatePurchaseOrderStatus,
