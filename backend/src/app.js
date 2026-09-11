@@ -30,14 +30,14 @@ app.use('/api/uploads/products', express.static(UPLOAD_DIR));
 // stuffing target), a looser one for the rest of the API.
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  limit: 20,
+  limit: process.env.NODE_ENV === 'production' ? 100 : 2000,
   standardHeaders: true,
   legacyHeaders: false,
   message: { success: false, message: 'Quá nhiều yêu cầu đăng nhập, vui lòng thử lại sau ít phút.' }
 });
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  limit: 600,
+  limit: process.env.NODE_ENV === 'production' ? 1000 : 10000,
   standardHeaders: true,
   legacyHeaders: false,
   message: { success: false, message: 'Quá nhiều yêu cầu, vui lòng thử lại sau.' }

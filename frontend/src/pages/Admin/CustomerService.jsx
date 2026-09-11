@@ -9,7 +9,8 @@ import {
   HeadphonesIcon, AlertCircle, MessageSquare, RefreshCw, CheckCircle,
   Clock, X, Plus, User, Phone, Mail, Filter, Search, 
   ArrowRight, Package, Tag, Send, Eye, Star, ThumbsUp, ShieldCheck,
-  TrendingUp, Award, Check, AlertTriangle, FileText, ChevronRight
+  TrendingUp, Award, Check, AlertTriangle, FileText, ChevronRight,
+  Zap, CheckCheck, ToggleLeft, ToggleRight
 } from 'lucide-react';
 import { Bar, Doughnut } from 'react-chartjs-2';
 import {
@@ -45,6 +46,11 @@ export default function CustomerService() {
   const updateComplaintStatus = useSalesStore(state => state.updateComplaintStatus);
   const returnRequests = useSalesStore(state => state.returnRequests) || [];
   const orders = useSalesStore(state => state.orders) || [];
+  const reviewReturnRequest = useSalesStore(state => state.reviewReturnRequest);
+  const batchApproveReturns = useSalesStore(state => state.batchApproveReturns);
+  const getReturnSettings = useSalesStore(state => state.getReturnSettings);
+  const updateReturnSettings = useSalesStore(state => state.updateReturnSettings);
+  const getReturnRequests = useSalesStore(state => state.getReturnRequests);
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -63,6 +69,100 @@ export default function CustomerService() {
   const [selectedReturnDetail, setSelectedReturnDetail] = useState(null);
   const [resolution, setResolution] = useState('');
   const [csNote, setCsNote] = useState('');
+
+  // Return Approval & Auto-Approve States
+  const [autoApproveReturns, setAutoApproveReturns] = useState(false);
+  const [loadingAutoApprove, setLoadingAutoApprove] = useState(false);
+  const [isBatchApproving, setIsBatchApproving] = useState(false);
+  const [returnStatusFilter, setReturnStatusFilter] = useState('ALL');
+  const [returnSearch, setReturnSearch] = useState('');
+  const [rejectModal, setRejectModal] = useState(null); // { returnItem, reason }
+  const [actionLoadingId, setActionLoadingId] = useState(null);
+
+  // Load return auto-approve setting
+  useEffect(() => {
+    if (typeof getReturnSettings === 'function') {
+      getReturnSettings().then(res => {
+        if (res && res.autoApproveReturns !== undefined) {
+          setAutoApproveReturns(Boolean(res.autoApproveReturns));
+        }
+      });
+    }
+  }, [getReturnSettings]);
+
+  const handleToggleAutoApprove = async () => {
+    const nextVal = !autoApproveReturns;
+    setLoadingAutoApprove(true);
+    try {
+      if (typeof updateReturnSettings === 'function') {
+        await updateReturnSettings(nextVal);
+      }
+      setAutoApproveReturns(nextVal);
+      notify(`Đã ${nextVal ? 'BẬT' : 'TẮT'} chế độ Tự Động Duyệt (Auto-Approve) đổi trả!`, 'success');
+    } catch (err) {
+      notify(`Lỗi cập nhật cấu hình: ${err.message}`, 'error');
+    } finally {
+      setLoadingAutoApprove(false);
+    }
+  };
+
+  const handleApproveReturn = async (ret) => {
+    setActionLoadingId(ret.id);
+    try {
+      if (typeof reviewReturnRequest === 'function') {
+        await reviewReturnRequest(ret.id, 'APPROVE', 'CSKH đã xác nhận đủ điều kiện bảo hành');
+      }
+      notify(`Đã duyệt yêu cầu đổi trả #${ret.id}! Đơn đã chuyển sang danh sách thu hồi của Shipper.`, 'success');
+      if (selectedReturnDetail?.id === ret.id) {
+        setSelectedReturnDetail(prev => ({ ...prev, status: 'RETURN_APPROVED' }));
+      }
+    } catch (err) {
+      notify(`Lỗi khi duyệt đổi trả: ${err.message}`, 'error');
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  const handleOpenRejectModal = (ret) => {
+    setRejectModal({
+      returnItem: ret,
+      reason: 'Sản phẩm không thuộc diện bảo hành / Bằng chứng lỗi chưa rõ ràng'
+    });
+  };
+
+  const handleConfirmReject = async () => {
+    if (!rejectModal?.returnItem) return;
+    const ret = rejectModal.returnItem;
+    setActionLoadingId(ret.id);
+    try {
+      if (typeof reviewReturnRequest === 'function') {
+        await reviewReturnRequest(ret.id, 'REJECT', rejectModal.reason);
+      }
+      notify(`Đã từ chối yêu cầu đổi trả #${ret.id}.`, 'info');
+      if (selectedReturnDetail?.id === ret.id) {
+        setSelectedReturnDetail(prev => ({ ...prev, status: 'REJECTED' }));
+      }
+      setRejectModal(null);
+    } catch (err) {
+      notify(`Lỗi khi từ chối đổi trả: ${err.message}`, 'error');
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  const handleBatchApprove = async () => {
+    setIsBatchApproving(true);
+    try {
+      if (typeof batchApproveReturns === 'function') {
+        const res = await batchApproveReturns();
+        notify(res?.message || 'Đã tự động duyệt tất cả yêu cầu đổi trả chờ xử lý!', 'success');
+      }
+    } catch (err) {
+      notify(`Lỗi duyệt tự động: ${err.message}`, 'error');
+    } finally {
+      setIsBatchApproving(false);
+    }
+  };
 
   // Form for New Ticket
   const [newTicketForm, setNewTicketForm] = useState({
@@ -598,113 +698,370 @@ export default function CustomerService() {
       {/* ========================================================================= */}
       {/* TAB 4: RETURNS (TIẾP NHẬN ĐỔI TRẢ RMA) */}
       {/* ========================================================================= */}
-      {activeTab === 'returns' && (
-        <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem' }}>
-          <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-            <RefreshCw size={18} style={{ color: '#8b5cf6' }} />
-            <span>Tiếp Nhận & Thẩm Định Đổi Trả Sản Phẩm</span>
-          </h3>
-          <p style={{ color: '#64748b', fontSize: '0.78rem', marginBottom: '1.25rem' }}>
-            Kiểm tra bằng chứng lỗi, đối chiếu bảo hành 36 tháng và đồng ý thu hồi hàng chuyển cho Shipper lấy
-          </p>
+      {activeTab === 'returns' && (() => {
+        const pendingReturnsCount = returnRequests.filter(r => r.status === 'PENDING').length;
+        const approvedReturnsCount = returnRequests.filter(r => r.status === 'RETURN_APPROVED').length;
+        const rejectedReturnsCount = returnRequests.filter(r => r.status === 'REJECTED' || r.status === 'QC_REJECTED').length;
+        const inProgressReturnsCount = returnRequests.filter(r => ['RETURNING_TO_WAREHOUSE', 'DELIVERED_TO_WAREHOUSE', 'QC_PASSED', 'PROCESSING'].includes(r.status)).length;
+        const completedReturnsCount = returnRequests.filter(r => ['RESTOCKED', 'EXCHANGED', 'REFUNDED', 'COMPLETED'].includes(r.status)).length;
 
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
-              <thead>
-                <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569' }}>
-                  <th style={{ padding: '0.65rem 0.85rem' }}>Mã RMA</th>
-                  <th style={{ padding: '0.65rem 0.85rem' }}>Mã Đơn Gốc</th>
-                  <th style={{ padding: '0.65rem 0.85rem' }}>Khách Hàng & SĐT</th>
-                  <th style={{ padding: '0.65rem 0.85rem' }}>Lý Do Đổi Trả</th>
-                  <th style={{ padding: '0.65rem 0.85rem' }}>Trạng Thái Hiện Tại</th>
-                  <th style={{ padding: '0.65rem 0.85rem', textAlign: 'center' }}>Thao Tác CSKH</th>
-                </tr>
-              </thead>
-              <tbody>
-                {returnRequests.map((ret, rIdx) => (
-                  <tr key={ret.id || rIdx} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                    <td style={{ padding: '0.65rem 0.85rem' }}>
-                      <span
-                        onClick={() => setSelectedReturnDetail(ret)}
-                        style={{
-                          fontWeight: 800,
-                          color: '#8b5cf6',
-                          cursor: 'pointer',
-                          textDecoration: 'none',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '0.2rem'
-                        }}
-                        title="Bấm xem chi tiết yêu cầu đổi trả"
-                      >
-                        #RMA-{ret.id || rIdx + 1}
+        const filteredReturns = returnRequests.filter(ret => {
+          const q = returnSearch.trim().toLowerCase();
+          const matchSearch = !q ||
+            (ret.id && String(ret.id).toLowerCase().includes(q)) ||
+            (ret.orderId && String(ret.orderId).toLowerCase().includes(q)) ||
+            (ret.customerName && ret.customerName.toLowerCase().includes(q)) ||
+            (ret.phone && ret.phone.includes(q));
+          if (!matchSearch) return false;
+
+          if (returnStatusFilter === 'ALL') return true;
+          if (returnStatusFilter === 'PENDING') return ret.status === 'PENDING';
+          if (returnStatusFilter === 'RETURN_APPROVED') return ret.status === 'RETURN_APPROVED';
+          if (returnStatusFilter === 'REJECTED') return ret.status === 'REJECTED' || ret.status === 'QC_REJECTED';
+          if (returnStatusFilter === 'IN_PROGRESS') {
+            return ['RETURNING_TO_WAREHOUSE', 'DELIVERED_TO_WAREHOUSE', 'QC_PASSED', 'PROCESSING'].includes(ret.status);
+          }
+          if (returnStatusFilter === 'COMPLETED') {
+            return ['RESTOCKED', 'EXCHANGED', 'REFUNDED', 'COMPLETED'].includes(ret.status);
+          }
+          return true;
+        });
+
+        return (
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem' }}>
+            {/* Top Title & Controls */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem', marginBottom: '1rem' }}>
+              <div>
+                <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a', margin: '0 0 0.35rem 0', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <RefreshCw size={18} style={{ color: '#8b5cf6' }} />
+                  <span>Tiếp Nhận & Thẩm Định Đổi Trả Sản Phẩm</span>
+                </h3>
+                <p style={{ color: '#64748b', fontSize: '0.78rem', margin: 0 }}>
+                  Kiểm tra bằng chứng lỗi, đối chiếu bảo hành 36 tháng và thẩm định thu hồi hàng chuyển giao Shipper
+                </p>
+              </div>
+
+              {/* Auto-Approve Toggle & Quick Bulk Button */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                {/* Auto Approve Toggle Card */}
+                <div
+                  onClick={!loadingAutoApprove ? handleToggleAutoApprove : undefined}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.6rem',
+                    padding: '0.45rem 0.85rem',
+                    borderRadius: '8px',
+                    backgroundColor: autoApproveReturns ? '#f0fdf4' : '#f8fafc',
+                    border: `1.5px solid ${autoApproveReturns ? '#86efac' : '#cbd5e1'}`,
+                    cursor: loadingAutoApprove ? 'wait' : 'pointer',
+                    userSelect: 'none',
+                    transition: 'all 0.2s ease'
+                  }}
+                  title={autoApproveReturns ? "Đang BẬT tự động duyệt: Đơn đổi trả mới sẽ tự động duyệt ngay" : "Đang TẮT tự động duyệt: Đơn đổi trả mới sẽ ở trạng thái Chờ Duyệt (PENDING) để CSKH thẩm định"}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                    <Zap size={15} style={{ color: autoApproveReturns ? '#16a34a' : '#64748b' }} />
+                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#334155' }}>
+                      Chế độ Auto Duyệt:
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                    {autoApproveReturns ? (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.2rem', padding: '2px 7px', borderRadius: '12px', fontSize: '0.7rem', fontWeight: 800, backgroundColor: '#dcfce7', color: '#15803d' }}>
+                        <CheckCheck size={12} /> BẬT (Tự Động)
                       </span>
-                    </td>
-                    <td style={{ padding: '0.65rem 0.85rem' }}>
-                      <span
-                        onClick={() => setSelectedReturnDetail(ret)}
-                        style={{
-                          fontSize: '0.78rem',
-                          color: '#2563eb',
-                          backgroundColor: '#eff6ff',
-                          padding: '3px 8px',
-                          borderRadius: '4px',
-                          fontWeight: 700,
-                          cursor: 'pointer',
-                          textDecoration: 'none',
-                          border: '1px solid #dbeafe',
-                          display: 'inline-block'
-                        }}
-                        title="Bấm xem chi tiết đơn hàng gốc"
-                      >
-                        {ret.orderId}
+                    ) : (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.2rem', padding: '2px 7px', borderRadius: '12px', fontSize: '0.7rem', fontWeight: 700, backgroundColor: '#f1f5f9', color: '#64748b' }}>
+                        TẮT (Duyệt Thủ Công)
                       </span>
-                    </td>
-                    <td style={{ padding: '0.65rem 0.85rem' }}>
-                      <strong style={{ color: '#0f172a', display: 'block' }}>{ret.customerName}</strong>
-                      <span style={{ fontSize: '0.72rem', color: '#64748b' }}>{ret.phone}</span>
-                    </td>
-                    <td style={{ padding: '0.65rem 0.85rem', color: '#475569' }}>
-                      <span style={{
-                        display: 'inline-block',
-                        padding: '1px 6px',
-                        borderRadius: '4px',
-                        fontSize: '0.7rem',
-                        fontWeight: 800,
-                        backgroundColor: ret.type === 'REFUND' ? '#ecfdf5' : '#eff6ff',
-                        color: ret.type === 'REFUND' ? '#15803d' : '#1d4ed8',
-                        border: `1px solid ${ret.type === 'REFUND' ? '#a7f3d0' : '#bfdbfe'}`,
-                        marginBottom: '0.2rem'
-                      }}>
-                        {ret.type === 'REFUND' ? 'Hoàn tiền 100%' : 'Đổi mới 1-1'}
-                      </span>
-                      <div style={{ fontSize: '0.76rem', color: '#334155' }}>{ret.reason || 'Lỗi không lên màn hình'}</div>
-                    </td>
-                    <td style={{ padding: '0.65rem 0.85rem' }}>
-                      <span style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 800, backgroundColor: `${getStatusInfo(RETURN_STATUS, ret.status).color}15`, color: getStatusInfo(RETURN_STATUS, ret.status).color }}>
-                        {getStatusLabel(RETURN_STATUS, ret.status)}
-                      </span>
-                    </td>
-                    <td style={{ padding: '0.65rem 0.85rem', textAlign: 'center' }}>
-                      {/* ReturnRequest thật không bao giờ ở trạng thái PENDING — backend
-                          (createReturnRequest) luôn set thẳng RETURN_APPROVED ngay khi tạo,
-                          nên nút Duyệt/Từ Chối thủ công trước đây ở đây không bao giờ hiện
-                          ra được với dữ liệu thật (và nếu có cũng gọi vào API không tồn
-                          tại) — đã bỏ, chỉ còn đúng luồng thật là xem chi tiết. */}
-                      <button
-                        onClick={() => setSelectedReturnDetail(ret)}
-                        style={{ backgroundColor: '#ffffff', color: '#8b5cf6', border: '1px solid #ddd6fe', borderRadius: '4px', padding: '0.3rem 0.65rem', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}
-                      >
-                        <Eye size={12} /> Chi Tiết
-                      </button>
-                    </td>
-                  </tr>
+                    )}
+                    {autoApproveReturns ? (
+                      <ToggleRight size={22} style={{ color: '#16a34a' }} />
+                    ) : (
+                      <ToggleLeft size={22} style={{ color: '#94a3b8' }} />
+                    )}
+                  </div>
+                </div>
+
+                {/* Bulk Auto Approve Button */}
+                <button
+                  type="button"
+                  disabled={pendingReturnsCount === 0 || isBatchApproving}
+                  onClick={handleBatchApprove}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.35rem',
+                    padding: '0.5rem 0.9rem',
+                    borderRadius: '8px',
+                    border: 'none',
+                    backgroundColor: pendingReturnsCount > 0 ? '#8b5cf6' : '#e2e8f0',
+                    color: pendingReturnsCount > 0 ? '#ffffff' : '#94a3b8',
+                    fontSize: '0.78rem',
+                    fontWeight: 800,
+                    cursor: pendingReturnsCount > 0 && !isBatchApproving ? 'pointer' : 'not-allowed',
+                    transition: 'all 0.2s ease',
+                    boxShadow: pendingReturnsCount > 0 ? '0 2px 6px rgba(139, 92, 246, 0.25)' : 'none'
+                  }}
+                  title="Tự động phê duyệt tất cả các yêu cầu đổi trả đang chờ xử lý"
+                >
+                  <Zap size={14} />
+                  <span>{isBatchApproving ? 'Đang duyệt...' : `Duyệt Tất Cả (${pendingReturnsCount})`}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Filter Pills & Search */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1rem', paddingTop: '0.5rem', borderTop: '1px solid #f1f5f9' }}>
+              <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                {[
+                  { id: 'ALL', label: 'Tất Cả', count: returnRequests.length, color: '#64748b' },
+                  { id: 'PENDING', label: 'Chờ CSKH Duyệt', count: pendingReturnsCount, color: '#f59e0b', highlight: pendingReturnsCount > 0 },
+                  { id: 'RETURN_APPROVED', label: 'Đã Duyệt Thu Hồi', count: approvedReturnsCount, color: '#2563eb' },
+                  { id: 'REJECTED', label: 'Đã Từ Chối', count: rejectedReturnsCount, color: '#ef4444' },
+                  { id: 'IN_PROGRESS', label: 'Đang Về Kho / QC', count: inProgressReturnsCount, color: '#6366f1' },
+                  { id: 'COMPLETED', label: 'Đã Hoàn Tất', count: completedReturnsCount, color: '#10b981' }
+                ].map(tab => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setReturnStatusFilter(tab.id)}
+                    style={{
+                      padding: '0.35rem 0.75rem',
+                      borderRadius: '20px',
+                      fontSize: '0.74rem',
+                      fontWeight: returnStatusFilter === tab.id ? 800 : 600,
+                      cursor: 'pointer',
+                      border: returnStatusFilter === tab.id ? `1.5px solid ${tab.color}` : '1px solid #e2e8f0',
+                      backgroundColor: returnStatusFilter === tab.id ? `${tab.color}15` : '#ffffff',
+                      color: returnStatusFilter === tab.id ? tab.color : '#475569',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.3rem',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    {tab.highlight && (
+                      <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#f59e0b' }} />
+                    )}
+                    <span>{tab.label}</span>
+                    <span style={{
+                      padding: '1px 5px',
+                      borderRadius: '10px',
+                      fontSize: '0.68rem',
+                      fontWeight: 800,
+                      backgroundColor: returnStatusFilter === tab.id ? tab.color : '#f1f5f9',
+                      color: returnStatusFilter === tab.id ? '#ffffff' : '#64748b'
+                    }}>
+                      {tab.count}
+                    </span>
+                  </button>
                 ))}
-              </tbody>
-            </table>
+              </div>
+
+              <div style={{ position: 'relative', width: '240px' }}>
+                <Search size={14} style={{ position: 'absolute', left: '0.65rem', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                <input
+                  type="text"
+                  placeholder="Tìm RMA, đơn gốc, khách..."
+                  value={returnSearch}
+                  onChange={e => setReturnSearch(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '0.4rem 0.65rem 0.4rem 2rem',
+                    fontSize: '0.78rem',
+                    borderRadius: '6px',
+                    border: '1px solid #cbd5e1',
+                    boxSizing: 'border-box'
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Table */}
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+                <thead>
+                  <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569' }}>
+                    <th style={{ padding: '0.65rem 0.85rem' }}>Mã RMA</th>
+                    <th style={{ padding: '0.65rem 0.85rem' }}>Mã Đơn Gốc</th>
+                    <th style={{ padding: '0.65rem 0.85rem' }}>Khách Hàng & SĐT</th>
+                    <th style={{ padding: '0.65rem 0.85rem' }}>Lý Do Đổi Trả</th>
+                    <th style={{ padding: '0.65rem 0.85rem' }}>Trạng Thái Hiện Tại</th>
+                    <th style={{ padding: '0.65rem 0.85rem', textAlign: 'center' }}>Thao Tác CSKH</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredReturns.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} style={{ padding: '2.5rem 1rem', textAlign: 'center', color: '#94a3b8' }}>
+                        <RefreshCw size={32} style={{ margin: '0 auto 0.5rem', opacity: 0.5 }} />
+                        <div style={{ fontWeight: 700, fontSize: '0.85rem' }}>Không có yêu cầu đổi trả nào phù hợp bộ lọc</div>
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredReturns.map((ret, rIdx) => {
+                      const isPending = ret.status === 'PENDING';
+                      const isLoading = actionLoadingId === ret.id;
+
+                      return (
+                        <tr key={ret.id || rIdx} style={{ borderBottom: '1px solid #f1f5f9', backgroundColor: isPending ? 'rgba(245, 158, 11, 0.04)' : 'transparent' }}>
+                          <td style={{ padding: '0.65rem 0.85rem' }}>
+                            <span
+                              onClick={() => setSelectedReturnDetail(ret)}
+                              style={{
+                                fontWeight: 800,
+                                color: '#8b5cf6',
+                                cursor: 'pointer',
+                                textDecoration: 'none',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.2rem'
+                              }}
+                              title="Bấm xem chi tiết yêu cầu đổi trả"
+                            >
+                              #RMA-{ret.id || rIdx + 1}
+                            </span>
+                          </td>
+                          <td style={{ padding: '0.65rem 0.85rem' }}>
+                            <span
+                              onClick={() => setSelectedReturnDetail(ret)}
+                              style={{
+                                fontSize: '0.78rem',
+                                color: '#2563eb',
+                                backgroundColor: '#eff6ff',
+                                padding: '3px 8px',
+                                borderRadius: '4px',
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                                textDecoration: 'none',
+                                border: '1px solid #dbeafe',
+                                display: 'inline-block'
+                              }}
+                              title="Bấm xem chi tiết đơn hàng gốc"
+                            >
+                              {ret.orderId}
+                            </span>
+                          </td>
+                          <td style={{ padding: '0.65rem 0.85rem' }}>
+                            <strong style={{ color: '#0f172a', display: 'block' }}>{ret.customerName}</strong>
+                            <span style={{ fontSize: '0.72rem', color: '#64748b' }}>{ret.phone}</span>
+                          </td>
+                          <td style={{ padding: '0.65rem 0.85rem', color: '#475569' }}>
+                            <span style={{
+                              display: 'inline-block',
+                              padding: '1px 6px',
+                              borderRadius: '4px',
+                              fontSize: '0.7rem',
+                              fontWeight: 800,
+                              backgroundColor: ret.type === 'REFUND' ? '#ecfdf5' : '#eff6ff',
+                              color: ret.type === 'REFUND' ? '#15803d' : '#1d4ed8',
+                              border: `1px solid ${ret.type === 'REFUND' ? '#a7f3d0' : '#bfdbfe'}`,
+                              marginBottom: '0.2rem'
+                            }}>
+                              {ret.type === 'REFUND' ? 'Hoàn tiền 100%' : 'Đổi mới 1-1'}
+                            </span>
+                            <div style={{ fontSize: '0.76rem', color: '#334155' }}>{ret.reason || 'Lỗi không lên màn hình'}</div>
+                          </td>
+                          <td style={{ padding: '0.65rem 0.85rem' }}>
+                            <span style={{
+                              padding: '3px 9px',
+                              borderRadius: '12px',
+                              fontSize: '0.7rem',
+                              fontWeight: 800,
+                              backgroundColor: `${getStatusInfo(RETURN_STATUS, ret.status).color}18`,
+                              color: getStatusInfo(RETURN_STATUS, ret.status).color,
+                              border: `1px solid ${getStatusInfo(RETURN_STATUS, ret.status).color}40`,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.25rem'
+                            }}>
+                              {isPending && <Clock size={11} />}
+                              {getStatusLabel(RETURN_STATUS, ret.status)}
+                            </span>
+                          </td>
+                          <td style={{ padding: '0.65rem 0.85rem', textAlign: 'center' }}>
+                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', justifyContent: 'center' }}>
+                              {isPending && (
+                                <>
+                                  <button
+                                    type="button"
+                                    disabled={isLoading}
+                                    onClick={() => handleApproveReturn(ret)}
+                                    style={{
+                                      backgroundColor: '#16a34a',
+                                      color: '#ffffff',
+                                      border: 'none',
+                                      borderRadius: '5px',
+                                      padding: '0.32rem 0.65rem',
+                                      fontSize: '0.72rem',
+                                      fontWeight: 800,
+                                      cursor: isLoading ? 'wait' : 'pointer',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '0.2rem',
+                                      boxShadow: '0 1px 3px rgba(22, 163, 74, 0.25)'
+                                    }}
+                                    title="Duyệt yêu cầu đổi trả và phân công Shipper đến lấy hàng"
+                                  >
+                                    <Check size={12} /> Duyệt
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={isLoading}
+                                    onClick={() => handleOpenRejectModal(ret)}
+                                    style={{
+                                      backgroundColor: '#ffffff',
+                                      color: '#dc2626',
+                                      border: '1px solid #f87171',
+                                      borderRadius: '5px',
+                                      padding: '0.32rem 0.55rem',
+                                      fontSize: '0.72rem',
+                                      fontWeight: 700,
+                                      cursor: isLoading ? 'wait' : 'pointer',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '0.2rem'
+                                    }}
+                                    title="Từ chối yêu cầu đổi trả kèm lý do"
+                                  >
+                                    <X size={12} /> Từ Chối
+                                  </button>
+                                </>
+                              )}
+
+                              <button
+                                type="button"
+                                onClick={() => setSelectedReturnDetail(ret)}
+                                style={{
+                                  backgroundColor: '#ffffff',
+                                  color: '#8b5cf6',
+                                  border: '1px solid #ddd6fe',
+                                  borderRadius: '5px',
+                                  padding: '0.32rem 0.65rem',
+                                  fontSize: '0.72rem',
+                                  fontWeight: 700,
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '0.2rem'
+                                }}
+                              >
+                                <Eye size={12} /> Chi Tiết
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* ========================================================================= */}
       {/* TAB 5: FEEDBACK (KHẢO SÁT & CSAT) */}
@@ -984,7 +1341,7 @@ export default function CustomerService() {
               </div>
 
               {/* Actions */}
-              <div style={{ display: 'flex', gap: '0.6rem', justifyContent: 'flex-end', marginTop: '0.5rem', borderTop: '1px solid #e2e8f0', paddingTop: '1rem' }}>
+              <div style={{ display: 'flex', gap: '0.6rem', justifyContent: 'flex-end', marginTop: '0.5rem', borderTop: '1px solid #e2e8f0', paddingTop: '1rem', flexWrap: 'wrap' }}>
                 <button
                   type="button"
                   onClick={() => setSelectedReturnDetail(null)}
@@ -993,13 +1350,139 @@ export default function CustomerService() {
                   Đóng
                 </button>
 
-                {/* ReturnRequest thật không bao giờ ở trạng thái PENDING (xem ghi chú ở
-                    bảng danh sách phía trên) — đã bỏ cặp nút Duyệt/Từ Chối không bao giờ
-                    hiện ra được với dữ liệu thật. */}
+                {selectedReturnDetail.status === 'PENDING' && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenRejectModal(selectedReturnDetail)}
+                      disabled={actionLoadingId === selectedReturnDetail.id}
+                      style={{
+                        backgroundColor: '#fff1f2',
+                        color: '#e11d48',
+                        border: '1px solid #fecdd3',
+                        borderRadius: '6px',
+                        padding: '0.5rem 1rem',
+                        fontSize: '0.8rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.35rem'
+                      }}
+                    >
+                      <X size={15} />
+                      Từ Chối Tiếp Nhận
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleApproveReturn(selectedReturnDetail)}
+                      disabled={actionLoadingId === selectedReturnDetail.id}
+                      style={{
+                        backgroundColor: '#16a34a',
+                        color: '#ffffff',
+                        border: 'none',
+                        borderRadius: '6px',
+                        padding: '0.5rem 1.25rem',
+                        fontSize: '0.8rem',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.4rem',
+                        boxShadow: '0 2px 4px rgba(22, 163, 74, 0.2)'
+                      }}
+                    >
+                      <Check size={16} />
+                      {actionLoadingId === selectedReturnDetail.id ? 'Đang duyệt...' : 'Duyệt Tiếp Nhận (Giao Shipper Lấy)'}
+                    </button>
+                  </>
+                )}
               </div>
 
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL: TỪ CHỐI YÊU CẦU ĐỔI TRẢ ================= */}
+      {rejectModal && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(6px)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', width: '100%', maxWidth: '480px', padding: '1.5rem', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.15)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid #f1f5f9', paddingBottom: '0.5rem' }}>
+              <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#e11d48', margin: 0, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <X size={20} />
+                Từ Chối Tiếp Nhận Đổi Trả #{rejectModal.returnItem?.id}
+              </h3>
+              <button onClick={() => setRejectModal(null)} style={{ background: '#f1f5f9', border: 'none', padding: '0.35rem', borderRadius: '6px', cursor: 'pointer' }}>
+                <X size={16} />
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', fontSize: '0.82rem' }}>
+              <div style={{ padding: '0.75rem', backgroundColor: '#fff1f2', borderRadius: '6px', border: '1px solid #fecdd3', color: '#9f1239' }}>
+                Khách hàng: <strong>{rejectModal.returnItem?.customerName}</strong> - Đơn: <strong>{rejectModal.returnItem?.orderId}</strong>
+                <div style={{ fontSize: '0.75rem', marginTop: '0.2rem', color: '#be123c' }}>
+                  Hành động này sẽ từ chối hỗ trợ thu hồi sản phẩm và lưu lý do vào hồ sơ đơn hàng.
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontWeight: 700, color: '#0f172a', marginBottom: '0.4rem' }}>
+                  Lý do từ chối tiếp nhận:
+                </label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginBottom: '0.6rem' }}>
+                  {[
+                    'Sản phẩm không thuộc diện bảo hành / Hết hạn bảo hành',
+                    'Bằng chứng lỗi chưa rõ ràng / Thiếu video kiểm chứng',
+                    'Lỗi phát sinh do tác động ngoại lực / Rơi vỡ / Vào nước',
+                    'Khách hàng đồng ý giữ lại sử dụng sau khi được hỗ trợ từ xa',
+                    'Lý do khác'
+                  ].map((preset) => (
+                    <label key={preset} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.8rem', color: '#334155' }}>
+                      <input
+                        type="radio"
+                        name="rejectReasonPreset"
+                        checked={rejectModal.reason === preset || (preset === 'Lý do khác' && !['Sản phẩm không thuộc diện bảo hành / Hết hạn bảo hành', 'Bằng chứng lỗi chưa rõ ràng / Thiếu video kiểm chứng', 'Lỗi phát sinh do tác động ngoại lực / Rơi vỡ / Vào nước', 'Khách hàng đồng ý giữ lại sử dụng sau khi được hỗ trợ từ xa'].includes(rejectModal.reason))}
+                        onChange={() => {
+                          if (preset !== 'Lý do khác') {
+                            setRejectModal(prev => ({ ...prev, reason: preset }));
+                          }
+                        }}
+                      />
+                      <span>{preset}</span>
+                    </label>
+                  ))}
+                </div>
+
+                <textarea
+                  rows={3}
+                  placeholder="Nhập chi tiết lý do từ chối để phản hồi đến khách hàng..."
+                  value={rejectModal.reason}
+                  onChange={(e) => setRejectModal(prev => ({ ...prev, reason: e.target.value }))}
+                  style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem', boxSizing: 'border-box' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.5rem' }}>
+                <button
+                  type="button"
+                  onClick={() => setRejectModal(null)}
+                  style={{ backgroundColor: '#ffffff', color: '#64748b', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.45rem 0.9rem', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}
+                >
+                  Hủy
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmReject}
+                  disabled={actionLoadingId === rejectModal.returnItem?.id}
+                  style={{ backgroundColor: '#e11d48', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.45rem 1.1rem', fontSize: '0.8rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+                >
+                  <X size={15} />
+                  {actionLoadingId === rejectModal.returnItem?.id ? 'Đang xử lý...' : 'Xác Nhận Từ Chối'}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

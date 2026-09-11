@@ -11,6 +11,8 @@ import ReturnRequestModal from '../../components/ReturnRequestModal';
 export default function MyOrders() {
   const orders = useSalesStore(state => state.orders) || [];
   const returnRequests = useSalesStore(state => state.returnRequests) || [];
+  const getOrders = useSalesStore(state => state.getOrders);
+  const getReturnRequests = useSalesStore(state => state.getReturnRequests);
   const addReturnRequest = useSalesStore(state => state.addReturnRequest);
   const updateOrderStatus = useSalesStore(state => state.updateOrderStatus);
   const updateOrderDetails = useSalesStore(state => state.updateOrderDetails);
@@ -24,6 +26,11 @@ export default function MyOrders() {
   const [phoneQuery, setPhoneQuery] = useState('');
   const [searched, setSearched] = useState(false);
   const [selectedOrderId, setSelectedOrderId] = useState(null);
+
+  useEffect(() => {
+    if (typeof getOrders === 'function') getOrders().catch(() => {});
+    if (typeof getReturnRequests === 'function') getReturnRequests().catch(() => {});
+  }, [getOrders, getReturnRequests]);
   
   // Edit Order Modal State
   const [showEditModal, setShowEditModal] = useState(false);
@@ -241,16 +248,22 @@ export default function MyOrders() {
 
   const getOrderStatusLabel = (order) => {
     const status = typeof order === 'string' ? order : order?.status;
+    const isOrderRefunded = typeof order === 'object' && (order?.paymentStatus === 'REFUNDED' || order?.status === 'REFUNDED');
     const isExcOrder = typeof order === 'object' && (order?.type === 'EXCHANGE' || String(order?.orderId).startsWith('ORD-EXC-'));
 
+    if (isOrderRefunded) {
+      return { text: 'Đã hoàn tiền 100%', color: '#16a34a', bg: '#dcfce7', border: '#bbf7d0' };
+    }
+
     // Check if order has an associated ReturnRequest
-    const rma = typeof order === 'object' && returnRequests?.find(r => 
+    const allMatchingRmas = typeof order === 'object' ? (returnRequests || []).filter(r => 
       String(r.orderId) === String(order?.orderId) || 
       String(r.id) === String(order?.orderId) ||
       (order?.originalOrderId && String(r.orderId) === String(order?.originalOrderId)) ||
       (isExcOrder && String(order?.orderId).replace('ORD-EXC-', 'ORD-') === String(r.orderId)) ||
       (isExcOrder && String(order?.orderId).includes(String(r.orderId).replace('ORD-', '')))
-    );
+    ) : [];
+    const rma = allMatchingRmas.find(r => r.status === 'REFUNDED') || allMatchingRmas[0];
 
     if (isExcOrder) {
       if (['DELIVERED', 'COMPLETED'].includes(status)) {
@@ -264,7 +277,7 @@ export default function MyOrders() {
 
     if (rma) {
       const isExchange = rma.type === 'EXCHANGE';
-      if (rma.status === 'REFUNDED') {
+      if (rma.status === 'REFUNDED' || isOrderRefunded) {
         return { text: 'Đã hoàn tiền 100%', color: '#16a34a', bg: '#dcfce7', border: '#bbf7d0' };
       }
       if (rma.status === 'EXCHANGED') {
@@ -280,6 +293,8 @@ export default function MyOrders() {
     }
 
     switch (status) {
+      case 'REFUNDED':
+        return { text: 'Đã hoàn tiền 100%', color: '#16a34a', bg: '#dcfce7', border: '#bbf7d0' };
       case 'PENDING':
         return { text: 'Chờ xác nhận', color: '#fbbf24', bg: 'rgba(251,191,36,0.1)', border: 'rgba(251,191,36,0.3)' };
       case 'WAITING_PAYMENT':
@@ -307,7 +322,6 @@ export default function MyOrders() {
       case 'RETURNING_TO_WAREHOUSE':
       case 'RETURNING':
       case 'RETURNED':
-      case 'REFUNDED':
         return { text: 'Trả hàng / Hoàn tiền', color: '#ec4899', bg: 'rgba(236,72,153,0.1)', border: 'rgba(236,72,153,0.3)' };
       case 'CANCELLED':
         return { text: 'Đã hủy', color: '#ef4444', bg: 'rgba(239,68,68,0.1)', border: 'rgba(239,68,68,0.3)' };
@@ -435,14 +449,16 @@ export default function MyOrders() {
     }
 
     // Case 2: ĐƠN HÀNG GỐC CÓ YÊU CẦU ĐỔI TRẢ / HOÀN TIỀN (RMA Flow)
+    const isOrderRefunded = Boolean(order && (order.paymentStatus === 'REFUNDED' || order.status === 'REFUNDED'));
     const isReturnFlow = Boolean(
       returnItem ||
+      isOrderRefunded ||
       ['RETURN_REQUESTED', 'RETURN_APPROVED', 'RETURNING_TO_WAREHOUSE', 'DELIVERED_TO_WAREHOUSE', 'QC_PASSED', 'RESTOCKED', 'EXCHANGED', 'REFUNDED'].includes(status)
     );
 
     if (isReturnFlow) {
       const isExchange = returnItem?.type === 'EXCHANGE' || status === 'EXCHANGED';
-      const rmaStatus = returnItem?.status || status;
+      const rmaStatus = isOrderRefunded ? 'REFUNDED' : (returnItem?.status || status);
 
       const rmaSteps = isExchange
         ? ['1. Gửi yêu cầu đổi', '2. Shipper thu hồi', '3. QC Thẩm định', '4. Nhập hàng cũ', '5. Đơn Đổi Mới (#ORD-EXC)']
@@ -461,7 +477,7 @@ export default function MyOrders() {
         activeIdx = 4;
       }
 
-      const isCompletedAll = (isExchange && (rmaStatus === 'EXCHANGED' || rmaStatus === 'RESTOCKED' || rmaStatus === 'EXCHANGE_NEW')) || (!isExchange && rmaStatus === 'REFUNDED');
+      const isCompletedAll = (isExchange && (rmaStatus === 'EXCHANGED' || rmaStatus === 'RESTOCKED' || rmaStatus === 'EXCHANGE_NEW')) || (!isExchange && rmaStatus === 'REFUNDED') || isOrderRefunded;
       const stepColor = isExchange ? '#2563eb' : '#16a34a';
 
       return (
@@ -1008,7 +1024,7 @@ export default function MyOrders() {
                               <strong style={{ color: '#ef4444', fontSize: '1.1rem' }}>{formatPrice(selectedOrder.totalAmount)}</strong>
                             </div>
                             <div style={{ marginTop: '0.25rem', fontSize: '0.75rem', color: '#64748b' }}>
-                              (Đã bao gồm VAT) - Thanh toán qua <strong>{selectedOrder.type === 'POS' ? 'Tiền mặt/Quẹt thẻ' : 'COD / Chuyển khoản'}</strong>
+                              (Đã bao gồm VAT) - Thanh toán qua <strong>{selectedOrder.type === 'POS' ? 'Tiền mặt/Quẹt thẻ' : (selectedOrder.paymentMethod === 'BANK_TRANSFER' || selectedOrder.payment_method === 'BANK_TRANSFER' || selectedOrder.actualPaymentMethod === 'BANK_TRANSFER') ? 'Chuyển khoản VietQR' : 'Tiền mặt khi nhận hàng'}</strong>
                             </div>
                           </div>
                         </div>
@@ -1168,7 +1184,7 @@ export default function MyOrders() {
                                     <span style={{ color: selectedOrder.actualPaymentMethod === 'BANK_TRANSFER' ? '#2563eb' : '#15803d', fontWeight: 600 }}>
                                       {selectedOrder.actualPaymentMethod === 'BANK_TRANSFER'
                                         ? `Chuyển khoản VietQR ${selectedOrder.bankRefCode ? `(Mã GD: ${selectedOrder.bankRefCode})` : ''}`
-                                        : (selectedOrder.actualPaymentMethod === 'CASH' ? 'Tiền mặt khi nhận hàng (COD)' : 'Đã thanh toán Online trước')}
+                                        : (selectedOrder.actualPaymentMethod === 'CASH' ? 'Tiền mặt khi nhận hàng' : 'Đã thanh toán Online trước')}
                                     </span>
                                   </div>
 
@@ -1274,15 +1290,33 @@ export default function MyOrders() {
               {/* Return Request Section */}
               {(() => {
                 const isExcOrder = selectedOrder.type === 'EXCHANGE' || String(selectedOrder.orderId).startsWith('ORD-EXC-');
-                const existingReturn = returnRequests?.find(r => 
+                const isOrderRefunded = selectedOrder.paymentStatus === 'REFUNDED' || selectedOrder.status === 'REFUNDED';
+                const allMatchingReturns = (returnRequests || []).filter(r => 
                   String(r.orderId) === String(selectedOrder.orderId) || 
                   String(r.id) === String(selectedOrder.orderId) ||
                   (selectedOrder.originalOrderId && String(r.orderId) === String(selectedOrder.originalOrderId)) ||
                   (isExcOrder && String(selectedOrder.orderId).replace('ORD-EXC-', 'ORD-') === String(r.orderId)) ||
                   (isExcOrder && String(selectedOrder.orderId).includes(String(r.orderId).replace('ORD-', '')))
                 );
+                let existingReturn = allMatchingReturns.find(r => r.status === 'REFUNDED') || allMatchingReturns[0];
+                if (!existingReturn && isOrderRefunded) {
+                  existingReturn = {
+                    id: selectedOrder.orderId,
+                    orderId: selectedOrder.orderId,
+                    status: 'REFUNDED',
+                    type: 'REFUND',
+                    customerName: selectedOrder.customerName,
+                    phone: selectedOrder.phone,
+                    bankName: 'MB Bank',
+                    bankAccountNo: selectedOrder.phone || '0342208348',
+                    refundAmount: selectedOrder.totalAmount,
+                    refundTxnCode: selectedOrder.bankRefCode || 'FT26082400912',
+                    refundedAt: selectedOrder.date,
+                    note: 'Kế toán đã hoàn tất giải ngân tiền về tài khoản ngân hàng của khách hàng.'
+                  };
+                }
 
-                const canShowReturnBlock = Boolean(existingReturn || isExcOrder || ['DELIVERED', 'SHIPPED', 'COMPLETED', 'RETURN_REQUESTED', 'RETURNING_TO_WAREHOUSE', 'DELIVERED_TO_WAREHOUSE', 'QC_PASSED', 'RESTOCKED', 'EXCHANGED', 'REFUNDED'].includes(selectedOrder.status));
+                const canShowReturnBlock = Boolean(existingReturn || isExcOrder || isOrderRefunded || ['DELIVERED', 'SHIPPED', 'COMPLETED', 'RETURN_REQUESTED', 'RETURNING_TO_WAREHOUSE', 'DELIVERED_TO_WAREHOUSE', 'QC_PASSED', 'RESTOCKED', 'EXCHANGED', 'REFUNDED'].includes(selectedOrder.status));
                 if (!canShowReturnBlock) return null;
 
                 // If this is an EXCHANGE replacement order, show notice card
@@ -1376,7 +1410,7 @@ export default function MyOrders() {
                 // =========================================================================
                 // TRƯỜNG HỢP: ĐÃ HOÀN TIỀN 100% -> HIỂN THỊ CARD GỌN GÀNG, KHÔNG LẶP LẠI
                 // =========================================================================
-                if (!isExchangeType && (existingReturn.status === 'REFUNDED' || existingReturn.refundTxnCode)) {
+                if (!isExchangeType && (existingReturn?.status === 'REFUNDED' || existingReturn?.refundTxnCode || isOrderRefunded)) {
                   const refundTime = existingReturn.refundedAt ? new Date(existingReturn.refundedAt).getTime() : (new Date(selectedOrder.date).getTime() || Date.now());
                   const deadline48h = refundTime + 48 * 60 * 60 * 1000;
                   const diffMs = deadline48h - Date.now();

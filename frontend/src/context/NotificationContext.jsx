@@ -10,11 +10,9 @@ export const useNotification = () => useContext(NotificationContext);
 // Module-level refs so `notify`/`confirm` can be called from ANYWHERE —
 // including Zustand store actions, which run outside React and can't use
 // the useNotification() hook. NotificationProvider keeps these pointed at
-// its live addNotification/confirm implementations on every render. This
-// mirrors how real toast libraries (react-hot-toast, sonner) expose a
-// plain `toast()` function alongside their hook.
-let notifyRef = (msg) => console.warn('[Notify] NotificationProvider chưa sẵn sàng:', msg);
-let confirmRef = (msg) => Promise.resolve(window.confirm(msg));
+// its live addNotification/confirm implementations on every render.
+let notifyRef = (msg, type, link) => console.warn('[Notify] NotificationProvider chưa sẵn sàng:', msg);
+let confirmRef = (msg, options) => Promise.resolve(window.confirm(msg));
 let promptRef = (msg, def) => Promise.resolve(window.prompt(msg, def));
 
 export const notify = (messageOrObj, type, link) => notifyRef(messageOrObj, type, link);
@@ -30,45 +28,100 @@ export const promptText = (message, defaultValue = '') => promptRef(message, def
 const storageKeyFor = (user) => `aether_notifications_${user?.id ?? 'guest'}`;
 
 export const NotificationProvider = ({ children }) => {
-  const { user } = useAuth();
-  const [notifications, setNotifications] = useState([]);
-  const [toasts, setToasts] = useState([]);
-  const activeStorageKey = useRef(storageKeyFor(user));
+  const { user, loading: authLoading } = useAuth() || {};
 
-  // Reload the notification history whenever the logged-in identity changes
-  // (login, logout, or switching accounts in the same tab) instead of only
-  // once on mount, so a fresh login never inherits the previous account's list.
-  useEffect(() => {
-    const key = storageKeyFor(user);
-    activeStorageKey.current = key;
+  // Compute storage key scoped strictly to current user account
+  const getUserKey = (u) => {
+    if (!u) return 'guest';
+    if (u.id) return `user_${u.id}`;
+    if (u.employeeCode) return `emp_${u.employeeCode}`;
+    if (u.username) return `u_${u.username}`;
+    if (u.email) return `email_${u.email}`;
+    return 'user';
+  };
+
+  const userKey = getUserKey(user);
+  const storageKey = `aether_notifications_${userKey}`;
+
+  // Helper to load user-scoped notifications and clean up legacy unscoped storage
+  const loadUserNotifications = (key, currentUser) => {
     try {
+      // Clear legacy global key that leaked previous sessions across users
+      if (localStorage.getItem('aether_notifications')) {
+        localStorage.removeItem('aether_notifications');
+      }
+
       const saved = localStorage.getItem(key);
-      setNotifications(saved ? JSON.parse(saved) : []);
+      if (saved !== null) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
     } catch (e) {
-      setNotifications([]);
+      console.warn('[NotificationContext] Failed to parse notifications:', e);
     }
-  }, [user?.id]);
 
+    // Default notifications for a newly created or first-time logged in user
+    if (currentUser) {
+      const displayName = currentUser.name || currentUser.username || 'bạn';
+      return [
+        {
+          id: `welcome_${userKey}`,
+          message: `Chào mừng ${displayName} đến với AetherPC! Chúc bạn có trải nghiệm mua sắm tuyệt vời.`,
+          type: 'info',
+          link: '/products',
+          read: false,
+          createdAt: new Date().toISOString()
+        }
+      ];
+    }
+    return [];
+  };
+
+  const [notifications, setNotifications] = useState(() => loadUserNotifications(storageKey, user));
+  const [toasts, setToasts] = useState([]);
+  const currentUserKeyRef = useRef(userKey);
+
+  // Sync notifications whenever active user changes (login / logout / switch account)
   useEffect(() => {
-    try {
-      localStorage.setItem(activeStorageKey.current, JSON.stringify(notifications));
-    } catch (e) {}
-  }, [notifications]);
+    if (authLoading) return;
+    if (currentUserKeyRef.current !== userKey) {
+      currentUserKeyRef.current = userKey;
+      const loaded = loadUserNotifications(storageKey, user);
+      setNotifications(loaded);
+    }
+  }, [userKey, storageKey, authLoading]);
 
-  const addNotification = (messageOrObj, type = 'success', link = null) => {
+  // Persist notifications to user-scoped storage key
+  useEffect(() => {
+    if (authLoading) return;
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(notifications));
+    } catch (e) {
+      console.warn('[NotificationContext] Failed to save notifications:', e);
+    }
+  }, [notifications, storageKey, authLoading]);
+
+  const addNotification = (messageOrObj, type = 'success', link = null, options = {}) => {
     const id = Date.now().toString() + Math.random().toString(36).substr(2, 9);
     
     let textMessage = messageOrObj;
     let notifType = type;
     let notifLink = link;
+    let explicitToHistory = undefined;
 
     if (typeof messageOrObj === 'object' && messageOrObj !== null) {
       textMessage = messageOrObj.message || messageOrObj.title || messageOrObj.text || JSON.stringify(messageOrObj);
       notifType = messageOrObj.type || type || 'success';
       notifLink = messageOrObj.link || link || null;
+      if (typeof messageOrObj.toHistory === 'boolean') {
+        explicitToHistory = messageOrObj.toHistory;
+      }
     }
 
-    // Add to history (bell dropdown)
+    if (typeof options === 'object' && options !== null && typeof options.toHistory === 'boolean') {
+      explicitToHistory = options.toHistory;
+    }
+
     const newNotification = {
       id,
       message: String(textMessage || ''),
@@ -77,10 +130,25 @@ export const NotificationProvider = ({ children }) => {
       read: false,
       createdAt: new Date().toISOString()
     };
-    
-    setNotifications(prev => [newNotification, ...prev].slice(0, 50)); // Keep max 50
 
-    // Add to active toasts
+    // Filter out transient toast messages from being permanently dumped into the Bell Inbox.
+    // Error validations, clipboard copy confirmations, registration toasts, and quick cart alerts
+    // are momentary feedback for the active view, NOT persistent inbox notifications.
+    const textStr = String(textMessage || '');
+    const isTransientActionOrError = (
+      notifType === 'error' ||
+      /^(Vui lòng|Không thể|Lỗi|Chưa|File quá lớn|Đã thêm .* vào giỏ hàng|Đã sao chép|Đã xóa|Xóa thành công|Cập nhật thông tin hồ sơ|Đăng ký tài khoản)/i.test(textStr)
+    );
+
+    const shouldSaveToHistory = explicitToHistory !== undefined
+      ? explicitToHistory
+      : (Boolean(notifLink) && !isTransientActionOrError);
+
+    if (shouldSaveToHistory) {
+      setNotifications(prev => [newNotification, ...prev].slice(0, 50)); // Keep max 50
+    }
+
+    // Add to active toasts (always visible as transient popup)
     setToasts(prev => [...prev, newNotification]);
 
     // Auto-remove toast after 3.5 seconds
@@ -99,6 +167,10 @@ export const NotificationProvider = ({ children }) => {
 
   const markAllAsRead = () => {
     setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+  };
+
+  const removeNotification = (id) => {
+    setNotifications(prev => prev.filter(n => n.id !== id));
   };
 
   const clearAllNotifications = () => {
@@ -143,6 +215,7 @@ export const NotificationProvider = ({ children }) => {
       promptText: promptFn,
       markAsRead,
       markAllAsRead,
+      removeNotification,
       clearAllNotifications
     }}>
       {children}

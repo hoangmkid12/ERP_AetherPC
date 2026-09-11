@@ -101,6 +101,20 @@ export default function OrderDetailSheet({ order: ord, onClose, fmt, actions = {
               </div>
             </div>
           )}
+
+          {ord.status === 'RETURNING_TO_WAREHOUSE' && (ord.returnProofPhoto || ord.returnNote) && (
+            <div className="delivery-card" style={{ marginBottom: '0.85rem', borderColor: 'var(--warning)' }}>
+              <div style={{ fontWeight: 800, fontSize: '0.88rem', marginBottom: '0.5rem', color: 'var(--warning)' }}>
+                Ảnh Minh Chứng Hoàn Kho
+              </div>
+              {ord.returnProofPhoto ? (
+                <img src={ord.returnProofPhoto} alt="Return Proof" style={{ width: '100%', borderRadius: 'var(--radius-md)', display: 'block', marginBottom: '0.6rem' }} />
+              ) : (
+                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '0.6rem' }}>Shipper đã bỏ qua chụp ảnh cho lần hoàn kho này.</div>
+              )}
+              {ord.returnNote && <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Ghi chú: {ord.returnNote}</div>}
+            </div>
+          )}
         </div>
 
         {/* Footer actions — only for a plain "en route" order; SHIPPING_FAILED /

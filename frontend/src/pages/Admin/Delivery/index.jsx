@@ -13,7 +13,9 @@ import ReturnsTab from './ReturnsTab';
 import HistoryTab from './HistoryTab';
 import PODModal from './components/PODModal';
 import FailModal from './components/FailModal';
+import ReturnProofModal from './components/ReturnProofModal';
 import OrderDetailSheet from './components/OrderDetailSheet';
+import { getDeliveryIncidentStatus } from './deliveryHelpers';
 
 // Refetch orders/returns while the tab is visible, paused otherwise.
 const POLL_INTERVAL_MS = 35000;
@@ -111,7 +113,7 @@ export default function Delivery() {
     } catch (_) { }
 
     const map = new Map();
-    (contextOrders || []).forEach(o => {
+    (apiOrders || []).forEach(o => {
       const key = String(o.orderId || o.id || '');
       if (key) map.set(key, o);
     });
@@ -119,7 +121,7 @@ export default function Delivery() {
       const key = String(o.orderId || o.id || '');
       if (key) map.set(key, { ...map.get(key), ...o });
     });
-    (apiOrders || []).forEach(o => {
+    (contextOrders || []).forEach(o => {
       const key = String(o.orderId || o.id || '');
       if (key) map.set(key, { ...map.get(key), ...o });
     });
@@ -135,7 +137,7 @@ export default function Delivery() {
     } catch (_) { }
 
     const map = new Map();
-    (returnRequests || []).forEach(r => {
+    (apiReturns || []).forEach(r => {
       const key = String(r.id || r.orderId || '');
       if (key) map.set(key, r);
     });
@@ -143,7 +145,7 @@ export default function Delivery() {
       const key = String(r.id || r.orderId || '');
       if (key) map.set(key, { ...map.get(key), ...r });
     });
-    (apiReturns || []).forEach(r => {
+    (returnRequests || []).forEach(r => {
       const key = String(r.id || r.orderId || '');
       if (key) map.set(key, { ...map.get(key), ...r });
     });
@@ -206,6 +208,8 @@ export default function Delivery() {
   const [failModal, setFailModal] = useState(null);
   // Proof of Delivery Modal State
   const [deliverModal, setDeliverModal] = useState(null);
+  // Return-to-Warehouse Photo Proof Modal State
+  const [returnModal, setReturnModal] = useState(null);
 
   const isManagerOrAdmin = ['CEO', 'ADMIN', 'WAREHOUSE_MANAGER', 'SALES_MANAGER'].includes(user?.role);
   const userIdStr = String(user?.id || user?.username || '');
@@ -265,24 +269,30 @@ export default function Delivery() {
   };
 
   const myDeliveryOrders = orders.filter(o =>
-    o && ['READY_TO_SHIP', 'SHIPPED', 'DELIVERED', 'SHIPPING_FAILED', 'CONFIRMED'].includes(o.status)
+    o && ['READY_TO_SHIP', 'SHIPPED', 'DELIVERED', 'SHIPPING_FAILED', 'RETURNING_TO_WAREHOUSE', 'CANCELLED', 'CONFIRMED'].includes(o.status)
   );
 
   const readyCount = myDeliveryOrders.filter(o => o.status === 'READY_TO_SHIP').length;
-  const activeOrdersList = myDeliveryOrders.filter(o => ['SHIPPED', 'DELIVERED', 'SHIPPING_FAILED', 'RETURNING_TO_WAREHOUSE'].includes(o.status) && isShipperMatched(o));
-  const activeCount = myDeliveryOrders.filter(o => ['SHIPPED', 'SHIPPING_FAILED', 'RETURNING_TO_WAREHOUSE'].includes(o.status) && isShipperMatched(o)).length;
+  const activeOrdersList = myDeliveryOrders.filter(o =>
+    ['SHIPPED', 'SHIPPING_FAILED', 'RETURNING_TO_WAREHOUSE', 'CANCELLED'].includes(o.status) && isShipperMatched(o)
+  );
+  const activeCount = activeOrdersList.length;
   const doneCount = myDeliveryOrders.filter(o => o.status === 'DELIVERED' && isShipperMatched(o)).length;
-  const failedCount = myDeliveryOrders.filter(o => (o.status === 'SHIPPING_FAILED' || o.status === 'RETURNING_TO_WAREHOUSE') && isShipperMatched(o)).length;
+  const failedCount = myDeliveryOrders.filter(o => {
+    if (!isShipperMatched(o)) return false;
+    const st = getDeliveryIncidentStatus(o);
+    return st.isAwaiting || st.isRescheduled || st.isRejected || st.isReturning;
+  }).length;
 
   const todayCount = activeOrdersList.filter(o => getOrderTimeClassification(o).isToday).length;
   const newCount = activeOrdersList.filter(o => getOrderTimeClassification(o).isNew).length;
   const backlogCount = activeOrdersList.filter(o => getOrderTimeClassification(o).isBacklog).length;
 
-  const countShipping = myDeliveryOrders.filter(o => o.status === 'SHIPPED' && !o.isAwaitingCallback && isShipperMatched(o)).length;
-  const countAwaiting = myDeliveryOrders.filter(o => o.isAwaitingCallback && isShipperMatched(o)).length;
-  const countRescheduled = myDeliveryOrders.filter(o => (o.failReason || '').includes('Khách hẹn') && isShipperMatched(o)).length;
-  const countRejected = myDeliveryOrders.filter(o => ((o.failReason || '').includes('từ chối') || (o.failReason || '').includes('Bom hàng') || o.status === 'CANCELLED') && isShipperMatched(o)).length;
-  const countReturning = myDeliveryOrders.filter(o => o.status === 'RETURNING_TO_WAREHOUSE' && isShipperMatched(o)).length;
+  const countShipping = myDeliveryOrders.filter(o => isShipperMatched(o) && getDeliveryIncidentStatus(o).isShipping).length;
+  const countAwaiting = myDeliveryOrders.filter(o => isShipperMatched(o) && getDeliveryIncidentStatus(o).isAwaiting).length;
+  const countRescheduled = myDeliveryOrders.filter(o => isShipperMatched(o) && getDeliveryIncidentStatus(o).isRescheduled).length;
+  const countRejected = myDeliveryOrders.filter(o => isShipperMatched(o) && getDeliveryIncidentStatus(o).isRejected).length;
+  const countReturning = myDeliveryOrders.filter(o => isShipperMatched(o) && getDeliveryIncidentStatus(o).isReturning).length;
 
   const totalCodCollected = myDeliveryOrders
     .filter(o => o.status === 'DELIVERED' && isShipperMatched(o))
@@ -329,23 +339,18 @@ export default function Delivery() {
       if (paymentFilter === 'COD' && isPaid) return false;
       if (paymentFilter === 'PREPAID' && !isPaid) return false;
 
-      const isDelivered = o.status === 'DELIVERED';
-      const isAwaiting = Boolean(o.isAwaitingCallback);
-      const isRescheduled = (o.failReason || '').includes('Khách hẹn');
-      const isRejected = (o.failReason || '').includes('từ chối') || (o.failReason || '').includes('Bom hàng') || o.status === 'CANCELLED';
-      const isReturning = o.status === 'RETURNING_TO_WAREHOUSE';
-      const isNormalShipping = o.status === 'SHIPPED' && !isAwaiting && !isRescheduled && !isRejected && !isReturning;
+      const incidentState = getDeliveryIncidentStatus(o);
 
       const ordTime = getOrderTimeClassification(o);
       if (incidentFilter === 'TODAY' && !ordTime.isToday) return false;
       if (incidentFilter === 'NEW' && !ordTime.isNew) return false;
       if (incidentFilter === 'BACKLOG' && !ordTime.isBacklog) return false;
-      if (incidentFilter === 'SHIPPING' && !isNormalShipping) return false;
-      if (incidentFilter === 'DELIVERED' && !isDelivered) return false;
-      if (incidentFilter === 'AWAITING_CALLBACK' && !isAwaiting) return false;
-      if (incidentFilter === 'RESCHEDULED' && !isRescheduled) return false;
-      if (incidentFilter === 'REJECTED' && !isRejected) return false;
-      if (incidentFilter === 'RETURNING' && !isReturning) return false;
+      if (incidentFilter === 'SHIPPING' && !incidentState.isShipping) return false;
+      if (incidentFilter === 'DELIVERED' && !incidentState.isDelivered) return false;
+      if (incidentFilter === 'AWAITING_CALLBACK' && !incidentState.isAwaiting) return false;
+      if (incidentFilter === 'RESCHEDULED' && !incidentState.isRescheduled) return false;
+      if (incidentFilter === 'REJECTED' && !incidentState.isRejected) return false;
+      if (incidentFilter === 'RETURNING' && !incidentState.isReturning) return false;
 
       const getOrderDateTime = (ord) => {
         const dateVal = ord.deliveredAt || ord.shippedAt || ord.updatedAt || ord.createdAt || ord.packedAt || ord.date;
@@ -395,11 +400,12 @@ export default function Delivery() {
       if (activeTab === 'pending') return o.status === 'READY_TO_SHIP';
 
       if (activeTab === 'active') {
-        return ['SHIPPED', 'DELIVERED', 'SHIPPING_FAILED', 'RETURNING_TO_WAREHOUSE'].includes(o.status);
+        if (incidentFilter === 'DELIVERED') return o.status === 'DELIVERED';
+        return ['SHIPPED', 'SHIPPING_FAILED', 'RETURNING_TO_WAREHOUSE', 'CANCELLED'].includes(o.status);
       }
 
       if (activeTab === 'history') {
-        return ['DELIVERED', 'SHIPPING_FAILED', 'RETURNING_TO_WAREHOUSE'].includes(o.status);
+        return ['DELIVERED', 'SHIPPING_FAILED', 'RETURNING_TO_WAREHOUSE', 'CANCELLED'].includes(o.status);
       }
 
       return true;
@@ -421,71 +427,151 @@ export default function Delivery() {
   }, [myDeliveryOrders, search, regionFilter, paymentFilter, incidentFilter, dateFilterPeriod, customStartDate, customEndDate, sortOrder, activeTab, userIdStr, isManagerOrAdmin, user]);
 
   const handleClaimOrder = async (orderId) => {
-    if (typeof claimOrderForDelivery === 'function') {
-      const result = await claimOrderForDelivery(orderId, user);
-      if (result?.success) {
-        addNotification(`Đã nhận đơn hàng #${orderId}! Đơn đã chuyển sang tab "Đang Giao & Minh Chứng".`, 'success', '/admin/delivery?tab=active');
+    const sId = user?.id || user?.username || 'SHIPPER';
+    const sName = user?.fullname || user?.name || user?.username || 'Shipper';
+    setApiOrders(prev => prev.map(o => (String(o.orderId || o.id) === String(orderId) ? { ...o, status: 'SHIPPED', assignedShipperId: sId, assignedShipperName: sName } : o)));
+    try {
+      if (typeof claimOrderForDelivery === 'function') {
+        const result = await claimOrderForDelivery(orderId, user);
+        if (result?.success) {
+          addNotification(`Đã nhận đơn hàng #${orderId}! Đơn đã chuyển sang tab "Đang Giao & Minh Chứng".`, 'success', '/admin/delivery?tab=active');
+        } else {
+          addNotification(result?.message || `Không thể nhận đơn hàng #${orderId}.`, 'error');
+        }
       } else {
-        addNotification(result?.message || `Không thể nhận đơn hàng #${orderId}.`, 'error');
+        await updateOrderStatus(orderId, 'SHIPPED');
+        addNotification(`Đã nhận đơn hàng #${orderId}!`, 'success', '/admin/delivery?tab=active');
       }
-    } else {
-      updateOrderStatus(orderId, 'SHIPPED');
-      addNotification(`Đã nhận đơn hàng #${orderId}!`, 'success', '/admin/delivery?tab=active');
+    } catch (err) {
+      addNotification(`Lỗi nhận đơn #${orderId}: ${err.message}`, 'error');
+    } finally {
+      fetchApiData(true);
     }
   };
 
-  const handleConfirmDelivered = (payload) => {
+  const handleConfirmDelivered = async (payload) => {
     if (!deliverModal) return;
     const ordId = deliverModal.orderId || deliverModal.id;
-    updateOrderStatus(ordId, 'DELIVERED', payload);
-    setDeliverModal(null);
     const payLabel = payload.actualPaymentMethod === 'BANK_TRANSFER' ? `Chuyển khoản VietQR (${payload.bankRefCode})` : (payload.actualPaymentMethod === 'CASH' ? 'Tiền mặt' : 'Đã thanh toán trước');
-    addNotification(`Đơn hàng #${ordId} giao thành công! Hình thức thanh toán: [${payLabel}], Người nhận: [${payload.receiverNameActual}].`, 'success', '/admin/delivery?tab=history');
-  };
 
-  const handleFailDelivery = (payload) => {
-    if (!failModal) return;
-    const ordId = failModal.orderId || failModal.id;
-    updateOrderStatus(ordId, 'SHIPPING_FAILED', payload);
-    setFailModal(null);
+    // Optimistically update apiOrders state for instant UI responsiveness
+    setApiOrders(prev => prev.map(o => {
+      if (String(o.orderId || o.id) === String(ordId)) {
+        return {
+          ...o,
+          status: 'DELIVERED',
+          paymentStatus: 'PAID',
+          deliveredAt: payload.deliveredAt || new Date().toISOString(),
+          ...payload
+        };
+      }
+      return o;
+    }));
+    setDeliverModal(null);
 
-    if (payload.isAwaitingCallback) {
-      addNotification(`Đã đưa đơn #${ordId} vào danh sách "Chờ khách gọi lại (24h)". Sau 24h hệ thống sẽ tự động hoàn kho.`, 'warning', '/admin/delivery?tab=active');
-    } else {
-      addNotification(`Đã cập nhật trạng thái đơn #${ordId}: Giao Thất Bại / Hẹn Lại.`, 'warning', '/admin/delivery?tab=history');
+    try {
+      await updateOrderStatus(ordId, 'DELIVERED', payload);
+      addNotification(`Đơn hàng #${ordId} giao thành công! Hình thức thanh toán: [${payLabel}], Người nhận: [${payload.receiverNameActual}].`, 'success', '/admin/delivery?tab=history');
+    } catch (err) {
+      addNotification(`Lỗi cập nhật trạng thái đơn #${ordId}: ${err.message}`, 'error');
+    } finally {
+      fetchApiData(true);
     }
   };
 
-  const handleResumeDelivery = (orderId) => {
-    updateOrderStatus(orderId, 'SHIPPED', {
+  const handleFailDelivery = async (payload) => {
+    if (!failModal) return;
+    const ordId = failModal.orderId || failModal.id;
+
+    setApiOrders(prev => prev.map(o => {
+      if (String(o.orderId || o.id) === String(ordId)) {
+        return {
+          ...o,
+          status: 'SHIPPING_FAILED',
+          ...payload
+        };
+      }
+      return o;
+    }));
+    setFailModal(null);
+
+    try {
+      await updateOrderStatus(ordId, 'SHIPPING_FAILED', payload);
+      if (payload.isAwaitingCallback) {
+        addNotification(`Đã đưa đơn #${ordId} vào danh sách "Chờ khách gọi lại (24h)". Sau 24h hệ thống sẽ tự động hoàn kho.`, 'warning', '/admin/delivery?tab=active');
+      } else {
+        addNotification(`Đã cập nhật trạng thái đơn #${ordId}: Giao Thất Bại / Hẹn Lại.`, 'warning', '/admin/delivery?tab=history');
+      }
+    } catch (err) {
+      addNotification(`Lỗi cập nhật trạng thái đơn #${ordId}: ${err.message}`, 'error');
+    } finally {
+      fetchApiData(true);
+    }
+  };
+
+  const handleResumeDelivery = async (orderId) => {
+    const extra = {
       isAwaitingCallback: false,
       failReason: '',
       failNote: '',
       resumedAt: new Date().toISOString()
-    });
-    setIncidentFilter('ALL');
-    addNotification(`Đơn #${orderId} đã được kích hoạt lại! Bạn có thể tiếp tục đi giao và chụp ảnh POD.`, 'success', '/admin/delivery?tab=active');
+    };
+    setApiOrders(prev => prev.map(o => (String(o.orderId || o.id) === String(orderId) ? { ...o, status: 'SHIPPED', ...extra } : o)));
+    try {
+      await updateOrderStatus(orderId, 'SHIPPED', extra);
+      setIncidentFilter('ALL');
+      addNotification(`Đơn #${orderId} đã được kích hoạt lại! Bạn có thể tiếp tục đi giao và chụp ảnh POD.`, 'success', '/admin/delivery?tab=active');
+    } catch (err) {
+      addNotification(`Lỗi kích hoạt lại đơn #${orderId}: ${err.message}`, 'error');
+    } finally {
+      fetchApiData(true);
+    }
   };
 
   const handleEscalateToCSKH = (orderId) => {
     addNotification(`Đã gửi thông báo khẩn đến bộ phận CSKH để liên hệ hỗ trợ cứu đơn hàng #${orderId}!`, 'info', '/admin/delivery?tab=active');
   };
 
-  const handleForceReturnToWarehouse = (orderId) => {
-    updateOrderStatus(orderId, 'RETURNING_TO_WAREHOUSE', {
-      isAwaitingCallback: false,
-      failReason: '',
-      failNote: '',
-      returnReason: 'Khách từ chối nhận - Chuyển hoàn về kho',
-      returnedAt: new Date().toISOString()
-    });
-    setIncidentFilter('ALL');
-    addNotification(`Đơn hàng #${orderId} đã được chuyển sang trạng thái "Đang Chuyển Hoàn Về Kho". Vui lòng bàn giao kiện hàng cho Thủ kho.`, 'warning', '/admin/delivery?tab=active');
+  // Opens the photo-proof modal instead of returning the order immediately —
+  // triggered by OrderCard's "Hoàn Kho" button, which now passes the full
+  // order object (not just its id) so the modal has customer/order context.
+  const handleForceReturnToWarehouse = (ord) => {
+    setReturnModal(ord);
   };
 
-  const handleRedeliver = (orderId) => {
-    updateOrderStatus(orderId, 'SHIPPED');
-    addNotification(`Đã chuyển đơn #${orderId} lại trạng thái đang giao`, 'info');
+  const handleConfirmReturn = async (payload) => {
+    if (!returnModal) return;
+    const orderId = returnModal.orderId || returnModal.id;
+    const extra = {
+      isAwaitingCallback: false,
+      failReason: returnModal.failReason || 'Khách từ chối nhận - Chuyển hoàn về kho',
+      failNote: returnModal.failNote || '',
+      returnReason: 'Khách từ chối nhận - Chuyển hoàn về kho',
+      ...payload
+    };
+    setApiOrders(prev => prev.map(o => (String(o.orderId || o.id) === String(orderId) ? { ...o, status: 'RETURNING_TO_WAREHOUSE', ...extra } : o)));
+    setReturnModal(null);
+    try {
+      await updateOrderStatus(orderId, 'RETURNING_TO_WAREHOUSE', extra);
+      setIncidentFilter('ALL');
+      addNotification(`Đơn hàng #${orderId} đã được chuyển sang trạng thái "Đang Chuyển Hoàn Về Kho". Vui lòng bàn giao kiện hàng cho Thủ kho.`, 'warning', '/admin/delivery?tab=active');
+    } catch (err) {
+      addNotification(`Lỗi hoàn kho đơn #${orderId}: ${err.message}`, 'error');
+    } finally {
+      fetchApiData(true);
+    }
+  };
+
+  const handleRedeliver = async (orderId) => {
+    setApiOrders(prev => prev.map(o => (String(o.orderId || o.id) === String(orderId) ? { ...o, status: 'SHIPPED' } : o)));
+    try {
+      await updateOrderStatus(orderId, 'SHIPPED');
+      addNotification(`Đã chuyển đơn #${orderId} lại trạng thái đang giao`, 'info');
+    } catch (err) {
+      addNotification(`Lỗi chuyển đơn #${orderId}: ${err.message}`, 'error');
+    } finally {
+      fetchApiData(true);
+    }
   };
 
   const handleReturnPickedUp = async (ret) => {
@@ -647,6 +733,14 @@ export default function Delivery() {
           order={failModal}
           onClose={() => setFailModal(null)}
           onConfirm={handleFailDelivery}
+        />
+      )}
+
+      {returnModal && (
+        <ReturnProofModal
+          order={returnModal}
+          onClose={() => setReturnModal(null)}
+          onConfirm={handleConfirmReturn}
         />
       )}
 

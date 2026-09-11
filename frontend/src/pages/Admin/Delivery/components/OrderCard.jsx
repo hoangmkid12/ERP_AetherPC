@@ -1,5 +1,6 @@
 import React from 'react';
 import { Truck, Clock, Camera, Eye } from 'lucide-react';
+import { getDeliveryIncidentStatus } from '../deliveryHelpers';
 
 // Shared full-width mobile card used by PendingTab / ActiveTab / HistoryTab.
 // `variant` controls which action buttons render:
@@ -7,34 +8,22 @@ import { Truck, Clock, Camera, Eye } from 'lucide-react';
 //   'active'  -> the full status-based action set (POD / fail / resume / etc.)
 //   'history' -> read-only, tap to view detail only
 export default function OrderCard({ order: ord, variant, fmt, getOrderTimeClassification, onOpenDetail, actions = {} }) {
-  const isDelivered = ord.status === 'DELIVERED';
+  const incidentStatus = getDeliveryIncidentStatus(ord);
+  const { isDelivered, isAwaiting, isRescheduled, isRejected, isReturning } = incidentStatus;
+
   const timeInfo = getOrderTimeClassification(ord);
   const codAmount = parseFloat(ord.totalAmount || ord.total || 0);
   const isPrepaid = ord.paymentStatus === 'PAID' || ord.paymentMethod === 'ONLINE_GATEWAY' || ord.paymentMethod === 'BANK_TRANSFER' || codAmount === 0;
   const addrStr = (ord.shippingAddress || '').toLowerCase();
   const isHCM = addrStr.includes('hồ chí minh') || addrStr.includes('hcm') || addrStr.includes('tp.hcm') || addrStr.includes('quận');
 
-  const isFailedOrder = ord.status === 'SHIPPING_FAILED';
-  const isAwaiting = isFailedOrder && Boolean(ord.isAwaitingCallback);
-  const isRescheduled = isFailedOrder && (ord.failReason || '').includes('Khách hẹn');
-  const isRejected = isFailedOrder && !isAwaiting && !isRescheduled;
-  const isReturning = ord.status === 'RETURNING_TO_WAREHOUSE';
-
   const orderId = ord.orderId || ord.id;
 
-  const statusBadge = isDelivered
-    ? { text: 'ĐÃ GIAO XONG (POD)', bg: 'rgba(22,163,74,0.12)', color: 'var(--success)' }
-    : isAwaiting
-      ? { text: 'CHỜ GỌI LẠI (24H)', bg: 'rgba(217,119,6,0.12)', color: 'var(--warning)' }
-      : isRescheduled
-        ? { text: 'KHÁCH HẸN LẠI', bg: 'rgba(124,58,237,0.12)', color: '#7c3aed' }
-        : isRejected
-          ? { text: 'KHÁCH TỪ CHỐI', bg: 'rgba(220,38,38,0.12)', color: 'var(--danger)' }
-          : isReturning
-            ? { text: 'ĐANG HOÀN KHO', bg: 'rgba(100,116,139,0.12)', color: 'var(--text-muted)' }
-            : ord.status === 'READY_TO_SHIP'
-              ? { text: 'SẴN SÀNG TẠI KHO', bg: 'rgba(217,119,6,0.12)', color: 'var(--warning)' }
-              : { text: 'ĐANG GIAO', bg: 'rgba(37,99,235,0.12)', color: 'var(--primary)' };
+  const statusBadge = {
+    text: incidentStatus.badgeText,
+    bg: incidentStatus.badgeBg,
+    color: incidentStatus.badgeColor
+  };
 
   return (
     <div className="delivery-card" onClick={() => onOpenDetail && onOpenDetail(ord)} style={{ cursor: onOpenDetail ? 'pointer' : 'default' }}>
@@ -146,7 +135,7 @@ export default function OrderCard({ order: ord, variant, fmt, getOrderTimeClassi
               </button>
               <button
                 type="button"
-                onClick={() => actions.onForceReturn && actions.onForceReturn(orderId)}
+                onClick={() => actions.onForceReturn && actions.onForceReturn(ord)}
                 style={{ flex: 0.8, backgroundColor: 'transparent', color: 'var(--danger)', border: '1px solid var(--danger)', borderRadius: 'var(--radius-md)', padding: '0.55rem', fontSize: '0.76rem', fontWeight: 700, cursor: 'pointer' }}
               >
                 Hoàn Kho
@@ -163,7 +152,7 @@ export default function OrderCard({ order: ord, variant, fmt, getOrderTimeClassi
               </button>
               <button
                 type="button"
-                onClick={() => actions.onForceReturn && actions.onForceReturn(orderId)}
+                onClick={() => actions.onForceReturn && actions.onForceReturn(ord)}
                 style={{ flex: 0.8, backgroundColor: 'transparent', color: 'var(--danger)', border: '1px solid var(--danger)', borderRadius: 'var(--radius-md)', padding: '0.55rem', fontSize: '0.76rem', fontWeight: 700, cursor: 'pointer' }}
               >
                 Hoàn Kho
@@ -173,7 +162,7 @@ export default function OrderCard({ order: ord, variant, fmt, getOrderTimeClassi
             <>
               <button
                 type="button"
-                onClick={() => actions.onForceReturn && actions.onForceReturn(orderId)}
+                onClick={() => actions.onForceReturn && actions.onForceReturn(ord)}
                 style={{ flex: 1.2, backgroundColor: 'var(--danger)', color: '#fff', border: 'none', borderRadius: 'var(--radius-md)', padding: '0.55rem', fontSize: '0.76rem', fontWeight: 800, cursor: 'pointer' }}
               >
                 Xác Nhận Hoàn Kho

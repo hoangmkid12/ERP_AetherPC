@@ -12,223 +12,8 @@ import {
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../../services/api';
 
-const VIETNAM_PROVINCES = [
-  { id: 'HN', name: 'Thành phố Hà Nội', districts: ['Quận Ba Đình', 'Quận Hoàn Kiếm', 'Quận Tây Hồ', 'Quận Long Biên', 'Quận Cầu Giấy', 'Quận Đống Đa', 'Quận Hai Bà Trưng', 'Quận Hoàng Mai', 'Quận Thanh Xuân', 'Quận Hà Đông', 'Quận Nam Từ Liêm', 'Quận Bắc Từ Liêm', 'Thị xã Sơn Tây', 'Huyện Đông Anh', 'Huyện Gia Lâm', 'Huyện Thanh Trì', 'Huyện Mê Linh', 'Huyện Sóc Sơn', 'Huyện Ba Vì', 'Huyện Thạch Thất', 'Huyện Hoài Đức', 'Huyện Quốc Oai', 'Huyện Chương Mỹ', 'Huyện Thường Tín', 'Huyện Phú Xuyên', 'Huyện Ứng Hòa', 'Huyện Mỹ Đức', 'Huyện Đan Phượng', 'Huyện Phúc Thọ', 'Huyện Thanh Oai'] },
-  { id: 'HCM', name: 'Thành phố Hồ Chí Minh (gồm TP.HCM, Bình Dương, Bà Rịa - Vũng Tàu)', districts: ['TP. Thủ Đức', 'Quận 1', 'Quận 3', 'Quận 4', 'Quận 5', 'Quận 6', 'Quận 7', 'Quận 8', 'Quận 10', 'Quận 11', 'Quận 12', 'Quận Bình Thạnh', 'Quận Tân Bình', 'Quận Tân Phú', 'Quận Phú Nhuận', 'Quận Gò Vấp', 'Quận Bình Tân', 'TP. Thủ Dầu Một', 'TP. Dĩ An', 'TP. Thuận An', 'TP. Tân Uyên', 'TP. Bến Cát', 'TP. Vũng Tàu', 'TP. Bà Rịa', 'Thị xã Phú Mỹ', 'Huyện Bình Chánh', 'Huyện Củ Chi', 'Huyện Hóc Môn', 'Huyện Nhà Bè', 'Huyện Cần Giờ', 'Huyện Bàu Bàng', 'Huyện Phú Giáo', 'Huyện Châu Đức', 'Huyện Xuyên Mộc'] },
-  { id: 'HP', name: 'Thành phố Hải Phòng (gồm Hải Phòng, Hải Dương)', districts: ['Quận Hồng Bàng', 'Quận Ngô Quyền', 'Quận Lê Chân', 'Quận Kiến An', 'Quận Hải An', 'Quận Dương Kinh', 'Quận Đồ Sơn', 'TP. Thủy Nguyên', 'Quận An Dương', 'TP. Hải Dương', 'TP. Chí Linh', 'Thị xã Kinh Môn', 'Huyện Tiên Lãng', 'Huyện Vĩnh Bảo', 'Huyện Kiến Thụy', 'Huyện An Lão', 'Huyện Cát Hải', 'Huyện Bình Giang', 'Huyện Cẩm Giàng', 'Huyện Nam Sách'] },
-  { id: 'DN', name: 'Thành phố Đà Nẵng (gồm Đà Nẵng, Quảng Nam)', districts: ['Quận Hải Châu', 'Quận Thanh Khê', 'Quận Sơn Trà', 'Quận Ngũ Hành Sơn', 'Quận Liên Chiểu', 'Quận Cẩm Lệ', 'TP. Tam Kỳ', 'TP. Hội An', 'Thị xã Điện Bàn', 'Huyện Hòa Vàng', 'Huyện Đại Lộc', 'Huyện Duy Xuyên', 'Huyện Núi Thành', 'Huyện Thăng Bình', 'Huyện Hoàng Sa'] },
-  { id: 'CT', name: 'Thành phố Cần Thơ (gồm Cần Thơ, Sóc Trăng, Hậu Giang)', districts: ['Quận Ninh Kiều', 'Quận Bình Thủy', 'Quận Cái Răng', 'Quận Ô Môn', 'Quận Thốt Nốt', 'TP. Sóc Trăng', 'TP. Vị Thanh', 'TP. Ngã Bảy', 'Thị xã Ngã Năm', 'Thị xã Vĩnh Châu', 'Thị xã Long Mỹ', 'Huyện Phong Điền', 'Huyện Thới Lai', 'Huyện Cờ Đỏ', 'Huyện Vĩnh Thạnh', 'Huyện Phụng Hiệp', 'Huyện Mỹ Xuyên'] },
-  { id: 'HUE', name: 'Thành phố Huế', districts: ['Quận Thuận Hóa', 'Quận Phú Xuân', 'Thị xã Hương Thủy', 'Thị xã Hương Trà', 'Thị xã Phong Điền', 'Huyện Phú Lộc', 'Huyện Phú Vàng', 'Huyện Quảng Điền', 'Huyện A Lưới'] },
-  { id: 'TQ', name: 'Tỉnh Tuyên Quang (gồm Tuyên Quang, Hà Giang)', districts: ['TP. Tuyên Quang', 'TP. Hà Giang', 'Huyện Bắc Quang', 'Huyện Đồng Văn', 'Huyện Hoàng Su Phì', 'Huyện Mèo Vạc', 'Huyện Vị Xuyên', 'Huyện Chiêm Hóa', 'Huyện Hàm Yên', 'Huyện Sơn Dương', 'Huyện Yên Sơn'] },
-  { id: 'LC', name: 'Tỉnh Lào Cai (gồm Lào Cai, Yên Bái)', districts: ['TP. Lào Cai', 'TP. Yên Bái', 'Thị xã Sa Pa', 'Thị xã Nghĩa Lộ', 'Huyện Bắc Hà', 'Huyện Bảo Thắng', 'Huyện Bát Xát', 'Huyện Lục Yên', 'Huyện Trấn Yên', 'Huyện Văn Chấn', 'Huyện Yên Bình'] },
-  { id: 'TN', name: 'Tỉnh Thái Nguyên (gồm Thái Nguyên, Bắc Kạn)', districts: ['TP. Thái Nguyên', 'TP. Bắc Kạn', 'TP. Phổ Yên', 'TP. Sông Công', 'Huyện Ba Bể', 'Huyện Bạch Thông', 'Huyện Chợ Đồn', 'Huyện Na Rì', 'Huyện Đại Từ', 'Huyện Phú Bình', 'Huyện Phú Lương'] },
-  { id: 'PT', name: 'Tỉnh Phú Thọ (gồm Phú Thọ, Vĩnh Phúc, Hòa Bình)', districts: ['TP. Việt Trì', 'TP. Vĩnh Yên', 'TP. Hòa Bình', 'Thị xã Phú Thọ', 'TP. Phúc Yên', 'Huyện Cẩm Khê', 'Huyện Đoan Hùng', 'Huyện Lâm Thao', 'Huyện Phù Ninh', 'Huyện Cao Phong', 'Huyện Lương Sơn', 'Huyện Mai Châu', 'Huyện Tân Lạc', 'Huyện Bình Xuyên', 'Huyện Vĩnh Tường'] },
-  { id: 'BN', name: 'Tỉnh Bắc Ninh (gồm Bắc Ninh, Bắc Giang)', districts: ['TP. Bắc Ninh', 'TP. Từ Sơn', 'TP. Bắc Giang', 'Thị xã Quế Võ', 'Thị xã Thuận Thành', 'Thị xã Việt Yên', 'Huyện Hiệp Hòa', 'Huyện Tiên Du', 'Huyện Yên Phong', 'Huyện Lạng Giang', 'Huyện Lục Nam'] },
-  { id: 'HY', name: 'Tỉnh Hưng Yên (gồm Hưng Yên, Thái Bình)', districts: ['TP. Hưng Yên', 'TP. Thái Bình', 'Thị xã Mỹ Hào', 'Huyện Ân Thi', 'Huyện Khoái Châu', 'Huyện Văn Giang', 'Huyện Yên Mỹ', 'Huyện Đông Hưng', 'Huyện Hưng Hà', 'Huyện Kiến Xương', 'Huyện Tiền Hải', 'Huyện Vũ Thư'] },
-  { id: 'NB', name: 'Tỉnh Ninh Bình (gồm Ninh Bình, Hà Nam, Nam Định)', districts: ['TP. Ninh Bình', 'TP. Phủ Lý', 'TP. Nam Định', 'TP. Tam Điệp', 'Thị xã Duy Tiên', 'Thị xã Kim Bảng', 'Huyện Gia Viễn', 'Huyện Hoa Lư', 'Huyện Kim Sơn', 'Huyện Nho Quan', 'Huyện Giao Thủy', 'Huyện Hải Hậu', 'Huyện Nam Trực', 'Huyện Ý Yên'] },
-  { id: 'QT', name: 'Tỉnh Quảng Trị (gồm Quảng Trị, Quảng Bình)', districts: ['TP. Đông Hà', 'TP. Đồng Hới', 'Thị xã Ba Đồn', 'Thị xã Quảng Trị', 'Huyện Bố Trạch', 'Huyện Lệ Thủy', 'Huyện Quảng Trạch', 'Huyện Cam Lộ', 'Huyện Gio Linh', 'Huyện Triệu Phong', 'Huyện Vĩnh Linh'] },
-  { id: 'QNG', name: 'Tỉnh Quảng Ngãi (gồm Quảng Ngãi, Kon Tum)', districts: ['TP. Quảng Ngãi', 'TP. Kon Tum', 'Thị xã Đức Phổ', 'Huyện Bình Sơn', 'Huyện Mộ Đức', 'Huyện Tư Nghĩa', 'Huyện Đắk Hà', 'Huyện Đắk Tô', 'Huyện Ngọc Hồi', 'Huyện Sa Thầy'] },
-  { id: 'GL', name: 'Tỉnh Gia Lai (gồm Gia Lai, Bình Định)', districts: ['TP. Pleiku', 'TP. Quy Nhơn', 'Thị xã An Khê', 'Thị xã Ayun Pa', 'Thị xã An Nhơn', 'Thị xã Hoài Nhơn', 'Huyện Chư Sê', 'Huyện Đăk Đoa', 'Huyện Ia Grai', 'Huyện Tuy Phước', 'Huyện Phù Cát', 'Huyện Phù Mỹ'] },
-  { id: 'KH', name: 'Tỉnh Khánh Hòa (gồm Khánh Hòa, Ninh Thuận)', districts: ['TP. Nha Trang', 'TP. Cam Ranh', 'TP. Phan Rang - Tháp Chàm', 'Thị xã Ninh Hòa', 'Huyện Cam Lâm', 'Huyện Diên Khánh', 'Huyện Vạn Ninh', 'Huyện Ninh Hải', 'Huyện Ninh Phước', 'Huyện Ninh Sơn'] },
-  { id: 'LD', name: 'Tỉnh Lâm Đồng (gồm Lâm Đồng, Đắk Nông, Bình Thuận)', districts: ['TP. Đà Lạt', 'TP. Bảo Lộc', 'TP. Gia Nghĩa', 'TP. Phan Thiết', 'Thị xã La Gi', 'Huyện Bảo Lâm', 'Huyện Di Linh', 'Huyện Đức Trọng', 'Huyện Đơn Dương', 'Huyện Cư Jút', 'Huyện Đắk Mil', 'Huyện Đắk R\'lấp', 'Huyện Hàm Thuận Bắc', 'Huyện Hàm Thuận Nam'] },
-  { id: 'DL', name: 'Tỉnh Đắk Lắk (gồm Đắk Lắk, Phú Yên)', districts: ['TP. Buôn Ma Thuột', 'TP. Tuy Hòa', 'Thị xã Buôn Hồ', 'Thị xã Đông Hòa', 'Thị xã Sông Cầu', 'Huyện Cư M\'gar', 'Huyện Ea Kar', 'Huyện Krông Pắc', 'Huyện Buôn Đôn', 'Huyện Phú Hòa', 'Huyện Tuy An'] },
-  { id: 'DNAI', name: 'Tỉnh Đồng Nai (gồm Đồng Nai, Bình Phước)', districts: ['TP. Biên Hòa', 'TP. Long Khánh', 'TP. Đồng Xoài', 'Thị xã Bình Long', 'Thị xã Phước Long', 'Thị xã Chơn Thành', 'Huyện Nhơn Trạch', 'Huyện Trảng Bom', 'Huyện Long Thành', 'Huyện Vĩnh Cửu', 'Huyện Thống Nhất', 'Huyện Đồng Phú', 'Huyện Lộc Ninh'] },
-  { id: 'TNIEN', name: 'Tỉnh Tây Ninh (gồm Tây Ninh, Long An)', districts: ['TP. Tây Ninh', 'TP. Tân An', 'Thị xã Hòa Thành', 'Thị xã Trảng Bàng', 'Thị xã Kiến Tường', 'Huyện Bến Cầu', 'Huyện Châu Thành', 'Huyện Gò Dầu', 'Huyện Bến Lức', 'Huyện Cần Đước', 'Huyện Cần Giuộc', 'Huyện Đức Hòa'] },
-  { id: 'VL', name: 'Tỉnh Vĩnh Long (gồm Vĩnh Long, Bến Tre, Trà Vinh)', districts: ['TP. Vĩnh Long', 'TP. Bến Tre', 'TP. Trà Vinh', 'Thị xã Bình Minh', 'Thị xã Duyên Hải', 'Huyện Long Hồ', 'Huyện Mang Thít', 'Huyện Tam Bình', 'Huyện Vũng Liêm', 'Huyện Ba Tri', 'Huyện Bình Đại', 'Huyện Giồng Trôm', 'Huyện Càng Long', 'Huyện Cầu Ngang'] },
-  { id: 'DT', name: 'Tỉnh Đồng Tháp (gồm Đồng Tháp, Tiền Giang)', districts: ['TP. Cao Lãnh', 'TP. Sa Đéc', 'TP. Hồng Ngự', 'TP. Mỹ Tho', 'TP. Gò Công', 'Thị xã Cai Lậy', 'Huyện Lấp Vò', 'Huyện Lai Vung', 'Huyện Tháp Mười', 'Huyện Châu Thành', 'Huyện Chợ Gạo', 'Huyện Cái Bè'] },
-  { id: 'CM', name: 'Tỉnh Cà Mau (gồm Cà Mau, Bạc Liêu)', districts: ['TP. Cà Mau', 'TP. Bạc Liêu', 'Thị xã Giá Rai', 'Huyện Cái Nước', 'Huyện Đầm Dơi', 'Huyện Năm Căn', 'Huyện Trần Văn Thời', 'Huyện U Minh', 'Huyện Đông Hải', 'Huyện Phước Long', 'Huyện Vĩnh Lợi'] },
-  { id: 'AG', name: 'Tỉnh An Giang (gồm An Giang, Kiên Giang)', districts: ['TP. Long Xuyên', 'TP. Châu Đốc', 'TP. Rạch Giá', 'TP. Hà Tiên', 'TP. Phú Quốc', 'Thị xã Tân Châu', 'Thị xã Tịnh Biên', 'Huyện Chợ Mới', 'Huyện Thoại Sơn', 'Huyện Châu Phú', 'Huyện Châu Thành', 'Huyện Hòn Đất', 'Huyện Kiên Lương'] },
-  { id: 'LCHAU', name: 'Tỉnh Lai Châu', districts: ['TP. Lai Châu', 'Huyện Mường Tè', 'Huyện Nậm Nhùn', 'Huyện Phong Thổ', 'Huyện Sìn Hồ', 'Huyện Tam Đường', 'Huyện Tân Uyên', 'Huyện Than Uyên'] },
-  { id: 'DBIEN', name: 'Tỉnh Điện Biên', districts: ['TP. Điện Biên Phủ', 'Thị xã Mường Lay', 'Huyện Điện Biên', 'Huyện Điện Biên Đông', 'Huyện Mường Chà', 'Huyện Mường Nhé', 'Huyện Mường Ảng', 'Huyện Nậm Pồ', 'Huyện Tủa Chùa', 'Huyện Tuần Giáo'] },
-  { id: 'SLA', name: 'Tỉnh Sơn La', districts: ['TP. Sơn La', 'Huyện Bắc Yên', 'Huyện Mai Sơn', 'Huyện Mộc Châu', 'Huyện Mường La', 'Huyện Phù Yên', 'Huyện Quỳnh Nhai', 'Huyện Sông Mã', 'Huyện Thuận Châu', 'Huyện Vân Hồ'] },
-  { id: 'LSON', name: 'Tỉnh Lạng Sơn', districts: ['TP. Lạng Sơn', 'Huyện Bắc Sơn', 'Huyện Bình Gia', 'Huyện Cao Lộc', 'Huyện Chi Lăng', 'Huyện Đình Lập', 'Huyện Hữu Lũng', 'Huyện Lộc Bình', 'Huyện Tràng Định', 'Huyện Văn Lãng'] },
-  { id: 'QNINH', name: 'Tỉnh Quảng Ninh', districts: ['TP. Hạ Long', 'TP. Cẩm Phả', 'TP. Móng Cái', 'TP. Uông Bí', 'TP. Đông Triều', 'Thị xã Quảng Yên', 'Huyện Ba Chẽ', 'Huyện Bình Liêu', 'Huyện Cô Tô', 'Huyện Đầm Hà', 'Huyện Hải Hà', 'Huyện Tiên Yên', 'Huyện Vân Đồn'] },
-  { id: 'THOA', name: 'Tỉnh Thanh Hóa', districts: ['TP. Thanh Hóa', 'TP. Sầm Sơn', 'Thị xã Bỉm Sơn', 'Thị xã Nghi Sơn', 'Huyện Bá Thước', 'Huyện Cẩm Thủy', 'Huyện Đông Sơn', 'Huyện Hà Trung', 'Huyện Hậu Lộc', 'Huyện Hoằng Hóa', 'Huyện Nga Sơn', 'Huyện Nông Cống', 'Huyện Quảng Xương', 'Huyện Thọ Xuân'] },
-  { id: 'NAN', name: 'Tỉnh Nghệ An', districts: ['TP. Vinh', 'Thị xã Cửa Lò', 'Thị xã Hoàng Mai', 'Thị xã Thái Hòa', 'Huyện Anh Sơn', 'Huyện Con Cuông', 'Huyện Diễn Châu', 'Huyện Đô Lương', 'Huyện Hưng Nguyên', 'Huyện Kỳ Sơn', 'Huyện Nam Đàn', 'Huyện Nghi Lộc', 'Huyện Nghĩa Đàn', 'Huyện Quỳnh Lưu'] },
-  { id: 'HTINH', name: 'Tỉnh Hà Tĩnh', districts: ['TP. Hà Tĩnh', 'Thị xã Hồng Lĩnh', 'Thị xã Kỳ Anh', 'Huyện Cẩm Xuyên', 'Huyện Can Lộc', 'Huyện Đức Thọ', 'Huyện Hương Khê', 'Huyện Hương Sơn', 'Huyện Kỳ Anh', 'Huyện Nghi Xuân', 'Huyện Thạch Hà'] },
-];
-
-// Helper for smart Vietnamese accent-insensitive matching
-const removeAccents = (str) => {
-  if (!str) return '';
-  return str
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/đ/g, 'd')
-    .replace(/Đ/g, 'D')
-    .toLowerCase()
-    .trim();
-};
-
-const matchesSearch = (label, query) => {
-  if (!query) return true;
-  const normLabel = removeAccents(label);
-  const normQuery = removeAccents(query);
-
-  // 1. Direct accent-insensitive substring match (e.g. "ho" -> "Hồ Chí Minh")
-  if (normLabel.includes(normQuery)) return true;
-
-  // 2. Acronym / abbreviation initials match (e.g. "hcm" -> "Thành phố Hồ Chí Minh")
-  const initials = normLabel
-    .split(/[\s\.\,\(\)\-]+/)
-    .filter(Boolean)
-    .map(w => w[0])
-    .join('');
-  if (initials.includes(normQuery)) return true;
-
-  // 3. Match all words in query anywhere in label (e.g. "chi minh" -> "Hồ Chí Minh")
-  const queryWords = normQuery.split(/\s+/).filter(Boolean);
-  return queryWords.every(w => normLabel.includes(w));
-};
-
-function SearchableSelect({ value, onChange, options, placeholder, disabled }) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
-  const wrapperRef = useRef(null);
-
-  useEffect(() => {
-    function handleClickOutside(event) {
-      if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
-        setIsOpen(false);
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  const filteredOptions = (options || []).filter(opt => {
-    const label = typeof opt === 'string' ? opt : (opt.name || opt.label || '');
-    return matchesSearch(label, searchTerm);
-  });
-
-  return (
-    <div ref={wrapperRef} style={{ position: 'relative', width: '100%' }}>
-      {/* Trigger Select Box */}
-      <div
-        onClick={() => {
-          if (!disabled) setIsOpen(!isOpen);
-        }}
-        style={{
-          width: '100%',
-          padding: '0.55rem 2.2rem 0.55rem 0.75rem',
-          borderRadius: '8px',
-          border: '1.5px solid #cbd5e1',
-          fontSize: '0.82rem',
-          color: value ? '#0f172a' : '#64748b',
-          backgroundColor: disabled ? '#f1f5f9' : '#ffffff',
-          cursor: disabled ? 'not-allowed' : 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          userSelect: 'none',
-          boxSizing: 'border-box',
-          position: 'relative'
-        }}
-      >
-        <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          {value || placeholder}
-        </span>
-        <ChevronDown
-          size={16}
-          style={{
-            position: 'absolute',
-            right: '0.65rem',
-            top: '50%',
-            transform: `translateY(-50%) rotate(${isOpen ? 180 : 0}deg)`,
-            transition: 'transform 0.2s ease',
-            color: '#64748b',
-            pointerEvents: 'none'
-          }}
-        />
-      </div>
-
-      {/* Dropdown Options Popup */}
-      {isOpen && !disabled && (
-        <div
-          style={{
-            position: 'absolute',
-            top: 'calc(100% + 4px)',
-            left: 0,
-            right: 0,
-            zIndex: 9999,
-            backgroundColor: '#ffffff',
-            borderRadius: '10px',
-            border: '1px solid #cbd5e1',
-            boxShadow: '0 10px 25px rgba(0,0,0,0.12)',
-            padding: '0.4rem',
-            maxHeight: '260px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '0.35rem'
-          }}
-        >
-          {/* Search Bar */}
-          <div style={{ position: 'relative' }}>
-            <Search size={14} style={{ position: 'absolute', left: '0.55rem', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
-            <input
-              type="text"
-              autoFocus
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-              placeholder="Gõ để tìm kiếm..."
-              style={{
-                width: '100%',
-                padding: '0.45rem 0.55rem 0.45rem 2rem',
-                borderRadius: '6px',
-                border: '1px solid #cbd5e1',
-                fontSize: '0.8rem',
-                outline: 'none',
-                boxSizing: 'border-box'
-              }}
-            />
-          </div>
-
-          {/* Options List */}
-          <div style={{ overflowY: 'auto', maxHeight: '190px', display: 'flex', flexDirection: 'column' }}>
-            {filteredOptions.length > 0 ? (
-              filteredOptions.map((opt, idx) => {
-                const optName = typeof opt === 'string' ? opt : opt.name;
-                const optKey = typeof opt === 'string' ? `${opt}-${idx}` : (opt.code || opt.id || idx);
-                return (
-                  <div
-                    key={optKey}
-                    onClick={() => {
-                      onChange(optName);
-                      setIsOpen(false);
-                      setSearchTerm('');
-                    }}
-                    style={{
-                      padding: '0.45rem 0.65rem',
-                      borderRadius: '6px',
-                      fontSize: '0.82rem',
-                      color: value === optName ? '#2563eb' : '#0f172a',
-                      backgroundColor: value === optName ? '#eff6ff' : 'transparent',
-                      fontWeight: value === optName ? 700 : 400,
-                      cursor: 'pointer',
-                      transition: 'background-color 0.15s ease'
-                    }}
-                    onMouseEnter={e => {
-                      if (value !== optName) e.currentTarget.style.backgroundColor = '#f8fafc';
-                    }}
-                    onMouseLeave={e => {
-                      if (value !== optName) e.currentTarget.style.backgroundColor = 'transparent';
-                    }}
-                  >
-                    {optName}
-                  </div>
-                );
-              })
-            ) : (
-              <div style={{ padding: '0.6rem', fontSize: '0.8rem', color: '#94a3b8', textAlign: 'center' }}>
-                Không tìm thấy kết quả
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
+import { VIETNAM_PROVINCES, removeAccents } from '../../utils/vietnamProvinces';
+import SearchableSelect from '../../components/Common/SearchableSelect';
 
 const formatPrice = (price) => {
   return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price || 0);
@@ -438,14 +223,21 @@ export default function Cart() {
     setApiCommunes([]);
     fetchCommunesForProvince(address.city || '');
   };
-  // Update ward & fetch live communes when province changes
+  // Update district, ward & fetch live communes when province changes
   const handleProvinceChange = (val) => {
     const provName = typeof val === 'string' ? val : val?.target?.value;
     setSelectedProvince(provName);
+    setSelectedDistrict('');
     setWard('');
     setApiCommunes([]);
     fetchCommunesForProvince(provName);
   };
+
+  // Find matching province in VIETNAM_PROVINCES to retrieve standard districts
+  const currentProvinceObj = VIETNAM_PROVINCES.find(p => {
+    if (!selectedProvince) return false;
+    return p.name === selectedProvince || p.name.includes(selectedProvince) || selectedProvince.includes(p.name) || p.code === selectedProvince;
+  }) || { districts: [] };
 
   const handleCopy = (text, field) => {
     navigator.clipboard.writeText(text);
@@ -573,6 +365,7 @@ export default function Cart() {
       const baseAddress = [
         streetAddress,
         ward ? (ward.toLowerCase().includes('phường') || ward.toLowerCase().includes('xã') ? ward : `Phường/Xã ${ward}`) : '',
+        selectedDistrict,
         selectedProvince
       ].filter(Boolean).join(', ');
 
@@ -622,8 +415,6 @@ export default function Cart() {
       setCheckingOut(false);
     }
   };
-
-  const currentProvinceObj = VIETNAM_PROVINCES.find(p => p.name === selectedProvince) || { districts: [] };
 
   // Invoice Success Screen
   if (invoice) {
@@ -712,7 +503,7 @@ export default function Cart() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', fontSize: '0.85rem', color: '#475569' }}>
                 <div><strong>Người nhận:</strong> {invoice.customerName} ({invoice.phone})</div>
                 <div><strong>Địa chỉ giao:</strong> {invoice.address}</div>
-                <div><strong>Phương thức thanh toán:</strong> COD (Tiền mặt khi nhận hàng)</div>
+                <div><strong>Phương thức thanh toán:</strong> {invoice.paymentMethod === 'BANK_TRANSFER' ? 'Chuyển khoản VietQR / Internet Banking' : invoice.paymentMethod === 'CASH' ? 'Tiền mặt khi nhận hàng' : 'Tiền mặt khi nhận hàng'}</div>
                 <div><strong>Tổng tiền thanh toán:</strong> <strong style={{ color: '#dc2626', fontSize: '1.1rem' }}>{formatPrice(invoice.totalAmount)}</strong></div>
               </div>
             </div>
@@ -1166,8 +957,20 @@ export default function Cart() {
                       />
                     </div>
 
-                    {/* Ward & Street address */}
+                    {/* District & Ward */}
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#64748b', marginBottom: '0.25rem' }}>
+                          Quận / Huyện <span style={{ color: '#ef4444' }}>*</span>
+                        </label>
+                        <SearchableSelect
+                          value={selectedDistrict}
+                          onChange={val => setSelectedDistrict(val)}
+                          options={currentProvinceObj.districts || []}
+                          placeholder={!selectedProvince ? "-- Chọn Tỉnh/TP trước --" : "-- Chọn Quận / Huyện --"}
+                          disabled={!selectedProvince}
+                        />
+                      </div>
                       <div>
                         <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#64748b', marginBottom: '0.25rem' }}>
                           Phường / Xã <span style={{ color: '#ef4444' }}>*</span>
@@ -1176,23 +979,26 @@ export default function Cart() {
                           value={ward}
                           onChange={val => setWard(val)}
                           options={apiCommunes}
-                          placeholder={loadingCommunes ? "-- Đang tải Phường / Xã... --" : "-- Chọn Phường / Xã --"}
+                          placeholder={loadingCommunes ? "-- Đang tải Phường / Xã... --" : (!selectedProvince ? "-- Chọn Tỉnh/TP trước --" : "-- Chọn Phường / Xã --")}
                           disabled={loadingCommunes || !selectedProvince}
+                          loading={loadingCommunes}
                         />
                       </div>
-                      <div>
-                        <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#64748b', marginBottom: '0.25rem' }}>
-                          Số nhà, tên đường <span style={{ color: '#ef4444' }}>*</span>
-                        </label>
-                        <input
-                          type="text"
-                          value={streetAddress}
-                          onChange={e => setStreetAddress(e.target.value)}
-                          placeholder="Số nhà, tên đường..."
-                          required
-                          style={{ width: '100%', padding: '0.55rem', borderRadius: '8px', border: '1.5px solid #cbd5e1', fontSize: '0.82rem', color: '#0f172a', backgroundColor: '#ffffff', outline: 'none', boxSizing: 'border-box' }}
-                        />
-                      </div>
+                    </div>
+
+                    {/* Street address */}
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#64748b', marginBottom: '0.25rem' }}>
+                        Số nhà, tên đường <span style={{ color: '#ef4444' }}>*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={streetAddress}
+                        onChange={e => setStreetAddress(e.target.value)}
+                        placeholder="Số nhà, tên đường..."
+                        required
+                        style={{ width: '100%', padding: '0.55rem', borderRadius: '8px', border: '1.5px solid #cbd5e1', fontSize: '0.82rem', color: '#0f172a', backgroundColor: '#ffffff', outline: 'none', boxSizing: 'border-box' }}
+                      />
                     </div>
                   </div>
 

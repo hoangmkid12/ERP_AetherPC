@@ -47,7 +47,7 @@ const NAV_ITEMS = [
 export default function Header() {
   const { user, logout, isAuthenticated } = useAuth();
   const { cartCount, wishlist, toggleWishlist, addToCart } = useCart();
-  const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotification();
+  const { notifications, unreadCount, markAsRead, markAllAsRead, removeNotification, clearAllNotifications } = useNotification();
   const navigate = useNavigate();
   const location = useLocation();
   const [openDropdown, setOpenDropdown] = useState(null);
@@ -407,17 +407,36 @@ export default function Header() {
                     flexDirection: 'column',
                     overflow: 'hidden'
                   }}>
-                    <div style={{ padding: '1rem', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#f8fafc' }}>
-                      <h3 style={{ margin: 0, fontSize: '1rem', color: '#0f172a' }}>Thông báo</h3>
-                      {unreadCount > 0 && (
-                        <button onClick={markAllAsRead} style={{ background: 'transparent', border: 'none', color: '#2563eb', fontSize: '0.8rem', cursor: 'pointer', fontWeight: 500 }}>
-                          Đánh dấu đã đọc tất cả
-                        </button>
-                      )}
+                    <div style={{ padding: '0.875rem 1rem', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#f8fafc' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600, color: '#0f172a' }}>Thông báo</h3>
+                        {unreadCount > 0 && (
+                          <span style={{ fontSize: '0.7rem', padding: '1px 6px', borderRadius: '10px', backgroundColor: '#eff6ff', color: '#2563eb', fontWeight: 600 }}>
+                            {unreadCount} mới
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
+                        {unreadCount > 0 && (
+                          <button onClick={markAllAsRead} style={{ background: 'transparent', border: 'none', color: '#2563eb', fontSize: '0.78rem', cursor: 'pointer', fontWeight: 500 }}>
+                            Đánh dấu đã đọc
+                          </button>
+                        )}
+                        {notifications.length > 0 && (
+                          <button 
+                            onClick={clearAllNotifications} 
+                            style={{ background: 'transparent', border: 'none', color: '#94a3b8', fontSize: '0.78rem', cursor: 'pointer', fontWeight: 500 }}
+                            title="Xóa tất cả thông báo"
+                          >
+                            Xóa tất cả
+                          </button>
+                        )}
+                      </div>
                     </div>
                     <div style={{ maxHeight: '350px', overflowY: 'auto' }}>
                       {notifications.length === 0 ? (
-                        <div style={{ padding: '2rem', textAlign: 'center', color: '#64748b', fontSize: '0.9rem' }}>
+                        <div style={{ padding: '2.5rem 1rem', textAlign: 'center', color: '#64748b', fontSize: '0.875rem' }}>
+                          <Bell size={28} color="#cbd5e1" style={{ margin: '0 auto 0.5rem auto', display: 'block' }} />
                           Không có thông báo nào.
                         </div>
                       ) : (
@@ -431,27 +450,53 @@ export default function Header() {
                               }
                             }}
                             style={{ 
-                              padding: '1rem', 
+                              padding: '0.875rem 1rem', 
                               borderBottom: '1px solid #f1f5f9', 
                               backgroundColor: note.read ? '#fff' : '#eff6ff',
                               cursor: 'pointer',
                               display: 'flex',
                               gap: '0.75rem',
+                              position: 'relative',
                               transition: 'background-color 0.2s'
                             }}
                             onMouseEnter={e => e.currentTarget.style.backgroundColor = note.read ? '#f8fafc' : '#dbeafe'}
                             onMouseLeave={e => e.currentTarget.style.backgroundColor = note.read ? '#fff' : '#eff6ff'}
                           >
-                            <div style={{ marginTop: '2px' }}>
+                            <div style={{ marginTop: '2px', flexShrink: 0 }}>
                               {note.type === 'success' && <CheckCircle size={16} color="#10b981" />}
                               {note.type === 'error' && <AlertCircle size={16} color="#ef4444" />}
                               {note.type === 'info' && <Info size={16} color="#3b82f6" />}
                             </div>
-                            <div style={{ flex: 1 }}>
-                              <div style={{ fontSize: '0.875rem', color: note.read ? '#475569' : '#0f172a', fontWeight: note.read ? 400 : 500, lineHeight: 1.4 }}>
-                                {note.message}
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem' }}>
+                                <div style={{ fontSize: '0.85rem', color: note.read ? '#475569' : '#0f172a', fontWeight: note.read ? 400 : 500, lineHeight: 1.4, wordBreak: 'break-word' }}>
+                                  {note.message}
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    removeNotification(note.id);
+                                  }}
+                                  style={{
+                                    background: 'transparent',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    padding: '2px',
+                                    color: '#94a3b8',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    flexShrink: 0,
+                                    opacity: 0.7
+                                  }}
+                                  onMouseEnter={e => { e.currentTarget.style.color = '#ef4444'; e.currentTarget.style.opacity = '1'; }}
+                                  onMouseLeave={e => { e.currentTarget.style.color = '#94a3b8'; e.currentTarget.style.opacity = '0.7'; }}
+                                  title="Xóa thông báo"
+                                >
+                                  <X size={13} />
+                                </button>
                               </div>
-                              <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '0.35rem' }}>
+                              <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '0.35rem' }}>
                                 {new Date(note.createdAt).toLocaleString('vi-VN')}
                               </div>
                             </div>

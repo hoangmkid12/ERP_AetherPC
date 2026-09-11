@@ -92,14 +92,29 @@ export const useSalesStore = create((set, get) => ({
     try {
       set({ error: null });
       const data = await api.get('/orders');
-      const orders = Array.isArray(data) ? data : (data?.data || []);
-      
-      set({ orders });
-      try {
-        localStorage.setItem(STORAGE_KEYS.orders, JSON.stringify(orders));
-      } catch (e) {}
-      
-      return orders;
+      const apiOrders = Array.isArray(data) ? data : (data?.data || []);
+
+      // Merge: keep any locally-created orders that the backend hasn't returned yet
+      // (e.g. placed moments ago and not yet persisted on the server).
+      set(state => {
+        const apiIds = new Set(apiOrders.map(o => String(o.orderId || o.id || '')));
+        const localOnlyOrders = (state.orders || []).filter(o => {
+          const oid = String(o.orderId || o.id || '');
+          // Keep local order if:
+          // 1. API doesn't have it yet, AND
+          // 2. It was created very recently (within last 30 minutes) to avoid keeping stale local entries
+          const isNew = o.createdAtTime && (Date.now() - o.createdAtTime < 30 * 60 * 1000);
+          return oid && !apiIds.has(oid) && isNew;
+        });
+
+        const merged = [...localOnlyOrders, ...apiOrders];
+        try {
+          localStorage.setItem(STORAGE_KEYS.orders, JSON.stringify(merged));
+        } catch (e) {}
+        return { orders: merged };
+      });
+
+      return apiOrders;
     } catch (err) {
       const errorMsg = err.message || 'Failed to fetch orders';
       set({ error: errorMsg });
@@ -127,17 +142,31 @@ export const useSalesStore = create((set, get) => ({
         localReturns = JSON.parse(localStorage.getItem(STORAGE_KEYS.returnRequests) || '[]');
       } catch (e) {}
 
+      const getKey = (r) => (r.orderId ? `ORDER_${r.orderId}` : `ID_${r.id}`);
       const map = new Map();
       localReturns.forEach(r => {
-        const k = String(r.id || r.orderId || '');
+        const k = getKey(r);
         if (k) map.set(k, r);
       });
       apiReturns.forEach(r => {
-        const k = String(r.id || r.orderId || '');
-        if (k) map.set(k, { ...map.get(k), ...r });
+        const k = getKey(r);
+        if (k) {
+          const existing = map.get(k) || {};
+          map.set(k, { ...existing, ...r });
+        }
       });
 
-      const merged = Array.from(map.values());
+      const currentOrders = get().orders || [];
+      const orderMap = new Map();
+      currentOrders.forEach(o => { if (o.orderId) orderMap.set(String(o.orderId), o); });
+
+      const merged = Array.from(map.values()).map(r => {
+        const linkedOrder = r.orderId ? orderMap.get(String(r.orderId)) : null;
+        if (linkedOrder && (linkedOrder.paymentStatus === 'REFUNDED' || linkedOrder.status === 'REFUNDED')) {
+          return { ...r, status: 'REFUNDED' };
+        }
+        return r;
+      });
       set({ returnRequests: merged });
       try {
         localStorage.setItem(STORAGE_KEYS.returnRequests, JSON.stringify(merged));
@@ -244,6 +273,7 @@ export const useSalesStore = create((set, get) => ({
       status: orderStatus,
       type,
       items,
+      paymentMethod,
       createdAtTime: Date.now()
     };
     
@@ -372,7 +402,7 @@ export const useSalesStore = create((set, get) => ({
             ...(isDelivered ? {
               paymentStatus: 'PAID',
               deliveredAt: extraData.deliveredAt || new Date().toISOString(),
-              actualPaymentMethod: extraData.actualPaymentMethod || (o.paymentMethod === 'COD' ? 'CASH' : 'PREPAID'),
+              actualPaymentMethod: extraData.actualPaymentMethod || (o.paymentMethod === 'BANK_TRANSFER' ? 'BANK_TRANSFER' : 'CASH'),
               bankRefCode: extraData.bankRefCode || null,
               paymentProofPhoto: extraData.paymentProofPhoto || null,
               receivedByType: extraData.receivedByType || 'DIRECT_CUSTOMER',
@@ -434,12 +464,25 @@ export const useSalesStore = create((set, get) => ({
    * Add a new return request (Customer / CSKH)
    */
   addReturnRequest: async (returnData) => {
+    let apiReturn = null;
+    try {
+      if (returnData.orderId) {
+        const res = await api.post(`/orders/${returnData.orderId}/return`, returnData);
+        apiReturn = res?.data || res;
+      }
+    } catch (e) {
+      console.warn('[SalesStore] addReturnRequest sync notice:', e.message);
+    }
+
+    const determinedStatus = apiReturn?.status || returnData.status || 'PENDING';
+
     const newReturn = {
-      id: returnData.id || `RMA-${Date.now().toString().slice(-6)}`,
-      createdAt: new Date().toISOString(),
-      status: returnData.status || 'RETURN_APPROVED',
+      id: apiReturn?.id || returnData.id || `RMA-${Date.now().toString().slice(-6)}`,
+      createdAt: apiReturn?.createdAt || new Date().toISOString(),
+      status: determinedStatus,
       type: returnData.type || 'REFUND',
-      ...returnData
+      ...returnData,
+      ...(apiReturn || {})
     };
 
     set(state => {
@@ -450,22 +493,15 @@ export const useSalesStore = create((set, get) => ({
       return { returnRequests: updated };
     });
 
-    // Cập nhật trạng thái đơn hàng tương ứng
-    if (returnData.orderId) {
+    // Cập nhật trạng thái đơn hàng tương ứng: chỉ đổi sang RETURNING_TO_WAREHOUSE nếu đã được duyệt
+    if (returnData.orderId && determinedStatus === 'RETURN_APPROVED') {
       get().updateOrderStatus(
         returnData.orderId,
         'RETURNING_TO_WAREHOUSE',
-        `Khách hàng tạo yêu cầu ${returnData.type === 'REFUND' ? 'Trả hàng Hoàn tiền 100%' : 'Đổi sản phẩm mới'}. Lý do: ${returnData.reason || 'N/A'}. (STK hoàn: ${returnData.bankAccountNo || 'N/A'} - ${returnData.bankName || 'N/A'})`
+        `Khách hàng tạo yêu cầu ${returnData.type === 'REFUND' ? 'Trả hàng Hoàn tiền 100%' : 'Đổi sản phẩm mới'} (Tự động duyệt). Lý do: ${returnData.reason || 'N/A'}. (STK hoàn: ${returnData.bankAccountNo || 'N/A'} - ${returnData.bankName || 'N/A'})`
       );
     }
 
-    try {
-      if (returnData.orderId) {
-        await api.post(`/orders/${returnData.orderId}/return`, returnData);
-      }
-    } catch (e) {
-      console.warn('[SalesStore] addReturnRequest sync notice:', e.message);
-    }
     return newReturn;
   },
 
@@ -523,16 +559,29 @@ export const useSalesStore = create((set, get) => ({
     let capturedOrderId = null;
 
     set(state => {
+      // Xác định capturedOrderId trước để cập nhật toàn bộ bản ghi liên quan cùng order
+      state.returnRequests.forEach(r => {
+        if (
+          String(r.id) === String(returnId) ||
+          String(r.orderId) === String(returnId) ||
+          (r.rmaNumber && String(r.rmaNumber) === String(returnId))
+        ) {
+          if (r.orderId) capturedOrderId = r.orderId;
+        }
+      });
+      const effectiveTargetOrderId = capturedOrderId || (String(returnId).startsWith('ORD-') ? returnId : null);
+
       const returnRequests = state.returnRequests.map(r => {
         const match = 
           String(r.id) === String(returnId) ||
           String(r.orderId) === String(returnId) ||
+          (effectiveTargetOrderId && String(r.orderId) === String(effectiveTargetOrderId)) ||
           (r.rmaNumber && String(r.rmaNumber) === String(returnId)) ||
           String(r.id).includes(String(returnId)) ||
           String(returnId).includes(String(r.id));
 
         if (match) {
-          capturedOrderId = r.orderId;
+          if (!capturedOrderId && r.orderId) capturedOrderId = r.orderId;
           const updatedReturn = { ...r, status, ...extraObj };
 
           // Nếu loại EXCHANGE và kho nhập hàng cũ (RESTOCKED / EXCHANGED) -> Tạo đơn đổi mới nếu chưa có
@@ -572,28 +621,123 @@ export const useSalesStore = create((set, get) => ({
       return { returnRequests };
     });
 
-    // KHÔNG được nuốt lỗi ở đây (trước đây chỉ console.warn rồi coi như xong):
+    // KHÔNG được nuốt lỗi ở đây:
     // hàm này cập nhật RMA/hoàn tiền/nhập kho — nếu API thật thất bại mà vẫn
-    // resolve bình thường, mọi màn hình gọi hàm này (Kế Toán hoàn tiền, Kho
-    // nhập lại hàng, QC thẩm định, Shipper thu hồi) đều tưởng đã thành công
-    // trong khi backend chưa hề ghi nhận gì. Ném lỗi thật để nơi gọi biết và
-    // báo đúng cho người dùng.
+    // resolve bình thường, mọi màn hình gọi hàm này đều tưởng đã thành công
+    // trong khi backend chưa hề ghi nhận gì.
     const targetApiId = capturedOrderId || returnId;
-    if (status === 'RETURNING_TO_WAREHOUSE') {
+    if (status === 'RETURN_APPROVED') {
+      await api.patch(`/orders/returns/${targetApiId}/review`, { decision: 'APPROVE', note: extraObj.note });
+    } else if (status === 'REJECTED') {
+      await api.patch(`/orders/returns/${targetApiId}/review`, { decision: 'REJECT', rejectReason: extraObj.note || extraObj.reason });
+    } else if (status === 'RETURNING_TO_WAREHOUSE') {
       await api.patch(`/orders/returns/${targetApiId}/pickup`, extraObj);
     } else if (status === 'DELIVERED_TO_WAREHOUSE') {
       await api.patch(`/orders/returns/${targetApiId}/deliver-warehouse`, extraObj);
-    } else if (status === 'QC_PASSED' || status === 'REJECTED') {
+    } else if (status === 'QC_PASSED') {
       await api.patch(`/orders/returns/${targetApiId}/qc-inspect`, extraObj);
     } else if (['RESTOCKED', 'EXCHANGED', 'VENDOR_WARRANTY', 'INSPECTED_SCRAP'].includes(status)) {
-      // Backend infers the real outcome (restock / exchange / send-to-
-      // vendor / scrap) from `shelfLocation` in the body, not from this
-      // status value itself — see confirmReturnWarehouse.
       await api.patch(`/orders/returns/${targetApiId}/restock`, extraObj);
     } else if (status === 'REFUNDED') {
       await api.patch(`/orders/returns/${targetApiId}/refund`, extraObj);
     } else {
       throw new Error(`Không có API thật cho trạng thái "${status}".`);
+    }
+
+    // Tự động đồng bộ dữ liệu mới nhất từ backend
+    try {
+      await Promise.allSettled([
+        get().getReturnRequests(),
+        get().getOrders()
+      ]);
+    } catch (_) {}
+  },
+
+  /**
+   * CSKH review return request: APPROVE or REJECT
+   */
+  reviewReturnRequest: async (returnId, decision, note = '') => {
+    const isApprove = decision === 'APPROVE' || decision === 'RETURN_APPROVED';
+    const newStatus = isApprove ? 'RETURN_APPROVED' : 'REJECTED';
+    let targetOrderId = null;
+
+    try {
+      await api.patch(`/orders/returns/${returnId}/review`, {
+        decision: isApprove ? 'APPROVE' : 'REJECT',
+        note,
+        rejectReason: !isApprove ? note : undefined
+      });
+    } catch (err) {
+      console.error(`[SalesStore] reviewReturnRequest error for #${returnId}:`, err.message);
+      throw err;
+    }
+
+    set(state => {
+      const returnRequests = state.returnRequests.map(r => {
+        if (String(r.id) === String(returnId) || String(r.orderId) === String(returnId)) {
+          targetOrderId = r.orderId;
+          return {
+            ...r,
+            status: newStatus,
+            note: r.note ? `${r.note} | [CSKH: ${note}]` : `[CSKH: ${note}]`
+          };
+        }
+        return r;
+      });
+
+      try {
+        localStorage.setItem(STORAGE_KEYS.returnRequests, JSON.stringify(returnRequests));
+      } catch (e) {}
+
+      if (targetOrderId) {
+        if (isApprove) {
+          get().updateOrderStatus(targetOrderId, 'RETURNING_TO_WAREHOUSE', `CSKH đã duyệt yêu cầu đổi trả #${returnId}. Chuyển Shipper thu hồi.`);
+        } else {
+          get().updateOrderStatus(targetOrderId, 'DELIVERED', `CSKH từ chối yêu cầu đổi trả #${returnId}. Lý do: ${note || 'Không đủ điều kiện'}`);
+        }
+      }
+
+      return { returnRequests };
+    });
+  },
+
+  /**
+   * CSKH batch approve all pending returns
+   */
+  batchApproveReturns: async () => {
+    try {
+      const res = await api.post('/orders/returns/batch-approve');
+      await Promise.allSettled([
+        get().getReturnRequests(),
+        get().getOrders()
+      ]);
+      return res;
+    } catch (err) {
+      console.error('[SalesStore] batchApproveReturns error:', err.message);
+      throw err;
+    }
+  },
+
+  /**
+   * Get / update auto approve returns setting
+   */
+  getReturnSettings: async () => {
+    try {
+      const res = await api.get('/orders/returns/settings');
+      return res?.data || res;
+    } catch (err) {
+      console.warn('[SalesStore] getReturnSettings error:', err.message);
+      return { autoApproveReturns: false };
+    }
+  },
+
+  updateReturnSettings: async (autoApproveReturns) => {
+    try {
+      const res = await api.put('/orders/returns/settings', { autoApproveReturns });
+      return res?.data || res;
+    } catch (err) {
+      console.error('[SalesStore] updateReturnSettings error:', err.message);
+      throw err;
     }
   },
 
