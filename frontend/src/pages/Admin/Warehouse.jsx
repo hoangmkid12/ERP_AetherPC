@@ -1900,14 +1900,6 @@ export default function Warehouse() {
   const [showCreateCategoryForm, setShowCreateCategoryForm] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
 
-  // Khớp với CATEGORY_SLUG_TO_CODE (frontend/src/stores/inventoryStore.js) —
-  // đó là mã ngắn item.category thật sự mang trên mỗi dòng tồn kho, dùng để
-  // bộ lọc tab "Danh Sách Sản Phẩm" hoạt động đúng khi bấm "Xem Sản Phẩm".
-  const CATEGORY_SLUG_TO_SHORT_CODE = {
-    cpu: 'CPU', gpu: 'VGA', ram: 'RAM', ram_laptop: 'RAM', ssd: 'STORAGE', hdd: 'STORAGE',
-    mainboard: 'MAINBOARD', case: 'CASE', psu: 'PSU', cooler: 'COOLER', monitor: 'MONITOR',
-    keyboard: 'KEYBOARD', mouse: 'MOUSE'
-  };
 
   const loadCategories = async () => {
     setLoadingCategories(true);
@@ -2986,13 +2978,23 @@ export default function Warehouse() {
     'MOUSE': ['MOUSE', 'CHUỘT', 'CHUOT']
   };
 
+  // CAT_ALIASES matches against the coarse short-code (`item.category`), which
+  // deliberately merges ram+ram_laptop and ssd+hdd into one bucket each for the
+  // manual dropdown filter — clicking "Xem Sản Phẩm" from the 13-way real
+  // Category tab needs an exact 1:1 match instead, or e.g. "RAM Laptop (15)"
+  // would land here showing the merged RAM+RAM Laptop count instead. Prefer an
+  // exact `categorySlug` match (the real, ungrouped Category.slug) when present.
+  const matchesCategoryFilter = (item, selectedCat) => {
+    if (selectedCat === 'ALL') return true;
+    if (item.categorySlug && item.categorySlug === selectedCat) return true;
+    const itemCatUpper = String(item.category || '').toUpperCase().trim();
+    const aliases = CAT_ALIASES[selectedCat] || [selectedCat];
+    return aliases.some(a => itemCatUpper === a || itemCatUpper.includes(a));
+  };
+
   const filteredProducts = activeInventory.filter(item => {
     const matchSearch = !searchQuery.trim() || item.name.toLowerCase().includes(searchQuery.toLowerCase()) || (item.supplier && item.supplier.toLowerCase().includes(searchQuery.toLowerCase()));
-    const itemCatUpper = String(item.category || '').toUpperCase().trim();
-    const matchCat = selectedCategory === 'ALL' || (() => {
-      const aliases = CAT_ALIASES[selectedCategory] || [selectedCategory];
-      return aliases.some(a => itemCatUpper === a || itemCatUpper.includes(a));
-    })();
+    const matchCat = matchesCategoryFilter(item, selectedCategory);
     const matchLoc = selectedLocationStatus === 'ALL' || (selectedLocationStatus === 'ASSIGNED' ? (!!item.location && item.location !== 'Chưa xếp kệ') : (!item.location || item.location === 'Chưa xếp kệ'));
     const matchSup = selectedSupplier === 'ALL' || item.supplier === selectedSupplier;
 
@@ -3005,22 +3007,13 @@ export default function Warehouse() {
   });
 
   // Dynamic suppliers available for current selected category
-  const categoryMatchedInventory = activeInventory.filter(item => {
-    if (selectedCategory === 'ALL') return true;
-    const itemCatUpper = String(item.category || '').toUpperCase().trim();
-    const aliases = CAT_ALIASES[selectedCategory] || [selectedCategory];
-    return aliases.some(a => itemCatUpper === a || itemCatUpper.includes(a));
-  });
+  const categoryMatchedInventory = activeInventory.filter(item => matchesCategoryFilter(item, selectedCategory));
   const availableSuppliers = [...new Set(categoryMatchedInventory.map(i => i.supplier).filter(Boolean))].sort();
 
   // Stock status counts computed in context of category/supplier/location/search filters
   const baseForStockStatus = activeInventory.filter(item => {
     const matchSearch = !searchQuery.trim() || item.name.toLowerCase().includes(searchQuery.toLowerCase()) || (item.supplier && item.supplier.toLowerCase().includes(searchQuery.toLowerCase()));
-    const itemCatUpper = String(item.category || '').toUpperCase().trim();
-    const matchCat = selectedCategory === 'ALL' || (() => {
-      const aliases = CAT_ALIASES[selectedCategory] || [selectedCategory];
-      return aliases.some(a => itemCatUpper === a || itemCatUpper.includes(a));
-    })();
+    const matchCat = matchesCategoryFilter(item, selectedCategory);
     const matchLoc = selectedLocationStatus === 'ALL' || (selectedLocationStatus === 'ASSIGNED' ? (!!item.location && item.location !== 'Chưa xếp kệ') : (!item.location || item.location === 'Chưa xếp kệ'));
     const matchSup = selectedSupplier === 'ALL' || item.supplier === selectedSupplier;
     return matchSearch && matchCat && matchLoc && matchSup;
@@ -5787,11 +5780,32 @@ export default function Warehouse() {
                       </button>
                     )}
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.75rem', borderTop: '1px dashed #f1f5f9', paddingTop: '0.65rem' }}>
-                    <p style={{ margin: 0, fontSize: '0.82rem', color: '#64748b' }}>
-                      Đã gán: <strong style={{ color: '#0f172a' }}>{loc.assignedCount}</strong> / {loc.capacity} sức chứa
-                    </p>
-                    <span style={{ fontSize: '0.75rem', color: '#2563eb', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
+                  <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    marginTop: '0.85rem',
+                    borderTop: '1px solid #f1f5f9',
+                    paddingTop: '0.65rem',
+                    gap: '0.5rem'
+                  }}>
+                    <div style={{ margin: 0, fontSize: '0.8rem', color: '#64748b', whiteSpace: 'nowrap' }}>
+                      Đã gán: <strong style={{ color: '#0f172a' }}>{loc.assignedCount}</strong> / {loc.capacity}
+                    </div>
+                    <span style={{
+                      fontSize: '0.74rem',
+                      color: '#2563eb',
+                      fontWeight: 700,
+                      whiteSpace: 'nowrap',
+                      flexShrink: 0,
+                      backgroundColor: '#eff6ff',
+                      border: '1px solid #dbeafe',
+                      padding: '3px 8px',
+                      borderRadius: '4px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '3px'
+                    }}>
                       Xem hàng &rarr;
                     </span>
                   </div>
@@ -5871,7 +5885,7 @@ export default function Warehouse() {
                           <button
                             type="button"
                             onClick={() => {
-                              setSelectedCategory(CATEGORY_SLUG_TO_SHORT_CODE[cat.slug] || cat.name.toUpperCase());
+                              setSelectedCategory(cat.slug);
                               setSelectedSupplier('ALL');
                               setStockStatusFilter('ALL');
                               setSelectedLocationStatus('ALL');
