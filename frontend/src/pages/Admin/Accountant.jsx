@@ -398,11 +398,33 @@ export default function Accountant() {
   const allReturnRequests = useMemo(() => {
     let localReturns = [];
     try { localReturns = JSON.parse(localStorage.getItem('erp_return_requests') || '[]'); } catch (_) {}
+    const getKey = (r) => (r.orderId ? `ORDER_${r.orderId}` : `ID_${r.id}`);
     const retMap = new Map();
-    (returnRequests || []).forEach(r => { const k = String(r.id || r.orderId || ''); if (k) retMap.set(k, r); });
-    localReturns.forEach(r => { const k = String(r.id || r.orderId || ''); if (k) retMap.set(k, { ...retMap.get(k), ...r }); });
-    return Array.from(retMap.values());
-  }, [returnRequests]);
+    // Load local returns trước
+    localReturns.forEach(r => {
+      const k = getKey(r);
+      if (k) retMap.set(k, r);
+    });
+    // Dữ liệu API từ server đè lên dữ liệu local
+    (returnRequests || []).forEach(r => {
+      const k = getKey(r);
+      if (k) {
+        const local = retMap.get(k) || {};
+        retMap.set(k, { ...local, ...r });
+      }
+    });
+
+    const orderMap = new Map();
+    (orders || []).forEach(o => { if (o.orderId) orderMap.set(String(o.orderId), o); });
+
+    return Array.from(retMap.values()).map(r => {
+      const linkedOrder = r.orderId ? orderMap.get(String(r.orderId)) : null;
+      if (linkedOrder && (linkedOrder.paymentStatus === 'REFUNDED' || linkedOrder.status === 'REFUNDED')) {
+        return { ...r, status: 'REFUNDED' };
+      }
+      return r;
+    });
+  }, [returnRequests, orders]);
 
   const refundReturnRequests = useMemo(() => {
     return allReturnRequests.filter(r => {
@@ -481,7 +503,15 @@ export default function Accountant() {
       if (typeof updateReturnStatus !== 'function') {
         throw new Error('Chức năng cập nhật trạng thái hoàn tiền không khả dụng.');
       }
-      await updateReturnStatus(refundModalItem.orderId || refundModalItem.id, 'REFUNDED', extraRefundData);
+      try {
+        await updateReturnStatus(refundModalItem.orderId || refundModalItem.id, 'REFUNDED', extraRefundData);
+      } catch (callErr) {
+        if (callErr.message && (callErr.message.includes('đã được hoàn tiền') || callErr.message.includes('hoàn tất chuyển tiền trước đó'))) {
+          console.log('[Accountant] Đơn hàng đã được hoàn tất chuyển tiền trước đó, tiếp tục đồng bộ giao diện');
+        } else {
+          throw callErr;
+        }
+      }
 
       // Sync local list
       let localList = [];
@@ -515,6 +545,8 @@ export default function Accountant() {
 
       notify(`Đã hoàn tiền và ghi sổ cái thành công. Số tiền: ${fmt(finalAmount)}. Người nhận: ${refundModalItem.customerName}. Mã GD: ${txnCode}. Bút toán chi phí đã được ghi nhận tự động vào Sổ Cái Kế Toán.`, 'success');
       await fetchLedgerData();
+      if (typeof getReturnRequests === 'function') await getReturnRequests();
+      if (typeof getOrders === 'function') await getOrders();
       setRefundModalItem(null);
       setRefundTxnCode('');
       setRefundNote('');
@@ -815,7 +847,8 @@ export default function Accountant() {
                     </tr>
                   ) : (
                     filteredRefunds.map((ret, rIdx) => {
-                      const isRefunded = ret.status === 'REFUNDED';
+                      const linkedOrder = (orders || []).find(o => String(o.orderId) === String(ret.orderId));
+                      const isRefunded = ret.status === 'REFUNDED' || linkedOrder?.paymentStatus === 'REFUNDED' || linkedOrder?.status === 'REFUNDED';
                       const refundAmount = parseFloat(ret.refundAmount || ret.totalAmount || 0);
 
                       return (

@@ -584,13 +584,34 @@ export default function QualityControl() {
     e.preventDefault();
     if (!selectedRMA) return;
 
+    const expectedSn = getRmaSerial(selectedRMA);
+    const trimmedActual = (actualSerial || '').trim();
+
+    if (!trimmedActual) {
+      showToast('Thiếu Thông Tin Serial', 'Vui lòng quét mã Barcode hoặc nhập mã Serial thực tế đọc được trên linh kiện!', 'error');
+      notify('Vui lòng quét Barcode hoặc nhập mã Serial thực tế đọc được trên linh kiện!', 'error');
+      return;
+    }
+
+    const isMatched = trimmedActual.toUpperCase() === expectedSn.trim().toUpperCase();
+
+    if (!isMatched && rmaDecision !== 'REJECT_RMA') {
+      showToast(
+        'Lỗi Khớp Serial Sản Phẩm!',
+        `Mã Serial thực tế "${trimmedActual}" KHÔNG TRÙNG KHỚP với Serial xuất bán gốc "${expectedSn}". Không thể duyệt Đổi mới hoặc Nhập kho! Vui lòng đối soát lại hoặc chọn quyết định "TỪ CHỐI ĐỔI TRẢ".`,
+        'error'
+      );
+      notify(`Lỗi: Serial "${trimmedActual}" không khớp với Serial xuất bán (${expectedSn})!`, 'error');
+      return;
+    }
+
     setSubmitting(true);
     const inspectorName = user?.name || user?.fullname || 'Nguyễn Văn QC';
     const dateStr = new Date().toLocaleDateString('vi-VN');
     const rmaLogId = `RMA-QA-${Date.now().toString().slice(-4)}`;
 
     const resolvedProduct = getRmaProductName(selectedRMA);
-    const resolvedSerial = actualSerial || getRmaSerial(selectedRMA);
+    const resolvedSerial = trimmedActual || expectedSn;
 
     let statusKey = 'QC_PASSED';
     let resolutionText = '';
@@ -609,7 +630,10 @@ export default function QualityControl() {
       resolutionText = `Hàng đạt chuẩn, nhập lại kho bán lẻ & hoàn tiền. QC: ${inspectorName}`;
     } else if (rmaDecision === 'REJECT_RMA') {
       statusKey = 'REJECTED';
-      resolutionText = `Từ chối đổi trả (${warrantySealStatus === 'LOST_UNIDENTIFIED' ? 'Không thể định danh nguồn gốc / Mất tem' : 'Vi phạm điều kiện bảo hành'}). QC: ${inspectorName}`;
+      const rejectReasonDetail = !isMatched
+        ? `Số Serial thực tế (${trimmedActual}) không khớp Serial xuất bán gốc (${expectedSn}) - Nghi vấn tráo linh kiện ngoài`
+        : (warrantySealStatus === 'LOST_UNIDENTIFIED' ? 'Không thể định danh nguồn gốc / Mất tem' : 'Vi phạm điều kiện bảo hành');
+      resolutionText = `Từ chối đổi trả (${rejectReasonDetail}). QC: ${inspectorName}`;
     }
 
     // 1. Update in ERP context & Backend API — must succeed for real before
@@ -621,6 +645,7 @@ export default function QualityControl() {
           qcDecision: rmaDecision,
           qcDefectType: rmaDefectType,
           qcNotes: rmaNotes,
+          actualSerial: resolvedSerial,
           qcProofPhoto: qcProofPhoto || null,
           qcInspectedAt: new Date().toISOString(),
           qcInspector: inspectorName,
@@ -2029,76 +2054,189 @@ export default function QualityControl() {
       {/* ========================================================================= */}
       {/* MODAL 2: THẨM ĐỊNH HÀNG ĐỔI TRẢ KHÁCH HÀNG (CUSTOMER RMA INSPECTION) */}
       {/* ========================================================================= */}
-      {selectedRMA && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.55)', backdropFilter: 'blur(6px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '1.5rem' }}>
-          <div style={{ width: '100%', maxWidth: '740px', maxHeight: '92vh', overflowY: 'auto', padding: '1.75rem', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
-            
-            {/* Modal Header */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid #f1f5f9', paddingBottom: '0.75rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <ShieldAlert size={22} style={{ color: '#8b5cf6' }} />
-                <div>
-                  <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
-                    Thẩm Định & Nghiệm Thu Kỹ Thuật RMA: {selectedRMA.id}
-                  </h3>
-                  <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Đơn hàng gốc: <strong>#{selectedRMA.orderId || 'N/A'}</strong> • Khách hàng: <strong>{selectedRMA.customerName}</strong> ({selectedRMA.phone})</span>
-                </div>
-              </div>
-              <button onClick={() => setSelectedRMA(null)} style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#475569', cursor: 'pointer', padding: '0.4rem', borderRadius: '6px' }}>
-                <X size={18} />
-              </button>
-            </div>
+      {selectedRMA && (() => {
+        const expectedSerial = getRmaSerial(selectedRMA);
+        const trimmedActual = (actualSerial || '').trim();
+        const isSerialEmpty = !trimmedActual;
+        const isSerialMatched = !isSerialEmpty && trimmedActual.toUpperCase() === expectedSerial.trim().toUpperCase();
+        const isSerialMismatch = !isSerialEmpty && !isSerialMatched;
 
-            <form onSubmit={handleSubmitRmaInspection}>
+        return (
+          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.55)', backdropFilter: 'blur(6px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '1.5rem' }}>
+            <div style={{ width: '100%', maxWidth: '740px', maxHeight: '92vh', overflowY: 'auto', padding: '1.75rem', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
               
-              {/* Product Info Bar */}
-              <div style={{ backgroundColor: '#f8fafc', padding: '0.75rem 1rem', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '1.25rem', fontSize: '0.82rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+              {/* Modal Header */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid #f1f5f9', paddingBottom: '0.75rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <ShieldAlert size={22} style={{ color: '#8b5cf6' }} />
                   <div>
-                    <span style={{ color: '#64748b' }}>Linh kiện cần kiểm tra: </span>
-                    <strong style={{ color: '#0f172a', fontSize: '0.88rem' }}>{getRmaProductName(selectedRMA)}</strong>
-                  </div>
-                  <div>
-                    <span style={{ color: '#64748b' }}>Serial xuất bán: </span>
-                    <code style={{ color: '#2563eb', fontWeight: 700, backgroundColor: '#eff6ff', padding: '2px 6px', borderRadius: '4px' }}>{getRmaSerial(selectedRMA)}</code>
+                    <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                      Thẩm Định & Nghiệm Thu Kỹ Thuật RMA: {selectedRMA.id}
+                    </h3>
+                    <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Đơn hàng gốc: <strong>#{selectedRMA.orderId || 'N/A'}</strong> • Khách hàng: <strong>{selectedRMA.customerName}</strong> ({selectedRMA.phone})</span>
                   </div>
                 </div>
-                <div style={{ marginTop: '0.35rem', paddingTop: '0.35rem', borderTop: '1px dashed #cbd5e1', color: '#dc2626', fontSize: '0.78rem' }}>
-                  Khách báo: <em>"{selectedRMA.reason}"</em> {selectedRMA.description ? `- ${selectedRMA.description}` : ''}
-                </div>
+                <button onClick={() => setSelectedRMA(null)} style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#475569', cursor: 'pointer', padding: '0.4rem', borderRadius: '6px' }}>
+                  <X size={18} />
+                </button>
               </div>
 
-              {/* BƯỚC 1: ĐỐI SOÁT NGUỒN GỐC & TÌNH TRẠNG TEM BẢO HÀNH */}
-              <div style={{ marginBottom: '1.25rem', padding: '1rem', borderRadius: '8px', border: '1px solid #e2e8f0', backgroundColor: '#ffffff' }}>
-                <div style={{ fontSize: '0.84rem', fontWeight: 800, color: '#0f172a', marginBottom: '0.65rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                  <ShieldCheck size={17} style={{ color: '#8b5cf6' }} />
-                  <span>Bước 1: Đối Soát Nguồn Gốc & Tình Trạng Tem Bảo Hành</span>
+              <form onSubmit={handleSubmitRmaInspection}>
+                
+                {/* Product Info Bar */}
+                <div style={{ backgroundColor: '#f8fafc', padding: '0.75rem 1rem', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '1.25rem', fontSize: '0.82rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                    <div>
+                      <span style={{ color: '#64748b' }}>Linh kiện cần kiểm tra: </span>
+                      <strong style={{ color: '#0f172a', fontSize: '0.88rem' }}>{getRmaProductName(selectedRMA)}</strong>
+                    </div>
+                    <div>
+                      <span style={{ color: '#64748b' }}>Serial xuất bán: </span>
+                      <code style={{ color: '#2563eb', fontWeight: 700, backgroundColor: '#eff6ff', padding: '2px 6px', borderRadius: '4px' }}>{getRmaSerial(selectedRMA)}</code>
+                    </div>
+                  </div>
+                  <div style={{ marginTop: '0.35rem', paddingTop: '0.35rem', borderTop: '1px dashed #cbd5e1', color: '#dc2626', fontSize: '0.78rem' }}>
+                    Khách báo: <em>"{selectedRMA.reason}"</em> {selectedRMA.description ? `- ${selectedRMA.description}` : ''}
+                  </div>
                 </div>
 
-                {/* Serial Verification Input */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '0.5rem', marginBottom: '0.85rem' }}>
-                  <div>
-                    <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '0.2rem' }}>
-                      Mã Serial thực tế đọc được trên linh kiện (Quét Barcode / Nhập mã):
-                    </label>
-                    <input
-                      type="text"
-                      value={actualSerial}
-                      onChange={e => setActualSerial(e.target.value)}
-                      placeholder="Nhập hoặc quét mã Serial..."
-                      style={{ width: '100%', padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.85rem', fontFamily: 'monospace', fontWeight: 700, color: '#0f172a' }}
-                    />
+                {/* BƯỚC 1: ĐỐI SOÁT NGUỒN GỐC & TÌNH TRẠNG TEM BẢO HÀNH */}
+                <div style={{ marginBottom: '1.25rem', padding: '1rem', borderRadius: '8px', border: '1px solid #e2e8f0', backgroundColor: '#ffffff' }}>
+                  <div style={{ fontSize: '0.84rem', fontWeight: 800, color: '#0f172a', marginBottom: '0.65rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <ShieldCheck size={17} style={{ color: '#8b5cf6' }} />
+                    <span>Bước 1: Đối Soát Nguồn Gốc & Tình Trạng Tem Bảo Hành</span>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'flex-end' }}>
-                    <button
-                      type="button"
-                      onClick={() => setActualSerial(getRmaSerial(selectedRMA))}
-                      style={{ padding: '0.45rem 0.75rem', borderRadius: '6px', border: '1px solid #bfdbfe', backgroundColor: '#eff6ff', color: '#2563eb', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer' }}
-                    >
-                      ✓ Khớp Serial Gốc
-                    </button>
+
+                  {/* Serial Verification Input */}
+                  <div style={{ marginBottom: '0.85rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
+                      <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569' }}>
+                        Mã Serial thực tế đọc được trên linh kiện (Quét Barcode / Nhập mã): *
+                      </label>
+                      {isSerialMatched && (
+                        <span style={{ padding: '2px 8px', borderRadius: '12px', fontSize: '0.72rem', fontWeight: 800, backgroundColor: '#dcfce7', color: '#15803d', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                          <Check size={12} /> Khớp Serial Gốc
+                        </span>
+                      )}
+                      {isSerialMismatch && (
+                        <span style={{ padding: '2px 8px', borderRadius: '12px', fontSize: '0.72rem', fontWeight: 800, backgroundColor: '#fee2e2', color: '#dc2626', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                          <X size={12} /> Sai Mã Serial
+                        </span>
+                      )}
+                      {isSerialEmpty && (
+                        <span style={{ padding: '2px 8px', borderRadius: '12px', fontSize: '0.72rem', fontWeight: 700, backgroundColor: '#fef3c7', color: '#b45309' }}>
+                          Chưa nhập mã Serial
+                        </span>
+                      )}
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '0.5rem' }}>
+                      <input
+                        type="text"
+                        value={actualSerial}
+                        onChange={e => setActualSerial(e.target.value)}
+                        placeholder="Nhập hoặc quét mã Serial trên linh kiện..."
+                        style={{
+                          width: '100%',
+                          padding: '0.45rem 0.65rem',
+                          borderRadius: '6px',
+                          border: isSerialMismatch ? '2px solid #ef4444' : isSerialMatched ? '2px solid #16a34a' : '1px solid #cbd5e1',
+                          backgroundColor: isSerialMismatch ? '#fef2f2' : isSerialMatched ? '#f0fdf4' : '#ffffff',
+                          color: isSerialMismatch ? '#b91c1c' : isSerialMatched ? '#15803d' : '#0f172a',
+                          fontSize: '0.85rem',
+                          fontFamily: 'monospace',
+                          fontWeight: 700,
+                          boxSizing: 'border-box',
+                          transition: 'all 0.15s ease'
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setActualSerial(expectedSerial)}
+                        title={`Khôi phục Serial xuất bán gốc: ${expectedSerial}`}
+                        style={{
+                          padding: '0.45rem 0.75rem',
+                          borderRadius: '6px',
+                          border: '1px solid #bfdbfe',
+                          backgroundColor: '#eff6ff',
+                          color: '#2563eb',
+                          fontSize: '0.75rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          whiteSpace: 'nowrap'
+                        }}
+                      >
+                        ✓ Khớp Serial Gốc
+                      </button>
+                    </div>
+
+                    {/* Serial Status Alert Message */}
+                    {isSerialMismatch && (
+                      <div style={{
+                        marginTop: '0.5rem',
+                        padding: '0.65rem 0.85rem',
+                        borderRadius: '6px',
+                        backgroundColor: '#fef2f2',
+                        border: '1px solid #fca5a5',
+                        color: '#991b1b',
+                        fontSize: '0.8rem',
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        gap: '0.5rem',
+                        boxShadow: '0 1px 3px rgba(239, 68, 68, 0.08)'
+                      }}>
+                        <AlertTriangle size={18} style={{ color: '#dc2626', flexShrink: 0, marginTop: '2px' }} />
+                        <div style={{ flex: 1 }}>
+                          <strong style={{ display: 'block', fontSize: '0.82rem', color: '#b91c1c', marginBottom: '0.2rem' }}>
+                            ❌ BÁO LỖI: SỐ SERIAL KHÔNG CHÍNH XÁC!
+                          </strong>
+                          <div style={{ lineHeight: '1.4' }}>
+                            Mã Serial thực tế <code>"{actualSerial}"</code> <strong>KHÔNG TRÙNG KHỚP</strong> với Serial xuất bán gốc <code>"{expectedSerial}"</code>.
+                          </div>
+                          <div style={{ fontSize: '0.74rem', color: '#7f1d1d', marginTop: '0.35rem', lineHeight: '1.45' }}>
+                            ⚠️ <strong>Cảnh báo nghiệp vụ QC:</strong> Linh kiện gửi trả không khớp hồ sơ đơn hàng AetherPC (nguy cơ tráo linh kiện cũ/hỏng bên ngoài).
+                            Hệ thống <strong>chặn các thao tác Đổi Mới 1-1 hoặc Nhập Kho</strong>. Vui lòng đối soát lại barcode hoặc chọn quyết định <strong>"TỪ CHỐI ĐỔI TRẢ"</strong>.
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {isSerialMatched && (
+                      <div style={{
+                        marginTop: '0.45rem',
+                        padding: '0.45rem 0.75rem',
+                        borderRadius: '6px',
+                        backgroundColor: '#f0fdf4',
+                        border: '1px solid #bbf7d0',
+                        color: '#15803d',
+                        fontSize: '0.78rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.4rem'
+                      }}>
+                        <CheckCircle size={15} style={{ color: '#16a34a', flexShrink: 0 }} />
+                        <span><strong>Xác thực thành công:</strong> Mã Serial hoàn toàn trùng khớp với hồ sơ xuất kho ({expectedSerial}). Đạt chuẩn đối soát.</span>
+                      </div>
+                    )}
+
+                    {isSerialEmpty && (
+                      <div style={{
+                        marginTop: '0.45rem',
+                        padding: '0.45rem 0.75rem',
+                        borderRadius: '6px',
+                        backgroundColor: '#fffbeb',
+                        border: '1px solid #fde68a',
+                        color: '#b45309',
+                        fontSize: '0.78rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.4rem'
+                      }}>
+                        <AlertCircle size={15} style={{ color: '#f59e0b', flexShrink: 0 }} />
+                        <span>Vui lòng quét Barcode hoặc nhập Serial thực tế trên linh kiện để kiểm tra đối soát nguồn gốc.</span>
+                      </div>
+                    )}
                   </div>
-                </div>
 
                 {/* 4 Tình trạng Tem Bảo Hành */}
                 <div>
@@ -2170,38 +2308,57 @@ export default function QualityControl() {
                 </div>
 
                 {/* Auto Provenance Feedback Box */}
-                <div style={{
-                  marginTop: '0.75rem',
-                  padding: '0.6rem 0.85rem',
-                  borderRadius: '6px',
-                  fontSize: '0.78rem',
-                  backgroundColor: warrantySealStatus === 'INTACT' ? '#f0fdf4' : warrantySealStatus === 'SCRATCHED_FIRMWARE_OK' ? '#fffbeb' : warrantySealStatus === 'SHOP_LOST_VENDOR_OK' ? '#fff7ed' : '#fef2f2',
-                  border: `1px solid ${warrantySealStatus === 'INTACT' ? '#bbf7d0' : warrantySealStatus === 'SCRATCHED_FIRMWARE_OK' ? '#fde68a' : warrantySealStatus === 'SHOP_LOST_VENDOR_OK' ? '#fed7aa' : '#fca5a5'}`,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.4rem'
-                }}>
-                  {warrantySealStatus === 'INTACT' && (
-                    <span style={{ color: '#15803d', fontWeight: 700 }}>
-                      <strong>Hợp Lệ Tuyệt Đối:</strong> Linh kiện chính hãng AetherPC xuất bán. Đầy đủ điều kiện đổi mới 1-1 hoặc nhập lại kho.
-                    </span>
-                  )}
-                  {warrantySealStatus === 'SCRATCHED_FIRMWARE_OK' && (
-                    <span style={{ color: '#b45309', fontWeight: 700 }}>
-                      <strong>Hợp Lệ Thứ Cấp:</strong> Xác thực thành công qua mã khắc Laser / Firmware ROM. <em>(Đã tự động bật cờ: In & Cấp lại tem bảo hành mới sau nghiệm thu)</em>.
-                    </span>
-                  )}
-                  {warrantySealStatus === 'SHOP_LOST_VENDOR_OK' && (
-                    <span style={{ color: '#c2410c', fontWeight: 700 }}>
-                      <strong>Hợp Lệ Bảo Hành Hãng:</strong> Mất tem shop nhưng còn tem Hãng. Hệ thống tự động chuyển sang luồng <em>"Gửi Hãng Bảo Hành"</em>.
-                    </span>
-                  )}
-                  {warrantySealStatus === 'LOST_UNIDENTIFIED' && (
-                    <span style={{ color: '#dc2626', fontWeight: 700 }}>
-                      <strong>Không Đủ Điều Kiện:</strong> Mất toàn bộ tem & không thể xác thực nguồn gốc linh kiện. Đề xuất: <em>Từ chối bảo hành đổi trả miễn phí</em>.
-                    </span>
-                  )}
-                </div>
+                {isSerialMismatch ? (
+                  <div style={{
+                    marginTop: '0.75rem',
+                    padding: '0.65rem 0.85rem',
+                    borderRadius: '6px',
+                    fontSize: '0.78rem',
+                    backgroundColor: '#fef2f2',
+                    border: '1px solid #fca5a5',
+                    color: '#dc2626',
+                    fontWeight: 700,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.4rem'
+                  }}>
+                    <AlertTriangle size={16} />
+                    <span><strong>NGUỒN GỐC KHÔNG HỢP LỆ:</strong> Serial thực tế không trùng khớp với lịch sử xuất bán của đơn hàng. Không đủ điều kiện bảo hành AetherPC.</span>
+                  </div>
+                ) : (
+                  <div style={{
+                    marginTop: '0.75rem',
+                    padding: '0.6rem 0.85rem',
+                    borderRadius: '6px',
+                    fontSize: '0.78rem',
+                    backgroundColor: warrantySealStatus === 'INTACT' ? '#f0fdf4' : warrantySealStatus === 'SCRATCHED_FIRMWARE_OK' ? '#fffbeb' : warrantySealStatus === 'SHOP_LOST_VENDOR_OK' ? '#fff7ed' : '#fef2f2',
+                    border: `1px solid ${warrantySealStatus === 'INTACT' ? '#bbf7d0' : warrantySealStatus === 'SCRATCHED_FIRMWARE_OK' ? '#fde68a' : warrantySealStatus === 'SHOP_LOST_VENDOR_OK' ? '#fed7aa' : '#fca5a5'}`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.4rem'
+                  }}>
+                    {warrantySealStatus === 'INTACT' && (
+                      <span style={{ color: '#15803d', fontWeight: 700 }}>
+                        <strong>Hợp Lệ Tuyệt Đối:</strong> Linh kiện chính hãng AetherPC xuất bán. Đầy đủ điều kiện đổi mới 1-1 hoặc nhập lại kho.
+                      </span>
+                    )}
+                    {warrantySealStatus === 'SCRATCHED_FIRMWARE_OK' && (
+                      <span style={{ color: '#b45309', fontWeight: 700 }}>
+                        <strong>Hợp Lệ Thứ Cấp:</strong> Xác thực thành công qua mã khắc Laser / Firmware ROM. <em>(Đã tự động bật cờ: In & Cấp lại tem bảo hành mới sau nghiệm thu)</em>.
+                      </span>
+                    )}
+                    {warrantySealStatus === 'SHOP_LOST_VENDOR_OK' && (
+                      <span style={{ color: '#c2410c', fontWeight: 700 }}>
+                        <strong>Hợp Lệ Bảo Hành Hãng:</strong> Mất tem shop nhưng còn tem Hãng. Hệ thống tự động chuyển sang luồng <em>"Gửi Hãng Bảo Hành"</em>.
+                      </span>
+                    )}
+                    {warrantySealStatus === 'LOST_UNIDENTIFIED' && (
+                      <span style={{ color: '#dc2626', fontWeight: 700 }}>
+                        <strong>Không Đủ Điều Kiện:</strong> Mất toàn bộ tem & không thể xác thực nguồn gốc linh kiện. Đề xuất: <em>Từ chối bảo hành đổi trả miễn phí</em>.
+                      </span>
+                    )}
+                  </div>
+                )}
 
               </div>
 
@@ -2259,14 +2416,20 @@ export default function QualityControl() {
                     { key: 'REJECT_RMA', label: 'TỪ CHỐI ĐỔI TRẢ', desc: 'Mất tem / Vi phạm điều kiện / Hư hỏng do dùng', color: '#ef4444', bg: '#fef2f2' }
                   ].map(d => {
                     const active = rmaDecision === d.key;
+                    const isBlockedBySerial = isSerialMismatch && d.key !== 'REJECT_RMA';
                     return (
                       <button
                         type="button"
                         key={d.key}
                         onClick={() => {
+                          if (isBlockedBySerial) {
+                            showToast('Lỗi Khớp Serial', `Serial thực tế ("${trimmedActual}") không khớp với Serial xuất bán ("${expectedSerial}"). Bạn chỉ có thể chọn "TỪ CHỐI ĐỔI TRẢ"!`, 'error');
+                            notify(`Lỗi: Serial không khớp (${trimmedActual} ≠ ${expectedSerial})! Không thể duyệt ${d.label}.`, 'error');
+                            return;
+                          }
                           setRmaDecision(d.key);
                           if (d.key === 'EXCHANGE_NEW') setRmaDefectType('DOA_FACTORY_DEFECT');
-                          else if (d.key === 'REJECT_RMA') setRmaDefectType(warrantySealStatus === 'LOST_UNIDENTIFIED' ? 'SERIAL_WARRANTY_MISSING' : 'USER_PHYSICAL_DAMAGE');
+                          else if (d.key === 'REJECT_RMA') setRmaDefectType(isSerialMismatch ? 'SERIAL_WARRANTY_MISSING' : (warrantySealStatus === 'LOST_UNIDENTIFIED' ? 'SERIAL_WARRANTY_MISSING' : 'USER_PHYSICAL_DAMAGE'));
                           else if (d.key === 'RESTOCK_WAREHOUSE') setRmaDefectType('NORMAL_RESTOCK');
                         }}
                         style={{
@@ -2275,11 +2438,17 @@ export default function QualityControl() {
                           border: active ? `2px solid ${d.color}` : '1px solid #cbd5e1',
                           backgroundColor: active ? d.bg : '#ffffff',
                           color: active ? d.color : '#334155',
-                          cursor: 'pointer',
-                          textAlign: 'left'
+                          cursor: isBlockedBySerial ? 'not-allowed' : 'pointer',
+                          opacity: isBlockedBySerial ? 0.45 : 1,
+                          textAlign: 'left',
+                          transition: 'all 0.15s ease'
                         }}
+                        title={isBlockedBySerial ? `Bị chặn: Serial "${trimmedActual}" không khớp Serial xuất bán gốc.` : ''}
                       >
-                        <div style={{ fontWeight: 800, fontSize: '0.8rem' }}>{d.label}</div>
+                        <div style={{ fontWeight: 800, fontSize: '0.8rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span>{d.label}</span>
+                          {isBlockedBySerial && <span style={{ fontSize: '0.68rem', color: '#dc2626' }}>[Khóa do sai Serial]</span>}
+                        </div>
                         <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '0.15rem' }}>{d.desc}</div>
                       </button>
                     );
@@ -2400,28 +2569,63 @@ export default function QualityControl() {
                 />
               </div>
 
-              {/* Actions */}
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem', borderTop: '1px solid #f1f5f9', paddingTop: '1rem' }}>
-                <button
-                  type="button"
-                  onClick={() => setSelectedRMA(null)}
-                  style={{ backgroundColor: '#ffffff', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.5rem 1rem', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
-                >
-                  Hủy Bỏ
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  style={{ backgroundColor: '#8b5cf6', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.5rem 1.25rem', fontSize: '0.82rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.35rem', boxShadow: '0 2px 4px rgba(139, 92, 246, 0.25)' }}
-                >
-                  <Check size={16} /> Lưu & Xuất Biên Bản Thẩm Định RMA
-                </button>
-              </div>
-            </form>
+                {/* Actions */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', borderTop: '1px solid #f1f5f9', paddingTop: '1rem' }}>
+                  {isSerialMismatch && rmaDecision !== 'REJECT_RMA' && (
+                    <div style={{
+                      padding: '0.55rem 0.85rem',
+                      borderRadius: '6px',
+                      backgroundColor: '#fff1f2',
+                      border: '1px solid #fecdd3',
+                      color: '#be123c',
+                      fontSize: '0.78rem',
+                      fontWeight: 700,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.4rem'
+                    }}>
+                      <AlertTriangle size={16} />
+                      <span>Không thể xuất biên bản nghiệm thu: Số Serial đang sai lệch ({trimmedActual} ≠ {expectedSerial}). Vui lòng nhập đúng Serial hoặc chọn "TỪ CHỐI ĐỔI TRẢ".</span>
+                    </div>
+                  )}
 
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem' }}>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedRMA(null)}
+                      style={{ backgroundColor: '#ffffff', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.5rem 1rem', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
+                    >
+                      Hủy Bỏ
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={submitting || (isSerialMismatch && rmaDecision !== 'REJECT_RMA')}
+                      style={{
+                        backgroundColor: (isSerialMismatch && rmaDecision !== 'REJECT_RMA') ? '#cbd5e1' : '#8b5cf6',
+                        color: '#ffffff',
+                        border: 'none',
+                        borderRadius: '6px',
+                        padding: '0.5rem 1.25rem',
+                        fontSize: '0.82rem',
+                        fontWeight: 800,
+                        cursor: (isSerialMismatch && rmaDecision !== 'REJECT_RMA') ? 'not-allowed' : 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.35rem',
+                        boxShadow: (isSerialMismatch && rmaDecision !== 'REJECT_RMA') ? 'none' : '0 2px 4px rgba(139, 92, 246, 0.25)'
+                      }}
+                      title={isSerialMismatch && rmaDecision !== 'REJECT_RMA' ? 'Bị khóa do sai số Serial linh kiện' : ''}
+                    >
+                      <Check size={16} /> Lưu & Xuất Biên Bản Thẩm Định RMA
+                    </button>
+                  </div>
+                </div>
+              </form>
+
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* ========================================================================= */}
       {/* MODAL 3: XEM CHI TIẾT BIÊN BẢN NGHIỆM THU KỸ THUẬT (ENTERPRISE CERTIFICATE) */}

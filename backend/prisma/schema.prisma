@@ -236,6 +236,11 @@ model Order {
   paymentProofPhoto   String?         @map("payment_proof_photo") @db.Text
   receivedByType      String?         @default("DIRECT_CUSTOMER") @map("received_by_type") @db.VarChar(30)
   receiverNameActual  String?         @map("receiver_name_actual") @db.VarChar(150)
+  // Ảnh minh chứng kiện hàng khi Shipper chuyển hoàn về kho (chụp lúc bấm
+  // "Xác Nhận Hoàn Kho") — cùng cơ chế với proofPhoto của POD nhưng cho
+  // chiều ngược lại, để Thủ Kho/QC đối chiếu tình trạng kiện hàng lúc nhận.
+  returnProofPhoto    String?         @map("return_proof_photo") @db.Text
+  returnNote          String?         @map("return_note")
 
   customer            Customer        @relation(fields: [customerId], references: [customerId])
   assignedShipper Employee?          @relation("ShipperOrders", fields: [assignedShipperId], references: [id])
@@ -935,6 +940,7 @@ model CompanySettings {
   assemblyBonus       Decimal  @default(750000.00) @map("assembly_bonus") @db.Decimal(15, 2)
   defaultVat          Decimal  @default(10.00) @map("default_vat") @db.Decimal(5, 2)
   lowStockThreshold   Int      @default(5) @map("low_stock_threshold")
+  autoApproveReturns  Boolean  @default(false) @map("auto_approve_returns")
   updatedAt           DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
 
   @@map("company_settings")

@@ -79,6 +79,15 @@ export const AuthProvider = ({ children }) => {
       try {
         ({ kind, response } = await Promise.any([employeeAttempt, customerAttempt]));
       } catch (aggregateError) {
+        const errors = aggregateError.errors || [];
+        const rateLimitErr = errors.find(e =>
+          e?.message?.includes('Quá nhiều yêu cầu') ||
+          e?.message?.includes('429') ||
+          e?.message?.includes('Too many requests')
+        );
+        if (rateLimitErr) {
+          throw new Error(rateLimitErr.message || 'Quá nhiều yêu cầu đăng nhập, vui lòng thử lại sau ít phút.');
+        }
         throw new Error('Tài khoản hoặc mật khẩu không chính xác');
       }
 

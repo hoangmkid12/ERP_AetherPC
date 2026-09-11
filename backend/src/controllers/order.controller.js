@@ -137,9 +137,22 @@ const createOrder = async (req, res, next) => {
         initialStatus = 'WAITING_PAYMENT';
       } else if (hasShortage) {
         initialStatus = 'AWAITING_STOCK';
-      } else {
+      } else if (req.body.type === 'POS' || customerId === 'WALK-IN') {
         initialStatus = 'CONFIRMED';
+      } else {
+        initialStatus = 'PENDING';
       }
+
+      // Trạng thái thanh toán ban đầu: KHÔNG được suy ra từ initialStatus.
+      // COD (paymentMethod = CASH) đặt qua storefront chỉ thực sự được thanh
+      // toán khi Shipper giao hàng thành công (xem updateOrderStatus, đơn
+      // DELIVERED mới set PAID) — nếu set PAID ngay lúc tạo đơn thì màn hình
+      // "Đang Giao" của Shipper sẽ hiển thị nhầm COD thành "Đã trả online".
+      // Bán tại quầy (POS, khách WALK-IN) thì tiền đã thu ngay nên coi là PAID.
+      const initialPaymentStatus = customerId === 'WALK-IN'
+        || (['BANK_TRANSFER', 'ONLINE_GATEWAY'].includes(paymentMethod) && req.body.isPaid === true)
+        ? 'PAID'
+        : 'PENDING';
 
       // Tạo đơn hàng trên DB
       const newOrder = await tx.order.create({
@@ -151,7 +164,7 @@ const createOrder = async (req, res, next) => {
           shippingFee,
           totalAmount,
           paymentMethod,
-          paymentStatus: initialStatus === 'WAITING_PAYMENT' ? 'PENDING' : 'PAID',
+          paymentStatus: initialPaymentStatus,
           shippingAddress: shippingAddress || 'Chưa cung cấp',
           shippingCity: shippingCity || 'TP. Hồ Chí Minh',
           notes,
@@ -328,7 +341,7 @@ const getCustomerOrders = async (req, res, next) => {
       // Shipper xem các đơn từ trạng thái đóng gói sẵn sàng trở đi
       whereClause = {
         status: {
-          in: ['CONFIRMED', 'PROCESSING', 'READY_TO_SHIP', 'SHIPPED', 'DELIVERED', 'SHIPPING_FAILED']
+          in: ['CONFIRMED', 'PROCESSING', 'READY_TO_SHIP', 'SHIPPED', 'DELIVERED', 'SHIPPING_FAILED', 'RETURNING_TO_WAREHOUSE', 'CANCELLED']
         }
       };
     }
@@ -364,13 +377,13 @@ const getCustomerOrders = async (req, res, next) => {
               select: {
                 productId: true,
                 name: true,
-                images: true,
                 price: true
               }
             }
           }
         },
         statusHistory: {
+          take: 1,
           orderBy: { timestamp: 'desc' }
         }
       },
@@ -648,9 +661,28 @@ const updateOrderStatus = async (req, res, next) => {
             receivedByType: receivedType,
             receiverNameActual: receiverName
           } : {}),
-          ...(status === 'SHIPPED' ? { shippedAt: new Date() } : {}),
+          ...(status === 'SHIPPED' ? {
+            shippedAt: new Date(),
+            failReason: null,
+            failNote: null
+          } : {}),
           ...(status === 'CONFIRMED' ? { confirmedAt: new Date() } : {}),
-          ...(status === 'CANCELLED' ? { cancelledAt: new Date() } : {})
+          ...(status === 'CANCELLED' ? {
+            cancelledAt: new Date(),
+            failReason: req.body.failReason !== undefined ? req.body.failReason : existingOrder.failReason,
+            failNote: req.body.failNote !== undefined ? req.body.failNote : existingOrder.failNote
+          } : {}),
+          ...(status === 'SHIPPING_FAILED' ? {
+            failReason: req.body.failReason !== undefined ? req.body.failReason : (req.body.isAwaitingCallback ? 'Không liên lạc được (Chờ gọi lại 24h)' : existingOrder.failReason),
+            failNote: req.body.failNote !== undefined ? req.body.failNote : existingOrder.failNote
+          } : {}),
+          // Ảnh minh chứng kiện hàng hoàn kho (chụp bởi Shipper) & ghi chú kèm theo.
+          ...(status === 'RETURNING_TO_WAREHOUSE' ? {
+            failReason: req.body.failReason !== undefined ? req.body.failReason : (req.body.returnReason || existingOrder.failReason),
+            failNote: req.body.failNote !== undefined ? req.body.failNote : existingOrder.failNote,
+            returnProofPhoto: req.body.returnProofPhoto !== undefined ? req.body.returnProofPhoto : existingOrder.returnProofPhoto,
+            returnNote: req.body.returnNote !== undefined ? req.body.returnNote : existingOrder.returnNote
+          } : {})
         }
       });
 
@@ -676,7 +708,8 @@ const updateOrderStatus = async (req, res, next) => {
         } else if (status === 'SHIPPING_FAILED') {
           historyLogNote = `Giao thất bại: ${req.body.failReason || 'Không liên lạc được'} (${req.body.isAwaitingCallback ? 'Chờ gọi lại 24h' : 'Hẹn lại'}) bởi ${changedBy}`;
         } else if (status === 'RETURNING_TO_WAREHOUSE') {
-          historyLogNote = `Đơn hàng chuyển hoàn về kho (Lý do: ${req.body.returnReason || req.body.failReason || 'Khách không nhận'}) bởi ${changedBy}`;
+          const returnPhotoNote = req.body.returnProofPhoto ? ', đã chụp ảnh minh chứng kiện hàng' : '';
+          historyLogNote = `Đơn hàng chuyển hoàn về kho (Lý do: ${req.body.returnReason || req.body.failReason || 'Khách không nhận'}${returnPhotoNote}) bởi ${changedBy}`;
         } else {
           historyLogNote = `Cập nhật trạng thái sang ${status} bởi ${changedBy}`;
         }
@@ -764,6 +797,15 @@ const createReturnRequest = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'Chỉ được tạo yêu cầu đổi trả cho đơn hàng đã nhận/giao thành công' });
     }
 
+    // Kiểm tra cấu hình Auto-Approve từ companySettings (mặc định false = cần CSKH duyệt thủ công)
+    let isAutoApprove = false;
+    try {
+      const settings = await prisma.companySettings.findUnique({ where: { id: 1 } });
+      isAutoApprove = Boolean(settings?.autoApproveReturns);
+    } catch (_) {}
+
+    const initialStatus = isAutoApprove ? 'RETURN_APPROVED' : 'PENDING';
+
     // 1. Tạo bản ghi ReturnRequest chi tiết
     const returnReq = await prisma.returnRequest.create({
       data: {
@@ -780,31 +822,199 @@ const createReturnRequest = async (req, res, next) => {
         bankName: isExchange ? '' : (bankName || ''),
         bankAccountNo: isExchange ? '' : (bankAccountNo || ''),
         bankAccountName: isExchange ? '' : (bankAccountName || ''),
-        status: 'RETURN_APPROVED' // Tự động duyệt để chuyển Shipper thu hồi
+        status: initialStatus
       }
     });
 
-    // 2. Cập nhật trạng thái đơn sang RETURNING_TO_WAREHOUSE
-    await prisma.order.update({
-      where: { orderId: id },
-      data: { status: 'RETURNING_TO_WAREHOUSE' }
-    });
+    // 2. Cập nhật trạng thái đơn: nếu auto duyệt thì chuyển sang RETURNING_TO_WAREHOUSE
+    if (isAutoApprove) {
+      await prisma.order.update({
+        where: { orderId: id },
+        data: { status: 'RETURNING_TO_WAREHOUSE' }
+      });
+    }
 
     const loaiYeuCauText = isExchange ? 'Đổi mới 1-1' : 'Trả hàng Hoàn tiền 100%';
 
     await prisma.orderStatusHistory.create({
       data: {
         orderId: id,
-        status: 'RETURNING_TO_WAREHOUSE',
-        note: `Khách hàng tạo yêu cầu ${loaiYeuCauText}. Lý do: ${reason || 'Không ghi'}. ${!isExchange && bankAccountNo ? `Số TK hoàn: ${bankAccountNo} (${bankName || 'N/A'})` : ''}`,
+        status: isAutoApprove ? 'RETURNING_TO_WAREHOUSE' : order.status,
+        note: isAutoApprove
+          ? `Khách hàng tạo yêu cầu ${loaiYeuCauText} (Hệ thống tự động duyệt đổi trả). Lý do: ${reason || 'Không ghi'}. ${!isExchange && bankAccountNo ? `Số TK hoàn: ${bankAccountNo} (${bankName || 'N/A'})` : ''}`
+          : `Khách hàng gửi yêu cầu ${loaiYeuCauText} (Chờ CSKH thẩm định & phê duyệt). Lý do: ${reason || 'Không ghi'}.`,
         changedBy: req.user?.fullname || req.user?.name || 'Khách hàng'
       }
     });
 
     res.json({
       success: true,
-      message: `Yêu cầu ${loaiYeuCauText} đã được tiếp nhận thành công. Shipper sẽ liên hệ thu hồi hàng.`,
+      message: isAutoApprove
+        ? `Yêu cầu ${loaiYeuCauText} đã được tự động duyệt. Shipper sẽ liên hệ thu hồi hàng.`
+        : `Yêu cầu ${loaiYeuCauText} đã được tiếp nhận thành công. Nhân viên CSKH sẽ thẩm định và phản hồi sớm nhất!`,
       data: returnReq
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * 4.1 CSKH THẨM ĐỊNH & DUYỆT / TỪ CHỐI YÊU CẦU ĐỔI TRẢ (TỰ DUYỆT)
+ */
+const reviewReturnRequest = async (req, res, next) => {
+  try {
+    const { id } = req.params; // id có thể là returnRequest.id hoặc orderId
+    const { decision, note, rejectReason } = req.body;
+    const reviewerName = req.user?.fullname || req.user?.name || req.user?.username || 'CSKH';
+
+    const returnReq = await prisma.returnRequest.findFirst({
+      where: {
+        OR: [
+          { id: id },
+          { orderId: id }
+        ]
+      }
+    });
+
+    if (!returnReq) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy yêu cầu đổi trả' });
+    }
+
+    const isApprove = decision === 'APPROVE' || decision === 'RETURN_APPROVED';
+    const isReject = decision === 'REJECT' || decision === 'REJECTED';
+
+    if (!isApprove && !isReject) {
+      return res.status(400).json({ success: false, message: 'Hành động thẩm định không hợp lệ. Chỉ chấp nhận APPROVE hoặc REJECT.' });
+    }
+
+    const newStatus = isApprove ? 'RETURN_APPROVED' : 'REJECTED';
+    const reasonText = rejectReason || note || (isReject ? 'Không đủ điều kiện đổi trả theo quy định' : 'CSKH đã thẩm định hợp lệ');
+
+    // Cập nhật ReturnRequest
+    const updatedReturn = await prisma.returnRequest.update({
+      where: { id: returnReq.id },
+      data: {
+        status: newStatus,
+        note: returnReq.note ? `${returnReq.note} | [CSKH: ${reasonText}]` : `[CSKH: ${reasonText}]`
+      }
+    });
+
+    // Cập nhật Order status tương ứng
+    if (isApprove) {
+      await prisma.order.update({
+        where: { orderId: returnReq.orderId },
+        data: { status: 'RETURNING_TO_WAREHOUSE' }
+      });
+    }
+
+    await prisma.orderStatusHistory.create({
+      data: {
+        orderId: returnReq.orderId,
+        status: isApprove ? 'RETURNING_TO_WAREHOUSE' : 'DELIVERED',
+        note: isApprove
+          ? `CSKH ${reviewerName} đã thẩm định & duyệt yêu cầu đổi trả. Chuyển Shipper thu hồi kiện hàng.`
+          : `CSKH ${reviewerName} từ chối yêu cầu đổi trả. Lý do: ${reasonText}`,
+        changedBy: reviewerName
+      }
+    });
+
+    res.json({
+      success: true,
+      message: isApprove
+        ? `Đã duyệt yêu cầu đổi trả #${returnReq.id}! Đơn đã chuyển sang danh sách thu hồi của Shipper.`
+        : `Đã từ chối yêu cầu đổi trả #${returnReq.id}.`,
+      data: updatedReturn
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * 4.2 CSKH DUYỆT TỰ ĐỘNG TẤT CẢ CÁC YÊU CẦU ĐỔI TRẢ ĐANG CHỜ (AUTO DUYỆT HÀNG LOẠT)
+ */
+const batchApproveReturns = async (req, res, next) => {
+  try {
+    const reviewerName = req.user?.fullname || req.user?.name || req.user?.username || 'CSKH';
+
+    const pendingReturns = await prisma.returnRequest.findMany({
+      where: { status: 'PENDING' }
+    });
+
+    if (pendingReturns.length === 0) {
+      return res.json({ success: true, message: 'Không có yêu cầu đổi trả nào đang chờ duyệt', count: 0 });
+    }
+
+    const updatedIds = [];
+    for (const ret of pendingReturns) {
+      await prisma.returnRequest.update({
+        where: { id: ret.id },
+        data: {
+          status: 'RETURN_APPROVED',
+          note: ret.note ? `${ret.note} | [CSKH duyệt tự động hàng loạt]` : '[CSKH duyệt tự động hàng loạt]'
+        }
+      });
+
+      await prisma.order.update({
+        where: { orderId: ret.orderId },
+        data: { status: 'RETURNING_TO_WAREHOUSE' }
+      });
+
+      await prisma.orderStatusHistory.create({
+        data: {
+          orderId: ret.orderId,
+          status: 'RETURNING_TO_WAREHOUSE',
+          note: `CSKH ${reviewerName} duyệt nhanh (Auto Approve All). Chuyển Shipper thu hồi kiện hàng.`,
+          changedBy: reviewerName
+        }
+      });
+
+      updatedIds.push(ret.id);
+    }
+
+    res.json({
+      success: true,
+      message: `Đã duyệt thành công ${updatedIds.length} yêu cầu đổi trả sang trạng thái Thu Hồi!`,
+      count: updatedIds.length,
+      ids: updatedIds
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * 4.3 LẤY VÀ CẬP NHẬT CẤU HÌNH TỰ ĐỘNG DUYỆT ĐỔI TRẢ
+ */
+const getReturnSettings = async (req, res, next) => {
+  try {
+    const settings = await prisma.companySettings.findUnique({ where: { id: 1 } });
+    res.json({
+      success: true,
+      data: {
+        autoApproveReturns: Boolean(settings?.autoApproveReturns)
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const updateReturnSettings = async (req, res, next) => {
+  try {
+    const { autoApproveReturns } = req.body;
+    const settings = await prisma.companySettings.upsert({
+      where: { id: 1 },
+      update: { autoApproveReturns: Boolean(autoApproveReturns) },
+      create: { id: 1, autoApproveReturns: Boolean(autoApproveReturns) }
+    });
+    res.json({
+      success: true,
+      message: `Đã ${autoApproveReturns ? 'BẬT' : 'TẮT'} chế độ Tự Động Duyệt (Auto-Approve) đổi trả!`,
+      data: {
+        autoApproveReturns: Boolean(settings.autoApproveReturns)
+      }
     });
   } catch (err) {
     next(err);
@@ -926,7 +1136,7 @@ const shipperDeliverWarehouseReturn = async (req, res, next) => {
 const qcInspectReturn = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { qcDecision, qcDefectType, qcNotes, qcProofPhoto, note } = req.body;
+    const { qcDecision, qcDefectType, qcNotes, qcProofPhoto, note, actualSerial } = req.body;
     const inspectorName = req.user?.fullname || req.user?.name || req.body.qcInspector || 'Kỹ thuật viên QC';
 
     const returnReq = await prisma.returnRequest.findFirst({
@@ -940,13 +1150,16 @@ const qcInspectReturn = async (req, res, next) => {
     const isApproved = ['APPROVE_REFUND', 'APPROVE_EXCHANGE', 'EXCHANGE_NEW', 'RESTOCK_WAREHOUSE', 'PASSED'].includes(qcDecision);
     const newStatus = isApproved ? 'QC_PASSED' : 'REJECTED';
 
+    const serialPrefix = actualSerial ? `[Mã Serial đối soát: ${actualSerial}] ` : '';
+    const finalQcNotes = serialPrefix + (qcNotes || '');
+
     await prisma.returnRequest.update({
       where: { id: returnReq.id },
       data: {
         status: newStatus,
         qcDecision: qcDecision || (returnReq.type === 'EXCHANGE' ? 'EXCHANGE_NEW' : 'RESTOCK_WAREHOUSE'),
         qcDefectType: qcDefectType || 'DOA_FACTORY_DEFECT',
-        qcNotes: qcNotes || '',
+        qcNotes: finalQcNotes,
         qcProofPhoto: qcProofPhoto || null,
         qcInspectorId: req.user?.id && !isNaN(Number(req.user.id)) ? Number(req.user.id) : null,
         qcInspectedAt: new Date()
@@ -1209,7 +1422,23 @@ const processRefund = async (req, res, next) => {
     }
 
     if (order.paymentStatus === 'REFUNDED') {
-      return res.status(400).json({ success: false, message: 'Đơn hàng này đã được hoàn tiền trước đó' });
+      // Đơn hàng đã được hoàn tiền trong hệ thống — cập nhật đồng bộ các ReturnRequest nếu còn sót
+      await prisma.returnRequest.updateMany({
+        where: { orderId: order.orderId },
+        data: {
+          status: 'REFUNDED',
+          refundTxnCode: refundTxnCode || undefined,
+          refundProofPhoto: refundProofPhoto || undefined,
+          refundedAt: new Date(),
+          refundedById: req.user?.id && !isNaN(Number(req.user.id)) ? Number(req.user.id) : null
+        }
+      });
+
+      return res.json({
+        success: true,
+        message: `Đơn hàng #${order.orderId} đã được hoàn tất chuyển tiền trước đó. Hệ thống đã đồng bộ trạng thái thành công.`,
+        data: order
+      });
     }
 
     const finalAmount = parseFloat(refundAmount || order.totalAmount || 0);
@@ -1394,5 +1623,9 @@ module.exports = {
   processRefund,
   getReturnRequests,
   updateOrderDetails,
-  adjustLoyaltyForOrder
+  adjustLoyaltyForOrder,
+  reviewReturnRequest,
+  batchApproveReturns,
+  getReturnSettings,
+  updateReturnSettings
 };

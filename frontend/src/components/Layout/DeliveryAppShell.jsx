@@ -63,6 +63,15 @@ export default function DeliveryAppShell({ children }) {
   const readyAtWarehouse = (orders || []).filter(o => o && o.status === 'READY_TO_SHIP');
   const totalDeliveryTasks = myAssignedOrders.length + readyAtWarehouse.length;
 
+  // Per-tab badge counts for the bottom nav — splits the same aggregate the
+  // Bell icon already shows into where each order actually lives, so a
+  // Shipper sees at a glance whether new work is waiting to be claimed
+  // ("Chờ Nhận") or already in hand and needs delivering ("Đang Giao").
+  const tabBadgeCounts = {
+    pending: readyAtWarehouse.length,
+    active: myAssignedOrders.length
+  };
+
   const handleLogout = () => {
     logout();
     navigate('/login');
@@ -149,6 +158,7 @@ export default function DeliveryAppShell({ children }) {
           {TABS.map(tab => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
+            const badgeCount = tabBadgeCounts[tab.id] || 0;
             return (
               <button
                 key={tab.id}
@@ -156,7 +166,21 @@ export default function DeliveryAppShell({ children }) {
                 onClick={() => goToTab(tab.id)}
                 className={`delivery-bottom-nav-item${isActive ? ' active' : ''}`}
               >
-                <Icon size={20} />
+                <span style={{ position: 'relative', display: 'inline-flex' }}>
+                  <Icon size={20} />
+                  {badgeCount > 0 && (
+                    <span style={{
+                      position: 'absolute', top: '-6px', right: '-9px',
+                      minWidth: '15px', height: '15px', borderRadius: '999px',
+                      backgroundColor: 'var(--danger)', color: '#fff',
+                      fontSize: '0.6rem', fontWeight: 800,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      padding: '0 3px', lineHeight: 1, border: '1.5px solid var(--bg-primary)'
+                    }}>
+                      {badgeCount > 99 ? '99+' : badgeCount}
+                    </span>
+                  )}
+                </span>
                 <span>{tab.label}</span>
               </button>
             );

@@ -144,6 +144,8 @@ export default function SalesPOS() {
   const [orderStartDate, setOrderStartDate] = useState('');
   const [orderEndDate, setOrderEndDate] = useState('');
   const [selectedDetailOrder, setSelectedDetailOrder] = useState(null);
+  // Track which orderId is currently being confirmed (loading guard)
+  const [updatingOrderId, setUpdatingOrderId] = useState(null);
 
   // Customers CRM State
   const [customerSearch, setCustomerSearch] = useState('');
@@ -395,13 +397,21 @@ export default function SalesPOS() {
   }, [derivedCustomers, customerSearch, customerTierFilter]);
 
   // Order Status Change Action
-  const handleUpdateOrderStatus = (orderId, newStatus) => {
-    if (typeof updateOrderStatus === 'function') {
-      updateOrderStatus(orderId, newStatus);
+  const handleUpdateOrderStatus = async (orderId, newStatus) => {
+    if (!orderId || updatingOrderId) return; // prevent double-click
+    if (typeof updateOrderStatus !== 'function') return;
+    setUpdatingOrderId(orderId);
+    try {
+      await updateOrderStatus(orderId, newStatus);
+      // Sync selectedDetailOrder if the modal is open for this order
       if (selectedDetailOrder && (selectedDetailOrder.orderId === orderId || selectedDetailOrder.id === orderId)) {
         setSelectedDetailOrder(prev => ({ ...prev, status: newStatus }));
       }
       notify(`Đơn hàng #${orderId} đã được cập nhật sang trạng thái: ${getStatusBadge(newStatus).text}`, 'success');
+    } catch (err) {
+      notify(`Không thể cập nhật đơn hàng #${orderId}: ${err?.message || 'Lỗi kết nối máy chủ'}`, 'error');
+    } finally {
+      setUpdatingOrderId(null);
     }
   };
 
@@ -505,7 +515,7 @@ export default function SalesPOS() {
 
           <button
             onClick={() => {
-              setOrderStatusFilter('PENDING');
+              setOrderStatusFilter('ALL');
               setTab('orders');
             }}
             style={{
@@ -1109,9 +1119,25 @@ export default function SalesPOS() {
                             {o.status === 'PENDING' && (
                               <button
                                 onClick={() => handleUpdateOrderStatus(o.orderId || o.id, 'CONFIRMED')}
-                                style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '4px', padding: '0.3rem 0.6rem', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer' }}
+                                disabled={updatingOrderId === (o.orderId || o.id)}
+                                style={{
+                                  backgroundColor: updatingOrderId === (o.orderId || o.id) ? '#93c5fd' : '#2563eb',
+                                  color: '#ffffff',
+                                  border: 'none',
+                                  borderRadius: '4px',
+                                  padding: '0.3rem 0.6rem',
+                                  fontSize: '0.75rem',
+                                  fontWeight: 700,
+                                  cursor: updatingOrderId === (o.orderId || o.id) ? 'not-allowed' : 'pointer',
+                                  display: 'flex', alignItems: 'center', gap: '0.3rem'
+                                }}
                               >
-                                Xác Nhận
+                                {updatingOrderId === (o.orderId || o.id) ? (
+                                  <>
+                                    <span style={{ display: 'inline-block', width: '10px', height: '10px', border: '2px solid #fff', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
+                                    Đang xử lý...
+                                  </>
+                                ) : 'Xác Nhận'}
                               </button>
                             )}
                           </div>
@@ -1715,9 +1741,25 @@ export default function SalesPOS() {
               {selectedDetailOrder.status === 'PENDING' && (
                 <button
                   onClick={() => handleUpdateOrderStatus(selectedDetailOrder.orderId || selectedDetailOrder.id, 'CONFIRMED')}
-                  style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.5rem 1.1rem', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
+                  disabled={updatingOrderId === (selectedDetailOrder.orderId || selectedDetailOrder.id)}
+                  style={{
+                    backgroundColor: updatingOrderId === (selectedDetailOrder.orderId || selectedDetailOrder.id) ? '#93c5fd' : '#2563eb',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '6px',
+                    padding: '0.5rem 1.1rem',
+                    fontSize: '0.82rem',
+                    fontWeight: 700,
+                    cursor: updatingOrderId === (selectedDetailOrder.orderId || selectedDetailOrder.id) ? 'not-allowed' : 'pointer',
+                    display: 'flex', alignItems: 'center', gap: '0.4rem'
+                  }}
                 >
-                  Xác Nhận Đơn Hàng
+                  {updatingOrderId === (selectedDetailOrder.orderId || selectedDetailOrder.id) ? (
+                    <>
+                      <span style={{ display: 'inline-block', width: '12px', height: '12px', border: '2px solid #fff', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
+                      Đang xác nhận...
+                    </>
+                  ) : 'Xác Nhận Đơn Hàng'}
                 </button>
               )}
 

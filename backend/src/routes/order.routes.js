@@ -12,7 +12,11 @@ const {
   confirmReturnWarehouse,
   processRefund,
   getReturnRequests,
-  updateOrderDetails
+  updateOrderDetails,
+  reviewReturnRequest,
+  batchApproveReturns,
+  getReturnSettings,
+  updateReturnSettings
 } = require('../controllers/order.controller');
 const { authMiddleware } = require('../middlewares/auth.middleware');
 const { getEmailLogs } = require('../services/emailService');
@@ -42,6 +46,20 @@ router.post('/:id/return', authMiddleware(['CUSTOMER', 'CSKH', 'SALES_MANAGER', 
 // @route   GET /api/v1/orders/returns
 // @desc    Lấy danh sách các đơn đổi trả (Shipper / QC / Kho / Kế toán / CSKH)
 router.get('/returns', authMiddleware(['SALES', 'SALES_MANAGER', 'CEO', 'ADMIN', 'CSKH', 'WAREHOUSE', 'WAREHOUSE_MANAGER', 'ACCOUNTANT', 'DELIVERY', ...QC_ROLES]), getReturnRequests);
+
+// @route   GET/PUT /api/v1/orders/returns/settings
+// @desc    Lấy & Cập nhật cấu hình Tự Động Duyệt (Auto-Approve) đổi trả
+router.get('/returns/settings', authMiddleware(['CSKH', 'SALES', 'SALES_MANAGER', 'CEO', 'ADMIN']), getReturnSettings);
+router.put('/returns/settings', authMiddleware(['CSKH', 'SALES_MANAGER', 'CEO', 'ADMIN']), updateReturnSettings);
+
+// @route   POST /api/v1/orders/returns/batch-approve
+// @desc    CSKH duyệt tự động tất cả các đơn đổi trả đang PENDING
+router.post('/returns/batch-approve', authMiddleware(['CSKH', 'SALES_MANAGER', 'CEO', 'ADMIN']), batchApproveReturns);
+
+// @route   PATCH /api/v1/orders/returns/:id/review & /status
+// @desc    CSKH thẩm định & duyệt (APPROVE) hoặc từ chối (REJECT) yêu cầu đổi trả
+router.patch('/returns/:id/review', authMiddleware(['CSKH', 'SALES_MANAGER', 'CEO', 'ADMIN']), reviewReturnRequest);
+router.patch('/returns/:id/status', authMiddleware(['CSKH', 'SALES_MANAGER', 'CEO', 'ADMIN']), reviewReturnRequest);
 
 // @route   PATCH /api/v1/orders/returns/:id/pickup
 // @desc    Shipper xác nhận đã lấy hàng thu hồi tại nhà khách

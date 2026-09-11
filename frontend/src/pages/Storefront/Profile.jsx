@@ -4,6 +4,8 @@ import { MapPin, Plus, User, X } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { notify, confirm } from '../../context/NotificationContext';
 import { api } from '../../services/api';
+import { VIETNAM_PROVINCES } from '../../utils/vietnamProvinces';
+import SearchableSelect from '../../components/Common/SearchableSelect';
 
 const TEXT = {
   home: 'Trang chủ',
@@ -54,6 +56,42 @@ export default function Profile() {
   const [showAddressModal, setShowAddressModal] = useState(false);
   const [editingAddress, setEditingAddress] = useState(null);
   const [addressForm, setAddressForm] = useState(emptyAddress);
+  const [apiProvinces, setApiProvinces] = useState([]);
+  const [apiCommunes, setApiCommunes] = useState([]);
+  const [loadingCommunes, setLoadingCommunes] = useState(false);
+
+  // Fetch live provinces from backend /address/provinces (General Statistics Office / Decree 202/2025/QH15)
+  useEffect(() => {
+    api.get('/address/provinces')
+      .then(res => {
+        const provinces = res?.data?.provinces;
+        if (Array.isArray(provinces) && provinces.length > 0) {
+          setApiProvinces(provinces);
+        }
+      })
+      .catch(err => console.warn('AddressKit provinces fetch error:', err));
+  }, []);
+
+  // Fetch live communes/wards for selected province code
+  const fetchCommunesForProvince = (provName) => {
+    const list = apiProvinces.length > 0 ? apiProvinces : VIETNAM_PROVINCES;
+    const found = list.find(p => p.name === provName || p.code === provName || p.id === provName);
+    const code = found?.code;
+    if (code) {
+      setLoadingCommunes(true);
+      api.get(`/address/provinces/${code}/communes`)
+        .then(res => {
+          const communes = res?.data?.communes;
+          if (Array.isArray(communes)) {
+            setApiCommunes(communes);
+          }
+        })
+        .catch(err => console.warn('AddressKit communes fetch error:', err))
+        .finally(() => setLoadingCommunes(false));
+    } else {
+      setApiCommunes([]);
+    }
+  };
 
   useEffect(() => {
     if (!authLoading && !user) navigate('/login', { replace: true });
@@ -95,14 +133,31 @@ export default function Profile() {
     }
   };
 
-  // Save address
+  // Save address with full administrative level validation
   const saveAddress = async (event) => {
     event.preventDefault();
+    if (!addressForm.city?.trim()) {
+      notify('Vui lòng chọn Tỉnh / Thành phố.', 'error');
+      return;
+    }
+    if (!addressForm.district?.trim()) {
+      notify('Vui lòng chọn Quận / Huyện.', 'error');
+      return;
+    }
+    if (!addressForm.ward?.trim()) {
+      notify('Vui lòng chọn Phường / Xã.', 'error');
+      return;
+    }
+    if (!addressForm.addressLine?.trim()) {
+      notify('Vui lòng nhập địa chỉ cụ thể (Số nhà, tên đường).', 'error');
+      return;
+    }
     try {
       if (editingAddress) await api.put(`/customers/addresses/${editingAddress.id}`, addressForm);
       else await api.post('/customers/addresses', addressForm);
       setShowAddressModal(false);
       await loadAddresses();
+      notify(editingAddress ? 'Cập nhật địa chỉ thành công.' : 'Thêm địa chỉ mới thành công.', 'success');
     } catch (error) {
       notify(error.message || 'Không thể lưu địa chỉ.', 'error');
     }
@@ -114,6 +169,7 @@ export default function Profile() {
     try {
       await api.delete(`/customers/addresses/${id}`);
       await loadAddresses();
+      notify('Xóa địa chỉ thành công.', 'success');
     } catch (error) {
       notify(error.message || 'Không thể xóa địa chỉ.', 'error');
     }
@@ -145,13 +201,23 @@ export default function Profile() {
 
   const openNewAddress = () => {
     setEditingAddress(null);
-    setAddressForm(emptyAddress);
+    setAddressForm({
+      ...emptyAddress,
+      recipientName: user.fullname || user.name || '',
+      recipientPhone: user.phone || ''
+    });
+    setApiCommunes([]);
     setShowAddressModal(true);
   };
 
   const openEditAddress = (address) => {
     setEditingAddress(address);
     setAddressForm({ ...emptyAddress, ...address });
+    if (address.city) {
+      fetchCommunesForProvince(address.city);
+    } else {
+      setApiCommunes([]);
+    }
     setShowAddressModal(true);
   };
 
@@ -360,6 +426,10 @@ export default function Profile() {
           editing={Boolean(editingAddress)}
           onClose={() => setShowAddressModal(false)}
           onSave={saveAddress}
+          provinces={apiProvinces.length > 0 ? apiProvinces : VIETNAM_PROVINCES}
+          communes={apiCommunes}
+          loadingCommunes={loadingCommunes}
+          onProvinceChange={fetchCommunesForProvince}
         />
       )}
     </div>
@@ -383,11 +453,14 @@ const primaryButton = {
 
 const formStyle = { display: 'grid', gap: '1.15rem' };
 
-function Field({ label, children }) {
+function Field({ label, children, required = false }) {
+  const isInputOrTextarea = React.isValidElement(children) && ['input', 'textarea', 'select'].includes(children.type);
   return (
-    <label style={{ display: 'grid', gap: '.4rem', color: '#334155', fontWeight: 600, fontSize: '0.85rem' }}>
-      {label}
-      {React.cloneElement(children, {
+    <div style={{ display: 'grid', gap: '.4rem', color: '#334155', fontWeight: 600, fontSize: '0.85rem' }}>
+      <span>
+        {label} {required && <span style={{ color: '#ef4444' }}>*</span>}
+      </span>
+      {isInputOrTextarea ? React.cloneElement(children, {
         style: {
           boxSizing: 'border-box',
           width: '100%',
@@ -400,8 +473,8 @@ function Field({ label, children }) {
           backgroundColor: '#ffffff',
           ...(children.props?.style || {})
         }
-      })}
-    </label>
+      }) : children}
+    </div>
   );
 }
 
@@ -496,25 +569,100 @@ function AddressCard({ address, onEdit, onDelete, onDefault }) {
   );
 }
 
-function AddressModal({ form, setForm, editing, onClose, onSave }) {
+function AddressModal({
+  form,
+  setForm,
+  editing,
+  onClose,
+  onSave,
+  provinces = [],
+  communes = [],
+  loadingCommunes = false,
+  onProvinceChange
+}) {
   const update = key => event => setForm({ ...form, [key]: event.target.type === 'checkbox' ? event.target.checked : event.target.value });
+
+  // Find matching province in VIETNAM_PROVINCES to retrieve standard districts
+  const currentProvinceObj = VIETNAM_PROVINCES.find(p => {
+    if (!form.city) return false;
+    return p.name === form.city || p.name.includes(form.city) || form.city.includes(p.name) || p.code === form.city;
+  }) || { districts: [] };
+
+  const handleCityChange = (cityName) => {
+    setForm(prev => ({
+      ...prev,
+      city: cityName,
+      district: '',
+      ward: ''
+    }));
+    if (onProvinceChange) onProvinceChange(cityName);
+  };
+
+  const handleDistrictChange = (districtName) => {
+    setForm(prev => ({ ...prev, district: districtName }));
+  };
+
+  const handleWardChange = (wardName) => {
+    setForm(prev => ({ ...prev, ward: wardName }));
+  };
+
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.5)', backdropFilter: 'blur(2px)', display: 'grid', placeItems: 'center', zIndex: 100000000, padding: '1rem' }}>
-      <form onSubmit={onSave} style={{ width: 'min(520px, 100%)', background: '#ffffff', borderRadius: '16px', padding: '1.75rem', display: 'grid', gap: '1rem', boxShadow: '0 25px 50px rgba(0,0,0,0.25)' }}>
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.5)', backdropFilter: 'blur(3px)', display: 'grid', placeItems: 'center', zIndex: 100000000, padding: '1rem' }}>
+      <form onSubmit={onSave} style={{ width: 'min(540px, 100%)', background: '#ffffff', borderRadius: '16px', padding: '1.75rem', display: 'grid', gap: '1.1rem', boxShadow: '0 25px 50px rgba(0,0,0,0.25)', maxHeight: '90vh', overflowY: 'auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '0.75rem', borderBottom: '1px solid #f1f5f9' }}>
           <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#0f172a', fontWeight: 800 }}>{editing ? TEXT.update : TEXT.addAddress}</h3>
           <button type="button" onClick={onClose} style={{ border: 0, background: 'none', cursor: 'pointer', color: '#64748b' }}><X size={20} /></button>
         </div>
-        <Field label={TEXT.name}><input required value={form.recipientName} onChange={update('recipientName')} placeholder="Tên người nhận hàng" /></Field>
-        <Field label={TEXT.phone}><input required value={form.recipientPhone} onChange={update('recipientPhone')} placeholder="Số điện thoại nhận hàng" /></Field>
-        <Field label={TEXT.city}><input required value={form.city} onChange={update('city')} placeholder="Tỉnh / Thành phố" /></Field>
-        <Field label={TEXT.district}><input value={form.district} onChange={update('district')} placeholder="Quận / Huyện" /></Field>
-        <Field label={TEXT.ward}><input value={form.ward} onChange={update('ward')} placeholder="Phường / Xã" /></Field>
-        <Field label={TEXT.street}><textarea required rows={2} value={form.addressLine} onChange={update('addressLine')} placeholder="Số nhà, tên đường..." /></Field>
-        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: '#334155', fontWeight: 600 }}>
+
+        <Field label={TEXT.name} required>
+          <input required value={form.recipientName} onChange={update('recipientName')} placeholder="Tên người nhận hàng" />
+        </Field>
+
+        <Field label={TEXT.phone} required>
+          <input required value={form.recipientPhone} onChange={update('recipientPhone')} placeholder="Số điện thoại nhận hàng" />
+        </Field>
+
+        <Field label={TEXT.city} required>
+          <SearchableSelect
+            value={form.city}
+            onChange={handleCityChange}
+            options={provinces}
+            placeholder="-- Chọn Tỉnh / Thành phố --"
+          />
+        </Field>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem' }}>
+          <Field label={TEXT.district} required>
+            <SearchableSelect
+              value={form.district}
+              onChange={handleDistrictChange}
+              options={currentProvinceObj.districts || []}
+              placeholder={!form.city ? "-- Chọn Tỉnh/TP trước --" : "-- Chọn Quận / Huyện --"}
+              disabled={!form.city}
+            />
+          </Field>
+
+          <Field label={TEXT.ward} required>
+            <SearchableSelect
+              value={form.ward}
+              onChange={handleWardChange}
+              options={communes}
+              placeholder={!form.city ? "-- Chọn Tỉnh/TP trước --" : (loadingCommunes ? "-- Đang tải Phường/Xã... --" : "-- Chọn Phường / Xã --")}
+              disabled={!form.city || loadingCommunes}
+              loading={loadingCommunes}
+            />
+          </Field>
+        </div>
+
+        <Field label={TEXT.street} required>
+          <textarea required rows={2} value={form.addressLine} onChange={update('addressLine')} placeholder="Số nhà, tên đường..." />
+        </Field>
+
+        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: '#334155', fontWeight: 600, cursor: 'pointer' }}>
           <input type="checkbox" checked={form.isDefault} onChange={update('isDefault')} />
           {TEXT.setDefault}
         </label>
+
         <Actions onCancel={onClose} saveLabel={TEXT.complete} />
       </form>
     </div>

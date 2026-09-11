@@ -75,8 +75,12 @@ export default function ReturnRequestModal({ show, onClose, order }) {
     };
 
     try {
-      await addReturnRequest(reqData);
-      notify('Đã gửi Yêu cầu Hoàn trả / Hoàn tiền thành công! Shipper và CSKH sẽ liên hệ thu hồi hàng.', 'success');
+      const created = await addReturnRequest(reqData);
+      if (created?.status === 'PENDING') {
+        notify('Đã gửi yêu cầu đổi trả thành công! Nhân viên CSKH sẽ thẩm định và liên hệ sớm nhất.', 'success');
+      } else {
+        notify('Đã gửi yêu cầu thành công! Hồ sơ đã được duyệt tự động, Shipper sẽ liên hệ thu hồi hàng.', 'success');
+      }
       setIsSubmitting(false);
       onClose(true);
     } catch (err) {
