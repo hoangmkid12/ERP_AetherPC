@@ -2991,7 +2991,7 @@ export default function Warehouse() {
           <div style={{ marginBottom: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
             <div>
               <h2 style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
-                Quản Lý Đơn Hàng Chờ Nhập Kho
+                Quản Lý Đơn Chờ Hàng
               </h2>
               <p style={{ fontSize: '0.82rem', color: '#64748b', margin: '0.25rem 0 0 0' }}>
                 Danh sách các đơn hàng tạm giữ chỗ do thiếu tồn kho. Hệ thống tự động giải phóng đơn sang Chờ xuất kho khi hoàn tất nhập hàng PO.

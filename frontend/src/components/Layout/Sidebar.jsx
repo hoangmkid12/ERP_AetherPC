@@ -106,7 +106,7 @@ export default function Sidebar({ isOpen = false, onClose }) {
 
   const warehouseSubItems = [
     { tab: 'overview', label: 'Tổng Quan Tồn Kho' },
-    { tab: 'backorders', label: 'Đơn Chờ Hàng (Nợ Khách)', badgeKey: 'backordersCount' },
+    { tab: 'backorders', label: 'Đơn Chờ Hàng', badgeKey: 'backordersCount' },
     { tab: 'grn', label: 'Phiếu Nhập Kho', badgeKey: 'pendingReceipts' },
     { tab: 'delivery', label: 'Lệnh Giao Hàng', badgeKey: 'pendingExportCount' },
     { tab: 'intake', label: 'Nhập Trực Tiếp' },
