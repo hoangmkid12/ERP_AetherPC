@@ -15,6 +15,22 @@
 const claimAvailableSerials = async (tx, productId, quantity, orderId) => {
   if (quantity <= 0) return [];
 
+  // Idempotency guard: if this order has already had serials claimed for this
+  // product (e.g. a previous attempt succeeded but the caller retried after a
+  // later failure, or the approval flow was re-run), reuse what's already
+  // allocated instead of claiming/generating more and hitting unique
+  // constraint violations on retry.
+  if (orderId) {
+    const alreadyClaimed = await tx.serialNumber.findMany({
+      where: { productId, orderId, status: 'USED' },
+      orderBy: { id: 'asc' },
+      select: { serial: true }
+    });
+    if (alreadyClaimed.length >= quantity) {
+      return alreadyClaimed.slice(0, quantity).map(c => c.serial);
+    }
+  }
+
   const candidates = await tx.serialNumber.findMany({
     where: { productId, status: 'AVAILABLE' },
     orderBy: { id: 'asc' },
@@ -51,10 +67,14 @@ const claimAvailableSerials = async (tx, productId, quantity, orderId) => {
       });
       claimedSerials.push(serialStr);
     }
-    await tx.serialNumber.createMany({ data: newSerials });
+    // skipDuplicates guards against the (rare) case where a retried request
+    // regenerates a serial string that was already inserted by a prior
+    // attempt, so the createMany can never throw P2002 on retry.
+    await tx.serialNumber.createMany({ data: newSerials, skipDuplicates: true });
   }
 
   return claimedSerials;
 };
 
 module.exports = { claimAvailableSerials };
+
