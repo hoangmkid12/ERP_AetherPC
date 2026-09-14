@@ -453,10 +453,10 @@ export default function Purchasing() {
   const formatPurchaseReference = (po) => {
     if (!po) return '';
     const raw = typeof po === 'object' ? String(po.poNumber || po.reference || po.id || '') : String(po);
-    // QUOTED_PENDING_CEO/PO thuộc về bản ghi PO THẬT (lập từ confirm-quote,
-    // xem sourceRfqId) — không còn là giai đoạn của RFQ. CONVERTED là trạng
-    // thái đóng của RFQ sau khi đã được chọn để lập PO.
-    const isRfq = typeof po === 'object' && po !== null ? (['RFQ', 'RFQ_SENT', 'AWAITING_SUPPLIER_QUOTE', 'QUOTED', 'CONVERTED', 'DRAFT_RFQ'].includes(po.status) || po.type === 'BACKORDER_RFQ' || po.type === 'RFQ') : false;
+    // QUOTED_PENDING_CEO/PO thuộc về bản ghi PO THẬT (lập từ POST .../issue-po,
+    // xem sourceRfqId) — không còn là giai đoạn của RFQ. PENDING_PO_DRAFT/
+    // CONVERTED vẫn là trạng thái của RFQ (đã duyệt chọn / đã lập phiếu).
+    const isRfq = typeof po === 'object' && po !== null ? (['RFQ', 'RFQ_SENT', 'AWAITING_SUPPLIER_QUOTE', 'QUOTED', 'PENDING_PO_DRAFT', 'CONVERTED', 'DRAFT_RFQ'].includes(po.status) || po.type === 'BACKORDER_RFQ' || po.type === 'RFQ') : false;
     const prefix = isRfq ? 'RFQ' : 'PO';
 
     const matchFull = raw.match(/^(?:PO|RFQ|PR)-(\d{4})-(\d+)$/i);
@@ -519,6 +519,7 @@ export default function Purchasing() {
         'RFQ_SENT': 20,
         'SENT': 20,
         'QUOTED': 30,
+        'PENDING_PO_DRAFT': 32,
         'QUOTED_PENDING_CEO': 35,
         'PO': 40,
         'APPROVED': 40,
@@ -530,8 +531,8 @@ export default function Purchasing() {
         'RECEIVED': 70,
         'DONE': 100,
         'COMPLETED': 100,
-        // Trạng thái đóng của một RFQ sau khi đã được chọn để lập PO riêng
-        // (xem confirm-quote) — bản ghi RFQ này dừng lại vĩnh viễn ở đây.
+        // Trạng thái đóng của một RFQ sau khi đã lập Phiếu Mua Hàng riêng
+        // (xem POST .../issue-po) — bản ghi RFQ này dừng lại vĩnh viễn ở đây.
         'CONVERTED': 100,
         'CANCELLED': 1000
       };
@@ -1145,29 +1146,44 @@ export default function Purchasing() {
     setSubmitting(false);
   };
 
-  // RFQ và PO là 2 chứng từ khác nhau (2 bản ghi khác nhau trong CSDL) — chọn
-  // NCC tối ưu từ một RFQ đã có báo giá (QUOTED) không chỉ đổi trạng thái, mà
-  // LẬP MỘT ĐƠN PO MỚI (số riêng) tham chiếu ngược lại RFQ gốc, rồi mới trình
-  // CEO duyệt trên chính đơn PO đó. Xem POST /orders/:id/confirm-quote.
-  const handleConfirmQuote = async (rfqId, loserIds = []) => {
-    setSubmitting(true);
+  // Bước 2 của việc chốt báo giá — bước 1 (Mua Hàng duyệt chọn NCC tối ưu) chỉ
+  // đổi trạng thái RFQ sang PENDING_PO_DRAFT qua handleUpdateStatus, dùng chung
+  // với mọi transition khác. Bước này mở form "Lập Phiếu Mua Hàng" riêng
+  // (issuePOTarget/issuePOForm), submit form mới thật sự LẬP MỘT ĐƠN PO MỚI
+  // (số riêng, bản ghi riêng) tham chiếu ngược lại RFQ gốc, trình CEO duyệt.
+  const [issuePOTarget, setIssuePOTarget] = useState(null); // RFQ record đang lập phiếu, hoặc null khi đóng form
+  const [issuePOForm, setIssuePOForm] = useState({ expectedDeliveryDate: '', notes: '' });
+  const [issuingPO, setIssuingPO] = useState(false);
+
+  const openIssuePOForm = (rfq) => {
+    setIssuePOTarget(rfq);
+    setIssuePOForm({
+      expectedDeliveryDate: rfq.expectedDeliveryDate ? String(rfq.expectedDeliveryDate).slice(0, 10) : '',
+      notes: ''
+    });
+  };
+
+  const handleIssuePO = async () => {
+    if (!issuePOTarget) return;
+    setIssuingPO(true);
     try {
-      const res = await api.post(`/purchasing/orders/${rfqId}/confirm-quote`, { loserIds });
+      const res = await api.post(`/purchasing/orders/${issuePOTarget.id}/issue-po`, {
+        expectedDeliveryDate: issuePOForm.expectedDeliveryDate || undefined,
+        notes: issuePOForm.notes || undefined
+      });
       if (res && res.success) {
-        notify(`Đã lập đơn mua hàng chính thức ${res.data.poNumber} — trình CEO phê duyệt.`, 'success');
+        notify(`Đã lập Phiếu Mua Hàng ${res.data.poNumber} — trình CEO phê duyệt.`, 'success');
       } else {
-        notify('Máy chủ chưa xác nhận lập được đơn PO — vui lòng thử lại.', 'error');
+        notify('Máy chủ chưa xác nhận lập được Phiếu Mua Hàng — vui lòng thử lại.', 'error');
       }
       window.dispatchEvent(new Event('erp-po-updated'));
       await fetchData();
       setSelectedPO(null);
-      setShowCompareModal(false);
-      return res?.data || null;
+      setIssuePOTarget(null);
     } catch (err) {
-      notify('Lỗi: ' + (err.message || 'Không lập được đơn PO'), 'error');
-      return null;
+      notify('Lỗi: ' + (err.message || 'Không lập được Phiếu Mua Hàng'), 'error');
     } finally {
-      setSubmitting(false);
+      setIssuingPO(false);
     }
   };
 
@@ -1180,19 +1196,22 @@ export default function Purchasing() {
     return getStatusLabel(PO_STATUS, status);
   };
 
-  // RFQ và PO là 2 chứng từ/bản ghi khác nhau (xem confirm-quote ở backend),
-  // nên mỗi loại có pipeline hiển thị riêng thay vì 1 chuỗi 9 bước chung.
-  // RFQ dừng lại ở CONVERTED (đã chọn NCC, đã lập PO riêng) hoặc CANCELLED.
+  // RFQ và PO là 2 chứng từ/bản ghi khác nhau (xem PATCH .../status ->
+  // PENDING_PO_DRAFT rồi POST .../issue-po ở backend), nên mỗi loại có
+  // pipeline hiển thị riêng thay vì 1 chuỗi 9 bước chung. RFQ dừng lại ở
+  // CONVERTED (đã lập Phiếu Mua Hàng riêng) hoặc CANCELLED.
   const RFQ_PIPELINE_STEPS = [
     { key: 'RFQ', label: 'Khởi Tạo YCBG' },
     { key: 'RFQ_SENT', label: 'Gửi NCC Báo Giá' },
     { key: 'QUOTED', label: 'NCC Đã Báo Giá' },
-    { key: 'CONVERTED', label: 'Đã Chọn — Lập PO' }
+    { key: 'PENDING_PO_DRAFT', label: 'Đã Duyệt — Chờ Lập Phiếu' },
+    { key: 'CONVERTED', label: 'Đã Lập Phiếu Mua Hàng' }
   ];
-  const RFQ_PIPELINE_STEP_INDEX = { RFQ: 0, RFQ_SENT: 1, SENT: 1, QUOTED: 2, CONVERTED: 3 };
+  const RFQ_PIPELINE_STEP_INDEX = { RFQ: 0, RFQ_SENT: 1, SENT: 1, QUOTED: 2, PENDING_PO_DRAFT: 3, CONVERTED: 4 };
 
-  // Pipeline của bản ghi PO thật, bắt đầu từ lúc Mua Hàng lập PO (confirm-quote)
-  // cho tới khi hoàn tất, khớp với allowedTransitions trong purchase.controller.js.
+  // Pipeline của bản ghi PO thật, bắt đầu từ lúc Mua Hàng lập Phiếu Mua Hàng
+  // (issue-po) cho tới khi hoàn tất, khớp với allowedTransitions trong
+  // purchase.controller.js.
   const PO_PIPELINE_STEPS = [
     { key: 'QUOTED_PENDING_CEO', label: 'Chờ CEO Duyệt' },
     { key: 'PO', label: 'Đã Duyệt (PO)' },
@@ -1207,7 +1226,7 @@ export default function Purchasing() {
     QA_PASSED: 3, QA_PARTIAL: 3, QA_REJECTED: 3,
     RECEIVED: 4, DONE: 5, COMPLETED: 5
   };
-  const RFQ_STAGE_STATUSES = ['RFQ', 'RFQ_SENT', 'SENT', 'QUOTED', 'CONVERTED'];
+  const RFQ_STAGE_STATUSES = ['RFQ', 'RFQ_SENT', 'SENT', 'QUOTED', 'PENDING_PO_DRAFT', 'CONVERTED'];
 
   // Filtered orders list based on active tab & filters
   const filteredOrders = orders
@@ -1277,6 +1296,7 @@ export default function Purchasing() {
   const rfqDraftCount = orders.filter(po => po.status === 'RFQ').length;
   const rfqSentCount = orders.filter(po => po.status === 'RFQ_SENT').length;
   const rfqQuotedCount = orders.filter(po => po.status === 'QUOTED').length;
+  const rfqPendingDraftCount = orders.filter(po => po.status === 'PENDING_PO_DRAFT').length;
   const rfqPendingCeoCount = orders.filter(po => po.status === 'QUOTED_PENDING_CEO').length;
   // Every PO the backend actually issues (status !== RFQ/RFQ_SENT/QUOTED/
   // CANCELLED) routes through CONFIRMED_BY_SUPPLIER → QA_PASSED/QA_PARTIAL
@@ -1379,7 +1399,20 @@ export default function Purchasing() {
                       padding: '2px 8px',
                       borderRadius: '12px'
                     }}>
-                      {rfqQuotedCount} Báo Giá Cần Xác Nhận
+                      {rfqQuotedCount} Báo Giá Cần Duyệt
+                    </span>
+                  )}
+                  {rfqPendingDraftCount > 0 && (
+                    <span style={{
+                      backgroundColor: '#eff6ff',
+                      color: '#2563eb',
+                      border: '1px solid #bfdbfe',
+                      fontSize: '0.72rem',
+                      fontWeight: 700,
+                      padding: '2px 8px',
+                      borderRadius: '12px'
+                    }}>
+                      {rfqPendingDraftCount} Chờ Lập Phiếu
                     </span>
                   )}
                   {rfqPendingCeoCount > 0 && (
@@ -1530,7 +1563,12 @@ export default function Purchasing() {
 
             <div style={{ backgroundColor: '#fffbeb', padding: '1rem', borderRadius: '8px', border: '1px solid #fde68a', textAlign: 'center' }}>
               <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#d97706' }}>{rfqQuotedCount}</div>
-              <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#b45309', marginTop: '0.2rem' }}>Chờ Xác Nhận Báo Giá</div>
+              <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#b45309', marginTop: '0.2rem' }}>Chờ Duyệt Báo Giá</div>
+            </div>
+
+            <div style={{ backgroundColor: '#eff6ff', padding: '1rem', borderRadius: '8px', border: '1px solid #bfdbfe', textAlign: 'center' }}>
+              <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#2563eb' }}>{rfqPendingDraftCount}</div>
+              <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#2563eb', marginTop: '0.2rem' }}>Chờ Lập Phiếu</div>
             </div>
 
             <div style={{ backgroundColor: '#fffbeb', padding: '1rem', borderRadius: '8px', border: '1px solid #fde68a', textAlign: 'center' }}>
@@ -1567,7 +1605,7 @@ export default function Purchasing() {
                   onClick={() => navigate('/admin/purchasing?tab=rfq')}
                   style={{ backgroundColor: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', borderRadius: '6px', padding: '0.35rem 0.8rem', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer' }}
                 >
-                  Xem Tất Cả ({rfqDraftCount + rfqSentCount + rfqQuotedCount + rfqPendingCeoCount}) →
+                  Xem Tất Cả ({rfqDraftCount + rfqSentCount + rfqQuotedCount + rfqPendingDraftCount}) →
                 </button>
               </div>
               <p style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '1rem' }}>
@@ -2175,8 +2213,9 @@ export default function Purchasing() {
                 <>
                   <option value="RFQ">Bản nháp (RFQ)</option>
                   <option value="RFQ_SENT">Đã gửi NCC</option>
-                  <option value="QUOTED">NCC đã báo giá (chờ lập PO)</option>
-                  <option value="CONVERTED">Đã chọn — đã lập PO</option>
+                  <option value="QUOTED">NCC đã báo giá (chờ duyệt)</option>
+                  <option value="PENDING_PO_DRAFT">Đã duyệt — chờ lập phiếu</option>
+                  <option value="CONVERTED">Đã lập phiếu mua hàng</option>
                 </>
               ) : (
                 <>
@@ -2321,8 +2360,8 @@ export default function Purchasing() {
                           <div style={{ display: 'inline-flex', gap: '0.4rem' }}>
                             {po.status === 'QUOTED' && isPurchasingConfirmer && (
                               <button
-                                onClick={() => handleConfirmQuote(po.id)}
-                                title="Lập đơn mua hàng (PO) chính thức từ báo giá này và trình CEO phê duyệt"
+                                onClick={() => handleUpdateStatus(po.id, 'PENDING_PO_DRAFT')}
+                                title="Duyệt chọn báo giá này (chuyển sang Chờ Lập Phiếu)"
                                 style={{
                                   backgroundColor: '#2563eb',
                                   color: '#ffffff',
@@ -2334,7 +2373,25 @@ export default function Purchasing() {
                                   cursor: 'pointer'
                                 }}
                               >
-                                Lập PO
+                                Duyệt
+                              </button>
+                            )}
+                            {po.status === 'PENDING_PO_DRAFT' && isPurchasingConfirmer && (
+                              <button
+                                onClick={() => openIssuePOForm(po)}
+                                title="Lập Phiếu Mua Hàng chính thức từ báo giá đã duyệt và trình CEO phê duyệt"
+                                style={{
+                                  backgroundColor: '#2563eb',
+                                  color: '#ffffff',
+                                  border: 'none',
+                                  borderRadius: '4px',
+                                  padding: '0.3rem 0.65rem',
+                                  fontSize: '0.75rem',
+                                  fontWeight: 700,
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                Lập Phiếu
                               </button>
                             )}
                             {po.status === 'QUOTED_PENDING_CEO' && isCeoApprover && (
@@ -3961,6 +4018,15 @@ export default function Purchasing() {
               )}
             </div>
 
+            {/* Ghi chú/điều khoản nhập khi Lập Phiếu — CEO cần thấy nội dung này
+                trước khi duyệt, không chỉ người lập phiếu mới xem được. */}
+            {selectedPO.notes && (
+              <div style={{ backgroundColor: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px', padding: '0.85rem 1rem', marginBottom: '1.25rem' }}>
+                <strong style={{ fontSize: '0.8rem', color: '#92400e', display: 'block', marginBottom: '0.3rem' }}>Ghi Chú / Điều Khoản</strong>
+                <p style={{ margin: 0, fontSize: '0.85rem', color: '#78350f', whiteSpace: 'pre-wrap' }}>{selectedPO.notes}</p>
+              </div>
+            )}
+
             {selectedPO.isBlanket && (() => {
               const cap = parseFloat(selectedPO.blanketCapAmount) || 0;
               const used = (selectedPO.releases || []).reduce((sum, r) => sum + (parseFloat(r.totalAmount) || 0), 0);
@@ -4139,10 +4205,10 @@ export default function Purchasing() {
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
                       <button
                         onClick={async () => {
-                          // Same reasoning as the CEO cancel below: the backend has
-                          // no "send back for renegotiation" transition, so rejecting
-                          // a quote at this stage means cancelling it for real and
-                          // letting Purchasing create a fresh RFQ.
+                          // Same reasoning as the other cancel buttons below: the
+                          // backend has no "send back for renegotiation" transition,
+                          // so rejecting a quote here means cancelling it for real
+                          // and letting Purchasing create a fresh RFQ.
                           const reason = await promptText('Nhập lý do hủy báo giá này (NCC sẽ cần gửi báo giá mới qua một RFQ khác):', 'Giá chào thầu cao hơn ngân sách dự kiến');
                           if (reason !== null) {
                             await handleUpdateStatus(selectedPO.id, 'CANCELLED', { reason });
@@ -4159,9 +4225,9 @@ export default function Purchasing() {
                         const blocked = hasMissingPrice || totalInvalid;
                         return (
                           <button
-                            onClick={() => !blocked && handleConfirmQuote(selectedPO.id)}
+                            onClick={() => !blocked && handleUpdateStatus(selectedPO.id, 'PENDING_PO_DRAFT')}
                             disabled={blocked}
-                            title={blocked ? 'Không thể lập PO: còn linh kiện chưa có đơn giá hoặc tổng tiền bằng 0' : 'Lập đơn mua hàng (PO) chính thức từ báo giá này và trình CEO phê duyệt'}
+                            title={blocked ? 'Không thể duyệt: còn linh kiện chưa có đơn giá hoặc tổng tiền bằng 0' : 'Duyệt chọn báo giá này (chuyển sang Chờ Lập Phiếu)'}
                             style={{
                               backgroundColor: blocked ? '#9ca3af' : '#2563eb',
                               color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.5rem 1.1rem',
@@ -4169,7 +4235,7 @@ export default function Purchasing() {
                               opacity: blocked ? 0.75 : 1
                             }}
                           >
-                            {blocked ? 'Thiếu Đơn Giá' : 'Lập PO & Trình CEO Duyệt'}
+                            {blocked ? 'Thiếu Đơn Giá' : 'Duyệt Báo Giá'}
                           </button>
                         );
                       })()}
@@ -4177,7 +4243,45 @@ export default function Purchasing() {
                   ) : (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                       <span style={{ fontSize: '0.78rem', color: '#d97706', fontWeight: 700, backgroundColor: '#fef3c7', padding: '0.4rem 0.8rem', borderRadius: '6px', border: '1px solid #fde68a' }}>
-                        ⏳ Đang chờ Phòng Mua Hàng đối soát & xác nhận báo giá
+                        ⏳ Đang chờ Phòng Mua Hàng đối soát & duyệt báo giá
+                      </span>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {selectedPO.status === 'PENDING_PO_DRAFT' && (
+                <>
+                  {isPurchasingConfirmer ? (
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <button
+                        onClick={async () => {
+                          const reason = await promptText('Nhập lý do hủy báo giá này (NCC sẽ cần gửi báo giá mới qua một RFQ khác):', 'Đổi ý, chọn NCC khác phù hợp hơn');
+                          if (reason !== null) {
+                            await handleUpdateStatus(selectedPO.id, 'CANCELLED', { reason });
+                          }
+                        }}
+                        style={{ backgroundColor: '#fee2e2', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '6px', padding: '0.5rem 1.1rem', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
+                      >
+                        Hủy Báo Giá
+                      </button>
+                      <button
+                        onClick={() => {
+                          // Đóng modal chi tiết trước — nếu không, 2 lớp overlay
+                          // (modal chi tiết + form Lập Phiếu) sẽ chồng lên nhau.
+                          const target = selectedPO;
+                          setSelectedPO(null);
+                          openIssuePOForm(target);
+                        }}
+                        style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.5rem 1.1rem', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
+                      >
+                        Lập Phiếu Mua Hàng
+                      </button>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <span style={{ fontSize: '0.78rem', color: '#d97706', fontWeight: 700, backgroundColor: '#fef3c7', padding: '0.4rem 0.8rem', borderRadius: '6px', border: '1px solid #fde68a' }}>
+                        ⏳ Đã duyệt báo giá — đang chờ Phòng Mua Hàng lập Phiếu Mua Hàng
                       </span>
                     </div>
                   )}
@@ -4487,9 +4591,9 @@ export default function Purchasing() {
                               {po.totalAmount > 0 ? formatCurrency(po.totalAmount) : 'Chờ NCC báo giá'}
                             </div>
 
-                            {/* So sánh & chốt báo giá là việc của Phòng Mua Hàng, không phải CEO —
-                                CEO chỉ ký duyệt phát hành PO ở bước sau (QUOTED_PENDING_CEO -> PO),
-                                trên đúng NCC mà Mua Hàng đã chọn tại đây. */}
+                            {/* So sánh & duyệt chọn báo giá là việc của Phòng Mua Hàng, không phải
+                                CEO. Duyệt ở đây chỉ chuyển RFQ sang "Chờ Lập Phiếu" — Mua Hàng còn
+                                phải mở form Lập Phiếu Mua Hàng riêng (bước 2) mới thật sự tạo PO. */}
                             {isQuoted && isPurchasingConfirmer && (() => {
                               const poItems = po.items || [];
                               const blocked = poItems.length === 0 || poItems.some(it => !(parseFloat(it.unitCost) > 0)) || !(parseFloat(po.totalAmount) > 0);
@@ -4497,11 +4601,11 @@ export default function Purchasing() {
                                 <button
                                   onClick={async () => {
                                     if (blocked) return;
-                                    // Chọn NCC này = lập một đơn PO MỚI từ RFQ này (backend đóng
-                                    // RFQ lại ở CONVERTED và tạo bản ghi PO riêng). Mọi báo giá
-                                    // khác trong cùng đợt so sánh bị huỷ trong cùng giao dịch.
+                                    // Mọi báo giá khác trong cùng đợt so sánh bị huỷ luôn — quyết
+                                    // định đã có, không cần chờ NCC này nữa.
                                     const losers = group.list.filter(other => other.id !== po.id && other.status === 'QUOTED');
-                                    await handleConfirmQuote(po.id, losers.map(l => l.id));
+                                    await handleUpdateStatus(po.id, 'PENDING_PO_DRAFT', { loserIds: losers.map(l => l.id) });
+                                    setShowCompareModal(false);
                                   }}
                                   disabled={blocked}
                                   title={blocked ? 'Còn linh kiện chưa có đơn giá' : undefined}
@@ -4518,7 +4622,7 @@ export default function Purchasing() {
                                     opacity: blocked ? 0.75 : 1
                                   }}
                                 >
-                                  {blocked ? 'Thiếu Đơn Giá' : 'Chọn NCC Này (Trình CEO Duyệt)'}
+                                  {blocked ? 'Thiếu Đơn Giá' : 'Duyệt Báo Giá Này (Chờ Lập Phiếu)'}
                                 </button>
                               );
                             })()}
@@ -4533,6 +4637,111 @@ export default function Purchasing() {
           </div>
         </div>
       )}
+
+      {/* ================= MODAL LẬP PHIẾU MUA HÀNG (bước 2 sau khi đã Duyệt Báo Giá) ================= */}
+      {issuePOTarget && (() => {
+        const items = issuePOTarget.items || [];
+        return (
+          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(6px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '1.5rem' }}>
+            <div style={{ width: '100%', maxWidth: '640px', maxHeight: '90vh', overflowY: 'auto', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.15)' }}>
+              {/* Header — trình bày như tiêu đề một chứng từ thật */}
+              <div style={{ padding: '1.5rem', borderBottom: '2px solid #0f172a' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div>
+                    <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: '#0f172a' }}>PHIẾU MUA HÀNG</h2>
+                    <p style={{ margin: '0.25rem 0 0', fontSize: '0.8rem', color: '#64748b' }}>
+                      Lập từ báo giá {issuePOTarget.poNumber} — Người lập: {user?.fullname || user?.name || user?.code || '—'} — Ngày lập: {new Date().toLocaleDateString('vi-VN')}
+                    </p>
+                  </div>
+                  <button onClick={() => setIssuePOTarget(null)} style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#475569', cursor: 'pointer', padding: '0.4rem', borderRadius: '6px', display: 'flex' }}>
+                    <X size={18} />
+                  </button>
+                </div>
+              </div>
+
+              <div style={{ padding: '1.5rem' }}>
+                {/* Thông tin NCC */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '1rem', marginBottom: '1.25rem' }}>
+                  <div>
+                    <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block' }}>Nhà Cung Cấp</span>
+                    <strong style={{ fontSize: '0.9rem', color: '#0f172a' }}>{getSupplierName(issuePOTarget)}</strong>
+                  </div>
+                  <div>
+                    <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block' }}>Mã NCC</span>
+                    <strong style={{ fontSize: '0.9rem', color: '#0f172a' }}>{issuePOTarget.supplierCode}</strong>
+                  </div>
+                </div>
+
+                {/* Bảng hàng hóa — đơn giá đã chốt từ báo giá, không sửa được ở bước này */}
+                <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '1.25rem', fontSize: '0.82rem' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '2px solid #0f172a' }}>
+                      <th style={{ textAlign: 'left', padding: '0.5rem 0.25rem', color: '#475569' }}>Sản Phẩm</th>
+                      <th style={{ textAlign: 'center', padding: '0.5rem 0.25rem', color: '#475569', width: '60px' }}>SL</th>
+                      <th style={{ textAlign: 'right', padding: '0.5rem 0.25rem', color: '#475569', width: '110px' }}>Đơn Giá</th>
+                      <th style={{ textAlign: 'right', padding: '0.5rem 0.25rem', color: '#475569', width: '120px' }}>Thành Tiền</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {items.map(it => (
+                      <tr key={it.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                        <td style={{ padding: '0.5rem 0.25rem', color: '#0f172a' }}>{it.product?.name || it.productId}</td>
+                        <td style={{ padding: '0.5rem 0.25rem', textAlign: 'center', color: '#475569' }}>{it.quantity}</td>
+                        <td style={{ padding: '0.5rem 0.25rem', textAlign: 'right', color: '#475569' }}>{formatCurrency(it.unitCost)}</td>
+                        <td style={{ padding: '0.5rem 0.25rem', textAlign: 'right', color: '#0f172a', fontWeight: 700 }}>{formatCurrency(it.totalCost)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr>
+                      <td colSpan={3} style={{ padding: '0.6rem 0.25rem', textAlign: 'right', fontWeight: 700, color: '#475569' }}>Tổng Cộng:</td>
+                      <td style={{ padding: '0.6rem 0.25rem', textAlign: 'right', fontWeight: 800, fontSize: '0.95rem', color: '#16a34a' }}>{formatCurrency(issuePOTarget.totalAmount)}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+
+                {/* Thông tin bổ sung của Phiếu — form phù hợp một chứng từ mua hàng thật */}
+                <div style={{ marginBottom: '1rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#334155', marginBottom: '0.35rem' }}>Ngày Giao Hàng Dự Kiến</label>
+                  <input
+                    type="date"
+                    value={issuePOForm.expectedDeliveryDate}
+                    onChange={(e) => setIssuePOForm(f => ({ ...f, expectedDeliveryDate: e.target.value }))}
+                    style={{ width: '100%', padding: '0.5rem 0.65rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.85rem' }}
+                  />
+                </div>
+                <div style={{ marginBottom: '0.5rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#334155', marginBottom: '0.35rem' }}>Ghi Chú / Điều Khoản</label>
+                  <textarea
+                    value={issuePOForm.notes}
+                    onChange={(e) => setIssuePOForm(f => ({ ...f, notes: e.target.value }))}
+                    placeholder="VD: Điều khoản thanh toán, yêu cầu đóng gói, bảo hành..."
+                    rows={3}
+                    style={{ width: '100%', padding: '0.5rem 0.65rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.85rem', fontFamily: 'inherit', resize: 'vertical' }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem', padding: '1.25rem 1.5rem', borderTop: '1px solid #f1f5f9' }}>
+                <button
+                  onClick={() => setIssuePOTarget(null)}
+                  disabled={issuingPO}
+                  style={{ backgroundColor: '#ffffff', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.5rem 1.1rem', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
+                >
+                  Hủy
+                </button>
+                <button
+                  onClick={handleIssuePO}
+                  disabled={issuingPO}
+                  style={{ backgroundColor: issuingPO ? '#9ca3af' : '#2563eb', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.5rem 1.25rem', fontSize: '0.82rem', fontWeight: 800, cursor: issuingPO ? 'not-allowed' : 'pointer' }}
+                >
+                  {issuingPO ? 'Đang lập phiếu...' : 'Lập Phiếu & Trình CEO Duyệt'}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
     </div>
   );

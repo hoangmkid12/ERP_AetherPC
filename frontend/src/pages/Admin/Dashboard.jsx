@@ -267,7 +267,7 @@ export default function Dashboard() {
   const formatPurchaseReference = (po) => {
     if (!po) return '';
     const raw = typeof po === 'object' ? String(po.poNumber || po.reference || po.id || '') : String(po);
-    const isRfq = typeof po === 'object' && po !== null ? (['RFQ', 'RFQ_SENT', 'AWAITING_SUPPLIER_QUOTE', 'QUOTED', 'CONVERTED', 'DRAFT_RFQ'].includes(po.status) || po.type === 'BACKORDER_RFQ' || po.type === 'RFQ') : false;
+    const isRfq = typeof po === 'object' && po !== null ? (['RFQ', 'RFQ_SENT', 'AWAITING_SUPPLIER_QUOTE', 'QUOTED', 'PENDING_PO_DRAFT', 'CONVERTED', 'DRAFT_RFQ'].includes(po.status) || po.type === 'BACKORDER_RFQ' || po.type === 'RFQ') : false;
     const prefix = isRfq ? 'RFQ' : 'PO';
 
     const matchFull = raw.match(/^(?:PO|RFQ|PR)-(\d{4})-(\d+)$/i);
@@ -328,6 +328,7 @@ export default function Dashboard() {
         'SENT': 20,
         'AWAITING_SUPPLIER_QUOTE': 20,
         'QUOTED': 30,
+        'PENDING_PO_DRAFT': 32,
         'CONVERTED': 35,
         'QUOTED_PENDING_CEO': 40,
         'PO': 45,
@@ -456,6 +457,7 @@ export default function Dashboard() {
     RFQ_SENT: { bg: '#eff6ff', color: '#2563eb', border: '#bfdbfe' },
     SENT: { bg: '#eff6ff', color: '#2563eb', border: '#bfdbfe' },
     QUOTED: { bg: '#fffbeb', color: '#d97706', border: '#fde68a' },
+    PENDING_PO_DRAFT: { bg: '#eff6ff', color: '#2563eb', border: '#bfdbfe' },
     CONVERTED: { bg: '#f1f5f9', color: '#475569', border: '#cbd5e1' },
     QUOTED_PENDING_CEO: { bg: '#fffbeb', color: '#d97706', border: '#fde68a' },
     PO: { bg: '#f0fdf4', color: '#16a34a', border: '#bbf7d0' },

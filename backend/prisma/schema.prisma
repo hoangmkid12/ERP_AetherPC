@@ -492,6 +492,10 @@ model PurchaseOrder {
   totalAmount          Decimal             @default(0.00) @map("total_amount") @db.Decimal(15, 2)
   expectedDeliveryDate DateTime?           @map("expected_delivery_date") @db.Date
   cancelReason         String?             @map("cancel_reason")
+  // Ghi chú / điều khoản trên chính Phiếu Mua Hàng (giao hàng, thanh toán...),
+  // nhập khi Mua Hàng lập phiếu (POST /orders/:id/issue-po) — khác với
+  // cancelReason (lý do hủy) và note trên PurchaseOrderStatusHistory (nhật ký).
+  notes                String?
   createdBy            String?             @map("created_by") @db.VarChar(100)
   createdAt            DateTime            @default(now()) @map("created_at") @db.Timestamptz()
   updatedAt            DateTime            @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()

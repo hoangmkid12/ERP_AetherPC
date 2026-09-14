@@ -195,7 +195,7 @@ export default function QualityControl() {
   const formatPurchaseReference = (po) => {
     if (!po) return '';
     const raw = String(po.poNumber || po.reference || po.id || '').trim();
-    const isRfq = ['RFQ', 'RFQ_SENT', 'AWAITING_SUPPLIER_QUOTE', 'QUOTED', 'CONVERTED', 'DRAFT_RFQ'].includes(po.status) || po.type === 'BACKORDER_RFQ' || po.type === 'RFQ';
+    const isRfq = ['RFQ', 'RFQ_SENT', 'AWAITING_SUPPLIER_QUOTE', 'QUOTED', 'PENDING_PO_DRAFT', 'CONVERTED', 'DRAFT_RFQ'].includes(po.status) || po.type === 'BACKORDER_RFQ' || po.type === 'RFQ';
     const prefix = isRfq ? 'RFQ' : 'PO';
 
     // Standard format: PREFIX-YYYY-NNNN (4-digit year, sequential number)

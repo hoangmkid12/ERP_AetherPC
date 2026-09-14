@@ -11,7 +11,8 @@ const { hasOperationalPermission } = require('../middlewares/rbac.middleware');
 const DEFAULT_TRANSITION_NOTES = {
   RFQ_SENT: 'Phòng Mua Hàng đã gửi Yêu Cầu Báo Giá đến Nhà Cung Cấp.',
   QUOTED: 'Nhà cung cấp đã gửi báo giá cho Yêu Cầu Báo Giá.',
-  QUOTED_PENDING_CEO: 'Phòng Mua Hàng đã đối soát và xác nhận báo giá, trình Ban Giám Đốc phê duyệt.',
+  PENDING_PO_DRAFT: 'Phòng Mua Hàng đã duyệt chọn báo giá này, chuẩn bị lập Phiếu Mua Hàng chính thức.',
+  QUOTED_PENDING_CEO: 'Phòng Mua Hàng đã lập Phiếu Mua Hàng, trình Ban Giám Đốc phê duyệt.',
   PO: 'CEO đã phê duyệt báo giá, phát hành PO chính thức.'
 };
 
@@ -278,7 +279,7 @@ const getPurchaseOrders = async (req, res, next) => {
         blanketRef: {
           select: { id: true, poNumber: true, blanketCapAmount: true, blanketValidUntil: true }
         },
-        // RFQ <-> PO thật (2 bản ghi khác nhau, xem confirmQuoteAndIssuePO):
+        // RFQ <-> PO thật (2 bản ghi khác nhau, xem issuePurchaseOrder):
         // sourceRfq cho biết PO này lập từ RFQ nào; derivedPOs cho biết RFQ này
         // (nếu đã CONVERTED) đã trở thành PO nào.
         sourceRfq: {
@@ -455,17 +456,18 @@ const createPurchaseOrder = async (req, res, next) => {
   }
 };
 
-// POST /api/v1/purchasing/orders/:id/confirm-quote
-// RFQ và PO là 2 chứng từ khác nhau: Mua Hàng đối soát/so sánh báo giá của các
-// NCC (thường vài RFQ song song cùng một lô hàng), chọn NCC tối ưu, rồi gọi
-// endpoint này để đóng RFQ đó lại (status CONVERTED) và lập một PurchaseOrder
-// MỚI — số PO riêng, bản ghi riêng, tham chiếu ngược qua sourceRfqId — ở trạng
-// thái QUOTED_PENDING_CEO để trình CEO ký duyệt. Các báo giá thua cuộc trong
-// cùng đợt so sánh (loserIds, tuỳ chọn) bị huỷ trong cùng giao dịch.
-const confirmQuoteAndIssuePO = async (req, res, next) => {
+// POST /api/v1/purchasing/orders/:id/issue-po
+// Bước 2 của việc chốt báo giá (bước 1 là PATCH .../status -> PENDING_PO_DRAFT,
+// xem updatePurchaseOrderStatus): sau khi Mua Hàng đã DUYỆT chọn báo giá này
+// (RFQ đang ở PENDING_PO_DRAFT), họ mở form "Lập Phiếu Mua Hàng", xem/điền
+// ngày giao hàng dự kiến + ghi chú/điều khoản rồi submit — lúc này mới thật
+// sự lập một PurchaseOrder MỚI (số riêng, bản ghi riêng, tham chiếu ngược qua
+// sourceRfqId) ở trạng thái QUOTED_PENDING_CEO để trình CEO ký duyệt. RFQ gốc
+// đóng lại ở CONVERTED (đã thành công, không phải bị huỷ).
+const issuePurchaseOrder = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { loserIds } = req.body;
+    const { expectedDeliveryDate, notes } = req.body;
     const actorName = req.user?.name || req.user?.email || req.user?.code || null;
     const actorRole = req.user?.role || null;
 
@@ -479,15 +481,31 @@ const confirmQuoteAndIssuePO = async (req, res, next) => {
         error.statusCode = 404;
         throw error;
       }
-      if (rfq.status !== 'QUOTED') {
-        const error = new Error(`Chỉ có thể lập PO từ báo giá đang ở trạng thái QUOTED (hiện tại: ${rfq.status}).`);
+      if (rfq.status !== 'PENDING_PO_DRAFT') {
+        const error = new Error(`Chỉ có thể lập Phiếu Mua Hàng từ báo giá đang ở trạng thái Chờ Lập Phiếu (hiện tại: ${rfq.status}). Hãy duyệt chọn báo giá trước.`);
         error.statusCode = 409;
         throw error;
       }
       const hasMissingPrice = rfq.items.length === 0 || rfq.items.some(it => !(parseFloat(it.unitCost) > 0));
       if (hasMissingPrice || !(parseFloat(rfq.totalAmount) > 0)) {
-        const error = new Error('Còn linh kiện chưa có đơn giá — không thể lập PO.');
+        const error = new Error('Còn linh kiện chưa có đơn giá — không thể lập Phiếu Mua Hàng.');
         error.statusCode = 400;
+        throw error;
+      }
+
+      // Atomically claim this RFQ before creating anything: the conditional
+      // updateMany only succeeds if it's still PENDING_PO_DRAFT. Without this,
+      // two concurrent issue-po calls for the same RFQ (double-click, two tabs)
+      // could both pass the status check above and each create its own PO row
+      // from the same báo giá — same race the PATCH .../status endpoint's
+      // `claim` guards against.
+      const claim = await tx.purchaseOrder.updateMany({
+        where: { id: rfq.id, status: 'PENDING_PO_DRAFT' },
+        data: { status: 'CONVERTED' }
+      });
+      if (claim.count === 0) {
+        const error = new Error('Báo giá này vừa được xử lý ở nơi khác — vui lòng tải lại trang.');
+        error.statusCode = 409;
         throw error;
       }
 
@@ -501,7 +519,8 @@ const confirmQuoteAndIssuePO = async (req, res, next) => {
           supplierCode: rfq.supplierCode,
           status: 'QUOTED_PENDING_CEO',
           totalAmount: rfq.totalAmount,
-          expectedDeliveryDate: rfq.expectedDeliveryDate,
+          expectedDeliveryDate: expectedDeliveryDate ? new Date(expectedDeliveryDate) : rfq.expectedDeliveryDate,
+          notes: notes || null,
           createdBy: actorName,
           sourceRfqId: rfq.id,
           items: {
@@ -520,45 +539,31 @@ const confirmQuoteAndIssuePO = async (req, res, next) => {
         data: {
           poId: po.id,
           status: 'QUOTED_PENDING_CEO',
-          note: `Lập từ báo giá ${rfq.poNumber} — Phòng Mua Hàng đã đối soát và xác nhận, trình Ban Giám Đốc phê duyệt.`,
+          note: `Lập từ báo giá ${rfq.poNumber} — Phòng Mua Hàng đã lập Phiếu Mua Hàng, trình Ban Giám Đốc phê duyệt.`,
           changedBy: actorName,
           changedByRole: actorRole
         }
       });
 
-      await tx.purchaseOrder.update({ where: { id: rfq.id }, data: { status: 'CONVERTED' } });
+      // Status already flipped to CONVERTED by the claim above — just log it.
       await tx.purchaseOrderStatusHistory.create({
         data: {
           poId: rfq.id,
           status: 'CONVERTED',
-          note: `Đã chọn báo giá này để lập đơn mua hàng chính thức ${po.poNumber}.`,
+          note: `Đã lập Phiếu Mua Hàng chính thức ${po.poNumber} từ báo giá này.`,
           changedBy: actorName,
           changedByRole: actorRole
         }
       });
 
-      if (Array.isArray(loserIds)) {
-        for (const rawLoserId of loserIds) {
-          const loserId = parseInt(rawLoserId);
-          if (!Number.isInteger(loserId) || loserId === rfq.id) continue;
-          const loser = await tx.purchaseOrder.findUnique({ where: { id: loserId } });
-          if (!loser || loser.status !== 'QUOTED') continue;
-          const cancelNote = `Đã chọn báo giá của NCC ${rfq.supplierCode} trong cùng đợt so sánh.`;
-          await tx.purchaseOrder.update({ where: { id: loserId }, data: { status: 'CANCELLED', cancelReason: cancelNote } });
-          await tx.purchaseOrderStatusHistory.create({
-            data: { poId: loserId, status: 'CANCELLED', note: cancelNote, changedBy: actorName, changedByRole: actorRole }
-          });
-        }
-      }
-
       return po;
     });
 
-    logAudit({ req, action: 'CONFIRM_QUOTE_ISSUE_PO', module: 'Mua Hàng', targetId: newPO.id, note: `${newPO.poNumber} từ RFQ #${id}` });
+    logAudit({ req, action: 'ISSUE_PURCHASE_ORDER', module: 'Mua Hàng', targetId: newPO.id, note: `${newPO.poNumber} từ RFQ #${id}` });
 
     res.status(201).json({
       success: true,
-      message: 'Đã lập đơn mua hàng chính thức từ báo giá đã chọn.',
+      message: 'Đã lập Phiếu Mua Hàng chính thức, trình CEO phê duyệt.',
       data: newPO
     });
   } catch (err) {
@@ -575,7 +580,7 @@ const updatePurchaseOrderStatus = async (req, res, next) => {
     // 'APPROVED' and 'PENDING_QA' deliberately excluded: no code path ever sets
     // a PO to either — approval goes straight to 'PO', and a PO sits in
     // 'CONFIRMED_BY_SUPPLIER' until QC files QA_PASSED/QA_PARTIAL/QA_REJECTED.
-    const validStatuses = ['RFQ', 'RFQ_SENT', 'SENT', 'QUOTED', 'QUOTED_PENDING_CEO', 'PO', 'CONFIRMED_BY_SUPPLIER', 'QA_PASSED', 'QA_PARTIAL', 'QA_REJECTED', 'RECEIVED', 'DONE', 'COMPLETED', 'CANCELLED'];
+    const validStatuses = ['RFQ', 'RFQ_SENT', 'SENT', 'QUOTED', 'PENDING_PO_DRAFT', 'QUOTED_PENDING_CEO', 'PO', 'CONFIRMED_BY_SUPPLIER', 'QA_PASSED', 'QA_PARTIAL', 'QA_REJECTED', 'RECEIVED', 'DONE', 'COMPLETED', 'CANCELLED'];
     if (!validStatuses.includes(status)) {
       return res.status(400).json({ success: false, message: `Invalid status: ${status}. Must be one of: ${validStatuses.join(', ')}` });
     }
@@ -647,12 +652,13 @@ const updatePurchaseOrderStatus = async (req, res, next) => {
           PURCHASING: {
             RFQ: ['RFQ_SENT', 'CANCELLED'],
             RFQ_SENT: ['CANCELLED'],
-            // NCC gửi báo giá xong (QUOTED) không đi thẳng lên CEO trên CÙNG bản
-            // ghi này — Mua Hàng chọn NCC tối ưu qua POST /orders/:id/confirm-quote,
-            // endpoint đó tự đóng RFQ này (status CONVERTED) và tạo một bản ghi
-            // PurchaseOrder MỚI (đơn PO thật) ở trạng thái QUOTED_PENDING_CEO để
-            // trình CEO duyệt. Ở đây chỉ còn lại quyền huỷ báo giá.
-            QUOTED: ['CANCELLED'],
+            // Bước 1/2 của việc chốt báo giá: Mua Hàng đối soát/so sánh các NCC và
+            // DUYỆT chọn báo giá phù hợp nhất -> chỉ đổi trạng thái RFQ này sang
+            // "Chờ Lập Phiếu" (PENDING_PO_DRAFT), CHƯA tạo PO nào cả. Bước 2 là
+            // POST /orders/:id/issue-po (form Lập Phiếu Mua Hàng) — lúc đó mới
+            // thật sự tạo bản ghi PurchaseOrder mới (xem issuePurchaseOrder).
+            QUOTED: ['PENDING_PO_DRAFT', 'CANCELLED'],
+            PENDING_PO_DRAFT: ['CANCELLED'],
             QUOTED_PENDING_CEO: ['CANCELLED']
           },
           // QC/QA/QUALITY_CONTROL đều được chuẩn hoá về 'QC' qua normalizeQcRole
@@ -663,6 +669,18 @@ const updatePurchaseOrderStatus = async (req, res, next) => {
         if (!permitted || !permitted[po.status]?.includes(status)) {
           const error = new Error('Trạng thái đơn hàng không hợp lệ cho vai trò hiện tại.');
           error.statusCode = 403;
+          throw error;
+        }
+      }
+
+      // Duyệt QUOTED -> PENDING_PO_DRAFT: chặn ngay từ bước 1 nếu còn linh kiện
+      // chưa có đơn giá — không chỉ dựa vào nút bị vô hiệu hoá ở frontend, vì
+      // issuePurchaseOrder (bước 2, lập phiếu) cũng chặn lại y hệt điều kiện này.
+      if (status === 'PENDING_PO_DRAFT' && po.status === 'QUOTED') {
+        const hasMissingPrice = po.items.length === 0 || po.items.some(it => !(parseFloat(it.unitCost) > 0));
+        if (hasMissingPrice || !(parseFloat(po.totalAmount) > 0)) {
+          const error = new Error('Còn linh kiện chưa có đơn giá — không thể duyệt báo giá này.');
+          error.statusCode = 400;
           throw error;
         }
       }
@@ -772,6 +790,24 @@ const updatePurchaseOrderStatus = async (req, res, next) => {
               status: 'READY',
               note: `Tự động tạo từ Đơn Mua Hàng ${updated.poNumber} (NCC đã xác nhận & hẹn giao)`
             }
+          });
+        }
+      }
+
+      // Duyệt chọn 1 báo giá trong một đợt so sánh nhiều NCC (QUOTED ->
+      // PENDING_PO_DRAFT) làm mọi báo giá khác trong cùng đợt trở nên vô nghĩa —
+      // huỷ luôn (loserIds, tuỳ chọn, do frontend truyền vào từ modal so sánh)
+      // để chúng không tiếp tục nằm lì ở "Chờ Xác Nhận" mãi mãi.
+      if (!skipSideEffects && status === 'PENDING_PO_DRAFT' && Array.isArray(req.body.loserIds)) {
+        for (const rawLoserId of req.body.loserIds) {
+          const loserId = parseInt(rawLoserId);
+          if (!Number.isInteger(loserId) || loserId === po.id) continue;
+          const loser = await tx.purchaseOrder.findUnique({ where: { id: loserId } });
+          if (!loser || loser.status !== 'QUOTED') continue;
+          const cancelNote = `Đã chọn báo giá của NCC ${po.supplierCode} trong cùng đợt so sánh.`;
+          await tx.purchaseOrder.update({ where: { id: loserId }, data: { status: 'CANCELLED', cancelReason: cancelNote } });
+          await tx.purchaseOrderStatusHistory.create({
+            data: { poId: loserId, status: 'CANCELLED', note: cancelNote, changedBy: req.user?.name || req.user?.email || req.user?.code || null, changedByRole: userRole || null }
           });
         }
       }
@@ -1202,7 +1238,7 @@ module.exports = {
   getPurchaseOrders,
   createPurchaseOrder,
   updatePurchaseOrderStatus,
-  confirmQuoteAndIssuePO,
+  issuePurchaseOrder,
   createVendorBill,
   registerPayment,
   validateReceipt

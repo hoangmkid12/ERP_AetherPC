@@ -36,7 +36,7 @@ export default function SupplierPortal() {
   const formatPurchaseReference = (po) => {
     if (!po) return '';
     const raw = String(po.poNumber || po.reference || po.id || '').trim();
-    const isRfq = ['RFQ', 'RFQ_SENT', 'AWAITING_SUPPLIER_QUOTE', 'QUOTED', 'CONVERTED', 'DRAFT_RFQ'].includes(po.status) || po.type === 'BACKORDER_RFQ' || po.type === 'RFQ';
+    const isRfq = ['RFQ', 'RFQ_SENT', 'AWAITING_SUPPLIER_QUOTE', 'QUOTED', 'PENDING_PO_DRAFT', 'CONVERTED', 'DRAFT_RFQ'].includes(po.status) || po.type === 'BACKORDER_RFQ' || po.type === 'RFQ';
     const prefix = isRfq ? 'RFQ' : 'PO';
 
     // Standard format: PREFIX-YYYY-NNNN (4-digit year, sequential number)
@@ -130,7 +130,7 @@ export default function SupplierPortal() {
 
   // Filter POs for this supplier using flexible status and supplier matching
   const myPOs = orders.filter(po => {
-    const isStatusMatch = ['RFQ', 'RFQ_SENT', 'SENT', 'QUOTED', 'CONVERTED', 'QUOTED_PENDING_CEO', 'PO', 'APPROVED', 'CONFIRMED_BY_SUPPLIER', 'QA_PASSED', 'QA_PARTIAL', 'QA_REJECTED', 'RECEIVED', 'DONE', 'COMPLETED', 'CANCELLED'].includes(po?.status);
+    const isStatusMatch = ['RFQ', 'RFQ_SENT', 'SENT', 'QUOTED', 'PENDING_PO_DRAFT', 'CONVERTED', 'QUOTED_PENDING_CEO', 'PO', 'APPROVED', 'CONFIRMED_BY_SUPPLIER', 'QA_PASSED', 'QA_PARTIAL', 'QA_REJECTED', 'RECEIVED', 'DONE', 'COMPLETED', 'CANCELLED'].includes(po?.status);
     
     const uCode = (user?.code || '').toLowerCase();
     const uName = (user?.fullname || user?.username || '').toLowerCase();
@@ -155,6 +155,8 @@ export default function SupplierPortal() {
         return <span className="badge badge-warning">Chờ Báo Giá</span>;
       case 'QUOTED':
         return <span className="badge badge-info" style={{ backgroundColor: 'rgba(99,102,241,0.15)', color: '#818cf8' }}>Đã Báo Giá (Chờ Xác Nhận)</span>;
+      case 'PENDING_PO_DRAFT':
+        return <span className="badge badge-info" style={{ backgroundColor: 'rgba(99,102,241,0.15)', color: '#818cf8' }}>Đã Được Chọn (Đang Lập Phiếu)</span>;
       case 'CONVERTED':
         return <span className="badge badge-success" style={{ backgroundColor: 'rgba(34,197,94,0.15)', color: '#16a34a', border: '1px solid #bbf7d0' }}>Báo Giá Đã Được Chọn (Xem Đơn PO Mới)</span>;
       case 'QUOTED_PENDING_CEO':
@@ -536,7 +538,7 @@ export default function SupplierPortal() {
   // an order's value briefly vanish from every KPI the moment the supplier shipped it —
   // it fell out of "pending" (no longer QUOTED/PO) but wasn't "earned" (not DONE, which
   // only happens once Accounting has also fully paid the vendor bill).
-  const AWAITING_PAYMENT_STATUSES = ['QUOTED', 'QUOTED_PENDING_CEO', 'PO', 'CONFIRMED_BY_SUPPLIER', 'PENDING_QA', 'QA_PASSED', 'QA_PARTIAL', 'RECEIVED'];
+  const AWAITING_PAYMENT_STATUSES = ['QUOTED', 'PENDING_PO_DRAFT', 'QUOTED_PENDING_CEO', 'PO', 'CONFIRMED_BY_SUPPLIER', 'PENDING_QA', 'QA_PASSED', 'QA_PARTIAL', 'RECEIVED'];
   const SUPPLIED_STATUSES = ['CONFIRMED_BY_SUPPLIER', 'PENDING_QA', 'QA_PASSED', 'QA_PARTIAL', 'QA_REJECTED', 'RECEIVED', 'DONE'];
 
   const earnedRevenue = myPOs
@@ -562,7 +564,7 @@ export default function SupplierPortal() {
   const STATUS_FILTER_GROUPS = [
     { id: 'ALL', label: 'Tất cả', match: null },
     { id: 'RFQ_SENT', label: 'Chờ Báo Giá', match: ['RFQ', 'RFQ_SENT', 'SENT'] },
-    { id: 'QUOTED', label: 'Đã Báo Giá', match: ['QUOTED', 'CONVERTED'] },
+    { id: 'QUOTED', label: 'Đã Báo Giá', match: ['QUOTED', 'PENDING_PO_DRAFT', 'CONVERTED'] },
     { id: 'PO', label: 'Đã Duyệt (PO)', match: ['QUOTED_PENDING_CEO', 'PO', 'APPROVED'] },
     { id: 'SHIPPING', label: 'Đang Giao/Chờ QC', match: ['CONFIRMED_BY_SUPPLIER', 'PENDING_QA'] },
     { id: 'QA_DONE', label: 'QC Đã Kiểm Định', match: ['QA_PASSED', 'QA_PARTIAL', 'QA_REJECTED', 'RECEIVED'] },
@@ -1139,6 +1141,10 @@ export default function SupplierPortal() {
                             <span className="badge badge-info" style={{ backgroundColor: 'rgba(99,102,241,0.15)', color: '#818cf8', padding: '0.35rem 0.75rem', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 600 }}>
                               Chờ Xác Nhận Báo Giá
                             </span>
+                          ) : po.status === 'PENDING_PO_DRAFT' ? (
+                            <span className="badge badge-info" style={{ backgroundColor: 'rgba(99,102,241,0.15)', color: '#818cf8', padding: '0.35rem 0.75rem', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 600 }}>
+                              Đã Được Chọn — Đang Lập Phiếu
+                            </span>
                           ) : po.status === 'CONVERTED' ? (
                             <span className="badge badge-success" style={{ backgroundColor: 'rgba(34,197,94,0.15)', color: '#16a34a', padding: '0.35rem 0.75rem', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 600 }}>
                               Đã Được Chọn — Xem Đơn PO Mới
@@ -1217,6 +1223,15 @@ export default function SupplierPortal() {
               </div>
             </div>
 
+            {/* Ghi chú/điều khoản Phòng Mua Hàng nhập khi lập Phiếu Mua Hàng — NCC
+                cần thấy để biết yêu cầu đóng gói, thanh toán, giao hàng... */}
+            {selectedPO.notes && (
+              <div style={{ padding: '1rem', backgroundColor: '#fffbeb', border: '1px solid #fde68a', borderRadius: '10px', marginBottom: '1.5rem' }}>
+                <div style={{ color: '#92400e', fontSize: '0.8rem', fontWeight: 700, marginBottom: '0.25rem' }}>Ghi Chú / Điều Khoản Từ Bên Mua</div>
+                <p style={{ margin: 0, fontSize: '0.85rem', color: '#78350f', whiteSpace: 'pre-wrap' }}>{selectedPO.notes}</p>
+              </div>
+            )}
+
             {/* RFQ_SENT or QUOTED with missing prices: Instructions for supplier */}
             {needsPriceInput(selectedPO) && (
               <div style={{ padding: '1rem', backgroundColor: '#fef3c7', border: '1px solid #fde68a', borderRadius: '10px', marginBottom: '1.5rem', display: 'flex', alignItems: 'flex-start', gap: '0.75rem' }}>
@@ -1261,7 +1276,7 @@ export default function SupplierPortal() {
                     <tr style={{ backgroundColor: '#f8fafc', color: '#475569', borderBottom: '1px solid #e2e8f0' }}>
                       <th style={{ padding: '0.75rem', textAlign: 'left' }}>Tên Sản Phẩm</th>
                       <th style={{ padding: '0.75rem', textAlign: 'center', width: '80px' }}>Số Lượng</th>
-                      {(needsPriceInput(selectedPO) || ['QUOTED', 'QUOTED_PENDING_CEO', 'PO', 'APPROVED', 'CONFIRMED_BY_SUPPLIER', 'DONE'].includes(selectedPO.status)) && (
+                      {(needsPriceInput(selectedPO) || ['QUOTED', 'PENDING_PO_DRAFT', 'CONVERTED', 'QUOTED_PENDING_CEO', 'PO', 'APPROVED', 'CONFIRMED_BY_SUPPLIER', 'DONE'].includes(selectedPO.status)) && (
                         <>
                           <th style={{ padding: '0.75rem', textAlign: 'right', width: '160px' }}>
                             {needsPriceInput(selectedPO) ? 'Đơn Giá (Nhập báo giá)' : 'Đơn Giá Báo Giá'}
@@ -1321,7 +1336,7 @@ export default function SupplierPortal() {
                                 </td>
                               </>
                             )}
-                            {['QUOTED', 'QUOTED_PENDING_CEO', 'PO', 'APPROVED', 'CONFIRMED_BY_SUPPLIER', 'DONE'].includes(selectedPO.status) && !needsPriceInput(selectedPO) && (
+                            {['QUOTED', 'PENDING_PO_DRAFT', 'CONVERTED', 'QUOTED_PENDING_CEO', 'PO', 'APPROVED', 'CONFIRMED_BY_SUPPLIER', 'DONE'].includes(selectedPO.status) && !needsPriceInput(selectedPO) && (
                               <>
                                 <td style={{ padding: '0.75rem', textAlign: 'right', color: '#475569' }}>{formatPrice(savedCost)}</td>
                                 <td style={{ padding: '0.75rem', textAlign: 'right', fontWeight: 700, color: 'var(--success)' }}>{formatPrice(savedTotal)}</td>
@@ -1511,7 +1526,7 @@ export default function SupplierPortal() {
             )}
 
             {/* Total summary */}
-            {['QUOTED', 'QUOTED_PENDING_CEO', 'PO', 'APPROVED', 'CONFIRMED_BY_SUPPLIER', 'DONE'].includes(selectedPO.status) && selectedPO.totalAmount > 0 && (
+            {['QUOTED', 'PENDING_PO_DRAFT', 'CONVERTED', 'QUOTED_PENDING_CEO', 'PO', 'APPROVED', 'CONFIRMED_BY_SUPPLIER', 'DONE'].includes(selectedPO.status) && selectedPO.totalAmount > 0 && (
               <div style={{ padding: '1rem', backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px', marginBottom: '1.5rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '1.1rem', fontWeight: 700 }}>
                   <span style={{ color: '#0f172a' }}>Tổng Báo Giá Đơn Hàng:</span>
