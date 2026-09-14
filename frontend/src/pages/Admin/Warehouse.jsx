@@ -7,7 +7,7 @@ import { useNotification, notify, confirm } from '../../context/NotificationCont
 import { DELIVERY_REGIONS, detectDeliveryRegion } from '../../utils/deliveryRegions';
 import { QC_STATUS, getStatusInfo } from '../../utils/statusLabels';
 import { api } from '../../services/api';
-import { Package, CheckCircle, X, AlertCircle, Truck, RotateCcw, Sparkles, RefreshCw, Box, Image, Plus } from 'lucide-react';
+import { Package, CheckCircle, X, AlertCircle, Truck, RotateCcw, Sparkles, RefreshCw, Box, Image, Plus, Eye, Printer } from 'lucide-react';
 import ActorNotificationBar from '../../components/ActorNotificationBar';
 import PackAndScanModal from '../../components/PackAndScanModal';
 import OrderDetailModal from '../../components/OrderDetailModal';
@@ -1990,6 +1990,7 @@ export default function Warehouse() {
   const [prBusyId, setPrBusyId] = useState(null);
   const [showCreatePrForm, setShowCreatePrForm] = useState(false);
   const [prForm, setPrForm] = useState({ productId: '', quantity: '', reason: '' });
+  const [viewingPR, setViewingPR] = useState(null); // PR đang xem/in dưới dạng chứng từ chuẩn
 
   const loadPurchaseRequests = async () => {
     setLoadingPRs(true);
@@ -4666,6 +4667,7 @@ export default function Warehouse() {
                       <th style={{ padding: '0.75rem 1rem', minWidth: '180px' }}>Lý Do</th>
                       <th style={{ padding: '0.75rem 1rem', width: '180px', whiteSpace: 'nowrap' }}>Người Đề Xuất</th>
                       <th style={{ padding: '0.75rem 1rem', textAlign: 'center', width: '130px', whiteSpace: 'nowrap' }}>Trạng Thái</th>
+                      <th style={{ padding: '0.75rem 1rem', textAlign: 'center', width: '90px', whiteSpace: 'nowrap' }}>Phiếu</th>
                       {canApprovePr && <th style={{ padding: '0.75rem 1rem', textAlign: 'center', width: '140px', whiteSpace: 'nowrap' }}>Thao Tác</th>}
                     </tr>
                   </thead>
@@ -4685,6 +4687,15 @@ export default function Warehouse() {
                           <td style={{ padding: '0.75rem 1rem', color: '#64748b', fontSize: '0.78rem', whiteSpace: 'nowrap' }}>{pr.requestedBy}</td>
                           <td style={{ padding: '0.75rem 1rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
                             <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: '12px', fontSize: '0.72rem', fontWeight: 700, backgroundColor: statusBg, color: statusColor, border: `1px solid ${statusBorder}`, whiteSpace: 'nowrap' }}>{statusLabel}</span>
+                          </td>
+                          <td style={{ padding: '0.75rem 1rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                            <button
+                              onClick={() => setViewingPR(pr)}
+                              title="Xem / In Phiếu Đề Xuất Mua Hàng"
+                              style={{ backgroundColor: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', borderRadius: '4px', padding: '0.3rem 0.55rem', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                            >
+                              <Eye size={13} /> Xem
+                            </button>
                           </td>
                           {canApprovePr && (
                             <td style={{ padding: '0.75rem 1rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
@@ -4706,6 +4717,100 @@ export default function Warehouse() {
               </div>
             )}
           </div>
+
+          {/* Chứng từ chuẩn: Phiếu Đề Xuất Mua Hàng — xem & in */}
+          {viewingPR && (
+            <div
+              style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1200, padding: '1.5rem' }}
+              onClick={() => setViewingPR(null)}
+            >
+              <style>{`
+                @media print {
+                  body * { visibility: hidden; }
+                  .aetherpc-pr-print, .aetherpc-pr-print * { visibility: visible; }
+                  .aetherpc-pr-print { position: fixed; inset: 0; margin: 0 auto; padding: 28px; max-width: 100%; box-shadow: none !important; border: none !important; }
+                  .aetherpc-no-print { display: none !important; }
+                }
+              `}</style>
+              <div
+                className="aetherpc-pr-print"
+                style={{ width: '100%', maxWidth: '640px', maxHeight: '90vh', overflowY: 'auto', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.15)' }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div style={{ padding: '1.75rem' }}>
+                  {/* Company header — trình bày như tiêu đề một chứng từ thật */}
+                  <div style={{ textAlign: 'center', borderBottom: '2px solid #0f172a', paddingBottom: '1rem', marginBottom: '1.25rem' }}>
+                    <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      CÔNG TY TNHH CÔNG NGHỆ AETHERPC — BỘ PHẬN KHO
+                    </div>
+                    <h2 style={{ margin: '0.4rem 0 0', fontSize: '1.3rem', fontWeight: 800, color: '#0f172a' }}>PHIẾU ĐỀ XUẤT MUA HÀNG</h2>
+                    <div style={{ fontSize: '0.85rem', color: '#2563eb', fontWeight: 700, marginTop: '0.2rem' }}>Số: {viewingPR.prCode}</div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem 1.5rem', fontSize: '0.85rem', marginBottom: '1.25rem' }}>
+                    <div><span style={{ color: '#64748b' }}>Ngày lập:</span> <strong style={{ color: '#0f172a' }}>{viewingPR.createdAt ? new Date(viewingPR.createdAt).toLocaleDateString('vi-VN') : '—'}</strong></div>
+                    <div><span style={{ color: '#64748b' }}>Người đề xuất:</span> <strong style={{ color: '#0f172a' }}>{viewingPR.requestedBy || '—'}</strong></div>
+                    <div><span style={{ color: '#64748b' }}>Sản phẩm:</span> <strong style={{ color: '#0f172a' }}>{viewingPR.product?.name || '—'}</strong></div>
+                    <div><span style={{ color: '#64748b' }}>Mã SP / SKU:</span> <strong style={{ color: '#0f172a' }}>{viewingPR.product?.sku || viewingPR.productId}</strong></div>
+                    <div><span style={{ color: '#64748b' }}>Tồn kho hiện tại:</span> <strong style={{ color: '#0f172a' }}>{viewingPR.product?.stockQuantity ?? '—'}</strong></div>
+                    <div><span style={{ color: '#64748b' }}>Số lượng đề xuất mua:</span> <strong style={{ color: '#2563eb' }}>{viewingPR.quantity}</strong></div>
+                  </div>
+
+                  <div style={{ marginBottom: '1.25rem' }}>
+                    <span style={{ fontSize: '0.8rem', color: '#64748b', display: 'block', marginBottom: '0.3rem' }}>Lý do đề xuất:</span>
+                    <div style={{ padding: '0.65rem 0.85rem', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '0.85rem', color: '#0f172a', minHeight: '2.2rem' }}>
+                      {viewingPR.reason || '—'}
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.5rem', fontSize: '0.85rem' }}>
+                    <span style={{ color: '#64748b' }}>Trạng thái:</span>
+                    {(() => {
+                      const statusLabel = viewingPR.status === 'APPROVED' ? 'Đã Duyệt' : viewingPR.status === 'REJECTED' ? 'Từ Chối' : 'Chờ Duyệt';
+                      const statusColor = viewingPR.status === 'APPROVED' ? '#15803d' : viewingPR.status === 'REJECTED' ? '#dc2626' : '#b45309';
+                      return <strong style={{ color: statusColor }}>{statusLabel}</strong>;
+                    })()}
+                    {viewingPR.approvedBy && (
+                      <span style={{ fontSize: '0.78rem', color: '#64748b' }}>
+                        — bởi {viewingPR.approvedBy}{viewingPR.approvedAt ? ` ngày ${new Date(viewingPR.approvedAt).toLocaleDateString('vi-VN')}` : ''}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Signature blocks — bản in để lưu hồ sơ / trình ký giấy */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', textAlign: 'center', marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px dashed #cbd5e1' }}>
+                    <div>
+                      <strong style={{ fontSize: '0.8rem', color: '#0f172a' }}>NGƯỜI ĐỀ XUẤT</strong>
+                      <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: '0.2rem' }}>(Ký, ghi rõ họ tên)</div>
+                      <div style={{ height: '56px' }} />
+                      <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#0f172a' }}>{viewingPR.requestedBy || ''}</div>
+                    </div>
+                    <div>
+                      <strong style={{ fontSize: '0.8rem', color: '#0f172a' }}>QUẢN LÝ KHO / PHÒNG MUA HÀNG DUYỆT</strong>
+                      <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: '0.2rem' }}>(Ký, ghi rõ họ tên)</div>
+                      <div style={{ height: '56px' }} />
+                      <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#0f172a' }}>{viewingPR.approvedBy || ''}</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="aetherpc-no-print" style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem', padding: '1.25rem 1.75rem', borderTop: '1px solid #f1f5f9' }}>
+                  <button
+                    onClick={() => setViewingPR(null)}
+                    style={{ backgroundColor: '#ffffff', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.5rem 1.1rem', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
+                  >
+                    Đóng
+                  </button>
+                  <button
+                    onClick={() => window.print()}
+                    style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.5rem 1.25rem', fontSize: '0.82rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+                  >
+                    <Printer size={15} /> In Phiếu
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Filter bar */}
           <div style={{ backgroundColor: '#ffffff', padding: '1rem', borderRadius: '8px', border: '1px solid #cbd5e1', marginBottom: '1.25rem', display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>

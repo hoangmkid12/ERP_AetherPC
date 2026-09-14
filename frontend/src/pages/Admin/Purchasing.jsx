@@ -7,13 +7,14 @@ import { notify, promptText } from '../../context/NotificationContext';
 import { PO_STATUS, VENDOR_BILL_STATUS, getStatusInfo, getStatusLabel } from '../../utils/statusLabels';
 import { api } from '../../services/api';
 import ActorNotificationBar from '../../components/ActorNotificationBar';
-import { 
-  Package, Search, Plus, DollarSign, Eye, 
-  Trash2, Calendar, ShoppingBag, Check, X, Send, 
+import {
+  Package, Search, Plus, DollarSign, Eye,
+  Trash2, Calendar, ShoppingBag, Check, X, Send,
   AlertCircle, RefreshCw, User, ShoppingCart, ArrowRight, Truck, FileText, CreditCard, Bell,
   BarChart2, Award, Zap, TrendingDown, Star, Phone, Mail, MapPin, Building, CheckCircle2, Clock,
-  ChevronLeft, ChevronRight
+  ChevronLeft, ChevronRight, Printer
 } from 'lucide-react';
+import { formatCurrencyInWords } from '../../utils/numberToWords';
 
 const CAT_ALIASES = {
   CPU: ['CPU', 'VI XỬ LÝ', 'CHIP', 'BỘ VI XỬ LÝ'],
@@ -4666,39 +4667,60 @@ export default function Purchasing() {
       {/* ================= MODAL LẬP PHIẾU MUA HÀNG (bước 2 sau khi đã Duyệt Báo Giá) ================= */}
       {issuePOTarget && (() => {
         const items = issuePOTarget.items || [];
+        const supplierInfo = issuePOTarget.supplier || {};
         return (
           <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(6px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '1.5rem' }}>
-            <div style={{ width: '100%', maxWidth: '640px', maxHeight: '90vh', overflowY: 'auto', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.15)' }}>
+            <style>{`
+              @media print {
+                body * { visibility: hidden; }
+                .aetherpc-po-print, .aetherpc-po-print * { visibility: visible; }
+                .aetherpc-po-print { position: fixed; inset: 0; margin: 0 auto; padding: 28px; max-width: 100%; box-shadow: none !important; border: none !important; }
+                .aetherpc-no-print { display: none !important; }
+                .aetherpc-print-only { display: block !important; }
+              }
+            `}</style>
+            <div className="aetherpc-po-print" style={{ width: '100%', maxWidth: '680px', maxHeight: '90vh', overflowY: 'auto', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.15)' }}>
               {/* Header — trình bày như tiêu đề một chứng từ thật */}
               <div style={{ padding: '1.5rem', borderBottom: '2px solid #0f172a' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <div>
-                    <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: '#0f172a' }}>PHIẾU MUA HÀNG</h2>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      CÔNG TY TNHH CÔNG NGHỆ AETHERPC — PHÒNG MUA HÀNG
+                    </div>
+                    <h2 style={{ margin: '0.3rem 0 0', fontSize: '1.25rem', fontWeight: 800, color: '#0f172a' }}>PHIẾU MUA HÀNG</h2>
                     <p style={{ margin: '0.25rem 0 0', fontSize: '0.8rem', color: '#64748b' }}>
                       Lập từ báo giá {issuePOTarget.poNumber} — Người lập: {user?.fullname || user?.name || user?.code || '—'} — Ngày lập: {new Date().toLocaleDateString('vi-VN')}
                     </p>
                   </div>
-                  <button onClick={() => setIssuePOTarget(null)} style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#475569', cursor: 'pointer', padding: '0.4rem', borderRadius: '6px', display: 'flex' }}>
+                  <button onClick={() => setIssuePOTarget(null)} className="aetherpc-no-print" style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#475569', cursor: 'pointer', padding: '0.4rem', borderRadius: '6px', display: 'flex' }}>
                     <X size={18} />
                   </button>
                 </div>
               </div>
 
               <div style={{ padding: '1.5rem' }}>
-                {/* Thông tin NCC */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '1rem', marginBottom: '1.25rem' }}>
-                  <div>
-                    <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block' }}>Nhà Cung Cấp</span>
-                    <strong style={{ fontSize: '0.9rem', color: '#0f172a' }}>{getSupplierName(issuePOTarget)}</strong>
+                {/* Bên Mua / Bên Bán — chứng từ mua hàng thật luôn thể hiện đủ 2 bên */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.25rem' }}>
+                  <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.85rem 1rem' }}>
+                    <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#2563eb', textTransform: 'uppercase' }}>Bên Mua Hàng (Bên A)</span>
+                    <div style={{ fontSize: '0.85rem', color: '#0f172a', fontWeight: 700, marginTop: '0.3rem' }}>Công Ty TNHH Công Nghệ AetherPC</div>
+                    <div style={{ fontSize: '0.76rem', color: '#64748b', marginTop: '0.15rem' }}>175 Nguyễn Thị Minh Khai, Quận 1, TP. HCM</div>
                   </div>
-                  <div>
-                    <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block' }}>Mã NCC</span>
-                    <strong style={{ fontSize: '0.9rem', color: '#0f172a' }}>{issuePOTarget.supplierCode}</strong>
+                  <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.85rem 1rem' }}>
+                    <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#b45309', textTransform: 'uppercase' }}>Bên Bán (Bên B — NCC)</span>
+                    <div style={{ fontSize: '0.85rem', color: '#0f172a', fontWeight: 700, marginTop: '0.3rem' }}>{getSupplierName(issuePOTarget)}</div>
+                    <div style={{ fontSize: '0.76rem', color: '#64748b', marginTop: '0.15rem' }}>
+                      Mã NCC: {issuePOTarget.supplierCode}
+                      {supplierInfo.phone ? ` • ĐT: ${supplierInfo.phone}` : ''}
+                    </div>
+                    {supplierInfo.address && (
+                      <div style={{ fontSize: '0.76rem', color: '#64748b', marginTop: '0.1rem' }}>{supplierInfo.address}</div>
+                    )}
                   </div>
                 </div>
 
                 {/* Bảng hàng hóa — đơn giá đã chốt từ báo giá, không sửa được ở bước này */}
-                <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '1.25rem', fontSize: '0.82rem' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '0.5rem', fontSize: '0.82rem' }}>
                   <thead>
                     <tr style={{ borderBottom: '2px solid #0f172a' }}>
                       <th style={{ textAlign: 'left', padding: '0.5rem 0.25rem', color: '#475569' }}>Sản Phẩm</th>
@@ -4724,9 +4746,12 @@ export default function Purchasing() {
                     </tr>
                   </tfoot>
                 </table>
+                <p style={{ fontSize: '0.78rem', color: '#64748b', fontStyle: 'italic', margin: '0 0 1.25rem' }}>
+                  Bằng chữ: {formatCurrencyInWords(issuePOTarget.totalAmount)}.
+                </p>
 
                 {/* Thông tin bổ sung của Phiếu — form phù hợp một chứng từ mua hàng thật */}
-                <div style={{ marginBottom: '1rem' }}>
+                <div className="aetherpc-no-print" style={{ marginBottom: '1rem' }}>
                   <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#334155', marginBottom: '0.35rem' }}>Ngày Giao Hàng Dự Kiến</label>
                   <input
                     type="date"
@@ -4735,7 +4760,7 @@ export default function Purchasing() {
                     style={{ width: '100%', padding: '0.5rem 0.65rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.85rem' }}
                   />
                 </div>
-                <div style={{ marginBottom: '0.5rem' }}>
+                <div className="aetherpc-no-print" style={{ marginBottom: '0.5rem' }}>
                   <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#334155', marginBottom: '0.35rem' }}>Ghi Chú / Điều Khoản</label>
                   <textarea
                     value={issuePOForm.notes}
@@ -4745,15 +4770,53 @@ export default function Purchasing() {
                     style={{ width: '100%', padding: '0.5rem 0.65rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.85rem', fontFamily: 'inherit', resize: 'vertical' }}
                   />
                 </div>
+
+                {/* Bản in tĩnh của ngày giao/ghi chú — input/textarea ở trên chỉ để chỉnh sửa trên màn hình */}
+                <div style={{ display: 'none' }} className="aetherpc-print-only">
+                  <div style={{ marginBottom: '0.5rem', fontSize: '0.85rem' }}>
+                    <strong style={{ color: '#334155' }}>Ngày Giao Hàng Dự Kiến:</strong> {issuePOForm.expectedDeliveryDate ? new Date(issuePOForm.expectedDeliveryDate).toLocaleDateString('vi-VN') : '—'}
+                  </div>
+                  {issuePOForm.notes && (
+                    <div style={{ marginBottom: '0.5rem', fontSize: '0.85rem' }}>
+                      <strong style={{ color: '#334155' }}>Ghi Chú / Điều Khoản:</strong> {issuePOForm.notes}
+                    </div>
+                  )}
+                </div>
+
+                {/* Chữ ký 3 bên — bản in để trình ký/lưu hồ sơ giấy */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem', textAlign: 'center', marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px dashed #cbd5e1' }}>
+                  <div>
+                    <strong style={{ fontSize: '0.76rem', color: '#0f172a' }}>NGƯỜI LẬP PHIẾU</strong>
+                    <div style={{ fontSize: '0.68rem', color: '#94a3b8', marginTop: '0.2rem' }}>(Ký, ghi rõ họ tên)</div>
+                    <div style={{ height: '52px' }} />
+                    <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#0f172a' }}>{user?.fullname || user?.name || user?.code || ''}</div>
+                  </div>
+                  <div>
+                    <strong style={{ fontSize: '0.76rem', color: '#0f172a' }}>TRƯỞNG PHÒNG MUA HÀNG</strong>
+                    <div style={{ fontSize: '0.68rem', color: '#94a3b8', marginTop: '0.2rem' }}>(Ký, ghi rõ họ tên)</div>
+                    <div style={{ height: '52px' }} />
+                  </div>
+                  <div>
+                    <strong style={{ fontSize: '0.76rem', color: '#0f172a' }}>GIÁM ĐỐC DUYỆT</strong>
+                    <div style={{ fontSize: '0.68rem', color: '#94a3b8', marginTop: '0.2rem' }}>(Ký, ghi rõ họ tên)</div>
+                    <div style={{ height: '52px' }} />
+                  </div>
+                </div>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem', padding: '1.25rem 1.5rem', borderTop: '1px solid #f1f5f9' }}>
+              <div className="aetherpc-no-print" style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem', padding: '1.25rem 1.5rem', borderTop: '1px solid #f1f5f9' }}>
                 <button
                   onClick={() => setIssuePOTarget(null)}
                   disabled={issuingPO}
                   style={{ backgroundColor: '#ffffff', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.5rem 1.1rem', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
                 >
                   Hủy
+                </button>
+                <button
+                  onClick={() => window.print()}
+                  style={{ backgroundColor: '#ffffff', color: '#2563eb', border: '1px solid #bfdbfe', borderRadius: '6px', padding: '0.5rem 1.1rem', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+                >
+                  <Printer size={15} /> In Phiếu
                 </button>
                 <button
                   onClick={handleIssuePO}
