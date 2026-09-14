@@ -182,7 +182,7 @@ export default function Sidebar({ isOpen = false, onClose }) {
   const pendingReturnsCount = (returnRequests && returnRequests.length > 0)
     ? returnRequests.filter(r => r && !['QC_PASSED', 'RESTOCKED', 'APPROVED', 'VENDOR_WARRANTY', 'INSPECTED_SCRAP', 'EXCHANGE_NEW', 'EXCHANGED', 'REJECTED', 'REJECT_RMA'].includes(r.status)).length
     : 0;
-  const pendingQuotedPOs = (purchaseOrders || []).filter(p => p && p.status === 'QUOTED').length;
+  const pendingQuotedPOs = (purchaseOrders || []).filter(p => p && p.status === 'QUOTED_PENDING_CEO').length;
   const pendingPayrollApproval = (payrolls && payrolls.length > 0 && payrolls[0]?.status === 'SUBMITTED_TO_CEO') ? 1 : 0;
   const pendingLeaveApproval = (leaveRequests || []).filter(l => l && (l.status === 'PENDING_CEO' || l.status === 'PENDING')).length;
   const pendingCeoApprovals = pendingQuotedPOs + pendingPayrollApproval + pendingLeaveApproval;
@@ -334,8 +334,8 @@ export default function Sidebar({ isOpen = false, onClose }) {
         });
       }
 
-      // Phê duyệt đơn mua hàng PO giá trị lớn
-      const quotedPOs = (purchaseOrders || []).filter(po => po.status === 'QUOTED');
+      // Phê duyệt đơn mua hàng PO giá trị lớn (Mua Hàng đã đối soát & xác nhận)
+      const quotedPOs = (purchaseOrders || []).filter(po => po.status === 'QUOTED_PENDING_CEO');
       quotedPOs.forEach(po => {
         list.push({
           id: `NOTIF-CEO-${po.id || po.poNumber}`,

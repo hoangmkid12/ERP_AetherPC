@@ -391,9 +391,11 @@ export default function Dashboard() {
 
       const combined = Array.from(mergedMap.values());
       const quoted = combined
-        .filter(po => 
-          ['QUOTED', 'QUOTED_PENDING_CEO', 'AWAITING_CEO_APPROVAL'].includes(po.status) ||
-          (po.status === 'RFQ_SENT' && Number(po.totalAmount) > 0)
+        .filter(po =>
+          // Plain QUOTED means the supplier just replied — that still needs Mua Hàng
+          // to compare/confirm before it's CEO's turn, so only QUOTED_PENDING_CEO
+          // (and its legacy alias) belong in the CEO's own approval queue here.
+          ['QUOTED_PENDING_CEO', 'AWAITING_CEO_APPROVAL'].includes(po.status)
         )
         .map(po => {
           const supplierName = getSupplierName(po);
@@ -413,7 +415,7 @@ export default function Dashboard() {
       let localPOs = [];
       try { localPOs = JSON.parse(localStorage.getItem('erp_pos') || '[]'); } catch (_) { localPOs = []; }
       const quoted = localPOs
-        .filter(po => ['QUOTED', 'QUOTED_PENDING_CEO', 'AWAITING_CEO_APPROVAL'].includes(po.status) || (po.status === 'RFQ_SENT' && Number(po.totalAmount) > 0))
+        .filter(po => ['QUOTED_PENDING_CEO', 'AWAITING_CEO_APPROVAL'].includes(po.status))
         .map(po => {
           const supplierName = getSupplierName(po);
           return {
@@ -453,6 +455,7 @@ export default function Dashboard() {
     RFQ_SENT: { bg: '#eff6ff', color: '#2563eb', border: '#bfdbfe' },
     SENT: { bg: '#eff6ff', color: '#2563eb', border: '#bfdbfe' },
     QUOTED: { bg: '#fffbeb', color: '#d97706', border: '#fde68a' },
+    QUOTED_PENDING_CEO: { bg: '#fffbeb', color: '#d97706', border: '#fde68a' },
     PO: { bg: '#f0fdf4', color: '#16a34a', border: '#bbf7d0' },
     CONFIRMED_BY_SUPPLIER: { bg: '#eff6ff', color: '#1d4ed8', border: '#93c5fd' },
     QA_PASSED: { bg: '#ecfdf5', color: '#059669', border: '#a7f3d0' },
@@ -1609,7 +1612,7 @@ export default function Dashboard() {
               {/* Chỉ đơn còn ở giai đoạn chờ CEO duyệt báo giá mới cần nút này — một đơn
                   mở từ Lịch Sử Duyệt có thể đã đi xa hơn (PO, NCC xác nhận...), lúc đó
                   việc "duyệt lại" không còn ý nghĩa và dễ gây hiểu nhầm. */}
-              {['QUOTED', 'QUOTED_PENDING_CEO', 'AWAITING_CEO_APPROVAL'].includes(selectedDetailPO.status) && (
+              {['QUOTED_PENDING_CEO', 'AWAITING_CEO_APPROVAL'].includes(selectedDetailPO.status) && (
                 <button
                   onClick={() => {
                     handleApproveQuotedPO(selectedDetailPO.id, selectedDetailPO.poNumber || selectedDetailPO.id);

@@ -414,8 +414,8 @@ export const useFinanceStore = create((set, get) => ({
    * Get pending purchase orders
    */
   getPendingPOs: () => {
-    return get().purchaseOrders.filter(po => 
-      po.status === 'PENDING' || po.status === 'QUOTED' || po.status === 'RFQ'
+    return get().purchaseOrders.filter(po =>
+      po.status === 'PENDING' || po.status === 'QUOTED' || po.status === 'QUOTED_PENDING_CEO' || po.status === 'RFQ'
     );
   },
 }));

@@ -11,6 +11,7 @@ const { hasOperationalPermission } = require('../middlewares/rbac.middleware');
 const DEFAULT_TRANSITION_NOTES = {
   RFQ_SENT: 'Phòng Mua Hàng đã gửi Yêu Cầu Báo Giá đến Nhà Cung Cấp.',
   QUOTED: 'Nhà cung cấp đã gửi báo giá cho Yêu Cầu Báo Giá.',
+  QUOTED_PENDING_CEO: 'Phòng Mua Hàng đã đối soát và xác nhận báo giá, trình Ban Giám Đốc phê duyệt.',
   PO: 'CEO đã phê duyệt báo giá, phát hành PO chính thức.'
 };
 
@@ -454,7 +455,7 @@ const updatePurchaseOrderStatus = async (req, res, next) => {
     // 'APPROVED' and 'PENDING_QA' deliberately excluded: no code path ever sets
     // a PO to either — approval goes straight to 'PO', and a PO sits in
     // 'CONFIRMED_BY_SUPPLIER' until QC files QA_PASSED/QA_PARTIAL/QA_REJECTED.
-    const validStatuses = ['RFQ', 'RFQ_SENT', 'SENT', 'QUOTED', 'PO', 'CONFIRMED_BY_SUPPLIER', 'QA_PASSED', 'QA_PARTIAL', 'QA_REJECTED', 'RECEIVED', 'DONE', 'COMPLETED', 'CANCELLED'];
+    const validStatuses = ['RFQ', 'RFQ_SENT', 'SENT', 'QUOTED', 'QUOTED_PENDING_CEO', 'PO', 'CONFIRMED_BY_SUPPLIER', 'QA_PASSED', 'QA_PARTIAL', 'QA_REJECTED', 'RECEIVED', 'DONE', 'COMPLETED', 'CANCELLED'];
     if (!validStatuses.includes(status)) {
       return res.status(400).json({ success: false, message: `Invalid status: ${status}. Must be one of: ${validStatuses.join(', ')}` });
     }
@@ -482,8 +483,8 @@ const updatePurchaseOrderStatus = async (req, res, next) => {
       // This route also carries every other RFQ/QC/receiving status transition
       // (SUPPLIER quoting, QC pass/fail, warehouse receiving...) so the operational
       // permission check can't sit at the router level — only the actual
-      // QUOTED → PO approve step is gated by the admin-configurable RBAC matrix.
-      if (status === 'PO' && po.status === 'QUOTED' && !isNoOpResubmit) {
+      // QUOTED_PENDING_CEO → PO approve step is gated by the admin-configurable RBAC matrix.
+      if (status === 'PO' && po.status === 'QUOTED_PENDING_CEO' && !isNoOpResubmit) {
         const allowed = await hasOperationalPermission(userRole, 'purchasing_approve_po');
         if (!allowed) {
           const error = new Error('Tài khoản của bạn không có quyền duyệt PO (đã bị quản trị viên tắt trong Ma Trận Phân Quyền).');
@@ -492,8 +493,8 @@ const updatePurchaseOrderStatus = async (req, res, next) => {
         }
       }
 
-      if (userRole === 'CEO' && !isNoOpResubmit && status !== 'CANCELLED' && !(po.status === 'QUOTED' && status === 'PO')) {
-        const error = new Error('CEO chỉ phê duyệt báo giá để phát hành PO hoặc hủy đơn trong trường hợp ngoại lệ.');
+      if (userRole === 'CEO' && !isNoOpResubmit && status !== 'CANCELLED' && !(po.status === 'QUOTED_PENDING_CEO' && status === 'PO')) {
+        const error = new Error('CEO chỉ phê duyệt báo giá đã được Phòng Mua Hàng xác nhận để phát hành PO, hoặc hủy đơn trong trường hợp ngoại lệ.');
         error.statusCode = 403;
         throw error;
       }
@@ -526,7 +527,11 @@ const updatePurchaseOrderStatus = async (req, res, next) => {
           PURCHASING: {
             RFQ: ['RFQ_SENT', 'CANCELLED'],
             RFQ_SENT: ['CANCELLED'],
-            QUOTED: ['CANCELLED']
+            // NCC gửi báo giá xong (QUOTED) không đi thẳng lên CEO — Mua Hàng phải
+            // đối soát/so sánh báo giá và tự xác nhận (QUOTED_PENDING_CEO) trước,
+            // rồi mới trình CEO duyệt phát hành PO chính thức.
+            QUOTED: ['QUOTED_PENDING_CEO', 'CANCELLED'],
+            QUOTED_PENDING_CEO: ['CANCELLED']
           },
           // QC/QA/QUALITY_CONTROL đều được chuẩn hoá về 'QC' qua normalizeQcRole
           // trước khi tra bảng này (xem constants/roles.js).
@@ -540,9 +545,10 @@ const updatePurchaseOrderStatus = async (req, res, next) => {
         }
       }
 
-      // Duyệt QUOTED -> PO: chỉ CEO/ADMIN được quyền phát hành PO chính thức,
-      // bất kể giá trị đơn — CEO cần nắm được mọi đơn mua hàng, không đặt hạn mức.
-      if (status === 'PO' && po.status === 'QUOTED') {
+      // Duyệt QUOTED_PENDING_CEO -> PO: chỉ CEO/ADMIN được quyền phát hành PO
+      // chính thức, bất kể giá trị đơn — CEO cần nắm được mọi đơn mua hàng,
+      // không đặt hạn mức.
+      if (status === 'PO' && po.status === 'QUOTED_PENDING_CEO') {
         if (userRole !== 'CEO' && userRole !== 'ADMIN') {
           const error = new Error('Chỉ CEO (Ban Giám Đốc) mới có quyền duyệt báo giá thành PO chính thức.');
           error.statusCode = 403;
@@ -551,7 +557,7 @@ const updatePurchaseOrderStatus = async (req, res, next) => {
       }
 
       // If supplier is quoting prices (RFQ_SENT → QUOTED) or confirming (→ PO / CONFIRMED_BY_SUPPLIER), update item prices first
-      if (['QUOTED', 'PO', 'CONFIRMED_BY_SUPPLIER'].includes(status) && itemPrices && itemPrices.length > 0) {
+      if (['QUOTED', 'QUOTED_PENDING_CEO', 'PO', 'CONFIRMED_BY_SUPPLIER'].includes(status) && itemPrices && itemPrices.length > 0) {
         let newTotal = 0;
         for (const priceInfo of itemPrices) {
           const item = po.items.find(i => String(i.id) === String(priceInfo.itemId));

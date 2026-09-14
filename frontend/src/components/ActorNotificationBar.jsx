@@ -53,7 +53,7 @@ export default function ActorNotificationBar() {
   const lowStockList = activeInventory.filter(item => Number(item.stock || 0) <= Number(item.threshold || 0));
   const lowStockCount = lowStockList.length;
 
-  const pendingQuotedPOs = (purchaseOrders || []).filter(po => po && po.status === 'QUOTED').length;
+  const pendingQuotedPOs = (purchaseOrders || []).filter(po => po && po.status === 'QUOTED_PENDING_CEO').length;
   const pendingPayablePOs = (purchaseOrders || []).filter(po => po && po.status === 'PO').length;
   const pendingReceipts = (receipts || []).filter(r => r && r.status === 'READY').length;
   const pendingExportCount = (orders || []).filter(o => o && o.status === 'CONFIRMED').length;

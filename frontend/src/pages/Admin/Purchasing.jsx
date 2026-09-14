@@ -81,6 +81,11 @@ export default function Purchasing() {
   const { user, isPurchasing, isCEO, isAccountant, isWarehouse, isWarehouseManager, isAdmin } = useAuth();
   const { can, canDo, canApprove, canCreate } = usePermission();
   const isCeoApprover = canDo('purchasing_approve_po') || canApprove('purchasing') || isCEO || isAdmin;
+  // Mua Hàng đối soát/so sánh báo giá NCC và tự xác nhận (QUOTED -> QUOTED_PENDING_CEO)
+  // trước khi trình CEO duyệt — CEO chỉ ký duyệt bước cuối, không tự so sánh báo giá.
+  // 'purchasing_compare_quotes' đã có sẵn trong Ma Trận Phân Quyền (rbacEngine.js) và
+  // được cấp mặc định cho PURCHASING, nhưng trước đây chưa được dùng ở đâu cả.
+  const isPurchasingConfirmer = canDo('purchasing_compare_quotes') || isPurchasing || isAdmin;
   const erpInventory = useInventoryStore(state => state.inventory) || [];
   const erpProducts = useInventoryStore(state => state.products) || [];
   const erpOrders = useSalesStore(state => state.orders) || [];
@@ -501,15 +506,17 @@ export default function Purchasing() {
       // can happen at any stage, and once set should always win over an older cached status.
       // Only backend-reachable statuses (purchase.controller.js validStatuses)
       // get a weight — a stale cached PO carrying an old fabricated status
-      // (DRAFT_RFQ/AWAITING_SUPPLIER_QUOTE/QUOTED_PENDING_CEO/CONFIRMED were
-      // never real PurchaseOrder.status values) now just falls to weight 0
-      // and loses to any real status instead of being treated as a
-      // legitimate, possibly-higher-priority pipeline stage.
+      // (DRAFT_RFQ/AWAITING_SUPPLIER_QUOTE/CONFIRMED were never real
+      // PurchaseOrder.status values) now just falls to weight 0 and loses to
+      // any real status instead of being treated as a legitimate,
+      // possibly-higher-priority pipeline stage. QUOTED_PENDING_CEO IS a real
+      // status (Mua Hàng has confirmed the quote and is waiting on CEO).
       const STATUS_WEIGHT = {
         'RFQ': 10,
         'RFQ_SENT': 20,
         'SENT': 20,
         'QUOTED': 30,
+        'QUOTED_PENDING_CEO': 35,
         'PO': 40,
         'APPROVED': 40,
         'CONFIRMED_BY_SUPPLIER': 50,
@@ -1141,15 +1148,17 @@ export default function Purchasing() {
     return getStatusLabel(PO_STATUS, status);
   };
 
-  // Real happy-path pipeline for a PO (RFQ -> RFQ_SENT -> QUOTED -> PO ->
-  // CONFIRMED_BY_SUPPLIER -> QA -> RECEIVED -> DONE), matching the exact
-  // transitions enforced in purchase.controller.js (allowedTransitions /
-  // allowedTransitionsByRole). Used to render a step-by-step progress bar
-  // instead of making the user infer position from the raw status text.
+  // Real happy-path pipeline for a PO (RFQ -> RFQ_SENT -> QUOTED ->
+  // QUOTED_PENDING_CEO -> PO -> CONFIRMED_BY_SUPPLIER -> QA -> RECEIVED ->
+  // DONE), matching the exact transitions enforced in purchase.controller.js
+  // (allowedTransitions / allowedTransitionsByRole). Used to render a
+  // step-by-step progress bar instead of making the user infer position from
+  // the raw status text.
   const PO_PIPELINE_STEPS = [
     { key: 'RFQ', label: 'Khởi Tạo YCBG' },
     { key: 'RFQ_SENT', label: 'Gửi NCC Báo Giá' },
-    { key: 'QUOTED', label: 'Chờ CEO Duyệt' },
+    { key: 'QUOTED', label: 'NCC Đã Báo Giá' },
+    { key: 'QUOTED_PENDING_CEO', label: 'Mua Hàng Xác Nhận' },
     { key: 'PO', label: 'Đã Duyệt (PO)' },
     { key: 'CONFIRMED_BY_SUPPLIER', label: 'NCC Xác Nhận' },
     { key: 'QA', label: 'Kiểm Định QC' },
@@ -1157,10 +1166,10 @@ export default function Purchasing() {
     { key: 'DONE', label: 'Hoàn Tất' }
   ];
   const PO_PIPELINE_STEP_INDEX = {
-    RFQ: 0, RFQ_SENT: 1, SENT: 1, QUOTED: 2, PO: 3, APPROVED: 3,
-    CONFIRMED_BY_SUPPLIER: 4,
-    QA_PASSED: 5, QA_PARTIAL: 5, QA_REJECTED: 5,
-    RECEIVED: 6, DONE: 7, COMPLETED: 7
+    RFQ: 0, RFQ_SENT: 1, SENT: 1, QUOTED: 2, QUOTED_PENDING_CEO: 3, PO: 4, APPROVED: 4,
+    CONFIRMED_BY_SUPPLIER: 5,
+    QA_PASSED: 6, QA_PARTIAL: 6, QA_REJECTED: 6,
+    RECEIVED: 7, DONE: 8, COMPLETED: 8
   };
 
   // Filtered orders list based on active tab & filters
@@ -1231,6 +1240,7 @@ export default function Purchasing() {
   const rfqDraftCount = orders.filter(po => po.status === 'RFQ').length;
   const rfqSentCount = orders.filter(po => po.status === 'RFQ_SENT').length;
   const rfqQuotedCount = orders.filter(po => po.status === 'QUOTED').length;
+  const rfqPendingCeoCount = orders.filter(po => po.status === 'QUOTED_PENDING_CEO').length;
   // Every PO the backend actually issues (status !== RFQ/RFQ_SENT/QUOTED/
   // CANCELLED) routes through CONFIRMED_BY_SUPPLIER → QA_PASSED/QA_PARTIAL
   // before ever reaching RECEIVED/DONE — excluding those stages from the
@@ -1332,7 +1342,20 @@ export default function Purchasing() {
                       padding: '2px 8px',
                       borderRadius: '12px'
                     }}>
-                      {rfqQuotedCount} Báo Giá Cần Duyệt
+                      {rfqQuotedCount} Báo Giá Cần Xác Nhận
+                    </span>
+                  )}
+                  {rfqPendingCeoCount > 0 && (
+                    <span style={{
+                      backgroundColor: '#fef3c7',
+                      color: '#b45309',
+                      border: '1px solid #fde68a',
+                      fontSize: '0.72rem',
+                      fontWeight: 700,
+                      padding: '2px 8px',
+                      borderRadius: '12px'
+                    }}>
+                      {rfqPendingCeoCount} Chờ CEO Duyệt
                     </span>
                   )}
                 </div>
@@ -1470,7 +1493,12 @@ export default function Purchasing() {
 
             <div style={{ backgroundColor: '#fffbeb', padding: '1rem', borderRadius: '8px', border: '1px solid #fde68a', textAlign: 'center' }}>
               <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#d97706' }}>{rfqQuotedCount}</div>
-              <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#b45309', marginTop: '0.2rem' }}>Chờ Duyệt Báo Giá</div>
+              <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#b45309', marginTop: '0.2rem' }}>Chờ Xác Nhận Báo Giá</div>
+            </div>
+
+            <div style={{ backgroundColor: '#fffbeb', padding: '1rem', borderRadius: '8px', border: '1px solid #fde68a', textAlign: 'center' }}>
+              <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#d97706' }}>{rfqPendingCeoCount}</div>
+              <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#b45309', marginTop: '0.2rem' }}>Chờ CEO Duyệt</div>
             </div>
 
             <div style={{ backgroundColor: '#f0fdf4', padding: '1rem', borderRadius: '8px', border: '1px solid #bbf7d0', textAlign: 'center' }}>
@@ -1502,7 +1530,7 @@ export default function Purchasing() {
                   onClick={() => navigate('/admin/purchasing?tab=rfq')}
                   style={{ backgroundColor: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', borderRadius: '6px', padding: '0.35rem 0.8rem', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer' }}
                 >
-                  Xem Tất Cả ({rfqDraftCount + rfqSentCount + rfqQuotedCount}) →
+                  Xem Tất Cả ({rfqDraftCount + rfqSentCount + rfqQuotedCount + rfqPendingCeoCount}) →
                 </button>
               </div>
               <p style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '1rem' }}>
@@ -2110,7 +2138,8 @@ export default function Purchasing() {
                 <>
                   <option value="RFQ">Bản nháp (RFQ)</option>
                   <option value="RFQ_SENT">Đã gửi NCC</option>
-                  <option value="QUOTED">Chờ CEO duyệt</option>
+                  <option value="QUOTED">NCC đã báo giá (chờ xác nhận)</option>
+                  <option value="QUOTED_PENDING_CEO">Chờ CEO duyệt</option>
                 </>
               ) : (
                 <>
@@ -2252,7 +2281,25 @@ export default function Purchasing() {
                         </td>
                         <td style={{ padding: '0.75rem 1rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
                           <div style={{ display: 'inline-flex', gap: '0.4rem' }}>
-                            {po.status === 'QUOTED' && isCeoApprover && (
+                            {po.status === 'QUOTED' && isPurchasingConfirmer && (
+                              <button
+                                onClick={() => handleUpdateStatus(po.id, 'QUOTED_PENDING_CEO')}
+                                title="Xác nhận báo giá này và trình CEO phê duyệt"
+                                style={{
+                                  backgroundColor: '#2563eb',
+                                  color: '#ffffff',
+                                  border: 'none',
+                                  borderRadius: '4px',
+                                  padding: '0.3rem 0.65rem',
+                                  fontSize: '0.75rem',
+                                  fontWeight: 700,
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                Xác Nhận
+                              </button>
+                            )}
+                            {po.status === 'QUOTED_PENDING_CEO' && isCeoApprover && (
                               <button
                                 onClick={() => handleUpdateStatus(po.id, 'PO')}
                                 style={{
@@ -4036,19 +4083,65 @@ export default function Purchasing() {
 
               {selectedPO.status === 'QUOTED' && (
                 <>
+                  {isPurchasingConfirmer ? (
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <button
+                        onClick={async () => {
+                          // Same reasoning as the CEO cancel below: the backend has
+                          // no "send back for renegotiation" transition, so rejecting
+                          // a quote at this stage means cancelling it for real and
+                          // letting Purchasing create a fresh RFQ.
+                          const reason = await promptText('Nhập lý do hủy báo giá này (NCC sẽ cần gửi báo giá mới qua một RFQ khác):', 'Giá chào thầu cao hơn ngân sách dự kiến');
+                          if (reason !== null) {
+                            await handleUpdateStatus(selectedPO.id, 'CANCELLED', { reason });
+                          }
+                        }}
+                        style={{ backgroundColor: '#fee2e2', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '6px', padding: '0.5rem 1.1rem', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
+                      >
+                        Hủy Báo Giá
+                      </button>
+                      {(() => {
+                        const items = selectedPO.items || [];
+                        const hasMissingPrice = items.length === 0 || items.some(it => !(parseFloat(it.unitCost) > 0));
+                        const totalInvalid = !(parseFloat(selectedPO.totalAmount) > 0);
+                        const blocked = hasMissingPrice || totalInvalid;
+                        return (
+                          <button
+                            onClick={() => !blocked && handleUpdateStatus(selectedPO.id, 'QUOTED_PENDING_CEO')}
+                            disabled={blocked}
+                            title={blocked ? 'Không thể xác nhận: còn linh kiện chưa có đơn giá hoặc tổng tiền bằng 0' : 'Xác nhận đã đối soát báo giá này và trình CEO phê duyệt'}
+                            style={{
+                              backgroundColor: blocked ? '#9ca3af' : '#2563eb',
+                              color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.5rem 1.1rem',
+                              fontSize: '0.82rem', fontWeight: 700, cursor: blocked ? 'not-allowed' : 'pointer',
+                              opacity: blocked ? 0.75 : 1
+                            }}
+                          >
+                            {blocked ? 'Thiếu Đơn Giá' : 'Xác Nhận & Trình CEO Duyệt'}
+                          </button>
+                        );
+                      })()}
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <span style={{ fontSize: '0.78rem', color: '#d97706', fontWeight: 700, backgroundColor: '#fef3c7', padding: '0.4rem 0.8rem', borderRadius: '6px', border: '1px solid #fde68a' }}>
+                        ⏳ Đang chờ Phòng Mua Hàng đối soát & xác nhận báo giá
+                      </span>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {selectedPO.status === 'QUOTED_PENDING_CEO' && (
+                <>
                   {isCeoApprover ? (
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
                       <button
                         onClick={async () => {
-                          // The backend only allows QUOTED to move to PO or
-                          // CANCELLED — there is no "send back for renegotiation"
-                          // transition. The old version of this button only
-                          // rewrote local state back to RFQ, which the next
-                          // fetchData() silently reverted (the API still had it
-                          // at QUOTED), so the CEO's "rejection" never actually
-                          // took effect. Cancelling for real and letting
-                          // Purchasing create a fresh RFQ is the only backend-
-                          // supported equivalent.
+                          // The backend only allows QUOTED_PENDING_CEO to move to PO
+                          // or CANCELLED — there is no "send back for renegotiation"
+                          // transition. Cancelling for real and letting Purchasing
+                          // create a fresh RFQ is the only backend-supported equivalent.
                           const reason = await promptText('Nhập lý do hủy báo giá này (NCC sẽ cần gửi báo giá mới qua một RFQ khác):', 'Giá chào thầu cao hơn ngân sách dự kiến');
                           if (reason !== null) {
                             await handleUpdateStatus(selectedPO.id, 'CANCELLED', { reason });
@@ -4337,17 +4430,20 @@ export default function Purchasing() {
                               {po.totalAmount > 0 ? formatCurrency(po.totalAmount) : 'Chờ NCC báo giá'}
                             </div>
 
-                            {isQuoted && isCeoApprover && (() => {
+                            {/* So sánh & chốt báo giá là việc của Phòng Mua Hàng, không phải CEO —
+                                CEO chỉ ký duyệt phát hành PO ở bước sau (QUOTED_PENDING_CEO -> PO),
+                                trên đúng NCC mà Mua Hàng đã chọn tại đây. */}
+                            {isQuoted && isPurchasingConfirmer && (() => {
                               const poItems = po.items || [];
                               const blocked = poItems.length === 0 || poItems.some(it => !(parseFloat(it.unitCost) > 0)) || !(parseFloat(po.totalAmount) > 0);
                               return (
                                 <button
                                   onClick={async () => {
                                     if (blocked) return;
-                                    await handleUpdateStatus(po.id, 'PO');
-                                    // Approving one supplier's quote makes every other
+                                    await handleUpdateStatus(po.id, 'QUOTED_PENDING_CEO');
+                                    // Confirming one supplier's quote makes every other
                                     // quote in the same comparison group moot — cancel
-                                    // them so they stop inflating "Chờ CEO duyệt" counts
+                                    // them so they stop inflating "Chờ xác nhận" counts
                                     // forever with a decision that's already been made.
                                     const losers = group.list.filter(other => other.id !== po.id && other.status === 'QUOTED');
                                     for (const loser of losers) {
@@ -4370,7 +4466,7 @@ export default function Purchasing() {
                                     opacity: blocked ? 0.75 : 1
                                   }}
                                 >
-                                  {blocked ? 'Thiếu Đơn Giá' : 'Chốt Duyệt Đơn Này (Tạo PO)'}
+                                  {blocked ? 'Thiếu Đơn Giá' : 'Chọn NCC Này (Trình CEO Duyệt)'}
                                 </button>
                               );
                             })()}
