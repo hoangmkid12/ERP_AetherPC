@@ -815,16 +815,16 @@ const getLocationProducts = async (req, res, next) => {
         product: {
           select: {
             productId: true,
-            productName: true,
+            name: true,
             sku: true,
-            sellingPrice: true,
-            costPrice: true,
-            imageUrl: true,
+            price: true,
+            averageCost: true,
+            primaryImage: true,
             category: { select: { name: true, slug: true } }
           }
         }
       },
-      orderBy: { product: { productName: 'asc' } }
+      orderBy: { product: { name: 'asc' } }
     });
 
     res.json({
@@ -835,16 +835,20 @@ const getLocationProducts = async (req, res, next) => {
           code: `${location.zone}-${location.shelf}-${location.bin}`,
           warehouseName: location.warehouse?.name
         },
+        // Tên trường khớp với quy ước LocationProductsModal đang dùng ở frontend
+        // (stock/reserved/available/image, giống hệt nhánh dự phòng activeInventory)
+        // — trước đây route này luôn crash (xem fix ở trên) nên frontend luôn rơi
+        // vào nhánh dự phòng, chưa ai nhận ra tên trường ở đây bị lệch.
         items: inventories.map(inv => ({
           productId: inv.productId,
-          productName: inv.product?.productName || 'Linh Kiện',
+          productName: inv.product?.name || 'Linh Kiện',
           sku: inv.product?.sku || inv.productId,
           category: inv.product?.category?.name || '',
-          price: Number(inv.product?.sellingPrice) || Number(inv.product?.costPrice) || 0,
-          quantityOnHand: inv.quantityOnHand,
-          quantityReserved: inv.quantityReserved,
-          availableQuantity: Math.max(0, inv.quantityOnHand - inv.quantityReserved),
-          imageUrl: inv.product?.imageUrl || null
+          price: Number(inv.product?.price) || Number(inv.product?.averageCost) || 0,
+          stock: inv.quantityOnHand,
+          reserved: inv.quantityReserved,
+          available: Math.max(0, inv.quantityOnHand - inv.quantityReserved),
+          image: inv.product?.primaryImage || null
         }))
       }
     });

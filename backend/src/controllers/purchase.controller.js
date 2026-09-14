@@ -1175,7 +1175,8 @@ const validateReceipt = async (req, res, next) => {
             type: 'IN',
             quantity: intakeQty,
             referenceId: receipt.receiptNumber || receipt.id.toString(),
-            note: `Nhập kho từ Phiếu Nhận Hàng ${receipt.receiptNumber}${po.status === 'QA_PARTIAL' ? ' (nghiệm thu một phần)' : ''}`
+            note: `Nhập kho từ Phiếu Nhận Hàng ${receipt.receiptNumber} (PO: ${po.poNumber}${po.status === 'QA_PARTIAL' ? ', nghiệm thu một phần' : ''})`,
+            createdBy: receivedBy
           }
         });
 
