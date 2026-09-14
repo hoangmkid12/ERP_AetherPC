@@ -1156,6 +1156,9 @@ export default function Purchasing() {
   const [issuePOForm, setIssuePOForm] = useState({ expectedDeliveryDate: '', notes: '' });
   const [issuingPO, setIssuingPO] = useState(false);
 
+  // Phiếu Báo Giá — chứng từ in cho RFQ đã có đơn giá NCC báo (QUOTED trở lên trong giai đoạn RFQ)
+  const [printQuoteTarget, setPrintQuoteTarget] = useState(null);
+
   const openIssuePOForm = (rfq) => {
     setIssuePOTarget(rfq);
     setIssuePOForm({
@@ -2432,6 +2435,27 @@ export default function Purchasing() {
                                 Duyệt
                               </button>
                             )}
+                            {['QUOTED', 'PENDING_PO_DRAFT', 'CONVERTED'].includes(po.status) && (
+                              <button
+                                onClick={() => setPrintQuoteTarget(po)}
+                                title="Xem / In Phiếu Báo Giá"
+                                style={{
+                                  backgroundColor: '#eff6ff',
+                                  color: '#2563eb',
+                                  border: '1px solid #bfdbfe',
+                                  borderRadius: '4px',
+                                  padding: '0.3rem 0.65rem',
+                                  fontSize: '0.75rem',
+                                  fontWeight: 700,
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px'
+                                }}
+                              >
+                                <Printer size={12} /> Báo Giá
+                              </button>
+                            )}
                             <button
                               onClick={() => setSelectedPO(po)}
                               style={{
@@ -3203,103 +3227,91 @@ export default function Purchasing() {
         );
       })()}
 
-      {/* ================= MODAL XEM CHI TIẾT PHIẾU YÊU CẦU MUA HÀNG (PR) ================= */}
+      {/* ================= MODAL XEM CHI TIẾT PHIẾU YÊU CẦU MUA HÀNG (PR) — chứng từ chuẩn, có in ================= */}
       {selectedViewPR && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(4px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1050, padding: '1.5rem' }}>
-          <div style={{ width: '100%', maxWidth: '620px', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)', overflow: 'hidden' }}>
-            {/* Header */}
-            <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#f8fafc' }}>
-              <div>
-                <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
-                  Chi Tiết Phiếu Yêu Cầu Mua Hàng ({selectedViewPR.prCode})
-                </h3>
-                <p style={{ margin: '0.2rem 0 0', fontSize: '0.78rem', color: '#64748b' }}>
-                  Đề xuất mua hàng nội bộ tiếp nhận từ Quản Lý Kho & Thủ Kho
-                </p>
-              </div>
-              <button onClick={() => setSelectedViewPR(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}>
-                <X size={20} />
-              </button>
-            </div>
-
-            {/* Body */}
-            <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', fontSize: '0.83rem' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', backgroundColor: '#f8fafc', padding: '1rem', borderRadius: '8px' }}>
-                <div>
-                  <span style={{ color: '#64748b', fontSize: '0.75rem' }}>Mã Phiếu:</span>
-                  <div style={{ fontWeight: 700, color: '#2563eb' }}>{selectedViewPR.prCode}</div>
+          <style>{`
+            @media print {
+              body * { visibility: hidden; }
+              .aetherpc-pr-print, .aetherpc-pr-print * { visibility: visible; }
+              .aetherpc-pr-print { position: fixed; inset: 0; margin: 0 auto; padding: 28px; max-width: 100%; box-shadow: none !important; border: none !important; }
+              .aetherpc-no-print { display: none !important; }
+            }
+          `}</style>
+          <div className="aetherpc-pr-print" style={{ width: '100%', maxWidth: '640px', maxHeight: '90vh', overflowY: 'auto', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.15)' }}>
+            <div style={{ padding: '1.75rem' }}>
+              {/* Company header — trình bày như tiêu đề một chứng từ thật */}
+              <div style={{ textAlign: 'center', borderBottom: '2px solid #0f172a', paddingBottom: '1rem', marginBottom: '1.25rem', position: 'relative' }}>
+                <button onClick={() => setSelectedViewPR(null)} className="aetherpc-no-print" style={{ position: 'absolute', right: 0, top: 0, background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#475569', cursor: 'pointer', padding: '0.4rem', borderRadius: '6px', display: 'flex' }}>
+                  <X size={18} />
+                </button>
+                <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  CÔNG TY TNHH CÔNG NGHỆ AETHERPC — PHÒNG MUA HÀNG
                 </div>
-                <div>
-                  <span style={{ color: '#64748b', fontSize: '0.75rem' }}>Thời Gian Tạo:</span>
-                  <div style={{ fontWeight: 600 }}>{formatDate(selectedViewPR.createdAt)}</div>
-                </div>
-                <div>
-                  <span style={{ color: '#64748b', fontSize: '0.75rem' }}>Người Lập Phiếu:</span>
-                  <div style={{ fontWeight: 600 }}>{selectedViewPR.requestedBy}</div>
-                </div>
-                <div>
-                  <span style={{ color: '#64748b', fontSize: '0.75rem' }}>Trạng Thái:</span>
-                  <div>
-                    <span style={{
-                      display: 'inline-block',
-                      padding: '2px 8px',
-                      borderRadius: '10px',
-                      fontSize: '0.72rem',
-                      fontWeight: 700,
-                      backgroundColor: selectedViewPR.status === 'APPROVED' ? '#f0fdf4' : selectedViewPR.status === 'REJECTED' ? '#fef2f2' : '#fffbeb',
-                      color: selectedViewPR.status === 'APPROVED' ? '#15803d' : selectedViewPR.status === 'REJECTED' ? '#dc2626' : '#b45309'
-                    }}>
-                      {selectedViewPR.status === 'APPROVED' ? 'Đã Ký Duyệt' : selectedViewPR.status === 'REJECTED' ? 'Từ Chối' : 'Chờ Duyệt / Mới'}
-                    </span>
-                  </div>
-                </div>
+                <h2 style={{ margin: '0.4rem 0 0', fontSize: '1.3rem', fontWeight: 800, color: '#0f172a' }}>PHIẾU ĐỀ XUẤT MUA HÀNG</h2>
+                <div style={{ fontSize: '0.85rem', color: '#2563eb', fontWeight: 700, marginTop: '0.2rem' }}>Số: {selectedViewPR.prCode}</div>
               </div>
 
-              <div>
-                <span style={{ color: '#64748b', fontSize: '0.75rem' }}>Linh Kiện Cần Bổ Sung:</span>
-                <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', marginTop: '0.2rem' }}>{selectedViewPR.productName}</div>
-                {selectedViewPR.sku && <div style={{ color: '#64748b', fontSize: '0.75rem' }}>Mã SKU: {selectedViewPR.sku}</div>}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem 1.5rem', fontSize: '0.85rem', marginBottom: '1.25rem' }}>
+                <div><span style={{ color: '#64748b' }}>Ngày lập:</span> <strong style={{ color: '#0f172a' }}>{formatDate(selectedViewPR.createdAt)}</strong></div>
+                <div><span style={{ color: '#64748b' }}>Người đề xuất:</span> <strong style={{ color: '#0f172a' }}>{selectedViewPR.requestedBy}</strong></div>
+                <div><span style={{ color: '#64748b' }}>Sản phẩm:</span> <strong style={{ color: '#0f172a' }}>{selectedViewPR.productName}</strong></div>
+                <div><span style={{ color: '#64748b' }}>Mã SP / SKU:</span> <strong style={{ color: '#0f172a' }}>{selectedViewPR.sku || selectedViewPR.productId || '—'}</strong></div>
+                <div><span style={{ color: '#64748b' }}>Tồn kho hiện tại:</span> <strong style={{ color: selectedViewPR.stock === 0 ? '#dc2626' : '#0f172a' }}>{selectedViewPR.stock !== null && selectedViewPR.stock !== undefined ? selectedViewPR.stock : '—'}</strong></div>
+                <div><span style={{ color: '#64748b' }}>Số lượng đề xuất mua:</span> <strong style={{ color: '#2563eb' }}>{selectedViewPR.quantity}</strong></div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                <div style={{ backgroundColor: '#f1f5f9', padding: '0.75rem 1rem', borderRadius: '6px' }}>
-                  <span style={{ color: '#64748b', fontSize: '0.75rem' }}>Tồn Kho Thực Tế:</span>
-                  <div style={{ fontWeight: 800, fontSize: '1.1rem', color: selectedViewPR.stock === 0 ? '#dc2626' : '#0f172a' }}>
-                    {selectedViewPR.stock !== null && selectedViewPR.stock !== undefined ? `${selectedViewPR.stock} SP` : '-'}
-                  </div>
-                </div>
-                <div style={{ backgroundColor: '#eff6ff', padding: '0.75rem 1rem', borderRadius: '6px', border: '1px solid #bfdbfe' }}>
-                  <span style={{ color: '#2563eb', fontSize: '0.75rem' }}>Số Lượng Đề Xuất Mua:</span>
-                  <div style={{ fontWeight: 800, fontSize: '1.1rem', color: '#1d4ed8' }}>
-                    {selectedViewPR.quantity} SP
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <span style={{ color: '#64748b', fontSize: '0.75rem' }}>Lý Do Đề Xuất:</span>
-                <div style={{ padding: '0.75rem', backgroundColor: '#f8fafc', borderRadius: '6px', border: '1px solid #e2e8f0', color: '#334155', marginTop: '0.25rem' }}>
+              <div style={{ marginBottom: '1.25rem' }}>
+                <span style={{ fontSize: '0.8rem', color: '#64748b', display: 'block', marginBottom: '0.3rem' }}>Lý do đề xuất:</span>
+                <div style={{ padding: '0.65rem 0.85rem', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '0.85rem', color: '#0f172a', minHeight: '2.2rem' }}>
                   {selectedViewPR.reason || 'Tồn kho chạm ngưỡng an toàn, cần bổ sung hàng phục vụ kinh doanh.'}
                 </div>
               </div>
 
-              {selectedViewPR.approvedBy && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.5rem', fontSize: '0.85rem' }}>
+                <span style={{ color: '#64748b' }}>Trạng thái:</span>
+                {(() => {
+                  const statusLabel = selectedViewPR.status === 'APPROVED' ? 'Đã Duyệt' : selectedViewPR.status === 'REJECTED' ? 'Từ Chối' : 'Chờ Duyệt';
+                  const statusColor = selectedViewPR.status === 'APPROVED' ? '#15803d' : selectedViewPR.status === 'REJECTED' ? '#dc2626' : '#b45309';
+                  return <strong style={{ color: statusColor }}>{statusLabel}</strong>;
+                })()}
+                {selectedViewPR.approvedBy && (
+                  <span style={{ fontSize: '0.78rem', color: '#64748b' }}>
+                    — bởi {selectedViewPR.approvedBy}{selectedViewPR.approvedAt ? ` ngày ${formatDate(selectedViewPR.approvedAt)}` : ''}
+                  </span>
+                )}
+              </div>
+
+              {/* Signature blocks — bản in để lưu hồ sơ / trình ký giấy */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', textAlign: 'center', marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px dashed #cbd5e1' }}>
                 <div>
-                  <span style={{ color: '#64748b', fontSize: '0.75rem' }}>Người Ký Duyệt:</span>
-                  <div style={{ fontWeight: 600, color: '#15803d' }}>
-                    {selectedViewPR.approvedBy} {selectedViewPR.approvedAt ? `(lúc ${formatDate(selectedViewPR.approvedAt)})` : ''}
-                  </div>
+                  <strong style={{ fontSize: '0.8rem', color: '#0f172a' }}>NGƯỜI ĐỀ XUẤT</strong>
+                  <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: '0.2rem' }}>(Ký, ghi rõ họ tên)</div>
+                  <div style={{ height: '56px' }} />
+                  <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#0f172a' }}>{selectedViewPR.requestedBy || ''}</div>
                 </div>
-              )}
+                <div>
+                  <strong style={{ fontSize: '0.8rem', color: '#0f172a' }}>QUẢN LÝ KHO / PHÒNG MUA HÀNG DUYỆT</strong>
+                  <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: '0.2rem' }}>(Ký, ghi rõ họ tên)</div>
+                  <div style={{ height: '56px' }} />
+                  <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#0f172a' }}>{selectedViewPR.approvedBy || ''}</div>
+                </div>
+              </div>
             </div>
 
             {/* Footer */}
-            <div style={{ padding: '1rem 1.5rem', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', backgroundColor: '#f8fafc' }}>
+            <div className="aetherpc-no-print" style={{ padding: '1rem 1.5rem', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', backgroundColor: '#f8fafc' }}>
               <button
                 onClick={() => setSelectedViewPR(null)}
                 style={{ backgroundColor: '#ffffff', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.5rem 1rem', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}
               >
                 Đóng
+              </button>
+              <button
+                onClick={() => window.print()}
+                style={{ backgroundColor: '#ffffff', color: '#2563eb', border: '1px solid #bfdbfe', borderRadius: '6px', padding: '0.5rem 1.1rem', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+              >
+                <Printer size={15} /> In Phiếu
               </button>
               <button
                 onClick={() => {
@@ -4824,6 +4836,147 @@ export default function Purchasing() {
                   style={{ backgroundColor: issuingPO ? '#9ca3af' : '#2563eb', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.5rem 1.25rem', fontSize: '0.82rem', fontWeight: 800, cursor: issuingPO ? 'not-allowed' : 'pointer' }}
                 >
                   {issuingPO ? 'Đang lập phiếu...' : 'Lập Phiếu & Trình CEO Duyệt'}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ================= PHIẾU BÁO GIÁ — chứng từ chuẩn, có in ================= */}
+      {printQuoteTarget && (() => {
+        const items = printQuoteTarget.items || [];
+        const supplierInfo = printQuoteTarget.supplier || {};
+        const statusLabel = printQuoteTarget.status === 'CONVERTED'
+          ? 'Đã chọn — đã lập Phiếu Mua Hàng'
+          : printQuoteTarget.status === 'PENDING_PO_DRAFT'
+            ? 'Đã duyệt chọn báo giá này — chờ lập phiếu'
+            : 'Đã báo giá — chờ Mua Hàng duyệt chọn';
+        return (
+          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(6px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '1.5rem' }}>
+            <style>{`
+              @media print {
+                body * { visibility: hidden; }
+                .aetherpc-quote-print, .aetherpc-quote-print * { visibility: visible; }
+                .aetherpc-quote-print { position: fixed; inset: 0; margin: 0 auto; padding: 28px; max-width: 100%; box-shadow: none !important; border: none !important; }
+                .aetherpc-no-print { display: none !important; }
+              }
+            `}</style>
+            <div className="aetherpc-quote-print" style={{ width: '100%', maxWidth: '680px', maxHeight: '90vh', overflowY: 'auto', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.15)' }}>
+              <div style={{ padding: '1.5rem', borderBottom: '2px solid #0f172a' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      CÔNG TY TNHH CÔNG NGHỆ AETHERPC — PHÒNG MUA HÀNG
+                    </div>
+                    <h2 style={{ margin: '0.3rem 0 0', fontSize: '1.25rem', fontWeight: 800, color: '#0f172a' }}>PHIẾU BÁO GIÁ</h2>
+                    <p style={{ margin: '0.25rem 0 0', fontSize: '0.8rem', color: '#64748b' }}>
+                      Số: {formatPurchaseReference(printQuoteTarget)} — Ngày lập: {formatDate(printQuoteTarget.createdAt)}
+                    </p>
+                  </div>
+                  <button onClick={() => setPrintQuoteTarget(null)} className="aetherpc-no-print" style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#475569', cursor: 'pointer', padding: '0.4rem', borderRadius: '6px', display: 'flex' }}>
+                    <X size={18} />
+                  </button>
+                </div>
+              </div>
+
+              <div style={{ padding: '1.5rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.25rem' }}>
+                  <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.85rem 1rem' }}>
+                    <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#2563eb', textTransform: 'uppercase' }}>Bên Yêu Cầu Báo Giá</span>
+                    <div style={{ fontSize: '0.85rem', color: '#0f172a', fontWeight: 700, marginTop: '0.3rem' }}>Công Ty TNHH Công Nghệ AetherPC</div>
+                    <div style={{ fontSize: '0.76rem', color: '#64748b', marginTop: '0.15rem' }}>175 Nguyễn Thị Minh Khai, Quận 1, TP. HCM</div>
+                  </div>
+                  <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.85rem 1rem' }}>
+                    <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#b45309', textTransform: 'uppercase' }}>Nhà Cung Cấp Báo Giá</span>
+                    <div style={{ fontSize: '0.85rem', color: '#0f172a', fontWeight: 700, marginTop: '0.3rem' }}>{getSupplierName(printQuoteTarget)}</div>
+                    <div style={{ fontSize: '0.76rem', color: '#64748b', marginTop: '0.15rem' }}>
+                      Mã NCC: {printQuoteTarget.supplierCode}
+                      {supplierInfo.phone ? ` • ĐT: ${supplierInfo.phone}` : ''}
+                    </div>
+                    {supplierInfo.address && (
+                      <div style={{ fontSize: '0.76rem', color: '#64748b', marginTop: '0.1rem' }}>{supplierInfo.address}</div>
+                    )}
+                  </div>
+                </div>
+
+                <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '0.5rem', fontSize: '0.82rem' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '2px solid #0f172a' }}>
+                      <th style={{ textAlign: 'left', padding: '0.5rem 0.25rem', color: '#475569' }}>Sản Phẩm</th>
+                      <th style={{ textAlign: 'center', padding: '0.5rem 0.25rem', color: '#475569', width: '60px' }}>SL</th>
+                      <th style={{ textAlign: 'right', padding: '0.5rem 0.25rem', color: '#475569', width: '110px' }}>Đơn Giá NCC Báo</th>
+                      <th style={{ textAlign: 'right', padding: '0.5rem 0.25rem', color: '#475569', width: '120px' }}>Thành Tiền</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {items.map(it => (
+                      <tr key={it.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                        <td style={{ padding: '0.5rem 0.25rem', color: '#0f172a' }}>{it.product?.name || it.productId}</td>
+                        <td style={{ padding: '0.5rem 0.25rem', textAlign: 'center', color: '#475569' }}>{it.quantity}</td>
+                        <td style={{ padding: '0.5rem 0.25rem', textAlign: 'right', color: '#475569' }}>
+                          {parseFloat(it.unitCost) > 0 ? formatCurrency(it.unitCost) : <span style={{ fontStyle: 'italic', color: '#94a3b8' }}>Chưa báo giá</span>}
+                        </td>
+                        <td style={{ padding: '0.5rem 0.25rem', textAlign: 'right', color: '#0f172a', fontWeight: 700 }}>
+                          {parseFloat(it.unitCost) > 0 ? formatCurrency(it.totalCost) : '—'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr>
+                      <td colSpan={3} style={{ padding: '0.6rem 0.25rem', textAlign: 'right', fontWeight: 700, color: '#475569' }}>Tổng Cộng:</td>
+                      <td style={{ padding: '0.6rem 0.25rem', textAlign: 'right', fontWeight: 800, fontSize: '0.95rem', color: '#16a34a' }}>{formatCurrency(printQuoteTarget.totalAmount)}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+                {parseFloat(printQuoteTarget.totalAmount) > 0 && (
+                  <p style={{ fontSize: '0.78rem', color: '#64748b', fontStyle: 'italic', margin: '0 0 1rem' }}>
+                    Bằng chữ: {formatCurrencyInWords(printQuoteTarget.totalAmount)}.
+                  </p>
+                )}
+
+                <div style={{ marginBottom: '1.5rem', fontSize: '0.85rem' }}>
+                  <span style={{ color: '#64748b' }}>Trạng thái:</span> <strong style={{ color: '#0f172a' }}>{statusLabel}</strong>
+                  {printQuoteTarget.expectedDeliveryDate && (
+                    <span style={{ color: '#64748b' }}> — Ngày giao dự kiến: <strong style={{ color: '#0f172a' }}>{formatDate(printQuoteTarget.expectedDeliveryDate)}</strong></span>
+                  )}
+                </div>
+
+                {/* Chữ ký 3 bên — bản in để trình ký/lưu hồ sơ giấy */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem', textAlign: 'center', marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px dashed #cbd5e1' }}>
+                  <div>
+                    <strong style={{ fontSize: '0.76rem', color: '#0f172a' }}>NGƯỜI LẬP YÊU CẦU</strong>
+                    <div style={{ fontSize: '0.68rem', color: '#94a3b8', marginTop: '0.2rem' }}>(Ký, ghi rõ họ tên)</div>
+                    <div style={{ height: '52px' }} />
+                    <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#0f172a' }}>{printQuoteTarget.createdBy || ''}</div>
+                  </div>
+                  <div>
+                    <strong style={{ fontSize: '0.76rem', color: '#0f172a' }}>NHÀ CUNG CẤP BÁO GIÁ & XÁC NHẬN</strong>
+                    <div style={{ fontSize: '0.68rem', color: '#94a3b8', marginTop: '0.2rem' }}>(Ký, đóng dấu)</div>
+                    <div style={{ height: '52px' }} />
+                    <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#0f172a' }}>{getSupplierName(printQuoteTarget)}</div>
+                  </div>
+                  <div>
+                    <strong style={{ fontSize: '0.76rem', color: '#0f172a' }}>TRƯỞNG PHÒNG MUA HÀNG DUYỆT</strong>
+                    <div style={{ fontSize: '0.68rem', color: '#94a3b8', marginTop: '0.2rem' }}>(Ký, ghi rõ họ tên)</div>
+                    <div style={{ height: '52px' }} />
+                  </div>
+                </div>
+              </div>
+
+              <div className="aetherpc-no-print" style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem', padding: '1.25rem 1.5rem', borderTop: '1px solid #f1f5f9' }}>
+                <button
+                  onClick={() => setPrintQuoteTarget(null)}
+                  style={{ backgroundColor: '#ffffff', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.5rem 1.1rem', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
+                >
+                  Đóng
+                </button>
+                <button
+                  onClick={() => window.print()}
+                  style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.5rem 1.25rem', fontSize: '0.82rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+                >
+                  <Printer size={15} /> In Phiếu
                 </button>
               </div>
             </div>
