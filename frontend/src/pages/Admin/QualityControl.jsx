@@ -416,6 +416,97 @@ export default function QualityControl() {
     ]
   };
 
+  // ─── Báo Cáo Chất Lượng & Đánh Giá Nhà Cung Cấp (tab 'reports') ───
+  // The sidebar/header have always advertised this tab (see the URL comment
+  // above and the page-title switch below), but no content block for it ever
+  // existed — clicking it rendered just the title over a blank page. Built
+  // from the same qaLogs used by the Logs tab, restricted to real supplier
+  // inbound inspections (INBOUND_PO) since customer RMA logs aren't about
+  // supplier quality.
+  const inboundQaLogs = qaLogs.filter(log => (log.type === 'INBOUND_PO' || !log.type) && log.supplierName);
+
+  const getSupplierRating = (passRate) => {
+    if (passRate >= 98) return { label: 'Xuất Sắc', color: '#16a34a', bg: '#f0fdf4', border: '#bbf7d0' };
+    if (passRate >= 90) return { label: 'Tốt', color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe' };
+    if (passRate >= 75) return { label: 'Trung Bình', color: '#d97706', bg: '#fffbeb', border: '#fde68a' };
+    return { label: 'Kém — Cần Xem Xét', color: '#dc2626', bg: '#fef2f2', border: '#fecaca' };
+  };
+
+  const supplierScorecards = useMemo(() => {
+    const map = new Map();
+    inboundQaLogs.forEach(log => {
+      const key = log.supplierName;
+      if (!map.has(key)) {
+        map.set(key, {
+          supplierName: key,
+          inspections: 0,
+          totalUnits: 0,
+          totalPassed: 0,
+          totalFailed: 0,
+          rejectAllCount: 0,
+          partialCount: 0,
+          acceptAllCount: 0,
+          defectCounts: {}
+        });
+      }
+      const s = map.get(key);
+      s.inspections += 1;
+      s.totalUnits += Number(log.totalQty) || 0;
+      s.totalPassed += Number(log.passedQty) || 0;
+      s.totalFailed += Number(log.failedQty) || 0;
+      if (log.decision === 'REJECT_ALL') s.rejectAllCount += 1;
+      else if (log.decision === 'ACCEPT_PARTIAL') s.partialCount += 1;
+      else if (log.decision === 'ACCEPT_ALL') s.acceptAllCount += 1;
+      if (log.defectCategory && log.defectCategory !== 'NONE') {
+        s.defectCounts[log.defectCategory] = (s.defectCounts[log.defectCategory] || 0) + 1;
+      }
+    });
+
+    return Array.from(map.values()).map(s => {
+      const passRate = s.totalUnits > 0 ? Math.round((s.totalPassed / s.totalUnits) * 100) : 100;
+      const topDefectEntry = Object.entries(s.defectCounts).sort((a, b) => b[1] - a[1])[0];
+      return {
+        ...s,
+        passRate,
+        topDefect: topDefectEntry ? (DEFECT_LABELS[topDefectEntry[0]] || topDefectEntry[0]) : '—',
+        rating: getSupplierRating(passRate)
+      };
+    }).sort((a, b) => a.passRate - b.passRate); // worst-performing suppliers surface first
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [qaLogs]);
+
+  const supplierReportSummary = {
+    totalSuppliers: supplierScorecards.length,
+    totalInspections: inboundQaLogs.length,
+    avgPassRate: supplierScorecards.length > 0
+      ? Math.round(supplierScorecards.reduce((sum, s) => sum + s.passRate, 0) / supplierScorecards.length)
+      : 0,
+    needsReviewCount: supplierScorecards.filter(s => s.passRate < 75).length
+  };
+
+  // Real defect-category distribution across every inbound inspection — a report
+  // is only useful if it reflects actual logged inspections, not a fixed sample.
+  const realDefectChartData = useMemo(() => {
+    const counts = {};
+    inboundQaLogs.forEach(log => {
+      if (log.defectCategory && log.defectCategory !== 'NONE') {
+        counts[log.defectCategory] = (counts[log.defectCategory] || 0) + 1;
+      }
+    });
+    const entries = Object.entries(counts);
+    if (entries.length === 0) {
+      return { labels: ['Chưa ghi nhận lỗi nào'], datasets: [{ data: [1], backgroundColor: ['#e2e8f0'] }] };
+    }
+    return {
+      labels: entries.map(([k]) => DEFECT_LABELS[k] || k),
+      datasets: [{
+        data: entries.map(([, v]) => v),
+        backgroundColor: ['#f59e0b', '#ef4444', '#8b5cf6', '#3b82f6', '#64748b', '#ec4899', '#14b8a6']
+      }]
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [qaLogs]);
+
   // Open Inspection Modal
   const handleOpenInspectionModal = (po) => {
     setSelectedPO(po);
@@ -1776,7 +1867,7 @@ export default function QualityControl() {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
               <thead>
                 <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569' }}>
-                  <th style={{ padding: '0.75rem 0.85rem', width: '130px', whiteSpace: 'nowrap' }}>Mã Biên Bản</th>
+                  <th style={{ padding: '0.75rem 0.85rem', width: '140px', whiteSpace: 'nowrap' }}>Mã Biên Bản</th>
                   <th style={{ padding: '0.75rem 0.85rem', width: '95px', whiteSpace: 'nowrap' }}>Thời Gian</th>
                   <th style={{ padding: '0.75rem 0.85rem', width: '115px', whiteSpace: 'nowrap', textAlign: 'center' }}>Phân Loại</th>
                   <th style={{ padding: '0.75rem 0.85rem', width: '140px', whiteSpace: 'nowrap' }}>Mã Đối Soát (PO / Đơn)</th>
@@ -1784,7 +1875,6 @@ export default function QualityControl() {
                   <th style={{ padding: '0.75rem 0.85rem', width: '135px', whiteSpace: 'nowrap' }}>Kiểm Định Viên</th>
                   <th style={{ padding: '0.75rem 0.85rem', width: '135px', textAlign: 'center', whiteSpace: 'nowrap' }}>Kết Quả</th>
                   <th style={{ padding: '0.75rem 0.85rem', minWidth: '180px' }}>Dạng Lỗi</th>
-                  <th style={{ padding: '0.75rem 0.85rem', width: '95px', textAlign: 'center', whiteSpace: 'nowrap' }}>Thao Tác</th>
                 </tr>
               </thead>
               <tbody>
@@ -1798,8 +1888,30 @@ export default function QualityControl() {
                     const isRma = log.type === 'CUSTOMER_RMA';
                     return (
                       <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ padding: '0.75rem 0.85rem', fontWeight: 800, color: isRma ? '#8b5cf6' : '#2563eb', whiteSpace: 'nowrap', fontFamily: 'monospace', fontSize: '0.84rem' }}>
-                          {log.id}
+                        <td style={{ padding: '0.75rem 0.85rem', whiteSpace: 'nowrap' }}>
+                          <button
+                            type="button"
+                            onClick={() => setViewingLog(log)}
+                            title={`Nhấn để xem chi tiết biên bản ${log.id}`}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              padding: 0,
+                              fontFamily: 'monospace',
+                              fontSize: '0.85rem',
+                              fontWeight: 800,
+                              color: isRma ? '#7c3aed' : '#2563eb',
+                              cursor: 'pointer',
+                              textDecoration: 'none',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}
+                            onMouseEnter={e => e.currentTarget.style.textDecoration = 'underline'}
+                            onMouseLeave={e => e.currentTarget.style.textDecoration = 'none'}
+                          >
+                            <span>{log.id}</span>
+                          </button>
                         </td>
                         <td style={{ padding: '0.75rem 0.85rem', color: '#64748b', fontSize: '0.78rem', whiteSpace: 'nowrap' }}>
                           {log.date || '18/08/2026'}
@@ -1846,34 +1958,120 @@ export default function QualityControl() {
                         <td style={{ padding: '0.75rem 0.85rem', fontSize: '0.78rem', color: '#475569' }}>
                           {DEFECT_LABELS[log.defectCategory] || log.defectCategory || 'None'}
                         </td>
-                        <td style={{ padding: '0.75rem 0.85rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
-                          <button
-                            onClick={() => setViewingLog(log)}
-                            style={{
-                              backgroundColor: '#eff6ff',
-                              color: '#2563eb',
-                              border: '1px solid #bfdbfe',
-                              borderRadius: '6px',
-                              padding: '0.35rem 0.75rem',
-                              fontSize: '0.75rem',
-                              fontWeight: 700,
-                              cursor: 'pointer',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              gap: '0.35rem',
-                              whiteSpace: 'nowrap'
-                            }}
-                          >
-                            <Eye size={13} />
-                            <span>Chi Tiết</span>
-                          </button>
-                        </td>
                       </tr>
                     );
                   })}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'reports' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          {/* Summary KPIs */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
+            {[
+              { label: 'Nhà Cung Cấp Đã Đánh Giá', value: supplierReportSummary.totalSuppliers, icon: <Building size={20} />, color: '#2563eb', bg: '#eff6ff' },
+              { label: 'Tổng Lượt Kiểm Định Hàng Nhập', value: supplierReportSummary.totalInspections, icon: <ShieldCheck size={20} />, color: '#0f172a', bg: '#f1f5f9' },
+              { label: 'Tỷ Lệ Đạt Chuẩn Bình Quân', value: `${supplierReportSummary.avgPassRate}%`, icon: <Award size={20} />, color: '#16a34a', bg: '#f0fdf4' },
+              { label: 'NCC Cần Xem Xét (< 75%)', value: supplierReportSummary.needsReviewCount, icon: <AlertTriangle size={20} />, color: '#dc2626', bg: '#fef2f2' }
+            ].map((st, sIdx) => (
+              <div key={sIdx} style={{ backgroundColor: '#ffffff', borderRadius: '10px', border: '1px solid #cbd5e1', padding: '1.1rem 1.25rem', display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+                <div style={{ width: '42px', height: '42px', borderRadius: '10px', backgroundColor: st.bg, color: st.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  {st.icon}
+                </div>
+                <div>
+                  <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0f172a', lineHeight: 1.1 }}>{st.value}</div>
+                  <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', marginTop: '0.2rem' }}>{st.label}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.6fr', gap: '1.25rem', alignItems: 'start' }}>
+            {/* Defect distribution — real counts from logged inspections */}
+            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem', height: '340px', display: 'flex', flexDirection: 'column' }}>
+              <h3 style={{ fontSize: '0.92rem', fontWeight: 800, color: '#0f172a', margin: '0 0 1rem 0' }}>
+                Phân Bố Dạng Lỗi (Hàng Nhập NCC)
+              </h3>
+              <div style={{ flex: 1, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Doughnut
+                  data={realDefectChartData}
+                  options={{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 9 } } } }
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Supplier Scorecard */}
+            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem' }}>
+              <h3 style={{ fontSize: '0.92rem', fontWeight: 800, color: '#0f172a', margin: '0 0 0.25rem 0', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <Award size={16} style={{ color: '#2563eb' }} /> Bảng Xếp Hạng Chất Lượng Nhà Cung Cấp
+              </h3>
+              <p style={{ fontSize: '0.78rem', color: '#64748b', margin: '0 0 1rem 0' }}>
+                Xếp theo tỷ lệ đạt chuẩn từ thấp đến cao — nhà cung cấp cần xem xét lại hiển thị trước.
+              </p>
+
+              {supplierScorecards.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '2.5rem 0', color: '#94a3b8', fontSize: '0.85rem' }}>
+                  Chưa có lô hàng nhập nào được kiểm định để đánh giá nhà cung cấp.
+                </div>
+              ) : (
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
+                    <thead>
+                      <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569' }}>
+                        <th style={{ padding: '0.6rem 0.7rem' }}>Nhà Cung Cấp</th>
+                        <th style={{ padding: '0.6rem 0.7rem', textAlign: 'center', whiteSpace: 'nowrap' }}>Lượt KĐ</th>
+                        <th style={{ padding: '0.6rem 0.7rem', textAlign: 'center', whiteSpace: 'nowrap' }}>Đạt / Lỗi</th>
+                        <th style={{ padding: '0.6rem 0.7rem', textAlign: 'center', whiteSpace: 'nowrap' }}>Tỷ Lệ Đạt</th>
+                        <th style={{ padding: '0.6rem 0.7rem' }}>Lỗi Phổ Biến Nhất</th>
+                        <th style={{ padding: '0.6rem 0.7rem', textAlign: 'center', whiteSpace: 'nowrap' }}>Xếp Loại</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {supplierScorecards.map(s => (
+                        <tr key={s.supplierName} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                          <td style={{ padding: '0.65rem 0.7rem', fontWeight: 700, color: '#0f172a' }}>
+                            {s.supplierName}
+                            <div style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 500 }}>
+                              {s.rejectAllCount > 0 && `${s.rejectAllCount} lô bị hoàn trả toàn bộ`}
+                              {s.rejectAllCount > 0 && s.partialCount > 0 && ' • '}
+                              {s.partialCount > 0 && `${s.partialCount} lô nghiệm thu một phần`}
+                            </div>
+                          </td>
+                          <td style={{ padding: '0.65rem 0.7rem', textAlign: 'center', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                            {s.inspections}
+                          </td>
+                          <td style={{ padding: '0.65rem 0.7rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                            <strong style={{ color: '#16a34a' }}>{s.totalPassed}</strong> / <strong style={{ color: '#ef4444' }}>{s.totalFailed}</strong>
+                          </td>
+                          <td style={{ padding: '0.65rem 0.7rem', textAlign: 'center', fontWeight: 800, color: s.rating.color, whiteSpace: 'nowrap' }}>
+                            {s.passRate}%
+                          </td>
+                          <td style={{ padding: '0.65rem 0.7rem', color: '#475569', fontSize: '0.76rem' }}>
+                            {s.topDefect}
+                          </td>
+                          <td style={{ padding: '0.65rem 0.7rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                            <span style={{
+                              display: 'inline-block', padding: '2px 9px', borderRadius: '10px',
+                              fontSize: '0.7rem', fontWeight: 800,
+                              backgroundColor: s.rating.bg, color: s.rating.color, border: `1px solid ${s.rating.border}`
+                            }}>
+                              {s.rating.label}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
