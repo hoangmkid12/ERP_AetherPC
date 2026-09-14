@@ -215,9 +215,26 @@ export default function Accountant() {
     return sum + (Number((bill ? bill.amountDue : po.totalAmount) || 0) || 0);
   }, 0);
 
-  const totalPayrollFund = payrolls.length > 0
-    ? payrolls.reduce((sum, p) => sum + (Number(p.netSalary || 0) || 0), 0)
+  // GET /hr/payrolls returns EVERY payroll record ever created (no period or
+  // status filter on the backend) — summing all of them directly used to make
+  // "Quỹ Lương Chờ Chi Trả" and the P&L's payroll expense line grow forever
+  // across every past period, and count payrolls already PAID as if they were
+  // still pending. Split into the two real concepts:
+  //  - payrollReadyFund: what's actually APPROVED_BY_CEO and will really be
+  //    disbursed if "Chi Lương Toàn Doanh Nghiệp" is clicked right now (must
+  //    match the backend's disburse-all eligibility filter exactly).
+  //  - payrollExpensePaid: netSalary of payrolls with status PAID — money that
+  //    has actually left the company for salaries. (Not sourced from ledger
+  //    PAYROLL-{id} entries: 45 of the seeded demo payrolls were inserted
+  //    directly as PAID by prisma/seed.js without a matching LedgerEntry, so
+  //    a ledger-only sum would silently drop that real historical cost.)
+  const payrollReadyFund = payrolls.length > 0
+    ? payrolls.filter(p => p.status === 'APPROVED_BY_CEO').reduce((sum, p) => sum + (Number(p.netSalary || 0) || 0), 0)
     : employees.reduce((s, e) => s + (Number(e.salary || e.baseSalary || 8500000) || 8500000), 0);
+
+  const payrollExpensePaid = payrolls
+    .filter(p => p && p.status === 'PAID')
+    .reduce((sum, p) => sum + (Number(p.netSalary || 0) || 0), 0);
 
   // Giá vốn hàng bán (COGS) = tổng các bút toán COGS thật do backend tự ghi mỗi
   // khi một đơn hàng thực sự xuất kho (referenceId `COGS-{orderId}`), tính theo
@@ -247,7 +264,7 @@ export default function Accountant() {
 
   // Tổng chi phí = đúng bằng tổng 4 dòng chi trong P&L bên dưới — không tính lại
   // riêng từ ledger nữa để tránh 2 nơi ra 2 con số khác nhau cho cùng 1 khái niệm.
-  const totalExpense = cogsAmount + totalPayrollFund + operatingExpense + refundAmount;
+  const totalExpense = cogsAmount + payrollExpensePaid + operatingExpense + refundAmount;
 
   const netProfit = totalRevenue - totalExpense;
   // Không có module vốn chủ sở hữu/số dư đầu kỳ thật trong hệ thống — không bịa
@@ -260,7 +277,7 @@ export default function Accountant() {
     { label: 'Lợi Nhuận Ròng', value: fmt(netProfit), change: netProfit >= 0 ? 'Tỷ suất lợi nhuận dương' : 'Cần tối ưu chi phí', icon: <DollarSign size={20} />, color: netProfit >= 0 ? '#16a34a' : '#ef4444', bg: netProfit >= 0 ? '#f0fdf4' : '#fef2f2' },
     { label: 'Lợi Nhuận Ròng Lũy Kế', value: fmt(cashBalance), change: 'Chưa gồm vốn góp ban đầu (không có module vốn chủ sở hữu)', icon: <CreditCard size={20} />, color: '#2563eb', bg: '#eff6ff' },
     { label: 'Đơn PO Chờ Thanh Toán NCC', value: `${unpaidPOs.length} đơn (${fmt(unpaidPOAmount)})`, change: 'Cần giải ngân cho Nhà Cung Cấp', icon: <ShoppingBag size={20} />, color: '#f59e0b', bg: '#fffbeb' },
-    { label: 'Quỹ Lương Chờ Chi Trả', value: fmt(totalPayrollFund), change: 'Dự toán kỳ lương tháng hiện tại', icon: <Users size={20} />, color: '#8b5cf6', bg: '#f5f3ff' }
+    { label: 'Quỹ Lương Chờ Chi Trả', value: fmt(payrollReadyFund), change: 'Đã CEO duyệt, sẵn sàng giải ngân', icon: <Users size={20} />, color: '#8b5cf6', bg: '#f5f3ff' }
   ];
 
   // Chart 1: Income vs Expense Doughnut
@@ -271,7 +288,7 @@ export default function Accountant() {
         data: [
           Math.max(1, totalRevenue),
           Math.max(1, cogsAmount),
-          Math.max(1, totalPayrollFund),
+          Math.max(1, payrollExpensePaid),
           Math.max(1, operatingExpense)
         ],
         backgroundColor: ['#16a34a', '#f59e0b', '#8b5cf6', '#ef4444']
@@ -595,7 +612,7 @@ export default function Accountant() {
 
   const [disbursingAll, setDisbursingAll] = useState(false);
   const handleDisburseAll = async () => {
-    if (!(await confirm(`Xác nhận GIẢI NGÂN LƯƠNG TOÀN DOANH NGHIỆP (${fmt(totalPayrollFund)})? Tiền sẽ được trừ vào quỹ và ghi sổ cái.`, { danger: true }))) return;
+    if (!(await confirm(`Xác nhận GIẢI NGÂN LƯƠNG TOÀN DOANH NGHIỆP (${fmt(payrollReadyFund)})? Tiền sẽ được trừ vào quỹ và ghi sổ cái.`, { danger: true }))) return;
     if (typeof disburseAllPayrolls !== 'function') return;
     setDisbursingAll(true);
     try {
@@ -1119,7 +1136,7 @@ export default function Accountant() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', fontSize: '0.78rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.45rem', backgroundColor: '#f8fafc', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
                   <span>Quỹ Lương:</span>
-                  <strong style={{ color: '#2563eb' }}>{fmt(totalPayrollFund)}</strong>
+                  <strong style={{ color: '#2563eb' }}>{fmt(payrollReadyFund)}</strong>
                 </div>
                 <button
                   onClick={() => setTab('payroll_disbursement')}
@@ -1482,7 +1499,7 @@ export default function Accountant() {
                 Bảng Lương Tháng Đã Phê Duyệt — Sẵn Sàng Chi Trả
               </h3>
               <p style={{ color: '#64748b', fontSize: '0.78rem', margin: '0.2rem 0 0' }}>
-                Tổng quỹ chi trả: <strong style={{ color: '#2563eb' }}>{fmt(totalPayrollFund)}</strong> (CEO đã phê duyệt)
+                Tổng quỹ chi trả: <strong style={{ color: '#2563eb' }}>{fmt(payrollReadyFund)}</strong> (CEO đã phê duyệt)
               </p>
             </div>
 
@@ -1596,7 +1613,7 @@ export default function Accountant() {
 
               <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'baseline', gap: '0.5rem', padding: '0.75rem', backgroundColor: '#fef2f2', borderRadius: '6px', border: '1px solid #fecaca' }}>
                 <strong style={{ color: '#dc2626', flex: '1 1 260px', minWidth: 0 }}>3. CHI PHÍ LƯƠNG NHÂN VIÊN & HOA HỒNG:</strong>
-                <strong style={{ color: '#dc2626', fontSize: '1rem', whiteSpace: 'nowrap' }}>- {fmt(totalPayrollFund)}</strong>
+                <strong style={{ color: '#dc2626', fontSize: '1rem', whiteSpace: 'nowrap' }}>- {fmt(payrollExpensePaid)}</strong>
               </div>
 
               <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'baseline', gap: '0.5rem', padding: '0.75rem', backgroundColor: '#fef2f2', borderRadius: '6px', border: '1px solid #fecaca' }}>
