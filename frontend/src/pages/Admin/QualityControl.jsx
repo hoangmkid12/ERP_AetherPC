@@ -1776,15 +1776,15 @@ export default function QualityControl() {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
               <thead>
                 <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569' }}>
-                  <th style={{ padding: '0.65rem 0.85rem' }}>Mã Biên Bản</th>
-                  <th style={{ padding: '0.65rem 0.85rem' }}>Thời Gian</th>
-                  <th style={{ padding: '0.65rem 0.85rem' }}>Phân Loại</th>
-                  <th style={{ padding: '0.65rem 0.85rem' }}>Mã Đối Soát (PO / Đơn)</th>
-                  <th style={{ padding: '0.65rem 0.85rem' }}>Đối Tượng / Khách Hàng</th>
-                  <th style={{ padding: '0.65rem 0.85rem' }}>Kiểm Định Viên</th>
-                  <th style={{ padding: '0.65rem 0.85rem', textAlign: 'center' }}>Kết Quả</th>
-                  <th style={{ padding: '0.65rem 0.85rem' }}>Dạng Lỗi</th>
-                  <th style={{ padding: '0.65rem 0.85rem', textAlign: 'center' }}>Thao Tác</th>
+                  <th style={{ padding: '0.75rem 0.85rem', width: '130px', whiteSpace: 'nowrap' }}>Mã Biên Bản</th>
+                  <th style={{ padding: '0.75rem 0.85rem', width: '95px', whiteSpace: 'nowrap' }}>Thời Gian</th>
+                  <th style={{ padding: '0.75rem 0.85rem', width: '115px', whiteSpace: 'nowrap', textAlign: 'center' }}>Phân Loại</th>
+                  <th style={{ padding: '0.75rem 0.85rem', width: '140px', whiteSpace: 'nowrap' }}>Mã Đối Soát (PO / Đơn)</th>
+                  <th style={{ padding: '0.75rem 0.85rem', minWidth: '180px' }}>Đối Tượng / Khách Hàng</th>
+                  <th style={{ padding: '0.75rem 0.85rem', width: '135px', whiteSpace: 'nowrap' }}>Kiểm Định Viên</th>
+                  <th style={{ padding: '0.75rem 0.85rem', width: '135px', textAlign: 'center', whiteSpace: 'nowrap' }}>Kết Quả</th>
+                  <th style={{ padding: '0.75rem 0.85rem', minWidth: '180px' }}>Dạng Lỗi</th>
+                  <th style={{ padding: '0.75rem 0.85rem', width: '95px', textAlign: 'center', whiteSpace: 'nowrap' }}>Thao Tác</th>
                 </tr>
               </thead>
               <tbody>
@@ -1798,18 +1798,20 @@ export default function QualityControl() {
                     const isRma = log.type === 'CUSTOMER_RMA';
                     return (
                       <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ padding: '0.65rem 0.85rem', fontWeight: 800, color: isRma ? '#8b5cf6' : '#2563eb' }}>
+                        <td style={{ padding: '0.75rem 0.85rem', fontWeight: 800, color: isRma ? '#8b5cf6' : '#2563eb', whiteSpace: 'nowrap', fontFamily: 'monospace', fontSize: '0.84rem' }}>
                           {log.id}
                         </td>
-                        <td style={{ padding: '0.65rem 0.85rem', color: '#64748b', fontSize: '0.78rem', whiteSpace: 'nowrap' }}>
+                        <td style={{ padding: '0.75rem 0.85rem', color: '#64748b', fontSize: '0.78rem', whiteSpace: 'nowrap' }}>
                           {log.date || '18/08/2026'}
                         </td>
-                        <td style={{ padding: '0.65rem 0.85rem' }}>
+                        <td style={{ padding: '0.75rem 0.85rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
                           <span style={{
-                            padding: '2px 6px',
-                            borderRadius: '4px',
+                            display: 'inline-block',
+                            padding: '3px 8px',
+                            borderRadius: '6px',
                             fontSize: '0.7rem',
                             fontWeight: 700,
+                            whiteSpace: 'nowrap',
                             backgroundColor: isRma ? '#f5f3ff' : '#eff6ff',
                             color: isRma ? '#7c3aed' : '#1d4ed8',
                             border: `1px solid ${isRma ? '#ddd6fe' : '#bfdbfe'}`
@@ -1817,36 +1819,54 @@ export default function QualityControl() {
                             {isRma ? 'RMA ĐỔI TRẢ' : 'NHẬP KHO PO'}
                           </span>
                         </td>
-                        <td style={{ padding: '0.65rem 0.85rem', fontWeight: 600 }}>
+                        <td style={{ padding: '0.75rem 0.85rem', fontWeight: 700, color: '#0f172a', whiteSpace: 'nowrap', fontFamily: 'monospace', fontSize: '0.82rem' }}>
                           {log.poNumber || log.rmaId || 'N/A'}
                         </td>
-                        <td style={{ padding: '0.65rem 0.85rem' }}>
+                        <td style={{ padding: '0.75rem 0.85rem', fontWeight: 600, color: '#1e293b' }}>
                           {log.supplierName || log.customerName || 'N/A'}
                         </td>
-                        <td style={{ padding: '0.65rem 0.85rem' }}>{log.inspector}</td>
-                        <td style={{ padding: '0.65rem 0.85rem', textAlign: 'center' }}>
+                        <td style={{ padding: '0.75rem 0.85rem', color: '#475569', whiteSpace: 'nowrap' }}>
+                          {log.inspector}
+                        </td>
+                        <td style={{ padding: '0.75rem 0.85rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
                           {isRma ? (
                             <span style={{
                               fontWeight: 700,
+                              whiteSpace: 'nowrap',
                               color: log.decision === 'REJECT_RMA' ? '#dc2626' : '#16a34a'
                             }}>
                               {log.decision === 'EXCHANGE_NEW' ? 'ĐỔI MỚI 1-1' : log.decision === 'VENDOR_WARRANTY' ? 'GỬI HÃNG' : log.decision === 'RESTOCK_WAREHOUSE' ? 'NHẬP LẠI KHO' : 'TỪ CHỐI'}
                             </span>
                           ) : (
-                            <>
+                            <span style={{ whiteSpace: 'nowrap' }}>
                               <strong style={{ color: '#16a34a' }}>{log.passedQty}</strong> / <span style={{ color: '#ef4444' }}>{log.failedQty}</span> (Tổng: {log.totalQty})
-                            </>
+                            </span>
                           )}
                         </td>
-                        <td style={{ padding: '0.65rem 0.85rem', fontSize: '0.78rem' }}>
+                        <td style={{ padding: '0.75rem 0.85rem', fontSize: '0.78rem', color: '#475569' }}>
                           {DEFECT_LABELS[log.defectCategory] || log.defectCategory || 'None'}
                         </td>
-                        <td style={{ padding: '0.65rem 0.85rem', textAlign: 'center' }}>
+                        <td style={{ padding: '0.75rem 0.85rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
                           <button
                             onClick={() => setViewingLog(log)}
-                            style={{ backgroundColor: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', borderRadius: '4px', padding: '0.3rem 0.65rem', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
+                            style={{
+                              backgroundColor: '#eff6ff',
+                              color: '#2563eb',
+                              border: '1px solid #bfdbfe',
+                              borderRadius: '6px',
+                              padding: '0.35rem 0.75rem',
+                              fontSize: '0.75rem',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '0.35rem',
+                              whiteSpace: 'nowrap'
+                            }}
                           >
-                            <Eye size={13} /> Chi Tiết
+                            <Eye size={13} />
+                            <span>Chi Tiết</span>
                           </button>
                         </td>
                       </tr>
