@@ -2156,11 +2156,31 @@ export default function Purchasing() {
                 {activeTab === 'rfq' ? 'Yêu Cầu Báo Giá (RFQ)' : 'Đơn Mua Hàng (PO)'}
               </h2>
               <p style={{ color: '#64748b', fontSize: '0.85rem', margin: '0.25rem 0 0' }}>
-                {activeTab === 'rfq' 
+                {activeTab === 'rfq'
                   ? 'Quản lý yêu cầu chào giá gửi tới nhà cung cấp và tổng hợp đối chiếu báo giá'
                   : 'Quản lý các đơn đặt hàng chính thức đã chốt giá và theo dõi tiến độ nhập kho'}
               </p>
             </div>
+            <button
+              onClick={() => { setSelectedGroupKey(rfqGroups[0]?.key || null); setShowCompareModal(true); }}
+              style={{
+                backgroundColor: '#eff6ff',
+                color: '#2563eb',
+                border: '1px solid #bfdbfe',
+                borderRadius: '6px',
+                padding: '0.5rem 1rem',
+                fontSize: '0.83rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+                whiteSpace: 'nowrap'
+              }}
+            >
+              <BarChart2 size={15} />
+              <span>So Sánh Báo Giá{rfqGroups.length > 0 ? ` (${rfqGroups.length})` : ''}</span>
+            </button>
           </div>
 
           {/* Filter Toolbar (Grid 5 cột đồng nhất với Warehouse.jsx) */}
@@ -2725,7 +2745,7 @@ export default function Purchasing() {
                         Lô Báo Giá #{gIdx + 1} — {group.list.length} Nhà Cung Cấp
                       </h3>
                       <span style={{ fontSize: '0.78rem', color: '#64748b' }}>
-                        Sản phẩm: {group.list[0]?.items?.map(i => i.productName || i.name).join(', ')}
+                        Sản phẩm: {group.list[0]?.items?.map(i => i.product?.name || i.productName || i.productId).join(', ')}
                       </span>
                     </div>
                     <button
@@ -4551,7 +4571,7 @@ export default function Purchasing() {
                     <div style={{ backgroundColor: '#f8fafc', padding: '0.75rem 1rem', borderRadius: '6px', border: '1px solid #e2e8f0', marginBottom: '0.75rem' }}>
                       <strong style={{ fontSize: '0.88rem', color: '#0f172a' }}>Nhóm Sản Phẩm Cần Nhập:</strong>
                       <span style={{ fontSize: '0.82rem', color: '#2563eb', marginLeft: '0.5rem' }}>
-                        {group.list[0]?.items?.map(i => `${i.productName || i.name} (x${i.quantity})`).join(', ')}
+                        {group.list[0]?.items?.map(i => `${i.product?.name || i.productName || i.productId} (x${i.quantity})`).join(', ')}
                       </span>
                     </div>
 
