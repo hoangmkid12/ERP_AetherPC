@@ -1,5 +1,5 @@
 import React from 'react';
-import { Truck, Clock, Camera, Eye } from 'lucide-react';
+import { Truck, Clock, Camera, Eye, Radio, PlayCircle, Navigation } from 'lucide-react';
 import { getDeliveryIncidentStatus } from '../deliveryHelpers';
 
 // Shared full-width mobile card used by PendingTab / ActiveTab / HistoryTab.
@@ -7,9 +7,12 @@ import { getDeliveryIncidentStatus } from '../deliveryHelpers';
 //   'pending' -> just the "Nhận Chuyến" claim button
 //   'active'  -> the full status-based action set (POD / fail / resume / etc.)
 //   'history' -> read-only, tap to view detail only
-export default function OrderCard({ order: ord, variant, fmt, getOrderTimeClassification, onOpenDetail, actions = {} }) {
+export default function OrderCard({ order: ord, variant, fmt, getOrderTimeClassification, onOpenDetail, actions = {}, isGpsActive = false, isSimulating = false }) {
   const incidentStatus = getDeliveryIncidentStatus(ord);
   const { isDelivered, isAwaiting, isRescheduled, isRejected, isReturning } = incidentStatus;
+  // GPS chỉ có ý nghĩa khi đơn thật sự đang trên đường đi giao — không phải
+  // lúc chờ khách gọi lại, đang hoàn kho hay đã giao xong.
+  const isPlainShipping = !isDelivered && !isAwaiting && !isRescheduled && !isRejected && !isReturning;
 
   const timeInfo = getOrderTimeClassification(ord);
   const codAmount = parseFloat(ord.totalAmount || ord.total || 0);
@@ -201,6 +204,36 @@ export default function OrderCard({ order: ord, variant, fmt, getOrderTimeClassi
               </button>
             </>
           )}
+        </div>
+      )}
+
+      {/* Lộ Trình Tối Ưu & Định Vị GPS Thực Tế — chỉ hiện khi đơn đang thật sự trên đường đi giao */}
+      {variant === 'active' && isPlainShipping && (
+        <div style={{ marginTop: '0.5rem' }} onClick={(e) => e.stopPropagation()}>
+          <button
+            type="button"
+            onClick={() => actions.onOpenNavigation && actions.onOpenNavigation(ord)}
+            style={{
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.45rem',
+              padding: '0.6rem 0.85rem',
+              borderRadius: 'var(--radius-md)',
+              fontSize: '0.8rem',
+              fontWeight: 800,
+              cursor: 'pointer',
+              backgroundColor: isGpsActive ? 'rgba(22,163,74,0.12)' : '#eff6ff',
+              color: isGpsActive ? 'var(--success)' : '#2563eb',
+              border: isGpsActive ? '1.5px solid var(--success)' : '1px solid #bfdbfe',
+              boxShadow: isGpsActive ? 'none' : '0 2px 6px rgba(37,99,235,0.08)',
+              transition: 'all 0.2s'
+            }}
+          >
+            <Navigation size={15} style={isGpsActive ? { animation: 'pulse 1.5s infinite' } : undefined} />
+            {isGpsActive ? 'Đang Bật GPS — Xem Lộ Trình' : 'Lộ Trình Giao Hàng'}
+          </button>
         </div>
       )}
     </div>

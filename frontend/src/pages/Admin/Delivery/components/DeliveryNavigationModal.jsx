@@ -1,0 +1,531 @@
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { X, Navigation, Phone, MapPin, Compass, ShieldCheck, CheckCircle2, AlertCircle, Clock, Gauge, Route, Camera } from 'lucide-react';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+import { fetchRoadRoute } from '../../../../utils/routingService';
+
+const emojiIcon = (emoji, bg) => L.divIcon({
+  className: 'aetherpc-delivery-marker',
+  html: `<div style="width:38px;height:38px;border-radius:50%;background:${bg};display:flex;align-items:center;justify-content:center;font-size:20px;box-shadow:0 3px 10px rgba(0,0,0,0.35);border:2.5px solid #fff;">${emoji}</div>`,
+  iconSize: [38, 38],
+  iconAnchor: [19, 19]
+});
+
+const WAREHOUSE_ICON = emojiIcon('🏬', '#2563eb');
+const DESTINATION_ICON = emojiIcon('🏠', '#16a34a');
+const SHIPPER_ICON = emojiIcon('🛵', '#f59e0b');
+
+function haversineKm(a, b) {
+  if (!a || !b) return null;
+  const R = 6371;
+  const dLat = (b.lat - a.lat) * Math.PI / 180;
+  const dLng = (b.lng - a.lng) * Math.PI / 180;
+  const lat1 = a.lat * Math.PI / 180;
+  const lat2 = b.lat * Math.PI / 180;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+}
+
+export default function DeliveryNavigationModal({
+  order,
+  warehouse,
+  destination,
+  isGpsActive,
+  onStartDeliveryWithGps,
+  onStopGps,
+  onOpenPOD,
+  onClose,
+  fmt
+}) {
+  const containerRef = useRef(null);
+  const mapRef = useRef(null);
+  const markersRef = useRef({});
+  const routeLayersRef = useRef([]);
+  const routeCoordsRef = useRef([]);
+
+  const [routeInfo, setRouteInfo] = useState(null);
+  const [loadingRoute, setLoadingRoute] = useState(true);
+  const [shipperLoc, setShipperLoc] = useState(null);
+  const [locError, setLocError] = useState('');
+  const [speedKmh, setSpeedKmh] = useState(0);
+
+  const orderId = String(order?.orderId || order?.id || '');
+  const customerName = order?.customerName || order?.customer?.name || 'Khách hàng';
+  const phone = order?.phone || order?.customer?.phone || '';
+  const address = order?.shippingAddress || order?.address || destination?.label || '';
+  const codAmount = parseFloat(order?.totalAmount || order?.total || 0);
+  const isPrepaid = order?.paymentStatus === 'PAID' || order?.paymentMethod === 'ONLINE_GATEWAY' || order?.paymentMethod === 'BANK_TRANSFER' || codAmount === 0;
+
+  // 1. Khởi tạo bản đồ Leaflet
+  useEffect(() => {
+    if (!containerRef.current || mapRef.current) return;
+    const map = L.map(containerRef.current, {
+      zoomControl: true,
+      attributionControl: true
+    });
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; OpenStreetMap'
+    }).addTo(map);
+    mapRef.current = map;
+
+    return () => {
+      map.remove();
+      mapRef.current = null;
+    };
+  }, []);
+
+  // 2. Thử lấy vị trí GPS hiện tại của Shipper ngay khi mở modal
+  useEffect(() => {
+    if (!navigator.geolocation) {
+      setLocError('Thiết bị hoặc trình duyệt không hỗ trợ Geolocation API.');
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setShipperLoc({
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          speed: pos.coords.speed,
+          heading: pos.coords.heading
+        });
+        if (pos.coords.speed != null && pos.coords.speed > 0) {
+          setSpeedKmh(Math.round(pos.coords.speed * 3.6));
+        }
+      },
+      (err) => {
+        console.warn('Không thể lấy vị trí tức thời của Shipper:', err.message);
+        // Fallback: xuất phát từ Kho
+        setLocError('Chưa có GPS vệ tinh - Sử dụng vị trí Kho xuất phát làm điểm bắt đầu.');
+      },
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 10000 }
+    );
+  }, []);
+
+  // 3. Tính toán và vẽ lộ trình đường bộ tối ưu qua OSRM
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !destination) return;
+
+    // Điểm xuất phát ưu tiên: Vị trí thực tế của Shipper, nếu chưa có thì dùng vị trí Kho
+    const origin = shipperLoc || warehouse;
+    if (!origin) return;
+
+    setLoadingRoute(true);
+
+    // Xoá các marker & layer cũ
+    if (markersRef.current.warehouse) markersRef.current.warehouse.remove();
+    if (markersRef.current.destination) markersRef.current.destination.remove();
+    routeLayersRef.current.forEach(layer => layer.remove());
+    routeLayersRef.current = [];
+
+    // Marker Điểm xuất phát (Kho hoặc Shipper)
+    if (warehouse) {
+      markersRef.current.warehouse = L.marker([warehouse.lat, warehouse.lng], { icon: WAREHOUSE_ICON })
+        .addTo(map)
+        .bindPopup(`<strong>🏬 Kho Xuất Phát:</strong><br/>${warehouse.name || 'Kho AetherPC'}`);
+    }
+
+    // Marker Điểm nhận hàng của Khách
+    markersRef.current.destination = L.marker([destination.lat, destination.lng], { icon: DESTINATION_ICON })
+      .addTo(map)
+      .bindPopup(`<strong>🏠 Điểm Giao Hàng:</strong><br/>${customerName}<br/>${address}`);
+
+    let isMounted = true;
+    fetchRoadRoute(origin, destination).then(route => {
+      if (!isMounted || !mapRef.current) return;
+      setLoadingRoute(false);
+
+      if (route && route.coordinates && route.coordinates.length > 0) {
+        setRouteInfo(route);
+        routeCoordsRef.current = route.coordinates;
+
+        // Viền bóng lộ trình
+        const borderLine = L.polyline(route.coordinates, {
+          color: '#1d4ed8',
+          weight: 8,
+          opacity: 0.35,
+          lineCap: 'round',
+          lineJoin: 'round'
+        }).addTo(mapRef.current);
+
+        // Đường chỉ dẫn tối ưu chính
+        const mainLine = L.polyline(route.coordinates, {
+          color: '#2563eb',
+          weight: 5,
+          opacity: 0.95,
+          lineCap: 'round',
+          lineJoin: 'round'
+        }).addTo(mapRef.current);
+
+        routeLayersRef.current = [borderLine, mainLine];
+
+        // Căn góc nhìn bao trọn tuyến đường
+        const bounds = L.latLngBounds(route.coordinates);
+        if (shipperLoc) bounds.extend([shipperLoc.lat, shipperLoc.lng]);
+        mapRef.current.fitBounds(bounds, { padding: [40, 40] });
+      }
+    });
+
+    return () => { isMounted = false; };
+  }, [warehouse?.lat, warehouse?.lng, destination?.lat, destination?.lng, shipperLoc?.lat, shipperLoc?.lng]);
+
+  // 4. Cập nhật vị trí Marker Shipper theo thời gian thực
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !shipperLoc) return;
+    const pos = [shipperLoc.lat, shipperLoc.lng];
+
+    if (markersRef.current.shipper) {
+      markersRef.current.shipper.setLatLng(pos);
+    } else {
+      markersRef.current.shipper = L.marker(pos, { icon: SHIPPER_ICON, zIndexOffset: 1000 })
+        .addTo(map)
+        .bindPopup(`<strong>🛵 Vị Trí Của Bạn (Shipper)</strong><br/><span style="color:#16a34a;">● Đang phát tín hiệu GPS trực tiếp</span>`);
+    }
+
+    if (!map.getBounds().pad(0.15).contains(pos)) {
+      map.panTo(pos, { animate: true, duration: 0.8 });
+    }
+  }, [shipperLoc]);
+
+  // Lắng nghe cập nhật toạ độ liên tục khi GPS Active
+  useEffect(() => {
+    if (!isGpsActive || !navigator.geolocation) return;
+
+    const watchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        setShipperLoc({
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          speed: pos.coords.speed,
+          heading: pos.coords.heading
+        });
+        if (pos.coords.speed != null && pos.coords.speed > 0) {
+          setSpeedKmh(Math.round(pos.coords.speed * 3.6));
+        }
+      },
+      (err) => console.warn('Lỗi định vị GPS thực tế:', err.message),
+      { enableHighAccuracy: true, maximumAge: 3000, timeout: 10000 }
+    );
+
+    return () => {
+      navigator.geolocation.clearWatch(watchId);
+    };
+  }, [isGpsActive]);
+
+  const fitFullRoute = useCallback(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    if (routeCoordsRef.current.length > 0) {
+      map.fitBounds(L.latLngBounds(routeCoordsRef.current), { padding: [40, 40], animate: true });
+    }
+  }, []);
+
+  const distanceRemaining = shipperLoc && destination ? haversineKm(shipperLoc, destination) : null;
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 1100,
+      backgroundColor: 'rgba(15, 23, 42, 0.75)',
+      backdropFilter: 'blur(4px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      padding: '0.75rem'
+    }}>
+      <div style={{
+        backgroundColor: 'var(--bg-primary, #ffffff)',
+        borderRadius: '16px',
+        width: '100%',
+        maxWidth: '780px',
+        maxHeight: '94vh',
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
+        boxShadow: '0 20px 40px rgba(0,0,0,0.25)',
+        border: '1px solid var(--border-glass, #e2e8f0)'
+      }}>
+        {/* Header Modal */}
+        <div style={{
+          padding: '1rem 1.25rem',
+          borderBottom: '1px solid var(--border-glass, #e2e8f0)',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          backgroundColor: '#f8fafc'
+        }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Navigation size={20} color="#2563eb" />
+              <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#0f172a' }}>
+                Lộ Trình Giao Hàng #{orderId}
+              </h3>
+            </div>
+            <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
+              Đề xuất tuyến đường giao hàng tối ưu và định vị GPS thực tế
+            </span>
+          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              background: 'none', border: 'none', cursor: 'pointer',
+              color: '#64748b', padding: '0.4rem', borderRadius: '50%',
+              display: 'flex', alignItems: 'center', justifyContent: 'center'
+            }}
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        {/* Thông tin khách hàng tóm tắt */}
+        <div style={{
+          padding: '0.75rem 1.25rem',
+          backgroundColor: '#eff6ff',
+          borderBottom: '1px solid #bfdbfe',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '0.5rem',
+          fontSize: '0.8rem'
+        }}>
+          <div>
+            <span style={{ color: '#64748b' }}>Khách hàng:</span> <strong style={{ color: '#0f172a' }}>{customerName}</strong>
+            {phone && (
+              <a
+                href={`tel:${phone}`}
+                style={{
+                  marginLeft: '0.5rem',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.2rem',
+                  color: '#2563eb',
+                  fontWeight: 700,
+                  textDecoration: 'none',
+                  backgroundColor: '#dbeafe',
+                  padding: '2px 8px',
+                  borderRadius: '4px'
+                }}
+              >
+                <Phone size={12} /> {phone}
+              </a>
+            )}
+            <div style={{ color: '#334155', marginTop: '0.25rem', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+              <MapPin size={13} style={{ color: '#64748b', flexShrink: 0 }} /> <span><strong>Địa chỉ:</strong> {address}</span>
+            </div>
+          </div>
+
+          <div style={{ textAlign: 'right' }}>
+            <span style={{ color: '#64748b' }}>Thu hộ COD:</span>{' '}
+            <strong style={{ color: isPrepaid ? '#16a34a' : '#ef4444', fontSize: '0.95rem' }}>
+              {isPrepaid ? 'Đã Thanh Toán Online' : fmt ? fmt(codAmount) : `${codAmount.toLocaleString('vi-VN')} ₫`}
+            </strong>
+          </div>
+        </div>
+
+        {/* Khung bản đồ */}
+        <div style={{ position: 'relative', flex: 1, minHeight: '340px' }}>
+          <div ref={containerRef} style={{ width: '100%', height: '100%', minHeight: '340px' }} />
+
+          {/* Nút căn góc nhìn */}
+          <button
+            type="button"
+            onClick={fitFullRoute}
+            style={{
+              position: 'absolute',
+              top: '10px',
+              right: '10px',
+              zIndex: 999,
+              backgroundColor: 'rgba(255, 255, 255, 0.95)',
+              border: '1px solid #cbd5e1',
+              borderRadius: '6px',
+              padding: '6px 10px',
+              fontSize: '0.75rem',
+              fontWeight: 700,
+              color: '#0f172a',
+              cursor: 'pointer',
+              boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.3rem'
+            }}
+          >
+            <Compass size={14} color="#2563eb" /> Căn giữa lộ trình
+          </button>
+
+          {/* Badge trạng thái GPS */}
+          <div style={{
+            position: 'absolute',
+            bottom: '12px',
+            left: '12px',
+            zIndex: 999,
+            backgroundColor: isGpsActive ? '#15803d' : 'rgba(15, 23, 42, 0.85)',
+            color: '#ffffff',
+            padding: '5px 12px',
+            borderRadius: '999px',
+            fontSize: '0.75rem',
+            fontWeight: 700,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.4rem',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
+          }}>
+            <span style={{
+              width: '8px', height: '8px', borderRadius: '50%',
+              backgroundColor: isGpsActive ? '#4ade80' : '#f59e0b',
+              boxShadow: isGpsActive ? '0 0 8px #4ade80' : 'none'
+            }} />
+            {isGpsActive ? 'GPS THỜI GIAN THỰC ĐANG BẬT' : 'CHƯA BẬT GPS GIAO HÀNG'}
+          </div>
+        </div>
+
+        {/* Thanh đề xuất quãng đường & HUD chỉ số tinh tế */}
+        <div style={{
+          padding: '0.65rem 1rem',
+          backgroundColor: '#f8fafc',
+          borderTop: '1px solid #e2e8f0',
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(135px, 1fr))',
+          gap: '0.5rem',
+          fontSize: '0.8rem'
+        }}>
+          <div style={{ padding: '0.45rem 0.6rem', backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+            <div style={{ color: '#64748b', fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: '0.3rem', marginBottom: '0.15rem' }}>
+              <Route size={13} color="#2563eb" /> Tuyến tối ưu
+            </div>
+            <strong style={{ color: '#2563eb', fontSize: '0.86rem' }}>
+              {loadingRoute ? 'Đang tính...' : routeInfo ? `${routeInfo.distanceKm} km` : '~5.3 km'}
+            </strong>
+          </div>
+
+          <div style={{ padding: '0.45rem 0.6rem', backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+            <div style={{ color: '#64748b', fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: '0.3rem', marginBottom: '0.15rem' }}>
+              <Clock size={13} color="#475569" /> Dự kiến
+            </div>
+            <strong style={{ color: '#0f172a', fontSize: '0.86rem' }}>
+              {loadingRoute ? '...' : routeInfo ? `~${routeInfo.durationMinutes} phút` : '~12 phút'}
+            </strong>
+          </div>
+
+          <div style={{ padding: '0.45rem 0.6rem', backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+            <div style={{ color: '#64748b', fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: '0.3rem', marginBottom: '0.15rem' }}>
+              <MapPin size={13} color="#16a34a" /> Khoảng cách
+            </div>
+            <strong style={{ color: '#16a34a', fontSize: '0.86rem' }}>
+              {distanceRemaining != null ? (distanceRemaining < 0.15 ? 'Đã đến nơi' : distanceRemaining < 1 ? `~${Math.round(distanceRemaining * 1000)} m` : `~${distanceRemaining.toFixed(1)} km`) : (routeInfo?.distanceKm ? `~${routeInfo.distanceKm} km` : 'Đang tính')}
+            </strong>
+          </div>
+
+          <div style={{ padding: '0.45rem 0.6rem', backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+            <div style={{ color: '#64748b', fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: '0.3rem', marginBottom: '0.15rem' }}>
+              <Gauge size={13} color="#7c3aed" /> Vận tốc
+            </div>
+            <strong style={{ color: '#7c3aed', fontSize: '0.86rem' }}>
+              {speedKmh > 0 ? `${speedKmh} km/h` : 'Đang dừng'}
+            </strong>
+          </div>
+        </div>
+
+        {/* Cảnh báo nếu chưa có toạ độ thực tế */}
+        {locError && !isGpsActive && (
+          <div style={{
+            padding: '0.45rem 1rem',
+            backgroundColor: '#fffbeb',
+            color: '#b45309',
+            fontSize: '0.75rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.4rem',
+            borderTop: '1px solid #fef3c7'
+          }}>
+            <AlertCircle size={14} />
+            <span>{locError} Bấm nút bên dưới để cấp quyền định vị GPS thực tế.</span>
+          </div>
+        )}
+
+        {/* Thanh nút hành động chính */}
+        <div style={{
+          padding: '0.85rem 1rem',
+          backgroundColor: '#ffffff',
+          borderTop: '1px solid #e2e8f0',
+          display: 'flex',
+          gap: '0.65rem',
+          alignItems: 'center',
+          flexWrap: 'wrap'
+        }}>
+          {!isGpsActive ? (
+            <button
+              type="button"
+              onClick={() => onStartDeliveryWithGps && onStartDeliveryWithGps(order)}
+              style={{
+                flex: '1 1 180px',
+                padding: '0.7rem 1rem',
+                backgroundColor: '#2563eb',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '10px',
+                fontWeight: 750,
+                fontSize: '0.85rem',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.45rem',
+                boxShadow: '0 4px 12px rgba(37,99,235,0.25)'
+              }}
+            >
+              <Navigation size={16} />
+              Bắt Đầu Giao (Bật Live GPS)
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => onStopGps && onStopGps(order)}
+              style={{
+                flex: '1 1 130px',
+                padding: '0.7rem 0.85rem',
+                backgroundColor: 'transparent',
+                color: '#dc2626',
+                border: '1.5px solid #dc2626',
+                borderRadius: '10px',
+                fontWeight: 700,
+                fontSize: '0.82rem',
+                cursor: 'pointer'
+              }}
+            >
+              Tạm Dừng Định Vị
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={() => {
+              onClose();
+              if (onOpenPOD) onOpenPOD(order);
+            }}
+            style={{
+              flex: '1 1 180px',
+              padding: '0.7rem 1rem',
+              backgroundColor: '#16a34a',
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: '10px',
+              fontWeight: 750,
+              fontSize: '0.85rem',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.45rem',
+              boxShadow: '0 4px 12px rgba(22,163,74,0.25)'
+            }}
+          >
+            <Camera size={16} />
+            Đã Đến Nơi - Chụp Ảnh POD
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

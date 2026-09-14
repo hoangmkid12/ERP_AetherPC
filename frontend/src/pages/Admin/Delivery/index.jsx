@@ -4,7 +4,8 @@ import { useSalesStore } from '../../../stores';
 import { useAuth } from '../../../context/AuthContext';
 import { useNotification, notify } from '../../../context/NotificationContext';
 import { api } from '../../../services/api';
-import { detectDeliveryRegion } from '../../../utils/deliveryRegions';
+import { detectDeliveryRegion, REGION_COORDS } from '../../../utils/deliveryRegions';
+import { fetchRoadRoute, sampleRoutePoints } from '../../../utils/routingService';
 
 import OverviewTab from './OverviewTab';
 import PendingTab from './PendingTab';
@@ -15,6 +16,7 @@ import PODModal from './components/PODModal';
 import FailModal from './components/FailModal';
 import ReturnProofModal from './components/ReturnProofModal';
 import OrderDetailSheet from './components/OrderDetailSheet';
+import DeliveryNavigationModal from './components/DeliveryNavigationModal';
 import { getDeliveryIncidentStatus } from './deliveryHelpers';
 
 // Refetch orders/returns while the tab is visible, paused otherwise.
@@ -467,7 +469,8 @@ export default function Delivery() {
       }
       return o;
     }));
-    setDeliverModal(null);
+    // Tự động tắt phát GPS cho đơn này khi đã giao xong
+    if (gpsOrderId === String(ordId)) stopGps();
 
     try {
       await updateOrderStatus(ordId, 'DELIVERED', payload);
@@ -482,6 +485,8 @@ export default function Delivery() {
   const handleFailDelivery = async (payload) => {
     if (!failModal) return;
     const ordId = failModal.orderId || failModal.id;
+
+    if (gpsOrderId === String(ordId)) stopGps();
 
     setApiOrders(prev => prev.map(o => {
       if (String(o.orderId || o.id) === String(ordId)) {
@@ -608,6 +613,209 @@ export default function Delivery() {
     }
   };
 
+  // ─── Live GPS Tracking (Shipper phát vị trí cho Khách hàng theo dõi) ───
+  const [gpsOrderId, setGpsOrderId] = useState(null);
+  const [simulatingOrderId, setSimulatingOrderId] = useState(null);
+  const [navigationModalOrder, setNavigationModalOrder] = useState(null);
+  const gpsSocketRef = useRef(null);
+  const watchIdRef = useRef(null);
+  const lastSentAtRef = useRef(0);
+  const simulationTimerRef = useRef(null);
+
+  const GPS_SEND_INTERVAL_MS = 8000;
+  // 2 kho thật trong hệ thống (xem prisma/seed.js) — Hà Nội phục vụ khu vực
+  // miền Bắc, còn lại xuất từ Kho Tổng TP.HCM.
+  const getOriginForRegion = (region) => (region === 'HN_NORTH' ? { lat: 21.0139, lng: 105.8228 } : { lat: 10.7756, lng: 106.6919 });
+
+  const openWsConnection = () => {
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    return new WebSocket(`${wsProtocol}//${window.location.host}/ws/cskh`);
+  };
+
+  const closeGpsSocket = useCallback(() => {
+    const ws = gpsSocketRef.current;
+    if (ws) {
+      try { ws.send(JSON.stringify({ type: 'SHIPPER_LEAVE_DELIVERY' })); } catch (_) { /* socket already closing */ }
+      ws.close();
+      gpsSocketRef.current = null;
+    }
+  }, []);
+
+  const stopGps = useCallback(() => {
+    if (watchIdRef.current != null && navigator.geolocation) {
+      navigator.geolocation.clearWatch(watchIdRef.current);
+      watchIdRef.current = null;
+    }
+    closeGpsSocket();
+    setGpsOrderId(null);
+  }, [closeGpsSocket]);
+
+  const sendLocation = (orderId, coords) => {
+    const payload = { orderId, lat: coords.lat, lng: coords.lng, speed: coords.speed ?? null, heading: coords.heading ?? null };
+    const ws = gpsSocketRef.current;
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: 'SHIPPER_UPDATE_LOCATION', payload }));
+    } else {
+      // Fallback HTTP khi WebSocket rớt mạng giữa chừng — không được để mất
+      // tín hiệu chỉ vì 1 lần mất kết nối tạm thời trên đường đi giao.
+      api.post(`/orders/${orderId}/location`, payload).catch(() => {});
+    }
+  };
+
+  const startGps = (orderId) => {
+    if (!navigator.geolocation) {
+      addNotification('Trình duyệt này không hỗ trợ định vị GPS.', 'error');
+      return;
+    }
+    const ws = openWsConnection();
+    gpsSocketRef.current = ws;
+    ws.onopen = () => ws.send(JSON.stringify({ type: 'SHIPPER_JOIN_DELIVERY', payload: { orderId } }));
+    ws.onmessage = (evt) => {
+      try {
+        const data = JSON.parse(evt.data);
+        if (data.type === 'ERROR') {
+          addNotification(data.message || 'Lỗi phát vị trí GPS.', 'error');
+          stopGps();
+        }
+      } catch (_) { /* ignore malformed frame */ }
+    };
+
+    watchIdRef.current = navigator.geolocation.watchPosition(
+      (pos) => {
+        const now = Date.now();
+        if (now - lastSentAtRef.current < GPS_SEND_INTERVAL_MS) return;
+        lastSentAtRef.current = now;
+        sendLocation(orderId, { lat: pos.coords.latitude, lng: pos.coords.longitude, speed: pos.coords.speed, heading: pos.coords.heading });
+      },
+      (err) => addNotification(`Không thể lấy vị trí GPS: ${err.message}`, 'error'),
+      { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
+    );
+    setGpsOrderId(orderId);
+  };
+
+  const handleToggleGPS = (ord) => {
+    const orderId = String(ord.orderId || ord.id);
+    if (gpsOrderId === orderId) {
+      stopGps();
+      addNotification(`Đã dừng phát vị trí GPS cho đơn #${orderId}.`, 'info');
+      return;
+    }
+    if (gpsOrderId) stopGps();
+    if (simulatingOrderId) {
+      clearInterval(simulationTimerRef.current);
+      simulationTimerRef.current = null;
+      setSimulatingOrderId(null);
+    }
+    startGps(orderId);
+    addNotification(`Đã bật định vị GPS cho đơn #${orderId}. Khách hàng có thể theo dõi trực tiếp.`, 'success');
+  };
+
+  // Demo Giả Lập — Di chuyển uốn lượn mượt mà theo đúng các tuyến phố thực tế (OSRM Road Routing)
+  // phục vụ thuyết trình/bảo vệ KLTN trong phòng kín không có GPS thật.
+  const handleSimulate = async (ord) => {
+    const orderId = String(ord.orderId || ord.id);
+    if (simulatingOrderId === orderId) {
+      clearInterval(simulationTimerRef.current);
+      simulationTimerRef.current = null;
+      setSimulatingOrderId(null);
+      closeGpsSocket();
+      addNotification(`Đã dừng giả lập đơn #${orderId}.`, 'info');
+      return;
+    }
+    if (gpsOrderId) stopGps();
+    if (simulationTimerRef.current) clearInterval(simulationTimerRef.current);
+
+    const region = ord.deliveryRegion || detectDeliveryRegion(ord.shippingAddress || ord.address || '');
+    const from = getOriginForRegion(region);
+    const to = REGION_COORDS[region] || REGION_COORDS.ALL;
+
+    setSimulatingOrderId(orderId);
+    addNotification(`Đang tính toán tuyến đường phố thực tế cho đơn #${orderId}...`, 'info');
+
+    // Tải tuyến đường thực tế qua các góc phố
+    const route = await fetchRoadRoute(from, to);
+    let roadPoints = [];
+    if (route && route.coordinates && route.coordinates.length > 0) {
+      roadPoints = sampleRoutePoints(route.coordinates, 35);
+    } else {
+      // Fallback nếu không có mạng
+      roadPoints = Array.from({ length: 30 }, (_, i) => {
+        const t = i / 29;
+        return [from.lat + (to.lat - from.lat) * t, from.lng + (to.lng - from.lng) * t];
+      });
+    }
+
+    const ws = openWsConnection();
+    gpsSocketRef.current = ws;
+
+    const startRun = () => {
+      ws.send(JSON.stringify({ type: 'SHIPPER_JOIN_DELIVERY', payload: { orderId } }));
+
+      // Phát ngay điểm xuất phát tại Kho
+      const [startLat, startLng] = roadPoints[0];
+      ws.send(JSON.stringify({
+        type: 'SHIPPER_UPDATE_LOCATION',
+        payload: { orderId, lat: startLat, lng: startLng, speed: 25.0, heading: 45 }
+      }));
+
+      let idx = 0;
+      addNotification(`Bắt đầu giả lập lộ trình đường bộ (${route?.distanceKm || '5.3'} km)...`, 'success');
+
+      simulationTimerRef.current = setInterval(() => {
+        idx += 1;
+        if (idx < roadPoints.length) {
+          const [lat, lng] = roadPoints[idx];
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({
+              type: 'SHIPPER_UPDATE_LOCATION',
+              payload: { orderId, lat, lng, speed: 28.5, heading: 90 }
+            }));
+          }
+        } else {
+          clearInterval(simulationTimerRef.current);
+          simulationTimerRef.current = null;
+          setSimulatingOrderId(null);
+          ws.close();
+          if (gpsSocketRef.current === ws) gpsSocketRef.current = null;
+          addNotification(`Giả lập giao hàng đơn #${orderId} đã đến đích an toàn!`, 'success');
+        }
+      }, 1200);
+    };
+
+    if (ws.readyState === WebSocket.OPEN) {
+      startRun();
+    } else {
+      ws.onopen = startRun;
+    }
+  };
+
+  // Dọn dẹp watchPosition/WebSocket/interval khi rời trang, tránh rò rỉ và
+  // tiếp tục xin quyền định vị của trình duyệt sau khi Shipper đã thoát.
+  useEffect(() => () => {
+    if (watchIdRef.current != null && navigator.geolocation) navigator.geolocation.clearWatch(watchIdRef.current);
+    if (simulationTimerRef.current) clearInterval(simulationTimerRef.current);
+    closeGpsSocket();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleOpenNavigation = (ord) => {
+    setNavigationModalOrder(ord);
+  };
+
+  const handleStartDeliveryWithGps = async (ord) => {
+    const orderId = String(ord.orderId || ord.id);
+    if (ord.status !== 'SHIPPED') {
+      try {
+        await updateOrderStatus(orderId, 'SHIPPED');
+        setApiOrders(prev => prev.map(o => String(o.orderId || o.id) === orderId ? { ...o, status: 'SHIPPED' } : o));
+      } catch (err) {
+        console.warn('Lỗi cập nhật trạng thái đơn:', err.message);
+      }
+    }
+    startGps(orderId);
+    addNotification(`Đã xác nhận bắt đầu giao đơn #${orderId}! GPS thực tế đang được phát sóng trực tiếp tới khách hàng.`, 'success');
+  };
+
   const actions = {
     onClaim: handleClaimOrder,
     onDeliver: setDeliverModal,
@@ -615,7 +823,11 @@ export default function Delivery() {
     onResume: handleResumeDelivery,
     onForceReturn: handleForceReturnToWarehouse,
     onEscalate: handleEscalateToCSKH,
-    onRedeliver: handleRedeliver
+    onRedeliver: handleRedeliver,
+    onToggleGPS: handleToggleGPS,
+    onSimulate: handleSimulate,
+    onOpenNavigation: handleOpenNavigation,
+    onStartDeliveryWithGps: handleStartDeliveryWithGps
   };
 
   const filterState = {
@@ -683,6 +895,8 @@ export default function Delivery() {
           countReturning={countReturning}
           doneCount={doneCount}
           onGoToPending={() => setTab('pending')}
+          gpsOrderId={gpsOrderId}
+          simulatingOrderId={simulatingOrderId}
         />
       )}
 
@@ -753,6 +967,26 @@ export default function Delivery() {
             onDeliver: setDeliverModal,
             onFail: setFailModal
           }}
+        />
+      )}
+
+      {navigationModalOrder && (
+        <DeliveryNavigationModal
+          order={navigationModalOrder}
+          warehouse={getOriginForRegion(navigationModalOrder.deliveryRegion || detectDeliveryRegion(navigationModalOrder.shippingAddress || navigationModalOrder.address || ''))}
+          destination={{
+            ...(REGION_COORDS[navigationModalOrder.deliveryRegion || detectDeliveryRegion(navigationModalOrder.shippingAddress || navigationModalOrder.address || '')] || REGION_COORDS.ALL),
+            label: navigationModalOrder.shippingAddress || navigationModalOrder.address || 'Địa chỉ nhận hàng'
+          }}
+          isGpsActive={gpsOrderId === String(navigationModalOrder.orderId || navigationModalOrder.id)}
+          onStartDeliveryWithGps={handleStartDeliveryWithGps}
+          onStopGps={stopGps}
+          onOpenPOD={(ord) => {
+            setDeliverModal(ord);
+            setNavigationModalOrder(null);
+          }}
+          onClose={() => setNavigationModalOrder(null)}
+          fmt={fmt}
         />
       )}
     </div>

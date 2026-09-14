@@ -1258,6 +1258,11 @@ select.input-field option {
   to { transform: rotate(360deg); }
 }
 
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
 /* Full-screen modal used by PODModal / FailModal / OrderDetailSheet —
    always fills the 480px phone-frame column, not a centered dialog. */
 .delivery-fullscreen-modal {
@@ -1380,6 +1385,214 @@ select.input-field option {
 @media (max-width: 768px) {
   .container {
     padding: 0 1rem !important;
+  }
+}
+
+/* Responsive Styles for MyOrders & Delivery Tracking */
+.my-orders-grid {
+  display: grid;
+  grid-template-columns: 360px 1fr;
+  gap: 1.75rem;
+  align-items: start;
+}
+
+@media (max-width: 960px) {
+  .my-orders-grid {
+    grid-template-columns: 1fr !important;
+    gap: 1.25rem !important;
+  }
+}
+
+.my-orders-container {
+  padding: 2.5rem 1.5rem 4rem;
+  min-height: 80vh;
+}
+
+@media (max-width: 768px) {
+  .my-orders-container {
+    padding: 1.25rem 0.75rem 3rem !important;
+  }
+}
+
+/* Stepper Responsive Scroll */
+.order-stepper-container {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 0.5rem 0.25rem;
+}
+
+.order-stepper-container::-webkit-scrollbar {
+  height: 4px;
+}
+.order-stepper-container::-webkit-scrollbar-thumb {
+  background: rgba(0,0,0,0.15);
+  border-radius: 4px;
+}
+
+/* Delivery Map Container Responsive */
+.delivery-map-wrapper {
+  height: 370px;
+}
+@media (max-width: 640px) {
+  .delivery-map-wrapper {
+    height: 270px !important;
+  }
+}
+
+/* ========================================================================= */
+/* UNIVERSAL RESPONSIVE & OVERFLOW SAFEGUARD (STOREFRONT & ADMIN ERP)        */
+/* ========================================================================= */
+
+/* 1. Global Viewport Overflow Guard — Chống tràn ngang tuyệt đối */
+html, body, #root, .admin-layout-container, .admin-main-content {
+  max-width: 100vw !important;
+  overflow-x: clip !important;
+}
+
+/* 2. Responsive Table Wrappers — Bảng dữ liệu tự động cuộn cảm ứng */
+.table-responsive,
+.erp-table-responsive,
+.erp-table-container,
+.table-wrapper {
+  width: 100% !important;
+  max-width: 100% !important;
+  overflow-x: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+  margin-bottom: 0.75rem !important;
+}
+
+/* Tùy biến thanh cuộn ngang của bảng mỏng, thanh lịch */
+.table-responsive::-webkit-scrollbar,
+.erp-table-responsive::-webkit-scrollbar,
+div:has(> table)::-webkit-scrollbar {
+  height: 5px;
+}
+.table-responsive::-webkit-scrollbar-thumb,
+.erp-table-responsive::-webkit-scrollbar-thumb,
+div:has(> table)::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+/* 3. Breakpoint Mobile & Tablet (<= 1024px) */
+@media (max-width: 1024px) {
+  /* Admin tabs cuộn ngang mượt mà khi nhiều tab */
+  .admin-tabs-nav,
+  .tabs-nav,
+  .erp-tabs-bar {
+    display: flex !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    white-space: nowrap !important;
+    scrollbar-width: none !important;
+    padding-bottom: 4px !important;
+  }
+  .admin-tabs-nav::-webkit-scrollbar,
+  .tabs-nav::-webkit-scrollbar,
+  .erp-tabs-bar::-webkit-scrollbar {
+    display: none !important;
+  }
+}
+
+/* 4. Breakpoint Mobile (< 768px) */
+@media (max-width: 768px) {
+  /* Giải phóng padding khung nội dung Admin trên điện thoại */
+  .admin-main-content {
+    padding: 0 !important;
+  }
+  .admin-main-content > div {
+    padding: 1rem 0.75rem !important;
+    max-width: 100% !important;
+  }
+
+  /* Tự động biến mọi container trực tiếp chứa thẻ table thành vùng cuộn cảm ứng */
+  div:has(> table) {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    display: block !important;
+    border-radius: 8px !important;
+  }
+
+  /* Đảm bảo table có độ rộng tối thiểu để nội dung không bị ép méo */
+  table {
+    min-width: 600px !important;
+  }
+
+  /* Cột thao tác cuối cùng của bảng không bị rớt dòng lộn xộn */
+  table td:last-child {
+    white-space: nowrap !important;
+  }
+
+  /* Toolbar / Search bar / Bộ lọc: tự xuống dòng linh hoạt */
+  .filter-bar,
+  .search-toolbar,
+  .action-bar,
+  .toolbar-container {
+    flex-wrap: wrap !important;
+    gap: 0.5rem !important;
+  }
+
+  .filter-bar > *,
+  .search-toolbar > * {
+    max-width: 100% !important;
+  }
+
+  /* Modal / Dialog toàn cục trên di động: không bao giờ tràn lề */
+  .modal-dialog,
+  .modal-box,
+  .modal-content-responsive,
+  .modal-wrapper > div,
+  [role="dialog"] > div {
+    width: 95vw !important;
+    max-width: 95vw !important;
+    max-height: 92vh !important;
+    overflow-y: auto !important;
+    padding: 1.1rem 0.85rem !important;
+    margin: auto !important;
+  }
+
+  /* Grid 2 cột tự chuyển thành 1 cột trên điện thoại */
+  .two-col-grid,
+  .split-grid,
+  .pos-layout-grid,
+  div[style*="grid-template-columns: 1fr 1fr"],
+  div[style*="grid-template-columns: 1.5fr 1fr"],
+  div[style*="grid-template-columns: 2fr 1fr"],
+  div[style*="grid-template-columns: 1fr 2fr"] {
+    grid-template-columns: 1fr !important;
+    gap: 1rem !important;
+  }
+
+  /* Đảm bảo các ô thao tác, nút hành động cuối bảng không bị ép méo */
+  table td:last-child > div {
+    display: inline-flex !important;
+    flex-wrap: nowrap !important;
+    gap: 0.35rem !important;
+    align-items: center !important;
+  }
+
+  /* Form controls không vượt quá chiều rộng màn hình */
+  input, select, textarea {
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Tiêu đề trang Admin co dãn cân đối */
+  .admin-page-title {
+    font-size: 1.15rem !important;
+  }
+
+  /* Storefront Cart & Checkout */
+  .cart-grid {
+    grid-template-columns: 1fr !important;
+    gap: 1.25rem !important;
+  }
+
+  /* Giảm bớt padding của card-glass trên mobile */
+  .card-glass {
+    padding: 1rem 0.85rem !important;
   }
 }
 

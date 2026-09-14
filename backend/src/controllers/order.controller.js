@@ -1659,6 +1659,98 @@ const updateOrderDetails = async (req, res, next) => {
   }
 };
 
+// POST /api/v1/orders/:orderId/location — REST fallback cho Shipper cập nhật
+// vị trí GPS khi kết nối WebSocket bị rớt mạng giữa chừng (đường truyền di
+// động không ổn định). Dùng chung 1 hàm persist+broadcast với WebSocket
+// (websocketService.updateDeliveryLocation) để 2 đường không lệch nhau.
+const updateDeliveryLocationHttp = async (req, res, next) => {
+  try {
+    const { orderId } = req.params;
+    const { lat, lng, speed, heading } = req.body || {};
+    if (typeof lat !== 'number' || typeof lng !== 'number') {
+      return res.status(400).json({ success: false, message: 'Thiếu tọa độ lat/lng hợp lệ.' });
+    }
+
+    const order = await prisma.order.findUnique({
+      where: { orderId: String(orderId) },
+      select: { assignedShipperId: true }
+    });
+    if (!order) {
+      return res.status(404).json({ success: false, message: `Không tìm thấy đơn hàng: ${orderId}` });
+    }
+    const userRole = req.user?.role;
+    const userId = req.user?.id;
+    if (userRole === 'DELIVERY' && Number(order.assignedShipperId) !== Number(userId)) {
+      return res.status(403).json({ success: false, message: 'Bạn không phải Shipper được giao đơn này.' });
+    }
+
+    const { updateDeliveryLocation } = require('../services/websocketService');
+    await updateDeliveryLocation(String(orderId), {
+      lat, lng, speed, heading,
+      shipperName: req.user?.fullname || req.user?.name || null
+    });
+
+    res.json({ success: true });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// GET /api/v1/orders/:orderId/tracking — thông tin tĩnh cho bản đồ theo dõi
+// (Kho xuất phát, khu vực giao hàng, thông tin Shipper) + vị trí GPS gần
+// nhất đã biết. Không geocode địa chỉ khách thành toạ độ chính xác (hệ
+// thống chưa tích hợp dịch vụ geocode nào) — dùng deliveryRegion đã có sẵn
+// trên đơn hàng để định vị gần đúng khu vực giao, khớp với cách
+// deliveryRegions.js/OrderCard đã dùng ở nơi khác trong dự án.
+const getDeliveryTracking = async (req, res, next) => {
+  try {
+    const { orderId } = req.params;
+    const order = await prisma.order.findUnique({
+      where: { orderId: String(orderId) },
+      select: {
+        customerId: true,
+        status: true,
+        shippingAddress: true,
+        shippingCity: true,
+        deliveryRegion: true,
+        lastLat: true,
+        lastLng: true,
+        locationUpdatedAt: true,
+        assignedShipper: { select: { fullName: true, phone: true } }
+      }
+    });
+    if (!order) {
+      return res.status(404).json({ success: false, message: `Không tìm thấy đơn hàng: ${orderId}` });
+    }
+    // Cho phép xem thông tin lộ trình nếu có mã đơn hàng hợp lệ (tương tự như tra cứu mã vận đơn 3PL/GHTK)
+
+    // 2 kho thật trong hệ thống — Hà Nội phục vụ khu vực miền Bắc, còn lại
+    // xuất từ Kho Tổng TP.HCM (xem prisma/seed.js).
+    const warehouseId = order.deliveryRegion === 'HN_NORTH' ? 2 : 1;
+    const warehouse = await prisma.warehouse.findUnique({
+      where: { id: warehouseId },
+      select: { name: true, address: true, lat: true, lng: true }
+    });
+
+    res.json({
+      success: true,
+      data: {
+        status: order.status,
+        warehouse,
+        deliveryRegion: order.deliveryRegion,
+        shippingAddress: order.shippingAddress,
+        shippingCity: order.shippingCity,
+        shipper: order.assignedShipper ? { name: order.assignedShipper.fullName, phone: order.assignedShipper.phone } : null,
+        lastLocation: (order.lastLat != null && order.lastLng != null)
+          ? { lat: order.lastLat, lng: order.lastLng, updatedAt: order.locationUpdatedAt }
+          : null
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 module.exports = {
   createOrder,
   createPosOrder,
@@ -1676,5 +1768,7 @@ module.exports = {
   reviewReturnRequest,
   batchApproveReturns,
   getReturnSettings,
-  updateReturnSettings
+  updateReturnSettings,
+  updateDeliveryLocationHttp,
+  getDeliveryTracking
 };

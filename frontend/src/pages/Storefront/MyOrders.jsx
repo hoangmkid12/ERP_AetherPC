@@ -3,10 +3,12 @@ import { useSalesStore, useUtilityStore, useInventoryStore } from '../../stores'
 import { useAuth } from '../../context/AuthContext';
 import { useNotification, notify, confirm } from '../../context/NotificationContext';
 import { COMPLAINT_STATUS, getStatusInfo, getStatusLabel } from '../../utils/statusLabels';
-import { Search, Package, Clock, ShieldCheck, CheckCircle2, ChevronRight, HelpCircle, RefreshCw, X, AlertCircle, Sparkles, Eye, Upload, CheckCircle } from 'lucide-react';
+import { Search, Package, Clock, ShieldCheck, CheckCircle2, ChevronRight, HelpCircle, RefreshCw, X, AlertCircle, Sparkles, Eye, Upload, CheckCircle, MapPin } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { api } from '../../services/api';
+import { REGION_COORDS, detectDeliveryRegion } from '../../utils/deliveryRegions';
 import ReturnRequestModal from '../../components/ReturnRequestModal';
+import DeliveryMap from '../../components/DeliveryMap';
 
 export default function MyOrders() {
   const orders = useSalesStore(state => state.orders) || [];
@@ -58,6 +60,14 @@ export default function MyOrders() {
   const [viewProofImage, setViewProofImage] = useState(null);
   // Refund Support Contact Modal State
   const [viewRefundContactModal, setViewRefundContactModal] = useState(null);
+
+  // Live GPS Tracking (Theo Dõi Giao Hàng Trực Tiếp) — thông tin tĩnh (kho,
+  // khu vực, shipper) tải qua REST 1 lần, vị trí GPS cập nhật liên tục qua
+  // WebSocket cùng kênh /ws/cskh đã dùng cho chat CSKH.
+  const [trackingData, setTrackingData] = useState(null);
+  const [trackingLoading, setTrackingLoading] = useState(false);
+  const [livePosition, setLivePosition] = useState(null);
+
 
   const handleCustomerConfirmRefundReceived = async (returnItem) => {
     if (!returnItem) return;
@@ -241,6 +251,47 @@ export default function MyOrders() {
   }, [matchedOrders, selectedOrderId]);
 
   const selectedOrder = orders.find(o => o.orderId === selectedOrderId) || matchedOrders[0];
+  const trackingOrderId = selectedOrder?.status === 'SHIPPED' ? (selectedOrder.orderId || selectedOrder.id) : null;
+
+  useEffect(() => {
+    if (!trackingOrderId) {
+      setTrackingData(null);
+      setLivePosition(null);
+      return;
+    }
+
+    let cancelled = false;
+    setTrackingLoading(true);
+    setLivePosition(null);
+
+    api.get(`/orders/${trackingOrderId}/tracking`)
+      .then(res => {
+        if (cancelled) return;
+        if (res?.success) {
+          setTrackingData(res.data);
+          if (res.data?.lastLocation) setLivePosition(res.data.lastLocation);
+        }
+      })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setTrackingLoading(false); });
+
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const ws = new WebSocket(`${wsProtocol}//${window.location.host}/ws/cskh`);
+    ws.onopen = () => ws.send(JSON.stringify({ type: 'CUSTOMER_TRACK_ORDER', payload: { orderId: trackingOrderId } }));
+    ws.onmessage = (evt) => {
+      try {
+        const data = JSON.parse(evt.data);
+        if (data.type === 'DELIVERY_LOCATION_UPDATE' && String(data.orderId) === String(trackingOrderId)) {
+          setLivePosition({ lat: data.lat, lng: data.lng, speed: data.speed, heading: data.heading, updatedAt: data.updatedAt });
+        }
+      } catch (_) { /* ignore malformed frame */ }
+    };
+
+    return () => {
+      cancelled = true;
+      ws.close();
+    };
+  }, [trackingOrderId]);
 
   const formatPrice = (price) => {
     return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price || 0);
@@ -617,73 +668,76 @@ export default function MyOrders() {
     }
 
     return (
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative', width: '100%', padding: '0.5rem 0' }}>
-        {steps.map((stepName, idx) => {
-          const isDone = idx < activeIdx || (idx === activeIdx && (status === 'DELIVERED' || status === 'COMPLETED'));
-          const isActive = idx === activeIdx && !isDone;
-          const isLineActive = idx <= activeIdx;
-          return (
-            <React.Fragment key={idx}>
-              {idx > 0 && (
-                <div style={{ 
-                  flex: 1, 
-                  height: '2.5px', 
-                  backgroundColor: isLineActive ? '#2563eb' : '#e2e8f0',
-                  margin: '0 0.25rem',
-                  marginBottom: '1.25rem',
-                  transition: 'all 0.3s ease'
-                }} />
-              )}
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: '60px' }}>
-                <div style={{ 
-                  width: '30px', 
-                  height: '30px', 
-                  borderRadius: '50%', 
-                  backgroundColor: isDone ? '#2563eb' : isActive ? '#eff6ff' : '#f8fafc',
-                  border: isActive ? '2px solid #2563eb' : isDone ? '2px solid #2563eb' : '1px solid #cbd5e1',
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'center',
-                  color: isDone ? '#ffffff' : isActive ? '#2563eb' : '#64748b',
-                  fontSize: '0.75rem',
-                  fontWeight: 800,
-                  boxShadow: isActive ? '0 0 10px rgba(37,99,235,0.3)' : 'none',
-                  transition: 'all 0.3s ease'
-                }}>
-                  {isDone ? '✓' : idx + 1}
+      <div className="order-stepper-container">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative', width: '100%', minWidth: '400px', padding: '0.5rem 0' }}>
+          {steps.map((stepName, idx) => {
+            const isDone = idx < activeIdx || (idx === activeIdx && (status === 'DELIVERED' || status === 'COMPLETED'));
+            const isActive = idx === activeIdx && !isDone;
+            const isLineActive = idx <= activeIdx;
+            return (
+              <React.Fragment key={idx}>
+                {idx > 0 && (
+                  <div style={{ 
+                    flex: 1, 
+                    height: '2.5px', 
+                    backgroundColor: isLineActive ? '#2563eb' : '#e2e8f0',
+                    margin: '0 0.25rem',
+                    marginBottom: '1.25rem',
+                    transition: 'all 0.3s ease'
+                  }} />
+                )}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: '55px' }}>
+                  <div style={{ 
+                    width: '30px', 
+                    height: '30px', 
+                    borderRadius: '50%', 
+                    backgroundColor: isDone ? '#2563eb' : isActive ? '#eff6ff' : '#f8fafc',
+                    border: isActive ? '2px solid #2563eb' : isDone ? '2px solid #2563eb' : '1px solid #cbd5e1',
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center',
+                    color: isDone ? '#ffffff' : isActive ? '#2563eb' : '#64748b',
+                    fontSize: '0.75rem',
+                    fontWeight: 800,
+                    boxShadow: isActive ? '0 0 10px rgba(37,99,235,0.3)' : 'none',
+                    transition: 'all 0.3s ease'
+                  }}>
+                    {isDone ? '✓' : idx + 1}
+                  </div>
+                  <span style={{ 
+                    fontSize: '0.7rem', 
+                    color: isDone || isActive ? '#0f172a' : '#64748b', 
+                    marginTop: '0.4rem', 
+                    textAlign: 'center',
+                    fontWeight: isActive || isDone ? 750 : 500,
+                    whiteSpace: 'nowrap'
+                  }}>
+                    {stepName}
+                  </span>
                 </div>
-                <span style={{ 
-                  fontSize: '0.7rem', 
-                  color: isDone || isActive ? '#0f172a' : '#64748b', 
-                  marginTop: '0.4rem', 
-                  textAlign: 'center',
-                  fontWeight: isActive || isDone ? 750 : 500,
-                  whiteSpace: 'nowrap'
-                }}>
-                  {stepName}
-                </span>
-              </div>
-            </React.Fragment>
-          );
-        })}
+              </React.Fragment>
+            );
+          })}
+        </div>
       </div>
     );
   };
 
   return (
-    <div className="container" style={{ padding: '3rem 1.5rem 5rem 1.5rem', minHeight: '80vh' }}>
-      <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
+    <div className="container my-orders-container">
+      <div style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
         <h1 style={{
-          fontSize: '2.5rem',
+          fontSize: 'clamp(1.6rem, 3.5vw, 2.3rem)',
           fontFamily: 'var(--font-title)',
           color: '#0f172a',
           fontWeight: 800,
-          marginBottom: '0.5rem'
+          marginBottom: '0.5rem',
+          lineHeight: 1.2
         }}>
           Tra Cứu Tiến Độ Đơn Hàng
         </h1>
-        <p style={{ color: 'var(--text-secondary)' }}>
-          Nhập số điện thoại mua hàng để theo dõi chi tiết hóa đơn và trạng thái vận chuyển của đơn hàng.
+        <p style={{ color: 'var(--text-secondary)', fontSize: 'clamp(0.85rem, 2vw, 0.95rem)', maxWidth: '600px', margin: '0 auto' }}>
+          Nhập số điện thoại mua hàng để theo dõi chi tiết hóa đơn và hành trình vận chuyển trực tiếp.
         </p>
 
         <div style={{ display: 'flex', justifyContent: 'center', gap: '0.75rem', marginTop: '1.25rem', flexWrap: 'wrap' }}>
@@ -727,16 +781,16 @@ export default function MyOrders() {
       </div>
 
       {complaintSuccess && (
-        <div style={{ maxWidth: '600px', margin: '0 auto 1.5rem', padding: '1rem 1.25rem', backgroundColor: '#ecfdf5', border: '1.5px solid #10b981', borderRadius: '12px', color: '#065f46', display: 'flex', alignItems: 'center', gap: '0.75rem', fontWeight: 700, boxShadow: '0 4px 12px rgba(16,185,129,0.15)' }}>
+        <div style={{ maxWidth: '680px', margin: '0 auto 1.5rem', padding: '1rem 1.25rem', backgroundColor: '#ecfdf5', border: '1.5px solid #10b981', borderRadius: '12px', color: '#065f46', display: 'flex', alignItems: 'center', gap: '0.75rem', fontWeight: 700, boxShadow: '0 4px 12px rgba(16,185,129,0.15)' }}>
           <CheckCircle2 size={22} style={{ color: '#10b981', flexShrink: 0 }} />
-          <span>Đã gửi Ticket Khiếu nại & Hỗ trợ thành công. Bộ phận CSKH AetherPC sẽ tiếp nhận và liên hệ bạn trong thời gian sớm nhất.</span>
+          <span style={{ fontSize: '0.9rem' }}>Đã gửi Ticket Khiếu nại & Hỗ trợ thành công. Bộ phận CSKH AetherPC sẽ tiếp nhận và liên hệ bạn trong thời gian sớm nhất.</span>
         </div>
       )}
 
       {/* Search Input Bar with Quick Lookup Chips */}
-      <div className="card-glass" style={{ maxWidth: '680px', margin: '0 auto 2.5rem auto', padding: '1.25rem 1.5rem', backgroundColor: '#ffffff', borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 4px 20px rgba(0,0,0,0.04)' }}>
-        <form onSubmit={handleSearch} style={{ display: 'flex', gap: '0.75rem' }}>
-          <div style={{ position: 'relative', flex: 1 }}>
+      <div className="card-glass" style={{ maxWidth: '680px', margin: '0 auto 2.25rem auto', padding: '1.1rem 1.25rem', backgroundColor: '#ffffff', borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 4px 20px rgba(0,0,0,0.04)' }}>
+        <form onSubmit={handleSearch} style={{ display: 'flex', gap: '0.65rem', flexWrap: 'wrap' }}>
+          <div style={{ position: 'relative', flex: '1 1 240px' }}>
             <Search size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
             <input
               type="text"
@@ -744,10 +798,10 @@ export default function MyOrders() {
               placeholder="Nhập số điện thoại, email hoặc mã đơn (#ORD-...)..."
               value={phoneQuery}
               onChange={(e) => setPhoneQuery(e.target.value)}
-              style={{ paddingLeft: '2.5rem', borderRadius: '10px', border: '1px solid #cbd5e1', backgroundColor: '#f8fafc', color: '#0f172a' }}
+              style={{ width: '100%', paddingLeft: '2.5rem', borderRadius: '10px', border: '1px solid #cbd5e1', backgroundColor: '#f8fafc', color: '#0f172a' }}
             />
           </div>
-          <button type="submit" className="btn btn-primary" style={{ padding: '0.65rem 1.5rem', borderRadius: '10px', backgroundColor: '#2563eb', fontWeight: 700 }}>
+          <button type="submit" className="btn btn-primary" style={{ padding: '0.65rem 1.5rem', borderRadius: '10px', backgroundColor: '#2563eb', fontWeight: 700, flexShrink: 0 }}>
             Tra Cứu
           </button>
         </form>
@@ -760,62 +814,103 @@ export default function MyOrders() {
             Không tìm thấy đơn hàng nào khớp với từ khóa "{phoneQuery}"
           </div>
           <p style={{ color: '#64748b', fontSize: '0.8rem', marginTop: '0.35rem' }}>
-            Vui lòng kiểm tra lại số điện thoại hoặc bấm vào <strong>"Tất cả đơn"</strong> ở trên để xem danh sách.
+            Vui lòng kiểm tra lại số điện thoại hoặc liên hệ tổng đài AetherPC để được hỗ trợ.
           </p>
         </div>
       )}
 
       {matchedOrders.length > 0 && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '2rem', alignItems: 'start' }}>
+        <div className="my-orders-grid">
           
           {/* Left Column: Orders List */}
           <div className="card-glass" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <h3 style={{ fontSize: '1rem', borderBottom: '1px solid var(--border-glass)', paddingBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Package size={16} />
-              Đơn Hàng Đã Tìm Thấy ({matchedOrders.length})
+            <h3 style={{ fontSize: '1rem', borderBottom: '1px solid var(--border-glass)', paddingBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0, fontWeight: 800 }}>
+              <Package size={18} color="#2563eb" />
+              Đơn Hàng Của Bạn ({matchedOrders.length})
             </h3>
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              {matchedOrders.map(order => (
-                <div
-                  key={order.orderId}
-                  onClick={() => setSelectedOrderId(order.orderId)}
-                  style={{
-                    padding: '1rem',
-                    border: selectedOrderId === order.orderId ? '1.5px solid var(--primary)' : '1px solid var(--border-glass)',
-                    borderRadius: 'var(--radius-md)',
-                    backgroundColor: selectedOrderId === order.orderId ? 'rgba(99, 102, 241, 0.05)' : 'rgba(255, 255, 255, 0.01)',
-                    cursor: 'pointer',
-                    transition: 'all var(--transition-fast)'
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
-                    <strong style={{ color: '#0f172a', fontSize: '0.9rem' }}>{order.orderId}</strong>
-                    {(() => {
-                      const badge = getOrderStatusLabel(order);
-                      return (
-                        <span 
-                          style={{ 
-                            fontSize: '0.65rem', 
-                            padding: '2px 6px', 
-                            borderRadius: '4px', 
-                            color: badge.color, 
-                            backgroundColor: badge.bg, 
-                            border: `1px solid ${badge.border}` 
-                          }}
-                        >
-                          {badge.text}
-                        </span>
-                      );
-                    })()}
-                  </div>
+              {matchedOrders.map(order => {
+                const isSelected = selectedOrderId === order.orderId;
+                return (
+                  <div
+                    key={order.orderId}
+                    onClick={() => setSelectedOrderId(order.orderId)}
+                    style={{
+                      padding: '0.9rem 1rem',
+                      border: isSelected ? '1.5px solid #2563eb' : '1px solid #e2e8f0',
+                      borderLeft: isSelected ? '4px solid #2563eb' : '4px solid transparent',
+                      borderRadius: '10px',
+                      backgroundColor: isSelected ? 'rgba(37, 99, 235, 0.04)' : '#ffffff',
+                      boxShadow: isSelected ? '0 4px 12px rgba(37,99,235,0.08)' : '0 1px 3px rgba(0,0,0,0.02)',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem', flexWrap: 'wrap', gap: '0.3rem' }}>
+                      <strong style={{ color: isSelected ? '#2563eb' : '#0f172a', fontSize: '0.92rem' }}>{order.orderId}</strong>
+                      {(() => {
+                        const badge = getOrderStatusLabel(order);
+                        return (
+                          <span 
+                            style={{ 
+                              fontSize: '0.68rem', 
+                              fontWeight: 750,
+                              padding: '2.5px 8px', 
+                              borderRadius: '6px', 
+                              color: badge.color, 
+                              backgroundColor: badge.bg, 
+                              border: `1px solid ${badge.border}` 
+                            }}
+                          >
+                            {badge.text}
+                          </span>
+                        );
+                      })()}
+                    </div>
                   <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'flex', justifyContent: 'space-between' }}>
                     <span>Ngày: {order.date}</span>
                     <strong style={{ color: 'var(--success)' }}>{formatPrice(order.totalAmount)}</strong>
                   </div>
+
+                  {order.status === 'SHIPPED' && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedOrderId(order.orderId);
+                        setTimeout(() => {
+                          const el = document.getElementById('live-gps-tracking-card');
+                          if (el) el.scrollIntoView({ behavior: 'smooth' });
+                        }, 120);
+                      }}
+                      style={{
+                        marginTop: '0.6rem',
+                        width: '100%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '0.4rem',
+                        padding: '0.45rem 0.65rem',
+                        borderRadius: '6px',
+                        fontSize: '0.75rem',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        backgroundColor: '#eff6ff',
+                        color: '#2563eb',
+                        border: '1px solid #bfdbfe',
+                        boxShadow: '0 1px 3px rgba(37,99,235,0.1)',
+                        transition: 'all 0.2s'
+                      }}
+                    >
+                      <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#ef4444', boxShadow: '0 0 6px #ef4444' }} />
+                      <MapPin size={13} /> Theo Dõi Trực Tiếp (Live GPS)
+                    </button>
+                  )}
                 </div>
-              ))}
-            </div>
+              );
+            })}
+          </div>
 
           {/* Return success banner */}
           {returnSuccess && (
@@ -983,7 +1078,7 @@ export default function MyOrders() {
                       )}
                       
                       {/* Chi tiết thanh toán & Giao hàng */}
-                      <div style={{ marginTop: '1.5rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
+                      <div style={{ marginTop: '1.5rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1rem' }}>
                         {/* Thông tin giao hàng */}
                         <div style={{ padding: '1rem', backgroundColor: '#f8fafc', borderRadius: '10px', border: '1px dashed #cbd5e1' }}>
                           <h4 style={{ margin: '0 0 0.75rem 0', fontSize: '0.9rem', color: '#0f172a' }}>Thông tin nhận hàng</h4>
@@ -1116,7 +1211,7 @@ export default function MyOrders() {
 
                               <div style={{
                                 display: 'grid',
-                                gridTemplateColumns: selectedOrder.proofPhoto ? '180px 1fr' : '1fr',
+                                gridTemplateColumns: selectedOrder.proofPhoto ? 'repeat(auto-fit, minmax(170px, 1fr))' : '1fr',
                                 gap: '1.25rem',
                                 alignItems: 'center'
                               }}>
@@ -1124,8 +1219,9 @@ export default function MyOrders() {
                                   <div
                                     style={{
                                       position: 'relative',
-                                      width: '180px',
-                                      height: '130px',
+                                      width: '100%',
+                                      maxWidth: '220px',
+                                      height: '140px',
                                       borderRadius: '8px',
                                       overflow: 'hidden',
                                       border: '1.5px solid #cbd5e1',
@@ -1639,6 +1735,49 @@ export default function MyOrders() {
                   return getStatusProgress(selectedOrder.status, currentReturn, selectedOrder);
                 })()}
               </div>
+
+              {/* Theo Dõi Vị Trí Giao Hàng Trực Tiếp — chỉ hiện khi đơn đang được Shipper giao */}
+              {selectedOrder.status === 'SHIPPED' && (
+                <div id="live-gps-tracking-card" className="card-glass" style={{ padding: 'clamp(1rem, 2.5vw, 1.5rem)', border: '1.5px solid #93c5fd', backgroundColor: '#f0f9ff', borderRadius: '14px', boxShadow: '0 8px 25px rgba(37,99,235,0.08)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.6rem' }}>
+                    <div>
+                      <h3 style={{ fontSize: 'clamp(1rem, 2vw, 1.15rem)', fontWeight: 800, margin: 0, display: 'flex', alignItems: 'center', gap: '0.55rem', color: '#1e3a8a' }}>
+                        <MapPin size={20} color="#2563eb" />
+                        Theo Dõi Vị Trí Giao Hàng Trực Tiếp
+                      </h3>
+                      <p style={{ margin: '0.25rem 0 0', fontSize: '0.78rem', color: '#64748b' }}>
+                        Tọa độ thực tế được truyền trực tiếp từ thiết bị định vị GPS của Shipper
+                      </p>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', backgroundColor: '#fee2e2', border: '1px solid #fca5a5', padding: '0.25rem 0.65rem', borderRadius: '999px', fontSize: '0.72rem', fontWeight: 800, color: '#b91c1c' }}>
+                      <span style={{ display: 'inline-block', width: '7px', height: '7px', borderRadius: '50%', backgroundColor: '#ef4444', boxShadow: '0 0 6px #ef4444' }} />
+                      ĐANG PHÁT ĐỊNH VỊ
+                    </div>
+                  </div>
+                  {(() => {
+                    const orderRegion = trackingData?.deliveryRegion || detectDeliveryRegion(selectedOrder.shippingAddress || selectedOrder.address || '');
+                    const orderWarehouse = trackingData?.warehouse || (orderRegion === 'HN_NORTH'
+                      ? { lat: 21.0139, lng: 105.8228, name: 'Kho AetherPC Hà Nội', address: 'Quận Đống Đa, Hà Nội' }
+                      : { lat: 10.7756, lng: 106.6919, name: 'Kho Tổng AetherPC TP.HCM', address: 'Quận 1, TP.HCM' });
+                    const orderDestination = {
+                      ...(REGION_COORDS[orderRegion] || REGION_COORDS.ALL),
+                      label: trackingData?.shippingAddress || selectedOrder.shippingAddress || selectedOrder.address || 'Địa chỉ nhận hàng'
+                    };
+                    const orderShipperName = trackingData?.shipper?.name || selectedOrder.assignedShipper || 'Shipper Nội Bộ AetherPC';
+                    const orderShipperPhone = trackingData?.shipper?.phone || selectedOrder.shipperPhone || '1900.8888';
+
+                    return (
+                      <DeliveryMap
+                        warehouse={orderWarehouse}
+                        destination={orderDestination}
+                        shipperPosition={livePosition}
+                        shipperName={orderShipperName}
+                        shipperPhone={orderShipperPhone}
+                      />
+                    );
+                  })()}
+                </div>
+              )}
             </div>
           )}
         </div>

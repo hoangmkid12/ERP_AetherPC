@@ -260,6 +260,13 @@ model Order {
   // chiều ngược lại, để Thủ Kho/QC đối chiếu tình trạng kiện hàng lúc nhận.
   returnProofPhoto    String?         @map("return_proof_photo") @db.Text
   returnNote          String?         @map("return_note")
+  // Live GPS Tracking — vị trí Shipper gần nhất trong lúc đơn ở trạng thái
+  // SHIPPED, phát lên qua WebSocket (websocketService.js) và ghi đè liên tục.
+  // Không lưu lịch sử toạ độ, chỉ điểm cuối cùng để khôi phục khi có người
+  // mới mở trang theo dõi (khách hàng tải lại trang, hoặc server restart).
+  lastLat             Float?          @map("last_lat")
+  lastLng             Float?          @map("last_lng")
+  locationUpdatedAt   DateTime?       @map("location_updated_at") @db.Timestamptz()
   // Nhân viên Sales đứng quầy POS thực hiện đơn — null cho đơn khách tự đặt ở
   // storefront. Dùng để tính hoa hồng Sales 1% doanh số thật trong bảng lương
   // (trước đây createPosOrder ghi đè hẳn req.user thành khách WALK-IN trước
@@ -343,6 +350,10 @@ model Warehouse {
   name           String              @unique @db.VarChar(100)
   address        String
   isActive       Boolean?            @default(true) @map("is_active")
+  // Toạ độ điểm xuất phát cho bản đồ theo dõi giao hàng thời gian thực
+  // (DeliveryMap.jsx) — kho không di chuyển nên chỉ cần 1 cặp toạ độ tĩnh.
+  lat            Float?
+  lng            Float?
   createdAt      DateTime            @default(now()) @map("created_at") @db.Timestamptz()
 
   locations      WarehouseLocation[]

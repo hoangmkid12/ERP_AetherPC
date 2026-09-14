@@ -1,8 +1,16 @@
 const WebSocket = require('ws');
 const jwt = require('jsonwebtoken');
 const { getAllSessions, createOrUpdateSession, addMessage, closeSession, deleteSession } = require('./chatService');
+const prisma = require('../config/database');
 
 let wss = null;
+
+// Live GPS Tracking (Shipper -> Khách hàng / Admin) — vị trí gần nhất mỗi
+// orderId đang có Shipper phát tín hiệu. Chỉ giữ trong bộ nhớ (không phải
+// lịch sử toạ độ), đồng thời ghi đè Order.lastLat/lastLng trong DB để một
+// client mới kết nối (khách tải lại trang, hoặc server vừa restart) vẫn
+// khôi phục được điểm cuối cùng đã biết.
+const activeDeliveries = new Map(); // orderId -> { lat, lng, speed, heading, updatedAt, shipperName }
 
 const initWebSocket = async (server) => {
   wss = new WebSocket.Server({ server, path: '/ws/cskh' });
@@ -18,11 +26,18 @@ const initWebSocket = async (server) => {
     // receive the staff session list or execute staff-only commands.
     ws._isStaff = false;
     ws._sessionId = null;
+    // Delivery-tracking tags: which order (if any) this connection is either
+    // broadcasting GPS for (shipper) or listening to (customer/admin).
+    ws._shipperOrderId = null;
+    ws._trackingOrderId = null;
     try {
       const cookie = request.headers.cookie || '';
       const match = cookie.match(/(?:^|;\s*)authToken=([^;]+)/);
       if (match && process.env.JWT_SECRET) {
         const user = jwt.verify(decodeURIComponent(match[1]), process.env.JWT_SECRET);
+        ws._userId = user.id;
+        ws._userRole = user.role;
+        ws._userName = user.fullname || user.name || user.email || null;
         ws._isStaff = ['CSKH', 'SALES_MANAGER', 'CEO', 'ADMIN'].includes(user.role);
       }
     } catch (_) {
@@ -137,6 +152,72 @@ const handleWSMessage = async (ws, data) => {
         sessionId
       });
     }
+    // ─── Live GPS Tracking (giao hàng) ───────────────────────────────────
+    else if (type === 'SHIPPER_JOIN_DELIVERY') {
+      const { orderId } = payload || {};
+      if (!orderId) return;
+      const allowedRoles = ['DELIVERY', 'CEO', 'ADMIN', 'SALES_MANAGER', 'WAREHOUSE_MANAGER', 'WAREHOUSE'];
+      if (!allowedRoles.includes(ws._userRole)) {
+        return ws.send(JSON.stringify({ type: 'ERROR', message: 'Chỉ Shipper hoặc Quản trị viên được phát vị trí giao hàng.' }));
+      }
+      const order = await prisma.order.findUnique({
+        where: { orderId: String(orderId) },
+        select: { assignedShipperId: true }
+      });
+      if (!order) return ws.send(JSON.stringify({ type: 'ERROR', message: `Không tìm thấy đơn hàng: ${orderId}` }));
+
+      // Nếu shipper đăng nhập và đơn chưa gán ai, tự động liên kết đơn cho shipper
+      if (ws._userRole === 'DELIVERY') {
+        if (!order.assignedShipperId && ws._userId) {
+          await prisma.order.update({
+            where: { orderId: String(orderId) },
+            data: { assignedShipperId: Number(ws._userId) }
+          }).catch(() => {});
+        } else if (order.assignedShipperId && Number(order.assignedShipperId) !== Number(ws._userId) && !['CEO', 'ADMIN'].includes(ws._userRole)) {
+          return ws.send(JSON.stringify({ type: 'ERROR', message: 'Bạn không phải Shipper được giao đơn này.' }));
+        }
+      }
+      ws._shipperOrderId = String(orderId);
+      ws.send(JSON.stringify({ type: 'SHIPPER_JOIN_ACK', orderId }));
+    }
+    else if (type === 'SHIPPER_UPDATE_LOCATION') {
+      const { orderId, lat, lng, speed, heading } = payload || {};
+      if (!orderId || typeof lat !== 'number' || typeof lng !== 'number') return;
+      if (ws._shipperOrderId !== String(orderId)) {
+        return ws.send(JSON.stringify({ type: 'ERROR', message: 'Chưa tham gia phiên phát vị trí cho đơn này (gửi SHIPPER_JOIN_DELIVERY trước).' }));
+      }
+      await updateDeliveryLocation(String(orderId), { lat, lng, speed, heading, shipperName: ws._userName });
+    }
+    else if (type === 'SHIPPER_LEAVE_DELIVERY') {
+      ws._shipperOrderId = null;
+    }
+    else if (type === 'CUSTOMER_TRACK_ORDER') {
+      const { orderId } = payload || {};
+      if (!orderId) return;
+      const order = await prisma.order.findUnique({
+        where: { orderId: String(orderId) },
+        select: { customerId: true, lastLat: true, lastLng: true, locationUpdatedAt: true }
+      });
+      if (!order) return ws.send(JSON.stringify({ type: 'ERROR', message: `Không tìm thấy đơn hàng: ${orderId}` }));
+
+      // Cho phép theo dõi vị trí trực tiếp theo mã đơn hàng hợp lệ
+      ws._trackingOrderId = String(orderId);
+      const live = activeDeliveries.get(String(orderId));
+      const lat = live?.lat ?? order.lastLat;
+      const lng = live?.lng ?? order.lastLng;
+      if (lat != null && lng != null) {
+        ws.send(JSON.stringify({
+          type: 'DELIVERY_LOCATION_UPDATE',
+          orderId,
+          lat,
+          lng,
+          speed: live?.speed ?? null,
+          heading: live?.heading ?? null,
+          shipperName: live?.shipperName ?? null,
+          updatedAt: live?.updatedAt ?? order.locationUpdatedAt
+        }));
+      }
+    }
   } catch (err) {
     console.error('[WebSocket] Error handling message:', err);
     ws.send(JSON.stringify({
@@ -145,6 +226,41 @@ const handleWSMessage = async (ws, data) => {
       error: err.message
     }));
   }
+};
+
+// Shared by the WS handler above and the REST fallback (order.controller.js
+// POST /orders/:orderId/location, for when a shipper's WebSocket connection
+// drops mid-delivery) — one place persists + broadcasts, so the two entry
+// points can never disagree on what a "location update" does.
+const updateDeliveryLocation = async (orderId, { lat, lng, speed, heading, shipperName }) => {
+  const updatedAt = new Date();
+  activeDeliveries.set(orderId, {
+    lat, lng,
+    speed: speed ?? null,
+    heading: heading ?? null,
+    shipperName: shipperName || activeDeliveries.get(orderId)?.shipperName || null,
+    updatedAt
+  });
+
+  try {
+    await prisma.order.update({
+      where: { orderId },
+      data: { lastLat: lat, lastLng: lng, locationUpdatedAt: updatedAt }
+    });
+  } catch (err) {
+    console.error('[WebSocket] Failed to persist delivery location:', err.message);
+  }
+
+  broadcast({
+    type: 'DELIVERY_LOCATION_UPDATE',
+    orderId,
+    lat,
+    lng,
+    speed: speed ?? null,
+    heading: heading ?? null,
+    shipperName: activeDeliveries.get(orderId)?.shipperName || null,
+    updatedAt
+  }, client => client._isStaff || client._trackingOrderId === orderId);
 };
 
 const getSessions = async () => {
@@ -205,5 +321,6 @@ module.exports = {
   broadcast,
   getSessions,
   addCustomerMessage,
-  addStaffMessage
+  addStaffMessage,
+  updateDeliveryLocation
 };

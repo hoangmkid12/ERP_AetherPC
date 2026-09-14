@@ -12,7 +12,8 @@ export default function ActiveTab({
   orders, fmt, getOrderTimeClassification, onOpenDetail, actions,
   filterState, activeOrdersList, todayCount, newCount, backlogCount,
   countShipping, doneCount, countAwaiting, countRescheduled, countRejected, countReturning,
-  onGoToPending, pullHandlers, isRefreshing, pullDistance
+  onGoToPending, pullHandlers, isRefreshing, pullDistance,
+  gpsOrderId, simulatingOrderId
 }) {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
@@ -110,17 +111,22 @@ export default function ActiveTab({
           </div>
         ) : (
           <>
-            {orders.slice(0, visibleCount).map((ord, oIdx) => (
-              <OrderCard
-                key={ord.id || oIdx}
-                order={ord}
-                variant="active"
-                fmt={fmt}
-                getOrderTimeClassification={getOrderTimeClassification}
-                onOpenDetail={onOpenDetail}
-                actions={actions}
-              />
-            ))}
+            {orders.slice(0, visibleCount).map((ord, oIdx) => {
+              const orderKey = String(ord.orderId || ord.id);
+              return (
+                <OrderCard
+                  key={ord.id || oIdx}
+                  order={ord}
+                  variant="active"
+                  fmt={fmt}
+                  getOrderTimeClassification={getOrderTimeClassification}
+                  onOpenDetail={onOpenDetail}
+                  actions={actions}
+                  isGpsActive={gpsOrderId === orderKey}
+                  isSimulating={simulatingOrderId === orderKey}
+                />
+              );
+            })}
             {orders.length > visibleCount && (
               <button
                 type="button"

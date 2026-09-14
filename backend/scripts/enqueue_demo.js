@@ -1,5 +1,5 @@
 require('dotenv').config();
-const { enqueueOrder } = require('./services/orderQueue');
+const { enqueueOrder } = require('../src/services/orderQueue');
 
 async function demo() {
   const sample = {

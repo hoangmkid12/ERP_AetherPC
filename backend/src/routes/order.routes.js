@@ -16,9 +16,11 @@ const {
   reviewReturnRequest,
   batchApproveReturns,
   getReturnSettings,
-  updateReturnSettings
+  updateReturnSettings,
+  updateDeliveryLocationHttp,
+  getDeliveryTracking
 } = require('../controllers/order.controller');
-const { authMiddleware } = require('../middlewares/auth.middleware');
+const { authMiddleware, optionalAuthMiddleware } = require('../middlewares/auth.middleware');
 const { getEmailLogs } = require('../services/emailService');
 const { QC_ROLES } = require('../constants/roles');
 
@@ -42,6 +44,16 @@ router.patch('/:id/details', authMiddleware(['CUSTOMER']), updateOrderDetails);
 // @route   POST /api/v1/orders/:id/return
 // @desc    Khách hàng / CSKH gửi Yêu cầu Đổi / Trả / Hoàn tiền
 router.post('/:id/return', authMiddleware(['CUSTOMER', 'CSKH', 'SALES_MANAGER', 'CEO', 'ADMIN']), createReturnRequest);
+
+// @route   GET /api/v1/orders/:orderId/tracking
+// @desc    Toạ độ Kho, khu vực giao, thông tin Shipper & vị trí GPS gần nhất
+//          cho bản đồ theo dõi giao hàng thời gian thực (DeliveryMap.jsx)
+//          Hỗ trợ cả khách hàng đăng nhập và khách tra cứu công khai bằng mã đơn
+router.get('/:orderId/tracking', optionalAuthMiddleware, getDeliveryTracking);
+
+// @route   POST /api/v1/orders/:orderId/location
+// @desc    Shipper cập nhật vị trí GPS — fallback HTTP khi WebSocket rớt mạng
+router.post('/:orderId/location', authMiddleware(['DELIVERY', 'CEO', 'ADMIN']), updateDeliveryLocationHttp);
 
 // @route   GET /api/v1/orders/returns
 // @desc    Lấy danh sách các đơn đổi trả (Shipper / QC / Kho / Kế toán / CSKH)

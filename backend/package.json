@@ -11,7 +11,7 @@
     "prisma:migrate": "prisma migrate dev",
     "db:seed": "node prisma/seed.js",
     "queue:worker": "node src/services/orderWorker.js",
-    "queue:producer-demo": "node src/enqueue_demo.js"
+    "queue:producer-demo": "node scripts/enqueue_demo.js"
   },
   "dependencies": {
     "@nlpjs/basic": "^5.0.0-alpha.5",

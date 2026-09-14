@@ -10,6 +10,21 @@ export const DELIVERY_REGIONS = [
   { code: 'ALL', name: 'Toàn Quốc / Tất Cả Khu Vực (Điều Phối / Cơ Động)', shortName: 'Toàn Quốc (Tất Cả KV)' }
 ];
 
+// Toạ độ trung tâm gần đúng cho từng khu vực giao hàng — hệ thống chưa tích
+// hợp dịch vụ geocode địa chỉ khách thành toạ độ chính xác, nên bản đồ theo
+// dõi giao hàng (DeliveryMap.jsx) dùng điểm này làm vị trí đích xấp xỉ, dựa
+// trên Order.deliveryRegion đã có sẵn (xem detectDeliveryRegion bên dưới).
+export const REGION_COORDS = {
+  HCM_KV1: { lat: 10.7769, lng: 106.7009 },
+  HCM_KV2: { lat: 10.8231, lng: 106.7300 },
+  HCM_KV3: { lat: 10.7411, lng: 106.6989 },
+  HCM_KV4: { lat: 10.7756, lng: 106.6250 },
+  HN_NORTH: { lat: 21.0285, lng: 105.8542 },
+  CENTRAL: { lat: 16.0544, lng: 108.2022 },
+  SOUTH_PROVINCE: { lat: 10.9804, lng: 106.6519 },
+  ALL: { lat: 10.7769, lng: 106.7009 }
+};
+
 export const detectDeliveryRegion = (address = '') => {
   const addr = (address || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 

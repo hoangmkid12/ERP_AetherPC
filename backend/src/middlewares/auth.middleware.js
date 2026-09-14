@@ -40,4 +40,25 @@ const authMiddleware = (roles = []) => {
   };
 };
 
-module.exports = { authMiddleware };
+const optionalAuthMiddleware = (req, res, next) => {
+  try {
+    const authHeader = req.headers.authorization;
+    let token = null;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.split(' ')[1];
+    } else if (req.cookies && req.cookies.authToken) {
+      token = req.cookies.authToken;
+    }
+
+    if (token && process.env.JWT_SECRET) {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      req.user = decoded;
+    }
+  } catch (_) {
+    req.user = null;
+  }
+  next();
+};
+
+module.exports = { authMiddleware, optionalAuthMiddleware };
+

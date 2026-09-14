@@ -632,8 +632,8 @@ async function main() {
 
   // 9. Warehouses & Stock
   console.log('Seeding Warehouses & Stock...');
-  await prisma.warehouse.create({ data: { id: 1, name: 'Kho Tổng TP.Hồ Chí Minh', address: '175 Nguyễn Thị Minh Khai, Quận 1, TP. HCM', isActive: true } });
-  await prisma.warehouse.create({ data: { id: 2, name: 'Kho Chi Nhánh Hà Nội', address: '33 Phố Thái Hà, Quận Đống Đa, Hà Nội', isActive: true } });
+  await prisma.warehouse.create({ data: { id: 1, name: 'Kho Tổng TP.Hồ Chí Minh', address: '175 Nguyễn Thị Minh Khai, Quận 1, TP. HCM', isActive: true, lat: 10.7756, lng: 106.6919 } });
+  await prisma.warehouse.create({ data: { id: 2, name: 'Kho Chi Nhánh Hà Nội', address: '33 Phố Thái Hà, Quận Đống Đa, Hà Nội', isActive: true, lat: 21.0139, lng: 105.8228 } });
   await prisma.$executeRawUnsafe(`SELECT setval('warehouses_id_seq', (SELECT MAX(id) FROM warehouses));`);
 
   await prisma.warehouseLocation.create({ data: { id: 1, warehouseId: 1, zone: 'ZONE-A', shelf: 'SHELF-01', bin: 'BIN-01', capacity: 200 } });
