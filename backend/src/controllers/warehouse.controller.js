@@ -270,7 +270,7 @@ const validateReceipt = async (req, res, next) => {
           warehouse: true
         }
       });
-    });
+    }, { timeout: 20000 });
 
     res.json({
       success: true,

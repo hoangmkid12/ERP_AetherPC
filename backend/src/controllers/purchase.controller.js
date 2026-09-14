@@ -958,7 +958,7 @@ const createVendorBill = async (req, res, next) => {
       }
 
       return { bill: newBill, originalAmount, acceptRatio };
-    });
+    }, { timeout: 15000 });
 
     const { bill: newBill, originalAmount, acceptRatio } = result;
     res.status(201).json({
@@ -1220,7 +1220,7 @@ const validateReceipt = async (req, res, next) => {
       await checkAndUpdatePoCompletion(tx, po.id);
 
       return tx.goodsReceipt.findUnique({ where: { id: receipt.id } });
-    });
+    }, { timeout: 20000 });
 
     res.json({ success: true, message: 'Goods receipt validated successfully', data: updatedReceipt });
   } catch (err) {

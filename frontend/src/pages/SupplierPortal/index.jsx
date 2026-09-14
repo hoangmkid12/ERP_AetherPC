@@ -541,13 +541,31 @@ export default function SupplierPortal() {
   const AWAITING_PAYMENT_STATUSES = ['QUOTED', 'PENDING_PO_DRAFT', 'QUOTED_PENDING_CEO', 'PO', 'CONFIRMED_BY_SUPPLIER', 'PENDING_QA', 'QA_PASSED', 'QA_PARTIAL', 'RECEIVED'];
   const SUPPLIED_STATUSES = ['CONFIRMED_BY_SUPPLIER', 'PENDING_QA', 'QA_PASSED', 'QA_PARTIAL', 'QA_REJECTED', 'RECEIVED', 'DONE'];
 
+  // po.totalAmount is the ORIGINAL quoted amount and is never adjusted after a
+  // QC_PARTIAL rejection — only the VendorBill (createVendorBill prorates it by
+  // acceptRatio) and its VendorPayments reflect the real, QC-corrected money.
+  // Summing po.totalAmount directly used to show the supplier as having earned/
+  // being owed the full order value even when a partial QC rejection had
+  // correctly cut their actual bill in half. Once a bill exists, its
+  // amountTotal (and the payments against it) are the source of truth.
+  const getPoBilledAmount = (po) => (
+    Array.isArray(po.bills) && po.bills.length > 0
+      ? po.bills.reduce((s, b) => s + (parseFloat(b.amountTotal) || 0), 0)
+      : (parseFloat(po.totalAmount) || 0)
+  );
+  const getPoPaidAmount = (po) => (
+    Array.isArray(po.bills)
+      ? po.bills.reduce((s, b) => s + (Array.isArray(b.payments) ? b.payments.reduce((s2, p) => s2 + (parseFloat(p.amount) || 0), 0) : 0), 0)
+      : 0
+  );
+
   const earnedRevenue = myPOs
     .filter(po => po.status === 'DONE')
-    .reduce((sum, po) => sum + (parseFloat(po.totalAmount) || 0), 0);
+    .reduce((sum, po) => sum + getPoPaidAmount(po), 0);
 
   const pendingRevenue = myPOs
     .filter(po => AWAITING_PAYMENT_STATUSES.includes(po.status))
-    .reduce((sum, po) => sum + (parseFloat(po.totalAmount) || 0), 0);
+    .reduce((sum, po) => sum + Math.max(0, getPoBilledAmount(po) - getPoPaidAmount(po)), 0);
 
   // "Đơn Hàng Đã Cung Cấp" = orders the supplier has actually shipped — 'PO' alone
   // (CEO approved, supplier hasn't even confirmed delivery yet) was never "supplied".
@@ -555,7 +573,7 @@ export default function SupplierPortal() {
 
   const totalQuotedVal = myPOs
     .filter(po => ['QUOTED', ...AWAITING_PAYMENT_STATUSES, 'DONE'].includes(po.status))
-    .reduce((sum, po) => sum + (parseFloat(po.totalAmount) || 0), 0);
+    .reduce((sum, po) => sum + getPoBilledAmount(po), 0);
 
   // Covers the full PO lifecycle — the old chip list only had 6 exact-match statuses
   // (RFQ_SENT/QUOTED/PO/DONE/CANCELLED) out of ~13 real ones, so any order sitting in
@@ -787,7 +805,8 @@ export default function SupplierPortal() {
                   const itemCount = po.items?.length || 1;
                   const totalQty = po.items?.reduce((s, i) => s + (parseInt(i.quantity) || 1), 0) || po.quantity || 1;
                   const itemNames = po.items?.map(i => i.product?.name || i.name).filter(Boolean).join(', ') || po.productName || 'Linh kiện';
-                  const poTotal = po.totalAmount || 0;
+                  const poTotal = getPoBilledAmount(po);
+                  const isQcAdjusted = Array.isArray(po.bills) && po.bills.length > 0 && Number(poTotal) !== Number(po.totalAmount || 0);
                   const isPendingQuote = ['RFQ', 'RFQ_SENT', 'SENT'].includes(po.status);
 
                   return (
@@ -868,9 +887,16 @@ export default function SupplierPortal() {
                           </span>
                         ) : (
                           poTotal > 0 && (
-                            <p style={{ fontWeight: 800, color: 'var(--success, #16a34a)', fontSize: '0.95rem', margin: 0 }}>
-                              {formatPrice(poTotal)}
-                            </p>
+                            <>
+                              <p style={{ fontWeight: 800, color: 'var(--success, #16a34a)', fontSize: '0.95rem', margin: 0 }}>
+                                {formatPrice(poTotal)}
+                              </p>
+                              {isQcAdjusted && (
+                                <span style={{ fontSize: '0.68rem', color: '#b45309', fontWeight: 600 }}>
+                                  Đã điều chỉnh theo QC (gốc {formatPrice(po.totalAmount)})
+                                </span>
+                              )}
+                            </>
                           )
                         )}
 
@@ -1101,7 +1127,7 @@ export default function SupplierPortal() {
                   myPOs.map(po => {
                     const totalQty = po.items?.reduce((s, i) => s + (parseInt(i.quantity) || 1), 0) || po.quantity || 1;
                     const itemNames = po.items?.map(i => `${i.product?.name || i.name} (x${i.quantity})`).join(', ') || po.productName || 'Linh kiện';
-                    const poTotal = po.totalAmount || 0;
+                    const poTotal = getPoBilledAmount(po);
 
                     return (
                       <tr key={po.id || po.poNumber} className="hover-row">
@@ -1532,6 +1558,12 @@ export default function SupplierPortal() {
                   <span style={{ color: '#0f172a' }}>Tổng Báo Giá Đơn Hàng:</span>
                   <span style={{ color: 'var(--success)', fontSize: '1.3rem' }}>{formatPrice(selectedPO.totalAmount)}</span>
                 </div>
+                {Array.isArray(selectedPO.bills) && selectedPO.bills.length > 0 && Number(getPoBilledAmount(selectedPO)) !== Number(selectedPO.totalAmount || 0) && (
+                  <div style={{ marginTop: '0.6rem', paddingTop: '0.6rem', borderTop: '1px dashed #bbf7d0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ color: '#b45309', fontSize: '0.85rem', fontWeight: 700 }}>Thực Nhận Sau Điều Chỉnh QC:</span>
+                    <span style={{ color: '#b45309', fontSize: '1.05rem', fontWeight: 800 }}>{formatPrice(getPoBilledAmount(selectedPO))}</span>
+                  </div>
+                )}
               </div>
             )}
 
