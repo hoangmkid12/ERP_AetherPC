@@ -453,7 +453,10 @@ export default function Purchasing() {
   const formatPurchaseReference = (po) => {
     if (!po) return '';
     const raw = typeof po === 'object' ? String(po.poNumber || po.reference || po.id || '') : String(po);
-    const isRfq = typeof po === 'object' && po !== null ? (['RFQ', 'RFQ_SENT', 'AWAITING_SUPPLIER_QUOTE', 'QUOTED', 'QUOTED_PENDING_CEO', 'DRAFT_RFQ'].includes(po.status) || po.type === 'BACKORDER_RFQ' || po.type === 'RFQ') : false;
+    // QUOTED_PENDING_CEO/PO thuộc về bản ghi PO THẬT (lập từ confirm-quote,
+    // xem sourceRfqId) — không còn là giai đoạn của RFQ. CONVERTED là trạng
+    // thái đóng của RFQ sau khi đã được chọn để lập PO.
+    const isRfq = typeof po === 'object' && po !== null ? (['RFQ', 'RFQ_SENT', 'AWAITING_SUPPLIER_QUOTE', 'QUOTED', 'CONVERTED', 'DRAFT_RFQ'].includes(po.status) || po.type === 'BACKORDER_RFQ' || po.type === 'RFQ') : false;
     const prefix = isRfq ? 'RFQ' : 'PO';
 
     const matchFull = raw.match(/^(?:PO|RFQ|PR)-(\d{4})-(\d+)$/i);
@@ -527,6 +530,9 @@ export default function Purchasing() {
         'RECEIVED': 70,
         'DONE': 100,
         'COMPLETED': 100,
+        // Trạng thái đóng của một RFQ sau khi đã được chọn để lập PO riêng
+        // (xem confirm-quote) — bản ghi RFQ này dừng lại vĩnh viễn ở đây.
+        'CONVERTED': 100,
         'CANCELLED': 1000
       };
 
@@ -1139,6 +1145,32 @@ export default function Purchasing() {
     setSubmitting(false);
   };
 
+  // RFQ và PO là 2 chứng từ khác nhau (2 bản ghi khác nhau trong CSDL) — chọn
+  // NCC tối ưu từ một RFQ đã có báo giá (QUOTED) không chỉ đổi trạng thái, mà
+  // LẬP MỘT ĐƠN PO MỚI (số riêng) tham chiếu ngược lại RFQ gốc, rồi mới trình
+  // CEO duyệt trên chính đơn PO đó. Xem POST /orders/:id/confirm-quote.
+  const handleConfirmQuote = async (rfqId, loserIds = []) => {
+    setSubmitting(true);
+    try {
+      const res = await api.post(`/purchasing/orders/${rfqId}/confirm-quote`, { loserIds });
+      if (res && res.success) {
+        notify(`Đã lập đơn mua hàng chính thức ${res.data.poNumber} — trình CEO phê duyệt.`, 'success');
+      } else {
+        notify('Máy chủ chưa xác nhận lập được đơn PO — vui lòng thử lại.', 'error');
+      }
+      window.dispatchEvent(new Event('erp-po-updated'));
+      await fetchData();
+      setSelectedPO(null);
+      setShowCompareModal(false);
+      return res?.data || null;
+    } catch (err) {
+      notify('Lỗi: ' + (err.message || 'Không lập được đơn PO'), 'error');
+      return null;
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const getStatusBadge = (status) => {
     const info = getStatusInfo(PO_STATUS, status);
     return { bg: info.bg, color: info.color, border: info.border, text: info.label };
@@ -1148,17 +1180,21 @@ export default function Purchasing() {
     return getStatusLabel(PO_STATUS, status);
   };
 
-  // Real happy-path pipeline for a PO (RFQ -> RFQ_SENT -> QUOTED ->
-  // QUOTED_PENDING_CEO -> PO -> CONFIRMED_BY_SUPPLIER -> QA -> RECEIVED ->
-  // DONE), matching the exact transitions enforced in purchase.controller.js
-  // (allowedTransitions / allowedTransitionsByRole). Used to render a
-  // step-by-step progress bar instead of making the user infer position from
-  // the raw status text.
-  const PO_PIPELINE_STEPS = [
+  // RFQ và PO là 2 chứng từ/bản ghi khác nhau (xem confirm-quote ở backend),
+  // nên mỗi loại có pipeline hiển thị riêng thay vì 1 chuỗi 9 bước chung.
+  // RFQ dừng lại ở CONVERTED (đã chọn NCC, đã lập PO riêng) hoặc CANCELLED.
+  const RFQ_PIPELINE_STEPS = [
     { key: 'RFQ', label: 'Khởi Tạo YCBG' },
     { key: 'RFQ_SENT', label: 'Gửi NCC Báo Giá' },
     { key: 'QUOTED', label: 'NCC Đã Báo Giá' },
-    { key: 'QUOTED_PENDING_CEO', label: 'Mua Hàng Xác Nhận' },
+    { key: 'CONVERTED', label: 'Đã Chọn — Lập PO' }
+  ];
+  const RFQ_PIPELINE_STEP_INDEX = { RFQ: 0, RFQ_SENT: 1, SENT: 1, QUOTED: 2, CONVERTED: 3 };
+
+  // Pipeline của bản ghi PO thật, bắt đầu từ lúc Mua Hàng lập PO (confirm-quote)
+  // cho tới khi hoàn tất, khớp với allowedTransitions trong purchase.controller.js.
+  const PO_PIPELINE_STEPS = [
+    { key: 'QUOTED_PENDING_CEO', label: 'Chờ CEO Duyệt' },
     { key: 'PO', label: 'Đã Duyệt (PO)' },
     { key: 'CONFIRMED_BY_SUPPLIER', label: 'NCC Xác Nhận' },
     { key: 'QA', label: 'Kiểm Định QC' },
@@ -1166,16 +1202,17 @@ export default function Purchasing() {
     { key: 'DONE', label: 'Hoàn Tất' }
   ];
   const PO_PIPELINE_STEP_INDEX = {
-    RFQ: 0, RFQ_SENT: 1, SENT: 1, QUOTED: 2, QUOTED_PENDING_CEO: 3, PO: 4, APPROVED: 4,
-    CONFIRMED_BY_SUPPLIER: 5,
-    QA_PASSED: 6, QA_PARTIAL: 6, QA_REJECTED: 6,
-    RECEIVED: 7, DONE: 8, COMPLETED: 8
+    QUOTED_PENDING_CEO: 0, PO: 1, APPROVED: 1,
+    CONFIRMED_BY_SUPPLIER: 2,
+    QA_PASSED: 3, QA_PARTIAL: 3, QA_REJECTED: 3,
+    RECEIVED: 4, DONE: 5, COMPLETED: 5
   };
+  const RFQ_STAGE_STATUSES = ['RFQ', 'RFQ_SENT', 'SENT', 'QUOTED', 'CONVERTED'];
 
   // Filtered orders list based on active tab & filters
   const filteredOrders = orders
     .filter(po => {
-      const isRfqStage = ['RFQ', 'RFQ_SENT', 'QUOTED', 'QUOTED_PENDING_CEO', 'DRAFT_RFQ'].includes(po.status);
+      const isRfqStage = [...RFQ_STAGE_STATUSES, 'DRAFT_RFQ'].includes(po.status);
       if (activeTab === 'rfq' && !isRfqStage) return false;
       if (activeTab === 'orders' && isRfqStage) return false;
 
@@ -2138,11 +2175,12 @@ export default function Purchasing() {
                 <>
                   <option value="RFQ">Bản nháp (RFQ)</option>
                   <option value="RFQ_SENT">Đã gửi NCC</option>
-                  <option value="QUOTED">NCC đã báo giá (chờ xác nhận)</option>
-                  <option value="QUOTED_PENDING_CEO">Chờ CEO duyệt</option>
+                  <option value="QUOTED">NCC đã báo giá (chờ lập PO)</option>
+                  <option value="CONVERTED">Đã chọn — đã lập PO</option>
                 </>
               ) : (
                 <>
+                  <option value="QUOTED_PENDING_CEO">Chờ CEO duyệt</option>
                   <option value="PO">Đơn mua hàng (PO)</option>
                   <option value="CONFIRMED_BY_SUPPLIER">NCC đã xác nhận</option>
                   <option value="PENDING_QA">Chờ nghiệm thu QC</option>
@@ -2283,8 +2321,8 @@ export default function Purchasing() {
                           <div style={{ display: 'inline-flex', gap: '0.4rem' }}>
                             {po.status === 'QUOTED' && isPurchasingConfirmer && (
                               <button
-                                onClick={() => handleUpdateStatus(po.id, 'QUOTED_PENDING_CEO')}
-                                title="Xác nhận báo giá này và trình CEO phê duyệt"
+                                onClick={() => handleConfirmQuote(po.id)}
+                                title="Lập đơn mua hàng (PO) chính thức từ báo giá này và trình CEO phê duyệt"
                                 style={{
                                   backgroundColor: '#2563eb',
                                   color: '#ffffff',
@@ -2296,7 +2334,7 @@ export default function Purchasing() {
                                   cursor: 'pointer'
                                 }}
                               >
-                                Xác Nhận
+                                Lập PO
                               </button>
                             )}
                             {po.status === 'QUOTED_PENDING_CEO' && isCeoApprover && (
@@ -3763,12 +3801,15 @@ export default function Purchasing() {
                 <X size={16} /> Đơn Hàng Đã Bị Hủy
               </div>
             ) : (() => {
-              const currentIdx = PO_PIPELINE_STEP_INDEX[selectedPO.status];
+              const isRfqRecord = RFQ_STAGE_STATUSES.includes(selectedPO.status);
+              const stepIndexMap = isRfqRecord ? RFQ_PIPELINE_STEP_INDEX : PO_PIPELINE_STEP_INDEX;
+              const steps = isRfqRecord ? RFQ_PIPELINE_STEPS : PO_PIPELINE_STEPS;
+              const currentIdx = stepIndexMap[selectedPO.status];
               if (currentIdx === undefined) return null;
               const isRejected = selectedPO.status === 'QA_REJECTED';
               return (
                 <div style={{ display: 'flex', alignItems: 'flex-start', marginBottom: '1.25rem', overflowX: 'auto', padding: '0.25rem 0' }}>
-                  {PO_PIPELINE_STEPS.map((step, idx) => {
+                  {steps.map((step, idx) => {
                     const isDone = idx < currentIdx;
                     const isCurrent = idx === currentIdx;
                     const dotColor = isCurrent && isRejected ? '#be123c' : (isDone || isCurrent) ? '#047857' : '#cbd5e1';
@@ -3790,7 +3831,7 @@ export default function Purchasing() {
                             {isCurrent && isRejected ? 'Từ Chối QC' : step.label}
                           </span>
                         </div>
-                        {idx < PO_PIPELINE_STEPS.length - 1 && (
+                        {idx < steps.length - 1 && (
                           <div style={{ flex: 1, height: '2px', backgroundColor: idx < currentIdx ? '#047857' : '#e2e8f0', marginTop: '13px', minWidth: '16px' }} />
                         )}
                       </React.Fragment>
@@ -3905,6 +3946,17 @@ export default function Purchasing() {
               {selectedPO.blanketRefId && selectedPO.blanketRef && (
                 <span style={{ fontSize: '0.75rem', color: '#b45309', marginTop: '0.25rem' }}>
                   Đơn mua theo Hợp Đồng Khung {selectedPO.blanketRef.poNumber}
+                </span>
+              )}
+              {/* RFQ và PO là 2 chứng từ khác nhau — hiển thị liên kết chéo giữa chúng. */}
+              {selectedPO.sourceRfqId && selectedPO.sourceRfq && (
+                <span style={{ fontSize: '0.75rem', color: '#2563eb', marginTop: '0.25rem' }}>
+                  Lập từ báo giá {formatPurchaseReference(selectedPO.sourceRfq)}
+                </span>
+              )}
+              {selectedPO.status === 'CONVERTED' && selectedPO.derivedPOs?.[0] && (
+                <span style={{ fontSize: '0.75rem', color: '#16a34a', marginTop: '0.25rem' }}>
+                  Đã chọn — xem đơn PO chính thức {selectedPO.derivedPOs[0].poNumber}
                 </span>
               )}
             </div>
@@ -4107,9 +4159,9 @@ export default function Purchasing() {
                         const blocked = hasMissingPrice || totalInvalid;
                         return (
                           <button
-                            onClick={() => !blocked && handleUpdateStatus(selectedPO.id, 'QUOTED_PENDING_CEO')}
+                            onClick={() => !blocked && handleConfirmQuote(selectedPO.id)}
                             disabled={blocked}
-                            title={blocked ? 'Không thể xác nhận: còn linh kiện chưa có đơn giá hoặc tổng tiền bằng 0' : 'Xác nhận đã đối soát báo giá này và trình CEO phê duyệt'}
+                            title={blocked ? 'Không thể lập PO: còn linh kiện chưa có đơn giá hoặc tổng tiền bằng 0' : 'Lập đơn mua hàng (PO) chính thức từ báo giá này và trình CEO phê duyệt'}
                             style={{
                               backgroundColor: blocked ? '#9ca3af' : '#2563eb',
                               color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.5rem 1.1rem',
@@ -4117,7 +4169,7 @@ export default function Purchasing() {
                               opacity: blocked ? 0.75 : 1
                             }}
                           >
-                            {blocked ? 'Thiếu Đơn Giá' : 'Xác Nhận & Trình CEO Duyệt'}
+                            {blocked ? 'Thiếu Đơn Giá' : 'Lập PO & Trình CEO Duyệt'}
                           </button>
                         );
                       })()}
@@ -4186,6 +4238,11 @@ export default function Purchasing() {
               {selectedPO.status === 'PO' && (
                 <span style={{ fontSize: '0.78rem', color: '#16a34a', fontWeight: 700, backgroundColor: '#dcfce7', padding: '0.4rem 0.8rem', borderRadius: '6px', border: '1px solid #bbf7d0' }}>
                   ✓ Đã phát hành PO chính thức (Chờ NCC giao & QA/Kho nghiệm thu)
+                </span>
+              )}
+              {selectedPO.status === 'CONVERTED' && (
+                <span style={{ fontSize: '0.78rem', color: '#475569', fontWeight: 700, backgroundColor: '#f1f5f9', padding: '0.4rem 0.8rem', borderRadius: '6px', border: '1px solid #cbd5e1' }}>
+                  ✓ Đã chọn báo giá này — đơn PO chính thức được lập ở bản ghi riêng
                 </span>
               )}
             </div>
@@ -4440,16 +4497,11 @@ export default function Purchasing() {
                                 <button
                                   onClick={async () => {
                                     if (blocked) return;
-                                    await handleUpdateStatus(po.id, 'QUOTED_PENDING_CEO');
-                                    // Confirming one supplier's quote makes every other
-                                    // quote in the same comparison group moot — cancel
-                                    // them so they stop inflating "Chờ xác nhận" counts
-                                    // forever with a decision that's already been made.
+                                    // Chọn NCC này = lập một đơn PO MỚI từ RFQ này (backend đóng
+                                    // RFQ lại ở CONVERTED và tạo bản ghi PO riêng). Mọi báo giá
+                                    // khác trong cùng đợt so sánh bị huỷ trong cùng giao dịch.
                                     const losers = group.list.filter(other => other.id !== po.id && other.status === 'QUOTED');
-                                    for (const loser of losers) {
-                                      await handleUpdateStatus(loser.id, 'CANCELLED', { reason: `Đã chọn báo giá của ${getSupplierName(po)} trong cùng đợt so sánh.` });
-                                    }
-                                    setShowCompareModal(false);
+                                    await handleConfirmQuote(po.id, losers.map(l => l.id));
                                   }}
                                   disabled={blocked}
                                   title={blocked ? 'Còn linh kiện chưa có đơn giá' : undefined}

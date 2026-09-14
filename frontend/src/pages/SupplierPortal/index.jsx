@@ -36,7 +36,7 @@ export default function SupplierPortal() {
   const formatPurchaseReference = (po) => {
     if (!po) return '';
     const raw = String(po.poNumber || po.reference || po.id || '').trim();
-    const isRfq = ['RFQ', 'RFQ_SENT', 'AWAITING_SUPPLIER_QUOTE', 'QUOTED', 'QUOTED_PENDING_CEO', 'DRAFT_RFQ'].includes(po.status) || po.type === 'BACKORDER_RFQ' || po.type === 'RFQ';
+    const isRfq = ['RFQ', 'RFQ_SENT', 'AWAITING_SUPPLIER_QUOTE', 'QUOTED', 'CONVERTED', 'DRAFT_RFQ'].includes(po.status) || po.type === 'BACKORDER_RFQ' || po.type === 'RFQ';
     const prefix = isRfq ? 'RFQ' : 'PO';
 
     // Standard format: PREFIX-YYYY-NNNN (4-digit year, sequential number)
@@ -130,7 +130,7 @@ export default function SupplierPortal() {
 
   // Filter POs for this supplier using flexible status and supplier matching
   const myPOs = orders.filter(po => {
-    const isStatusMatch = ['RFQ', 'RFQ_SENT', 'SENT', 'QUOTED', 'QUOTED_PENDING_CEO', 'PO', 'APPROVED', 'CONFIRMED_BY_SUPPLIER', 'QA_PASSED', 'QA_PARTIAL', 'QA_REJECTED', 'RECEIVED', 'DONE', 'COMPLETED', 'CANCELLED'].includes(po?.status);
+    const isStatusMatch = ['RFQ', 'RFQ_SENT', 'SENT', 'QUOTED', 'CONVERTED', 'QUOTED_PENDING_CEO', 'PO', 'APPROVED', 'CONFIRMED_BY_SUPPLIER', 'QA_PASSED', 'QA_PARTIAL', 'QA_REJECTED', 'RECEIVED', 'DONE', 'COMPLETED', 'CANCELLED'].includes(po?.status);
     
     const uCode = (user?.code || '').toLowerCase();
     const uName = (user?.fullname || user?.username || '').toLowerCase();
@@ -155,6 +155,8 @@ export default function SupplierPortal() {
         return <span className="badge badge-warning">Chờ Báo Giá</span>;
       case 'QUOTED':
         return <span className="badge badge-info" style={{ backgroundColor: 'rgba(99,102,241,0.15)', color: '#818cf8' }}>Đã Báo Giá (Chờ Xác Nhận)</span>;
+      case 'CONVERTED':
+        return <span className="badge badge-success" style={{ backgroundColor: 'rgba(34,197,94,0.15)', color: '#16a34a', border: '1px solid #bbf7d0' }}>Báo Giá Đã Được Chọn (Xem Đơn PO Mới)</span>;
       case 'QUOTED_PENDING_CEO':
         return <span className="badge badge-info" style={{ backgroundColor: 'rgba(99,102,241,0.15)', color: '#818cf8' }}>Đã Báo Giá (Chờ CEO Duyệt)</span>;
       case 'PO':
@@ -560,8 +562,8 @@ export default function SupplierPortal() {
   const STATUS_FILTER_GROUPS = [
     { id: 'ALL', label: 'Tất cả', match: null },
     { id: 'RFQ_SENT', label: 'Chờ Báo Giá', match: ['RFQ', 'RFQ_SENT', 'SENT'] },
-    { id: 'QUOTED', label: 'Đã Báo Giá', match: ['QUOTED', 'QUOTED_PENDING_CEO'] },
-    { id: 'PO', label: 'Đã Duyệt (PO)', match: ['PO', 'APPROVED'] },
+    { id: 'QUOTED', label: 'Đã Báo Giá', match: ['QUOTED', 'CONVERTED'] },
+    { id: 'PO', label: 'Đã Duyệt (PO)', match: ['QUOTED_PENDING_CEO', 'PO', 'APPROVED'] },
     { id: 'SHIPPING', label: 'Đang Giao/Chờ QC', match: ['CONFIRMED_BY_SUPPLIER', 'PENDING_QA'] },
     { id: 'QA_DONE', label: 'QC Đã Kiểm Định', match: ['QA_PASSED', 'QA_PARTIAL', 'QA_REJECTED', 'RECEIVED'] },
     { id: 'DONE', label: 'Hoàn Tất', match: ['DONE', 'COMPLETED'] },
@@ -1136,6 +1138,10 @@ export default function SupplierPortal() {
                           ) : po.status === 'QUOTED' ? (
                             <span className="badge badge-info" style={{ backgroundColor: 'rgba(99,102,241,0.15)', color: '#818cf8', padding: '0.35rem 0.75rem', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 600 }}>
                               Chờ Xác Nhận Báo Giá
+                            </span>
+                          ) : po.status === 'CONVERTED' ? (
+                            <span className="badge badge-success" style={{ backgroundColor: 'rgba(34,197,94,0.15)', color: '#16a34a', padding: '0.35rem 0.75rem', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 600 }}>
+                              Đã Được Chọn — Xem Đơn PO Mới
                             </span>
                           ) : po.status === 'RFQ_SENT' ? (
                             <span className="badge badge-secondary" style={{ padding: '0.35rem 0.75rem', borderRadius: '12px', fontSize: '0.75rem' }}>

@@ -503,6 +503,13 @@ model PurchaseOrder {
   blanketValidUntil    DateTime?           @map("blanket_valid_until") @db.Date
   blanketRefId         Int?                @map("blanket_ref_id")
 
+  // RFQ và PO là 2 bản ghi khác nhau (khác chứng từ thật): khi Mua Hàng chọn
+  // NCC tối ưu từ một RFQ đã có báo giá (status QUOTED), hệ thống tạo MỘT bản
+  // ghi PurchaseOrder MỚI (đơn PO thật, số riêng) tham chiếu ngược lại RFQ gốc
+  // qua sourceRfqId — RFQ gốc chuyển sang status CONVERTED (đóng, không hủy)
+  // và không còn được thao tác tiếp. Cùng mẫu thiết kế với blanketRefId ở trên.
+  sourceRfqId          Int?                @map("source_rfq_id")
+
   supplier             Supplier            @relation(fields: [supplierCode], references: [code])
   items                PurchaseOrderItem[]
   receipts             GoodsReceipt[]
@@ -510,12 +517,15 @@ model PurchaseOrder {
   statusHistory        PurchaseOrderStatusHistory[]
   blanketRef           PurchaseOrder?      @relation("BlanketReleases", fields: [blanketRefId], references: [id])
   releases             PurchaseOrder[]     @relation("BlanketReleases")
+  sourceRfq            PurchaseOrder?      @relation("RfqToPo", fields: [sourceRfqId], references: [id])
+  derivedPOs           PurchaseOrder[]     @relation("RfqToPo")
 
   @@index([supplierCode])
   @@index([status])
   @@index([createdAt])
   @@index([expectedDeliveryDate])
   @@index([blanketRefId])
+  @@index([sourceRfqId])
   @@map("purchase_orders")
 }
 

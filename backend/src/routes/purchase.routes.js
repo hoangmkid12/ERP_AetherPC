@@ -13,6 +13,7 @@ const {
   getPurchaseOrders,
   createPurchaseOrder,
   updatePurchaseOrderStatus,
+  confirmQuoteAndIssuePO,
   createVendorBill,
   registerPayment,
   validateReceipt
@@ -55,6 +56,11 @@ router.post('/orders', authMiddleware(['PURCHASING', 'CEO', 'ADMIN']), createPur
 
 // @route   PATCH /api/v1/purchasing/orders/:id/status
 router.patch('/orders/:id/status', authMiddleware(['PURCHASING', 'CEO', 'ADMIN', 'ACCOUNTANT', 'SUPPLIER', ...QC_ROLES]), updatePurchaseOrderStatus);
+
+// @route   POST /api/v1/purchasing/orders/:id/confirm-quote
+// @desc    Mua Hàng chọn NCC tối ưu từ 1 RFQ đã có báo giá (QUOTED) và lập một
+//          đơn PO chính thức MỚI (chứng từ riêng, số riêng) để trình CEO duyệt.
+router.post('/orders/:id/confirm-quote', authMiddleware(['PURCHASING', 'ADMIN']), confirmQuoteAndIssuePO);
 
 // @route   POST /api/v1/purchasing/orders/:id/bills
 router.post('/orders/:id/bills', authMiddleware(['ACCOUNTANT', 'CEO', 'ADMIN']), createVendorBill);
