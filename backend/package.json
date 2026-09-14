@@ -4,6 +4,7 @@
   "description": "Backend ERP System for Computer Components using Node.js, Express & Prisma",
   "main": "src/server.js",
   "scripts": {
+    "postinstall": "prisma generate",
     "start": "node src/server.js",
     "dev": "nodemon -L --config nodemon.json src/server.js",
     "prisma:generate": "prisma generate",

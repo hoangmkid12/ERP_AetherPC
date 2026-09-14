@@ -405,18 +405,14 @@ ERP_AetherPC/
 
 ### Cách 1: Khởi Chạy Bằng Docker Compose (Khuyên dùng)
 
-1. **Khởi tạo tệp môi trường từ bản mẫu**:
-   ```bash
-   cp backend/.env.example backend/.env
-   cp frontend/.env.example frontend/.env
-   ```
+`backend/.env` và `frontend/.env` đã được commit sẵn trong repo (kết nối thẳng tới PostgreSQL trên Railway) — **không cần** tạo lại từ `.env.example`; nếu đã lỡ ghi đè, khôi phục bằng `git checkout -- backend/.env frontend/.env`. Chỉ dùng `.env.example` khi muốn trỏ sang một database/SMTP khác của riêng bạn.
 
-2. **Chạy Docker Compose**:
+1. **Chạy Docker Compose**:
    ```bash
    docker-compose up --build -d
    ```
 
-3. **Truy cập ứng dụng**:
+2. **Truy cập ứng dụng**:
    - **Storefront & Admin ERP**: `http://localhost:3000`
    - **Backend REST API**: `http://localhost:5000`
    - **WebSocket Realtime CSKH**: `ws://localhost:5000/ws/cskh`
@@ -424,6 +420,8 @@ ERP_AetherPC/
 ---
 
 ### Cách 2: Khởi Chạy Thủ Công (Development Mode)
+
+Tương tự Cách 1, `.env` của cả hai phía đã có sẵn — chỉ cần cài dependencies rồi chạy (`npm install` tự động chạy `prisma generate` qua hook `postinstall` của backend):
 
 1. **Backend Server**:
    ```bash

@@ -28,6 +28,7 @@ pnpm-debug.log*
 .vscode/
 .idea/
 .claude/*.lock
+.claude/settings.local.json
 *.suo
 *.ntvs*
 *.njsproj
