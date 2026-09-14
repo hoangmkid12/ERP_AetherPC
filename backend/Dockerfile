@@ -17,6 +17,11 @@ WORKDIR /app
 # Sao chép file cấu hình package để cài đặt dependencies
 COPY package*.json ./
 
+# Sao chép schema Prisma trước khi cài đặt — script "postinstall" (prisma
+# generate) chạy trong lúc "npm install" và cần file này tồn tại sẵn, nếu
+# không sẽ báo lỗi "Could not find Prisma Schema".
+COPY prisma ./prisma
+
 # Cài đặt dependencies (bao gồm cả devDependencies như nodemon, prisma)
 RUN npm install
 
