@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useSalesStore, useInventoryStore, useHRStore, useFinanceStore, useUtilityStore } from '../../stores';
 import { api } from '../../services/api';
 import { notify, confirm } from '../../context/NotificationContext';
-import { PO_STATUS, ORDER_STATUS, getStatusLabel } from '../../utils/statusLabels';
+import { PO_STATUS, ORDER_STATUS, getStatusLabel, getStatusInfo } from '../../utils/statusLabels';
 import { Bar, Doughnut, Line } from 'react-chartjs-2';
 import { 
   Chart as ChartJS, 
@@ -450,27 +450,13 @@ export default function Dashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Status badge colors for the Approval History table (Dashboard.jsx has no getStatusBadge
-  // of its own, unlike Purchasing.jsx).
-  const HISTORY_STATUS_BADGE_MAP = {
-    RFQ: { bg: '#f1f5f9', color: '#475569', border: '#cbd5e1' },
-    RFQ_SENT: { bg: '#eff6ff', color: '#2563eb', border: '#bfdbfe' },
-    SENT: { bg: '#eff6ff', color: '#2563eb', border: '#bfdbfe' },
-    QUOTED: { bg: '#fffbeb', color: '#d97706', border: '#fde68a' },
-    PENDING_PO_DRAFT: { bg: '#eff6ff', color: '#2563eb', border: '#bfdbfe' },
-    CONVERTED: { bg: '#f1f5f9', color: '#475569', border: '#cbd5e1' },
-    QUOTED_PENDING_CEO: { bg: '#fffbeb', color: '#d97706', border: '#fde68a' },
-    PO: { bg: '#f0fdf4', color: '#16a34a', border: '#bbf7d0' },
-    CONFIRMED_BY_SUPPLIER: { bg: '#eff6ff', color: '#1d4ed8', border: '#93c5fd' },
-    QA_PASSED: { bg: '#ecfdf5', color: '#059669', border: '#a7f3d0' },
-    QA_PARTIAL: { bg: '#fff7ed', color: '#c2410c', border: '#fed7aa' },
-    QA_REJECTED: { bg: '#fef2f2', color: '#dc2626', border: '#fecaca' },
-    RECEIVED: { bg: '#ecfdf5', color: '#059669', border: '#a7f3d0' },
-    DONE: { bg: '#ecfdf5', color: '#047857', border: '#6ee7b7' },
-    COMPLETED: { bg: '#ecfdf5', color: '#047857', border: '#6ee7b7' },
-    CANCELLED: { bg: '#fef2f2', color: '#dc2626', border: '#fecaca' }
-  };
-  const getHistoryStatusBadge = (status) => HISTORY_STATUS_BADGE_MAP[status] || { bg: '#f8fafc', color: '#64748b', border: '#e2e8f0' };
+  // Status badge colors for the Approval History table — sourced from the shared
+  // PO_STATUS dictionary (statusLabels.js) instead of a separate local map, so a
+  // status's color/label can't drift out of sync between this history view and
+  // every other screen (Purchasing.jsx, Accountant.jsx...) that reads PO_STATUS.
+  // The previous local map was also missing PENDING_QA entirely (fell back to a
+  // generic gray badge instead of its real "Chờ Kiểm Tra QC" styling).
+  const getHistoryStatusBadge = (status) => getStatusInfo(PO_STATUS, status);
 
   // Fetch every PO (any status) directly from the backend and flatten each one's
   // statusHistory into one list for the Approval History modal, attaching poNumber/supplier
@@ -1063,28 +1049,29 @@ export default function Dashboard() {
           
           {/* Section 1: Quoted POs Approval */}
           <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <ShoppingBag size={18} style={{ color: '#2563eb' }} />
-                <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
-                  1. Phê Duyệt Báo Giá Mua Hàng Nhà Cung Cấp ({filteredQuotedOrders.length})
-                </h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
+                <ShoppingBag size={18} style={{ color: '#2563eb', marginTop: '0.15rem', flexShrink: 0 }} />
+                <div>
+                  <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                    1. Phê Duyệt Báo Giá Mua Hàng Nhà Cung Cấp ({filteredQuotedOrders.length})
+                  </h3>
+                  <p style={{ margin: '0.2rem 0 0', fontSize: '0.78rem', color: '#64748b' }}>
+                    Duyệt báo giá để chính thức phát hành PO và phiếu nhận hàng cho Kho
+                  </p>
+                </div>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', flexWrap: 'wrap' }}>
-                <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                  Duyệt báo giá để chính thức phát hành PO và phiếu nhận hàng cho Kho
-                </span>
-                <button
-                  onClick={() => { setShowApprovalHistory(true); setHistoryDrilldownPO(null); fetchApprovalHistory(); }}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: '0.35rem',
-                    backgroundColor: '#ffffff', color: '#334155', border: '1px solid #cbd5e1',
-                    borderRadius: '6px', padding: '0.4rem 0.75rem', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer'
-                  }}
-                >
-                  <Clock size={14} /> Xem Lịch Sử Duyệt
-                </button>
-              </div>
+              <button
+                onClick={() => { setShowApprovalHistory(true); setHistoryDrilldownPO(null); fetchApprovalHistory(); }}
+                title="Xem lịch sử toàn bộ các lượt duyệt/chuyển trạng thái của mọi đơn mua hàng"
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '0.35rem', flexShrink: 0,
+                  backgroundColor: '#ffffff', color: '#334155', border: '1px solid #cbd5e1',
+                  borderRadius: '6px', padding: '0.4rem 0.75rem', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer'
+                }}
+              >
+                <Clock size={14} /> Lịch Sử Duyệt Đơn Mua Hàng
+              </button>
             </div>
 
             {filteredQuotedOrders.length === 0 ? (
@@ -1110,10 +1097,8 @@ export default function Dashboard() {
                         <tr key={po.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
                           <td
                             onClick={() => setSelectedDetailPO(po)}
-                            title="Xem chi tiết sản phẩm trong đơn"
-                            style={{ padding: '0.65rem 0.85rem', fontWeight: 700, color: '#2563eb', cursor: 'pointer', textDecoration: 'underline', textDecorationColor: 'transparent' }}
-                            onMouseEnter={(e) => e.currentTarget.style.textDecorationColor = '#2563eb'}
-                            onMouseLeave={(e) => e.currentTarget.style.textDecorationColor = 'transparent'}
+                            title="Xem phiếu đơn hàng"
+                            style={{ padding: '0.65rem 0.85rem', fontWeight: 700, color: '#2563eb', cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: '2px' }}
                           >
                             {formatPurchaseReference(po)}
                           </td>
@@ -1727,14 +1712,25 @@ export default function Dashboard() {
                         </button>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
                           <div style={{ fontSize: '0.85rem', color: '#334155' }}>
-                            <strong style={{ color: '#0f172a' }}>{activeGroup.poNumber}</strong> — {activeGroup.supplierName} ({activeGroup.entries.length} lượt thay đổi)
+                            <strong
+                              onClick={() => {
+                                if (activeGroup.po) {
+                                  setShowApprovalHistory(false);
+                                  setSelectedDetailPO(activeGroup.po);
+                                }
+                              }}
+                              title="Xem phiếu đơn hàng"
+                              style={{ color: '#2563eb', textDecoration: 'underline', textUnderlineOffset: '2px', cursor: 'pointer' }}
+                            >
+                              {activeGroup.poNumber}
+                            </strong> — {activeGroup.supplierName} ({activeGroup.entries.length} lượt thay đổi)
                           </div>
                           {activeGroup.po && (
                             <button
                               onClick={() => { setShowApprovalHistory(false); setSelectedDetailPO(activeGroup.po); }}
                               style={{ backgroundColor: '#ffffff', color: '#2563eb', border: '1px solid #bfdbfe', borderRadius: '4px', padding: '0.3rem 0.75rem', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer' }}
                             >
-                              Xem Chi Tiết Sản Phẩm
+                              Xem Phiếu Đơn Hàng
                             </button>
                           )}
                         </div>
@@ -1796,8 +1792,20 @@ export default function Dashboard() {
                             onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
                             onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                           >
-                            <td style={{ padding: '0.65rem 0.75rem', fontWeight: 700, color: '#2563eb', whiteSpace: 'nowrap' }}>
-                              {g.poNumber}
+                            <td style={{ padding: '0.65rem 0.75rem', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                              <span
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (g.po) {
+                                    setShowApprovalHistory(false);
+                                    setSelectedDetailPO(g.po);
+                                  }
+                                }}
+                                title="Xem phiếu đơn hàng"
+                                style={{ color: '#2563eb', textDecoration: 'underline', textUnderlineOffset: '2px', cursor: 'pointer' }}
+                              >
+                                {g.poNumber}
+                              </span>
                             </td>
                             <td style={{ padding: '0.65rem 0.75rem', color: '#334155' }}>
                               {g.supplierName}
