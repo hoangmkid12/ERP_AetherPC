@@ -958,7 +958,6 @@ export default function Sidebar({ isOpen = false, onClose }) {
                       { tab: 'rfq', label: 'Yêu Cầu Báo Giá (RFQ)', badgeKey: 'rfqCount' },
                       { tab: 'orders', label: 'Đơn Mua Hàng (PO)', badgeKey: 'quotedPoCount' },
                       { tab: 'suppliers', label: 'Nhà Cung Cấp' },
-                      { tab: 'compare', label: 'So Sánh Báo Giá NCC' },
                       { tab: 'products', label: 'Sản Phẩm & Bảng Giá' },
                       { tab: 'reports', label: 'Báo Cáo & Phân Tích' }
                     ].map(sub => {

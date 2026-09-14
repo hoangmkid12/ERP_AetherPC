@@ -1601,13 +1601,27 @@ export default function Purchasing() {
           {/* Quick Action Navigation Panels */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.25rem', marginBottom: '1.5rem' }}>
             <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', gap: '0.5rem' }}>
+                <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', margin: 0, lineHeight: 1.3 }}>
                   Yêu Cầu Báo Giá (RFQ)
                 </h3>
                 <button
                   onClick={() => navigate('/admin/purchasing?tab=rfq')}
-                  style={{ backgroundColor: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', borderRadius: '6px', padding: '0.35rem 0.8rem', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer' }}
+                  style={{
+                    backgroundColor: '#eff6ff',
+                    color: '#2563eb',
+                    border: '1px solid #bfdbfe',
+                    borderRadius: '6px',
+                    padding: '0.35rem 0.65rem',
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap',
+                    flexShrink: 0,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
                 >
                   Xem Tất Cả ({rfqDraftCount + rfqSentCount + rfqQuotedCount + rfqPendingDraftCount}) →
                 </button>
@@ -1632,13 +1646,27 @@ export default function Purchasing() {
             </div>
 
             <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', gap: '0.5rem' }}>
+                <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', margin: 0, lineHeight: 1.3 }}>
                   Đơn Mua Hàng Chính Thức (PO)
                 </h3>
                 <button
                   onClick={() => navigate('/admin/purchasing?tab=orders')}
-                  style={{ backgroundColor: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', borderRadius: '6px', padding: '0.35rem 0.8rem', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer' }}
+                  style={{
+                    backgroundColor: '#eff6ff',
+                    color: '#2563eb',
+                    border: '1px solid #bfdbfe',
+                    borderRadius: '6px',
+                    padding: '0.35rem 0.65rem',
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap',
+                    flexShrink: 0,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
                 >
                   Xem Tất Cả ({poConfirmedCount}) →
                 </button>
@@ -1663,13 +1691,27 @@ export default function Purchasing() {
             </div>
 
             <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', gap: '0.5rem' }}>
+                <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', margin: 0, lineHeight: 1.3 }}>
                   Yêu Cầu Mua Hàng Nội Bộ (PR)
                 </h3>
                 <button
                   onClick={() => navigate('/admin/purchasing?tab=requests')}
-                  style={{ backgroundColor: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', borderRadius: '6px', padding: '0.35rem 0.8rem', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer' }}
+                  style={{
+                    backgroundColor: '#eff6ff',
+                    color: '#2563eb',
+                    border: '1px solid #bfdbfe',
+                    borderRadius: '6px',
+                    padding: '0.35rem 0.65rem',
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap',
+                    flexShrink: 0,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
                 >
                   Xem Tất Cả ({purchaseRequests.length}) →
                 </button>
@@ -1775,7 +1817,7 @@ export default function Purchasing() {
               <div style={{ backgroundColor: '#ffffff', padding: '1rem 1.25rem', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
-                    <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#64748b' }}>Tổng Yêu Cầu (Mới & Cũ)</div>
+                    <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#64748b' }}>Tổng Yêu Cầu</div>
                     <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#0f172a', marginTop: '0.2rem' }}>{purchaseRequests.length}</div>
                   </div>
                   <div style={{ width: '38px', height: '38px', borderRadius: '8px', backgroundColor: '#f1f5f9', color: '#475569', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -1787,7 +1829,7 @@ export default function Purchasing() {
               <div style={{ backgroundColor: '#fffbeb', padding: '1rem 1.25rem', borderRadius: '8px', border: '1px solid #fde68a' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
-                    <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#b45309' }}>Chờ Xử Lý (Mới)</div>
+                    <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#b45309' }}>Chờ Duyệt</div>
                     <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#b45309', marginTop: '0.2rem' }}>{pendingCount}</div>
                   </div>
                   <div style={{ width: '38px', height: '38px', borderRadius: '8px', backgroundColor: '#fef3c7', color: '#d97706', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -1799,7 +1841,7 @@ export default function Purchasing() {
               <div style={{ backgroundColor: '#f0fdf4', padding: '1rem 1.25rem', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
-                    <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#15803d' }}>Đã Duyệt / Sẵn Sàng Mua</div>
+                    <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#15803d' }}>Đã Duyệt</div>
                     <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#15803d', marginTop: '0.2rem' }}>{approvedCount}</div>
                   </div>
                   <div style={{ width: '38px', height: '38px', borderRadius: '8px', backgroundColor: '#dcfce7', color: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -1811,7 +1853,7 @@ export default function Purchasing() {
               <div style={{ backgroundColor: '#fef2f2', padding: '1rem 1.25rem', borderRadius: '8px', border: '1px solid #fecaca' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
-                    <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#dc2626' }}>Từ Chối / Đã Đóng</div>
+                    <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#dc2626' }}>Từ Chối</div>
                     <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#dc2626', marginTop: '0.2rem' }}>{rejectedCount}</div>
                   </div>
                   <div style={{ width: '38px', height: '38px', borderRadius: '8px', backgroundColor: '#fee2e2', color: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -1837,7 +1879,7 @@ export default function Purchasing() {
               <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
                 {[
                   { key: 'ALL', label: `Tất cả (${purchaseRequests.length})` },
-                  { key: 'PENDING', label: `Chờ xử lý / Mới (${pendingCount})` },
+                  { key: 'PENDING', label: `Chờ duyệt (${pendingCount})` },
                   { key: 'APPROVED', label: `Đã duyệt (${approvedCount})` },
                   { key: 'REJECTED', label: `Từ chối (${rejectedCount})` }
                 ].map(f => (
@@ -1913,7 +1955,7 @@ export default function Purchasing() {
                         const badgeBg = isApproved ? '#f0fdf4' : isRejected ? '#fef2f2' : '#fffbeb';
                         const badgeColor = isApproved ? '#15803d' : isRejected ? '#dc2626' : '#b45309';
                         const badgeBorder = isApproved ? '#bbf7d0' : isRejected ? '#fecaca' : '#fde68a';
-                        const badgeText = isApproved ? 'Đã Ký Duyệt' : isRejected ? 'Từ Chối' : 'Chờ Duyệt / Mới';
+                        const badgeText = isApproved ? 'Đã Duyệt' : isRejected ? 'Từ Chối' : 'Chờ Duyệt';
 
                         return (
                           <tr key={pr.id || pr.prCode} style={{ borderBottom: '1px solid #f1f5f9' }}>
@@ -2325,7 +2367,7 @@ export default function Purchasing() {
                   <th style={{ padding: '0.75rem 0.85rem', textAlign: 'center', whiteSpace: 'nowrap' }}>Hạn Đặt Hàng</th>
                   <th style={{ padding: '0.75rem 1rem', textAlign: 'right', whiteSpace: 'nowrap' }}>Tổng Tiền</th>
                   <th style={{ padding: '0.75rem 0.85rem', textAlign: 'center', whiteSpace: 'nowrap' }}>Trạng Thái</th>
-                  <th style={{ padding: '0.75rem 1rem', textAlign: 'center', whiteSpace: 'nowrap' }}>Hành Động</th>
+                  <th style={{ padding: '0.75rem 1rem', textAlign: 'right', whiteSpace: 'nowrap' }}>Hành Động</th>
                 </tr>
               </thead>
               <tbody>
@@ -2380,8 +2422,8 @@ export default function Purchasing() {
                             {badge.text}
                           </span>
                         </td>
-                        <td style={{ padding: '0.75rem 1rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
-                          <div style={{ display: 'inline-flex', gap: '0.4rem' }}>
+                        <td style={{ padding: '0.75rem 1rem', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                          <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.4rem' }}>
                             {po.status === 'QUOTED' && isPurchasingConfirmer && (
                               <button
                                 onClick={() => handleUpdateStatus(po.id, 'PENDING_PO_DRAFT')}
@@ -2394,7 +2436,14 @@ export default function Purchasing() {
                                   padding: '0.3rem 0.65rem',
                                   fontSize: '0.75rem',
                                   fontWeight: 700,
-                                  cursor: 'pointer'
+                                  cursor: 'pointer',
+                                  minWidth: '58px',
+                                  height: '28px',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  boxSizing: 'border-box',
+                                  whiteSpace: 'nowrap'
                                 }}
                               >
                                 Duyệt
@@ -2412,7 +2461,14 @@ export default function Purchasing() {
                                   padding: '0.3rem 0.65rem',
                                   fontSize: '0.75rem',
                                   fontWeight: 700,
-                                  cursor: 'pointer'
+                                  cursor: 'pointer',
+                                  minWidth: '74px',
+                                  height: '28px',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  boxSizing: 'border-box',
+                                  whiteSpace: 'nowrap'
                                 }}
                               >
                                 Lập Phiếu
@@ -2429,13 +2485,20 @@ export default function Purchasing() {
                                   padding: '0.3rem 0.65rem',
                                   fontSize: '0.75rem',
                                   fontWeight: 700,
-                                  cursor: 'pointer'
+                                  cursor: 'pointer',
+                                  minWidth: '58px',
+                                  height: '28px',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  boxSizing: 'border-box',
+                                  whiteSpace: 'nowrap'
                                 }}
                               >
                                 Duyệt
                               </button>
                             )}
-                            {['QUOTED', 'PENDING_PO_DRAFT', 'CONVERTED'].includes(po.status) && (
+                            {['QUOTED', 'PENDING_PO_DRAFT', 'QUOTED_PENDING_CEO', 'CONVERTED'].includes(po.status) && (
                               <button
                                 onClick={() => setPrintQuoteTarget(po)}
                                 title="Xem / In Phiếu Báo Giá"
@@ -2450,7 +2513,12 @@ export default function Purchasing() {
                                   cursor: 'pointer',
                                   display: 'inline-flex',
                                   alignItems: 'center',
-                                  gap: '4px'
+                                  justifyContent: 'center',
+                                  gap: '4px',
+                                  minWidth: '84px',
+                                  height: '28px',
+                                  boxSizing: 'border-box',
+                                  whiteSpace: 'nowrap'
                                 }}
                               >
                                 <Printer size={12} /> Báo Giá
@@ -2466,7 +2534,14 @@ export default function Purchasing() {
                                 padding: '0.3rem 0.65rem',
                                 fontSize: '0.75rem',
                                 fontWeight: 700,
-                                cursor: 'pointer'
+                                cursor: 'pointer',
+                                minWidth: '65px',
+                                height: '28px',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                boxSizing: 'border-box',
+                                whiteSpace: 'nowrap'
                               }}
                             >
                               Chi Tiết
