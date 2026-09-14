@@ -4546,8 +4546,8 @@ export default function Purchasing() {
               </div>
             ) : (
               <div>
-                {(selectedGroupKey ? rfqGroups.filter(g => g.key === selectedGroupKey) : rfqGroups).map((group, idx) => (
-                  <div key={idx} style={{ marginBottom: '1.5rem' }}>
+                {(selectedGroupKey ? rfqGroups.filter(g => g.key === selectedGroupKey) : rfqGroups).map((group) => (
+                  <div key={group.key} style={{ marginBottom: '1.5rem' }}>
                     <div style={{ backgroundColor: '#f8fafc', padding: '0.75rem 1rem', borderRadius: '6px', border: '1px solid #e2e8f0', marginBottom: '0.75rem' }}>
                       <strong style={{ fontSize: '0.88rem', color: '#0f172a' }}>Nhóm Sản Phẩm Cần Nhập:</strong>
                       <span style={{ fontSize: '0.82rem', color: '#2563eb', marginLeft: '0.5rem' }}>
@@ -4563,7 +4563,12 @@ export default function Purchasing() {
                         const poAvgScore = getSupplierAvgScore(poSupplier);
 
                         return (
-                          <div key={pIdx} style={{
+                          // key phải là po.id (định danh thật), không phải vị trí trong
+                          // mảng (pIdx) — khi 1 báo giá trong nhóm bị huỷ/đổi trạng thái,
+                          // list co lại và các vị trí dịch chuyển, khiến React tái dùng
+                          // nhầm DOM node cũ cho báo giá khác, hiển thị sai tên NCC/giá
+                          // của thẻ đứng trước cho đến khi trang được tải lại hẳn.
+                          <div key={po.id} style={{
                             backgroundColor: '#ffffff',
                             borderRadius: '8px',
                             border: isCheapest && po.totalAmount > 0 ? '2px solid #10b981' : '1px solid #cbd5e1',
