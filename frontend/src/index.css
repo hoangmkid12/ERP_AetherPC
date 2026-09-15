@@ -1145,7 +1145,10 @@ select.input-field option {
 .delivery-app-inner {
   width: 100%;
   max-width: var(--delivery-frame-width);
+  /* See .delivery-fullscreen-modal-inner comment: svh (not dvh/vh) avoids
+     the bottom-nav being tucked behind iOS Safari's still-expanded toolbar. */
   height: 100vh;
+  height: 100svh;
   display: flex;
   flex-direction: column;
   background: var(--bg-app);
@@ -1352,9 +1355,16 @@ select.input-field option {
 .delivery-fullscreen-modal-inner {
   width: 100%;
   max-width: var(--delivery-frame-width);
-  /* Use 100dvh so we track the real visible height on iOS/Android
-     (avoids being taller than the visible area when the browser chrome shrinks). */
-  height: 100dvh;
+  /* 100dvh can report a height TALLER than what's actually visible while
+     iOS Safari's bottom toolbar is still expanded (dvh optimistically
+     assumes the toolbar is about to collapse) — that tucks the sticky
+     action bar partly behind the toolbar instead of above it. 100svh is
+     the guaranteed-safe "small viewport height" (assumes the toolbar is
+     always expanded), so content sized to it never sits behind the
+     toolbar; the tradeoff is a little unused space once the toolbar does
+     collapse, which is the correct tradeoff for a bottom action bar. */
+  height: 100vh;
+  height: 100svh;
   background: var(--bg-app);
   display: flex;
   flex-direction: column;
