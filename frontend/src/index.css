@@ -1348,11 +1348,22 @@ select.input-field option {
 .delivery-fullscreen-modal-inner {
   width: 100%;
   max-width: var(--delivery-frame-width);
-  height: 100%;
+  /* Use 100dvh so we track the real visible height on iOS/Android
+     (avoids being taller than the visible area when the browser chrome shrinks). */
+  height: 100dvh;
   background: var(--bg-app);
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+/* Action bars that sit pinned to the bottom of a fullscreen modal MUST add
+   safe-area-inset-bottom so they are never hidden by the iOS home-indicator or
+   Android gesture-nav bar.  Apply this class to every sticky footer inside a
+   .delivery-fullscreen-modal-inner. */
+.delivery-modal-action-bar {
+  flex-shrink: 0;
+  padding-bottom: max(env(safe-area-inset-bottom, 0px) + 0.85rem, 1.1rem);
 }
 
 /* ==========================================================================

@@ -171,7 +171,7 @@ export default function ReturnProofModal({ order: ord, onClose, onConfirm }) {
               )}
             </div>
 
-            <div style={{ padding: '1rem', background: 'var(--bg-primary)', borderTop: '1px solid var(--border-glass)', flexShrink: 0 }}>
+            <div className="delivery-modal-action-bar" style={{ padding: '1rem 1rem 0', background: 'var(--bg-primary)', borderTop: '1px solid var(--border-glass)' }}>
               <button
                 type="button"
                 className="delivery-tap-target"
@@ -228,7 +228,7 @@ export default function ReturnProofModal({ order: ord, onClose, onConfirm }) {
               </div>
             </div>
 
-            <div style={{ padding: '1rem', background: 'var(--bg-primary)', borderTop: '1px solid var(--border-glass)', flexShrink: 0 }}>
+            <div className="delivery-modal-action-bar" style={{ padding: '1rem 1rem 0', background: 'var(--bg-primary)', borderTop: '1px solid var(--border-glass)' }}>
               <button
                 type="button"
                 className="delivery-tap-target"

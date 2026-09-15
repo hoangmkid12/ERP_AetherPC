@@ -126,7 +126,7 @@ export default function OrderDetailSheet({ order: ord, onClose, fmt, actions = {
             RETURNING_TO_WAREHOUSE orders have their own resume/escalate flows
             surfaced from the ActiveTab card, not duplicated here. */}
         {actions.onDeliver && ord.status === 'SHIPPED' && (
-          <div style={{ display: 'flex', gap: '0.6rem', padding: '0.85rem 1rem', borderTop: '1px solid var(--border-glass)', background: 'var(--bg-primary)', flexShrink: 0 }}>
+          <div className="delivery-modal-action-bar" style={{ display: 'flex', gap: '0.6rem', padding: '0.85rem 1rem 0', borderTop: '1px solid var(--border-glass)', background: 'var(--bg-primary)' }}>
             <button
               type="button"
               className="delivery-tap-target"

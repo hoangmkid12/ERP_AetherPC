@@ -431,8 +431,8 @@ export default function DeliveryNavigationModal({
         )}
 
         {/* Thanh nút hành động chính — Cân đối 3 cột đồng đều */}
-        <div style={{
-          padding: '0.75rem 0.85rem',
+        <div className="delivery-modal-action-bar" style={{
+          padding: '0.75rem 0.85rem 0',
           backgroundColor: '#ffffff',
           borderTop: '1px solid #e2e8f0',
           display: 'grid',

@@ -381,7 +381,7 @@ export default function PODModal({ order: deliverModal, user, onClose, onConfirm
             </div>
 
             {/* Sticky capture button & upload option */}
-            <div style={{ padding: '0.85rem 1rem', background: 'var(--bg-primary)', borderTop: '1px solid var(--border-glass)', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            <div className="delivery-modal-action-bar" style={{ padding: '0.85rem 1rem 0', background: 'var(--bg-primary)', borderTop: '1px solid var(--border-glass)', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               <button
                 type="button"
                 className="delivery-tap-target"
@@ -584,7 +584,7 @@ export default function PODModal({ order: deliverModal, user, onClose, onConfirm
             </div>
 
             {/* Sticky submit — Thanh trượt xác nhận chống chạm nhầm */}
-            <div style={{ padding: '0.85rem 1rem', background: 'var(--bg-primary)', borderTop: '1px solid var(--border-glass)', flexShrink: 0 }}>
+            <div className="delivery-modal-action-bar" style={{ padding: '0.85rem 1rem 0', background: 'var(--bg-primary)', borderTop: '1px solid var(--border-glass)' }}>
               <SwipeConfirmButton
                 onConfirm={handleSubmit}
                 disabled={!proofPhoto}
