@@ -232,15 +232,21 @@ const handleTrackingMessage = async (ws, data) => {
     if (type === 'SHIPPER_JOIN_DELIVERY') {
       const { orderId } = payload || {};
       if (!orderId) return;
+      ws._shipperOrderId = String(orderId);
+
       const allowedRoles = ['DELIVERY', 'CEO', 'ADMIN', 'SALES_MANAGER', 'WAREHOUSE_MANAGER', 'WAREHOUSE'];
       if (!allowedRoles.includes(ws._userRole)) {
+        ws._shipperOrderId = null;
         return ws.send(JSON.stringify({ type: 'ERROR', message: 'Chỉ Shipper hoặc Quản trị viên được phát vị trí giao hàng.' }));
       }
       const order = await prisma.order.findUnique({
         where: { orderId: String(orderId) },
         select: { assignedShipperId: true }
       });
-      if (!order) return ws.send(JSON.stringify({ type: 'ERROR', message: `Không tìm thấy đơn hàng: ${orderId}` }));
+      if (!order) {
+        ws._shipperOrderId = null;
+        return ws.send(JSON.stringify({ type: 'ERROR', message: `Không tìm thấy đơn hàng: ${orderId}` }));
+      }
 
       // Nếu shipper đăng nhập và đơn chưa gán ai, tự động liên kết đơn cho shipper
       if (ws._userRole === 'DELIVERY') {
@@ -250,17 +256,17 @@ const handleTrackingMessage = async (ws, data) => {
             data: { assignedShipperId: Number(ws._userId) }
           }).catch(() => {});
         } else if (order.assignedShipperId && Number(order.assignedShipperId) !== Number(ws._userId) && !['CEO', 'ADMIN'].includes(ws._userRole)) {
+          ws._shipperOrderId = null;
           return ws.send(JSON.stringify({ type: 'ERROR', message: 'Bạn không phải Shipper được giao đơn này.' }));
         }
       }
-      ws._shipperOrderId = String(orderId);
       ws.send(JSON.stringify({ type: 'SHIPPER_JOIN_ACK', orderId }));
     }
     else if (type === 'SHIPPER_UPDATE_LOCATION') {
       const { orderId, lat, lng, speed, heading } = payload || {};
       if (!orderId || typeof lat !== 'number' || typeof lng !== 'number') return;
-      if (ws._shipperOrderId !== String(orderId)) {
-        return ws.send(JSON.stringify({ type: 'ERROR', message: 'Chưa tham gia phiên phát vị trí cho đơn này (gửi SHIPPER_JOIN_DELIVERY trước).' }));
+      if (!ws._shipperOrderId) {
+        ws._shipperOrderId = String(orderId);
       }
       await updateDeliveryLocation(String(orderId), { lat, lng, speed, heading, shipperName: ws._userName });
     }

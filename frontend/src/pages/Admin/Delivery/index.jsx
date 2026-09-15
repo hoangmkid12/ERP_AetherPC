@@ -686,16 +686,19 @@ export default function Delivery() {
     gpsSocketRef.current = ws;
     ws.onopen = () => {
       ws.send(JSON.stringify({ type: 'SHIPPER_JOIN_DELIVERY', payload: { orderId } }));
-      if (initialCoords && typeof initialCoords.lat === 'number') {
-        sendLocation(orderId, initialCoords);
-      }
     };
     ws.onmessage = (evt) => {
       try {
         const data = JSON.parse(evt.data);
         if (data.type === 'ERROR') {
           if (!isSilent) addNotification(data.message || 'Lỗi phát vị trí GPS.', 'error');
-          stopGps();
+          if (data.message && (data.message.includes('không phải Shipper') || data.message.includes('Không tìm thấy'))) {
+            stopGps();
+          }
+        } else if (data.type === 'SHIPPER_JOIN_ACK') {
+          if (initialCoords && typeof initialCoords.lat === 'number') {
+            sendLocation(orderId, initialCoords);
+          }
         }
       } catch (_) { /* ignore malformed frame */ }
     };

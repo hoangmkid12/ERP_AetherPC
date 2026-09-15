@@ -96,3 +96,71 @@ export async function reverseGeocode(lat, lng) {
     return null;
   }
 }
+
+// Forward Geocoding thông minh cho địa chỉ Việt Nam (tự động phân tích phường/xã, quận/huyện, tỉnh/thành)
+const geocodeCache = new Map();
+
+export async function forwardGeocode(address) {
+  if (!address || typeof address !== 'string') return null;
+  const cleanKey = address.trim().toLowerCase();
+  if (geocodeCache.has(cleanKey)) return geocodeCache.get(cleanKey);
+
+  const queries = [];
+  // Bỏ tiền tố tổ/thôn/số nhà (ví dụ "Tổ 2 Phước Lộc, ...")
+  const strippedDetail = address
+    .replace(/^Tổ\s+\d+[^,]*,/i, '')
+    .replace(/^Số\s+[^,]*,/i, '')
+    .trim();
+
+  // Bỏ các từ định danh hành chính
+  const strippedAdmin = strippedDetail
+    .replace(/\b(Phường|Xã|Thị trấn|Thị xã|Quận|Huyện|Thành phố|Tỉnh)\s+/gi, '')
+    .trim();
+
+  const parts = strippedAdmin.split(',').map(s => s.trim()).filter(Boolean);
+
+  // Thử 1: [Phường/Xã, Quận/Huyện/Thị xã] (ví dụ: "Tân Phước, Phú Mỹ") -> tỷ lệ khớp OSM cao nhất
+  if (parts.length >= 2) {
+    queries.push(`${parts[0]}, ${parts[1]}`);
+  }
+  // Thử 2: Chuỗi đã bỏ chi tiết tổ/số nhà
+  queries.push(strippedDetail);
+  // Thử 3: 2 phần tử cuối
+  if (parts.length >= 2) {
+    queries.push(parts.slice(-2).join(', '));
+  }
+  // Thử 4: Chuỗi nguyên bản
+  queries.push(address);
+
+  const uniqueQueries = [...new Set(queries)];
+
+  for (const q of uniqueQueries) {
+    try {
+      const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&countrycodes=vn&limit=1`;
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 4000);
+      const res = await fetch(url, {
+        signal: controller.signal,
+        headers: { Accept: 'application/json' }
+      });
+      clearTimeout(timeoutId);
+
+      if (res.ok) {
+        const list = await res.json();
+        if (Array.isArray(list) && list.length > 0 && list[0].lat && list[0].lon) {
+          const result = {
+            lat: parseFloat(list[0].lat),
+            lng: parseFloat(list[0].lon),
+            displayName: list[0].display_name
+          };
+          geocodeCache.set(cleanKey, result);
+          return result;
+        }
+      }
+    } catch (_) {
+      // Tiếp tục thử query tiếp theo
+    }
+  }
+
+  return null;
+}

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { X, Navigation, Phone, MapPin, Compass, AlertCircle, Gauge, Camera, ExternalLink } from 'lucide-react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { fetchRoadRoute } from '../../../../utils/routingService';
+import { fetchRoadRoute, forwardGeocode } from '../../../../utils/routingService';
 import { TILE_URL, TILE_ATTRIBUTION, TILE_MAX_ZOOM, WAREHOUSE_ICON, DESTINATION_ICON, SHIPPER_ICON } from '../../../../utils/mapIcons';
 
 function haversineKm(a, b) {
@@ -50,8 +50,27 @@ export default function DeliveryNavigationModal({
   const codAmount = parseFloat(order?.totalAmount || order?.total || 0);
   const isPrepaid = order?.paymentStatus === 'PAID' || order?.paymentMethod === 'ONLINE_GATEWAY' || order?.paymentMethod === 'BANK_TRANSFER' || codAmount === 0;
 
-  const googleMapsUrl = destination?.lat && destination?.lng
-    ? `https://www.google.com/maps/dir/?api=1&destination=${destination.lat},${destination.lng}&travelmode=driving`
+  // Tự động phân giải địa chỉ thực tế (Forward Geocoding) để lấy toạ độ chính xác thay vì chỉ toạ độ khu vực
+  const [exactDestination, setExactDestination] = useState(destination);
+
+  useEffect(() => {
+    let isMounted = true;
+    if (address) {
+      forwardGeocode(address).then(geo => {
+        if (isMounted && geo && typeof geo.lat === 'number' && typeof geo.lng === 'number') {
+          setExactDestination(prev => ({
+            ...prev,
+            lat: geo.lat,
+            lng: geo.lng
+          }));
+        }
+      });
+    }
+    return () => { isMounted = false; };
+  }, [address]);
+
+  const googleMapsUrl = exactDestination?.lat && exactDestination?.lng
+    ? `https://www.google.com/maps/dir/?api=1&destination=${exactDestination.lat},${exactDestination.lng}&travelmode=driving`
     : `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(address)}&travelmode=driving`;
 
   // 1. Khởi tạo bản đồ Leaflet
@@ -104,7 +123,7 @@ export default function DeliveryNavigationModal({
   // 3. Tính toán và vẽ lộ trình đường bộ tối ưu qua OSRM
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !destination) return;
+    if (!map || !exactDestination) return;
 
     // Điểm xuất phát ưu tiên: Vị trí thực tế của Shipper, nếu chưa có thì dùng vị trí Kho
     const origin = shipperLoc || warehouse;
@@ -126,12 +145,12 @@ export default function DeliveryNavigationModal({
     }
 
     // Marker Điểm nhận hàng của Khách
-    markersRef.current.destination = L.marker([destination.lat, destination.lng], { icon: DESTINATION_ICON })
+    markersRef.current.destination = L.marker([exactDestination.lat, exactDestination.lng], { icon: DESTINATION_ICON })
       .addTo(map)
       .bindPopup(`<strong>🏠 Điểm Giao Hàng:</strong><br/>${customerName}<br/>${address}`);
 
     let isMounted = true;
-    fetchRoadRoute(origin, destination).then(route => {
+    fetchRoadRoute(origin, exactDestination).then(route => {
       if (!isMounted || !mapRef.current) return;
       setLoadingRoute(false);
 
@@ -139,9 +158,6 @@ export default function DeliveryNavigationModal({
         setRouteInfo(route);
         routeCoordsRef.current = route.coordinates;
 
-        // 1 đường mảnh màu xanh Google Maps — nhất quán với DeliveryMap.jsx,
-        // tuyến này luôn tính lại từ vị trí hiện tại nên không cần phân biệt
-        // "toàn tuyến" và "còn lại" như màn hình quan sát của khách/admin.
         const mainLine = L.polyline(route.coordinates, {
           color: '#1a73e8',
           weight: 5,
@@ -160,7 +176,7 @@ export default function DeliveryNavigationModal({
     });
 
     return () => { isMounted = false; };
-  }, [warehouse?.lat, warehouse?.lng, destination?.lat, destination?.lng, shipperLoc?.lat, shipperLoc?.lng]);
+  }, [warehouse?.lat, warehouse?.lng, exactDestination?.lat, exactDestination?.lng, shipperLoc?.lat, shipperLoc?.lng]);
 
   // 4. Cập nhật vị trí Marker Shipper theo thời gian thực
   useEffect(() => {
@@ -214,7 +230,7 @@ export default function DeliveryNavigationModal({
     }
   }, []);
 
-  const distanceRemaining = shipperLoc && destination ? haversineKm(shipperLoc, destination) : null;
+  const distanceRemaining = shipperLoc && exactDestination ? haversineKm(shipperLoc, exactDestination) : null;
 
   return (
     <div className="delivery-fullscreen-modal">

@@ -81,10 +81,11 @@ export const detectDeliveryRegion = (address = '') => {
     return 'CENTRAL';
   }
 
-  // South Provinces
+  // South Provinces (Bà Rịa - Vũng Tàu, Phú Mỹ, Đồng Nai, Bình Dương, Tây Nam Bộ)
   if (
     addr.includes('can tho') || addr.includes('binh duong') || addr.includes('dong nai') ||
-    addr.includes('vung tau') || addr.includes('long an') || addr.includes('tien giang') ||
+    addr.includes('vung tau') || addr.includes('ba ria') || (addr.includes('phu my') && !addr.includes('phu my hung')) ||
+    addr.includes('tan phuoc') || addr.includes('long an') || addr.includes('tien giang') ||
     addr.includes('an giang') || addr.includes('kien giang') || addr.includes('ben tre') ||
     addr.includes('vinh long') || addr.includes('tay ninh')
   ) {
