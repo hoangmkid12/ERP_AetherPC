@@ -168,16 +168,16 @@ export default function Cart() {
       .catch(err => console.warn('AddressKit API fetch error:', err));
   }, []);
 
-  // Sync user info when logged in
+  // Sync user info when logged in — street address is intentionally left
+  // blank here (not auto-filled from the profile) so the customer always
+  // types/picks the actual delivery address for this order; "Địa chỉ đã lưu"
+  // below still offers one-click fill from a saved address when there is one.
   useEffect(() => {
     if (user) {
       setCustomerName(user.fullname || user.name || '');
       setPhone(user.phone || '');
       const mail = getUserEmail(user);
       if (mail) setCustomerEmail(mail);
-      if (user.address) {
-        setStreetAddress(user.address);
-      }
     }
   }, [user]);
 
@@ -220,7 +220,6 @@ export default function Cart() {
     setSelectedProvince(address.city || '');
     setWard(address.ward || '');
     setSelectedDistrict(address.district || '');
-    setIsTwoTier(!address.district);
     setApiCommunes([]);
     fetchCommunesForProvince(address.city || '');
   };
@@ -231,15 +230,6 @@ export default function Cart() {
     setSelectedDistrict('');
     setWard('');
     setApiCommunes([]);
-
-    // Kiểm tra xem tỉnh thành có danh sách huyện hay không
-    const matched = VIETNAM_PROVINCES.find(p => {
-      if (!provName) return false;
-      return p.name === provName || p.name.includes(provName) || provName.includes(p.name) || p.code === provName;
-    });
-    const hasDistricts = Boolean(matched && Array.isArray(matched.districts) && matched.districts.length > 0);
-    setIsTwoTier(!hasDistricts);
-
     fetchCommunesForProvince(provName);
   };
 
@@ -978,7 +968,7 @@ export default function Cart() {
                       gridTemplateColumns: '1fr 1fr',
                       gap: '0.5rem'
                     }}>
-                      <div>
+                      <div style={{ minWidth: 0 }}>
                         <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#64748b', marginBottom: '0.25rem' }}>
                           Quận / Huyện <span style={{ color: '#ef4444' }}>*</span>
                         </label>
@@ -986,11 +976,11 @@ export default function Cart() {
                           value={selectedDistrict}
                           onChange={val => setSelectedDistrict(val)}
                           options={currentProvinceObj.districts || []}
-                          placeholder={!selectedProvince ? "-- Chọn Tỉnh/TP trước --" : "-- Chọn Quận / Huyện --"}
+                          placeholder="-- Chọn Quận / Huyện --"
                           disabled={!selectedProvince}
                         />
                       </div>
-                      <div>
+                      <div style={{ minWidth: 0 }}>
                         <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#64748b', marginBottom: '0.25rem' }}>
                           Phường / Xã <span style={{ color: '#ef4444' }}>*</span>
                         </label>
@@ -998,7 +988,7 @@ export default function Cart() {
                           value={ward}
                           onChange={val => setWard(val)}
                           options={apiCommunes}
-                          placeholder={loadingCommunes ? "-- Đang tải Phường / Xã... --" : (!selectedProvince ? "-- Chọn Tỉnh/TP trước --" : "-- Chọn Phường / Xã --")}
+                          placeholder={loadingCommunes ? "-- Đang tải... --" : "-- Chọn Phường / Xã --"}
                           disabled={loadingCommunes || !selectedProvince}
                           loading={loadingCommunes}
                         />
