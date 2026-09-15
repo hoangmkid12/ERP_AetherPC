@@ -3879,7 +3879,7 @@ export default function Warehouse() {
           </div>
 
           {/* Backorders Table */}
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', overflow: 'hidden' }}>
+          <div className="table-responsive" style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', overflowX: 'auto', WebkitOverflowScrolling: 'touch', maxWidth: '100%' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.83rem' }}>
               <thead>
                 <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569' }}>
@@ -4151,7 +4151,7 @@ export default function Warehouse() {
           </div>
 
           {/* Receipts Table */}
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', overflow: 'hidden' }}>
+          <div className="table-responsive" style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', overflowX: 'auto', WebkitOverflowScrolling: 'touch', maxWidth: '100%' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.83rem' }}>
               <thead>
                 <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569' }}>
@@ -4278,7 +4278,7 @@ export default function Warehouse() {
           </div>
 
           {/* Delivery Orders Table */}
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', overflow: 'hidden' }}>
+          <div className="table-responsive" style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', overflowX: 'auto', WebkitOverflowScrolling: 'touch', maxWidth: '100%' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.83rem' }}>
               <thead>
                 <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569' }}>
@@ -5076,7 +5076,7 @@ export default function Warehouse() {
           </div>
 
           {/* Low stock table */}
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', overflow: 'hidden' }}>
+          <div className="table-responsive" style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', overflowX: 'auto', WebkitOverflowScrolling: 'touch', maxWidth: '100%' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.83rem' }}>
               <thead>
                 <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569' }}>
@@ -5471,7 +5471,7 @@ export default function Warehouse() {
           </div>
 
           {/* Table */}
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', overflow: 'hidden', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
+          <div className="table-responsive" style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', overflowX: 'auto', WebkitOverflowScrolling: 'touch', maxWidth: '100%', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.83rem' }}>
               <thead>
                 <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569' }}>
@@ -5700,7 +5700,7 @@ export default function Warehouse() {
       {/* 7. VIEW: SẢN PHẨM > DANH SÁCH SẢN PHẨM (INVENTORY) */}
       {activeTab === 'inventory' && (
         <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
             <div>
               <h2 style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
                 Sản Phẩm / Danh Sách Sản Phẩm
@@ -5720,7 +5720,8 @@ export default function Warehouse() {
                   padding: '0.55rem 1.25rem',
                   fontSize: '0.85rem',
                   fontWeight: 700,
-                  cursor: 'pointer'
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap'
                 }}
               >
                 + Thêm Sản Phẩm Mới
@@ -5729,7 +5730,7 @@ export default function Warehouse() {
           </div>
 
           {/* Enhanced Filter Toolbar */}
-          <div style={{
+          <div className="admin-filter-toolbar" style={{
             backgroundColor: '#ffffff',
             padding: '0.85rem 1rem',
             borderRadius: '8px',
@@ -5856,7 +5857,7 @@ export default function Warehouse() {
           </div>
 
           {/* Inventory Table */}
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', overflow: 'hidden' }}>
+          <div className="table-responsive" style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', overflowX: 'auto', WebkitOverflowScrolling: 'touch', maxWidth: '100%' }}>
             <table style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse', fontSize: '0.83rem' }}>
               <thead>
                 <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569' }}>
@@ -6017,7 +6018,7 @@ export default function Warehouse() {
           </div>
 
           {/* History Table with Full Click & Detail Viewer */}
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', overflow: 'hidden' }}>
+          <div className="table-responsive" style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', overflowX: 'auto', WebkitOverflowScrolling: 'touch', maxWidth: '100%' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.83rem' }}>
               <thead>
                 <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569' }}>
@@ -6279,7 +6280,7 @@ export default function Warehouse() {
           {loadingCategories ? (
             <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>Đang tải...</div>
           ) : (
-            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', overflow: 'hidden' }}>
+            <div className="table-responsive" style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', overflowX: 'auto', WebkitOverflowScrolling: 'touch', maxWidth: '100%' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.83rem' }}>
                 <thead>
                   <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569' }}>
