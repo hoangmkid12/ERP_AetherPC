@@ -33,9 +33,10 @@ Thị trường kinh doanh linh kiện máy tính và lắp ráp PC theo yêu c�
 ### Các Mục Tiêu Cốt Lõi:
 1. **Tự động hóa luồng Procure-to-Pay (P2P)**: Đánh giá và chọn báo giá Nhà cung cấp tối ưu nhất bằng Thuật toán Ma trận Giá ($P_{\text{save}}$), khởi tạo RFQ giữ nguyên 100% số lượng đề xuất thực tế từ Thủ Kho (ví dụ: 63 cái, 25 cái).
 2. **Kiểm định chất lượng chuyên sâu (QA/QC Station)**: Tiếp nhận lô hàng từ Nhà cung cấp, kiểm tra theo tỷ lệ lấy mẫu ($100\%, 50\%, 10\%$), phân loại linh kiện đạt chuẩn và hàng lỗi nhà sản xuất (DOA, hỏng vỏ hộp, sai SKU), phát hành Biên bản QA/QC điện tử.
-3. **Chuẩn hóa luồng Order-to-Cash (O2C) & Phân công Shipper Theo Khu Vực**: Tích hợp bán lẻ POS tại quầy, quy trình lắp ráp PC 5 bước kỹ thuật, xuất kho bật modal Điều Phối Vận Chuyển — hệ thống tự nhận diện khu vực từ địa chỉ giao hàng và gợi ý shipper nội bộ phù hợp nhất (5 shipper cố định: 4 người phụ trách riêng 4 khu vực TP.HCM + 1 người phụ trách liên tỉnh/toàn quốc), không còn phụ thuộc đối tác vận chuyển ngoài; giao hàng có minh chứng thực tế (Base64 Proof of Delivery).
-4. **Chăm sóc khách hàng Realtime**: Xây dựng server WebSocket hai chiều hai kênh ($< 1\text{ms}$), mẫu câu trả lời nhanh, xóa phiên chat cũ, phân định lịch sử trò chuyện độc lập theo từng tài khoản (`session_user_<slug>`).
-5. **Quản trị Tài chính & Nhân sự**: Tính lương tự động theo quy chuẩn 26 ngày công Việt Nam, khấu trừ $10.5\%$ bảo hiểm bắt buộc ($8\%$ BHXH, $1.5\%$ BHYT, $1\%$ BHTN), cộng thưởng Sales $1\%$ và thưởng lắp ráp $150k$/máy, hạch toán Sổ Nhật ký Tài chính VAS.
+3. **Chuẩn hóa luồng Order-to-Cash (O2C) & Phân công Shipper Theo Khu Vực**: Tích hợp bán lẻ POS tại quầy, quy trình lắp ráp PC 5 bước kỹ thuật, xuất kho bật modal Điều Phối Vận Chuyển — hệ thống tự nhận diện khu vực từ địa chỉ giao hàng và gợi ý shipper nội bộ phù hợp nhất (5 shipper cố định: 4 người phụ trách riêng 4 khu vực TP.HCM + 1 người phụ trách liên tỉnh/toàn quốc), không còn phụ thuộc đối tác vận chuyển ngoài. Đơn được phân công **giữ nguyên trạng thái "Sẵn Sàng Giao" (chờ nhận)** cho đến khi đúng shipper đó tự bấm "Nhận Chuyến" mới chuyển sang "Đang Giao" — không tự động gán ép; giao hàng có minh chứng thực tế (Base64 Proof of Delivery).
+4. **Theo Dõi Vận Đơn Trực Tuyến Thời Gian Thực (Live GPS Tracking)**: Lấy cảm hứng từ Grab/Shopee/Xanh SM — Shipper phát toạ độ GPS thiết bị qua kênh WebSocket riêng (`/ws/tracking`, tách khỏi kênh CSKH), hệ thống tính lộ trình đường bộ thực tế qua OSRM (Open Source Routing Machine, có hạ tầng tự host chuẩn bị sẵn trên Railway, mặc định dùng server demo công khai), hiển thị trên bản đồ Leaflet/OpenStreetMap kiểu Google Maps đơn giản. Khách hàng theo dõi công khai không cần đăng nhập tại `/track/:orderId`; lưu vệt di chuyển đầy đủ (`LocationHistory`) phục vụ tra soát khiếu nại.
+5. **Chăm sóc khách hàng Realtime**: Xây dựng server WebSocket hai chiều hai kênh ($< 1\text{ms}$), mẫu câu trả lời nhanh, xóa phiên chat cũ, phân định lịch sử trò chuyện độc lập theo từng tài khoản (`session_user_<slug>`).
+6. **Quản trị Tài chính & Nhân sự**: Tính lương tự động theo quy chuẩn 26 ngày công Việt Nam, khấu trừ $10.5\%$ bảo hiểm bắt buộc ($8\%$ BHXH, $1.5\%$ BHYT, $1\%$ BHTN), cộng thưởng Sales $1\%$ và thưởng lắp ráp $150k$/máy, hạch toán Sổ Nhật ký Tài chính VAS.
 
 ---
 
@@ -52,31 +53,41 @@ graph TD
 
     subgraph "Application Layer (Tầng Xử Lý Nghiệp Vụ)"
         API[Express.js RESTful API Server]
-        WS[WebSocket Server /ws/cskh]
+        WSC[WebSocket Server /ws/cskh]
+        WST[WebSocket Server /ws/tracking]
         AI[Google Gemini AI Engine]
         SCH[Order & Stock Scheduler]
     end
 
     subgraph "Data Layer (Tầng Dữ Liệu & Tích Hợp)"
-        DB[(PostgreSQL Database / SQLite)]
+        DB[(PostgreSQL Database)]
         ORM[Prisma ORM Client]
         SMTP[Nodemailer SMTP Gmail Service]
         QR[VietQR Payment Gateway]
+        OSRM[OSRM Routing Engine self-host / demo public]
+        NOM[Nominatim Geocoding OpenStreetMap]
     end
 
     UI1 <-->|HTTPS / REST API| API
-    UI1 <-->|WebSocket Realtime| WS
+    UI1 <-->|WebSocket Realtime| WSC
+    UI1 <-->|Theo dõi vận đơn công khai| WST
     UI2 <-->|HTTPS / REST API| API
     UI3 <-->|HTTPS / REST API| API
-    UI3 <-->|WebSocket CSKH Staff| WS
+    UI3 <-->|WebSocket CSKH Staff| WSC
+    UI3 <-->|Shipper phát GPS / Khách theo dõi| WST
     UI4 <-->|HTTPS / REST API| API
 
     API <--> ORM <--> DB
     API <--> AI
     API <--> SMTP
     API <--> QR
+    UI1 <-->|Tính lộ trình đường bộ| OSRM
+    UI1 <-->|Geocode địa chỉ tiếng Việt| NOM
+    WST <--> ORM
     SCH <--> ORM
 ```
+
+> Ghi chú: `/ws/cskh` và `/ws/tracking` là 2 `WebSocketServer` độc lập gắn `noServer:true` trên cùng 1 HTTP server, tự phân luồng theo `pathname` lúc `upgrade` — thư viện `ws` không tự tách đúng 2 path nếu dùng chung tuỳ chọn `{server, path}` cho nhiều instance.
 
 ---
 
@@ -113,8 +124,8 @@ Hệ thống kết nối và quản lý danh mục báo giá chính thức từ 
 | 2 | `admin` | Quản Trị Hệ Thống | Cấu hình hệ thống, quản lý tài khoản người dùng, xem nhật ký truy cập Audit Logs, cấp lại mật khẩu. |
 | 3 | `sales_manager` | Quản Lý Bán Hàng | Quản lý danh mục đơn hàng bán lẻ POS & E-Commerce, duyệt hủy đơn, xem phân tích biểu đồ doanh số. |
 | 4 | `sales` | Nhân Viên Bán Hàng POS | Bán hàng tại quầy, tìm kiếm/quét mã vạch sản phẩm, in hóa đơn thu ngân, nhận thanh toán VietQR. |
-| 5 | `warehouse_manager`| Quản Lý Kho Bãi | Quản lý 1.580 linh kiện PC, kiểm kê tồn kho, thiết lập ngưỡng an toàn (Safe/Warning/Out of stock). |
-| 6 | `warehouse` | Thủ Kho | Tạo Phiếu nhập kho (GRN) từ PO mua hàng, đóng gói & quét mã Serial khi xuất kho (phân công Shipper cuối cùng thuộc quyền `warehouse_manager`). |
+| 5 | `warehouse_manager`| Quản Lý Kho Bãi | Quản lý 1.580 linh kiện PC, kiểm kê tồn kho, thiết lập ngưỡng an toàn (Safe/Warning/Out of stock), phân công Shipper theo khu vực. |
+| 6 | `warehouse` | Thủ Kho | Tạo Phiếu nhập kho (GRN) từ PO mua hàng, đóng gói & quét mã Serial khi xuất kho, **và tự phân công Shipper theo khu vực** (quyền `warehouse_dispatch_shipper` cấp cho cả `warehouse` lẫn `warehouse_manager` — không còn phải chờ Quản Lý Kho phân công thay). |
 | 7 | `purchasing` | Nhân Viên Mua Hàng | Khởi tạo Yêu cầu Báo giá (RFQ) gửi 15 NCC, giữ đúng số lượng đề xuất thực tế, sinh đơn PO. |
 | 8 | `supplier` | Cổng Nhà Cung Cấp | Truy cập Supplier Portal tiếp nhận RFQ từ AetherPC, nhập đơn giá và cam kết ngày giao hàng. |
 | 9 | `qc` / `qa` | Kiểm Định Chất Lượng (Mới)| Kiểm tra chất lượng linh kiện mua về, lập Biên bản QA/QC, phân loại hàng lỗi DOA trước khi nhập kho. |
@@ -122,7 +133,7 @@ Hệ thống kết nối và quản lý danh mục báo giá chính thức từ 
 | 11 | `hr` | Quản Lý Nhân Sự | Quản lý hồ sơ nhân viên, tính bảng lương 26 ngày công (Khấu trừ $10.5\%$ bảo hiểm, thưởng Sales $1\%$, thưởng lắp ráp $150k$). |
 | 12 | `accounting` | Kế Toán Tài Chính | Quản lý Sổ Nhật ký Tài chính VAS (`INCOME`/`EXPENSE`), kiểm tra hóa đơn NCC (Vendor Bill), báo cáo P&L. |
 | 13 | `cskh` | Chăm Sóc Khách Hàng | Quản lý Ticket bảo hành, Live Chat WebSocket thời gian thực ($<1\text{ms}$), mẫu câu phản hồi nhanh, xóa phiên chat cũ. |
-| 14 | `delivery` | Nhân Viên Giao Hàng (5 tài khoản theo khu vực)| Nhận đơn đã được hệ thống tự động phân công theo khu vực địa chỉ giao hàng, chụp ảnh minh chứng thực tế (Base64) khi giao thành công, ghi nhận 6 lý do thất bại. Xem chi tiết 5 tài khoản ở mục 12.1. |
+| 14 | `delivery` | Nhân Viên Giao Hàng (5 tài khoản theo khu vực)| Xem đơn được Kho phân công ở tab "Chờ Nhận", tự bấm "Nhận Chuyến" để nhận và chuyển đơn sang "Đang Giao". Màn hình giao hàng gộp 1 trang duy nhất: bản đồ + lộ trình OSRM, phát GPS thời gian thực, chụp ảnh minh chứng (Base64) ngay trong màn hình, trượt xác nhận giao thành công hoặc báo lỗi nhanh (2 lý do phổ biến, hoặc mở đầy đủ 5 lý do). Xem chi tiết 5 tài khoản ở mục 12.1. |
 
 ---
 
@@ -159,18 +170,19 @@ sequenceDiagram
     autonumber
     actor Khách Hàng / POS
     actor Kỹ Thuật Viên
-    actor Thủ Kho
-    actor Quản Lý Kho
+    actor Thủ Kho / Quản Lý Kho
     actor Shipper (Delivery)
     actor Kế Toán
 
     Khách Hàng / POS->>Hệ Thống ERP: Đặt đơn linh kiện / máy bộ PC (POS / Storefront)
     Hệ Thống ERP->>Kỹ Thuật Viên: Tự động sinh Job Lắp Ráp (đơn máy bộ)
     Kỹ Thuật Viên->>Hệ Thống ERP: Thực hiện Checklist 5 bước -> Bấm "Hoàn Tất Lắp Ráp"
-    Thủ Kho->>Quản Lý Kho: Đóng gói & quét mã Serial -> Bấm "Phân Công Shipper"
-    Quản Lý Kho->>Hệ Thống ERP: Mở Modal Điều Phối Vận Chuyển -> Hệ thống tự nhận diện khu vực từ địa chỉ & gợi ý shipper nội bộ rảnh nhất
-    Quản Lý Kho->>Shipper (Delivery): Xác nhận bàn giao cho shipper phụ trách đúng khu vực (hoặc điều phối chéo thủ công)
-    Shipper (Delivery)->>Hệ Thống ERP: Tiếp nhận đơn, Giao hàng & Tải ảnh minh chứng Base64 -> DELIVERED
+    Thủ Kho / Quản Lý Kho->>Hệ Thống ERP: Đóng gói & quét mã Serial -> READY_TO_SHIP
+    Thủ Kho / Quản Lý Kho->>Hệ Thống ERP: Mở Modal Điều Phối Vận Chuyển -> Hệ thống tự nhận diện khu vực từ địa chỉ & gợi ý shipper nội bộ rảnh nhất
+    Thủ Kho / Quản Lý Kho->>Hệ Thống ERP: Xác nhận phân công -> đơn VẪN ở READY_TO_SHIP, gắn assignedShipperId, hiện ở tab "Chờ Nhận" của đúng shipper đó
+    Shipper (Delivery)->>Hệ Thống ERP: Bấm "Nhận Chuyến" (tab Chờ Nhận) -> đơn chuyển SHIPPED, GPS bắt đầu phát qua /ws/tracking
+    Shipper (Delivery)->>Khách Hàng / POS: Khách theo dõi vị trí Realtime trên bản đồ (không cần đăng nhập, /track/:orderId)
+    Shipper (Delivery)->>Hệ Thống ERP: Giao hàng, chụp ảnh minh chứng Base64, trượt xác nhận -> DELIVERED
     Hệ Thống ERP->>Kế Toán: Tự động ghi nhận Bút toán Thu (INCOME) & gửi Email thông báo tách Phí giao hàng
 ```
 
@@ -195,7 +207,7 @@ sequenceDiagram
    - Quản lý 1.580 linh kiện PC theo 3 ngưỡng rủi ro (`SAFE`, `WARNING`, `OUT_OF_STOCK`).
    - Xem nhật ký biến động xuất nhập kho (Stock Movement Audit Logs) và modal chi tiết giao dịch.
    - Xem lịch sử gửi cảnh báo Yêu cầu Báo giá (RFQ Alert History Modal).
-   - **Đóng Gói & Điều Phối Vận Chuyển Theo Khu Vực**: Thủ Kho đóng gói, đối soát mã Serial rồi bàn giao cho Quản Lý Kho bấm "Phân Công Shipper" — modal Điều Phối Vận Chuyển tự nhận diện khu vực từ địa chỉ giao hàng (8 khu vực: 4 khu TP.HCM + Hà Nội/Miền Bắc + Miền Trung + Miền Tây/Đông Nam Bộ + liên tỉnh) và xếp hạng **shipper nội bộ** phù hợp nhất theo tải hiện tại (rảnh > đang giao > quá tải > đã tắt nhận đơn) — chỉ gồm 5 shipper cố định (mục 12.1), không còn tùy chọn đối tác vận chuyển ngoài (GHTK/GHN...). Backend xác thực `assignedShipperId` phải là nhân viên nội bộ role `DELIVERY` mới cho phép chuyển đơn sang `SHIPPED`. Tự động đóng cả 2 modal và phát thông báo Realtime tới bộ phận Giao Hàng & Bán Hàng.
+   - **Đóng Gói & Điều Phối Vận Chuyển Theo Khu Vực**: Thủ Kho (hoặc Quản Lý Kho) đóng gói, đối soát mã Serial (`READY_TO_SHIP`) rồi tự bấm "Phân Công Shipper" ngay — quyền `warehouse_dispatch_shipper` cấp cho cả 2 vai trò, không còn phải bàn giao chéo. Modal Điều Phối Vận Chuyển tự nhận diện khu vực từ địa chỉ giao hàng (8 khu vực: 4 khu TP.HCM + Hà Nội/Miền Bắc + Miền Trung + Miền Tây/Đông Nam Bộ + liên tỉnh) và xếp hạng **shipper nội bộ** phù hợp nhất theo tải hiện tại (rảnh > đang giao > quá tải > đã tắt nhận đơn) — chỉ gồm 5 shipper cố định (mục 12.1), không còn tùy chọn đối tác vận chuyển ngoài (GHTK/GHN...). Backend xác thực `assignedShipperId` phải là nhân viên nội bộ role `DELIVERY` mới cho phép ghi nhận phân công. **Xác nhận phân công KHÔNG chuyển đơn sang `SHIPPED` ngay** — đơn giữ nguyên `READY_TO_SHIP` kèm `assignedShipperId`, xuất hiện ở tab "Chờ Nhận" của đúng shipper đó; chỉ khi chính shipper được gán tự bấm "Nhận Chuyến" đơn mới chuyển `SHIPPED` (đã có sẵn xác thực chống nhận nhầm đơn của người khác). Đóng modal và phát thông báo Realtime tới đúng shipper được gán.
 
 4. **Mua Hàng & RFQ (`Purchasing.jsx`)**:
    - Ma trận so sánh báo giá đa NCC từ 15 Nhà cung cấp đối tác với thuật toán tiết kiệm $P_{\text{save}}$.
@@ -223,10 +235,11 @@ sequenceDiagram
    - Khớp hóa đơn mua hàng Vendor Bill 3 bên (PO - GRN - Bill).
    - Báo cáo P&L (Profit & Loss).
 
-9. **Giao Hàng & Logistics Mới (`Delivery.jsx`)**:
-   - Tiếp nhận đơn hàng phân công từ Kho (`READY_TO_SHIP`).
-   - Chụp/tải ảnh minh chứng giao hàng thực tế Base64 kèm ghi chú người nhận.
-   - Ghi nhận 6 lý do giao thất bại (Khách không nghe máy, hẹn lại ngày, hủy đơn, không tìm thấy địa chỉ, sai COD, hỏng do vận chuyển).
+9. **Giao Hàng & Logistics Mới (`Delivery/index.jsx`)** — giao diện dạng app di động (Tổng Quan / Chờ Nhận / Đang Giao / Trả Hàng / Lịch Sử), tách biệt hoàn toàn khỏi khung ERP desktop:
+   - **Chờ Nhận**: đơn `READY_TO_SHIP` đã được Kho phân công cho đúng shipper này (lọc theo `assignedShipperId`, không thấy đơn của shipper khác) — bấm "Nhận Chuyến & Xuất Kho" để nhận, chuyển `SHIPPED`.
+   - **Màn hình "Bắt Đầu Giao" gộp 1 trang** (không còn modal toàn màn hình lồng nhau, cố tình dùng dòng chảy tài liệu bình thường thay vì `position:fixed` để tránh lỗi hiển thị của thanh công cụ trình duyệt di động): thông tin khách hàng + icon mở Google Maps chỉ đường giọng nói, bản đồ Leaflet + lộ trình đường bộ OSRM + ETA, GPS tự động phát khi vào màn hình (badge trên bản đồ bấm được để tạm dừng/bật lại), khung chụp ảnh minh chứng (bắt buộc trước khi trượt xác nhận), chọn hình thức thu tiền (Tiền mặt / VietQR động), xác minh người nhận, rồi đến thanh trượt "Giao Thành Công" kèm nút "Từ Chối" nhỏ bên cạnh.
+   - **Báo lỗi nhanh**: bấm "Từ Chối" hiện 2 lý do phổ biến nhất (Khách không nghe máy → tự chuyển "Chờ Gọi Lại 24h"; Khách từ chối nhận → chuyển hoàn kho) để xử lý 1 chạm; còn "Lý do khác..." mở bảng đầy đủ 5 lý do (hẹn ngày khác, không liên lạc được, từ chối nhận, sai địa chỉ, hàng hư hỏng) kèm ghi chú tự do.
+   - **Theo dõi GPS thời gian thực**: phát toạ độ qua `/ws/tracking` mỗi ~8 giây trong lúc `SHIPPED`, lưu vệt đầy đủ vào `LocationHistory`; khách hàng xem trực tiếp trên `MyOrders.jsx`/trang công khai `/track/:orderId` (`TrackOrder.jsx`, không cần đăng nhập).
 
 10. **Chăm Sóc Khách Hàng Realtime (`CustomerService.jsx`)**:
     - Live Chat 1-1 Realtime qua WebSocket Server `ws://localhost:5000/ws/cskh` ($< 1\text{ms}$).
@@ -255,13 +268,14 @@ sequenceDiagram
 4. **Giỏ Hàng & Thanh Toán (`Cart.jsx`)**:
    - Tách biệt chi tiết **Tạm tính linh kiện**, **Phí giao hàng / Vận chuyển (`+30.000 đ` hoặc `MIỄN PHÍ`)**, và **Tổng thanh toán**.
    - Thanh toán VietQR Code tự động.
-5. **Theo Dõi Đơn Hàng (`MyOrders.jsx`)**: Tra cứu hành trình vận đơn Realtime, xem ảnh minh chứng giao hàng thực tế.
-6. **Flash Sale (`FlashSale.jsx`)**: Sản phẩm giảm giá theo khung giờ.
-7. **Member Tier Loyalty (`MemberTier.jsx`)**: Tích điểm thưởng & đặc quyền hạng thành viên.
-8. **Promotions (`Promotions.jsx`)**: Mã giảm giá & voucher.
-9. **News & NewsDetail (`News.jsx`)**: Tin tức phần cứng & hướng dẫn công nghệ.
-10. **About & Careers (`About.jsx`, `Careers.jsx`)**: Giới thiệu công ty & Tuyển dụng.
-11. **Trợ Lý Chatbot AI Antigravity**: Google Gemini AI SDK tư vấn cấu hình PC 24/7.
+5. **Theo Dõi Đơn Hàng (`MyOrders.jsx`)**: Tra cứu hành trình vận đơn, xem bản đồ GPS Realtime khi đơn `SHIPPED` (Leaflet + vị trí Shipper cập nhật qua `/ws/tracking`), xem ảnh minh chứng giao hàng thực tế.
+6. **Theo Dõi Vận Đơn Công Khai (`TrackOrder.jsx`, route `/track/:orderId`)**: Trang xem vị trí GPS Shipper Realtime **không cần đăng nhập** — chia sẻ link trực tiếp cho người nhận hộ, dùng chung engine bản đồ/tracking với `MyOrders.jsx`.
+7. **Flash Sale (`FlashSale.jsx`)**: Sản phẩm giảm giá theo khung giờ.
+8. **Member Tier Loyalty (`MemberTier.jsx`)**: Tích điểm thưởng & đặc quyền hạng thành viên.
+9. **Promotions (`Promotions.jsx`)**: Mã giảm giá & voucher.
+10. **News & NewsDetail (`News.jsx`)**: Tin tức phần cứng & hướng dẫn công nghệ.
+11. **About & Careers (`About.jsx`, `Careers.jsx`)**: Giới thiệu công ty & Tuyển dụng.
+12. **Trợ Lý Chatbot AI Antigravity**: Google Gemini AI SDK tư vấn cấu hình PC 24/7.
 
 ---
 
@@ -313,6 +327,18 @@ $$P_{\text{PSU khuyến nghị}} \ge \frac{P_{\text{tổng TDP}}}{0.80}$$
 | `UPDATE_SESSIONS` | Server $\rightarrow$ All Clients | `{ sessions: Array, newMsg }` | Phát thông điệp cập nhật tin nhắn tức thì ($< 1\text{ms}$) |
 | `DELETE_SESSION` | Staff $\rightarrow$ Server | `{ sessionId }` | Xóa hoàn toàn 1 phiên chat cũ khỏi Server |
 
+### 7.3. Giao Thức WebSocket Theo Dõi Vận Đơn (`ws://localhost:5000/ws/tracking`)
+
+Kênh riêng biệt hoàn toàn khỏi `/ws/cskh` (2 `WebSocketServer` độc lập, tự phân luồng theo `pathname` lúc `upgrade`) — phục vụ phát/nhận vị trí GPS Shipper thời gian thực:
+
+| Tên Sự Kiện (Type) | Chiều Gửi | Payload Cấu Trúc | Mô Tả Tác Vụ |
+| :--- | :---: | :--- | :--- |
+| `SHIPPER_JOIN_DELIVERY` | Shipper $\rightarrow$ Server | `{ orderId }` | Shipper vào màn hình giao hàng, xác thực chỉ đúng shipper được `assignedShipperId` (hoặc CEO/ADMIN) mới được phát |
+| `SHIPPER_UPDATE_LOCATION` | Shipper $\rightarrow$ Server | `{ orderId, lat, lng, speed, heading }` | Gửi toạ độ mới (client tự throttle ~8 giây/lần), server lưu vào `LocationHistory` & cập nhật `Order.lastLat/lastLng` |
+| `SHIPPER_LEAVE_DELIVERY` | Shipper $\rightarrow$ Server | `{}` | Ngừng phát vị trí (tạm dừng / đã giao xong) |
+| `CUSTOMER_TRACK_ORDER` | Customer/Guest $\rightarrow$ Server | `{ orderId }` | Đăng ký theo dõi 1 đơn hàng theo mã (không cần đăng nhập) |
+| `DELIVERY_LOCATION_UPDATE` | Server $\rightarrow$ Client theo dõi | `{ orderId, lat, lng, speed, heading, shipperName, updatedAt }` | Phát toạ độ mới nhất tới mọi client đang theo dõi đúng đơn hàng đó |
+
 ---
 
 ## 8. Bộ Kịch Bản Kiểm Thử Chi Tiết (Comprehensive Test Suite)
@@ -326,8 +352,9 @@ $$P_{\text{PSU khuyến nghị}} \ge \frac{P_{\text{tổng TDP}}}{0.80}$$
 
 ### 8.3. Quản Lý Kho (`TC-WH`)
 - **`TC-WH-01`**: Lọc nhật ký biến động kho IN/OUT theo khoảng thời gian.
-- **`TC-WH-02`**: Đóng gói đơn hàng, bấm "Phân Công Shipper" (role `warehouse_manager`) -> Modal tự nhận diện khu vực từ địa chỉ và gợi ý đúng shipper nội bộ phụ trách khu vực đó (ưu tiên người rảnh nhất) -> Xác nhận bàn giao -> Tự động đóng cả 2 modal, đơn chuyển `SHIPPED` và phát thông báo Realtime.
+- **`TC-WH-02`**: Đóng gói đơn hàng, bấm "Phân Công Shipper" (role `warehouse` hoặc `warehouse_manager`) -> Modal tự nhận diện khu vực từ địa chỉ và gợi ý đúng shipper nội bộ phụ trách khu vực đó (ưu tiên người rảnh nhất) -> Bấm "Xác Nhận" -> Đơn **giữ nguyên `READY_TO_SHIP`** kèm `assignedShipperId`, KHÔNG chuyển `SHIPPED` ngay; bảng đơn hàng của Kho hiện đúng badge "Chờ Shipper Nhận" và tên shipper đã gán.
 - **`TC-WH-03`**: Gọi `PATCH /orders/:id/status` với `assignedShipperId` không phải nhân viên role `DELIVERY` (hoặc id không tồn tại) -> Bị từ chối `400`, đơn giữ nguyên trạng thái cũ.
+- **`TC-WH-04`**: Đăng nhập đúng tài khoản shipper vừa được gán ở `TC-WH-02` -> đơn hiện ở tab "Chờ Nhận" (không hiện cho shipper khác) -> Bấm "Nhận Chuyến" -> đơn chuyển `SHIPPED`, chuyển sang tab "Đang Giao", GPS tự phát.
 
 ### 8.4. Mua Hàng & RFQ (`TC-PUR`)
 - **`TC-PUR-01`**: Tạo RFQ gửi 15 NCC cho sản phẩm cảnh báo kho -> Tự động giữ nguyên số lượng đề xuất thực tế (ví dụ: 63 cái, 25 cái).
@@ -337,7 +364,9 @@ $$P_{\text{PSU khuyến nghị}} \ge \frac{P_{\text{tổng TDP}}}{0.80}$$
 - **`TC-QC-01`**: Tiếp nhận lô hàng mua về trạm QC -> Chọn tỷ lệ kiểm tra ($100\%, 50\%, 10\%$) -> Phát hành biên bản QA/QC cho phép nhập kho.
 
 ### 8.6. Phân Công Shipper & Giao Hàng Mới (`TC-DEL`)
-- **`TC-DEL-01`**: Tiếp nhận đơn xuất kho đã phân công Shipper -> Chụp/tải ảnh minh chứng giao hàng Base64 -> Cập nhật trạng thái `DELIVERED`.
+- **`TC-DEL-01`**: Tiếp nhận đơn xuất kho đã phân công Shipper (tab Chờ Nhận -> Nhận Chuyến) -> Vào màn hình "Bắt Đầu Giao", chụp ảnh minh chứng -> trượt xác nhận -> Cập nhật trạng thái `DELIVERED`.
+- **`TC-DEL-02`**: Ở màn hình "Bắt Đầu Giao", bấm "Từ Chối" -> chọn nhanh "Khách Không Nghe Máy" -> đơn chuyển `SHIPPING_FAILED` kèm `isAwaitingCallback=true`, hiện đúng badge "Chờ Gọi Lại (24H)".
+- **`TC-DEL-03`**: Trong lúc đơn `SHIPPED`, mở `MyOrders.jsx` (khách đã đăng nhập) hoặc `/track/:orderId` (khách vãng lai, không đăng nhập) -> thấy vị trí Shipper cập nhật Realtime trên bản đồ qua `/ws/tracking`.
 
 ### 8.7. Chăm Sóc Khách Hàng WebSocket (`TC-CSKH`)
 - **`TC-CSKH-01`**: Chat 1-1 giữa Khách hàng và Nhân viên CSKH qua WebSocket -> Tin nhắn nhận tức thì $< 1\text{ms}$.
@@ -349,15 +378,16 @@ $$P_{\text{PSU khuyến nghị}} \ge \frac{P_{\text{tổng TDP}}}{0.80}$$
 
 ### Frontend
 - **Core Framework**: React.js (v18) xây dựng trên nền Vite bundling tool, route-based code-splitting (`React.lazy` + `Suspense`).
-- **Styling**: Vanilla CSS Custom Variables, thiết kế Glassmorphic UI cao cấp, font chữ **Inter**.
-- **Realtime Sync**: WebSocket Client & Inter-tab BroadcastChannel API.
+- **Styling**: Vanilla CSS Custom Variables, thiết kế Glassmorphic UI cao cấp, font chữ **Inter**; các màn hình di động (khung app Shipper, modal toàn màn hình) tránh phụ thuộc đơn vị viewport CSS (`100vh`/`100dvh`) không ổn định trên Safari iOS — dùng `window.visualViewport` qua hook dùng chung (`useSafeViewportHeight`) hoặc đơn giản là dòng chảy tài liệu bình thường thay cho `position:fixed`.
+- **Bản Đồ & Định Vị**: Leaflet.js (bản đồ kiểu Google Maps tối giản, marker Shipper/Kho/Điểm giao tuỳ chỉnh), OSRM (Open Source Routing Machine) tính lộ trình đường bộ thực tế (mặc định gọi server demo công khai `router.project-osrm.org`, có sẵn hạ tầng tự host qua Docker trên Railway ở thư mục `osrm/`), Nominatim (OpenStreetMap) cho reverse/forward geocoding địa chỉ tiếng Việt kèm bảng toạ độ dự phòng cho các đơn vị hành chính sau sáp nhập.
+- **Realtime Sync**: WebSocket Client (2 kênh độc lập `/ws/cskh` và `/ws/tracking`) & Inter-tab BroadcastChannel API.
 - **Icons & UI**: Lucide React Icons, Chart.js / React-Chartjs-2.
 - **State Management**: `ERPContext` (lớp state nguyên bản) song song với bộ Zustand store (`stores/`: `inventoryStore`, `salesStore`, `hrStore`, `financeStore`, `utilityStore`) đang trong quá trình tái cấu trúc dần; `CartContext`, `AuthContext` cho giỏ hàng & phiên đăng nhập.
 
 ### Backend
 - **Framework**: Node.js & Express.js RESTful API, bảo vệ bằng `helmet` + rate limiting riêng cho các endpoint xác thực.
-- **Realtime Engine**: WebSocket Server (`ws` library) khởi chạy trên cùng HTTP server tại `/ws/cskh`.
-- **Database & ORM**: PostgreSQL v15+ & Prisma ORM.
+- **Realtime Engine**: WebSocket Server (`ws` library, dùng `{ noServer: true }` + tự phân luồng theo `pathname` lúc `upgrade` — không dùng tuỳ chọn `{server, path}` cho nhiều instance vì `ws` không tự tách đúng path) khởi chạy trên cùng HTTP server tại 2 endpoint độc lập: `/ws/cskh` (chat CSKH) và `/ws/tracking` (GPS giao hàng Realtime).
+- **Database & ORM**: PostgreSQL v15+ (Railway managed) & Prisma ORM; `LocationHistory` lưu vệt di chuyển GPS đầy đủ của Shipper theo từng đơn.
 - **Hàng Đợi Xử Lý Đơn (Order Queue)**: Redis + `ioredis`/BullMQ-style worker (`orderWorker.js`) chạy như service độc lập, tách khỏi API server chính.
 - **Security & Auth**: JSON Web Token (JWT, cookie HTTP-Only) & bcryptjs password hashing.
 - **Audit Trail & Backup Thật**: Bảng `audit_logs` ghi nhận các thao tác nhạy cảm (đăng nhập thất bại, đổi mật khẩu, CRUD nhân viên, duyệt PO/lương, đổi RBAC); tính năng Sao Lưu/Khôi Phục dùng `pg_dump`/`pg_restore` thật (`/admin/system`), có chế độ bảo trì (maintenance mode) khóa ghi trong lúc restore.
@@ -388,16 +418,20 @@ ERP_AetherPC/
 │   └── Dockerfile            # Cấu hình Docker build Backend
 ├── frontend/                 # Client Single Page Application (React + Vite + Lucide)
 │   ├── src/
-│   │   ├── components/       # UI Components tái sử dụng (Layout, Modals, Chatbot AI/CSKH)
+│   │   ├── components/       # UI Components tái sử dụng (Layout, Modals, Chatbot AI/CSKH, DeliveryMap)
 │   │   ├── config/           # Cấu hình danh sách 15 Nhà Cung Cấp đối tác
 │   │   ├── context/          # React Context State (AuthContext, CartContext, ERPContext)
+│   │   ├── hooks/            # Custom hooks dùng chung (useSafeViewportHeight, usePermission...)
 │   │   ├── pages/            # Các trang phân hệ ERP & Storefront
 │   │   │   ├── Admin/        # 12 Phân hệ Quản trị ERP (SalesPOS, Purchasing, Warehouse, QualityControl...)
-│   │   │   ├── Storefront/   # 12 Trang cửa hàng Online & AI PC Builder
+│   │   │   │   └── Delivery/ # App di động riêng cho Shipper (Chờ Nhận/Đang Giao/Trả Hàng/Lịch Sử)
+│   │   │   ├── Storefront/   # 12 Trang cửa hàng Online, AI PC Builder & TrackOrder công khai
 │   │   │   └── SupplierPortal/ # Cổng tương tác báo giá cho 15 Nhà Cung Cấp
+│   │   ├── utils/             # Tiện ích dùng chung (routingService — OSRM/Nominatim, mapIcons, deliveryRegions...)
 │   │   └── services/         # Axios/Fetch API Client & helper utilities
 │   ├── .env.example          # Tệp cấu hình môi trường mẫu cho Frontend
 │   └── Dockerfile            # Cấu hình Docker build Frontend
+├── osrm/                     # Hạ tầng tự host OSRM Routing Engine trên Railway (Dockerfile, script build dữ liệu bản đồ)
 ├── docs/                     # Tài liệu Khóa luận Tốt nghiệp IUH (.docx) & Sơ đồ UML/BPMN
 ├── scraper/                  # Python Scraper cào & làm sạch 1.580 linh kiện PC thực tế
 ├── scripts/                  # Scripts hỗ trợ xuất báo cáo luận văn IUH
