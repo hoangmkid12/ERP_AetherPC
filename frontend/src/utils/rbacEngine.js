@@ -43,7 +43,7 @@ export const OPERATIONAL_PERMISSIONS = [
 
   // 2. Phân Hệ Kho Vận & Tồn Kho
   { id: 'warehouse_pack_scan', moduleId: 'warehouse', name: 'Đóng gói & quét mã vạch niêm phong (Thủ kho)', desc: 'Thao tác vật lý: lấy linh kiện, kiểm tra seal và quét mã đóng gói kiện hàng' },
-  { id: 'warehouse_dispatch_shipper', moduleId: 'warehouse', name: 'Phân công Shipper & đơn vị giao vận (Quản lý kho)', desc: 'Điều phối tài xế nội bộ theo tuyến hoặc bàn giao cho đối tác 3PL' },
+  { id: 'warehouse_dispatch_shipper', moduleId: 'warehouse', name: 'Phân công Shipper nội bộ theo khu vực', desc: 'Điều phối shipper nội bộ phù hợp theo khu vực địa chỉ giao hàng khi xuất kho' },
   { id: 'warehouse_stock_intake', moduleId: 'warehouse', name: 'Xếp hàng lên kệ kho sau khi QA nghiệm thu Đạt', desc: 'Bốc dỡ linh kiện từ dock nhập và quét mã vị trí xếp vào ô kệ cố định' },
   { id: 'warehouse_create_pr', moduleId: 'warehouse', name: 'Lập đề xuất Phiếu Yêu Cầu Mua Hàng (PR)', desc: 'Tạo phiếu PR khi phát hiện số lượng tồn kho chạm ngưỡng cảnh báo an toàn (ROP)' },
   { id: 'warehouse_approve_pr', moduleId: 'warehouse', name: 'Ký duyệt Phiếu Yêu Cầu Mua Hàng (PR) của kho', desc: 'Quản lý kho kiểm tra và ký duyệt trước khi chuyển tự động sang phòng Mua hàng' },
@@ -173,7 +173,12 @@ export const DEFAULT_OPERATIONAL_MATRIX = {
     qc_inspect_restock: true,
     // order.routes.js PATCH /:id/status (dùng cho "Xác Nhận Xuất Kho" & bàn
     // giao shipper) cấp quyền thật cho WAREHOUSE — giữ quyền xem trang Giao Hàng.
-    delivery_view_dashboard: true
+    delivery_view_dashboard: true,
+    // Trước đây chỉ WAREHOUSE_MANAGER mới bấm được nút "Phân Công Shipper"
+    // (Thủ Kho chỉ đóng gói rồi phải chờ Quản Lý Kho) — nay cho Thủ Kho tự
+    // phân công luôn, backend route vốn đã cho phép role WAREHOUSE gọi
+    // PATCH /:id/status với assignedShipperId từ trước.
+    warehouse_dispatch_shipper: true
   },
   PURCHASING: {
     purchasing_create_rfq: true,

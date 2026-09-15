@@ -7,7 +7,7 @@ import { useNotification, notify, confirm } from '../../context/NotificationCont
 import { DELIVERY_REGIONS, detectDeliveryRegion } from '../../utils/deliveryRegions';
 import { QC_STATUS, getStatusInfo } from '../../utils/statusLabels';
 import { api } from '../../services/api';
-import { Package, CheckCircle, X, AlertCircle, Truck, RotateCcw, Sparkles, RefreshCw, Box, Image, Plus, Eye, Printer } from 'lucide-react';
+import { Package, CheckCircle, X, AlertCircle, Truck, RotateCcw, Sparkles, RefreshCw, Box, Image, Plus, Eye, Printer, MapPin } from 'lucide-react';
 import ActorNotificationBar from '../../components/ActorNotificationBar';
 import PackAndScanModal from '../../components/PackAndScanModal';
 import OrderDetailModal from '../../components/OrderDetailModal';
@@ -959,293 +959,532 @@ function RegionalShipperModal({
     : `NB-LT-${Date.now().toString().slice(-6)}`;
 
   return (
-    <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.65)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 20000, padding: '1rem' }}>
-      <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', maxWidth: '640px', width: '100%', border: '1px solid #cbd5e1', overflow: 'hidden', boxShadow: '0 20px 40px rgba(0,0,0,0.2)', maxHeight: '92vh', display: 'flex', flexDirection: 'column' }}>
+    <div className="d-modal-overlay">
+      <style>{`
+        .d-modal-overlay {
+          position: fixed;
+          inset: 0;
+          background-color: rgba(15, 23, 42, 0.7);
+          backdrop-filter: blur(4px);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 20000;
+          padding: 1rem;
+        }
+        .d-modal-container {
+          background-color: #ffffff;
+          border-radius: 12px;
+          max-width: 640px;
+          width: 100%;
+          border: 1px solid #cbd5e1;
+          overflow: hidden;
+          box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+          max-height: 90vh;
+          display: flex;
+          flex-direction: column;
+        }
+        .d-modal-header {
+          padding: 0.9rem 1.25rem;
+          background-color: #f8fafc;
+          border-bottom: 1px solid #e2e8f0;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 0.75rem;
+          flex-shrink: 0;
+        }
+        .d-modal-body {
+          padding: 1rem 1.25rem;
+          overflow-y: auto;
+          flex: 1;
+          min-height: 0;
+          display: flex;
+          flex-direction: column;
+          gap: 0.85rem;
+        }
+        .d-stats-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 0.5rem;
+        }
+        .d-footer {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 0.75rem;
+          border-top: 1px solid #e2e8f0;
+          padding: 0.8rem 1.25rem;
+          background-color: #f8fafc;
+          flex-shrink: 0;
+        }
+        .d-footer-actions {
+          display: flex;
+          align-items: center;
+          gap: 0.65rem;
+        }
+        @media (max-width: 640px) {
+          .d-modal-overlay {
+            padding: 0.4rem !important;
+          }
+          .d-modal-container {
+            max-height: 95vh !important;
+            border-radius: 10px !important;
+          }
+          .d-modal-header {
+            padding: 0.75rem 0.9rem !important;
+          }
+          .d-modal-body {
+            padding: 0.8rem 0.9rem !important;
+            gap: 0.75rem !important;
+          }
+          .d-stats-grid {
+            grid-template-columns: 1fr 1fr !important;
+          }
+          .d-stat-full {
+            grid-column: span 2 !important;
+          }
+          .d-footer {
+            flex-direction: column-reverse !important;
+            padding: 0.75rem 0.9rem !important;
+            gap: 0.55rem !important;
+          }
+          .d-footer-hint {
+            text-align: center !important;
+            width: 100% !important;
+            justify-content: center !important;
+            font-size: 0.73rem !important;
+          }
+          .d-footer-actions {
+            width: 100% !important;
+            display: flex !important;
+            gap: 0.5rem !important;
+          }
+          .d-btn-cancel {
+            flex: 1 !important;
+            text-align: center !important;
+            justify-content: center !important;
+            padding: 0.6rem 0.5rem !important;
+          }
+          .d-btn-submit {
+            flex: 2 !important;
+            text-align: center !important;
+            justify-content: center !important;
+            padding: 0.6rem 0.5rem !important;
+          }
+        }
+      `}</style>
+
+      <div className="d-modal-container">
         {/* Header */}
-        <div style={{ padding: '1.25rem 1.5rem', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <h3 style={{ margin: 0, fontSize: '1.15rem', color: '#0f172a', fontWeight: 800 }}>
-                Điều Phối Vận Chuyển - Đơn #{orderToAssign.orderId || orderToAssign.id}
-              </h3>
-              <span style={{ fontSize: '0.72rem', padding: '2px 8px', borderRadius: '12px', fontWeight: 800, backgroundColor: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe' }}>
-                {currentRegionObj.shortName}
-              </span>
+        <div className="d-modal-header">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', minWidth: 0 }}>
+            <div style={{ width: '36px', height: '36px', borderRadius: '8px', backgroundColor: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2563eb', flexShrink: 0 }}>
+              <Truck size={20} />
             </div>
-            <span style={{ fontSize: '0.78rem', color: '#64748b', display: 'block', marginTop: '0.2rem' }}>
-              Khách hàng: <strong style={{ color: '#2563eb' }}>{orderToAssign.customerName}</strong> ({orderToAssign.phone || '090xxxxxxx'})
-            </span>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
+                <h3 style={{ margin: 0, fontSize: '1.02rem', color: '#0f172a', fontWeight: 800 }}>
+                  Điều Phối Vận Chuyển
+                </h3>
+                <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#2563eb', backgroundColor: '#eff6ff', padding: '2px 7px', borderRadius: '5px', border: '1px solid #bfdbfe' }}>
+                  #{orderToAssign.orderId || orderToAssign.id}
+                </span>
+              </div>
+              <div style={{ fontSize: '0.76rem', color: '#64748b', marginTop: '0.15rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                Khách hàng: <strong style={{ color: '#0f172a' }}>{orderToAssign.customerName}</strong> ({orderToAssign.phone || '090xxxxxxx'})
+              </div>
+            </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            style={{ background: 'none', border: '1px solid #cbd5e1', borderRadius: '4px', padding: '0.25rem 0.6rem', cursor: 'pointer', color: '#475569', fontWeight: 600 }}
+            style={{
+              flexShrink: 0,
+              background: '#ffffff',
+              border: '1px solid #cbd5e1',
+              borderRadius: '6px',
+              padding: '0.35rem 0.65rem',
+              cursor: 'pointer',
+              color: '#475569',
+              fontWeight: 600,
+              fontSize: '0.78rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.25rem'
+            }}
           >
-            Đóng
+            <X size={14} /> Đóng
           </button>
         </div>
 
-        <form onSubmit={(e) => {
-          e.preventDefault();
-          const formData = new FormData(e.target);
-          const shipperVal = formData.get('shipperName') || '';
-          const trackingCode = formData.get('trackingCode') || autoTrackingCode;
-          const note = formData.get('note') || '';
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const shipperVal = formData.get('shipperName') || '';
+            const trackingCode = formData.get('trackingCode') || autoTrackingCode;
+            const note = formData.get('note') || '';
 
-          // Mọi lựa chọn trong <select> giờ luôn là 1 shipper nội bộ thật (đã
-          // bỏ optgroup đối tác vận chuyển ngoài) — nếu vì lý do gì đó không
-          // khớp được nhân viên nào thì chặn submit thay vì âm thầm gán
-          // assignedShipperId = null như hành vi cũ khi chọn 3PL.
-          const foundEmp = allShippers.find(s =>
-            (s.fullname && shipperVal.includes(s.fullname)) ||
-            (s.name && shipperVal.includes(s.name)) ||
-            (s.username && shipperVal.includes(s.username))
-          );
-          if (!foundEmp) {
-            addNotification && addNotification('Vui lòng chọn 1 shipper nội bộ hợp lệ trước khi bàn giao.', 'error');
-            return;
-          }
-          const matchedShipperId = foundEmp.id || foundEmp.username;
-          const shipperDisplayName = `Shipper Nội Bộ - ${foundEmp.fullname || foundEmp.name} (${foundEmp.phone || '0912.xxx.xxx'})`;
-
-          const ordId = String(orderToAssign.orderId || orderToAssign.id || '');
-
-          if (typeof updateOrderStatus === 'function') {
-            updateOrderStatus(ordId, 'SHIPPED', `Đã bàn giao cho ${shipperDisplayName} [Mã VĐ: ${trackingCode}] - Khu vực: ${currentRegionObj.shortName}`, {
-              assignedShipper: shipperDisplayName,
-              assignedShipperId: matchedShipperId,
-              assignedShipperUsername: foundEmp?.username || (typeof matchedShipperId === 'string' ? matchedShipperId : null),
-              assignedShipperName: foundEmp?.fullname || foundEmp?.name || shipperDisplayName,
-              deliveryRegion: selectedRegion,
-              trackingCode: trackingCode,
-              shippingNote: note,
-              shippedAt: new Date().toISOString()
-            });
-          } else {
-            const updatedOrders = orders.map(o => {
-              if ((o.orderId && o.orderId === ordId) || o.id === ordId || String(o.id) === String(orderToAssign.id)) {
-                return {
-                  ...o,
-                  status: 'SHIPPED',
-                  deliveryStatus: 'SHIPPED',
-                  assignedShipper: shipperDisplayName,
-                  assignedShipperId: matchedShipperId,
-                  assignedShipperUsername: foundEmp?.username || (typeof matchedShipperId === 'string' ? matchedShipperId : null),
-                  assignedShipperName: foundEmp?.fullname || foundEmp?.name || shipperDisplayName,
-                  deliveryRegion: selectedRegion,
-                  trackingCode: trackingCode,
-                  shippingNote: note,
-                  shippedAt: new Date().toISOString(),
-                  lastNote: `Đã bàn giao cho ${shipperDisplayName}. Mã tra cứu: ${trackingCode}`
-                };
-              }
-              return o;
-            });
-            if (typeof setOrders === 'function') {
-              setOrders(updatedOrders);
+            const foundEmp = allShippers.find(s =>
+              (s.fullname && shipperVal.includes(s.fullname)) ||
+              (s.name && shipperVal.includes(s.name)) ||
+              (s.username && shipperVal.includes(s.username))
+            );
+            if (!foundEmp) {
+              addNotification && addNotification('Vui lòng chọn 1 shipper nội bộ hợp lệ trước khi bàn giao.', 'error');
+              return;
             }
-            try { localStorage.setItem('erp_orders', JSON.stringify(updatedOrders)); } catch (_) {}
-          }
+            const matchedShipperId = foundEmp.id || foundEmp.username;
+            const shipperDisplayName = `Shipper Nội Bộ - ${foundEmp.fullname || foundEmp.name} (${foundEmp.phone || '0912.xxx.xxx'})`;
 
-          if (sendSystemNotification) {
-            sendSystemNotification({
-              targetRoles: ['DELIVERY', 'SALES', 'CUSTOMER'],
-              title: `Đã Bàn Giao Vận Chuyển Đơn #${ordId}`,
-              message: `Đơn hàng đã bàn giao cho ${shipperDisplayName} (${currentRegionObj.shortName} - Mã VĐ: ${trackingCode}) xuất phát đi giao.`,
-              type: 'INFO'
-            });
-          }
+            const ordId = String(orderToAssign.orderId || orderToAssign.id || '');
 
-          if (typeof addNotification === 'function') {
-            addNotification(`Điều phối vận chuyển thành công! Đơn hàng #${ordId} [${currentRegionObj.shortName}] đã chuyển giao cho ${shipperDisplayName}.`, 'success');
-          }
+            if (typeof updateOrderStatus === 'function') {
+              updateOrderStatus(ordId, 'SHIPPED', `Đã bàn giao cho ${shipperDisplayName} [Mã VĐ: ${trackingCode}] - Khu vực: ${currentRegionObj.shortName}`, {
+                assignedShipper: shipperDisplayName,
+                assignedShipperId: matchedShipperId,
+                assignedShipperUsername: foundEmp?.username || (typeof matchedShipperId === 'string' ? matchedShipperId : null),
+                assignedShipperName: foundEmp?.fullname || foundEmp?.name || shipperDisplayName,
+                deliveryRegion: selectedRegion,
+                trackingCode: trackingCode,
+                shippingNote: note,
+                shippedAt: new Date().toISOString()
+              });
+            } else {
+              const updatedOrders = orders.map(o => {
+                if ((o.orderId && o.orderId === ordId) || o.id === ordId || String(o.id) === String(orderToAssign.id)) {
+                  return {
+                    ...o,
+                    status: 'SHIPPED',
+                    deliveryStatus: 'SHIPPED',
+                    assignedShipper: shipperDisplayName,
+                    assignedShipperId: matchedShipperId,
+                    assignedShipperUsername: foundEmp?.username || (typeof matchedShipperId === 'string' ? matchedShipperId : null),
+                    assignedShipperName: foundEmp?.fullname || foundEmp?.name || shipperDisplayName,
+                    deliveryRegion: selectedRegion,
+                    trackingCode: trackingCode,
+                    shippingNote: note,
+                    shippedAt: new Date().toISOString(),
+                    lastNote: `Đã bàn giao cho ${shipperDisplayName}. Mã tra cứu: ${trackingCode}`
+                  };
+                }
+                return o;
+              });
+              if (typeof setOrders === 'function') {
+                setOrders(updatedOrders);
+              }
+              try { localStorage.setItem('erp_orders', JSON.stringify(updatedOrders)); } catch (_) {}
+            }
 
-          onClose();
-        }} style={{ padding: '1.5rem', overflowY: 'auto' }}>
-          
-          {/* Detected Region Indicator & Selector */}
-          <div style={{
-            padding: '0.85rem 1rem',
-            borderRadius: '8px',
-            marginBottom: '1.25rem',
-            backgroundColor: '#eff6ff',
-            border: '1.5px solid #bfdbfe'
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
-              <div>
-                <div style={{ fontWeight: 800, fontSize: '0.85rem', color: '#1e40af', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                  <span>Khu Vực Giao Hàng Phân Bổ:</span>
-                </div>
-                <div style={{ fontSize: '0.78rem', color: '#3b82f6', marginTop: '0.15rem' }}>
-                  Hệ thống tự động nhận diện từ địa chỉ nhận hàng của khách.
-                </div>
-              </div>
-              <select
-                value={selectedRegion}
-                onChange={(e) => setSelectedRegion(e.target.value)}
-                style={{ padding: '0.4rem 0.65rem', borderRadius: '6px', border: '1px solid #93c5fd', backgroundColor: '#ffffff', fontSize: '0.78rem', fontWeight: 700, color: '#1e40af' }}
-              >
-                {DELIVERY_REGIONS.map(r => (
-                  <option key={r.code} value={r.code}>{r.name}</option>
-                ))}
-              </select>
-            </div>
-          </div>
+            if (sendSystemNotification) {
+              sendSystemNotification({
+                targetRoles: ['DELIVERY', 'SALES', 'CUSTOMER'],
+                title: `Đã Bàn Giao Vận Chuyển Đơn #${ordId}`,
+                message: `Đơn hàng đã bàn giao cho ${shipperDisplayName} (${currentRegionObj.shortName} - Mã VĐ: ${trackingCode}) xuất phát đi giao.`,
+                type: 'INFO'
+              });
+            }
 
-          {/* Gợi ý cân bằng tải thông minh */}
-          {bestShipper && (
+            if (typeof addNotification === 'function') {
+              addNotification(`Điều phối vận chuyển thành công! Đơn hàng #${ordId} [${currentRegionObj.shortName}] đã chuyển giao cho ${shipperDisplayName}.`, 'success');
+            }
+
+            onClose();
+          }}
+          style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}
+        >
+          {/* Scrollable Content Body */}
+          <div className="d-modal-body">
+            
+            {/* Unified Order & Route Overview Card */}
             <div style={{
-              padding: '0.65rem 0.9rem',
-              backgroundColor: bestShipperWorkload?.isFree ? '#f0fdf4' : '#f8fafc',
-              border: `1.5px solid ${bestShipperWorkload?.isFree ? '#86efac' : '#cbd5e1'}`,
-              borderRadius: '8px',
-              marginBottom: '1.25rem',
+              backgroundColor: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              borderRadius: '10px',
+              padding: '0.85rem 1rem',
               display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              flexWrap: 'wrap',
-              gap: '0.4rem'
+              flexDirection: 'column',
+              gap: '0.65rem'
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.78rem' }}>
-                <div>
-                  <span style={{ color: '#64748b' }}>Đề xuất cân bằng tải khu vực:</span>{' '}
-                  <strong style={{ color: '#0f172a' }}>{bestShipper.fullname}</strong>{' '}
-                  <span style={{ color: bestShipperWorkload?.badgeColor, fontWeight: 700 }}>
-                    ({bestShipperWorkload?.statusText})
+              {/* Route & Delivery Region Selector */}
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem' }}>
+                  <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#1e40af', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                    <MapPin size={13} color="#2563eb" /> Tuyến Vận Chuyển Phân Bổ:
+                  </label>
+                  <span style={{ fontSize: '0.7rem', color: '#64748b', fontStyle: 'italic' }}>
+                    (Tự động nhận diện từ địa chỉ)
                   </span>
                 </div>
-              </div>
-              <span style={{
-                fontSize: '0.7rem',
-                fontWeight: 800,
-                backgroundColor: bestShipperWorkload?.badgeBg,
-                color: bestShipperWorkload?.badgeColor,
-                padding: '2px 8px',
-                borderRadius: '6px',
-                border: '1px solid #cbd5e1'
-              }}>
-                {bestShipperWorkload?.isFree ? 'ƯU TIÊN #1 (RẢNH RỖI)' : 'PHÙ HỢP TUYẾN'}
-              </span>
-            </div>
-          )}
-
-          {/* Order Summary */}
-          <div style={{ backgroundColor: '#f8fafc', padding: '0.9rem', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '1.25rem' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', fontSize: '0.8rem', color: '#475569' }}>
-              <div style={{ gridColumn: 'span 2' }}>Địa chỉ giao: <strong style={{ color: '#0f172a' }}>{orderToAssign.shippingAddress || orderToAssign.address || 'TP.HCM'}</strong></div>
-              <div>Thu hộ COD: <strong style={{ color: '#16a34a' }}>{safeFormatPrice(orderToAssign.totalAmount || orderToAssign.total || 0)}</strong></div>
-              <div>Hình thức: <strong style={{ color: '#0f172a' }}>{orderToAssign.paymentMethod || 'COD'}</strong></div>
-              <div>Đóng gói: <strong style={{ color: '#2563eb' }}>{orderToAssign.packedSerials?.length || 1} linh kiện đã niêm phong</strong></div>
-              <div>Khu vực vận chuyển: <strong style={{ color: '#d97706' }}>{currentRegionObj.shortName}</strong></div>
-            </div>
-          </div>
-
-          {/* Form Fields */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: '0.75rem', alignItems: 'start' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.35rem', whiteSpace: 'nowrap' }}>
-                  Nhân Viên / Đơn Vị Giao Hàng *
-                </label>
                 <select
-                  name="shipperName"
-                  // Buộc remount khi allShippers tải xong (async) hoặc đổi
-                  // vùng — <select> không kiểm soát nên defaultValue chỉ áp
-                  // dụng lúc mount, phải đổi key để lấy defaultValue mới.
-                  key={`${selectedRegion}-${allShippers.length}`}
-                  defaultValue={
-                    bestShipper
-                      ? `Shipper Nội Bộ - ${bestShipper.fullname} (${bestShipper.phone || '0912.xxx.xxx'})`
-                      : (sortedRegionalShippers.length > 0
-                          ? `Shipper Nội Bộ - ${sortedRegionalShippers[0].fullname} (${sortedRegionalShippers[0].phone || '0912.xxx.xxx'})`
-                          : (otherShippers.length > 0
-                              ? `Shipper Nội Bộ - ${otherShippers[0].fullname} (${otherShippers[0].phone || '0912.xxx.xxx'})`
-                              : ''))
-                  }
-                  style={{ width: '100%', padding: '0.6rem 0.75rem', fontSize: '0.82rem', fontWeight: 600, border: '1.5px solid #2563eb', borderRadius: '6px', backgroundColor: '#ffffff', boxSizing: 'border-box' }}
+                  value={selectedRegion}
+                  onChange={(e) => setSelectedRegion(e.target.value)}
+                  style={{
+                    width: '100%',
+                    maxWidth: '100%',
+                    boxSizing: 'border-box',
+                    padding: '0.48rem 0.65rem',
+                    borderRadius: '6px',
+                    border: '1.5px solid #bfdbfe',
+                    backgroundColor: '#eff6ff',
+                    fontSize: '0.8rem',
+                    fontWeight: 700,
+                    color: '#1e40af',
+                    cursor: 'pointer',
+                    outline: 'none'
+                  }}
                 >
-                  {/* Regional matched Shippers sorted by best priority */}
-                  <optgroup label={`Shipper Khu Vực Này (${currentRegionObj.shortName})`}>
-                    {sortedRegionalShippers.length > 0 ? (
-                      sortedRegionalShippers.map(s => {
-                        const wl = getShipperWorkload(s);
-                        return (
-                          <option
-                            key={s.id || s.username}
-                            value={`Shipper Nội Bộ - ${s.fullname} (${s.phone || '0912.xxx.xxx'})`}
-                            style={{ color: wl.isOnline && !wl.isOverload ? '#0f172a' : '#64748b' }}
-                          >
-                            ★ {s.fullname} ({s.phone || '09xx.xxx.xxx'}) — [{wl.statusText}]
-                          </option>
-                        );
-                      })
-                    ) : (
-                      <option disabled value="">(Chưa có shipper chuyên trách khu vực này)</option>
-                    )}
-                  </optgroup>
-
-                  {/* Other regional Shippers */}
-                  {otherShippers.length > 0 && (
-                    <optgroup label="Shipper Các Khu Vực Khác (Điều Phối Chéo)">
-                      {otherShippers.map(s => {
-                        const sReg = DELIVERY_REGIONS.find(r => r.code === s.deliveryRegion);
-                        const wl = getShipperWorkload(s);
-                        return (
-                          <option key={s.id || s.username} value={`Shipper Nội Bộ - ${s.fullname} (${s.phone || '0912.xxx.xxx'})`}>
-                            {s.fullname} ({s.phone || '09xx.xxx.xxx'}) — [Gốc: {sReg?.shortName || s.deliveryRegion}] — [{wl.statusText}]
-                          </option>
-                        );
-                      })}
-                    </optgroup>
-                  )}
+                  {DELIVERY_REGIONS.map(r => (
+                    <option key={r.code} value={r.code}>{r.name}</option>
+                  ))}
                 </select>
-                <div style={{ fontSize: '0.71rem', color: '#64748b', marginTop: '0.3rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.2rem' }}>
-                  <span>✓ Gán trực tiếp vào app Shipper</span>
-                  <span style={{ color: '#059669', fontWeight: 600 }}>Rảnh • Giao • Bận • Tắt</span>
+              </div>
+
+              {/* Delivery Address */}
+              <div style={{
+                fontSize: '0.78rem',
+                display: 'flex',
+                gap: '0.35rem',
+                alignItems: 'flex-start',
+                backgroundColor: '#ffffff',
+                padding: '0.5rem 0.65rem',
+                borderRadius: '6px',
+                border: '1px solid #e2e8f0',
+                lineHeight: 1.35
+              }}>
+                <span style={{ color: '#64748b', fontWeight: 600, flexShrink: 0 }}>Địa chỉ nhận hàng:</span>
+                <span style={{ color: '#0f172a', fontWeight: 700, wordBreak: 'break-word' }}>
+                  {orderToAssign.shippingAddress || orderToAssign.address || 'TP.HCM'}
+                </span>
+              </div>
+
+              {/* 3-Column Info Metrics */}
+              <div className="d-stats-grid">
+                <div style={{ backgroundColor: '#ffffff', padding: '0.45rem 0.6rem', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+                  <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 600 }}>Thu Hộ COD</div>
+                  <div style={{ fontSize: '0.88rem', fontWeight: 800, color: '#16a34a', marginTop: '0.1rem' }}>
+                    {safeFormatPrice(orderToAssign.totalAmount || orderToAssign.total || 0)}
+                  </div>
+                </div>
+                <div style={{ backgroundColor: '#ffffff', padding: '0.45rem 0.6rem', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+                  <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 600 }}>Hình Thức TT</div>
+                  <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#0f172a', marginTop: '0.15rem' }}>
+                    {orderToAssign.paymentMethod || 'COD'}
+                  </div>
+                </div>
+                <div className="d-stat-full" style={{ backgroundColor: '#ffffff', padding: '0.45rem 0.6rem', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+                  <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 600 }}>Đóng Gói</div>
+                  <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#2563eb', marginTop: '0.15rem' }}>
+                    {orderToAssign.packedSerials?.length || 1} kiện niêm phong
+                  </div>
                 </div>
               </div>
+            </div>
 
-              <div>
-                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.35rem', whiteSpace: 'nowrap' }}>
-                  Mã Vận Đơn
-                </label>
-                <input
-                  type="text"
-                  name="trackingCode"
-                  defaultValue={autoTrackingCode}
-                  style={{ width: '100%', padding: '0.6rem 0.75rem', fontSize: '0.82rem', fontWeight: 700, color: '#2563eb', border: '1px solid #cbd5e1', borderRadius: '6px', backgroundColor: '#f8fafc', boxSizing: 'border-box' }}
-                />
+            {/* Smart Workload Balancing Recommendation */}
+            {bestShipper && (
+              <div style={{
+                padding: '0.55rem 0.8rem',
+                backgroundColor: bestShipperWorkload?.isFree ? '#f0fdf4' : '#eff6ff',
+                border: `1px solid ${bestShipperWorkload?.isFree ? '#86efac' : '#bfdbfe'}`,
+                borderRadius: '8px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '0.5rem'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.78rem', minWidth: 0 }}>
+                  <Sparkles size={15} color={bestShipperWorkload?.isFree ? '#16a34a' : '#2563eb'} style={{ flexShrink: 0 }} />
+                  <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <span style={{ color: '#475569' }}>Đề xuất theo tải:</span>{' '}
+                    <strong style={{ color: '#0f172a' }}>{bestShipper.fullname}</strong>{' '}
+                    <span style={{ color: bestShipperWorkload?.badgeColor, fontWeight: 700, fontSize: '0.74rem' }}>
+                      ({bestShipperWorkload?.statusText})
+                    </span>
+                  </div>
+                </div>
+                <span style={{
+                  fontSize: '0.68rem',
+                  fontWeight: 800,
+                  backgroundColor: bestShipperWorkload?.badgeBg,
+                  color: bestShipperWorkload?.badgeColor,
+                  padding: '2px 7px',
+                  borderRadius: '5px',
+                  border: '1px solid #cbd5e1',
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0
+                }}>
+                  {bestShipperWorkload?.isFree ? 'ƯU TIÊN (RẢNH)' : 'PHÙ HỢP TUYẾN'}
+                </span>
+              </div>
+            )}
+
+            {/* Shipper Selection - Full Width Row */}
+            <div>
+              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.3rem' }}>
+                Nhân Viên / Đơn Vị Giao Hàng *
+              </label>
+              <select
+                name="shipperName"
+                key={`${selectedRegion}-${allShippers.length}`}
+                defaultValue={
+                  bestShipper
+                    ? `Shipper Nội Bộ - ${bestShipper.fullname} (${bestShipper.phone || '0912.xxx.xxx'})`
+                    : (sortedRegionalShippers.length > 0
+                        ? `Shipper Nội Bộ - ${sortedRegionalShippers[0].fullname} (${sortedRegionalShippers[0].phone || '0912.xxx.xxx'})`
+                        : (otherShippers.length > 0
+                            ? `Shipper Nội Bộ - ${otherShippers[0].fullname} (${otherShippers[0].phone || '0912.xxx.xxx'})`
+                            : ''))
+                }
+                style={{
+                  width: '100%',
+                  maxWidth: '100%',
+                  boxSizing: 'border-box',
+                  padding: '0.52rem 0.7rem',
+                  fontSize: '0.82rem',
+                  fontWeight: 600,
+                  border: '1.5px solid #2563eb',
+                  borderRadius: '6px',
+                  backgroundColor: '#ffffff'
+                }}
+              >
+                <optgroup label={`Shipper Khu Vực Này (${currentRegionObj.shortName})`}>
+                  {sortedRegionalShippers.length > 0 ? (
+                    sortedRegionalShippers.map(s => {
+                      const wl = getShipperWorkload(s);
+                      return (
+                        <option
+                          key={s.id || s.username}
+                          value={`Shipper Nội Bộ - ${s.fullname} (${s.phone || '0912.xxx.xxx'})`}
+                          style={{ color: wl.isOnline && !wl.isOverload ? '#0f172a' : '#64748b' }}
+                        >
+                          ★ {s.fullname} ({s.phone || '09xx.xxx.xxx'}) — [{wl.statusText}]
+                        </option>
+                      );
+                    })
+                  ) : (
+                    <option disabled value="">(Chưa có shipper chuyên trách khu vực này)</option>
+                  )}
+                </optgroup>
+
+                {otherShippers.length > 0 && (
+                  <optgroup label="Shipper Các Khu Vực Khác (Điều Phối Chéo)">
+                    {otherShippers.map(s => {
+                      const sReg = DELIVERY_REGIONS.find(r => r.code === s.deliveryRegion);
+                      const wl = getShipperWorkload(s);
+                      return (
+                        <option key={s.id || s.username} value={`Shipper Nội Bộ - ${s.fullname} (${s.phone || '0912.xxx.xxx'})`}>
+                          {s.fullname} ({s.phone || '09xx.xxx.xxx'}) — [Gốc: {sReg?.shortName || s.deliveryRegion}] — [{wl.statusText}]
+                        </option>
+                      );
+                    })}
+                  </optgroup>
+                )}
+              </select>
+              <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '0.3rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.2rem' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                  <CheckCircle size={12} color="#16a34a" /> Gán trực tiếp vào app Shipper
+                </span>
+                <span style={{ color: '#475569', fontWeight: 600 }}>🟢 Rảnh • 🟡 Giao • 🔴 Bận • ⚪ Nghỉ</span>
               </div>
             </div>
 
+            {/* Tracking Code */}
             <div>
-              <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.35rem' }}>
+              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.3rem' }}>
+                Mã Vận Đơn (Tracking Code)
+              </label>
+              <input
+                type="text"
+                name="trackingCode"
+                defaultValue={autoTrackingCode}
+                style={{
+                  width: '100%',
+                  maxWidth: '100%',
+                  boxSizing: 'border-box',
+                  padding: '0.48rem 0.7rem',
+                  fontSize: '0.82rem',
+                  fontWeight: 700,
+                  color: '#2563eb',
+                  border: '1px solid #cbd5e1',
+                  borderRadius: '6px',
+                  backgroundColor: '#f8fafc',
+                  fontFamily: 'monospace'
+                }}
+              />
+            </div>
+
+            {/* Note */}
+            <div>
+              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.3rem' }}>
                 Ghi Chú Giao Hàng Cho Shipper / Đơn Vị Vận Chuyển
               </label>
               <textarea
                 name="note"
                 rows={2}
                 defaultValue={isHCM ? `Giao khu vực ${currentRegionObj.shortName}, gọi khách trước 15 phút` : 'Hàng linh kiện điện tử giá trị cao, bảo quản cẩn thận, cho khách đồng kiểm ngoại quan'}
-                style={{ width: '100%', padding: '0.55rem 0.85rem', fontSize: '0.82rem', border: '1px solid #cbd5e1', borderRadius: '6px', boxSizing: 'border-box' }}
+                style={{
+                  width: '100%',
+                  maxWidth: '100%',
+                  boxSizing: 'border-box',
+                  padding: '0.5rem 0.75rem',
+                  fontSize: '0.8rem',
+                  border: '1px solid #cbd5e1',
+                  borderRadius: '6px',
+                  fontFamily: 'inherit',
+                  resize: 'vertical'
+                }}
               />
             </div>
           </div>
 
-          {/* Actions */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', borderTop: '1px solid #e2e8f0', paddingTop: '1rem' }}>
-            <button
-              type="button"
-              onClick={onClose}
-              style={{ padding: '0.55rem 1.15rem', fontSize: '0.82rem', fontWeight: 600, border: '1px solid #cbd5e1', borderRadius: '6px', background: '#ffffff', color: '#475569', cursor: 'pointer' }}
-            >
-              Hủy Bỏ
-            </button>
-            <button
-              type="submit"
-              style={{ padding: '0.55rem 1.35rem', fontSize: '0.82rem', border: 'none', borderRadius: '6px', background: '#2563eb', color: '#ffffff', fontWeight: 700, cursor: 'pointer', boxShadow: '0 2px 4px rgba(0,0,0,0.15)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
-            >
-              <Truck size={15} /> Xác Nhận Phân Công & Bàn Giao
-            </button>
+          {/* Sticky Modal Actions Footer */}
+          <div className="d-footer">
+            <span className="d-footer-hint" style={{ fontSize: '0.75rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '0.3rem', whiteSpace: 'nowrap' }}>
+              <CheckCircle size={13} color="#2563eb" /> Chuyển sang <strong>Đang Giao Hàng</strong>
+            </span>
+            <div className="d-footer-actions">
+              <button
+                type="button"
+                onClick={onClose}
+                className="d-btn-cancel"
+                style={{
+                  padding: '0.5rem 1rem',
+                  fontSize: '0.82rem',
+                  fontWeight: 600,
+                  border: '1px solid #cbd5e1',
+                  borderRadius: '6px',
+                  background: '#ffffff',
+                  color: '#475569',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                Hủy Bỏ
+              </button>
+              <button
+                type="submit"
+                className="d-btn-submit"
+                style={{
+                  padding: '0.5rem 1.25rem',
+                  fontSize: '0.82rem',
+                  border: 'none',
+                  borderRadius: '6px',
+                  background: '#2563eb',
+                  color: '#ffffff',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 4px rgba(37,99,235,0.25)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.35rem',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                <Truck size={15} /> Xác Nhận Phân Công & Bàn Giao
+              </button>
+            </div>
           </div>
         </form>
       </div>
