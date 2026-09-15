@@ -2,7 +2,7 @@ import React from 'react';
 import { ShieldAlert, Cpu } from 'lucide-react';
 
 export default function LoadingScreen({
-  text = 'Đang nạp phân hệ...',
+  text = 'Đang tải...',
   subtext = '',
   minHeight = '100dvh',
   fullScreen = false

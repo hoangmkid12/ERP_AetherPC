@@ -52,7 +52,7 @@ const QualityControl = lazy(() => import('./pages/Admin/QualityControl'));
 
 // Shown while a lazy route chunk downloads — modern high-tech enterprise loading look
 const RouteLoadingFallback = () => (
-  <LoadingScreen text="Đang nạp phân hệ..." minHeight="100dvh" />
+  <LoadingScreen minHeight="100dvh" />
 );
 
 // 1. Layout for Storefront Customer Views
@@ -81,7 +81,7 @@ const AdminLayout = () => {
   }, [location.pathname, location.search]);
 
   if (loading) {
-    return <LoadingScreen text="Đang xác thực tài khoản..." fullScreen />;
+    return <LoadingScreen fullScreen />;
   }
 
   if (!isAuthenticated) {
@@ -198,7 +198,7 @@ const ProtectedRoute = ({ allowedRoles, children }) => {
   const { user, isAuthenticated, loading } = useAuth();
 
   if (loading) {
-    return <LoadingScreen text="Đang tải dữ liệu..." fullScreen />;
+    return <LoadingScreen fullScreen />;
   }
 
   if (!isAuthenticated) {
