@@ -1149,7 +1149,9 @@ select.input-field option {
   display: flex;
   flex-direction: column;
   background: var(--bg-app);
-  position: relative;
+  /* NOTE: do NOT add position:relative here — it creates a stacking context
+     that prevents .delivery-fullscreen-modal (position:fixed) children from
+     painting above .delivery-bottom-nav siblings. */
   box-shadow: var(--shadow-lg);
 }
 
@@ -1162,7 +1164,6 @@ select.input-field option {
   padding: calc(0.65rem + env(safe-area-inset-top, 0)) 1rem 0.65rem;
   background: var(--bg-primary);
   border-bottom: 1px solid var(--border-glass);
-  z-index: 10;
 }
 
 .delivery-icon-btn {
@@ -1201,7 +1202,8 @@ select.input-field option {
   background: var(--bg-primary);
   border-top: 1px solid var(--border-glass);
   padding-bottom: max(env(safe-area-inset-bottom, 0px) + 0.65rem, 24px);
-  z-index: 10;
+  /* No z-index here — a z-index on a non-positioned element would create a
+     stacking context and could paint over position:fixed modals. */
 }
 
 .delivery-bottom-nav-item {
@@ -1286,7 +1288,7 @@ select.input-field option {
   inset: 0;
   background: rgba(15, 23, 42, 0.45);
   backdrop-filter: blur(6px);
-  z-index: 20001;
+  z-index: 2147483646;
   display: flex;
   align-items: flex-end;
   justify-content: center;
@@ -1335,11 +1337,13 @@ select.input-field option {
 }
 
 /* Full-screen modal used by PODModal / FailModal / OrderDetailSheet —
-   always fills the phone-frame column, not a centered dialog. */
+   always fills the phone-frame column, not a centered dialog.
+   z-index must beat the browser chrome stacking order; 2147483647 is the
+   maximum safe value (2^31 - 1). */
 .delivery-fullscreen-modal {
   position: fixed;
   inset: 0;
-  z-index: 20000;
+  z-index: 2147483647;
   display: flex;
   justify-content: center;
   background: rgba(15, 23, 42, 0.45);
@@ -1364,6 +1368,24 @@ select.input-field option {
 .delivery-modal-action-bar {
   flex-shrink: 0;
   padding-bottom: max(env(safe-area-inset-bottom, 0px) + 0.85rem, 1.1rem);
+}
+
+/* Hide the bottom nav tab-bar whenever a fullscreen delivery modal is open
+   (:has() is supported on Chrome 105+, Safari 15.4+, Firefox 121+).
+   This guarantees the modal's action buttons are never obscured by the nav,
+   regardless of stacking context or z-index quirks. */
+.delivery-app-inner:has(.delivery-fullscreen-modal) .delivery-bottom-nav,
+.delivery-app-shell:has(.delivery-fullscreen-modal) .delivery-bottom-nav {
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+/* Also hide the filter-sheet overlay's backdrop from the nav when a
+   higher-z sheet like PODModal is stacked on top. */
+.delivery-app-inner:has(.delivery-filter-sheet-overlay) .delivery-bottom-nav,
+.delivery-app-shell:has(.delivery-filter-sheet-overlay) .delivery-bottom-nav {
+  visibility: hidden !important;
+  pointer-events: none !important;
 }
 
 /* ==========================================================================
