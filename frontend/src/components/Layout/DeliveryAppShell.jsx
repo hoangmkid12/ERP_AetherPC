@@ -33,7 +33,11 @@ export default function DeliveryAppShell({ children }) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const activeTab = searchParams.get('tab') || 'active';
-  const safeVh = useSafeViewportHeight();
+  // +24px buffer: visualViewport.height reads slightly conservative on the
+  // user's real iPhone, leaving a visible gap between the bottom tab bar
+  // and Safari's own toolbar below it — nudge the shell a little taller so
+  // the tab bar sits closer to the true bottom of the visible screen.
+  const safeVh = useSafeViewportHeight() + 24;
 
   const orders = useSalesStore(state => state.orders) || [];
 

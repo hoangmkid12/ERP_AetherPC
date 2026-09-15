@@ -1145,10 +1145,16 @@ select.input-field option {
 .delivery-app-inner {
   width: 100%;
   max-width: var(--delivery-frame-width);
-  /* See .delivery-fullscreen-modal-inner comment: svh (not dvh/vh) avoids
-     the bottom-nav being tucked behind iOS Safari's still-expanded toolbar. */
+  /* JS-computed height (see useSafeViewportHeight + DeliveryAppShell.jsx)
+     drives the actual height inline — this is just a fallback before JS
+     runs. Bottom-nav must stay OUTSIDE .delivery-content's own internal
+     scroll region (not page-level scroll) so it's always visible
+     regardless of scroll position in a long order list — page-level
+     scroll + position:sticky was tried and reverted because a sticky
+     bottom element in a tall document only pins near the END of the
+     scroll, not throughout, leaving the tab bar missing while scrolling
+     through the middle of a long list. */
   height: 100vh;
-  height: 100svh;
   display: flex;
   flex-direction: column;
   background: var(--bg-app);
@@ -1195,7 +1201,7 @@ select.input-field option {
   flex: 1;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  padding: 0.85rem 0.85rem max(env(safe-area-inset-bottom, 0px) + 5rem, 90px);
+  padding: 0.85rem 0.85rem 1rem;
 }
 
 .delivery-bottom-nav {
