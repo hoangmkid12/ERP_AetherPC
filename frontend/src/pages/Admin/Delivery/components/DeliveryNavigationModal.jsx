@@ -82,10 +82,14 @@ export default function DeliveryNavigationModal({
     });
     L.tileLayer(TILE_URL, {
       maxZoom: TILE_MAX_ZOOM,
-      attribution: TILE_ATTRIBUTION
+      attribution: TILE_ATTRIBUTION,
+      subdomains: ['a', 'b', 'c']
     }).addTo(map);
     map.setView([16.0544, 108.2022], 5);
     mapRef.current = map;
+    setTimeout(() => {
+      if (mapRef.current) mapRef.current.invalidateSize();
+    }, 200);
 
     return () => {
       map.remove();

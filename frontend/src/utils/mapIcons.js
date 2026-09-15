@@ -5,11 +5,9 @@ import L from 'leaflet';
 // chính Shipper) để 2 nơi luôn nhìn giống nhau thay vì mỗi nơi tự vẽ marker
 // kiểu emoji-trong-vòng-tròn riêng như trước.
 
-// Nền bản đồ Wikimedia (dựa trên dữ liệu OSM, tông nhạt/ít nhãn rườm rà hơn
-// tile OSM chuẩn) — miễn phí, không cần API key (CartoDB Positron đã thử
-// nhưng giờ bắt buộc phải có key mới hiện tile).
-export const TILE_URL = 'https://maps.wikimedia.org/osm-intl/{z}/{x}/{y}.png';
-export const TILE_ATTRIBUTION = '&copy; OpenStreetMap contributors';
+// Nền bản đồ OpenStreetMap chuẩn — hiển thị đầy đủ tên đường phố, ngõ hẻm, công trình
+export const TILE_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+export const TILE_ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
 export const TILE_MAX_ZOOM = 19;
 
 // Pin kiểu Google Maps (giọt nước, chấm trắng giữa) — gọn và quen mắt hơn

@@ -64,7 +64,8 @@ export default function DeliveryMap({
     // Positron (đã thử nhưng CartoDB giờ bắt buộc phải có key mới hiện tile).
     L.tileLayer(TILE_URL, {
       maxZoom: TILE_MAX_ZOOM,
-      attribution: TILE_ATTRIBUTION
+      attribution: TILE_ATTRIBUTION,
+      subdomains: ['a', 'b', 'c']
     }).addTo(map);
     // Leaflet ném lỗi "Set map center and zoom first" nếu gọi getBounds()/panTo()
     // trước khi map có view — có thể xảy ra khi shipperPosition đã có sẵn (từ
