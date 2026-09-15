@@ -12,7 +12,7 @@ import {
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../../services/api';
 
-import { VIETNAM_PROVINCES, removeAccents } from '../../utils/vietnamProvinces';
+import { VIETNAM_PROVINCES, removeAccents, buildStandardAddress, cleanProvinceName } from '../../utils/vietnamProvinces';
 import SearchableSelect from '../../components/Common/SearchableSelect';
 
 const formatPrice = (price) => {
@@ -130,6 +130,7 @@ export default function Cart() {
   const [selectedProvince, setSelectedProvince] = useState('');
   const [selectedDistrict, setSelectedDistrict] = useState('');
   const [ward, setWard] = useState('');
+  const [isTwoTier, setIsTwoTier] = useState(false);
   const [streetAddress, setStreetAddress] = useState('');
   const [savedAddresses, setSavedAddresses] = useState([]);
   const [selectedSavedAddressId, setSelectedSavedAddressId] = useState(null);
@@ -220,6 +221,7 @@ export default function Cart() {
     setSelectedProvince(address.city || '');
     setWard(address.ward || '');
     setSelectedDistrict(address.district || '');
+    setIsTwoTier(!address.district);
     setApiCommunes([]);
     fetchCommunesForProvince(address.city || '');
   };
@@ -230,6 +232,15 @@ export default function Cart() {
     setSelectedDistrict('');
     setWard('');
     setApiCommunes([]);
+
+    // Kiểm tra xem tỉnh thành có danh sách huyện hay không
+    const matched = VIETNAM_PROVINCES.find(p => {
+      if (!provName) return false;
+      return p.name === provName || p.name.includes(provName) || provName.includes(p.name) || p.code === provName;
+    });
+    const hasDistricts = Boolean(matched && Array.isArray(matched.districts) && matched.districts.length > 0);
+    setIsTwoTier(!hasDistricts);
+
     fetchCommunesForProvince(provName);
   };
 
@@ -349,6 +360,11 @@ export default function Cart() {
       return;
     }
 
+    if (!isTwoTier && currentProvinceObj.districts?.length > 0 && !selectedDistrict.trim()) {
+      addNotification('Vui lòng chọn Quận / Huyện!', 'error');
+      return;
+    }
+
     setCheckingOut(true);
 
     try {
@@ -362,12 +378,13 @@ export default function Cart() {
       }));
 
       // Combine structured address & order note if provided
-      const baseAddress = [
+      const baseAddress = buildStandardAddress({
         streetAddress,
-        ward ? (ward.toLowerCase().includes('phường') || ward.toLowerCase().includes('xã') ? ward : `Phường/Xã ${ward}`) : '',
-        selectedDistrict,
-        selectedProvince
-      ].filter(Boolean).join(', ');
+        ward,
+        district: isTwoTier ? '' : selectedDistrict,
+        city: selectedProvince,
+        isTwoTier
+      });
 
       const fullAddress = orderNote.trim()
         ? `${baseAddress} (Ghi chú: ${orderNote.trim()})`
@@ -957,20 +974,26 @@ export default function Cart() {
                       />
                     </div>
 
-                    {/* District & Ward */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-                      <div>
-                        <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#64748b', marginBottom: '0.25rem' }}>
-                          Quận / Huyện <span style={{ color: '#ef4444' }}>*</span>
-                        </label>
-                        <SearchableSelect
-                          value={selectedDistrict}
-                          onChange={val => setSelectedDistrict(val)}
-                          options={currentProvinceObj.districts || []}
-                          placeholder={!selectedProvince ? "-- Chọn Tỉnh/TP trước --" : "-- Chọn Quận / Huyện --"}
-                          disabled={!selectedProvince}
-                        />
-                      </div>
+                    {/* District & Ward (Linh hoạt 2 cấp / 3 cấp) */}
+                    <div style={{
+                      display: isTwoTier ? 'block' : 'grid',
+                      gridTemplateColumns: isTwoTier ? undefined : '1fr 1fr',
+                      gap: '0.5rem'
+                    }}>
+                      {!isTwoTier && (
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#64748b', marginBottom: '0.25rem' }}>
+                            Quận / Huyện <span style={{ color: '#ef4444' }}>*</span>
+                          </label>
+                          <SearchableSelect
+                            value={selectedDistrict}
+                            onChange={val => setSelectedDistrict(val)}
+                            options={currentProvinceObj.districts || []}
+                            placeholder={!selectedProvince ? "-- Chọn Tỉnh/TP trước --" : "-- Chọn Quận / Huyện --"}
+                            disabled={!selectedProvince}
+                          />
+                        </div>
+                      )}
                       <div>
                         <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#64748b', marginBottom: '0.25rem' }}>
                           Phường / Xã <span style={{ color: '#ef4444' }}>*</span>
@@ -986,6 +1009,23 @@ export default function Cart() {
                       </div>
                     </div>
 
+                    {/* Toggle chuyển đổi 2 cấp / 3 cấp */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.1rem 0' }}>
+                      <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.74rem', color: '#475569', cursor: 'pointer', fontWeight: 600 }}>
+                        <input
+                          type="checkbox"
+                          checked={isTwoTier}
+                          onChange={e => {
+                            const checked = e.target.checked;
+                            setIsTwoTier(checked);
+                            if (checked) setSelectedDistrict('');
+                          }}
+                          style={{ accentColor: '#2563eb', cursor: 'pointer' }}
+                        />
+                        <span>Địa phương 2 cấp (Chỉ gồm Tỉnh/TP và Xã/Phường, không có Quận/Huyện)</span>
+                      </label>
+                    </div>
+
                     {/* Street address */}
                     <div>
                       <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#64748b', marginBottom: '0.25rem' }}>
@@ -995,7 +1035,7 @@ export default function Cart() {
                         type="text"
                         value={streetAddress}
                         onChange={e => setStreetAddress(e.target.value)}
-                        placeholder="Số nhà, tên đường..."
+                        placeholder="Số nhà, ngõ/ngách, tên đường (Ví dụ: Số 123 Nguyễn Huệ)..."
                         required
                         style={{ width: '100%', padding: '0.55rem', borderRadius: '8px', border: '1.5px solid #cbd5e1', fontSize: '0.82rem', color: '#0f172a', backgroundColor: '#ffffff', outline: 'none', boxSizing: 'border-box' }}
                       />

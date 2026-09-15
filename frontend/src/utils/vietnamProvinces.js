@@ -240,3 +240,42 @@ export const matchesSearch = (label, query) => {
   const queryWords = normQuery.split(/\s+/).filter(Boolean);
   return queryWords.every(w => normLabel.includes(w));
 };
+
+// Làm sạch tên tỉnh thành, bỏ phần chú thích trong ngoặc (gồm...)
+export const cleanProvinceName = (name) => {
+  if (!name) return '';
+  return String(name).replace(/\s*\(gồm[^)]*\)/gi, '').trim();
+};
+
+// Ghép địa chỉ chuẩn hóa, tự động khử trùng lặp nếu người dùng gõ cả phường/quận/tỉnh trong ô số nhà
+export const buildStandardAddress = ({ streetAddress = '', ward = '', district = '', city = '', isTwoTier = false }) => {
+  const cleanCity = cleanProvinceName(city);
+  const cleanWard = (ward || '').trim();
+  const cleanDistrict = isTwoTier ? '' : (district || '').trim();
+  let street = (streetAddress || '').trim();
+
+  // Khử trùng lặp thông minh nếu ô số nhà đã gõ sẵn tên xã/huyện/tỉnh
+  if (street) {
+    if (cleanCity && street.toLowerCase().includes(cleanCity.toLowerCase())) {
+      const reg = new RegExp(`[,\\s]*${cleanCity.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'gi');
+      street = street.replace(reg, '').trim();
+    }
+    if (cleanDistrict && street.toLowerCase().includes(cleanDistrict.toLowerCase())) {
+      const reg = new RegExp(`[,\\s]*${cleanDistrict.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'gi');
+      street = street.replace(reg, '').trim();
+    }
+    if (cleanWard && street.toLowerCase().includes(cleanWard.toLowerCase())) {
+      const reg = new RegExp(`[,\\s]*${cleanWard.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'gi');
+      street = street.replace(reg, '').trim();
+    }
+    street = street.replace(/^[,\s]+|[,\s]+$/g, '').trim();
+  }
+
+  const formattedWard = cleanWard
+    ? (cleanWard.toLowerCase().startsWith('phường') || cleanWard.toLowerCase().startsWith('xã') || cleanWard.toLowerCase().startsWith('thị trấn')
+        ? cleanWard
+        : `Phường/Xã ${cleanWard}`)
+    : '';
+
+  return [street, formattedWard, cleanDistrict, cleanCity].filter(Boolean).join(', ');
+};

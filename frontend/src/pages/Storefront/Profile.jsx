@@ -140,7 +140,14 @@ export default function Profile() {
       notify('Vui lòng chọn Tỉnh / Thành phố.', 'error');
       return;
     }
-    if (!addressForm.district?.trim()) {
+    const matched = VIETNAM_PROVINCES.find(p => {
+      if (!addressForm.city) return false;
+      return p.name === addressForm.city || p.name.includes(addressForm.city) || addressForm.city.includes(p.name) || p.code === addressForm.city;
+    });
+    const hasDistricts = Boolean(matched && matched.districts?.length > 0);
+    const isTwoTier = addressForm.isTwoTier ?? !hasDistricts;
+
+    if (!isTwoTier && !addressForm.district?.trim()) {
       notify('Vui lòng chọn Quận / Huyện.', 'error');
       return;
     }
@@ -153,8 +160,12 @@ export default function Profile() {
       return;
     }
     try {
-      if (editingAddress) await api.put(`/customers/addresses/${editingAddress.id}`, addressForm);
-      else await api.post('/customers/addresses', addressForm);
+      const payload = {
+        ...addressForm,
+        district: isTwoTier ? '' : (addressForm.district || '')
+      };
+      if (editingAddress) await api.put(`/customers/addresses/${editingAddress.id}`, payload);
+      else await api.post('/customers/addresses', payload);
       setShowAddressModal(false);
       await loadAddresses();
       notify(editingAddress ? 'Cập nhật địa chỉ thành công.' : 'Thêm địa chỉ mới thành công.', 'success');
@@ -588,12 +599,21 @@ function AddressModal({
     return p.name === form.city || p.name.includes(form.city) || form.city.includes(p.name) || p.code === form.city;
   }) || { districts: [] };
 
+  const hasDistricts = Boolean(currentProvinceObj.districts && currentProvinceObj.districts.length > 0);
+  const isTwoTier = form.isTwoTier ?? (!hasDistricts && Boolean(form.city));
+
   const handleCityChange = (cityName) => {
+    const matched = VIETNAM_PROVINCES.find(p => {
+      if (!cityName) return false;
+      return p.name === cityName || p.name.includes(cityName) || cityName.includes(p.name) || p.code === cityName;
+    });
+    const provHasDistricts = Boolean(matched && matched.districts?.length > 0);
     setForm(prev => ({
       ...prev,
       city: cityName,
       district: '',
-      ward: ''
+      ward: '',
+      isTwoTier: !provHasDistricts
     }));
     if (onProvinceChange) onProvinceChange(cityName);
   };
@@ -631,16 +651,22 @@ function AddressModal({
           />
         </Field>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem' }}>
-          <Field label={TEXT.district} required>
-            <SearchableSelect
-              value={form.district}
-              onChange={handleDistrictChange}
-              options={currentProvinceObj.districts || []}
-              placeholder={!form.city ? "-- Chọn Tỉnh/TP trước --" : "-- Chọn Quận / Huyện --"}
-              disabled={!form.city}
-            />
-          </Field>
+        <div style={{
+          display: isTwoTier ? 'block' : 'grid',
+          gridTemplateColumns: isTwoTier ? undefined : '1fr 1fr',
+          gap: '0.85rem'
+        }}>
+          {!isTwoTier && (
+            <Field label={TEXT.district} required>
+              <SearchableSelect
+                value={form.district}
+                onChange={handleDistrictChange}
+                options={currentProvinceObj.districts || []}
+                placeholder={!form.city ? "-- Chọn Tỉnh/TP trước --" : "-- Chọn Quận / Huyện --"}
+                disabled={!form.city}
+              />
+            </Field>
+          )}
 
           <Field label={TEXT.ward} required>
             <SearchableSelect
@@ -654,8 +680,22 @@ function AddressModal({
           </Field>
         </div>
 
+        {/* Toggle 2 cấp / 3 cấp */}
+        <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.78rem', color: '#475569', fontWeight: 600, cursor: 'pointer' }}>
+          <input
+            type="checkbox"
+            checked={isTwoTier}
+            onChange={e => {
+              const checked = e.target.checked;
+              setForm(prev => ({ ...prev, isTwoTier: checked, district: checked ? '' : prev.district }));
+            }}
+            style={{ accentColor: '#2563eb', cursor: 'pointer' }}
+          />
+          <span>Địa phương 2 cấp (Chỉ gồm Tỉnh/TP và Xã/Phường, không có Quận/Huyện)</span>
+        </label>
+
         <Field label={TEXT.street} required>
-          <textarea required rows={2} value={form.addressLine} onChange={update('addressLine')} placeholder="Số nhà, tên đường..." />
+          <textarea required rows={2} value={form.addressLine} onChange={update('addressLine')} placeholder="Số nhà, ngõ/ngách, tên đường (Ví dụ: Số 123 Nguyễn Huệ)..." />
         </Field>
 
         <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: '#334155', fontWeight: 600, cursor: 'pointer' }}>

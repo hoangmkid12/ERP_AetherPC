@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { fetchRoadRoute, reverseGeocode } from '../utils/routingService';
+import { fetchRoadRoute, reverseGeocode, forwardGeocode } from '../utils/routingService';
 import { TILE_URL, TILE_ATTRIBUTION, TILE_MAX_ZOOM, WAREHOUSE_ICON, DESTINATION_ICON, SHIPPER_ICON } from '../utils/mapIcons';
 
 // Tần suất gọi lại OSRM/Nominatim khi Shipper di chuyển — GPS gửi mỗi 8s
@@ -45,6 +45,29 @@ export default function DeliveryMap({
   const lastLiveRecalcRef = useRef(0);
   const [remainingInfo, setRemainingInfo] = useState(null);
   const [currentAddress, setCurrentAddress] = useState('');
+
+  // Tự động phân giải địa chỉ thực tế (Forward Geocoding) để lấy toạ độ chính xác thay vì chỉ toạ độ khu vực
+  const [exactDestination, setExactDestination] = useState(destination);
+
+  useEffect(() => {
+    setExactDestination(destination);
+  }, [destination?.lat, destination?.lng, destination?.label]);
+
+  useEffect(() => {
+    let isMounted = true;
+    if (destination?.label) {
+      forwardGeocode(destination.label).then(geo => {
+        if (isMounted && geo && typeof geo.lat === 'number' && typeof geo.lng === 'number') {
+          setExactDestination(prev => ({
+            ...prev,
+            lat: geo.lat,
+            lng: geo.lng
+          }));
+        }
+      });
+    }
+    return () => { isMounted = false; };
+  }, [destination?.label]);
 
   // Hủy animation trượt marker khi component unmount, tránh setState/setLatLng
   // trên marker đã bị gỡ khỏi map.
@@ -92,7 +115,7 @@ export default function DeliveryMap({
   // Tải và vẽ lộ trình đường bộ thực tế (OSRM Road Routing) giữa Kho và Nhà khách
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !warehouse || !destination) return;
+    if (!map || !warehouse || !exactDestination) return;
 
     // Xóa marker cũ
     if (markersRef.current.warehouse) markersRef.current.warehouse.remove();
@@ -113,14 +136,14 @@ export default function DeliveryMap({
       .bindPopup(`<div style="padding:2px 4px;font-size:0.82rem;"><strong>Kho xuất phát</strong><br/>${warehouse.name || 'Kho AetherPC'}<br/><span style="font-size:0.75rem;color:#5f6368;">${warehouse.address || ''}</span></div>`);
 
     // Marker Nhà khách
-    markersRef.current.destination = L.marker([destination.lat, destination.lng], { icon: DESTINATION_ICON })
+    markersRef.current.destination = L.marker([exactDestination.lat, exactDestination.lng], { icon: DESTINATION_ICON })
       .addTo(map)
-      .bindPopup(`<div style="padding:2px 4px;font-size:0.82rem;"><strong>Điểm nhận hàng</strong><br/>${destination.label || 'Địa chỉ nhận hàng'}</div>`);
+      .bindPopup(`<div style="padding:2px 4px;font-size:0.82rem;"><strong>Điểm nhận hàng</strong><br/>${exactDestination.label || destination?.label || 'Địa chỉ nhận hàng'}</div>`);
 
     let isMounted = true;
 
     // Gọi dịch vụ OSRM để lấy toàn bộ các góc phố, khúc cua của con đường thực tế
-    fetchRoadRoute(warehouse, destination).then(route => {
+    fetchRoadRoute(warehouse, exactDestination).then(route => {
       if (!isMounted || !mapRef.current) return;
 
       if (route && route.coordinates && route.coordinates.length > 0) {
@@ -197,14 +220,14 @@ export default function DeliveryMap({
   // từ Kho), cộng thêm địa chỉ hiện tại (reverse geocode) kiểu Grab. Throttle
   // theo LIVE_RECALC_INTERVAL_MS để không gọi OSRM/Nominatim ở mọi lần GPS gửi.
   useEffect(() => {
-    if (!shipperPosition || !destination) return;
+    if (!shipperPosition || !exactDestination) return;
     const now = Date.now();
     if (now - lastLiveRecalcRef.current < LIVE_RECALC_INTERVAL_MS) return;
     lastLiveRecalcRef.current = now;
 
     let cancelled = false;
 
-    fetchRoadRoute(shipperPosition, destination).then((route) => {
+    fetchRoadRoute(shipperPosition, exactDestination).then((route) => {
       if (cancelled || !mapRef.current || !route?.coordinates?.length) return;
       setRemainingInfo(route);
       if (remainingLayerRef.current) remainingLayerRef.current.remove();
@@ -222,17 +245,17 @@ export default function DeliveryMap({
     });
 
     return () => { cancelled = true; };
-  }, [shipperPosition, destination]);
+  }, [shipperPosition, exactDestination]);
 
   const fitFullRoute = useCallback(() => {
     const map = mapRef.current;
     if (!map) return;
     if (routeCoordsRef.current.length > 0) {
       map.fitBounds(L.latLngBounds(routeCoordsRef.current), { padding: [45, 45], animate: true });
-    } else if (warehouse && destination) {
-      map.fitBounds(L.latLngBounds([[warehouse.lat, warehouse.lng], [destination.lat, destination.lng]]), { padding: [45, 45], animate: true });
+    } else if (warehouse && exactDestination) {
+      map.fitBounds(L.latLngBounds([[warehouse.lat, warehouse.lng], [exactDestination.lat, exactDestination.lng]]), { padding: [45, 45], animate: true });
     }
-  }, [warehouse, destination]);
+  }, [warehouse, exactDestination]);
 
   // Khoảng cách đường chim bay từ Shipper đến bạn — chỉ có ý nghĩa khi đã có
   // tín hiệu GPS sống; không dùng lại cho trường hợp chưa có vị trí (đã có

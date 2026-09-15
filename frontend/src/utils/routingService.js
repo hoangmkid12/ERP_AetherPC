@@ -1,7 +1,6 @@
 // OSRM (Open Source Routing Machine) - dịch vụ chỉ đường đường bộ thực tế miễn phí của OpenStreetMap
 // Mặc định gọi server demo công khai (không có SLA); trỏ VITE_OSRM_BASE_URL
-// sang instance tự host (xem thư mục osrm/) để có routing ổn định hơn.
-const OSRM_BASE_URL = import.meta.env.VITE_OSRM_BASE_URL || 'https://router.project-osrm.org';
+const OSRM_BASE_URL = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_OSRM_BASE_URL) || 'https://router.project-osrm.org';
 
 export async function fetchRoadRoute(origin, destination) {
   if (!origin?.lat || !origin?.lng || !destination?.lat || !destination?.lng) {
@@ -97,7 +96,31 @@ export async function reverseGeocode(lat, lng) {
   }
 }
 
-// Forward Geocoding thông minh cho địa chỉ Việt Nam (tự động phân tích phường/xã, quận/huyện, tỉnh/thành)
+// Từ điển toạ độ dự phòng chính xác cho các đơn vị hành chính trọng điểm & sáp nhập
+const ADMIN_FALLBACK_COORDS = [
+  { keys: ['tan phuoc', 'phu my'], lat: 10.5502574, lng: 107.0511265, name: 'Phường Tân Phước, Thị xã Phú Mỹ' },
+  { keys: ['phu my'], lat: 10.5960, lng: 107.0673, name: 'Thị xã Phú Mỹ' },
+  { keys: ['ben nghe'], lat: 10.7713, lng: 106.7058, name: 'Phường Bến Nghé, Quận 1' },
+  { keys: ['ben thanh'], lat: 10.7725, lng: 106.6980, name: 'Phường Bến Thành, Quận 1' },
+  { keys: ['thu duc'], lat: 10.8494, lng: 106.7717, name: 'TP. Thủ Đức' },
+  { keys: ['di an'], lat: 10.9069, lng: 106.7722, name: 'TP. Dĩ An' },
+  { keys: ['thuan an'], lat: 10.9238, lng: 106.6974, name: 'TP. Thuận An' },
+  { keys: ['thu dau mot'], lat: 10.9804, lng: 106.6519, name: 'TP. Thủ Dầu Một' },
+  { keys: ['bien hoa'], lat: 10.9574, lng: 106.8427, name: 'TP. Biên Hòa' },
+  { keys: ['vung tau'], lat: 10.3460, lng: 107.0843, name: 'TP. Vũng Tàu' },
+  { keys: ['ba ria'], lat: 10.4960, lng: 107.1685, name: 'TP. Bà Rịa' },
+  { keys: ['thuy nguyen'], lat: 20.9320, lng: 106.6780, name: 'TP. Thủy Nguyên' },
+  { keys: ['quan 1'], lat: 10.7769, lng: 106.7009, name: 'Quận 1, TP.HCM' },
+  { keys: ['quan 7'], lat: 10.7411, lng: 106.6989, name: 'Quận 7, TP.HCM' },
+  { keys: ['binh thanh'], lat: 10.8012, lng: 106.7114, name: 'Quận Bình Thạnh' },
+  { keys: ['cau giay'], lat: 21.0362, lng: 105.7906, name: 'Quận Cầu Giấy, Hà Nội' },
+  { keys: ['dong da'], lat: 21.0181, lng: 105.8273, name: 'Quận Đống Đa, Hà Nội' },
+  { keys: ['hoan kiem'], lat: 21.0285, lng: 105.8542, name: 'Quận Hoàn Kiếm, Hà Nội' },
+  { keys: ['hai chau'], lat: 16.0544, lng: 108.2022, name: 'Quận Hải Châu, Đà Nẵng' },
+  { keys: ['ninh kieu'], lat: 10.0342, lng: 105.7876, name: 'Quận Ninh Kiều, Cần Thơ' }
+];
+
+// Forward Geocoding thông minh cho địa chỉ Việt Nam (tự động thích ứng cả địa phương 2 cấp và 3 cấp)
 const geocodeCache = new Map();
 
 export async function forwardGeocode(address) {
@@ -105,43 +128,61 @@ export async function forwardGeocode(address) {
   const cleanKey = address.trim().toLowerCase();
   if (geocodeCache.has(cleanKey)) return geocodeCache.get(cleanKey);
 
-  const queries = [];
-  // Bỏ tiền tố tổ/thôn/số nhà (ví dụ "Tổ 2 Phước Lộc, ...")
-  const strippedDetail = address
+  // 1. Làm sạch sơ bộ chuỗi địa chỉ
+  const cleanAddr = address
+    .replace(/\(Ghi chú:[^)]*\)/gi, '')
+    .replace(/\s*\(gồm[^)]*\)/gi, '')
     .replace(/^Tổ\s+\d+[^,]*,/i, '')
     .replace(/^Số\s+[^,]*,/i, '')
     .trim();
 
-  // Bỏ các từ định danh hành chính
-  const strippedAdmin = strippedDetail
-    .replace(/\b(Phường|Xã|Thị trấn|Thị xã|Quận|Huyện|Thành phố|Tỉnh)\s+/gi, '')
+  // Tách các thành phần cách nhau bởi dấu phẩy
+  const rawParts = cleanAddr.split(',').map(s => s.trim()).filter(Boolean);
+
+  // Bỏ từ định danh hành chính (Phường, Xã, Quận, Huyện, Thị xã, TP...)
+  const stripPrefix = str => str
+    .replace(/\b(Phường|Xã|Thị trấn|Thị xã|Quận|Huyện|Thành phố|Tỉnh|TP\.?)\s+/gi, '')
     .trim();
 
-  const parts = strippedAdmin.split(',').map(s => s.trim()).filter(Boolean);
+  const cleanParts = rawParts.map(stripPrefix).filter(Boolean);
 
-  // Thử 1: [Phường/Xã, Quận/Huyện/Thị xã] (ví dụ: "Tân Phước, Phú Mỹ") -> tỷ lệ khớp OSM cao nhất
-  if (parts.length >= 2) {
-    queries.push(`${parts[0]}, ${parts[1]}`);
-  }
-  // Thử 2: Chuỗi đã bỏ chi tiết tổ/số nhà
-  queries.push(strippedDetail);
-  // Thử 3: 2 phần tử cuối
-  if (parts.length >= 2) {
-    queries.push(parts.slice(-2).join(', '));
-  }
-  // Thử 4: Chuỗi nguyên bản
-  queries.push(address);
+  const queries = [];
 
-  const uniqueQueries = [...new Set(queries)];
+  if (cleanParts.length >= 3) {
+    // Trường hợp 3 cấp: [Phường/Xã], [Quận/Huyện], [Tỉnh/TP]
+    const ward = cleanParts[cleanParts.length - 3];
+    const district = cleanParts[cleanParts.length - 2];
+    const province = cleanParts[cleanParts.length - 1];
+
+    queries.push(`${ward}, ${district}`);               // Thử 1: "Tân Phước, Phú Mỹ" (chuẩn nhất OSM)
+    queries.push(`${ward}, ${province}`);               // Thử 2: "Bến Nghé, Hồ Chí Minh"
+    queries.push(`${ward}, ${district}, ${province}`);   // Thử 3: Đầy đủ 3 cấp không tiền tố
+    queries.push(`${district}, ${province}`);           // Thử 4: "Phú Mỹ, Hồ Chí Minh"
+  } else if (cleanParts.length === 2) {
+    // Trường hợp 2 cấp: [Phường/Xã], [Tỉnh/TP]
+    const wardOrDist = cleanParts[0];
+    const province = cleanParts[1];
+
+    queries.push(`${wardOrDist}, ${province}`);         // Thử 1: "Bến Nghé, Hồ Chí Minh"
+    queries.push(wardOrDist);                           // Thử 2: Tên xã/phường
+  }
+
+  // Thử thêm chuỗi đã bỏ tiền tố và chuỗi nguyên bản
+  if (cleanParts.length > 0) {
+    queries.push(cleanParts.join(', '));
+  }
+  queries.push(cleanAddr);
+
+  const uniqueQueries = [...new Set(queries.filter(q => q && q.length > 2))];
 
   for (const q of uniqueQueries) {
     try {
       const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&countrycodes=vn&limit=1`;
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 4000);
+      const timeoutId = setTimeout(() => controller.abort(), 3500);
       const res = await fetch(url, {
         signal: controller.signal,
-        headers: { Accept: 'application/json' }
+        headers: { Accept: 'application/json', 'User-Agent': 'AetherPC-ERP/1.0' }
       });
       clearTimeout(timeoutId);
 
@@ -158,9 +199,25 @@ export async function forwardGeocode(address) {
         }
       }
     } catch (_) {
-      // Tiếp tục thử query tiếp theo
+      // Tiếp tục fallback query tiếp theo
+    }
+  }
+
+  // Fallback từ điển các đơn vị hành chính sau sáp nhập
+  const normAddr = cleanKey.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd');
+  for (const item of ADMIN_FALLBACK_COORDS) {
+    const allMatch = item.keys.every(k => normAddr.includes(k));
+    if (allMatch) {
+      const fallbackResult = {
+        lat: item.lat,
+        lng: item.lng,
+        displayName: item.name
+      };
+      geocodeCache.set(cleanKey, fallbackResult);
+      return fallbackResult;
     }
   }
 
   return null;
 }
+
