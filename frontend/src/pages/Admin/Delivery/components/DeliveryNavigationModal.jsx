@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { X, Navigation, Phone, MapPin, Compass, AlertCircle, Gauge, Camera, ExternalLink } from 'lucide-react';
+import { X, Navigation, Phone, MapPin, Compass, AlertCircle, Gauge, Camera, ExternalLink, Pause } from 'lucide-react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { fetchRoadRoute, forwardGeocode } from '../../../../utils/routingService';
@@ -272,70 +272,60 @@ export default function DeliveryNavigationModal({
 
         {/* Thông tin khách hàng tóm tắt */}
         <div style={{
-          padding: '0.75rem 1.25rem',
+          padding: '0.75rem 1.15rem',
           backgroundColor: '#eff6ff',
           borderBottom: '1px solid #bfdbfe',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: '0.5rem',
-          fontSize: '0.8rem'
+          fontSize: '0.82rem'
         }}>
-          <div>
-            <span style={{ color: '#64748b' }}>Khách hàng:</span> <strong style={{ color: '#0f172a' }}>{customerName}</strong>
-            {phone && (
-              <a
-                href={`tel:${phone}`}
-                style={{
-                  marginLeft: '0.5rem',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '0.2rem',
-                  color: '#2563eb',
-                  fontWeight: 700,
-                  textDecoration: 'none',
-                  backgroundColor: '#dbeafe',
-                  padding: '2px 8px',
-                  borderRadius: '4px'
-                }}
-              >
-                <Phone size={12} /> {phone}
-              </a>
-            )}
-            <div style={{ color: '#334155', marginTop: '0.25rem', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                <MapPin size={13} style={{ color: '#64748b', flexShrink: 0 }} /> <span><strong>Địa chỉ:</strong> {address}</span>
-              </div>
-              <a
-                href={googleMapsUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '0.25rem',
-                  fontSize: '0.72rem',
-                  color: '#0284c7',
-                  backgroundColor: '#e0f2fe',
-                  border: '1px solid #bae6fd',
-                  padding: '2px 7px',
-                  borderRadius: '4px',
-                  textDecoration: 'none',
-                  fontWeight: 750
-                }}
-                title="Mở ứng dụng Google Maps ngoài để nghe chỉ đường bằng giọng nói"
-              >
-                <ExternalLink size={11} /> Mở Google Maps
-              </a>
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: '0.75rem',
+            marginBottom: '0.35rem'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <span style={{ color: '#64748b' }}>Khách hàng:</span>
+              <strong style={{ color: '#0f172a' }}>{customerName}</strong>
+              {phone && (
+                <a
+                  href={`tel:${phone}`}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.25rem',
+                    color: '#2563eb',
+                    fontWeight: 700,
+                    textDecoration: 'none',
+                    backgroundColor: '#dbeafe',
+                    padding: '2px 8px',
+                    borderRadius: '5px',
+                    fontSize: '0.78rem'
+                  }}
+                >
+                  <Phone size={12} /> {phone}
+                </a>
+              )}
+            </div>
+
+            <div style={{ whiteSpace: 'nowrap', textAlign: 'right' }}>
+              <span style={{ color: '#64748b', fontSize: '0.78rem' }}>Thu hộ COD: </span>
+              <strong style={{ color: isPrepaid ? '#16a34a' : '#ef4444', fontSize: '0.95rem' }}>
+                {isPrepaid ? 'Đã Thanh Toán Online' : fmt ? fmt(codAmount) : `${codAmount.toLocaleString('vi-VN')} ₫`}
+              </strong>
             </div>
           </div>
 
-          <div style={{ textAlign: 'right' }}>
-            <span style={{ color: '#64748b' }}>Thu hộ COD:</span>{' '}
-            <strong style={{ color: isPrepaid ? '#16a34a' : '#ef4444', fontSize: '0.95rem' }}>
-              {isPrepaid ? 'Đã Thanh Toán Online' : fmt ? fmt(codAmount) : `${codAmount.toLocaleString('vi-VN')} ₫`}
-            </strong>
+          <div style={{
+            color: '#334155',
+            fontSize: '0.78rem',
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: '0.35rem',
+            lineHeight: 1.35
+          }}>
+            <MapPin size={14} style={{ color: '#ef4444', flexShrink: 0, marginTop: '2px' }} />
+            <span><strong style={{ color: '#475569' }}>Địa chỉ:</strong> {address}</span>
           </div>
         </div>
 
@@ -440,15 +430,15 @@ export default function DeliveryNavigationModal({
           </div>
         )}
 
-        {/* Thanh nút hành động chính */}
+        {/* Thanh nút hành động chính — Cân đối 3 cột đồng đều */}
         <div style={{
-          padding: '0.85rem 1rem',
+          padding: '0.75rem 0.85rem',
           backgroundColor: '#ffffff',
           borderTop: '1px solid #e2e8f0',
-          display: 'flex',
-          gap: '0.65rem',
-          alignItems: 'center',
-          flexWrap: 'wrap'
+          display: 'grid',
+          gridTemplateColumns: 'repeat(3, 1fr)',
+          gap: '0.5rem',
+          alignItems: 'center'
         }}>
           {!isEffectiveGpsActive ? (
             <button
@@ -456,24 +446,25 @@ export default function DeliveryNavigationModal({
               className="delivery-tap-target"
               onClick={() => onStartDeliveryWithGps && onStartDeliveryWithGps(order, shipperLoc)}
               style={{
-                flex: '1 1 180px',
-                padding: '0.7rem 1rem',
+                height: '46px',
+                padding: '0 0.4rem',
                 backgroundColor: '#2563eb',
                 color: '#ffffff',
                 border: 'none',
                 borderRadius: '10px',
-                fontWeight: 750,
-                fontSize: '0.85rem',
+                fontWeight: 700,
+                fontSize: '0.84rem',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '0.45rem',
-                boxShadow: '0 4px 12px rgba(37,99,235,0.25)'
+                gap: '0.35rem',
+                whiteSpace: 'nowrap',
+                boxShadow: '0 2px 8px rgba(37,99,235,0.2)'
               }}
             >
-              <Navigation size={16} />
-              Bắt Đầu Giao (Bật Live GPS)
+              <Navigation size={15} />
+              Bắt Đầu Giao
             </button>
           ) : (
             <button
@@ -481,18 +472,24 @@ export default function DeliveryNavigationModal({
               className="delivery-tap-target"
               onClick={() => onStopGps && onStopGps(order)}
               style={{
-                flex: '1 1 130px',
-                padding: '0.7rem 0.85rem',
-                backgroundColor: 'transparent',
-                color: '#dc2626',
-                border: '1.5px solid #dc2626',
+                height: '46px',
+                padding: '0 0.4rem',
+                backgroundColor: '#fff1f2',
+                color: '#e11d48',
+                border: '1.5px solid #fecdd3',
                 borderRadius: '10px',
                 fontWeight: 700,
-                fontSize: '0.82rem',
-                cursor: 'pointer'
+                fontSize: '0.84rem',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.35rem',
+                whiteSpace: 'nowrap'
               }}
             >
-              Tạm Dừng Định Vị
+              <Pause size={15} />
+              Tạm Dừng
             </button>
           )}
 
@@ -502,20 +499,21 @@ export default function DeliveryNavigationModal({
             rel="noopener noreferrer"
             className="delivery-tap-target"
             style={{
-              flex: '0 0 auto',
-              padding: '0.7rem 0.95rem',
+              height: '46px',
+              padding: '0 0.4rem',
               backgroundColor: '#f0f9ff',
               color: '#0284c7',
               border: '1.5px solid #bae6fd',
               borderRadius: '10px',
-              fontWeight: 750,
+              fontWeight: 700,
               fontSize: '0.84rem',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '0.4rem',
-              textDecoration: 'none'
+              gap: '0.35rem',
+              textDecoration: 'none',
+              whiteSpace: 'nowrap'
             }}
             title="Mở ứng dụng Google Maps ngoài để nghe chỉ đường bằng giọng nói"
           >
@@ -531,24 +529,25 @@ export default function DeliveryNavigationModal({
               if (onOpenPOD) onOpenPOD(order);
             }}
             style={{
-              flex: '1 1 180px',
-              padding: '0.7rem 1rem',
+              height: '46px',
+              padding: '0 0.4rem',
               backgroundColor: '#16a34a',
               color: '#ffffff',
               border: 'none',
               borderRadius: '10px',
-              fontWeight: 750,
-              fontSize: '0.85rem',
+              fontWeight: 700,
+              fontSize: '0.84rem',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '0.45rem',
-              boxShadow: '0 4px 12px rgba(22,163,74,0.25)'
+              gap: '0.35rem',
+              whiteSpace: 'nowrap',
+              boxShadow: '0 2px 8px rgba(22,163,74,0.2)'
             }}
           >
-            <Camera size={16} />
-            Đã Đến Nơi - Chụp Ảnh POD
+            <Camera size={15} />
+            Đã Đến Nơi
           </button>
         </div>
       </div>
