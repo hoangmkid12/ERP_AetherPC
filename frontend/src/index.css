@@ -1434,6 +1434,13 @@ select.input-field option {
   .header-mobile-toggle {
     display: inline-flex !important;
   }
+
+  /* Wishlist trigger is redundant on mobile — the drawer opened by the
+     hamburger already has its own "Danh Sách Yêu Thích" entry — so free up
+     header space instead of leaving it crammed next to Cart/Bell/User. */
+  .desktop-only {
+    display: none !important;
+  }
 }
 
 /* Breakpoint: <= 768px (Smartphones) */
@@ -1462,6 +1469,22 @@ select.input-field option {
     left: auto !important;
     width: min(280px, calc(100vw - 2rem)) !important;
     max-width: calc(100vw - 2rem) !important;
+  }
+
+  /* Cart goes icon-only on phones (badge already shows the count) so the
+     action cluster (Cart, Bell, User avatar, Hamburger) never overflows and
+     starves the logo of room on the left. */
+  .header-cart-text {
+    display: none !important;
+  }
+
+  .header-cart-link {
+    padding: 0 0.6rem !important;
+    gap: 0 !important;
+  }
+
+  .header-actions {
+    gap: 0.5rem !important;
   }
 }
 

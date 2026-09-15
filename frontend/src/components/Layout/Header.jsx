@@ -259,9 +259,9 @@ export default function Header() {
           </nav>
 
           {/* Actions */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexShrink: 0 }}>
+          <div className="header-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexShrink: 0 }}>
             {/* Cart */}
-            <Link to="/cart" style={{
+            <Link to="/cart" className="header-cart-link" style={{
               position: 'relative',
               display: 'flex',
               alignItems: 'center',
@@ -282,7 +282,7 @@ export default function Header() {
               onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border-glass)'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
             >
               <ShoppingBag size={15} />
-              <span>Giỏ Hàng</span>
+              <span className="header-cart-text">Giỏ Hàng</span>
               {cartCount > 0 && (
                 <span style={{
                   position: 'absolute',
