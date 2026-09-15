@@ -140,8 +140,9 @@ export default function Login() {
   };
 
   return (
-    <div style={{
+    <div className="login-page-container" style={{
       minHeight: '100vh',
+      width: '100%',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -153,6 +154,7 @@ export default function Login() {
     }}>
       {/* Back to Home Button */}
       <button
+        className="login-back-btn"
         onClick={() => navigate('/')}
         style={{
           position: 'absolute',
@@ -190,20 +192,20 @@ export default function Login() {
       </button>
 
       {/* Main Container */}
-      <div style={{ width: '100%', maxWidth: isRegister ? '900px' : '460px', zIndex: 1 }}>
+      <div className="login-card-wrapper" style={{ width: '100%', maxWidth: isRegister ? '900px' : '460px', zIndex: 1 }}>
         
         {/* Card */}
-        <div style={{ 
+        <div className="login-card" style={{ 
           backgroundColor: '#ffffff', 
           border: '1px solid #e2e8f0', 
           borderRadius: '24px', 
           overflow: 'hidden',
           boxShadow: '0 24px 60px -10px rgba(15, 23, 42, 0.13)' 
         }}>
-          <div style={{ display: 'flex', flexDirection: 'row' }}>
+          <div className="login-card-layout" style={{ display: 'flex', flexDirection: 'row' }}>
             
             {/* ── LEFT COLUMN: Form ── */}
-            <div style={{ flex: '1 1 420px', padding: '2.5rem', minWidth: '300px' }}>
+            <div className="login-form-container" style={{ flex: '1 1 420px', padding: '2.5rem', minWidth: '300px' }}>
               
               {/* Brand */}
               <div style={{ marginBottom: '2rem' }}>
@@ -347,7 +349,7 @@ export default function Login() {
                       />
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                    <div className="login-input-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
                       <div>
                         <label htmlFor="regName" style={{ color: '#374151', fontWeight: 600, fontSize: '0.85rem', marginBottom: '0.4rem', display: 'block' }}>Họ và Tên *</label>
                         <input
@@ -370,7 +372,7 @@ export default function Login() {
                       </div>
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+                    <div className="login-input-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
                       <div>
                         <label htmlFor="regPassword" style={{ color: '#374151', fontWeight: 600, fontSize: '0.85rem', marginBottom: '0.4rem', display: 'block' }}>Mật khẩu *</label>
                         <input
@@ -419,7 +421,7 @@ export default function Login() {
 
             {/* ── RIGHT COLUMN: Chỉ hiện ở Register mode ── */}
             {isRegister && (
-              <div style={{ 
+              <div className="login-benefits-banner" style={{ 
                 flex: '0 0 340px',
                 background: 'linear-gradient(160deg, #eff6ff 0%, #dbeafe 100%)',
                 borderLeft: '1px solid #bfdbfe',

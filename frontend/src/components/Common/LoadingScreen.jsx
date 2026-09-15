@@ -2,9 +2,9 @@ import React from 'react';
 import { ShieldAlert, Cpu } from 'lucide-react';
 
 export default function LoadingScreen({
-  text = 'Đang tải hệ thống...',
-  subtext = 'Vui lòng chờ trong giây lát, dữ liệu đang được đồng bộ',
-  minHeight = '100vh',
+  text = 'Đang nạp phân hệ...',
+  subtext = '',
+  minHeight = '100dvh',
   fullScreen = false
 }) {
   return (
@@ -14,13 +14,13 @@ export default function LoadingScreen({
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        minHeight: fullScreen ? '100vh' : minHeight,
+        minHeight: fullScreen ? '100dvh' : minHeight,
         width: '100%',
         backgroundColor: 'var(--bg-app, #f8fafc)',
         position: fullScreen ? 'fixed' : 'relative',
         inset: fullScreen ? 0 : 'auto',
         zIndex: fullScreen ? 999999 : 1,
-        padding: '2rem 1rem',
+        padding: '1.5rem 1rem',
         boxSizing: 'border-box',
         animation: 'fadeInLoading 0.3s ease-out'
       }}
@@ -83,7 +83,7 @@ export default function LoadingScreen({
       </div>
 
       {/* Brand Title */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.35rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.4rem' }}>
         <span style={{ fontSize: '1.05rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', fontFamily: 'var(--font-title, inherit)' }}>
           AETHER PC
         </span>
@@ -93,11 +93,11 @@ export default function LoadingScreen({
       </div>
 
       {/* Status Text */}
-      <h3 style={{ fontSize: '0.92rem', fontWeight: 700, color: '#334155', margin: '0 0 0.35rem 0', textAlign: 'center' }}>
+      <h3 style={{ fontSize: '0.92rem', fontWeight: 700, color: '#334155', margin: subtext ? '0 0 0.35rem 0' : '0 0 1.25rem 0', textAlign: 'center', maxWidth: '90vw' }}>
         {text}
       </h3>
 
-      {/* Subtext */}
+      {/* Subtext (only if provided) */}
       {subtext && (
         <p style={{ fontSize: '0.78rem', color: '#64748b', margin: '0 0 1.25rem 0', textAlign: 'center', maxWidth: '320px', lineHeight: 1.45 }}>
           {subtext}
@@ -107,7 +107,7 @@ export default function LoadingScreen({
       {/* Modern High-Tech Shimmer Progress Bar */}
       <div
         style={{
-          width: '180px',
+          width: 'min(200px, 65vw)',
           height: '4px',
           borderRadius: '999px',
           backgroundColor: '#e2e8f0',

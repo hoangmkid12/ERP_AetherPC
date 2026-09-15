@@ -1869,6 +1869,62 @@ html, body {
   .container {
     padding: 0 0.85rem !important;
   }
+
+  /* Trang Đăng Nhập & Đăng Ký trên điện thoại (< 768px): cân đối, không tràn màn hình */
+  .login-page-container {
+    flex-direction: column !important;
+    padding: 1.25rem 1rem 2.5rem !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    min-height: 100dvh !important;
+    box-sizing: border-box !important;
+  }
+
+  .login-back-btn {
+    position: static !important;
+    margin-bottom: 1rem !important;
+    align-self: flex-start !important;
+    font-size: 0.85rem !important;
+    padding: 0.5rem 1rem !important;
+  }
+
+  .login-card-wrapper {
+    width: 100% !important;
+    max-width: 480px !important;
+    margin: 0 auto !important;
+    box-sizing: border-box !important;
+  }
+
+  .login-card {
+    border-radius: 20px !important;
+    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08) !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .login-card-layout {
+    flex-direction: column !important;
+    width: 100% !important;
+  }
+
+  .login-form-container {
+    padding: 1.75rem 1.25rem !important;
+    min-width: 0 !important;
+    width: 100% !important;
+    flex: 1 1 auto !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Chuyển các cặp ô nhập liệu Họ tên + Email, Mật khẩu + SĐT về 1 cột trên điện thoại để không bị co nhỏ hay tràn lề */
+  .login-input-grid {
+    grid-template-columns: 1fr !important;
+    gap: 0.85rem !important;
+  }
+
+  /* Ẩn cột banner quyền lợi trên điện thoại để form đăng ký cân đối, gọn gàng, không bị lệch hoặc tràn màn hình */
+  .login-benefits-banner {
+    display: none !important;
+  }
 }
 
 /* 5. Breakpoint Small Mobile (< 480px) */
