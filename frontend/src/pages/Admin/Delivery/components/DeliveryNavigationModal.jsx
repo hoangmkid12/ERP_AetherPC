@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { X, Navigation, Phone, MapPin, Compass, AlertCircle, Gauge, Camera, ExternalLink, Pause } from 'lucide-react';
+import { X, Navigation, Phone, MapPin, Compass, AlertCircle, Gauge, ExternalLink, Pause } from 'lucide-react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { fetchRoadRoute, forwardGeocode } from '../../../../utils/routingService';
 import { TILE_URL, TILE_ATTRIBUTION, TILE_MAX_ZOOM, WAREHOUSE_ICON, DESTINATION_ICON, SHIPPER_ICON } from '../../../../utils/mapIcons';
 import useSafeViewportHeight from '../../../../hooks/useSafeViewportHeight';
+import PODCaptureSection from './PODCaptureSection';
 
 function haversineKm(a, b) {
   if (!a || !b) return null;
@@ -19,12 +20,14 @@ function haversineKm(a, b) {
 
 export default function DeliveryNavigationModal({
   order,
+  user,
   warehouse,
   destination,
   isGpsActive,
   onStartDeliveryWithGps,
   onStopGps,
-  onOpenPOD,
+  onConfirmDelivered,
+  onReject,
   onClose,
   fmt
 }) {
@@ -51,6 +54,16 @@ export default function DeliveryNavigationModal({
   const address = order?.shippingAddress || order?.address || destination?.label || '';
   const codAmount = parseFloat(order?.totalAmount || order?.total || 0);
   const isPrepaid = order?.paymentStatus === 'PAID' || order?.paymentMethod === 'ONLINE_GATEWAY' || order?.paymentMethod === 'BANK_TRANSFER' || codAmount === 0;
+
+  // Tự động phát GPS ngay khi vào màn hình "Bắt Đầu Giao" gộp — bỏ nút bấm
+  // riêng, chỉ còn badge nhỏ trên bản đồ để tắt/bật lại khi cần.
+  const autoStartedRef = useRef(false);
+  useEffect(() => {
+    if (autoStartedRef.current || isEffectiveGpsActive) return;
+    autoStartedRef.current = true;
+    if (onStartDeliveryWithGps) onStartDeliveryWithGps(order, shipperLoc);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Tự động phân giải địa chỉ thực tế (Forward Geocoding) để lấy toạ độ chính xác thay vì chỉ toạ độ khu vực
   const [exactDestination, setExactDestination] = useState(destination);
@@ -320,11 +333,26 @@ export default function DeliveryNavigationModal({
               )}
             </div>
 
-            <div style={{ whiteSpace: 'nowrap', textAlign: 'right' }}>
-              <span style={{ color: '#64748b', fontSize: '0.78rem' }}>Thu hộ COD: </span>
-              <strong style={{ color: isPrepaid ? '#16a34a' : '#ef4444', fontSize: '0.95rem' }}>
-                {isPrepaid ? 'Đã Thanh Toán Online' : fmt ? fmt(codAmount) : `${codAmount.toLocaleString('vi-VN')} ₫`}
-              </strong>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>
+              <div style={{ whiteSpace: 'nowrap', textAlign: 'right' }}>
+                <span style={{ color: '#64748b', fontSize: '0.78rem' }}>Thu hộ COD: </span>
+                <strong style={{ color: isPrepaid ? '#16a34a' : '#ef4444', fontSize: '0.95rem' }}>
+                  {isPrepaid ? 'Đã Thanh Toán Online' : fmt ? fmt(codAmount) : `${codAmount.toLocaleString('vi-VN')} ₫`}
+                </strong>
+              </div>
+              <a
+                href={googleMapsUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Mở Google Maps để nghe chỉ đường bằng giọng nói"
+                style={{
+                  flexShrink: 0, width: '32px', height: '32px', borderRadius: '50%',
+                  backgroundColor: '#0284c7', color: '#fff', display: 'flex',
+                  alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 6px rgba(2,132,199,0.3)'
+                }}
+              >
+                <ExternalLink size={15} />
+              </a>
             </div>
           </div>
 
@@ -370,30 +398,40 @@ export default function DeliveryNavigationModal({
             <Compass size={17} color="#5f6368" />
           </button>
 
-          {/* Badge trạng thái GPS */}
-          <div style={{
-            position: 'absolute',
-            bottom: '12px',
-            left: '12px',
-            zIndex: 999,
-            backgroundColor: isEffectiveGpsActive ? '#15803d' : 'rgba(15, 23, 42, 0.85)',
-            color: '#ffffff',
-            padding: '5px 12px',
-            borderRadius: '999px',
-            fontSize: '0.75rem',
-            fontWeight: 700,
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.4rem',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
-          }}>
+          {/* Badge trạng thái GPS — bấm được để tắt/bật lại, thay cho nút
+              Bắt Đầu Giao/Tạm Dừng lớn trước đây (GPS giờ tự bật khi vào
+              màn hình, badge này chỉ còn dùng khi cần tạm dừng thủ công). */}
+          <button
+            type="button"
+            onClick={() => (isEffectiveGpsActive ? (onStopGps && onStopGps(order)) : (onStartDeliveryWithGps && onStartDeliveryWithGps(order, shipperLoc)))}
+            title={isEffectiveGpsActive ? 'Bấm để tạm dừng phát GPS' : 'Bấm để bật lại GPS'}
+            style={{
+              position: 'absolute',
+              bottom: '12px',
+              left: '12px',
+              zIndex: 999,
+              border: 'none',
+              cursor: 'pointer',
+              backgroundColor: isEffectiveGpsActive ? '#15803d' : 'rgba(15, 23, 42, 0.85)',
+              color: '#ffffff',
+              padding: '5px 12px',
+              borderRadius: '999px',
+              fontSize: '0.75rem',
+              fontWeight: 700,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
+            }}
+          >
+            {isEffectiveGpsActive ? <Pause size={12} /> : <Navigation size={12} />}
             <span style={{
               width: '8px', height: '8px', borderRadius: '50%',
               backgroundColor: isEffectiveGpsActive ? '#4ade80' : '#f59e0b',
               boxShadow: isEffectiveGpsActive ? '0 0 8px #4ade80' : 'none'
             }} />
-            {isEffectiveGpsActive ? 'GPS THỜI GIAN THỰC ĐANG BẬT' : 'CHƯA BẬT GPS GIAO HÀNG'}
-          </div>
+            {isEffectiveGpsActive ? 'GPS ĐANG BẬT — BẤM ĐỂ TẠM DỪNG' : 'CHƯA BẬT GPS — BẤM ĐỂ BẬT'}
+          </button>
         </div>
 
         {/* Thẻ ETA phẳng — cùng bố cục với bottom-card của DeliveryMap.jsx
@@ -442,135 +480,17 @@ export default function DeliveryNavigationModal({
           </div>
         )}
 
-        {/* Thanh nút hành động chính — Cân đối 3 cột đồng đều. Đặt NGAY TRONG
-            vùng cuộn (không phải sibling ngoài flex) và ghim bằng
-            position:sticky+bottom:0 thay vì chỉ dựa vào flex-shrink:0 của
-            phần tử anh em: sticky bám theo scrollport thực tế của trình
-            duyệt nên vẫn hiển thị đúng kể cả khi 100dvh tính sai/trễ so với
-            chiều cao khả kiến thật trên điện thoại thật (thanh địa chỉ ẩn/hiện
-            khi cuộn), tránh tái diễn lỗi bị khoảng trắng che mất nút. */}
-        <div className="delivery-modal-action-bar" style={{
-          position: 'sticky',
-          bottom: 0,
-          zIndex: 10,
-          marginTop: 'auto',
-          padding: '0.75rem 0.85rem 0',
-          backgroundColor: '#ffffff',
-          borderTop: '1px solid #e2e8f0',
-          display: 'grid',
-          gridTemplateColumns: 'repeat(3, 1fr)',
-          gap: '0.5rem',
-          alignItems: 'center'
-        }}>
-          {!isEffectiveGpsActive ? (
-            <button
-              type="button"
-              className="delivery-tap-target"
-              onClick={() => onStartDeliveryWithGps && onStartDeliveryWithGps(order, shipperLoc)}
-              style={{
-                height: '46px',
-                padding: '0 0.4rem',
-                backgroundColor: '#2563eb',
-                color: '#ffffff',
-                border: 'none',
-                borderRadius: '10px',
-                fontWeight: 700,
-                fontSize: '0.84rem',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '0.35rem',
-                whiteSpace: 'nowrap',
-                boxShadow: '0 2px 8px rgba(37,99,235,0.2)'
-              }}
-            >
-              <Navigation size={15} />
-              Bắt Đầu Giao
-            </button>
-          ) : (
-            <button
-              type="button"
-              className="delivery-tap-target"
-              onClick={() => onStopGps && onStopGps(order)}
-              style={{
-                height: '46px',
-                padding: '0 0.4rem',
-                backgroundColor: '#fff1f2',
-                color: '#e11d48',
-                border: '1.5px solid #fecdd3',
-                borderRadius: '10px',
-                fontWeight: 700,
-                fontSize: '0.84rem',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '0.35rem',
-                whiteSpace: 'nowrap'
-              }}
-            >
-              <Pause size={15} />
-              Tạm Dừng
-            </button>
-          )}
-
-          <a
-            href={googleMapsUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="delivery-tap-target"
-            style={{
-              height: '46px',
-              padding: '0 0.4rem',
-              backgroundColor: '#f0f9ff',
-              color: '#0284c7',
-              border: '1.5px solid #bae6fd',
-              borderRadius: '10px',
-              fontWeight: 700,
-              fontSize: '0.84rem',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '0.35rem',
-              textDecoration: 'none',
-              whiteSpace: 'nowrap'
-            }}
-            title="Mở ứng dụng Google Maps ngoài để nghe chỉ đường bằng giọng nói"
-          >
-            <ExternalLink size={15} color="#0284c7" />
-            Google Maps
-          </a>
-
-          <button
-            type="button"
-            className="delivery-tap-target"
-            onClick={() => {
-              onClose();
-              if (onOpenPOD) onOpenPOD(order);
-            }}
-            style={{
-              height: '46px',
-              padding: '0 0.4rem',
-              backgroundColor: '#16a34a',
-              color: '#ffffff',
-              border: 'none',
-              borderRadius: '10px',
-              fontWeight: 700,
-              fontSize: '0.84rem',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '0.35rem',
-              whiteSpace: 'nowrap',
-              boxShadow: '0 2px 8px rgba(22,163,74,0.2)'
-            }}
-          >
-            <Camera size={15} />
-            Đã Đến Nơi
-          </button>
+        {/* Chụp ảnh minh chứng + thu tiền/người nhận + trượt xác nhận giao
+            thành công — gộp thẳng vào đây thay vì phải mở tiếp modal POD
+            riêng, kèm nút "Từ Chối" nhỏ bên cạnh thanh trượt. */}
+        <div style={{ padding: '1rem' }}>
+          <PODCaptureSection
+            order={order}
+            user={user}
+            fmt={fmt}
+            onConfirm={onConfirmDelivered}
+            onReject={onReject}
+          />
         </div>
         </div>
       </div>

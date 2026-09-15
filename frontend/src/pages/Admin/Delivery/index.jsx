@@ -14,6 +14,7 @@ import ReturnsTab from './ReturnsTab';
 import HistoryTab from './HistoryTab';
 import PODModal from './components/PODModal';
 import FailModal from './components/FailModal';
+import QuickFailSheet from './components/QuickFailSheet';
 import ReturnProofModal from './components/ReturnProofModal';
 import OrderDetailSheet from './components/OrderDetailSheet';
 import DeliveryNavigationModal from './components/DeliveryNavigationModal';
@@ -208,6 +209,8 @@ export default function Delivery() {
 
   // Delivery Failure Modal State
   const [failModal, setFailModal] = useState(null);
+  // Quick 1-tap fail reason sheet (from the consolidated "Bắt Đầu Giao" screen)
+  const [quickFailOrder, setQuickFailOrder] = useState(null);
   // Proof of Delivery Modal State
   const [deliverModal, setDeliverModal] = useState(null);
   // Return-to-Warehouse Photo Proof Modal State
@@ -451,9 +454,9 @@ export default function Delivery() {
     }
   };
 
-  const handleConfirmDelivered = async (payload) => {
-    if (!deliverModal) return;
-    const ordId = deliverModal.orderId || deliverModal.id;
+  const handleConfirmDelivered = async (ord, payload) => {
+    if (!ord) return;
+    const ordId = ord.orderId || ord.id;
     const payLabel = payload.actualPaymentMethod === 'BANK_TRANSFER' ? `Chuyển khoản VietQR (${payload.bankRefCode})` : (payload.actualPaymentMethod === 'CASH' ? 'Tiền mặt' : 'Đã thanh toán trước');
 
     // Optimistically update apiOrders state for instant UI responsiveness
@@ -482,9 +485,9 @@ export default function Delivery() {
     }
   };
 
-  const handleFailDelivery = async (payload) => {
-    if (!failModal) return;
-    const ordId = failModal.orderId || failModal.id;
+  const handleFailDelivery = async (ord, payload) => {
+    if (!ord) return;
+    const ordId = ord.orderId || ord.id;
 
     if (gpsOrderId === String(ordId)) stopGps();
 
@@ -499,6 +502,7 @@ export default function Delivery() {
       return o;
     }));
     setFailModal(null);
+    setQuickFailOrder(null);
 
     try {
       await updateOrderStatus(ordId, 'SHIPPING_FAILED', payload);
@@ -1017,7 +1021,7 @@ export default function Delivery() {
           user={user}
           fmt={fmt}
           onClose={() => setDeliverModal(null)}
-          onConfirm={handleConfirmDelivered}
+          onConfirm={(payload) => { handleConfirmDelivered(deliverModal, payload); setDeliverModal(null); }}
         />
       )}
 
@@ -1025,7 +1029,16 @@ export default function Delivery() {
         <FailModal
           order={failModal}
           onClose={() => setFailModal(null)}
-          onConfirm={handleFailDelivery}
+          onConfirm={(payload) => handleFailDelivery(failModal, payload)}
+        />
+      )}
+
+      {quickFailOrder && (
+        <QuickFailSheet
+          order={quickFailOrder}
+          onConfirm={(payload) => handleFailDelivery(quickFailOrder, payload)}
+          onOpenFullFail={(ord) => { setQuickFailOrder(null); setFailModal(ord); }}
+          onClose={() => setQuickFailOrder(null)}
         />
       )}
 
@@ -1052,6 +1065,7 @@ export default function Delivery() {
       {navigationModalOrder && (
         <DeliveryNavigationModal
           order={navigationModalOrder}
+          user={user}
           warehouse={getOriginForRegion(navigationModalOrder.deliveryRegion || detectDeliveryRegion(navigationModalOrder.shippingAddress || navigationModalOrder.address || ''))}
           destination={{
             ...(REGION_COORDS[navigationModalOrder.deliveryRegion || detectDeliveryRegion(navigationModalOrder.shippingAddress || navigationModalOrder.address || '')] || REGION_COORDS.ALL),
@@ -1060,9 +1074,13 @@ export default function Delivery() {
           isGpsActive={gpsOrderId === String(navigationModalOrder.orderId || navigationModalOrder.id)}
           onStartDeliveryWithGps={handleStartDeliveryWithGps}
           onStopGps={stopGps}
-          onOpenPOD={(ord) => {
-            setDeliverModal(ord);
+          onConfirmDelivered={(payload) => {
+            handleConfirmDelivered(navigationModalOrder, payload);
             setNavigationModalOrder(null);
+          }}
+          onReject={(ord) => {
+            setNavigationModalOrder(null);
+            setQuickFailOrder(ord);
           }}
           onClose={() => setNavigationModalOrder(null)}
           fmt={fmt}

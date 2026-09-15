@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { X, AlertTriangle } from 'lucide-react';
+import { buildFailPayload } from '../deliveryHelpers';
 
 // Delivery-failure report flow. Keeps the reason dropdown + attempt
 // counter + free-text note from the old Delivery.jsx (these ARE read by
@@ -15,18 +16,7 @@ export default function FailModal({ order: failModal, onClose, onConfirm }) {
 
   const handleSubmit = () => {
     if (!failReason) return;
-    const isNoContact = failReason.includes('Không liên lạc được');
-    const now = new Date();
-    const deadline24h = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();
-
-    onConfirm({
-      failReason,
-      failNote,
-      failedAt: now.toISOString(),
-      callbackDeadline: isNoContact ? deadline24h : null,
-      isAwaitingCallback: isNoContact,
-      deliveryAttempts: attemptCount
-    });
+    onConfirm(buildFailPayload(failModal, failReason, failNote));
   };
 
   return (

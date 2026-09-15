@@ -1,7 +1,6 @@
 import React from 'react';
-import { Truck, Clock, Camera, Eye, Radio, PlayCircle, Navigation, Phone, MapPin, ExternalLink } from 'lucide-react';
+import { Truck, Clock, Eye, Navigation, Phone, MapPin } from 'lucide-react';
 import { getDeliveryIncidentStatus } from '../deliveryHelpers';
-import { detectDeliveryRegion, REGION_COORDS } from '../../../../utils/deliveryRegions';
 
 // Shared full-width mobile card used by PendingTab / ActiveTab / HistoryTab.
 // `variant` controls which action buttons render:
@@ -26,12 +25,6 @@ export default function OrderCard({ order: ord, variant, fmt, getOrderTimeClassi
     isGpsActive ||
     (orderId && typeof window !== 'undefined' && localStorage.getItem('aether_active_gps_order_id') === orderId)
   );
-
-  const region = ord.deliveryRegion || detectDeliveryRegion(ord.shippingAddress || ord.address || '');
-  const destCoords = REGION_COORDS[region] || REGION_COORDS.ALL;
-  const googleMapsUrl = destCoords?.lat && destCoords?.lng
-    ? `https://www.google.com/maps/dir/?api=1&destination=${destCoords.lat},${destCoords.lng}&travelmode=driving`
-    : `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(ord.shippingAddress || ord.address || '')}&travelmode=driving`;
 
   const statusBadge = {
     text: incidentStatus.badgeText,
@@ -219,83 +212,32 @@ export default function OrderCard({ order: ord, variant, fmt, getOrderTimeClassi
               Khách Đổi Ý → Tiếp Tục Giao
             </button>
           ) : (
-            <>
-              <button
-                type="button"
-                className="delivery-tap-target"
-                onClick={() => actions.onDeliver && actions.onDeliver(ord)}
-                style={{ flex: 1, backgroundColor: 'var(--success)', color: '#fff', border: 'none', borderRadius: 'var(--radius-md)', padding: '0.6rem', fontSize: '0.8rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}
-              >
-                <Camera size={15} /> Giao Thành Công
-              </button>
-              <button
-                type="button"
-                className="delivery-tap-target"
-                onClick={() => actions.onFail && actions.onFail(ord)}
-                style={{ backgroundColor: 'transparent', color: 'var(--danger)', border: '1px solid var(--danger)', borderRadius: 'var(--radius-md)', padding: '0.6rem 0.85rem', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer' }}
-              >
-                Báo Lỗi
-              </button>
-            </>
+            <button
+              type="button"
+              className="delivery-tap-target"
+              onClick={() => actions.onOpenNavigation && actions.onOpenNavigation(ord)}
+              style={{
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.4rem',
+                padding: '0.65rem',
+                borderRadius: 'var(--radius-md)',
+                fontSize: '0.85rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                backgroundColor: isEffectiveGps ? 'rgba(22,163,74,0.12)' : 'var(--primary)',
+                color: isEffectiveGps ? 'var(--success)' : '#fff',
+                border: isEffectiveGps ? '1.5px solid var(--success)' : 'none',
+                boxShadow: isEffectiveGps ? 'none' : '0 2px 8px rgba(37,99,235,0.2)',
+                transition: 'all 0.2s'
+              }}
+            >
+              <Navigation size={16} style={isEffectiveGps ? { animation: 'pulse 1.5s infinite' } : undefined} />
+              {isEffectiveGps ? 'Đang Giao — Tiếp Tục' : 'Bắt Đầu Giao'}
+            </button>
           )}
-        </div>
-      )}
-
-      {/* Lộ Trình Tối Ưu & Định Vị GPS Thực Tế — chỉ hiện khi đơn đang thật sự trên đường đi giao */}
-      {variant === 'active' && isPlainShipping && (
-        <div style={{ marginTop: '0.5rem', display: 'flex', gap: '0.45rem', alignItems: 'stretch' }} onClick={(e) => e.stopPropagation()}>
-          <button
-            type="button"
-            className="delivery-tap-target"
-            onClick={() => actions.onOpenNavigation && actions.onOpenNavigation(ord)}
-            style={{
-              flex: 1,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '0.4rem',
-              padding: '0.6rem 0.75rem',
-              borderRadius: 'var(--radius-md)',
-              fontSize: '0.8rem',
-              fontWeight: 800,
-              cursor: 'pointer',
-              backgroundColor: isEffectiveGps ? 'rgba(22,163,74,0.12)' : '#eff6ff',
-              color: isEffectiveGps ? 'var(--success)' : '#2563eb',
-              border: isEffectiveGps ? '1.5px solid var(--success)' : '1px solid #bfdbfe',
-              boxShadow: isEffectiveGps ? 'none' : '0 2px 6px rgba(37,99,235,0.08)',
-              transition: 'all 0.2s'
-            }}
-          >
-            <Navigation size={15} style={isEffectiveGps ? { animation: 'pulse 1.5s infinite' } : undefined} />
-            {isEffectiveGps ? 'Đang Bật GPS' : 'Xem Lộ Trình'}
-          </button>
-
-          <a
-            href={googleMapsUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="delivery-tap-target"
-            style={{
-              flex: '0 0 auto',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '0.35rem',
-              padding: '0.6rem 0.8rem',
-              borderRadius: 'var(--radius-md)',
-              fontSize: '0.78rem',
-              fontWeight: 750,
-              backgroundColor: '#f8fafc',
-              color: '#0284c7',
-              border: '1px solid #bae6fd',
-              textDecoration: 'none',
-              cursor: 'pointer'
-            }}
-            title="Mở ứng dụng Google Maps ngoài để nghe chỉ đường bằng giọng nói"
-          >
-            <ExternalLink size={13} color="#0284c7" />
-            Google Maps
-          </a>
         </div>
       )}
     </div>

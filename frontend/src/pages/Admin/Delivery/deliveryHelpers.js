@@ -1,3 +1,23 @@
+// Builds the payload for a "delivery failed" status update — shared by
+// FailModal (full reason picker) and QuickFailSheet (1-tap common reasons)
+// so the attempt-count / 24h-callback-deadline logic lives in one place.
+export const buildFailPayload = (order, failReason, failNote = '') => {
+  const attemptCount = (order.deliveryAttempts || 0) + 1;
+  const reasonLower = failReason.toLowerCase();
+  const isNoContact = reasonLower.includes('không liên lạc') || reasonLower.includes('không nghe máy') || reasonLower.includes('thuê bao');
+  const now = new Date();
+  const deadline24h = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();
+
+  return {
+    failReason,
+    failNote,
+    failedAt: now.toISOString(),
+    callbackDeadline: isNoContact ? deadline24h : null,
+    isAwaitingCallback: isNoContact,
+    deliveryAttempts: attemptCount
+  };
+};
+
 /**
  * Delivery Incident and Status Classification Helper
  * Single source of truth for delivery tabs, cards, and filters.
