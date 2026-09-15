@@ -77,7 +77,8 @@ graph TD
     UI3 <-->|Shipper phát GPS / Khách theo dõi| WST
     UI4 <-->|HTTPS / REST API| API
 
-    API <--> ORM <--> DB
+    API <--> ORM
+    ORM <--> DB
     API <--> AI
     API <--> SMTP
     API <--> QR
