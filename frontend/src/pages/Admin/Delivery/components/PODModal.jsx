@@ -1,11 +1,149 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Camera, RefreshCw, CreditCard, ChevronLeft } from 'lucide-react';
+import { X, Camera, RefreshCw, CreditCard, ChevronLeft, Upload, Check, ChevronRight } from 'lucide-react';
 
 // Proof-of-Delivery capture flow. Carries over the EXACT camera/watermark
 // capture logic, VietQR bank-transfer branching and receiver-type handling
 // from the old Delivery.jsx page — only the presentation changed to a
 // full-screen two-step mobile flow (camera step -> confirm-details step)
-// instead of a centered maxWidth:600px dialog.
+// Thanh trượt xác nhận (Swipe to Confirm) chống chạm nhầm khi đi đường
+function SwipeConfirmButton({ onConfirm, disabled, label = "Trượt để hoàn tất giao hàng" }) {
+  const containerRef = useRef(null);
+  const [sliderPos, setSliderPos] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const [isCompleted, setIsCompleted] = useState(false);
+  const startXRef = useRef(0);
+  const maxSlideRef = useRef(0);
+
+  const getMaxSlide = () => {
+    if (!containerRef.current) return 200;
+    return Math.max(60, containerRef.current.clientWidth - 52);
+  };
+
+  const handleStart = (clientX) => {
+    if (disabled || isCompleted) return;
+    setIsDragging(true);
+    startXRef.current = clientX - sliderPos;
+    maxSlideRef.current = getMaxSlide();
+  };
+
+  const handleMove = (clientX) => {
+    if (!isDragging || disabled || isCompleted) return;
+    const max = maxSlideRef.current || getMaxSlide();
+    const currentPos = Math.max(0, Math.min(clientX - startXRef.current, max));
+    setSliderPos(currentPos);
+
+    if (currentPos >= max * 0.85) {
+      setIsDragging(false);
+      setIsCompleted(true);
+      setSliderPos(max);
+      if (typeof navigator !== 'undefined' && navigator.vibrate) {
+        try { navigator.vibrate([40, 60, 40]); } catch (_) {}
+      }
+      onConfirm();
+    }
+  };
+
+  const handleEnd = () => {
+    if (!isDragging || isCompleted) return;
+    setIsDragging(false);
+    setSliderPos(0);
+  };
+
+  const onTouchStart = (e) => handleStart(e.touches[0].clientX);
+  const onTouchMove = (e) => handleMove(e.touches[0].clientX);
+  const onTouchEnd = handleEnd;
+
+  const onMouseDown = (e) => {
+    handleStart(e.clientX);
+    const onMouseMove = (ev) => handleMove(ev.clientX);
+    const onMouseUp = () => {
+      handleEnd();
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+    };
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+  };
+
+  return (
+    <div
+      ref={containerRef}
+      style={{
+        position: 'relative',
+        width: '100%',
+        height: '52px',
+        backgroundColor: disabled ? '#f1f5f9' : '#e2e8f0',
+        borderRadius: '999px',
+        overflow: 'hidden',
+        userSelect: 'none',
+        border: '1.5px solid',
+        borderColor: isCompleted ? '#16a34a' : (disabled ? '#cbd5e1' : '#94a3b8'),
+        boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.06)',
+        cursor: disabled ? 'not-allowed' : 'grab'
+      }}
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
+    >
+      {/* Vệt màu chạy theo thanh kéo */}
+      <div
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          height: '100%',
+          width: `${sliderPos + 48}px`,
+          backgroundColor: isCompleted ? '#16a34a' : 'rgba(34, 197, 94, 0.45)',
+          transition: isDragging ? 'none' : 'width 0.25s ease-out'
+        }}
+      />
+
+      {/* Dòng chữ hướng dẫn ở giữa */}
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: '0.84rem',
+          fontWeight: 800,
+          color: isCompleted ? '#ffffff' : (disabled ? '#94a3b8' : '#334155'),
+          pointerEvents: 'none',
+          paddingLeft: '32px',
+          letterSpacing: '0.01em'
+        }}
+      >
+        {isCompleted ? '✓ Đang Lưu Biên Bản...' : (disabled ? 'Chưa chụp ảnh minh chứng' : label)}
+      </div>
+
+      {/* Nút tròn kéo */}
+      <div
+        onMouseDown={onMouseDown}
+        style={{
+          position: 'absolute',
+          top: '3px',
+          left: '3px',
+          width: '44px',
+          height: '44px',
+          borderRadius: '50%',
+          backgroundColor: isCompleted ? '#ffffff' : (disabled ? '#cbd5e1' : '#16a34a'),
+          color: isCompleted ? '#16a34a' : '#ffffff',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+          transform: `translateX(${sliderPos}px)`,
+          transition: isDragging ? 'none' : 'transform 0.25s ease-out',
+          cursor: disabled ? 'not-allowed' : (isDragging ? 'grabbing' : 'grab')
+        }}
+      >
+        {isCompleted ? <Check size={20} strokeWidth={3} /> : <ChevronRight size={22} strokeWidth={2.8} />}
+      </div>
+    </div>
+  );
+}
+
 export default function PODModal({ order: deliverModal, user, onClose, onConfirm, fmt }) {
   const videoRef = useRef(null);
   const [isCameraActive, setIsCameraActive] = useState(false);
@@ -105,6 +243,50 @@ export default function PODModal({ order: deliverModal, user, onClose, onConfirm
     startCamera();
   };
 
+  const handleFileUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width || 800;
+        canvas.height = img.height || 600;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+        const now = new Date();
+        const timeStr = now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        const dateStr = now.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        const ordIdStr = deliverModal.orderId || deliverModal.id;
+        const shipperNameStr = user?.fullname || user?.name || 'Shipper';
+
+        const stampText = `${timeStr} | ${dateStr} | Đơn: #${ordIdStr} | NV: ${shipperNameStr}`;
+        ctx.font = 'bold 15px sans-serif';
+        const textWidth = ctx.measureText(stampText).width;
+
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+        ctx.beginPath();
+        ctx.roundRect ? ctx.roundRect(10, canvas.height - 40, textWidth + 20, 30, 4) : ctx.fillRect(10, canvas.height - 40, textWidth + 20, 30);
+        ctx.fill();
+
+        ctx.strokeStyle = '#22c55e';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText(stampText, 18, canvas.height - 20);
+
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
+        setProofPhoto(dataUrl);
+        stopCamera();
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  };
+
   const cleanOrdCode = String(deliverModal.orderId || deliverModal.id || '').replace(/[^a-zA-Z0-9]/g, '');
   const qrUrl = `https://img.vietqr.io/image/970415-1133668899-compact2.jpg?amount=${Math.round(codAmount)}&addInfo=DH%20${cleanOrdCode}&accountName=AETHERPC%20ERP%20CORP`;
 
@@ -198,8 +380,8 @@ export default function PODModal({ order: deliverModal, user, onClose, onConfirm
               )}
             </div>
 
-            {/* Sticky capture button */}
-            <div style={{ padding: '1rem', background: 'var(--bg-primary)', borderTop: '1px solid var(--border-glass)', flexShrink: 0 }}>
+            {/* Sticky capture button & upload option */}
+            <div style={{ padding: '0.85rem 1rem', background: 'var(--bg-primary)', borderTop: '1px solid var(--border-glass)', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               <button
                 type="button"
                 className="delivery-tap-target"
@@ -214,6 +396,25 @@ export default function PODModal({ order: deliverModal, user, onClose, onConfirm
               >
                 <Camera size={18} /> Bấm Chụp Ảnh Minh Chứng
               </button>
+
+              <label
+                className="delivery-tap-target"
+                style={{
+                  width: '100%', padding: '0.6rem', fontSize: '0.78rem', fontWeight: 750,
+                  backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-secondary)',
+                  border: '1px dashed var(--border-glass)', borderRadius: 'var(--radius-md)',
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.45rem',
+                  boxSizing: 'border-box'
+                }}
+              >
+                <Upload size={15} color="var(--primary)" /> Tải ảnh minh chứng từ máy (Thư viện ảnh)
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileUpload}
+                  style={{ display: 'none' }}
+                />
+              </label>
             </div>
           </>
         ) : (
@@ -382,16 +583,13 @@ export default function PODModal({ order: deliverModal, user, onClose, onConfirm
               </div>
             </div>
 
-            {/* Sticky submit */}
-            <div style={{ padding: '1rem', background: 'var(--bg-primary)', borderTop: '1px solid var(--border-glass)', flexShrink: 0 }}>
-              <button
-                type="button"
-                className="delivery-tap-target"
-                onClick={handleSubmit}
-                style={{ width: '100%', backgroundColor: 'var(--success)', color: '#fff', border: 'none', borderRadius: 'var(--radius-md)', padding: '0.75rem', fontSize: '0.85rem', fontWeight: 800, cursor: 'pointer' }}
-              >
-                {isPrepaid ? 'Xác Nhận Bàn Giao Hàng' : (actualPaymentMethod === 'BANK_TRANSFER' ? 'Xác Nhận Đã Nhận CK' : 'Xác Nhận Thu Tiền & Giao')}
-              </button>
+            {/* Sticky submit — Thanh trượt xác nhận chống chạm nhầm */}
+            <div style={{ padding: '0.85rem 1rem', background: 'var(--bg-primary)', borderTop: '1px solid var(--border-glass)', flexShrink: 0 }}>
+              <SwipeConfirmButton
+                onConfirm={handleSubmit}
+                disabled={!proofPhoto}
+                label={isPrepaid ? 'Trượt Để Xác Nhận Bàn Giao' : (actualPaymentMethod === 'BANK_TRANSFER' ? 'Trượt Để Xác Nhận Đã Nhận CK' : 'Trượt Để Xác Nhận Thu Tiền & Giao')}
+              />
             </div>
           </>
         )}

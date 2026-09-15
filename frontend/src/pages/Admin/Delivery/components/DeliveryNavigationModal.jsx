@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { X, Navigation, Phone, MapPin, Compass, AlertCircle, Gauge, Camera } from 'lucide-react';
+import { X, Navigation, Phone, MapPin, Compass, AlertCircle, Gauge, Camera, ExternalLink } from 'lucide-react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { fetchRoadRoute } from '../../../../utils/routingService';
@@ -40,11 +40,19 @@ export default function DeliveryNavigationModal({
   const [speedKmh, setSpeedKmh] = useState(0);
 
   const orderId = String(order?.orderId || order?.id || '');
+  const isEffectiveGpsActive = Boolean(
+    isGpsActive ||
+    (orderId && typeof window !== 'undefined' && localStorage.getItem('aether_active_gps_order_id') === orderId)
+  );
   const customerName = order?.customerName || order?.customer?.name || 'Khách hàng';
   const phone = order?.phone || order?.customer?.phone || '';
   const address = order?.shippingAddress || order?.address || destination?.label || '';
   const codAmount = parseFloat(order?.totalAmount || order?.total || 0);
   const isPrepaid = order?.paymentStatus === 'PAID' || order?.paymentMethod === 'ONLINE_GATEWAY' || order?.paymentMethod === 'BANK_TRANSFER' || codAmount === 0;
+
+  const googleMapsUrl = destination?.lat && destination?.lng
+    ? `https://www.google.com/maps/dir/?api=1&destination=${destination.lat},${destination.lng}&travelmode=driving`
+    : `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(address)}&travelmode=driving`;
 
   // 1. Khởi tạo bản đồ Leaflet
   useEffect(() => {
@@ -175,7 +183,7 @@ export default function DeliveryNavigationModal({
 
   // Lắng nghe cập nhật toạ độ liên tục khi GPS Active
   useEffect(() => {
-    if (!isGpsActive || !navigator.geolocation) return;
+    if (!isEffectiveGpsActive || !navigator.geolocation) return;
 
     const watchId = navigator.geolocation.watchPosition(
       (pos) => {
@@ -196,7 +204,7 @@ export default function DeliveryNavigationModal({
     return () => {
       navigator.geolocation.clearWatch(watchId);
     };
-  }, [isGpsActive]);
+  }, [isEffectiveGpsActive]);
 
   const fitFullRoute = useCallback(() => {
     const map = mapRef.current;
@@ -275,8 +283,31 @@ export default function DeliveryNavigationModal({
                 <Phone size={12} /> {phone}
               </a>
             )}
-            <div style={{ color: '#334155', marginTop: '0.25rem', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-              <MapPin size={13} style={{ color: '#64748b', flexShrink: 0 }} /> <span><strong>Địa chỉ:</strong> {address}</span>
+            <div style={{ color: '#334155', marginTop: '0.25rem', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                <MapPin size={13} style={{ color: '#64748b', flexShrink: 0 }} /> <span><strong>Địa chỉ:</strong> {address}</span>
+              </div>
+              <a
+                href={googleMapsUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.25rem',
+                  fontSize: '0.72rem',
+                  color: '#0284c7',
+                  backgroundColor: '#e0f2fe',
+                  border: '1px solid #bae6fd',
+                  padding: '2px 7px',
+                  borderRadius: '4px',
+                  textDecoration: 'none',
+                  fontWeight: 750
+                }}
+                title="Mở ứng dụng Google Maps ngoài để nghe chỉ đường bằng giọng nói"
+              >
+                <ExternalLink size={11} /> Mở Google Maps
+              </a>
             </div>
           </div>
 
@@ -323,7 +354,7 @@ export default function DeliveryNavigationModal({
             bottom: '12px',
             left: '12px',
             zIndex: 999,
-            backgroundColor: isGpsActive ? '#15803d' : 'rgba(15, 23, 42, 0.85)',
+            backgroundColor: isEffectiveGpsActive ? '#15803d' : 'rgba(15, 23, 42, 0.85)',
             color: '#ffffff',
             padding: '5px 12px',
             borderRadius: '999px',
@@ -336,10 +367,10 @@ export default function DeliveryNavigationModal({
           }}>
             <span style={{
               width: '8px', height: '8px', borderRadius: '50%',
-              backgroundColor: isGpsActive ? '#4ade80' : '#f59e0b',
-              boxShadow: isGpsActive ? '0 0 8px #4ade80' : 'none'
+              backgroundColor: isEffectiveGpsActive ? '#4ade80' : '#f59e0b',
+              boxShadow: isEffectiveGpsActive ? '0 0 8px #4ade80' : 'none'
             }} />
-            {isGpsActive ? 'GPS THỜI GIAN THỰC ĐANG BẬT' : 'CHƯA BẬT GPS GIAO HÀNG'}
+            {isEffectiveGpsActive ? 'GPS THỜI GIAN THỰC ĐANG BẬT' : 'CHƯA BẬT GPS GIAO HÀNG'}
           </div>
         </div>
 
@@ -373,7 +404,7 @@ export default function DeliveryNavigationModal({
         </div>
 
         {/* Cảnh báo nếu chưa có toạ độ thực tế */}
-        {locError && !isGpsActive && (
+        {locError && !isEffectiveGpsActive && (
           <div style={{
             padding: '0.45rem 1rem',
             backgroundColor: '#fffbeb',
@@ -399,11 +430,11 @@ export default function DeliveryNavigationModal({
           alignItems: 'center',
           flexWrap: 'wrap'
         }}>
-          {!isGpsActive ? (
+          {!isEffectiveGpsActive ? (
             <button
               type="button"
               className="delivery-tap-target"
-              onClick={() => onStartDeliveryWithGps && onStartDeliveryWithGps(order)}
+              onClick={() => onStartDeliveryWithGps && onStartDeliveryWithGps(order, shipperLoc)}
               style={{
                 flex: '1 1 180px',
                 padding: '0.7rem 1rem',
@@ -444,6 +475,33 @@ export default function DeliveryNavigationModal({
               Tạm Dừng Định Vị
             </button>
           )}
+
+          <a
+            href={googleMapsUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="delivery-tap-target"
+            style={{
+              flex: '0 0 auto',
+              padding: '0.7rem 0.95rem',
+              backgroundColor: '#f0f9ff',
+              color: '#0284c7',
+              border: '1.5px solid #bae6fd',
+              borderRadius: '10px',
+              fontWeight: 750,
+              fontSize: '0.84rem',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.4rem',
+              textDecoration: 'none'
+            }}
+            title="Mở ứng dụng Google Maps ngoài để nghe chỉ đường bằng giọng nói"
+          >
+            <ExternalLink size={15} color="#0284c7" />
+            Google Maps
+          </a>
 
           <button
             type="button"

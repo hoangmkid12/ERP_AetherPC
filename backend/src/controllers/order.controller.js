@@ -723,11 +723,16 @@ const updateOrderStatus = async (req, res, next) => {
             receiverNameActual: receiverName
           } : {}),
           ...(status === 'SHIPPED' ? {
-            shippedAt: new Date(),
+            shippedAt: existingOrder.shippedAt || new Date(),
             failReason: null,
             failNote: null,
             ...(assignedShipperIdInt !== null ? { assignedShipperId: assignedShipperIdInt } : {}),
-            ...(req.body.deliveryRegion !== undefined ? { deliveryRegion: req.body.deliveryRegion } : {})
+            ...(req.body.deliveryRegion !== undefined ? { deliveryRegion: req.body.deliveryRegion } : {}),
+            ...(!isNaN(parseFloat(req.body.lat)) && !isNaN(parseFloat(req.body.lng)) ? {
+              lastLat: parseFloat(req.body.lat),
+              lastLng: parseFloat(req.body.lng),
+              locationUpdatedAt: new Date()
+            } : {})
           } : {}),
           ...(status === 'CONFIRMED' ? { confirmedAt: new Date() } : {}),
           ...(status === 'CANCELLED' ? {
@@ -1684,8 +1689,10 @@ const updateOrderDetails = async (req, res, next) => {
 const updateDeliveryLocationHttp = async (req, res, next) => {
   try {
     const { orderId } = req.params;
-    const { lat, lng, speed, heading } = req.body || {};
-    if (typeof lat !== 'number' || typeof lng !== 'number') {
+    let { lat, lng, speed, heading } = req.body || {};
+    lat = parseFloat(lat);
+    lng = parseFloat(lng);
+    if (isNaN(lat) || isNaN(lng)) {
       return res.status(400).json({ success: false, message: 'Thiếu tọa độ lat/lng hợp lệ.' });
     }
 
