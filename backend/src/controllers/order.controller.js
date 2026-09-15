@@ -711,6 +711,15 @@ const updateOrderStatus = async (req, res, next) => {
         where: { orderId: id },
         data: {
           status,
+          // Ghi assignedShipperId/deliveryRegion bất kể trạng thái đích —
+          // trước đây 2 field này chỉ được ghi khi status==='SHIPPED', nhưng
+          // giờ Kho phân công shipper trong khi đơn CÒN Ở READY_TO_SHIP (đơn
+          // phải nằm bên "Chờ Nhận" của đúng shipper đó, chờ họ tự bấm "Nhận
+          // Chuyến" mới chuyển sang SHIPPED) — nếu vẫn chỉ ghi lúc SHIPPED,
+          // việc phân công sẽ bị lặng lẽ mất, đơn không lọc đúng theo shipper
+          // ở tab Chờ Nhận nữa.
+          ...(assignedShipperIdInt !== null ? { assignedShipperId: assignedShipperIdInt } : {}),
+          ...(req.body.deliveryRegion !== undefined ? { deliveryRegion: req.body.deliveryRegion } : {}),
           ...(status === 'DELIVERED' ? {
             deliveredAt: new Date(),
             paymentStatus: 'PAID',
@@ -726,8 +735,6 @@ const updateOrderStatus = async (req, res, next) => {
             shippedAt: existingOrder.shippedAt || new Date(),
             failReason: null,
             failNote: null,
-            ...(assignedShipperIdInt !== null ? { assignedShipperId: assignedShipperIdInt } : {}),
-            ...(req.body.deliveryRegion !== undefined ? { deliveryRegion: req.body.deliveryRegion } : {}),
             ...(!isNaN(parseFloat(req.body.lat)) && !isNaN(parseFloat(req.body.lng)) ? {
               lastLat: parseFloat(req.body.lat),
               lastLng: parseFloat(req.body.lng),

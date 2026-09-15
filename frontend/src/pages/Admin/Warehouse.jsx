@@ -1067,7 +1067,7 @@ function RegionalShipperModal({
             padding: 0.6rem 0.5rem !important;
           }
           .d-btn-submit {
-            flex: 2 !important;
+            flex: 1 !important;
             text-align: center !important;
             justify-content: center !important;
             padding: 0.6rem 0.5rem !important;
@@ -1140,24 +1140,29 @@ function RegionalShipperModal({
 
             const ordId = String(orderToAssign.orderId || orderToAssign.id || '');
 
+            // Phân công vẫn giữ đơn ở READY_TO_SHIP (không nhảy thẳng lên
+            // SHIPPED) — đơn phải nằm bên "Chờ Nhận" của đúng shipper được
+            // chọn, shipper phải tự bấm "Nhận Chuyến" thì mới chuyển sang
+            // SHIPPED/"Đang Giao". isShipperMatched() ở trang Delivery đã
+            // lọc theo assignedShipperId nên việc này không cần đổi gì thêm
+            // ở phía shipper — chỉ cần KHÔNG set status=SHIPPED ở đây.
             if (typeof updateOrderStatus === 'function') {
-              updateOrderStatus(ordId, 'SHIPPED', `Đã bàn giao cho ${shipperDisplayName} [Mã VĐ: ${trackingCode}] - Khu vực: ${currentRegionObj.shortName}`, {
+              updateOrderStatus(ordId, 'READY_TO_SHIP', `Đã phân công cho ${shipperDisplayName} [Mã VĐ: ${trackingCode}] - Khu vực: ${currentRegionObj.shortName}, chờ shipper xác nhận nhận đơn.`, {
                 assignedShipper: shipperDisplayName,
                 assignedShipperId: matchedShipperId,
                 assignedShipperUsername: foundEmp?.username || (typeof matchedShipperId === 'string' ? matchedShipperId : null),
                 assignedShipperName: foundEmp?.fullname || foundEmp?.name || shipperDisplayName,
                 deliveryRegion: selectedRegion,
                 trackingCode: trackingCode,
-                shippingNote: note,
-                shippedAt: new Date().toISOString()
+                shippingNote: note
               });
             } else {
               const updatedOrders = orders.map(o => {
                 if ((o.orderId && o.orderId === ordId) || o.id === ordId || String(o.id) === String(orderToAssign.id)) {
                   return {
                     ...o,
-                    status: 'SHIPPED',
-                    deliveryStatus: 'SHIPPED',
+                    status: 'READY_TO_SHIP',
+                    deliveryStatus: 'READY_TO_SHIP',
                     assignedShipper: shipperDisplayName,
                     assignedShipperId: matchedShipperId,
                     assignedShipperUsername: foundEmp?.username || (typeof matchedShipperId === 'string' ? matchedShipperId : null),
@@ -1165,8 +1170,7 @@ function RegionalShipperModal({
                     deliveryRegion: selectedRegion,
                     trackingCode: trackingCode,
                     shippingNote: note,
-                    shippedAt: new Date().toISOString(),
-                    lastNote: `Đã bàn giao cho ${shipperDisplayName}. Mã tra cứu: ${trackingCode}`
+                    lastNote: `Đã phân công cho ${shipperDisplayName}, chờ xác nhận nhận đơn. Mã tra cứu: ${trackingCode}`
                   };
                 }
                 return o;
@@ -1179,15 +1183,15 @@ function RegionalShipperModal({
 
             if (sendSystemNotification) {
               sendSystemNotification({
-                targetRoles: ['DELIVERY', 'SALES', 'CUSTOMER'],
-                title: `Đã Bàn Giao Vận Chuyển Đơn #${ordId}`,
-                message: `Đơn hàng đã bàn giao cho ${shipperDisplayName} (${currentRegionObj.shortName} - Mã VĐ: ${trackingCode}) xuất phát đi giao.`,
+                targetRoles: ['DELIVERY'],
+                title: `Đơn #${ordId} Chờ Bạn Nhận Chuyến`,
+                message: `Đơn hàng đã được phân công cho bạn (${currentRegionObj.shortName} - Mã VĐ: ${trackingCode}). Vào tab "Chờ Nhận" để xác nhận nhận chuyến.`,
                 type: 'INFO'
               });
             }
 
             if (typeof addNotification === 'function') {
-              addNotification(`Điều phối vận chuyển thành công! Đơn hàng #${ordId} [${currentRegionObj.shortName}] đã chuyển giao cho ${shipperDisplayName}.`, 'success');
+              addNotification(`Điều phối vận chuyển thành công! Đơn hàng #${ordId} [${currentRegionObj.shortName}] đã phân công cho ${shipperDisplayName}, đang chờ shipper xác nhận nhận đơn.`, 'success');
             }
 
             onClose();
@@ -1442,7 +1446,7 @@ function RegionalShipperModal({
           {/* Sticky Modal Actions Footer */}
           <div className="d-footer">
             <span className="d-footer-hint" style={{ fontSize: '0.75rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '0.3rem', whiteSpace: 'nowrap' }}>
-              <CheckCircle size={13} color="#2563eb" /> Chuyển sang <strong>Đang Giao Hàng</strong>
+              <CheckCircle size={13} color="#2563eb" /> Đơn sẽ vào mục <strong>Chờ Nhận</strong> của shipper này
             </span>
             <div className="d-footer-actions">
               <button
@@ -1482,7 +1486,7 @@ function RegionalShipperModal({
                   whiteSpace: 'nowrap'
                 }}
               >
-                <Truck size={15} /> Xác Nhận Phân Công & Bàn Giao
+                <Truck size={15} /> Xác Nhận
               </button>
             </div>
           </div>
@@ -4302,6 +4306,10 @@ export default function Warehouse() {
                   filteredDeliveriesList.map(o => {
                     const isPendingPack = ['CONFIRMED', 'PROCESSING', 'PENDING', 'AWAITING_SHIP'].includes(o.status);
                     const isPackedWaitingShipper = ['PACKED', 'READY_TO_SHIP'].includes(o.status);
+                    // Phân công giờ giữ đơn ở READY_TO_SHIP cho tới khi shipper tự bấm
+                    // "Nhận Chuyến" — tách riêng sub-state này để bảng không hiển thị
+                    // nhầm "Chưa phân công" cho đơn thực ra đã có assignedShipperId.
+                    const isAwaitingShipperAccept = isPackedWaitingShipper && Boolean(o.assignedShipperId);
                     const isShipping = ['SHIPPED', 'OUT_FOR_DELIVERY', 'ASSIGNED'].includes(o.status);
                     const isDelivered = ['DELIVERED', 'COMPLETED'].includes(o.status);
                     // Only reachable when deliveryFilter === 'ALL' — none of the 4 buckets above
@@ -4329,7 +4337,7 @@ export default function Warehouse() {
                           {safeFormatPrice(o.totalAmount || o.total || 0)}
                         </td>
                         <td style={{ padding: '0.75rem 1rem', textAlign: 'center', color: '#334155' }}>
-                          {isShipping || isDelivered ? (
+                          {isShipping || isDelivered || isAwaitingShipperAccept ? (
                             <span style={{ fontWeight: 700, color: '#0f172a' }}>
                               {o.assignedShipper || 'Shipper Nội Bộ'}
                             </span>
@@ -4366,7 +4374,7 @@ export default function Warehouse() {
                               color: '#6d28d9',
                               border: '1px solid #ddd6fe'
                             }}>
-                              Đã Đóng Gói
+                              {isAwaitingShipperAccept ? 'Chờ Shipper Nhận' : 'Đã Đóng Gói'}
                             </span>
                           )}
 
@@ -4504,7 +4512,7 @@ export default function Warehouse() {
                                       cursor: 'pointer'
                                     }}
                                   >
-                                    Phân Công Shipper
+                                    {isAwaitingShipperAccept ? 'Đổi Shipper' : 'Phân Công Shipper'}
                                   </button>
                                   <button
                                     onClick={() => setSelectedOrderForDetail(o)}
