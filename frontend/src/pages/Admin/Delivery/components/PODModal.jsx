@@ -581,15 +581,19 @@ export default function PODModal({ order: deliverModal, user, onClose, onConfirm
                   style={{ width: '100%', padding: '0.55rem 0.7rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-glass)', boxSizing: 'border-box', fontSize: '0.8rem' }}
                 />
               </div>
-            </div>
 
-            {/* Sticky submit — Thanh trượt xác nhận chống chạm nhầm */}
-            <div className="delivery-modal-action-bar" style={{ padding: '0.85rem 1rem 0', background: 'var(--bg-primary)', borderTop: '1px solid var(--border-glass)' }}>
-              <SwipeConfirmButton
-                onConfirm={handleSubmit}
-                disabled={!proofPhoto}
-                label={isPrepaid ? 'Trượt Để Xác Nhận Bàn Giao' : (actualPaymentMethod === 'BANK_TRANSFER' ? 'Trượt Để Xác Nhận Đã Nhận CK' : 'Trượt Để Xác Nhận Thu Tiền & Giao')}
-              />
+              {/* Sticky submit — Thanh trượt xác nhận chống chạm nhầm. Nằm
+                  NGAY TRONG vùng cuộn, ghim bằng position:sticky+bottom:0
+                  thay vì chỉ là sibling flex-shrink:0 — sticky bám theo
+                  scrollport thật trên điện thoại thật nên không bị khoảng
+                  trắng che khi 100dvh tính trễ/sai lúc thanh địa chỉ ẩn/hiện. */}
+              <div className="delivery-modal-action-bar" style={{ position: 'sticky', bottom: 0, zIndex: 10, marginTop: 'auto', padding: '0.85rem 1rem 0', background: 'var(--bg-primary)', borderTop: '1px solid var(--border-glass)' }}>
+                <SwipeConfirmButton
+                  onConfirm={handleSubmit}
+                  disabled={!proofPhoto}
+                  label={isPrepaid ? 'Trượt Để Xác Nhận Bàn Giao' : (actualPaymentMethod === 'BANK_TRANSFER' ? 'Trượt Để Xác Nhận Đã Nhận CK' : 'Trượt Để Xác Nhận Thu Tiền & Giao')}
+                />
+              </div>
             </div>
           </>
         )}

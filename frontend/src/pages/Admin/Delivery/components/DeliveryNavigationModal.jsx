@@ -439,10 +439,19 @@ export default function DeliveryNavigationModal({
             <span>{locError} Bấm nút bên dưới để cấp quyền định vị GPS thực tế.</span>
           </div>
         )}
-        </div>
 
-        {/* Thanh nút hành động chính — Cân đối 3 cột đồng đều */}
+        {/* Thanh nút hành động chính — Cân đối 3 cột đồng đều. Đặt NGAY TRONG
+            vùng cuộn (không phải sibling ngoài flex) và ghim bằng
+            position:sticky+bottom:0 thay vì chỉ dựa vào flex-shrink:0 của
+            phần tử anh em: sticky bám theo scrollport thực tế của trình
+            duyệt nên vẫn hiển thị đúng kể cả khi 100dvh tính sai/trễ so với
+            chiều cao khả kiến thật trên điện thoại thật (thanh địa chỉ ẩn/hiện
+            khi cuộn), tránh tái diễn lỗi bị khoảng trắng che mất nút. */}
         <div className="delivery-modal-action-bar" style={{
+          position: 'sticky',
+          bottom: 0,
+          zIndex: 10,
+          marginTop: 'auto',
           padding: '0.75rem 0.85rem 0',
           backgroundColor: '#ffffff',
           borderTop: '1px solid #e2e8f0',
@@ -560,6 +569,7 @@ export default function DeliveryNavigationModal({
             <Camera size={15} />
             Đã Đến Nơi
           </button>
+        </div>
         </div>
       </div>
     </div>

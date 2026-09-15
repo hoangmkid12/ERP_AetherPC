@@ -120,33 +120,36 @@ export default function OrderDetailSheet({ order: ord, onClose, fmt, actions = {
               {ord.returnNote && <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Ghi chú: {ord.returnNote}</div>}
             </div>
           )}
-        </div>
 
-        {/* Footer actions — only for a plain "en route" order; SHIPPING_FAILED /
-            RETURNING_TO_WAREHOUSE orders have their own resume/escalate flows
-            surfaced from the ActiveTab card, not duplicated here. */}
-        {actions.onDeliver && ord.status === 'SHIPPED' && (
-          <div className="delivery-modal-action-bar" style={{ display: 'flex', gap: '0.6rem', padding: '0.85rem 1rem 0', borderTop: '1px solid var(--border-glass)', background: 'var(--bg-primary)' }}>
-            <button
-              type="button"
-              className="delivery-tap-target"
-              onClick={() => { onClose(); actions.onDeliver(ord); }}
-              style={{ flex: 1, backgroundColor: 'var(--success)', color: '#fff', border: 'none', borderRadius: 'var(--radius-md)', padding: '0.65rem', fontSize: '0.82rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
-            >
-              <Camera size={16} /> Giao Thành Công
-            </button>
-            {actions.onFail && (
+          {/* Footer actions — only for a plain "en route" order; SHIPPING_FAILED /
+              RETURNING_TO_WAREHOUSE orders have their own resume/escalate flows
+              surfaced from the ActiveTab card, not duplicated here. Ghim bằng
+              position:sticky+bottom:0 ngay trong vùng cuộn (thay vì sibling
+              flex-shrink:0 ngoài) để không bị khoảng trắng che trên điện
+              thoại thật khi 100dvh tính trễ/sai lúc thanh địa chỉ ẩn/hiện. */}
+          {actions.onDeliver && ord.status === 'SHIPPED' && (
+            <div className="delivery-modal-action-bar" style={{ position: 'sticky', bottom: 0, zIndex: 10, display: 'flex', gap: '0.6rem', padding: '0.85rem 1rem 0', borderTop: '1px solid var(--border-glass)', background: 'var(--bg-primary)' }}>
               <button
                 type="button"
                 className="delivery-tap-target"
-                onClick={() => { onClose(); actions.onFail(ord); }}
-                style={{ backgroundColor: 'transparent', color: 'var(--danger)', border: '1px solid var(--danger)', borderRadius: 'var(--radius-md)', padding: '0.65rem 0.9rem', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}
+                onClick={() => { onClose(); actions.onDeliver(ord); }}
+                style={{ flex: 1, backgroundColor: 'var(--success)', color: '#fff', border: 'none', borderRadius: 'var(--radius-md)', padding: '0.65rem', fontSize: '0.82rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
               >
-                Báo Lỗi
+                <Camera size={16} /> Giao Thành Công
               </button>
-            )}
-          </div>
-        )}
+              {actions.onFail && (
+                <button
+                  type="button"
+                  className="delivery-tap-target"
+                  onClick={() => { onClose(); actions.onFail(ord); }}
+                  style={{ backgroundColor: 'transparent', color: 'var(--danger)', border: '1px solid var(--danger)', borderRadius: 'var(--radius-md)', padding: '0.65rem 0.9rem', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}
+                >
+                  Báo Lỗi
+                </button>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

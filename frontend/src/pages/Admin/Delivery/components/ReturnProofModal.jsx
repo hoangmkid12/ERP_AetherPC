@@ -226,17 +226,17 @@ export default function ReturnProofModal({ order: ord, onClose, onConfirm }) {
                   style={{ width: '100%', padding: '0.6rem 0.7rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-glass)', boxSizing: 'border-box', fontSize: '0.82rem' }}
                 />
               </div>
-            </div>
 
-            <div className="delivery-modal-action-bar" style={{ padding: '1rem 1rem 0', background: 'var(--bg-primary)', borderTop: '1px solid var(--border-glass)' }}>
-              <button
-                type="button"
-                className="delivery-tap-target"
-                onClick={handleSubmit}
-                style={{ width: '100%', backgroundColor: 'var(--warning)', color: '#fff', border: 'none', borderRadius: 'var(--radius-md)', padding: '0.75rem', fontSize: '0.85rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
-              >
-                <Undo2 size={16} /> Xác Nhận Hoàn Kho
-              </button>
+              <div className="delivery-modal-action-bar" style={{ position: 'sticky', bottom: 0, zIndex: 10, marginTop: 'auto', padding: '1rem 1rem 0', background: 'var(--bg-primary)', borderTop: '1px solid var(--border-glass)' }}>
+                <button
+                  type="button"
+                  className="delivery-tap-target"
+                  onClick={handleSubmit}
+                  style={{ width: '100%', backgroundColor: 'var(--warning)', color: '#fff', border: 'none', borderRadius: 'var(--radius-md)', padding: '0.75rem', fontSize: '0.85rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
+                >
+                  <Undo2 size={16} /> Xác Nhận Hoàn Kho
+                </button>
+              </div>
             </div>
           </>
         )}
