@@ -596,10 +596,12 @@ export default function PODCaptureSection({ order, user, fmt, onConfirm, onRejec
         />
       </div>
 
-      {/* Sticky submit — Thanh trượt xác nhận chống chạm nhầm, kèm nút Từ
+      {/* Thanh trượt xác nhận chống chạm nhầm — nằm cuối luồng nội dung bình
+          thường (không sticky/fixed) để luôn cuộn xuống thấy được, không
+          phụ thuộc vào cách trình duyệt tính chiều cao khả kiến. Kèm nút Từ
           Chối nhỏ bên cạnh khi component cha truyền onReject (chỉ dùng ở
           luồng gộp DeliveryNavigationModal, không áp dụng cho PODModal). */}
-      <div className="delivery-modal-action-bar" style={{ position: 'sticky', bottom: 0, zIndex: 10, marginTop: 'auto', display: 'flex', gap: '0.5rem', alignItems: 'stretch', padding: '0.85rem 1rem 0', background: 'var(--bg-primary)', borderTop: '1px solid var(--border-glass)' }}>
+      <div className="delivery-modal-action-bar" style={{ display: 'flex', gap: '0.5rem', alignItems: 'stretch', padding: '0.85rem 1rem 0', background: 'var(--bg-primary)', borderTop: '1px solid var(--border-glass)' }}>
         <div style={{ flex: 1 }}>
           <SwipeConfirmButton
             onConfirm={handleSubmit}

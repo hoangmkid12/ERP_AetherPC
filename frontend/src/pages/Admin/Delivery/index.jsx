@@ -627,6 +627,18 @@ export default function Delivery() {
   });
   const [simulatingOrderId, setSimulatingOrderId] = useState(null);
   const [navigationModalOrder, setNavigationModalOrder] = useState(null);
+  // Màn hình "Bắt Đầu Giao" giờ hiện cùng lúc với thanh tab dưới cùng (không
+  // còn là modal fixed che hết nữa) nên khi Shipper bấm sang tab khác (Tổng
+  // Quan/Chờ Nhận/...) — đổi activeTab qua URL, xử lý ở DeliveryAppShell,
+  // không có quyền truy cập state này — phải tự đóng màn hình lại để thật
+  // sự chuyển tab, tránh tình trạng bấm tab không có tác dụng gì.
+  const prevActiveTabRef = useRef(activeTab);
+  useEffect(() => {
+    if (prevActiveTabRef.current !== activeTab) {
+      prevActiveTabRef.current = activeTab;
+      setNavigationModalOrder(null);
+    }
+  }, [activeTab]);
   const gpsSocketRef = useRef(null);
   const watchIdRef = useRef(null);
   const lastSentAtRef = useRef(0);
@@ -936,6 +948,38 @@ export default function Delivery() {
 
   return (
     <div>
+      {/* Màn hình "Bắt Đầu Giao" gộp giờ render NGAY TRONG dòng chảy nội
+          dung bình thường (thay cho modal toàn màn hình fixed trước đây)
+          nên thay hẳn phần tab đang xem thay vì chồng lên nó — nhờ vậy
+          thanh tab dưới cùng (Tổng Quan/Chờ Nhận/...) ở DeliveryAppShell
+          luôn hiển thị (nó là sibling cố định bên ngoài `.delivery-content`,
+          không còn bị modal che nữa) và toàn màn hình cuộn bằng đúng cơ chế
+          cuộn trang vẫn dùng cho các tab khác. */}
+      {navigationModalOrder ? (
+        <DeliveryNavigationModal
+          order={navigationModalOrder}
+          user={user}
+          warehouse={getOriginForRegion(navigationModalOrder.deliveryRegion || detectDeliveryRegion(navigationModalOrder.shippingAddress || navigationModalOrder.address || ''))}
+          destination={{
+            ...(REGION_COORDS[navigationModalOrder.deliveryRegion || detectDeliveryRegion(navigationModalOrder.shippingAddress || navigationModalOrder.address || '')] || REGION_COORDS.ALL),
+            label: navigationModalOrder.shippingAddress || navigationModalOrder.address || 'Địa chỉ nhận hàng'
+          }}
+          isGpsActive={gpsOrderId === String(navigationModalOrder.orderId || navigationModalOrder.id)}
+          onStartDeliveryWithGps={handleStartDeliveryWithGps}
+          onStopGps={stopGps}
+          onConfirmDelivered={(payload) => {
+            handleConfirmDelivered(navigationModalOrder, payload);
+            setNavigationModalOrder(null);
+          }}
+          onReject={(ord) => {
+            setNavigationModalOrder(null);
+            setQuickFailOrder(ord);
+          }}
+          onClose={() => setNavigationModalOrder(null)}
+          fmt={fmt}
+        />
+      ) : (
+        <>
       {activeTab === 'overview' && (
         <OverviewTab
           fmt={fmt}
@@ -1014,6 +1058,8 @@ export default function Delivery() {
           totalCodCollected={totalCodCollected}
         />
       )}
+        </>
+      )}
 
       {deliverModal && (
         <PODModal
@@ -1062,30 +1108,6 @@ export default function Delivery() {
         />
       )}
 
-      {navigationModalOrder && (
-        <DeliveryNavigationModal
-          order={navigationModalOrder}
-          user={user}
-          warehouse={getOriginForRegion(navigationModalOrder.deliveryRegion || detectDeliveryRegion(navigationModalOrder.shippingAddress || navigationModalOrder.address || ''))}
-          destination={{
-            ...(REGION_COORDS[navigationModalOrder.deliveryRegion || detectDeliveryRegion(navigationModalOrder.shippingAddress || navigationModalOrder.address || '')] || REGION_COORDS.ALL),
-            label: navigationModalOrder.shippingAddress || navigationModalOrder.address || 'Địa chỉ nhận hàng'
-          }}
-          isGpsActive={gpsOrderId === String(navigationModalOrder.orderId || navigationModalOrder.id)}
-          onStartDeliveryWithGps={handleStartDeliveryWithGps}
-          onStopGps={stopGps}
-          onConfirmDelivered={(payload) => {
-            handleConfirmDelivered(navigationModalOrder, payload);
-            setNavigationModalOrder(null);
-          }}
-          onReject={(ord) => {
-            setNavigationModalOrder(null);
-            setQuickFailOrder(ord);
-          }}
-          onClose={() => setNavigationModalOrder(null)}
-          fmt={fmt}
-        />
-      )}
     </div>
   );
 }

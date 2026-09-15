@@ -4,7 +4,6 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { fetchRoadRoute, forwardGeocode } from '../../../../utils/routingService';
 import { TILE_URL, TILE_ATTRIBUTION, TILE_MAX_ZOOM, WAREHOUSE_ICON, DESTINATION_ICON, SHIPPER_ICON } from '../../../../utils/mapIcons';
-import useSafeViewportHeight from '../../../../hooks/useSafeViewportHeight';
 import PODCaptureSection from './PODCaptureSection';
 
 function haversineKm(a, b) {
@@ -18,6 +17,20 @@ function haversineKm(a, b) {
   return R * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
 }
 
+// Màn hình "Bắt Đầu Giao" gộp — CỐ Ý render theo dòng chảy tài liệu bình
+// thường (không position:fixed, không sticky, không vh/dvh/svh) thay vì
+// modal toàn màn hình như 3 lần sửa trước. Lý do: sau 3 lần vá bằng CSS
+// viewport units mà nút hành động vẫn bị Safari iOS thật che/hụt, hướng
+// đi chắc chắn nhất là bỏ hẳn mọi kỹ thuật định vị đặc biệt — component
+// này giờ chỉ là 1 khối nội dung bình thường nằm trong `.delivery-content`
+// (vùng cuộn chính của khung ứng dụng ở DeliveryAppShell.jsx), nên:
+//   - Cuộn bằng đúng cơ chế cuộn trang đã luôn hoạt động đúng cho các tab
+//     khác (Đang Giao/Lịch Sử...), không tự chế cơ chế cuộn riêng.
+//   - Thanh tab dưới cùng (Tổng Quan/Chờ Nhận/...) ở DeliveryAppShell vẫn
+//     luôn hiển thị vì nó là sibling cố định bên ngoài `.delivery-content`,
+//     không còn bị modal fixed đè lên/ẩn đi nữa.
+//   - Thanh trượt xác nhận nằm cuối luồng nội dung, kéo xuống là thấy —
+//     đúng yêu cầu, không cần sticky.
 export default function DeliveryNavigationModal({
   order,
   user,
@@ -31,7 +44,6 @@ export default function DeliveryNavigationModal({
   onClose,
   fmt
 }) {
-  const safeVh = useSafeViewportHeight();
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const markersRef = useRef({});
@@ -252,247 +264,233 @@ export default function DeliveryNavigationModal({
   const distanceRemaining = shipperLoc && exactDestination ? haversineKm(shipperLoc, exactDestination) : null;
 
   return (
-    <div className="delivery-fullscreen-modal" style={{ height: `${safeVh}px` }}>
-      <div className="delivery-fullscreen-modal-inner" style={{ height: `${safeVh}px` }}>
-        {/* Header Modal */}
+    <div style={{ backgroundColor: 'var(--bg-app)' }}>
+      {/* Header */}
+      <div style={{
+        padding: '0.85rem 1rem',
+        borderBottom: '1px solid var(--border-glass)',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        background: 'var(--bg-primary)'
+      }}>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <Navigation size={18} color="var(--primary)" />
+            <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+              Lộ Trình Giao Hàng #{orderId}
+            </h3>
+          </div>
+          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+            Đề xuất tuyến đường giao hàng tối ưu và định vị GPS thực tế
+          </span>
+        </div>
+
+        <button
+          type="button"
+          onClick={onClose}
+          className="delivery-icon-btn"
+        >
+          <X size={20} />
+        </button>
+      </div>
+
+      {/* Thông tin khách hàng tóm tắt */}
+      <div style={{
+        padding: '0.75rem 1.15rem',
+        backgroundColor: '#eff6ff',
+        borderBottom: '1px solid #bfdbfe',
+        fontSize: '0.82rem'
+      }}>
         <div style={{
-          padding: '0.85rem 1rem',
-          borderBottom: '1px solid var(--border-glass)',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          background: 'var(--bg-primary)',
-          flexShrink: 0
+          gap: '0.75rem',
+          marginBottom: '0.35rem'
         }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Navigation size={18} color="var(--primary)" />
-              <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-primary)' }}>
-                Lộ Trình Giao Hàng #{orderId}
-              </h3>
-            </div>
-            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-              Đề xuất tuyến đường giao hàng tối ưu và định vị GPS thực tế
-            </span>
-          </div>
-
-          <button
-            type="button"
-            onClick={onClose}
-            className="delivery-icon-btn"
-          >
-            <X size={20} />
-          </button>
-        </div>
-
-        {/* Vùng nội dung cuộn được — bọc thông tin khách hàng + bản đồ + ETA +
-            cảnh báo GPS trong 1 khối cuộn riêng (flex:1 + minHeight:0) thay vì
-            để chúng nằm thẳng trong cột flex cao cố định của modal: nếu không
-            có minHeight:0, flex item mặc định không co xuống dưới chiều cao
-            nội dung tự nhiên, khiến bản đồ (minHeight 340px) + các khối phía
-            trên có thể vượt quá 100dvh trên máy màn hình thấp — phần bị tràn
-            khi đó bị .delivery-fullscreen-modal-inner (overflow:hidden) cắt
-            mất ở dưới, che luôn thanh nút "Đã Đến Nơi". Bọc cuộn riêng đảm bảo
-            header và thanh nút hành động luôn cố định, luôn nhìn thấy được. */}
-        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
-        {/* Thông tin khách hàng tóm tắt */}
-        <div style={{
-          padding: '0.75rem 1.15rem',
-          backgroundColor: '#eff6ff',
-          borderBottom: '1px solid #bfdbfe',
-          fontSize: '0.82rem'
-        }}>
-          <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            gap: '0.75rem',
-            marginBottom: '0.35rem'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-              <span style={{ color: '#64748b' }}>Khách hàng:</span>
-              <strong style={{ color: '#0f172a' }}>{customerName}</strong>
-              {phone && (
-                <a
-                  href={`tel:${phone}`}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '0.25rem',
-                    color: '#2563eb',
-                    fontWeight: 700,
-                    textDecoration: 'none',
-                    backgroundColor: '#dbeafe',
-                    padding: '2px 8px',
-                    borderRadius: '5px',
-                    fontSize: '0.78rem'
-                  }}
-                >
-                  <Phone size={12} /> {phone}
-                </a>
-              )}
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>
-              <div style={{ whiteSpace: 'nowrap', textAlign: 'right' }}>
-                <span style={{ color: '#64748b', fontSize: '0.78rem' }}>Thu hộ COD: </span>
-                <strong style={{ color: isPrepaid ? '#16a34a' : '#ef4444', fontSize: '0.95rem' }}>
-                  {isPrepaid ? 'Đã Thanh Toán Online' : fmt ? fmt(codAmount) : `${codAmount.toLocaleString('vi-VN')} ₫`}
-                </strong>
-              </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <span style={{ color: '#64748b' }}>Khách hàng:</span>
+            <strong style={{ color: '#0f172a' }}>{customerName}</strong>
+            {phone && (
               <a
-                href={googleMapsUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                title="Mở Google Maps để nghe chỉ đường bằng giọng nói"
+                href={`tel:${phone}`}
                 style={{
-                  flexShrink: 0, width: '32px', height: '32px', borderRadius: '50%',
-                  backgroundColor: '#0284c7', color: '#fff', display: 'flex',
-                  alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 6px rgba(2,132,199,0.3)'
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.25rem',
+                  color: '#2563eb',
+                  fontWeight: 700,
+                  textDecoration: 'none',
+                  backgroundColor: '#dbeafe',
+                  padding: '2px 8px',
+                  borderRadius: '5px',
+                  fontSize: '0.78rem'
                 }}
               >
-                <ExternalLink size={15} />
+                <Phone size={12} /> {phone}
               </a>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>
+            <div style={{ whiteSpace: 'nowrap', textAlign: 'right' }}>
+              <span style={{ color: '#64748b', fontSize: '0.78rem' }}>Thu hộ COD: </span>
+              <strong style={{ color: isPrepaid ? '#16a34a' : '#ef4444', fontSize: '0.95rem' }}>
+                {isPrepaid ? 'Đã Thanh Toán Online' : fmt ? fmt(codAmount) : `${codAmount.toLocaleString('vi-VN')} ₫`}
+              </strong>
             </div>
-          </div>
-
-          <div style={{
-            color: '#334155',
-            fontSize: '0.78rem',
-            display: 'flex',
-            alignItems: 'flex-start',
-            gap: '0.35rem',
-            lineHeight: 1.35
-          }}>
-            <MapPin size={14} style={{ color: '#ef4444', flexShrink: 0, marginTop: '2px' }} />
-            <span><strong style={{ color: '#475569' }}>Địa chỉ:</strong> {address}</span>
+            <a
+              href={googleMapsUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Mở Google Maps để nghe chỉ đường bằng giọng nói"
+              style={{
+                flexShrink: 0, width: '32px', height: '32px', borderRadius: '50%',
+                backgroundColor: '#0284c7', color: '#fff', display: 'flex',
+                alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 6px rgba(2,132,199,0.3)'
+              }}
+            >
+              <ExternalLink size={15} />
+            </a>
           </div>
         </div>
 
-        {/* Khung bản đồ */}
-        <div style={{ position: 'relative', flex: 1, minHeight: '340px' }}>
-          <div ref={containerRef} style={{ width: '100%', height: '100%', minHeight: '340px' }} />
-
-          {/* Nút căn góc nhìn — tròn tối giản, nhất quán với DeliveryMap.jsx */}
-          <button
-            type="button"
-            onClick={fitFullRoute}
-            title="Căn giữa lộ trình"
-            style={{
-              position: 'absolute',
-              top: '10px',
-              right: '10px',
-              zIndex: 999,
-              width: '38px',
-              height: '38px',
-              backgroundColor: '#fff',
-              border: 'none',
-              borderRadius: '50%',
-              cursor: 'pointer',
-              boxShadow: '0 1px 4px rgba(0,0,0,0.3)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}
-          >
-            <Compass size={17} color="#5f6368" />
-          </button>
-
-          {/* Badge trạng thái GPS — bấm được để tắt/bật lại, thay cho nút
-              Bắt Đầu Giao/Tạm Dừng lớn trước đây (GPS giờ tự bật khi vào
-              màn hình, badge này chỉ còn dùng khi cần tạm dừng thủ công). */}
-          <button
-            type="button"
-            onClick={() => (isEffectiveGpsActive ? (onStopGps && onStopGps(order)) : (onStartDeliveryWithGps && onStartDeliveryWithGps(order, shipperLoc)))}
-            title={isEffectiveGpsActive ? 'Bấm để tạm dừng phát GPS' : 'Bấm để bật lại GPS'}
-            style={{
-              position: 'absolute',
-              bottom: '12px',
-              left: '12px',
-              zIndex: 999,
-              border: 'none',
-              cursor: 'pointer',
-              backgroundColor: isEffectiveGpsActive ? '#15803d' : 'rgba(15, 23, 42, 0.85)',
-              color: '#ffffff',
-              padding: '5px 12px',
-              borderRadius: '999px',
-              fontSize: '0.75rem',
-              fontWeight: 700,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.4rem',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
-            }}
-          >
-            {isEffectiveGpsActive ? <Pause size={12} /> : <Navigation size={12} />}
-            <span style={{
-              width: '8px', height: '8px', borderRadius: '50%',
-              backgroundColor: isEffectiveGpsActive ? '#4ade80' : '#f59e0b',
-              boxShadow: isEffectiveGpsActive ? '0 0 8px #4ade80' : 'none'
-            }} />
-            {isEffectiveGpsActive ? 'GPS ĐANG BẬT — BẤM ĐỂ TẠM DỪNG' : 'CHƯA BẬT GPS — BẤM ĐỂ BẬT'}
-          </button>
-        </div>
-
-        {/* Thẻ ETA phẳng — cùng bố cục với bottom-card của DeliveryMap.jsx
-            (số phút lớn nổi bật + khoảng cách/tốc độ phụ), thay cho lưới 4 ô
-            trước đây vốn hơi chật trên màn hình dưới 360px. */}
         <div style={{
-          padding: '0.85rem 1rem',
-          backgroundColor: 'var(--bg-primary)',
-          borderTop: '1px solid var(--border-glass)',
+          color: '#334155',
+          fontSize: '0.78rem',
           display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexWrap: 'wrap',
-          gap: '0.75rem'
+          alignItems: 'flex-start',
+          gap: '0.35rem',
+          lineHeight: 1.35
         }}>
-          <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: '1.3rem', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.2 }}>
-              {loadingRoute ? 'Đang tính...' : routeInfo ? `${routeInfo.durationMinutes} phút` : '—'}
-            </div>
-            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-              {routeInfo ? `${routeInfo.distanceKm} km` : 'Tìm tuyến đường tối ưu'}
-              {distanceRemaining != null && ` · Còn ${distanceRemaining < 0.15 ? 'đã đến nơi' : distanceRemaining < 1 ? `${Math.round(distanceRemaining * 1000)} m` : `${distanceRemaining.toFixed(1)} km`}`}
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--text-secondary)', fontSize: '0.82rem', fontWeight: 700 }}>
-            <Gauge size={16} color="#7c3aed" />
-            {speedKmh > 0 ? `${speedKmh} km/h` : 'Đang dừng'}
-          </div>
+          <MapPin size={14} style={{ color: '#ef4444', flexShrink: 0, marginTop: '2px' }} />
+          <span><strong style={{ color: '#475569' }}>Địa chỉ:</strong> {address}</span>
         </div>
+      </div>
 
-        {/* Cảnh báo nếu chưa có toạ độ thực tế */}
-        {locError && !isEffectiveGpsActive && (
-          <div style={{
-            padding: '0.45rem 1rem',
-            backgroundColor: '#fffbeb',
-            color: '#b45309',
+      {/* Khung bản đồ — chiều cao cố định (không flex:1) vì giờ nằm trong
+          dòng chảy nội dung bình thường, không còn bị ép vào 1 cột flex
+          cao cố định nữa. */}
+      <div style={{ position: 'relative', height: '280px' }}>
+        <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
+
+        {/* Nút căn góc nhìn — tròn tối giản, nhất quán với DeliveryMap.jsx */}
+        <button
+          type="button"
+          onClick={fitFullRoute}
+          title="Căn giữa lộ trình"
+          style={{
+            position: 'absolute',
+            top: '10px',
+            right: '10px',
+            zIndex: 999,
+            width: '38px',
+            height: '38px',
+            backgroundColor: '#fff',
+            border: 'none',
+            borderRadius: '50%',
+            cursor: 'pointer',
+            boxShadow: '0 1px 4px rgba(0,0,0,0.3)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
+        >
+          <Compass size={17} color="#5f6368" />
+        </button>
+
+        {/* Badge trạng thái GPS — bấm được để tắt/bật lại, thay cho nút
+            Bắt Đầu Giao/Tạm Dừng lớn trước đây (GPS giờ tự bật khi vào
+            màn hình, badge này chỉ còn dùng khi cần tạm dừng thủ công). */}
+        <button
+          type="button"
+          onClick={() => (isEffectiveGpsActive ? (onStopGps && onStopGps(order)) : (onStartDeliveryWithGps && onStartDeliveryWithGps(order, shipperLoc)))}
+          title={isEffectiveGpsActive ? 'Bấm để tạm dừng phát GPS' : 'Bấm để bật lại GPS'}
+          style={{
+            position: 'absolute',
+            bottom: '12px',
+            left: '12px',
+            zIndex: 999,
+            border: 'none',
+            cursor: 'pointer',
+            backgroundColor: isEffectiveGpsActive ? '#15803d' : 'rgba(15, 23, 42, 0.85)',
+            color: '#ffffff',
+            padding: '5px 12px',
+            borderRadius: '999px',
             fontSize: '0.75rem',
+            fontWeight: 700,
             display: 'flex',
             alignItems: 'center',
             gap: '0.4rem',
-            borderTop: '1px solid #fef3c7'
-          }}>
-            <AlertCircle size={14} />
-            <span>{locError} Bấm nút bên dưới để cấp quyền định vị GPS thực tế.</span>
-          </div>
-        )}
+            boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
+          }}
+        >
+          {isEffectiveGpsActive ? <Pause size={12} /> : <Navigation size={12} />}
+          <span style={{
+            width: '8px', height: '8px', borderRadius: '50%',
+            backgroundColor: isEffectiveGpsActive ? '#4ade80' : '#f59e0b',
+            boxShadow: isEffectiveGpsActive ? '0 0 8px #4ade80' : 'none'
+          }} />
+          {isEffectiveGpsActive ? 'GPS ĐANG BẬT — BẤM ĐỂ TẠM DỪNG' : 'CHƯA BẬT GPS — BẤM ĐỂ BẬT'}
+        </button>
+      </div>
 
-        {/* Chụp ảnh minh chứng + thu tiền/người nhận + trượt xác nhận giao
-            thành công — gộp thẳng vào đây thay vì phải mở tiếp modal POD
-            riêng, kèm nút "Từ Chối" nhỏ bên cạnh thanh trượt. */}
-        <div style={{ padding: '1rem' }}>
-          <PODCaptureSection
-            order={order}
-            user={user}
-            fmt={fmt}
-            onConfirm={onConfirmDelivered}
-            onReject={onReject}
-          />
+      {/* Thẻ ETA phẳng */}
+      <div style={{
+        padding: '0.85rem 1rem',
+        backgroundColor: 'var(--bg-primary)',
+        borderTop: '1px solid var(--border-glass)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        flexWrap: 'wrap',
+        gap: '0.75rem'
+      }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: '1.3rem', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.2 }}>
+            {loadingRoute ? 'Đang tính...' : routeInfo ? `${routeInfo.durationMinutes} phút` : '—'}
+          </div>
+          <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+            {routeInfo ? `${routeInfo.distanceKm} km` : 'Tìm tuyến đường tối ưu'}
+            {distanceRemaining != null && ` · Còn ${distanceRemaining < 0.15 ? 'đã đến nơi' : distanceRemaining < 1 ? `${Math.round(distanceRemaining * 1000)} m` : `${distanceRemaining.toFixed(1)} km`}`}
+          </div>
         </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--text-secondary)', fontSize: '0.82rem', fontWeight: 700 }}>
+          <Gauge size={16} color="#7c3aed" />
+          {speedKmh > 0 ? `${speedKmh} km/h` : 'Đang dừng'}
         </div>
+      </div>
+
+      {/* Cảnh báo nếu chưa có toạ độ thực tế */}
+      {locError && !isEffectiveGpsActive && (
+        <div style={{
+          padding: '0.45rem 1rem',
+          backgroundColor: '#fffbeb',
+          color: '#b45309',
+          fontSize: '0.75rem',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.4rem',
+          borderTop: '1px solid #fef3c7'
+        }}>
+          <AlertCircle size={14} />
+          <span>{locError} Bấm nút bên dưới để cấp quyền định vị GPS thực tế.</span>
+        </div>
+      )}
+
+      {/* Chụp ảnh minh chứng + thu tiền/người nhận + trượt xác nhận giao
+          thành công — nằm cuối luồng nội dung, kéo xuống là thấy, kèm nút
+          "Từ Chối" nhỏ bên cạnh thanh trượt. */}
+      <div style={{ padding: '1rem' }}>
+        <PODCaptureSection
+          order={order}
+          user={user}
+          fmt={fmt}
+          onConfirm={onConfirmDelivered}
+          onReject={onReject}
+        />
       </div>
     </div>
   );
