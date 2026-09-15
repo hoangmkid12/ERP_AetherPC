@@ -336,7 +336,7 @@ export default function PODModal({ order: deliverModal, user, onClose, onConfirm
         {step === 'camera' ? (
           <>
             {/* CAMERA STEP — full screen viewfinder */}
-            <div style={{ flex: 1, position: 'relative', backgroundColor: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+            <div style={{ flex: 1, minHeight: 0, position: 'relative', backgroundColor: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
               <video
                 ref={videoRef}
                 autoPlay
@@ -420,7 +420,7 @@ export default function PODModal({ order: deliverModal, user, onClose, onConfirm
         ) : (
           <>
             {/* DETAILS STEP — scrollable confirm form */}
-            <div style={{ flex: 1, overflowY: 'auto', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.9rem', fontSize: '0.82rem' }}>
+            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.9rem', fontSize: '0.82rem' }}>
 
               {/* Captured photo preview */}
               <div style={{ position: 'relative', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>

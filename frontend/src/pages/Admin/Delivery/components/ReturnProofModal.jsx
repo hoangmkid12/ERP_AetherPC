@@ -127,7 +127,7 @@ export default function ReturnProofModal({ order: ord, onClose, onConfirm }) {
         {step === 'camera' ? (
           <>
             {/* CAMERA STEP */}
-            <div style={{ flex: 1, position: 'relative', backgroundColor: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+            <div style={{ flex: 1, minHeight: 0, position: 'relative', backgroundColor: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
               <video
                 ref={videoRef}
                 autoPlay
@@ -199,7 +199,7 @@ export default function ReturnProofModal({ order: ord, onClose, onConfirm }) {
         ) : (
           <>
             {/* DETAILS STEP */}
-            <div style={{ flex: 1, overflowY: 'auto', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.9rem', fontSize: '0.82rem' }}>
+            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.9rem', fontSize: '0.82rem' }}>
               <div style={{ position: 'relative', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
                 <img src={proofPhoto} alt="Return Proof" style={{ width: '100%', height: '180px', objectFit: 'cover', display: 'block' }} />
                 <span style={{ position: 'absolute', top: '8px', right: '8px', backgroundColor: 'rgba(217,119,6,0.9)', color: '#fff', padding: '3px 8px', borderRadius: '4px', fontSize: '0.68rem', fontWeight: 800 }}>

@@ -270,6 +270,16 @@ export default function DeliveryNavigationModal({
           </button>
         </div>
 
+        {/* Vùng nội dung cuộn được — bọc thông tin khách hàng + bản đồ + ETA +
+            cảnh báo GPS trong 1 khối cuộn riêng (flex:1 + minHeight:0) thay vì
+            để chúng nằm thẳng trong cột flex cao cố định của modal: nếu không
+            có minHeight:0, flex item mặc định không co xuống dưới chiều cao
+            nội dung tự nhiên, khiến bản đồ (minHeight 340px) + các khối phía
+            trên có thể vượt quá 100dvh trên máy màn hình thấp — phần bị tràn
+            khi đó bị .delivery-fullscreen-modal-inner (overflow:hidden) cắt
+            mất ở dưới, che luôn thanh nút "Đã Đến Nơi". Bọc cuộn riêng đảm bảo
+            header và thanh nút hành động luôn cố định, luôn nhìn thấy được. */}
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
         {/* Thông tin khách hàng tóm tắt */}
         <div style={{
           padding: '0.75rem 1.15rem',
@@ -429,6 +439,7 @@ export default function DeliveryNavigationModal({
             <span>{locError} Bấm nút bên dưới để cấp quyền định vị GPS thực tế.</span>
           </div>
         )}
+        </div>
 
         {/* Thanh nút hành động chính — Cân đối 3 cột đồng đều */}
         <div className="delivery-modal-action-bar" style={{

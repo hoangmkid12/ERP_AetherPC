@@ -35,7 +35,7 @@ export default function OrderDetailSheet({ order: ord, onClose, fmt, actions = {
         </div>
 
         {/* Body */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '1rem' }}>
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '1rem' }}>
           <span style={{
             display: 'inline-block', padding: '3px 10px', borderRadius: '999px', fontSize: '0.72rem', fontWeight: 800,
             backgroundColor: `${statusInfo.color}20`, color: statusInfo.color, marginBottom: '0.85rem'
