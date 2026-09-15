@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Camera, RefreshCw, CreditCard, ChevronLeft, Upload, Check, ChevronRight, XCircle } from 'lucide-react';
-import useSafeViewportHeight from '../../../../hooks/useSafeViewportHeight';
 
 // Thanh trượt xác nhận (Swipe to Confirm) chống chạm nhầm khi đi đường
 function SwipeConfirmButton({ onConfirm, disabled, label = "Trượt để hoàn tất giao hàng" }) {
@@ -147,11 +146,9 @@ function SwipeConfirmButton({ onConfirm, disabled, label = "Trượt để hoàn
 //     mở thẳng vào camera giống hành vi gốc.
 //   - DeliveryNavigationModal.jsx (luồng chính "Bắt Đầu Giao" gộp màn hình):
 //     autoStartCamera=false, hiện khung "chưa chụp ảnh" trước, người dùng
-//     tự bấm để mở camera — camera luôn tự nổi thành lớp phủ toàn màn hình
-//     (position:fixed) bất kể đang nằm sâu trong modal nào, nên component
-//     cha không cần biết/điều phối bước camera.
+//     tự bấm để mở camera — camera là khối nội dung bình thường (không
+//     position:fixed), luôn nằm gọn trong dòng chảy cuộn của component cha.
 export default function PODCaptureSection({ order, user, fmt, onConfirm, onReject, autoStartCamera = false }) {
-  const safeVh = useSafeViewportHeight();
   const videoRef = useRef(null);
   const [step, setStep] = useState(autoStartCamera ? 'camera' : 'form');
   const [isCameraActive, setIsCameraActive] = useState(false);
@@ -318,102 +315,102 @@ export default function PODCaptureSection({ order, user, fmt, onConfirm, onRejec
     });
   };
 
-  // ─── Bước camera: luôn nổi thành lớp phủ toàn màn hình, độc lập với
-  // component cha (PODModal hoặc DeliveryNavigationModal) đang bọc ngoài. ───
+  // ─── Bước camera: KHÔNG dùng position:fixed/toàn màn hình nữa — cùng lý
+  // do đã bỏ modal fixed ở DeliveryNavigationModal: mọi cách tính chiều cao
+  // viewport (100dvh/100svh/visualViewport) đều từng để lại khoảng trắng
+  // che nút trên điện thoại thật. Giờ đây là 1 khối nội dung bình thường,
+  // khung camera cao cố định (không phụ thuộc viewport), nút chụp nằm ngay
+  // bên dưới trong dòng chảy — luôn cuộn tới được, không thể bị che. ───
   if (step === 'camera') {
     return (
-      <div className="delivery-fullscreen-modal" style={{ height: `${safeVh}px` }}>
-        <div className="delivery-fullscreen-modal-inner" style={{ height: `${safeVh}px` }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.85rem 1rem', background: 'var(--bg-primary)', borderBottom: '1px solid var(--border-glass)', flexShrink: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              {proofPhoto && (
-                <button type="button" onClick={() => setStep('form')} className="delivery-icon-btn"><ChevronLeft size={18} /></button>
-              )}
-              <strong style={{ fontSize: '0.9rem', color: 'var(--text-primary)' }}>Chụp Ảnh Minh Chứng</strong>
-            </div>
-            <button type="button" onClick={() => setStep('form')} className="delivery-icon-btn"><X size={18} /></button>
-          </div>
-
-          <div style={{ flex: 1, minHeight: 0, position: 'relative', backgroundColor: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-            <video
-              ref={videoRef}
-              autoPlay
-              playsInline
-              muted
-              style={{ width: '100%', height: '100%', objectFit: 'cover', display: isCameraActive ? 'block' : 'none' }}
-            />
-
-            {isCameraActive && (
-              <>
-                <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <div style={{ width: '78%', height: '55%', border: '2px dashed rgba(37,99,235,0.7)', borderRadius: '8px' }} />
-                </div>
-                <div style={{
-                  position: 'absolute', bottom: '90px', left: '10px',
-                  backgroundColor: 'rgba(15, 23, 42, 0.85)', color: '#fff',
-                  padding: '4px 10px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 800,
-                  display: 'flex', alignItems: 'center', gap: '0.4rem',
-                  border: '1px solid rgba(34, 197, 94, 0.6)'
-                }}>
-                  <span style={{ width: '7px', height: '7px', borderRadius: '50%', backgroundColor: '#22c55e' }} />
-                  <span>{currentTime.toLocaleTimeString('vi-VN')} - {currentTime.toLocaleDateString('vi-VN')}</span>
-                </div>
-              </>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            {proofPhoto && (
+              <button type="button" onClick={() => setStep('form')} className="delivery-icon-btn"><ChevronLeft size={18} /></button>
             )}
-
-            {!isCameraActive && (
-              <div style={{ textAlign: 'center', padding: '1rem', color: '#cbd5e1' }}>
-                <Camera size={32} style={{ color: '#94a3b8', margin: '0 auto 0.5rem' }} />
-                <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#f8fafc' }}>
-                  {cameraError || 'Đang kết nối Camera thiết bị...'}
-                </div>
-                <button
-                  type="button"
-                  onClick={startCamera}
-                  style={{ marginTop: '0.6rem', padding: '0.4rem 0.85rem', fontSize: '0.75rem', fontWeight: 700, backgroundColor: 'var(--primary)', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
-                >
-                  Thử Mở Lại Camera
-                </button>
-              </div>
-            )}
+            <strong style={{ fontSize: '0.9rem', color: 'var(--text-primary)' }}>Chụp Ảnh Minh Chứng</strong>
           </div>
-
-          <div className="delivery-modal-action-bar" style={{ padding: '0.85rem 1rem 0', background: 'var(--bg-primary)', borderTop: '1px solid var(--border-glass)', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-            <button
-              type="button"
-              className="delivery-tap-target"
-              onClick={capturePhoto}
-              disabled={!isCameraActive}
-              style={{
-                width: '100%', padding: '0.75rem', fontSize: '0.88rem', fontWeight: 800,
-                backgroundColor: isCameraActive ? 'var(--danger)' : '#94a3b8', color: '#fff',
-                border: 'none', borderRadius: 'var(--radius-md)', cursor: isCameraActive ? 'pointer' : 'not-allowed',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem'
-              }}
-            >
-              <Camera size={18} /> Bấm Chụp Ảnh Minh Chứng
-            </button>
-
-            <label
-              className="delivery-tap-target"
-              style={{
-                width: '100%', padding: '0.6rem', fontSize: '0.78rem', fontWeight: 750,
-                backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-secondary)',
-                border: '1px dashed var(--border-glass)', borderRadius: 'var(--radius-md)',
-                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.45rem',
-                boxSizing: 'border-box'
-              }}
-            >
-              <Upload size={15} color="var(--primary)" /> Tải ảnh minh chứng từ máy (Thư viện ảnh)
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleFileUpload}
-                style={{ display: 'none' }}
-              />
-            </label>
-          </div>
+          <button type="button" onClick={() => setStep('form')} className="delivery-icon-btn"><X size={18} /></button>
         </div>
+
+        <div style={{ position: 'relative', height: '360px', backgroundColor: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', borderRadius: 'var(--radius-md)' }}>
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            muted
+            style={{ width: '100%', height: '100%', objectFit: 'cover', display: isCameraActive ? 'block' : 'none' }}
+          />
+
+          {isCameraActive && (
+            <>
+              <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ width: '78%', height: '55%', border: '2px dashed rgba(37,99,235,0.7)', borderRadius: '8px' }} />
+              </div>
+              <div style={{
+                position: 'absolute', bottom: '10px', left: '10px',
+                backgroundColor: 'rgba(15, 23, 42, 0.85)', color: '#fff',
+                padding: '4px 10px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 800,
+                display: 'flex', alignItems: 'center', gap: '0.4rem',
+                border: '1px solid rgba(34, 197, 94, 0.6)'
+              }}>
+                <span style={{ width: '7px', height: '7px', borderRadius: '50%', backgroundColor: '#22c55e' }} />
+                <span>{currentTime.toLocaleTimeString('vi-VN')} - {currentTime.toLocaleDateString('vi-VN')}</span>
+              </div>
+            </>
+          )}
+
+          {!isCameraActive && (
+            <div style={{ textAlign: 'center', padding: '1rem', color: '#cbd5e1' }}>
+              <Camera size={32} style={{ color: '#94a3b8', margin: '0 auto 0.5rem' }} />
+              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#f8fafc' }}>
+                {cameraError || 'Đang kết nối Camera thiết bị...'}
+              </div>
+              <button
+                type="button"
+                onClick={startCamera}
+                style={{ marginTop: '0.6rem', padding: '0.4rem 0.85rem', fontSize: '0.75rem', fontWeight: 700, backgroundColor: 'var(--primary)', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+              >
+                Thử Mở Lại Camera
+              </button>
+            </div>
+          )}
+        </div>
+
+        <button
+          type="button"
+          className="delivery-tap-target"
+          onClick={capturePhoto}
+          disabled={!isCameraActive}
+          style={{
+            width: '100%', padding: '0.75rem', fontSize: '0.88rem', fontWeight: 800,
+            backgroundColor: isCameraActive ? 'var(--danger)' : '#94a3b8', color: '#fff',
+            border: 'none', borderRadius: 'var(--radius-md)', cursor: isCameraActive ? 'pointer' : 'not-allowed',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem'
+          }}
+        >
+          <Camera size={18} /> Bấm Chụp Ảnh Minh Chứng
+        </button>
+
+        <label
+          className="delivery-tap-target"
+          style={{
+            width: '100%', padding: '0.6rem', fontSize: '0.78rem', fontWeight: 750,
+            backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-secondary)',
+            border: '1px dashed var(--border-glass)', borderRadius: 'var(--radius-md)',
+            cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.45rem',
+            boxSizing: 'border-box'
+          }}
+        >
+          <Upload size={15} color="var(--primary)" /> Tải ảnh minh chứng từ máy (Thư viện ảnh)
+          <input
+            type="file"
+            accept="image/*"
+            onChange={handleFileUpload}
+            style={{ display: 'none' }}
+          />
+        </label>
       </div>
     );
   }
