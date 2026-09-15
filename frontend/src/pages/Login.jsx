@@ -214,10 +214,10 @@ export default function Login() {
                   <span style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', fontFamily: 'var(--font-title)', letterSpacing: '-0.02em' }}>AETHER PC</span>
                 </div>
                 <h2 style={{ fontSize: '1.75rem', fontFamily: 'var(--font-title)', color: '#0f172a', fontWeight: 800, margin: '0 0 0.3rem' }}>
-                  {isRegister ? 'Đăng Ký Khách Hàng' : 'Đăng Nhập'}
+                  {isRegister ? 'Đăng Ký' : 'Đăng Nhập'}
                 </h2>
                 <p style={{ color: '#64748b', fontSize: '0.875rem', margin: 0, lineHeight: 1.5 }}>
-                  {isRegister ? 'Tạo tài khoản để trải nghiệm dịch vụ lắp ráp PC' : 'Chào mừng quay lại! Vui lòng đăng nhập để tiếp tục.'}
+                  {isRegister ? 'Tạo tài khoản để trải nghiệm dịch vụ linh kiện & lắp ráp PC' : 'Chào mừng quay lại! Vui lòng đăng nhập để tiếp tục.'}
                 </p>
               </div>
 
@@ -260,7 +260,7 @@ export default function Login() {
                     fontFamily: 'var(--font-sans)'
                   }}
                 >
-                  Đăng Ký Khách Hàng
+                  Đăng Ký
                 </button>
               </div>
 
@@ -410,7 +410,7 @@ export default function Login() {
                       disabled={loading}
                     >
                       <UserPlus size={18} />
-                      {loading ? 'Đang khởi tạo...' : 'Đăng Ký Khách Hàng'}
+                      {loading ? 'Đang khởi tạo...' : 'Đăng Ký'}
                     </button>
                   </>
                 )}
@@ -437,10 +437,10 @@ export default function Login() {
 
                 <div style={{ position: 'relative', zIndex: 1 }}>
                   <h3 style={{ fontSize: '1.3rem', fontWeight: 800, color: '#1e3a8a', margin: '0 0 0.6rem', letterSpacing: '-0.02em', fontFamily: 'var(--font-title)' }}>
-                    Quyền Lợi Thành Viên
+                    Quyền Lợi Khi Đăng Ký
                   </h3>
                   <p style={{ fontSize: '0.875rem', color: '#475569', margin: 0, lineHeight: 1.6 }}>
-                    Đăng ký tài khoản để trải nghiệm dịch vụ lắp ráp PC chuyên nghiệp và theo dõi đơn hàng tức thì.
+                    Đăng ký tài khoản để trải nghiệm mua sắm linh kiện máy tính, lắp ráp PC và theo dõi đơn hàng tức thì.
                   </p>
                 </div>
 

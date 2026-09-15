@@ -15,6 +15,7 @@ import Footer from './components/Layout/Footer';
 import Chatbot from './components/Layout/Chatbot';
 import Sidebar from './components/Layout/Sidebar';
 import DeliveryAppShell from './components/Layout/DeliveryAppShell';
+import LoadingScreen from './components/Common/LoadingScreen';
 
 // Storefront Components
 const Home = lazy(() => import('./pages/Storefront/Home'));
@@ -49,12 +50,9 @@ const CustomerService = lazy(() => import('./pages/Admin/CustomerService'));
 const Delivery = lazy(() => import('./pages/Admin/Delivery'));
 const QualityControl = lazy(() => import('./pages/Admin/QualityControl'));
 
-// Shown while a lazy route chunk downloads — same "Đang tải..." look already
-// used by ProtectedRoute/AdminLayout's own auth-loading states.
+// Shown while a lazy route chunk downloads — modern high-tech enterprise loading look
 const RouteLoadingFallback = () => (
-  <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
-    <div style={{ color: 'var(--text-muted, #64748b)', fontSize: '0.95rem' }}>Đang tải...</div>
-  </div>
+  <LoadingScreen text="Đang nạp phân hệ..." subtext="Hệ thống AetherPC ERP đang tải giao diện và cấu hình" minHeight="70vh" />
 );
 
 // 1. Layout for Storefront Customer Views
@@ -83,11 +81,7 @@ const AdminLayout = () => {
   }, [location.pathname, location.search]);
 
   if (loading) {
-    return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', background: 'var(--bg-app)' }}>
-        <div style={{ color: 'var(--text-muted)', fontSize: '0.95rem' }}>Đang tải...</div>
-      </div>
-    );
+    return <LoadingScreen text="Đang xác thực tài khoản..." subtext="Đang kiểm tra thông tin nhân viên và phân quyền" fullScreen />;
   }
 
   if (!isAuthenticated) {
@@ -204,11 +198,7 @@ const ProtectedRoute = ({ allowedRoles, children }) => {
   const { user, isAuthenticated, loading } = useAuth();
 
   if (loading) {
-    return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', background: 'var(--bg-app)' }}>
-        <div style={{ color: 'var(--text-muted)', fontSize: '0.95rem' }}>Đang tải...</div>
-      </div>
-    );
+    return <LoadingScreen text="Đang tải dữ liệu..." subtext="Vui lòng đợi trong giây lát" fullScreen />;
   }
 
   if (!isAuthenticated) {
