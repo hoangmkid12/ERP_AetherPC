@@ -2,10 +2,12 @@ import React from 'react';
 import { X, Phone, MapPin, Package, CheckCircle, AlertTriangle, Camera, CreditCard } from 'lucide-react';
 import { ORDER_STATUS, getStatusLabel, getStatusInfo } from '../../../../utils/statusLabels';
 import DeliveryProgressStepper from '../../../../components/DeliveryProgressStepper';
+import useSafeViewportHeight from '../../../../hooks/useSafeViewportHeight';
 
 // Full-screen order detail view. Replaces the old dead "Xem Chi Tiết & Ảnh
 // POD" button which used to set `selectedOrder` but had no modal reading it.
 export default function OrderDetailSheet({ order: ord, onClose, fmt, actions = {} }) {
+  const safeVh = useSafeViewportHeight();
   if (!ord) return null;
 
   const orderId = ord.orderId || ord.id;
@@ -23,8 +25,8 @@ export default function OrderDetailSheet({ order: ord, onClose, fmt, actions = {
   );
 
   return (
-    <div className="delivery-fullscreen-modal" onClick={onClose}>
-      <div className="delivery-fullscreen-modal-inner" onClick={e => e.stopPropagation()}>
+    <div className="delivery-fullscreen-modal" style={{ height: `${safeVh}px` }} onClick={onClose}>
+      <div className="delivery-fullscreen-modal-inner" style={{ height: `${safeVh}px` }} onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.85rem 1rem', background: 'var(--bg-primary)', borderBottom: '1px solid var(--border-glass)', flexShrink: 0 }}>
           <div>

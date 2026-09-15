@@ -4,6 +4,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { fetchRoadRoute, forwardGeocode } from '../../../../utils/routingService';
 import { TILE_URL, TILE_ATTRIBUTION, TILE_MAX_ZOOM, WAREHOUSE_ICON, DESTINATION_ICON, SHIPPER_ICON } from '../../../../utils/mapIcons';
+import useSafeViewportHeight from '../../../../hooks/useSafeViewportHeight';
 
 function haversineKm(a, b) {
   if (!a || !b) return null;
@@ -27,6 +28,7 @@ export default function DeliveryNavigationModal({
   onClose,
   fmt
 }) {
+  const safeVh = useSafeViewportHeight();
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const markersRef = useRef({});
@@ -237,8 +239,8 @@ export default function DeliveryNavigationModal({
   const distanceRemaining = shipperLoc && exactDestination ? haversineKm(shipperLoc, exactDestination) : null;
 
   return (
-    <div className="delivery-fullscreen-modal">
-      <div className="delivery-fullscreen-modal-inner">
+    <div className="delivery-fullscreen-modal" style={{ height: `${safeVh}px` }}>
+      <div className="delivery-fullscreen-modal-inner" style={{ height: `${safeVh}px` }}>
         {/* Header Modal */}
         <div style={{
           padding: '0.85rem 1rem',

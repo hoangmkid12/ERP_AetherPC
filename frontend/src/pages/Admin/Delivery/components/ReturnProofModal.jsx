@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Camera, RefreshCw, Undo2, ChevronLeft } from 'lucide-react';
+import useSafeViewportHeight from '../../../../hooks/useSafeViewportHeight';
 
 // Photo-proof capture flow for a Shipper handing a package back to the
 // warehouse (RETURNING_TO_WAREHOUSE). Mirrors PODModal's camera/watermark
 // capture step so Thủ Kho/QC can visually verify the package condition on
 // arrival, the same way customers get visual proof of delivery.
 export default function ReturnProofModal({ order: ord, onClose, onConfirm }) {
+  const safeVh = useSafeViewportHeight();
   const videoRef = useRef(null);
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [cameraError, setCameraError] = useState('');
@@ -102,8 +104,8 @@ export default function ReturnProofModal({ order: ord, onClose, onConfirm }) {
   const step = proofPhoto ? 'details' : 'camera';
 
   return (
-    <div className="delivery-fullscreen-modal">
-      <div className="delivery-fullscreen-modal-inner">
+    <div className="delivery-fullscreen-modal" style={{ height: `${safeVh}px` }}>
+      <div className="delivery-fullscreen-modal-inner" style={{ height: `${safeVh}px` }}>
         {/* Header */}
         <div style={{ flexShrink: 0, background: 'var(--bg-primary)', borderBottom: '1px solid var(--border-glass)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.85rem 1rem 0.5rem' }}>

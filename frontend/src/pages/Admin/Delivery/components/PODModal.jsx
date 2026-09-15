@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Camera, RefreshCw, CreditCard, ChevronLeft, Upload, Check, ChevronRight } from 'lucide-react';
+import useSafeViewportHeight from '../../../../hooks/useSafeViewportHeight';
 
 // Proof-of-Delivery capture flow. Carries over the EXACT camera/watermark
 // capture logic, VietQR bank-transfer branching and receiver-type handling
@@ -145,6 +146,7 @@ function SwipeConfirmButton({ onConfirm, disabled, label = "Trượt để hoàn
 }
 
 export default function PODModal({ order: deliverModal, user, onClose, onConfirm, fmt }) {
+  const safeVh = useSafeViewportHeight();
   const videoRef = useRef(null);
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [cameraError, setCameraError] = useState('');
@@ -310,8 +312,8 @@ export default function PODModal({ order: deliverModal, user, onClose, onConfirm
   const step = proofPhoto ? 'details' : 'camera';
 
   return (
-    <div className="delivery-fullscreen-modal">
-      <div className="delivery-fullscreen-modal-inner">
+    <div className="delivery-fullscreen-modal" style={{ height: `${safeVh}px` }}>
+      <div className="delivery-fullscreen-modal-inner" style={{ height: `${safeVh}px` }}>
         {/* Header */}
         <div style={{ flexShrink: 0, background: 'var(--bg-primary)', borderBottom: '1px solid var(--border-glass)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.85rem 1rem 0.5rem' }}>

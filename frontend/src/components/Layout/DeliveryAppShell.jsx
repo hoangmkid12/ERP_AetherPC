@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useSalesStore, useHRStore } from '../../stores';
 import { notify } from '../../context/NotificationContext';
 import { LEAVE_STATUS, getStatusInfo, getStatusLabel } from '../../utils/statusLabels';
+import useSafeViewportHeight from '../../hooks/useSafeViewportHeight';
 import { Home, Package, Truck, Undo2, History, Bell, LogOut, CalendarCheck, X, Send } from 'lucide-react';
 
 const TABS = [
@@ -32,6 +33,7 @@ export default function DeliveryAppShell({ children }) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const activeTab = searchParams.get('tab') || 'active';
+  const safeVh = useSafeViewportHeight();
 
   const orders = useSalesStore(state => state.orders) || [];
 
@@ -133,7 +135,7 @@ export default function DeliveryAppShell({ children }) {
 
   return (
     <div className="delivery-app-shell">
-      <div className="delivery-app-inner">
+      <div className="delivery-app-inner" style={{ height: `${safeVh}px` }}>
         {/* Top Bar */}
         <div className="delivery-topbar">
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', minWidth: 0 }}>
