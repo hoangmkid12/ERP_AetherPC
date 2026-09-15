@@ -1309,7 +1309,7 @@ export default function Sidebar({ isOpen = false, onClose }) {
       </nav>
 
       {/* User Status / Bottom Actions Card */}
-      <div style={{
+      <div className="admin-sidebar-footer" style={{
         padding: '1rem',
         borderTop: '1px solid #e2e8f0',
         display: 'flex',
@@ -1367,7 +1367,7 @@ export default function Sidebar({ isOpen = false, onClose }) {
         </div>
 
         {/* Action Buttons */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+        <div className="admin-sidebar-actions" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
           <button
             onClick={() => navigate('/')}
             className="btn" 

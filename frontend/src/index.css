@@ -1191,7 +1191,7 @@ select.input-field option {
   flex: 1;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  padding: 0.85rem 0.85rem 1.5rem;
+  padding: 0.85rem 0.85rem max(env(safe-area-inset-bottom, 0px) + 5rem, 90px);
 }
 
 .delivery-bottom-nav {
@@ -1200,7 +1200,7 @@ select.input-field option {
   align-items: stretch;
   background: var(--bg-primary);
   border-top: 1px solid var(--border-glass);
-  padding-bottom: max(env(safe-area-inset-bottom, 0px), 10px);
+  padding-bottom: max(env(safe-area-inset-bottom, 0px) + 0.65rem, 24px);
   z-index: 10;
 }
 
@@ -1624,8 +1624,13 @@ html, body {
     visibility: hidden !important;
     pointer-events: none !important;
     max-width: 85vw !important;
-    width: 280px !important;
+    width: 290px !important;
+    height: 100dvh !important;
+    max-height: 100dvh !important;
     display: flex !important;
+    flex-direction: column !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
   }
 
   /* Chỉ hiển thị bóng đổ và tương tác khi Sidebar mở */
@@ -1636,6 +1641,34 @@ html, body {
     box-shadow: 8px 0 24px rgba(0, 0, 0, 0.25) !important;
   }
 
+  /* Nâng phần chân menu (thông tin tài khoản, cửa hàng, đăng xuất) nổi lên trên thanh tìm kiếm/địa chỉ trình duyệt điện thoại */
+  .admin-sidebar-footer {
+    padding: 1rem 1rem max(env(safe-area-inset-bottom, 0px) + 1.25rem, 85px) 1rem !important;
+    background-color: #f8fafc !important;
+    border-top: 1px solid #e2e8f0 !important;
+    margin-top: auto !important;
+    flex-shrink: 0 !important;
+  }
+
+  /* 2 nút Cửa hàng và Đăng xuất nằm song song 2 cột cân đối, không bị che khuất hay rớt dòng */
+  .admin-sidebar-actions {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 0.5rem !important;
+    width: 100% !important;
+  }
+
+  .admin-sidebar-actions > button,
+  .admin-sidebar-actions > a {
+    width: 100% !important;
+    min-height: 42px !important;
+    font-size: 0.82rem !important;
+    padding: 0.55rem 0.5rem !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+
   .desktop-only {
     display: none !important;
   }
@@ -1644,18 +1677,21 @@ html, body {
     display: flex !important;
   }
 
-  /* Khung nội dung Admin trên điện thoại: chống tràn ngang */
+  /* Khung nội dung Admin trên điện thoại: chống tràn ngang, kéo lên thoải mái không bị thanh tìm kiếm/địa chỉ che */
   .admin-main-content {
     padding: 0 !important;
-    min-height: calc(100vh - 56px) !important;
-    max-height: calc(100vh - 56px) !important;
+    min-height: calc(100dvh - 56px) !important;
+    max-height: calc(100dvh - 56px) !important;
     width: 100% !important;
     max-width: 100vw !important;
     overflow-x: hidden !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
     box-sizing: border-box !important;
   }
   .admin-main-content > div {
     padding: 0.75rem 0.6rem !important;
+    padding-bottom: max(env(safe-area-inset-bottom, 0px) + 2.5rem, 100px) !important;
     max-width: 100% !important;
     box-sizing: border-box !important;
     overflow-x: hidden !important;
