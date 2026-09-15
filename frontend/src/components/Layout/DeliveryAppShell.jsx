@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useSalesStore, useHRStore } from '../../stores';
 import { notify } from '../../context/NotificationContext';
 import { LEAVE_STATUS, getStatusInfo, getStatusLabel } from '../../utils/statusLabels';
-import { Home, Package, Truck, Undo2, History, Bell, LogOut, CalendarCheck, X, Send, Wallet } from 'lucide-react';
+import { Home, Package, Truck, Undo2, History, Bell, LogOut, CalendarCheck, X, Send } from 'lucide-react';
 
 const TABS = [
   { id: 'overview', label: 'Tổng Quan', icon: Home },
@@ -129,44 +129,66 @@ export default function DeliveryAppShell({ children }) {
     navigate(`/admin/delivery?tab=${tabId}`);
   };
 
+  const initials = displayName.trim().split(/\s+/).slice(-1)[0]?.[0]?.toUpperCase() || 'S';
+
   return (
     <div className="delivery-app-shell">
       <div className="delivery-app-inner">
         {/* Top Bar */}
         <div className="delivery-topbar">
-          <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-            <strong style={{ fontSize: '0.9rem', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              {displayName}
-            </strong>
-            <button
-              type="button"
-              onClick={toggleShipperStatus}
-              style={{
-                marginTop: '0.2rem',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.3rem',
-                border: 'none',
-                borderRadius: '999px',
-                padding: '0.15rem 0.55rem',
-                fontSize: '0.68rem',
-                fontWeight: 800,
-                cursor: 'pointer',
-                width: 'fit-content',
-                backgroundColor: shipperStatus.isOnline ? 'rgba(22,163,74,0.12)' : 'rgba(100,116,139,0.14)',
-                color: shipperStatus.isOnline ? 'var(--success)' : 'var(--text-muted)'
-              }}
-              title={shipperStatus.isOnline ? 'Bấm để tạm dừng nhận đơn' : 'Bấm để bật nhận đơn'}
-            >
-              <span style={{
-                width: '7px', height: '7px', borderRadius: '50%',
-                backgroundColor: shipperStatus.isOnline ? 'var(--success)' : 'var(--text-muted)'
-              }} />
-              {shipperStatus.isOnline ? 'Sẵn sàng nhận đơn' : 'Tạm dừng'}
-            </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', minWidth: 0 }}>
+            <div style={{
+              width: '38px', height: '38px', borderRadius: '50%', flexShrink: 0,
+              background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary-hover) 100%)',
+              color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: '0.9rem', fontWeight: 800
+            }}>
+              {initials}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+              <strong style={{ fontSize: '0.88rem', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {displayName}
+              </strong>
+              {/* Switch bật/tắt nhận đơn — dạng thanh trượt rõ ràng hơn chấm tròn+chữ trước đây */}
+              <button
+                type="button"
+                onClick={toggleShipperStatus}
+                className="delivery-pressable"
+                style={{
+                  marginTop: '0.2rem',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.4rem',
+                  border: 'none',
+                  background: 'none',
+                  padding: 0,
+                  cursor: 'pointer',
+                  width: 'fit-content'
+                }}
+                title={shipperStatus.isOnline ? 'Bấm để tạm dừng nhận đơn' : 'Bấm để bật nhận đơn'}
+              >
+                <span style={{
+                  position: 'relative', width: '28px', height: '16px', borderRadius: '999px', flexShrink: 0,
+                  backgroundColor: shipperStatus.isOnline ? 'var(--success)' : 'var(--border-glass)',
+                  transition: 'background-color var(--transition-fast)'
+                }}>
+                  <span style={{
+                    position: 'absolute', top: '2px', left: shipperStatus.isOnline ? '14px' : '2px',
+                    width: '12px', height: '12px', borderRadius: '50%', backgroundColor: '#fff',
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.3)', transition: 'left var(--transition-fast)'
+                  }} />
+                </span>
+                <span style={{ fontSize: '0.72rem', fontWeight: 700, color: shipperStatus.isOnline ? 'var(--success)' : 'var(--text-muted)' }}>
+                  {shipperStatus.isOnline ? 'Sẵn sàng nhận đơn' : 'Tạm dừng'}
+                </span>
+              </button>
+            </div>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+            <button type="button" onClick={openLeaveModal} className="delivery-icon-btn" title="Xin nghỉ phép">
+              <CalendarCheck size={18} />
+            </button>
             <button
               type="button"
               onClick={() => navigate('/admin/delivery?tab=pending')}

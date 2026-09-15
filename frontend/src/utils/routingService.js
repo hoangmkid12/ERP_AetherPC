@@ -1,4 +1,7 @@
 // OSRM (Open Source Routing Machine) - dịch vụ chỉ đường đường bộ thực tế miễn phí của OpenStreetMap
+// Mặc định gọi server demo công khai (không có SLA); trỏ VITE_OSRM_BASE_URL
+// sang instance tự host (xem thư mục osrm/) để có routing ổn định hơn.
+const OSRM_BASE_URL = import.meta.env.VITE_OSRM_BASE_URL || 'https://router.project-osrm.org';
 
 export async function fetchRoadRoute(origin, destination) {
   if (!origin?.lat || !origin?.lng || !destination?.lat || !destination?.lng) {
@@ -6,7 +9,7 @@ export async function fetchRoadRoute(origin, destination) {
   }
 
   try {
-    const url = `https://router.project-osrm.org/route/v1/driving/${origin.lng},${origin.lat};${destination.lng},${destination.lat}?overview=full&geometries=geojson`;
+    const url = `${OSRM_BASE_URL}/route/v1/driving/${origin.lng},${origin.lat};${destination.lng},${destination.lat}?overview=full&geometries=geojson`;
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 6000);
 
@@ -71,4 +74,25 @@ export function sampleRoutePoints(coordinates, count = 35) {
     sampled.push(coordinates[idx]);
   }
   return sampled;
+}
+
+// Reverse geocoding qua Nominatim (OpenStreetMap, miễn phí) — hiển thị "đang ở
+// đâu" cho vị trí Shipper hiện tại, kiểu Grab. Usage policy của Nominatim giới
+// hạn ~1 request/giây; gọi hàm này nên tự throttle ở phía component, không gọi
+// theo mỗi lần cập nhật GPS (8s/lần đã đủ thưa nhưng vẫn nên throttle ở caller).
+export async function reverseGeocode(lat, lng) {
+  if (typeof lat !== 'number' || typeof lng !== 'number') return null;
+  try {
+    const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=17&addressdetails=0`;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    const res = await fetch(url, { signal: controller.signal, headers: { Accept: 'application/json' } });
+    clearTimeout(timeoutId);
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data?.display_name || null;
+  } catch (err) {
+    console.warn('Không thể lấy địa chỉ hiện tại (Nominatim):', err.message);
+    return null;
+  }
 }

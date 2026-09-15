@@ -1124,6 +1124,14 @@ select.input-field option {
 /* Delivery (Shipper) Mobile App Shell — permanent phone-style UI */
 /* used only for the DELIVERY role, regardless of viewport width. */
 /* ============================================================= */
+:root {
+  /* 1 nơi duy nhất định nghĩa bề rộng "khung điện thoại" — trước đây con số
+     480px bị lặp lại ở 3 rule khác nhau (.delivery-app-inner,
+     .delivery-fullscreen-modal-inner, .delivery-filter-sheet), dễ lệch nhau
+     khi chỉnh. Nới nhẹ lên 520px cho phablet/điện thoại lớn vẫn thoáng. */
+  --delivery-frame-width: 520px;
+}
+
 .delivery-app-shell {
   min-height: 100vh;
   width: 100%;
@@ -1134,7 +1142,7 @@ select.input-field option {
 
 .delivery-app-inner {
   width: 100%;
-  max-width: 480px;
+  max-width: var(--delivery-frame-width);
   height: 100vh;
   display: flex;
   flex-direction: column;
@@ -1149,7 +1157,7 @@ select.input-field option {
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
-  padding: 0.65rem 1rem;
+  padding: calc(0.65rem + env(safe-area-inset-top, 0)) 1rem 0.65rem;
   background: var(--bg-primary);
   border-bottom: 1px solid var(--border-glass);
   z-index: 10;
@@ -1159,17 +1167,22 @@ select.input-field option {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   border-radius: var(--radius-md);
   border: 1px solid var(--border-glass);
   background: var(--bg-app);
   color: var(--text-secondary);
   cursor: pointer;
+  transition: background var(--transition-fast), transform var(--transition-fast);
 }
 
 .delivery-icon-btn:hover {
   background: var(--border-glass);
+}
+
+.delivery-icon-btn:active {
+  transform: scale(0.92);
 }
 
 .delivery-content {
@@ -1196,6 +1209,7 @@ select.input-field option {
   align-items: center;
   justify-content: center;
   gap: 0.2rem;
+  min-height: 52px;
   padding: 0.5rem 0.25rem;
   background: none;
   border: none;
@@ -1203,10 +1217,37 @@ select.input-field option {
   font-size: 0.66rem;
   font-weight: 700;
   cursor: pointer;
+  position: relative;
+}
+
+/* Thanh gạch trên active tab kiểu Grab/Shopee — thay vì chỉ đổi màu chữ */
+.delivery-bottom-nav-item::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%) scaleX(0);
+  width: 28px;
+  height: 3px;
+  border-radius: 0 0 3px 3px;
+  background: var(--primary);
+  transition: transform var(--transition-fast);
+}
+
+.delivery-bottom-nav-item.active::before {
+  transform: translateX(-50%) scaleX(1);
 }
 
 .delivery-bottom-nav-item.active {
   color: var(--primary);
+}
+
+.delivery-bottom-nav-item svg {
+  transition: transform var(--transition-fast);
+}
+
+.delivery-bottom-nav-item.active svg {
+  transform: translateY(-1px);
 }
 
 .delivery-card {
@@ -1216,6 +1257,23 @@ select.input-field option {
   padding: 1rem;
   box-shadow: var(--shadow-sm);
   margin-bottom: 0.85rem;
+  transition: transform 0.1s ease;
+}
+
+/* Tap-target tối thiểu 44px cho các nút hành động chính trong card — chuẩn
+   UX của app di động (Grab/Shopee), tránh bấm nhầm trên màn hình nhỏ. Đánh
+   dấu thủ công bằng class thay vì áp đặt lên mọi <button> để không ảnh
+   hưởng các nút icon tròn nhỏ (đóng modal, v.v.) vốn cố tình nhỏ gọn hơn. */
+.delivery-tap-target {
+  min-height: 44px;
+  box-sizing: border-box;
+}
+
+/* Phản hồi khi chạm — cho cảm giác "bấm được" rõ ràng hơn trên di động,
+   dùng chung cho card và mọi phần tử đánh dấu .delivery-pressable. */
+.delivery-card:active,
+.delivery-pressable:active {
+  transform: scale(0.98);
 }
 
 /* Bottom sheet used for filters — same overlay/slide pattern as
@@ -1235,17 +1293,28 @@ select.input-field option {
 
 .delivery-filter-sheet {
   width: 100%;
-  max-width: 480px;
+  max-width: var(--delivery-frame-width);
   max-height: 85vh;
   background: var(--bg-primary);
   border-radius: var(--radius-xl) var(--radius-xl) 0 0;
-  padding: 1.1rem 1.1rem calc(1.1rem + env(safe-area-inset-bottom, 0));
+  padding: 0.6rem 1.1rem calc(1.1rem + env(safe-area-inset-bottom, 0));
   box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.15);
   overflow-y: auto;
   animation: slideUpSheet 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   display: flex;
   flex-direction: column;
   border-top: 1px solid var(--border-glass);
+}
+
+/* Tay cầm kéo ở đỉnh sheet — quy ước quen thuộc của bottom-sheet hiện đại,
+   chỉ trang trí (không có gesture kéo thật vì dự án không có thư viện hỗ trợ). */
+.delivery-sheet-handle {
+  width: 36px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--border-glass);
+  margin: 0.5rem auto 0.75rem;
+  flex-shrink: 0;
 }
 
 @keyframes slideUpSheet {
@@ -1264,7 +1333,7 @@ select.input-field option {
 }
 
 /* Full-screen modal used by PODModal / FailModal / OrderDetailSheet —
-   always fills the 480px phone-frame column, not a centered dialog. */
+   always fills the phone-frame column, not a centered dialog. */
 .delivery-fullscreen-modal {
   position: fixed;
   inset: 0;
@@ -1276,7 +1345,7 @@ select.input-field option {
 
 .delivery-fullscreen-modal-inner {
   width: 100%;
-  max-width: 480px;
+  max-width: var(--delivery-frame-width);
   height: 100%;
   background: var(--bg-app);
   display: flex;

@@ -19,7 +19,8 @@
 9. [9. Công Nghệ Sử Dụng (Tech Stack)](#9-công-nghệ-sử-dụng-tech-stack)
 10. [10. Cấu Trúc Thư Mục Dự Án Toàn Diện](#10-cấu-trúc-thư-mục-dự-án-toàn-diện)
 11. [11. Hướng Dẫn Khởi Chạy & Triển Khai (Deployment Guide)](#11-hướng-dẫn-khởi-chạy--triển-khai-deployment-guide)
-12. [12. Danh Sách Tài Khoản Demo Hệ Thống](#12-danh-sách-tài-khoản-demo-hệ-thống)
+12. [12. Danh Sách Tài Khoản Demo Hệ Thống](#12-danh-sách-14-tài-khoản-demo-hệ-thống)
+    - [12.1. Tài Khoản Shipper Theo Khu Vực](#121-tài-khoản-shipper-theo-khu-vực-5-shipper-nội-bộ-cố-định)
 
 ---
 
@@ -27,12 +28,12 @@
 
 Thị trường kinh doanh linh kiện máy tính và lắp ráp PC theo yêu cầu (Custom PC / Gaming Workstation) đòi hỏi khả năng xử lý dữ liệu vô cùng phức tạp: hàng ngàn mã sản phẩm (SKU) với thông số kỹ thuật đa dạng (Socket CPU, Bus RAM, Form Factor Mainboard, Công suất TDP), biến động giá liên tục từ 15 Nhà cung cấp đối tác, cùng các dịch vụ giá trị gia tăng như kiểm định chất lượng QA/QC, lắp ráp kỹ thuật, phân công giao hàng và chăm sóc khách hàng.
 
-**AetherPC ERP** được nghiên cứu và phát triển nhằm giải quyết triệt để các thách thức trên thông qua một **Hệ thống ERP Hợp nhất (Unified Enterprise Resource Planning)**, kết nối trực tiếp **Website Thương mại Điện tử (E-Commerce Storefront)**, **Trợ lý AI Tự động hóa (Google Gemini AI SDK)**, **Phân hệ Kiểm định QA/QC Mới**, **Quy trình Xuất Kho & Phân Công Shipper Mới** và **Kênh Chat CSKH Realtime (WebSocket Server)**.
+**AetherPC ERP** được nghiên cứu và phát triển nhằm giải quyết triệt để các thách thức trên thông qua một **Hệ thống ERP Hợp nhất (Unified Enterprise Resource Planning)**, kết nối trực tiếp **Website Thương mại Điện tử (E-Commerce Storefront)**, **Trợ lý AI Tự động hóa (Google Gemini AI SDK)**, **Phân hệ Kiểm định QA/QC Mới**, **Quy trình Xuất Kho & Phân Công Shipper Theo Khu Vực** và **Kênh Chat CSKH Realtime (WebSocket Server)**.
 
 ### Các Mục Tiêu Cốt Lõi:
 1. **Tự động hóa luồng Procure-to-Pay (P2P)**: Đánh giá và chọn báo giá Nhà cung cấp tối ưu nhất bằng Thuật toán Ma trận Giá ($P_{\text{save}}$), khởi tạo RFQ giữ nguyên 100% số lượng đề xuất thực tế từ Thủ Kho (ví dụ: 63 cái, 25 cái).
 2. **Kiểm định chất lượng chuyên sâu (QA/QC Station)**: Tiếp nhận lô hàng từ Nhà cung cấp, kiểm tra theo tỷ lệ lấy mẫu ($100\%, 50\%, 10\%$), phân loại linh kiện đạt chuẩn và hàng lỗi nhà sản xuất (DOA, hỏng vỏ hộp, sai SKU), phát hành Biên bản QA/QC điện tử.
-3. **Chuẩn hóa luồng Order-to-Cash (O2C) & Phân công Shipper Mới**: Tích hợp bán lẻ POS tại quầy, quy trình lắp ráp PC 5 bước kỹ thuật, xuất kho bật modal Phân công Shipper trực tiếp (**Shipper 1 — Trần Giao Hàng**, **Shipper 2 — Nguyễn Văn Shipper**, **Giao Hàng Tự Do**) và giao hàng có minh chứng thực tế (Base64 Proof of Delivery).
+3. **Chuẩn hóa luồng Order-to-Cash (O2C) & Phân công Shipper Theo Khu Vực**: Tích hợp bán lẻ POS tại quầy, quy trình lắp ráp PC 5 bước kỹ thuật, xuất kho bật modal Điều Phối Vận Chuyển — hệ thống tự nhận diện khu vực từ địa chỉ giao hàng và gợi ý shipper nội bộ phù hợp nhất (5 shipper cố định: 4 người phụ trách riêng 4 khu vực TP.HCM + 1 người phụ trách liên tỉnh/toàn quốc), không còn phụ thuộc đối tác vận chuyển ngoài; giao hàng có minh chứng thực tế (Base64 Proof of Delivery).
 4. **Chăm sóc khách hàng Realtime**: Xây dựng server WebSocket hai chiều hai kênh ($< 1\text{ms}$), mẫu câu trả lời nhanh, xóa phiên chat cũ, phân định lịch sử trò chuyện độc lập theo từng tài khoản (`session_user_<slug>`).
 5. **Quản trị Tài chính & Nhân sự**: Tính lương tự động theo quy chuẩn 26 ngày công Việt Nam, khấu trừ $10.5\%$ bảo hiểm bắt buộc ($8\%$ BHXH, $1.5\%$ BHYT, $1\%$ BHTN), cộng thưởng Sales $1\%$ và thưởng lắp ráp $150k$/máy, hạch toán Sổ Nhật ký Tài chính VAS.
 
@@ -113,7 +114,7 @@ Hệ thống kết nối và quản lý danh mục báo giá chính thức từ 
 | 3 | `sales_manager` | Quản Lý Bán Hàng | Quản lý danh mục đơn hàng bán lẻ POS & E-Commerce, duyệt hủy đơn, xem phân tích biểu đồ doanh số. |
 | 4 | `sales` | Nhân Viên Bán Hàng POS | Bán hàng tại quầy, tìm kiếm/quét mã vạch sản phẩm, in hóa đơn thu ngân, nhận thanh toán VietQR. |
 | 5 | `warehouse_manager`| Quản Lý Kho Bãi | Quản lý 1.580 linh kiện PC, kiểm kê tồn kho, thiết lập ngưỡng an toàn (Safe/Warning/Out of stock). |
-| 6 | `warehouse` | Thủ Kho | Tạo Phiếu nhập kho (GRN) từ PO mua hàng, xuất kho mở modal phân công Shipper trực tiếp. |
+| 6 | `warehouse` | Thủ Kho | Tạo Phiếu nhập kho (GRN) từ PO mua hàng, đóng gói & quét mã Serial khi xuất kho (phân công Shipper cuối cùng thuộc quyền `warehouse_manager`). |
 | 7 | `purchasing` | Nhân Viên Mua Hàng | Khởi tạo Yêu cầu Báo giá (RFQ) gửi 15 NCC, giữ đúng số lượng đề xuất thực tế, sinh đơn PO. |
 | 8 | `supplier` | Cổng Nhà Cung Cấp | Truy cập Supplier Portal tiếp nhận RFQ từ AetherPC, nhập đơn giá và cam kết ngày giao hàng. |
 | 9 | `qc` / `qa` | Kiểm Định Chất Lượng (Mới)| Kiểm tra chất lượng linh kiện mua về, lập Biên bản QA/QC, phân loại hàng lỗi DOA trước khi nhập kho. |
@@ -121,7 +122,7 @@ Hệ thống kết nối và quản lý danh mục báo giá chính thức từ 
 | 11 | `hr` | Quản Lý Nhân Sự | Quản lý hồ sơ nhân viên, tính bảng lương 26 ngày công (Khấu trừ $10.5\%$ bảo hiểm, thưởng Sales $1\%$, thưởng lắp ráp $150k$). |
 | 12 | `accounting` | Kế Toán Tài Chính | Quản lý Sổ Nhật ký Tài chính VAS (`INCOME`/`EXPENSE`), kiểm tra hóa đơn NCC (Vendor Bill), báo cáo P&L. |
 | 13 | `cskh` | Chăm Sóc Khách Hàng | Quản lý Ticket bảo hành, Live Chat WebSocket thời gian thực ($<1\text{ms}$), mẫu câu phản hồi nhanh, xóa phiên chat cũ. |
-| 14 | `delivery` | Nhân Viên Giao Hàng (Mới)| Nhận đơn sẵn sàng giao, chụp ảnh minh chứng thực tế (Base64) khi giao thành công, ghi nhận 6 lý do thất bại. |
+| 14 | `delivery` | Nhân Viên Giao Hàng (5 tài khoản theo khu vực)| Nhận đơn đã được hệ thống tự động phân công theo khu vực địa chỉ giao hàng, chụp ảnh minh chứng thực tế (Base64) khi giao thành công, ghi nhận 6 lý do thất bại. Xem chi tiết 5 tài khoản ở mục 12.1. |
 
 ---
 
@@ -151,7 +152,7 @@ sequenceDiagram
 
 ---
 
-### 4.2. Quy Trình Bán Hàng, Phân Công Shipper Mới & Giao Hàng (O2C — Order-to-Cash)
+### 4.2. Quy Trình Bán Hàng, Phân Công Shipper Theo Khu Vực & Giao Hàng (O2C — Order-to-Cash)
 
 ```mermaid
 sequenceDiagram
@@ -159,13 +160,16 @@ sequenceDiagram
     actor Khách Hàng / POS
     actor Kỹ Thuật Viên
     actor Thủ Kho
+    actor Quản Lý Kho
     actor Shipper (Delivery)
     actor Kế Toán
 
     Khách Hàng / POS->>Hệ Thống ERP: Đặt đơn linh kiện / máy bộ PC (POS / Storefront)
     Hệ Thống ERP->>Kỹ Thuật Viên: Tự động sinh Job Lắp Ráp (đơn máy bộ)
     Kỹ Thuật Viên->>Hệ Thống ERP: Thực hiện Checklist 5 bước -> Bấm "Hoàn Tất Lắp Ráp"
-    Thủ Kho->>Shipper (Delivery): Bấm "Xác Nhận Xuất Kho" -> Mở Modal Phân công Shipper (Trần Giao Hàng / Nguyễn Văn Shipper / Tự do)
+    Thủ Kho->>Quản Lý Kho: Đóng gói & quét mã Serial -> Bấm "Phân Công Shipper"
+    Quản Lý Kho->>Hệ Thống ERP: Mở Modal Điều Phối Vận Chuyển -> Hệ thống tự nhận diện khu vực từ địa chỉ & gợi ý shipper nội bộ rảnh nhất
+    Quản Lý Kho->>Shipper (Delivery): Xác nhận bàn giao cho shipper phụ trách đúng khu vực (hoặc điều phối chéo thủ công)
     Shipper (Delivery)->>Hệ Thống ERP: Tiếp nhận đơn, Giao hàng & Tải ảnh minh chứng Base64 -> DELIVERED
     Hệ Thống ERP->>Kế Toán: Tự động ghi nhận Bút toán Thu (INCOME) & gửi Email thông báo tách Phí giao hàng
 ```
@@ -191,7 +195,7 @@ sequenceDiagram
    - Quản lý 1.580 linh kiện PC theo 3 ngưỡng rủi ro (`SAFE`, `WARNING`, `OUT_OF_STOCK`).
    - Xem nhật ký biến động xuất nhập kho (Stock Movement Audit Logs) và modal chi tiết giao dịch.
    - Xem lịch sử gửi cảnh báo Yêu cầu Báo giá (RFQ Alert History Modal).
-   - **Xác Nhận Xuất Kho & Phân Công Shipper Mới**: Nhấn "Xác Nhận Xuất Kho" trong chi tiết đơn hàng sẽ tự động mở modal Phân công Shipper (**Shipper 1 — Trần Giao Hàng**, **Shipper 2 — Nguyễn Văn Shipper**, **Giao Hàng Tự Do**). Tự động đóng cả 2 modal và phát thông báo Realtime tới bộ phận Giao Hàng & Bán Hàng.
+   - **Đóng Gói & Điều Phối Vận Chuyển Theo Khu Vực**: Thủ Kho đóng gói, đối soát mã Serial rồi bàn giao cho Quản Lý Kho bấm "Phân Công Shipper" — modal Điều Phối Vận Chuyển tự nhận diện khu vực từ địa chỉ giao hàng (8 khu vực: 4 khu TP.HCM + Hà Nội/Miền Bắc + Miền Trung + Miền Tây/Đông Nam Bộ + liên tỉnh) và xếp hạng **shipper nội bộ** phù hợp nhất theo tải hiện tại (rảnh > đang giao > quá tải > đã tắt nhận đơn) — chỉ gồm 5 shipper cố định (mục 12.1), không còn tùy chọn đối tác vận chuyển ngoài (GHTK/GHN...). Backend xác thực `assignedShipperId` phải là nhân viên nội bộ role `DELIVERY` mới cho phép chuyển đơn sang `SHIPPED`. Tự động đóng cả 2 modal và phát thông báo Realtime tới bộ phận Giao Hàng & Bán Hàng.
 
 4. **Mua Hàng & RFQ (`Purchasing.jsx`)**:
    - Ma trận so sánh báo giá đa NCC từ 15 Nhà cung cấp đối tác với thuật toán tiết kiệm $P_{\text{save}}$.
@@ -322,7 +326,8 @@ $$P_{\text{PSU khuyến nghị}} \ge \frac{P_{\text{tổng TDP}}}{0.80}$$
 
 ### 8.3. Quản Lý Kho (`TC-WH`)
 - **`TC-WH-01`**: Lọc nhật ký biến động kho IN/OUT theo khoảng thời gian.
-- **`TC-WH-02`**: Nhấn "Xác Nhận Xuất Kho" trong chi tiết đơn hàng -> Bật modal chọn Shipper (Shipper 1, Shipper 2, Tự do) -> Tự động đóng cả 2 modal và phát thông báo Realtime.
+- **`TC-WH-02`**: Đóng gói đơn hàng, bấm "Phân Công Shipper" (role `warehouse_manager`) -> Modal tự nhận diện khu vực từ địa chỉ và gợi ý đúng shipper nội bộ phụ trách khu vực đó (ưu tiên người rảnh nhất) -> Xác nhận bàn giao -> Tự động đóng cả 2 modal, đơn chuyển `SHIPPED` và phát thông báo Realtime.
+- **`TC-WH-03`**: Gọi `PATCH /orders/:id/status` với `assignedShipperId` không phải nhân viên role `DELIVERY` (hoặc id không tồn tại) -> Bị từ chối `400`, đơn giữ nguyên trạng thái cũ.
 
 ### 8.4. Mua Hàng & RFQ (`TC-PUR`)
 - **`TC-PUR-01`**: Tạo RFQ gửi 15 NCC cho sản phẩm cảnh báo kho -> Tự động giữ nguyên số lượng đề xuất thực tế (ví dụ: 63 cái, 25 cái).
@@ -470,7 +475,21 @@ Hệ thống được deploy thật lên [Railway](https://railway.app) thay vì
 | 11 | `hr` | Quản Lý Nhân Sự | `hr` | `123456` |
 | 12 | `accounting` | Kế Toán Tài Chính | `accounting` | `123456` |
 | 13 | `cskh` | Chăm Sóc Khách Hàng | `cskh` | `123456` |
-| 14 | `delivery` | Nhân Viên Giao Hàng | `delivery` | `123456` |
+| 14 | `delivery` | Nhân Viên Giao Hàng (liên tỉnh/toàn quốc) | `delivery` | `123456` |
+
+Vai trò `delivery` có **5 tài khoản** thật trong hệ thống (không chỉ 1 như các vai trò khác) vì mỗi shipper phụ trách riêng 1 khu vực địa lý — xem đầy đủ ở mục 12.1 ngay dưới đây.
+
+### 12.1. Tài Khoản Shipper Theo Khu Vực (5 Shipper Nội Bộ Cố Định)
+
+Modal Điều Phối Vận Chuyển (`Warehouse.jsx`, mục 5.1.3) tự nhận diện khu vực từ địa chỉ giao hàng và gợi ý 1 trong 5 shipper nội bộ dưới đây — không có tùy chọn đối tác vận chuyển ngoài (GHTK/GHN/Viettel Post/VNPost):
+
+| Shipper | Email đăng nhập | Khu vực phụ trách | Mật khẩu |
+| :--- | :--- | :--- | :---: |
+| Bùi Văn Giao | `delivery@kltn-erp.vn` | Liên tỉnh / Toàn quốc (Hà Nội & Miền Bắc, Miền Trung, Miền Tây & Đông Nam Bộ) | `123456` |
+| Nguyễn Văn Nam | `delivery.kv1@kltn-erp.vn` | TP.HCM — Khu Vực 1 (Trung tâm: Q1, Q3, Q4, Q5, Q10, Phú Nhuận) | `123456` |
+| Trần Minh Khoa | `delivery.kv2@kltn-erp.vn` | TP.HCM — Khu Vực 2 (Phía Đông: TP. Thủ Đức, Q2, Q9, Bình Thạnh, Gò Vấp) | `123456` |
+| Lê Hoàng Phúc | `delivery.kv3@kltn-erp.vn` | TP.HCM — Khu Vực 3 (Phía Nam: Q7, Q8, Nhà Bè, Bình Chánh, Cần Giờ) | `123456` |
+| Phạm Đức Thắng | `delivery.kv4@kltn-erp.vn` | TP.HCM — Khu Vực 4 (Phía Tây & Bắc: Tân Bình, Tân Phú, Bình Tân, Q6, Q11, Q12, Hóc Môn, Củ Chi) | `123456` |
 
 ---
 

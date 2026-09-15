@@ -131,17 +131,24 @@ export default function PODModal({ order: deliverModal, user, onClose, onConfirm
     <div className="delivery-fullscreen-modal">
       <div className="delivery-fullscreen-modal-inner">
         {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.85rem 1rem', background: 'var(--bg-primary)', borderBottom: '1px solid var(--border-glass)', flexShrink: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            {step === 'details' && (
-              <button type="button" onClick={retakePhoto} className="delivery-icon-btn"><ChevronLeft size={18} /></button>
-            )}
-            <div>
-              <strong style={{ fontSize: '0.9rem', color: 'var(--text-primary)' }}>Biên Bản Giao Hàng #{deliverModal.orderId || deliverModal.id}</strong>
-              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{deliverModal.customerName} · {deliverModal.phone}</div>
+        <div style={{ flexShrink: 0, background: 'var(--bg-primary)', borderBottom: '1px solid var(--border-glass)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.85rem 1rem 0.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              {step === 'details' && (
+                <button type="button" onClick={retakePhoto} className="delivery-icon-btn"><ChevronLeft size={18} /></button>
+              )}
+              <div>
+                <strong style={{ fontSize: '0.9rem', color: 'var(--text-primary)' }}>Biên Bản Giao Hàng #{deliverModal.orderId || deliverModal.id}</strong>
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{deliverModal.customerName} · {deliverModal.phone}</div>
+              </div>
             </div>
+            <button type="button" onClick={onClose} className="delivery-icon-btn"><X size={18} /></button>
           </div>
-          <button type="button" onClick={onClose} className="delivery-icon-btn"><X size={18} /></button>
+          {/* Chỉ báo tiến trình 2 bước: Chụp ảnh -> Xác nhận thông tin */}
+          <div style={{ display: 'flex', gap: '0.3rem', padding: '0 1rem 0.7rem' }}>
+            <span style={{ flex: 1, height: '3px', borderRadius: '999px', backgroundColor: 'var(--success)' }} />
+            <span style={{ flex: 1, height: '3px', borderRadius: '999px', backgroundColor: step === 'details' ? 'var(--success)' : 'var(--border-glass)' }} />
+          </div>
         </div>
 
         {step === 'camera' ? (
@@ -195,6 +202,7 @@ export default function PODModal({ order: deliverModal, user, onClose, onConfirm
             <div style={{ padding: '1rem', background: 'var(--bg-primary)', borderTop: '1px solid var(--border-glass)', flexShrink: 0 }}>
               <button
                 type="button"
+                className="delivery-tap-target"
                 onClick={capturePhoto}
                 disabled={!isCameraActive}
                 style={{
@@ -250,6 +258,7 @@ export default function PODModal({ order: deliverModal, user, onClose, onConfirm
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
                     <button
                       type="button"
+                      className="delivery-tap-target"
                       onClick={() => { setActualPaymentMethod('CASH'); setShowVietQR(false); }}
                       style={{
                         padding: '0.55rem 0.5rem', borderRadius: 'var(--radius-md)',
@@ -263,6 +272,7 @@ export default function PODModal({ order: deliverModal, user, onClose, onConfirm
                     </button>
                     <button
                       type="button"
+                      className="delivery-tap-target"
                       onClick={() => { setActualPaymentMethod('BANK_TRANSFER'); setShowVietQR(true); }}
                       style={{
                         padding: '0.55rem 0.5rem', borderRadius: 'var(--radius-md)',
@@ -376,6 +386,7 @@ export default function PODModal({ order: deliverModal, user, onClose, onConfirm
             <div style={{ padding: '1rem', background: 'var(--bg-primary)', borderTop: '1px solid var(--border-glass)', flexShrink: 0 }}>
               <button
                 type="button"
+                className="delivery-tap-target"
                 onClick={handleSubmit}
                 style={{ width: '100%', backgroundColor: 'var(--success)', color: '#fff', border: 'none', borderRadius: 'var(--radius-md)', padding: '0.75rem', fontSize: '0.85rem', fontWeight: 800, cursor: 'pointer' }}
               >

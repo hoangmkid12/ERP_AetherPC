@@ -10,6 +10,7 @@ export default function FilterSheet({ isOpen, onClose, title = 'Bộ Lọc', onR
   return (
     <div className="delivery-filter-sheet-overlay" onClick={onClose}>
       <div className="delivery-filter-sheet" onClick={e => e.stopPropagation()}>
+        <div className="delivery-sheet-handle" />
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.9rem' }}>
           <strong style={{ fontSize: '0.95rem', color: 'var(--text-primary)' }}>{title}</strong>
           <button type="button" onClick={onClose} className="delivery-icon-btn"><X size={16} /></button>
@@ -23,6 +24,7 @@ export default function FilterSheet({ isOpen, onClose, title = 'Bộ Lọc', onR
           {onReset && (
             <button
               type="button"
+              className="delivery-tap-target"
               onClick={onReset}
               style={{ flex: 1, backgroundColor: 'transparent', color: 'var(--danger)', border: '1px solid var(--danger)', borderRadius: 'var(--radius-md)', padding: '0.6rem', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}
             >
@@ -31,6 +33,7 @@ export default function FilterSheet({ isOpen, onClose, title = 'Bộ Lọc', onR
           )}
           <button
             type="button"
+            className="delivery-tap-target"
             onClick={onClose}
             style={{ flex: 1, backgroundColor: 'var(--primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-md)', padding: '0.6rem', fontSize: '0.8rem', fontWeight: 800, cursor: 'pointer' }}
           >

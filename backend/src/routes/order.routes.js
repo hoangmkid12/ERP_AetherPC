@@ -18,7 +18,8 @@ const {
   getReturnSettings,
   updateReturnSettings,
   updateDeliveryLocationHttp,
-  getDeliveryTracking
+  getDeliveryTracking,
+  getDeliveryLocationHistory
 } = require('../controllers/order.controller');
 const { authMiddleware, optionalAuthMiddleware } = require('../middlewares/auth.middleware');
 const { getEmailLogs } = require('../services/emailService');
@@ -50,6 +51,10 @@ router.post('/:id/return', authMiddleware(['CUSTOMER', 'CSKH', 'SALES_MANAGER', 
 //          cho bản đồ theo dõi giao hàng thời gian thực (DeliveryMap.jsx)
 //          Hỗ trợ cả khách hàng đăng nhập và khách tra cứu công khai bằng mã đơn
 router.get('/:orderId/tracking', optionalAuthMiddleware, getDeliveryTracking);
+
+// @route   GET /api/v1/orders/:orderId/tracking/history
+// @desc    Vệt di chuyển đầy đủ của Shipper cho đơn này (xem lại lộ trình đã đi)
+router.get('/:orderId/tracking/history', optionalAuthMiddleware, getDeliveryLocationHistory);
 
 // @route   POST /api/v1/orders/:orderId/location
 // @desc    Shipper cập nhật vị trí GPS — fallback HTTP khi WebSocket rớt mạng

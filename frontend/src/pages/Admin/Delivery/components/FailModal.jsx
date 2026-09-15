@@ -35,7 +35,8 @@ export default function FailModal({ order: failModal, onClose, onConfirm }) {
         className="delivery-filter-sheet"
         onClick={e => e.stopPropagation()}
       >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.9rem' }}>
+        <div className="delivery-sheet-handle" />
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.9rem' }}>
           <div>
             <h3 style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--danger)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
               <AlertTriangle size={18} /> Báo Sự Cố #{failModal.orderId || failModal.id}
@@ -93,6 +94,7 @@ export default function FailModal({ order: failModal, onClose, onConfirm }) {
 
           <button
             type="button"
+            className="delivery-tap-target"
             onClick={handleSubmit}
             disabled={!failReason}
             style={{

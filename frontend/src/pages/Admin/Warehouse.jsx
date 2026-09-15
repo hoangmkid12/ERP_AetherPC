@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useInventoryStore, useSalesStore, useFinanceStore, useUtilityStore, useHRStore } from '../../stores';
+import { useInventoryStore, useSalesStore, useFinanceStore, useUtilityStore } from '../../stores';
 import { useAuth } from '../../context/AuthContext';
 import { usePermission } from '../../hooks/usePermission';
 import { useNotification, notify, confirm } from '../../context/NotificationContext';
@@ -849,40 +849,38 @@ function RegionalShipperModal({
   orders,
   setOrders
 }) {
-  const hrEmployees = useHRStore(state => state.employees) || [];
-  const storedErpEmps = (() => {
-    try { return JSON.parse(localStorage.getItem('erp_employees') || '[]'); } catch (_) { return []; }
-  })();
-
-  const rawList = [...hrEmployees, ...storedErpEmps];
-  const uniqueEmps = [];
-  const seenUsernames = new Set();
-  rawList.forEach(e => {
-    if (!e) return;
-    const u = (e.username || e.name || '').toLowerCase();
-    if (u && !seenUsernames.has(u)) {
-      seenUsernames.add(u);
-      uniqueEmps.push(e);
-    }
-  });
-
-  const defaultShippers = [
-    { id: 15, fullname: 'Nguyễn Văn A', username: 'delivery', phone: '0912.345.678', deliveryRegion: 'HCM_KV1', role: 'DELIVERY' },
-    { id: 17, fullname: 'Trần Văn B', username: 'delivery2', phone: '0988.765.432', deliveryRegion: 'HCM_KV2', role: 'DELIVERY' },
-    { id: 18, fullname: 'Lê Hoàng Long', username: 'delivery3', phone: '0909.112.233', deliveryRegion: 'HCM_KV3', role: 'DELIVERY' },
-    { id: 19, fullname: 'Vũ Đức Thịnh', username: 'delivery4', phone: '0933.445.566', deliveryRegion: 'HCM_KV4', role: 'DELIVERY' },
-    { id: 20, fullname: 'Phạm Văn Bắc', username: 'delivery5', phone: '0977.889.900', deliveryRegion: 'HN_NORTH', role: 'DELIVERY' },
-    { id: 21, fullname: 'Đặng Quốc Toàn', username: 'delivery6', phone: '0944.556.677', deliveryRegion: 'ALL', role: 'DELIVERY' }
-  ];
-
-  defaultShippers.forEach(ds => {
-    if (!seenUsernames.has(ds.username)) {
-      seenUsernames.add(ds.username);
-      uniqueEmps.push(ds);
-    }
-  });
-
-  const allShippers = uniqueEmps.filter(e => e.role === 'DELIVERY' || e.department === 'Giao Vận');
+  // Danh sách shipper nội bộ thật — GET /hr/employees/shippers (gọn, không có
+  // lương) vì /hr/employees đầy đủ chỉ HR/CEO/ADMIN gọi được, còn Thủ Kho/
+  // Quản Lý Kho (người thao tác màn hình này) thì không. Trước đây modal này
+  // còn bịa thêm 6 "shipper mặc định" (defaultShippers) làm dữ liệu demo khi
+  // DB chưa đủ shipper thật — giờ hệ thống đã seed đủ 5 shipper nội bộ thật
+  // (4 theo khu TP.HCM + 1 liên tỉnh) nên không cần bịa thêm nữa. Chỉ dùng
+  // cache `erp_employees` khi gọi API thất bại (đúng quy ước offline-fallback
+  // của app), không trộn lẫn với dữ liệu thật để tránh hiện tên/khu vực cũ.
+  const [allShippers, setAllShippers] = useState([]);
+  useEffect(() => {
+    let cancelled = false;
+    api.get('/hr/employees/shippers')
+      .then(res => {
+        if (cancelled || !res?.success) return;
+        setAllShippers((res.data || []).map(e => ({
+          id: e.id,
+          fullname: e.fullName,
+          username: e.employeeCode,
+          phone: e.phone,
+          deliveryRegion: e.deliveryRegion,
+          role: 'DELIVERY'
+        })));
+      })
+      .catch(() => {
+        if (cancelled) return;
+        try {
+          const cached = JSON.parse(localStorage.getItem('erp_employees') || '[]');
+          setAllShippers(cached.filter(e => e && (e.role === 'DELIVERY' || e.department === 'Giao Vận')));
+        } catch (_) { setAllShippers([]); }
+      });
+    return () => { cancelled = true; };
+  }, []);
 
   const initialRegion = orderToAssign.deliveryRegion || detectDeliveryRegion(orderToAssign.shippingAddress || orderToAssign.address || '');
   const [selectedRegion, setSelectedRegion] = useState(initialRegion);
@@ -958,7 +956,7 @@ function RegionalShipperModal({
 
   const autoTrackingCode = isHCM
     ? `NB-${selectedRegion}-${(orderToAssign.orderId || orderToAssign.id || '').replace(/\D/g, '').slice(-6) || Date.now().toString().slice(-6)}`
-    : `3PL-VN-${Date.now().toString().slice(-6)}`;
+    : `NB-LT-${Date.now().toString().slice(-6)}`;
 
   return (
     <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.65)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 20000, padding: '1rem' }}>
@@ -992,22 +990,23 @@ function RegionalShipperModal({
           const formData = new FormData(e.target);
           const shipperVal = formData.get('shipperName') || '';
           const trackingCode = formData.get('trackingCode') || autoTrackingCode;
-          const deliveryType = formData.get('deliveryType') || (isHCM ? 'INTERNAL_HCM' : 'EXTERNAL_3PL');
           const note = formData.get('note') || '';
-          
-          let matchedShipperId = null;
-          let shipperDisplayName = shipperVal;
-          
-          // Check if selected is an employee shipper
-          const foundEmp = allShippers.find(s => 
+
+          // Mọi lựa chọn trong <select> giờ luôn là 1 shipper nội bộ thật (đã
+          // bỏ optgroup đối tác vận chuyển ngoài) — nếu vì lý do gì đó không
+          // khớp được nhân viên nào thì chặn submit thay vì âm thầm gán
+          // assignedShipperId = null như hành vi cũ khi chọn 3PL.
+          const foundEmp = allShippers.find(s =>
             (s.fullname && shipperVal.includes(s.fullname)) ||
             (s.name && shipperVal.includes(s.name)) ||
             (s.username && shipperVal.includes(s.username))
           );
-          if (foundEmp) {
-            matchedShipperId = foundEmp.id || foundEmp.username;
-            shipperDisplayName = `Shipper Nội Bộ - ${foundEmp.fullname || foundEmp.name} (${foundEmp.phone || '0912.xxx.xxx'})`;
+          if (!foundEmp) {
+            addNotification && addNotification('Vui lòng chọn 1 shipper nội bộ hợp lệ trước khi bàn giao.', 'error');
+            return;
           }
+          const matchedShipperId = foundEmp.id || foundEmp.username;
+          const shipperDisplayName = `Shipper Nội Bộ - ${foundEmp.fullname || foundEmp.name} (${foundEmp.phone || '0912.xxx.xxx'})`;
 
           const ordId = String(orderToAssign.orderId || orderToAssign.id || '');
 
@@ -1019,7 +1018,6 @@ function RegionalShipperModal({
               assignedShipperName: foundEmp?.fullname || foundEmp?.name || shipperDisplayName,
               deliveryRegion: selectedRegion,
               trackingCode: trackingCode,
-              deliveryType: deliveryType,
               shippingNote: note,
               shippedAt: new Date().toISOString()
             });
@@ -1036,7 +1034,6 @@ function RegionalShipperModal({
                   assignedShipperName: foundEmp?.fullname || foundEmp?.name || shipperDisplayName,
                   deliveryRegion: selectedRegion,
                   trackingCode: trackingCode,
-                  deliveryType: deliveryType,
                   shippingNote: note,
                   shippedAt: new Date().toISOString(),
                   lastNote: `Đã bàn giao cho ${shipperDisplayName}. Mã tra cứu: ${trackingCode}`
@@ -1152,13 +1149,18 @@ function RegionalShipperModal({
                 </label>
                 <select
                   name="shipperName"
-                  key={selectedRegion}
+                  // Buộc remount khi allShippers tải xong (async) hoặc đổi
+                  // vùng — <select> không kiểm soát nên defaultValue chỉ áp
+                  // dụng lúc mount, phải đổi key để lấy defaultValue mới.
+                  key={`${selectedRegion}-${allShippers.length}`}
                   defaultValue={
-                    bestShipper 
+                    bestShipper
                       ? `Shipper Nội Bộ - ${bestShipper.fullname} (${bestShipper.phone || '0912.xxx.xxx'})`
-                      : (sortedRegionalShippers.length > 0 
+                      : (sortedRegionalShippers.length > 0
                           ? `Shipper Nội Bộ - ${sortedRegionalShippers[0].fullname} (${sortedRegionalShippers[0].phone || '0912.xxx.xxx'})`
-                          : 'Đối Tác Giao Hàng Tiết Kiệm (GHTK Express)')
+                          : (otherShippers.length > 0
+                              ? `Shipper Nội Bộ - ${otherShippers[0].fullname} (${otherShippers[0].phone || '0912.xxx.xxx'})`
+                              : ''))
                   }
                   style={{ width: '100%', padding: '0.6rem 0.75rem', fontSize: '0.82rem', fontWeight: 600, border: '1.5px solid #2563eb', borderRadius: '6px', backgroundColor: '#ffffff', boxSizing: 'border-box' }}
                 >
@@ -1196,14 +1198,6 @@ function RegionalShipperModal({
                       })}
                     </optgroup>
                   )}
-
-                  {/* 3PL Partners */}
-                  <optgroup label="Đối Tác Vận Chuyển Liên Tỉnh (3PL Logistics)">
-                    <option value="Đối Tác Giao Hàng Tiết Kiệm (GHTK Express)">Đối Tác Giao Hàng Tiết Kiệm (GHTK Express) [Khuyên dùng liên tỉnh]</option>
-                    <option value="Đối Tác Giao Hàng Nhanh (GHN Express)">Đối Tác Giao Hàng Nhanh (GHN Express) [Lấy hàng 15-30p]</option>
-                    <option value="Đối Tác Viettel Post">Đối Tác Viettel Post [Phủ 100% huyện xã]</option>
-                    <option value="Đối Tác VNPost (Bưu Điện Việt Nam)">Đối Tác VNPost (Bưu Điện Việt Nam)</option>
-                  </optgroup>
                 </select>
                 <div style={{ fontSize: '0.71rem', color: '#64748b', marginTop: '0.3rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.2rem' }}>
                   <span>✓ Gán trực tiếp vào app Shipper</span>

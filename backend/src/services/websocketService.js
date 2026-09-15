@@ -3,46 +3,76 @@ const jwt = require('jsonwebtoken');
 const { getAllSessions, createOrUpdateSession, addMessage, closeSession, deleteSession } = require('./chatService');
 const prisma = require('../config/database');
 
-let wss = null;
+let wss = null; // CSKH chat — path /ws/cskh
+let wssTracking = null; // Live GPS giao hàng — path /ws/tracking (tách riêng khỏi chat để 2 tính năng không đụng nhau)
 
 // Live GPS Tracking (Shipper -> Khách hàng / Admin) — vị trí gần nhất mỗi
-// orderId đang có Shipper phát tín hiệu. Chỉ giữ trong bộ nhớ (không phải
-// lịch sử toạ độ), đồng thời ghi đè Order.lastLat/lastLng trong DB để một
-// client mới kết nối (khách tải lại trang, hoặc server vừa restart) vẫn
-// khôi phục được điểm cuối cùng đã biết.
+// orderId đang có Shipper phát tín hiệu. Chỉ giữ trong bộ nhớ để trả ngay khi
+// có client mới kết nối; vệt di chuyển đầy đủ được ghi vào bảng LocationHistory
+// (xem updateDeliveryLocation), còn Order.lastLat/lastLng vẫn giữ điểm cuối để
+// khôi phục nhanh khi khách tải lại trang hoặc server vừa restart.
 const activeDeliveries = new Map(); // orderId -> { lat, lng, speed, heading, updatedAt, shipperName }
 
+// Đọc JWT từ cookie authToken — dùng chung cho cả 2 wss (chat và tracking) vì
+// cơ chế xác thực kết nối WebSocket giống hệt nhau, chỉ khác tập message xử lý.
+const authenticateConnection = (request) => {
+  const auth = { userId: null, userRole: null, userName: null, isStaff: false };
+  try {
+    const cookie = request.headers.cookie || '';
+    const match = cookie.match(/(?:^|;\s*)authToken=([^;]+)/);
+    if (match && process.env.JWT_SECRET) {
+      const user = jwt.verify(decodeURIComponent(match[1]), process.env.JWT_SECRET);
+      auth.userId = user.id;
+      auth.userRole = user.role;
+      auth.userName = user.fullname || user.name || user.email || null;
+      auth.isStaff = ['CSKH', 'SALES_MANAGER', 'CEO', 'ADMIN'].includes(user.role);
+    }
+  } catch (_) {
+    // Invalid cookies remain anonymous; they do not grant any privileges.
+  }
+  return auth;
+};
+
 const initWebSocket = async (server) => {
-  wss = new WebSocket.Server({ server, path: '/ws/cskh' });
+  // ws@8's WebSocketServer, when given {server, path}, does NOT skip
+  // non-matching requests — it unconditionally calls handleUpgrade() on every
+  // 'upgrade' event and that function itself aborts the handshake (HTTP 400)
+  // if the path doesn't match. With 2 such servers on the same HTTP server,
+  // whichever registers first intercepts and 400s every request meant for the
+  // other. The correct multi-path pattern (per ws's own README) is
+  // {noServer: true} on both, plus a single shared 'upgrade' listener that
+  // dispatches by pathname to the right server's handleUpgrade().
+  wss = new WebSocket.Server({ noServer: true });
+  wssTracking = new WebSocket.Server({ noServer: true });
+
+  server.on('upgrade', (req, socket, head) => {
+    const pathname = (req.url || '').split('?')[0];
+    if (pathname === '/ws/cskh') {
+      wss.handleUpgrade(req, socket, head, (ws) => wss.emit('connection', ws, req));
+    } else if (pathname === '/ws/tracking') {
+      wssTracking.handleUpgrade(req, socket, head, (ws) => wssTracking.emit('connection', ws, req));
+    } else {
+      socket.destroy();
+    }
+  });
 
   console.log('==================================================');
-  console.log('[WebSocket] Server initialized on ws://localhost:5000/ws/cskh');
-  console.log('[WebSocket] Chat storage: PostgreSQL Database');
+  console.log('[WebSocket] Chat server initialized on ws://localhost:5000/ws/cskh');
+  console.log('[WebSocket] Tracking server initialized on ws://localhost:5000/ws/tracking');
+  console.log('[WebSocket] Storage: PostgreSQL Database');
   console.log('==================================================');
 
   wss.on('connection', async (ws, request) => {
     // Browser WebSockets automatically include the HttpOnly auth cookie.
     // Unauthenticated connections are treated as guest customers and never
     // receive the staff session list or execute staff-only commands.
-    ws._isStaff = false;
+    const auth = authenticateConnection(request);
+    ws._userId = auth.userId;
+    ws._userRole = auth.userRole;
+    ws._userName = auth.userName;
+    ws._isStaff = auth.isStaff;
     ws._sessionId = null;
-    // Delivery-tracking tags: which order (if any) this connection is either
-    // broadcasting GPS for (shipper) or listening to (customer/admin).
-    ws._shipperOrderId = null;
-    ws._trackingOrderId = null;
-    try {
-      const cookie = request.headers.cookie || '';
-      const match = cookie.match(/(?:^|;\s*)authToken=([^;]+)/);
-      if (match && process.env.JWT_SECRET) {
-        const user = jwt.verify(decodeURIComponent(match[1]), process.env.JWT_SECRET);
-        ws._userId = user.id;
-        ws._userRole = user.role;
-        ws._userName = user.fullname || user.name || user.email || null;
-        ws._isStaff = ['CSKH', 'SALES_MANAGER', 'CEO', 'ADMIN'].includes(user.role);
-      }
-    } catch (_) {
-      // Invalid cookies remain anonymous; they do not grant any privileges.
-    }
+
     try {
       // Load all sessions from database on connection
       const sessions = ws._isStaff ? await getAllSessions() : [];
@@ -64,24 +94,55 @@ const initWebSocket = async (server) => {
     });
 
     ws.on('close', () => {
-      console.log('[WebSocket] Client disconnected');
+      console.log('[WebSocket] Chat client disconnected');
     });
 
     ws.on('error', (err) => {
-      console.error('[WebSocket] Error:', err);
+      console.error('[WebSocket] Chat error:', err);
+    });
+  });
+
+  wssTracking.on('connection', (ws, request) => {
+    const auth = authenticateConnection(request);
+    ws._userId = auth.userId;
+    ws._userRole = auth.userRole;
+    ws._userName = auth.userName;
+    ws._isStaff = auth.isStaff;
+    // Delivery-tracking tags: which order (if any) this connection is either
+    // broadcasting GPS for (shipper) or listening to (customer/admin).
+    ws._shipperOrderId = null;
+    ws._trackingOrderId = null;
+
+    ws.on('message', async (messageStr) => {
+      try {
+        const data = JSON.parse(messageStr);
+        await handleTrackingMessage(ws, data);
+      } catch (err) {
+        console.error('[WebSocket] Error parsing/handling tracking message:', err);
+      }
+    });
+
+    ws.on('close', () => {
+      console.log('[WebSocket] Tracking client disconnected');
+    });
+
+    ws.on('error', (err) => {
+      console.error('[WebSocket] Tracking error:', err);
     });
   });
 };
 
-const broadcast = (data, predicate = () => true) => {
-  if (!wss) return;
+const broadcast = (data, predicate = () => true, target = wss) => {
+  if (!target) return;
   const payload = JSON.stringify(data);
-  wss.clients.forEach((client) => {
+  target.clients.forEach((client) => {
     if (client.readyState === WebSocket.OPEN && predicate(client)) {
       client.send(payload);
     }
   });
 };
+
+const broadcastTracking = (data, predicate = () => true) => broadcast(data, predicate, wssTracking);
 
 const handleWSMessage = async (ws, data) => {
   if (!data || !data.type) return;
@@ -152,8 +213,23 @@ const handleWSMessage = async (ws, data) => {
         sessionId
       });
     }
-    // ─── Live GPS Tracking (giao hàng) ───────────────────────────────────
-    else if (type === 'SHIPPER_JOIN_DELIVERY') {
+  } catch (err) {
+    console.error('[WebSocket] Error handling message:', err);
+    ws.send(JSON.stringify({
+      type: 'ERROR',
+      message: 'Failed to process message',
+      error: err.message
+    }));
+  }
+};
+
+// ─── Live GPS Tracking (giao hàng) — kênh /ws/tracking, tách biệt khỏi chat ──
+const handleTrackingMessage = async (ws, data) => {
+  if (!data || !data.type) return;
+  const { type, payload } = data;
+
+  try {
+    if (type === 'SHIPPER_JOIN_DELIVERY') {
       const { orderId } = payload || {};
       if (!orderId) return;
       const allowedRoles = ['DELIVERY', 'CEO', 'ADMIN', 'SALES_MANAGER', 'WAREHOUSE_MANAGER', 'WAREHOUSE'];
@@ -219,7 +295,7 @@ const handleWSMessage = async (ws, data) => {
       }
     }
   } catch (err) {
-    console.error('[WebSocket] Error handling message:', err);
+    console.error('[WebSocket] Error handling tracking message:', err);
     ws.send(JSON.stringify({
       type: 'ERROR',
       message: 'Failed to process message',
@@ -247,11 +323,14 @@ const updateDeliveryLocation = async (orderId, { lat, lng, speed, heading, shipp
       where: { orderId },
       data: { lastLat: lat, lastLng: lng, locationUpdatedAt: updatedAt }
     });
+    await prisma.locationHistory.create({
+      data: { orderId, lat, lng, speed: speed ?? null, heading: heading ?? null }
+    });
   } catch (err) {
     console.error('[WebSocket] Failed to persist delivery location:', err.message);
   }
 
-  broadcast({
+  broadcastTracking({
     type: 'DELIVERY_LOCATION_UPDATE',
     orderId,
     lat,

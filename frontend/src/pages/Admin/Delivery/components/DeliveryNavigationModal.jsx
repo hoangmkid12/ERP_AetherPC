@@ -1,19 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { X, Navigation, Phone, MapPin, Compass, ShieldCheck, CheckCircle2, AlertCircle, Clock, Gauge, Route, Camera } from 'lucide-react';
+import { X, Navigation, Phone, MapPin, Compass, AlertCircle, Gauge, Camera } from 'lucide-react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { fetchRoadRoute } from '../../../../utils/routingService';
-
-const emojiIcon = (emoji, bg) => L.divIcon({
-  className: 'aetherpc-delivery-marker',
-  html: `<div style="width:38px;height:38px;border-radius:50%;background:${bg};display:flex;align-items:center;justify-content:center;font-size:20px;box-shadow:0 3px 10px rgba(0,0,0,0.35);border:2.5px solid #fff;">${emoji}</div>`,
-  iconSize: [38, 38],
-  iconAnchor: [19, 19]
-});
-
-const WAREHOUSE_ICON = emojiIcon('🏬', '#2563eb');
-const DESTINATION_ICON = emojiIcon('🏠', '#16a34a');
-const SHIPPER_ICON = emojiIcon('🛵', '#f59e0b');
+import { TILE_URL, TILE_ATTRIBUTION, TILE_MAX_ZOOM, WAREHOUSE_ICON, DESTINATION_ICON, SHIPPER_ICON } from '../../../../utils/mapIcons';
 
 function haversineKm(a, b) {
   if (!a || !b) return null;
@@ -63,10 +53,11 @@ export default function DeliveryNavigationModal({
       zoomControl: true,
       attributionControl: true
     });
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
-      attribution: '&copy; OpenStreetMap'
+    L.tileLayer(TILE_URL, {
+      maxZoom: TILE_MAX_ZOOM,
+      attribution: TILE_ATTRIBUTION
     }).addTo(map);
+    map.setView([16.0544, 108.2022], 5);
     mapRef.current = map;
 
     return () => {
@@ -140,25 +131,18 @@ export default function DeliveryNavigationModal({
         setRouteInfo(route);
         routeCoordsRef.current = route.coordinates;
 
-        // Viền bóng lộ trình
-        const borderLine = L.polyline(route.coordinates, {
-          color: '#1d4ed8',
-          weight: 8,
-          opacity: 0.35,
-          lineCap: 'round',
-          lineJoin: 'round'
-        }).addTo(mapRef.current);
-
-        // Đường chỉ dẫn tối ưu chính
+        // 1 đường mảnh màu xanh Google Maps — nhất quán với DeliveryMap.jsx,
+        // tuyến này luôn tính lại từ vị trí hiện tại nên không cần phân biệt
+        // "toàn tuyến" và "còn lại" như màn hình quan sát của khách/admin.
         const mainLine = L.polyline(route.coordinates, {
-          color: '#2563eb',
+          color: '#1a73e8',
           weight: 5,
           opacity: 0.95,
           lineCap: 'round',
           lineJoin: 'round'
         }).addTo(mapRef.current);
 
-        routeLayersRef.current = [borderLine, mainLine];
+        routeLayersRef.current = [mainLine];
 
         // Căn góc nhìn bao trọn tuyến đường
         const bounds = L.latLngBounds(route.coordinates);
@@ -225,42 +209,26 @@ export default function DeliveryNavigationModal({
   const distanceRemaining = shipperLoc && destination ? haversineKm(shipperLoc, destination) : null;
 
   return (
-    <div style={{
-      position: 'fixed', inset: 0, zIndex: 1100,
-      backgroundColor: 'rgba(15, 23, 42, 0.75)',
-      backdropFilter: 'blur(4px)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      padding: '0.75rem'
-    }}>
-      <div style={{
-        backgroundColor: 'var(--bg-primary, #ffffff)',
-        borderRadius: '16px',
-        width: '100%',
-        maxWidth: '780px',
-        maxHeight: '94vh',
-        display: 'flex',
-        flexDirection: 'column',
-        overflow: 'hidden',
-        boxShadow: '0 20px 40px rgba(0,0,0,0.25)',
-        border: '1px solid var(--border-glass, #e2e8f0)'
-      }}>
+    <div className="delivery-fullscreen-modal">
+      <div className="delivery-fullscreen-modal-inner">
         {/* Header Modal */}
         <div style={{
-          padding: '1rem 1.25rem',
-          borderBottom: '1px solid var(--border-glass, #e2e8f0)',
+          padding: '0.85rem 1rem',
+          borderBottom: '1px solid var(--border-glass)',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          backgroundColor: '#f8fafc'
+          background: 'var(--bg-primary)',
+          flexShrink: 0
         }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Navigation size={20} color="#2563eb" />
-              <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#0f172a' }}>
+              <Navigation size={18} color="var(--primary)" />
+              <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-primary)' }}>
                 Lộ Trình Giao Hàng #{orderId}
               </h3>
             </div>
-            <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
+            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
               Đề xuất tuyến đường giao hàng tối ưu và định vị GPS thực tế
             </span>
           </div>
@@ -268,11 +236,7 @@ export default function DeliveryNavigationModal({
           <button
             type="button"
             onClick={onClose}
-            style={{
-              background: 'none', border: 'none', cursor: 'pointer',
-              color: '#64748b', padding: '0.4rem', borderRadius: '50%',
-              display: 'flex', alignItems: 'center', justifyContent: 'center'
-            }}
+            className="delivery-icon-btn"
           >
             <X size={20} />
           </button>
@@ -328,30 +292,29 @@ export default function DeliveryNavigationModal({
         <div style={{ position: 'relative', flex: 1, minHeight: '340px' }}>
           <div ref={containerRef} style={{ width: '100%', height: '100%', minHeight: '340px' }} />
 
-          {/* Nút căn góc nhìn */}
+          {/* Nút căn góc nhìn — tròn tối giản, nhất quán với DeliveryMap.jsx */}
           <button
             type="button"
             onClick={fitFullRoute}
+            title="Căn giữa lộ trình"
             style={{
               position: 'absolute',
               top: '10px',
               right: '10px',
               zIndex: 999,
-              backgroundColor: 'rgba(255, 255, 255, 0.95)',
-              border: '1px solid #cbd5e1',
-              borderRadius: '6px',
-              padding: '6px 10px',
-              fontSize: '0.75rem',
-              fontWeight: 700,
-              color: '#0f172a',
+              width: '38px',
+              height: '38px',
+              backgroundColor: '#fff',
+              border: 'none',
+              borderRadius: '50%',
               cursor: 'pointer',
-              boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
+              boxShadow: '0 1px 4px rgba(0,0,0,0.3)',
               display: 'flex',
               alignItems: 'center',
-              gap: '0.3rem'
+              justifyContent: 'center'
             }}
           >
-            <Compass size={14} color="#2563eb" /> Căn giữa lộ trình
+            <Compass size={17} color="#5f6368" />
           </button>
 
           {/* Badge trạng thái GPS */}
@@ -380,50 +343,32 @@ export default function DeliveryNavigationModal({
           </div>
         </div>
 
-        {/* Thanh đề xuất quãng đường & HUD chỉ số tinh tế */}
+        {/* Thẻ ETA phẳng — cùng bố cục với bottom-card của DeliveryMap.jsx
+            (số phút lớn nổi bật + khoảng cách/tốc độ phụ), thay cho lưới 4 ô
+            trước đây vốn hơi chật trên màn hình dưới 360px. */}
         <div style={{
-          padding: '0.65rem 1rem',
-          backgroundColor: '#f8fafc',
-          borderTop: '1px solid #e2e8f0',
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(135px, 1fr))',
-          gap: '0.5rem',
-          fontSize: '0.8rem'
+          padding: '0.85rem 1rem',
+          backgroundColor: 'var(--bg-primary)',
+          borderTop: '1px solid var(--border-glass)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '0.75rem'
         }}>
-          <div style={{ padding: '0.45rem 0.6rem', backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-            <div style={{ color: '#64748b', fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: '0.3rem', marginBottom: '0.15rem' }}>
-              <Route size={13} color="#2563eb" /> Tuyến tối ưu
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: '1.3rem', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.2 }}>
+              {loadingRoute ? 'Đang tính...' : routeInfo ? `${routeInfo.durationMinutes} phút` : '—'}
             </div>
-            <strong style={{ color: '#2563eb', fontSize: '0.86rem' }}>
-              {loadingRoute ? 'Đang tính...' : routeInfo ? `${routeInfo.distanceKm} km` : '~5.3 km'}
-            </strong>
+            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+              {routeInfo ? `${routeInfo.distanceKm} km` : 'Tìm tuyến đường tối ưu'}
+              {distanceRemaining != null && ` · Còn ${distanceRemaining < 0.15 ? 'đã đến nơi' : distanceRemaining < 1 ? `${Math.round(distanceRemaining * 1000)} m` : `${distanceRemaining.toFixed(1)} km`}`}
+            </div>
           </div>
 
-          <div style={{ padding: '0.45rem 0.6rem', backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-            <div style={{ color: '#64748b', fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: '0.3rem', marginBottom: '0.15rem' }}>
-              <Clock size={13} color="#475569" /> Dự kiến
-            </div>
-            <strong style={{ color: '#0f172a', fontSize: '0.86rem' }}>
-              {loadingRoute ? '...' : routeInfo ? `~${routeInfo.durationMinutes} phút` : '~12 phút'}
-            </strong>
-          </div>
-
-          <div style={{ padding: '0.45rem 0.6rem', backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-            <div style={{ color: '#64748b', fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: '0.3rem', marginBottom: '0.15rem' }}>
-              <MapPin size={13} color="#16a34a" /> Khoảng cách
-            </div>
-            <strong style={{ color: '#16a34a', fontSize: '0.86rem' }}>
-              {distanceRemaining != null ? (distanceRemaining < 0.15 ? 'Đã đến nơi' : distanceRemaining < 1 ? `~${Math.round(distanceRemaining * 1000)} m` : `~${distanceRemaining.toFixed(1)} km`) : (routeInfo?.distanceKm ? `~${routeInfo.distanceKm} km` : 'Đang tính')}
-            </strong>
-          </div>
-
-          <div style={{ padding: '0.45rem 0.6rem', backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-            <div style={{ color: '#64748b', fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: '0.3rem', marginBottom: '0.15rem' }}>
-              <Gauge size={13} color="#7c3aed" /> Vận tốc
-            </div>
-            <strong style={{ color: '#7c3aed', fontSize: '0.86rem' }}>
-              {speedKmh > 0 ? `${speedKmh} km/h` : 'Đang dừng'}
-            </strong>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--text-secondary)', fontSize: '0.82rem', fontWeight: 700 }}>
+            <Gauge size={16} color="#7c3aed" />
+            {speedKmh > 0 ? `${speedKmh} km/h` : 'Đang dừng'}
           </div>
         </div>
 
@@ -457,6 +402,7 @@ export default function DeliveryNavigationModal({
           {!isGpsActive ? (
             <button
               type="button"
+              className="delivery-tap-target"
               onClick={() => onStartDeliveryWithGps && onStartDeliveryWithGps(order)}
               style={{
                 flex: '1 1 180px',
@@ -481,6 +427,7 @@ export default function DeliveryNavigationModal({
           ) : (
             <button
               type="button"
+              className="delivery-tap-target"
               onClick={() => onStopGps && onStopGps(order)}
               style={{
                 flex: '1 1 130px',
@@ -500,6 +447,7 @@ export default function DeliveryNavigationModal({
 
           <button
             type="button"
+            className="delivery-tap-target"
             onClick={() => {
               onClose();
               if (onOpenPOD) onOpenPOD(order);

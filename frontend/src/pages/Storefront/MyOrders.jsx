@@ -63,7 +63,7 @@ export default function MyOrders() {
 
   // Live GPS Tracking (Theo Dõi Giao Hàng Trực Tiếp) — thông tin tĩnh (kho,
   // khu vực, shipper) tải qua REST 1 lần, vị trí GPS cập nhật liên tục qua
-  // WebSocket cùng kênh /ws/cskh đã dùng cho chat CSKH.
+  // kênh WebSocket riêng /ws/tracking (tách khỏi chat CSKH).
   const [trackingData, setTrackingData] = useState(null);
   const [trackingLoading, setTrackingLoading] = useState(false);
   const [livePosition, setLivePosition] = useState(null);
@@ -276,7 +276,7 @@ export default function MyOrders() {
       .finally(() => { if (!cancelled) setTrackingLoading(false); });
 
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const ws = new WebSocket(`${wsProtocol}//${window.location.host}/ws/cskh`);
+    const ws = new WebSocket(`${wsProtocol}//${window.location.host}/ws/tracking`);
     ws.onopen = () => ws.send(JSON.stringify({ type: 'CUSTOMER_TRACK_ORDER', payload: { orderId: trackingOrderId } }));
     ws.onmessage = (evt) => {
       try {
@@ -1749,9 +1749,23 @@ export default function MyOrders() {
                         Tọa độ thực tế được truyền trực tiếp từ thiết bị định vị GPS của Shipper
                       </p>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', backgroundColor: '#fee2e2', border: '1px solid #fca5a5', padding: '0.25rem 0.65rem', borderRadius: '999px', fontSize: '0.72rem', fontWeight: 800, color: '#b91c1c' }}>
-                      <span style={{ display: 'inline-block', width: '7px', height: '7px', borderRadius: '50%', backgroundColor: '#ef4444', boxShadow: '0 0 6px #ef4444' }} />
-                      ĐANG PHÁT ĐỊNH VỊ
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const link = `${window.location.origin}/track/${selectedOrder.orderId || selectedOrder.id}`;
+                          navigator.clipboard?.writeText(link)
+                            .then(() => addNotification('Đã sao chép link theo dõi đơn hàng!', 'success'))
+                            .catch(() => addNotification(link, 'info'));
+                        }}
+                        style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', backgroundColor: '#eff6ff', border: '1px solid #93c5fd', padding: '0.3rem 0.7rem', borderRadius: '999px', fontSize: '0.72rem', fontWeight: 700, color: '#1d4ed8', cursor: 'pointer' }}
+                      >
+                        🔗 Chia sẻ link theo dõi
+                      </button>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', backgroundColor: '#fee2e2', border: '1px solid #fca5a5', padding: '0.25rem 0.65rem', borderRadius: '999px', fontSize: '0.72rem', fontWeight: 800, color: '#b91c1c' }}>
+                        <span style={{ display: 'inline-block', width: '7px', height: '7px', borderRadius: '50%', backgroundColor: '#ef4444', boxShadow: '0 0 6px #ef4444' }} />
+                        ĐANG PHÁT ĐỊNH VỊ
+                      </div>
                     </div>
                   </div>
                   {(() => {

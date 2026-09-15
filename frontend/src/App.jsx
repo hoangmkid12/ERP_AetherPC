@@ -21,6 +21,7 @@ const Home = lazy(() => import('./pages/Storefront/Home'));
 const PCBuilder = lazy(() => import('./pages/Storefront/PCBuilder'));
 const Cart = lazy(() => import('./pages/Storefront/Cart'));
 const MyOrders = lazy(() => import('./pages/Storefront/MyOrders'));
+const TrackOrder = lazy(() => import('./pages/Storefront/TrackOrder'));
 const Products = lazy(() => import('./pages/Storefront/Products'));
 const ProductDetail = lazy(() => import('./pages/Storefront/ProductDetail'));
 const Promotions = lazy(() => import('./pages/Storefront/Promotions'));
@@ -292,6 +293,7 @@ export default function App() {
                   <Route path="pc-builder" element={<PCBuilder />} />
                   <Route path="cart" element={<Cart />} />
                   <Route path="my-orders" element={<MyOrders />} />
+                  <Route path="track/:orderId" element={<TrackOrder />} />
                   {/* New TMĐT Pages */}
                   <Route path="promotions" element={<Promotions />} />
                   <Route path="flash-sale" element={<FlashSale />} />

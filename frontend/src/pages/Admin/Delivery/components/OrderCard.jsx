@@ -1,5 +1,5 @@
 import React from 'react';
-import { Truck, Clock, Camera, Eye, Radio, PlayCircle, Navigation } from 'lucide-react';
+import { Truck, Clock, Camera, Eye, Radio, PlayCircle, Navigation, Phone, MapPin } from 'lucide-react';
 import { getDeliveryIncidentStatus } from '../deliveryHelpers';
 
 // Shared full-width mobile card used by PendingTab / ActiveTab / HistoryTab.
@@ -29,7 +29,15 @@ export default function OrderCard({ order: ord, variant, fmt, getOrderTimeClassi
   };
 
   return (
-    <div className="delivery-card" onClick={() => onOpenDetail && onOpenDetail(ord)} style={{ cursor: onOpenDetail ? 'pointer' : 'default' }}>
+    <div
+      className="delivery-card delivery-pressable"
+      onClick={() => onOpenDetail && onOpenDetail(ord)}
+      style={{
+        cursor: onOpenDetail ? 'pointer' : 'default',
+        borderLeft: `4px solid ${statusBadge.color}`,
+        paddingLeft: '0.85rem'
+      }}
+    >
       {/* Header row */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem', gap: '0.5rem' }}>
         <span style={{ fontSize: '0.9rem', fontWeight: 800, color: isDelivered ? 'var(--success)' : 'var(--primary)' }}>
@@ -54,9 +62,11 @@ export default function OrderCard({ order: ord, variant, fmt, getOrderTimeClassi
         {ord.customerName}
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', color: 'var(--text-secondary)', marginBottom: '0.3rem' }}>
+        <Phone size={12} style={{ flexShrink: 0, color: 'var(--text-muted)' }} />
         <span>{ord.phone}</span>
       </div>
       <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginBottom: '0.55rem', display: 'flex', alignItems: 'flex-start', gap: '0.3rem' }}>
+        <MapPin size={12} style={{ flexShrink: 0, color: 'var(--text-muted)', marginTop: '2px' }} />
         <span>{ord.shippingAddress || 'TP. Hồ Chí Minh'}</span>
         <span style={{
           flexShrink: 0, padding: '1px 5px', borderRadius: '3px', fontSize: '0.65rem', fontWeight: 700,
@@ -90,6 +100,7 @@ export default function OrderCard({ order: ord, variant, fmt, getOrderTimeClassi
       {variant === 'pending' && (
         <button
           type="button"
+          className="delivery-tap-target"
           onClick={(e) => { e.stopPropagation(); actions.onClaim && actions.onClaim(orderId); }}
           style={{ width: '100%', backgroundColor: 'var(--primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-md)', padding: '0.65rem', fontSize: '0.82rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
         >
@@ -100,6 +111,7 @@ export default function OrderCard({ order: ord, variant, fmt, getOrderTimeClassi
       {variant === 'history' && (
         <button
           type="button"
+          className="delivery-tap-target"
           onClick={(e) => { e.stopPropagation(); onOpenDetail && onOpenDetail(ord); }}
           style={{ width: '100%', backgroundColor: 'transparent', color: 'var(--primary)', border: '1px solid var(--border-glass)', borderRadius: 'var(--radius-md)', padding: '0.5rem', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}
         >
@@ -113,6 +125,7 @@ export default function OrderCard({ order: ord, variant, fmt, getOrderTimeClassi
             <>
               <button
                 type="button"
+                className="delivery-tap-target"
                 onClick={() => onOpenDetail && onOpenDetail(ord)}
                 style={{ flex: 1, backgroundColor: 'rgba(22,163,74,0.1)', color: 'var(--success)', border: 'none', borderRadius: 'var(--radius-md)', padding: '0.55rem', fontSize: '0.76rem', fontWeight: 800, cursor: 'pointer' }}
               >
@@ -120,6 +133,7 @@ export default function OrderCard({ order: ord, variant, fmt, getOrderTimeClassi
               </button>
               <button
                 type="button"
+                className="delivery-tap-target"
                 onClick={() => actions.onRedeliver && actions.onRedeliver(orderId)}
                 title="Nếu giao nhầm hoặc cần chụp lại POD"
                 style={{ backgroundColor: 'transparent', color: 'var(--text-muted)', border: '1px solid var(--border-glass)', borderRadius: 'var(--radius-md)', padding: '0.55rem 0.7rem', fontSize: '0.74rem', fontWeight: 600, cursor: 'pointer' }}
@@ -131,6 +145,7 @@ export default function OrderCard({ order: ord, variant, fmt, getOrderTimeClassi
             <>
               <button
                 type="button"
+                className="delivery-tap-target"
                 onClick={() => actions.onResume && actions.onResume(orderId)}
                 style={{ flex: 1.2, backgroundColor: 'var(--success)', color: '#fff', border: 'none', borderRadius: 'var(--radius-md)', padding: '0.55rem', fontSize: '0.76rem', fontWeight: 800, cursor: 'pointer' }}
               >
@@ -138,6 +153,7 @@ export default function OrderCard({ order: ord, variant, fmt, getOrderTimeClassi
               </button>
               <button
                 type="button"
+                className="delivery-tap-target"
                 onClick={() => actions.onForceReturn && actions.onForceReturn(ord)}
                 style={{ flex: 0.8, backgroundColor: 'transparent', color: 'var(--danger)', border: '1px solid var(--danger)', borderRadius: 'var(--radius-md)', padding: '0.55rem', fontSize: '0.76rem', fontWeight: 700, cursor: 'pointer' }}
               >
@@ -148,6 +164,7 @@ export default function OrderCard({ order: ord, variant, fmt, getOrderTimeClassi
             <>
               <button
                 type="button"
+                className="delivery-tap-target"
                 onClick={() => actions.onResume && actions.onResume(orderId)}
                 style={{ flex: 1.2, backgroundColor: '#7c3aed', color: '#fff', border: 'none', borderRadius: 'var(--radius-md)', padding: '0.55rem', fontSize: '0.76rem', fontWeight: 800, cursor: 'pointer' }}
               >
@@ -155,6 +172,7 @@ export default function OrderCard({ order: ord, variant, fmt, getOrderTimeClassi
               </button>
               <button
                 type="button"
+                className="delivery-tap-target"
                 onClick={() => actions.onForceReturn && actions.onForceReturn(ord)}
                 style={{ flex: 0.8, backgroundColor: 'transparent', color: 'var(--danger)', border: '1px solid var(--danger)', borderRadius: 'var(--radius-md)', padding: '0.55rem', fontSize: '0.76rem', fontWeight: 700, cursor: 'pointer' }}
               >
@@ -165,6 +183,7 @@ export default function OrderCard({ order: ord, variant, fmt, getOrderTimeClassi
             <>
               <button
                 type="button"
+                className="delivery-tap-target"
                 onClick={() => actions.onForceReturn && actions.onForceReturn(ord)}
                 style={{ flex: 1.2, backgroundColor: 'var(--danger)', color: '#fff', border: 'none', borderRadius: 'var(--radius-md)', padding: '0.55rem', fontSize: '0.76rem', fontWeight: 800, cursor: 'pointer' }}
               >
@@ -172,6 +191,7 @@ export default function OrderCard({ order: ord, variant, fmt, getOrderTimeClassi
               </button>
               <button
                 type="button"
+                className="delivery-tap-target"
                 onClick={() => actions.onEscalate && actions.onEscalate(orderId)}
                 style={{ flex: 0.9, backgroundColor: 'rgba(37,99,235,0.1)', color: 'var(--primary)', border: 'none', borderRadius: 'var(--radius-md)', padding: '0.55rem', fontSize: '0.74rem', fontWeight: 700, cursor: 'pointer' }}
               >
@@ -181,6 +201,7 @@ export default function OrderCard({ order: ord, variant, fmt, getOrderTimeClassi
           ) : isReturning ? (
             <button
               type="button"
+              className="delivery-tap-target"
               onClick={() => actions.onResume && actions.onResume(orderId)}
               style={{ flex: 1, backgroundColor: 'transparent', color: 'var(--primary)', border: '1px solid var(--primary)', borderRadius: 'var(--radius-md)', padding: '0.55rem', fontSize: '0.76rem', fontWeight: 700, cursor: 'pointer' }}
             >
@@ -190,6 +211,7 @@ export default function OrderCard({ order: ord, variant, fmt, getOrderTimeClassi
             <>
               <button
                 type="button"
+                className="delivery-tap-target"
                 onClick={() => actions.onDeliver && actions.onDeliver(ord)}
                 style={{ flex: 1, backgroundColor: 'var(--success)', color: '#fff', border: 'none', borderRadius: 'var(--radius-md)', padding: '0.6rem', fontSize: '0.8rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}
               >
@@ -197,6 +219,7 @@ export default function OrderCard({ order: ord, variant, fmt, getOrderTimeClassi
               </button>
               <button
                 type="button"
+                className="delivery-tap-target"
                 onClick={() => actions.onFail && actions.onFail(ord)}
                 style={{ backgroundColor: 'transparent', color: 'var(--danger)', border: '1px solid var(--danger)', borderRadius: 'var(--radius-md)', padding: '0.6rem 0.85rem', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer' }}
               >
@@ -212,6 +235,7 @@ export default function OrderCard({ order: ord, variant, fmt, getOrderTimeClassi
         <div style={{ marginTop: '0.5rem' }} onClick={(e) => e.stopPropagation()}>
           <button
             type="button"
+            className="delivery-tap-target"
             onClick={() => actions.onOpenNavigation && actions.onOpenNavigation(ord)}
             style={{
               width: '100%',

@@ -399,7 +399,16 @@ async function main() {
     // always fail with "Invalid credentials" since there's no matching account.
     { id: 16, code: 'qc', name: 'Đặng Văn Kiểm (QA/QC)', email: 'qc@kltn-erp.vn', dept: 'Quality Control', role: 'QC', salary: 13000000 },
     { id: 17, code: 'cskh', name: 'Võ Thị Chăm (CSKH)', email: 'cskh@kltn-erp.vn', dept: 'Customer Service', role: 'CSKH', salary: 11000000 },
-    { id: 18, code: 'delivery', name: 'Bùi Văn Giao (Shipper)', email: 'delivery@kltn-erp.vn', dept: 'Delivery', role: 'DELIVERY', salary: 9000000, deliveryRegion: 'ALL' }
+    { id: 18, code: 'delivery', name: 'Bùi Văn Giao (Shipper)', email: 'delivery@kltn-erp.vn', dept: 'Delivery', role: 'DELIVERY', salary: 9000000, deliveryRegion: 'ALL' },
+    // 4 Shipper nội bộ phụ trách riêng từng khu vực TP.HCM (KV1-4) — cùng với
+    // Bùi Văn Giao (deliveryRegion 'ALL', phụ trách liên tỉnh/toàn quốc) ở
+    // trên, tổng cộng đúng 5 shipper nội bộ để RegionalShipperModal
+    // (Warehouse.jsx) có đủ dữ liệu thật cho từng vùng thay vì phải bịa thêm
+    // shipper giả hay chào mời đối tác vận chuyển ngoài (3PL) khi thiếu người.
+    { id: 19, code: 'delivery_kv1', name: 'Nguyễn Văn Nam (Shipper KV1)', email: 'delivery.kv1@kltn-erp.vn', dept: 'Delivery', role: 'DELIVERY', salary: 9000000, deliveryRegion: 'HCM_KV1' },
+    { id: 20, code: 'delivery_kv2', name: 'Trần Minh Khoa (Shipper KV2)', email: 'delivery.kv2@kltn-erp.vn', dept: 'Delivery', role: 'DELIVERY', salary: 9000000, deliveryRegion: 'HCM_KV2' },
+    { id: 21, code: 'delivery_kv3', name: 'Lê Hoàng Phúc (Shipper KV3)', email: 'delivery.kv3@kltn-erp.vn', dept: 'Delivery', role: 'DELIVERY', salary: 9000000, deliveryRegion: 'HCM_KV3' },
+    { id: 22, code: 'delivery_kv4', name: 'Phạm Đức Thắng (Shipper KV4)', email: 'delivery.kv4@kltn-erp.vn', dept: 'Delivery', role: 'DELIVERY', salary: 9000000, deliveryRegion: 'HCM_KV4' }
   ];
   for (const emp of employeesData) {
     await prisma.employee.create({

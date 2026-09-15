@@ -689,6 +689,24 @@ const updateOrderStatus = async (req, res, next) => {
       const shipperIdRaw = req.body.assignedShipperId;
       const assignedShipperIdInt = /^\d+$/.test(String(shipperIdRaw ?? '')) ? parseInt(shipperIdRaw, 10) : null;
 
+      // Chỉ chấp nhận gán cho nhân viên nội bộ thật có role DELIVERY — trước
+      // đây route này nhận bất kỳ số nguyên nào không kiểm tra gì, cho phép
+      // ghi 1 id không tồn tại hoặc id của nhân viên khác role vào
+      // assignedShipperId. Việc bỏ tuỳ chọn "đối tác vận chuyển ngoài" ở
+      // RegionalShipperModal (Warehouse.jsx) chỉ có ý nghĩa nếu backend cũng
+      // thực thi "chỉ shipper nội bộ" chứ không riêng dựa vào UI.
+      if (assignedShipperIdInt !== null) {
+        const shipperEmployee = await tx.employee.findUnique({
+          where: { id: assignedShipperIdInt },
+          select: { role: true }
+        });
+        if (!shipperEmployee || shipperEmployee.role !== 'DELIVERY') {
+          const error = new Error('assignedShipperId không hợp lệ: phải là nhân viên nội bộ có vai trò DELIVERY.');
+          error.statusCode = 400;
+          throw error;
+        }
+      }
+
       const updatedOrder = await tx.order.update({
         where: { orderId: id },
         data: {
@@ -1716,6 +1734,11 @@ const getDeliveryTracking = async (req, res, next) => {
         lastLat: true,
         lastLng: true,
         locationUpdatedAt: true,
+        createdAt: true,
+        confirmedAt: true,
+        shippedAt: true,
+        deliveredAt: true,
+        cancelledAt: true,
         assignedShipper: { select: { fullName: true, phone: true } }
       }
     });
@@ -1743,9 +1766,38 @@ const getDeliveryTracking = async (req, res, next) => {
         shipper: order.assignedShipper ? { name: order.assignedShipper.fullName, phone: order.assignedShipper.phone } : null,
         lastLocation: (order.lastLat != null && order.lastLng != null)
           ? { lat: order.lastLat, lng: order.lastLng, updatedAt: order.locationUpdatedAt }
-          : null
+          : null,
+        timeline: {
+          createdAt: order.createdAt,
+          confirmedAt: order.confirmedAt,
+          shippedAt: order.shippedAt,
+          deliveredAt: order.deliveredAt,
+          cancelledAt: order.cancelledAt
+        }
       }
     });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// GET /api/v1/orders/:orderId/tracking/history — vệt di chuyển đầy đủ của
+// Shipper cho đơn này (khác lastLocation ở trên chỉ có điểm cuối), dùng cho
+// việc xem lại lộ trình đã đi (khiếu nại/đối soát) — cùng mức công khai với
+// route tracking chính (tra cứu bằng mã đơn hàng, không cần đăng nhập).
+const getDeliveryLocationHistory = async (req, res, next) => {
+  try {
+    const { orderId } = req.params;
+    const order = await prisma.order.findUnique({ where: { orderId: String(orderId) }, select: { orderId: true } });
+    if (!order) {
+      return res.status(404).json({ success: false, message: `Không tìm thấy đơn hàng: ${orderId}` });
+    }
+    const history = await prisma.locationHistory.findMany({
+      where: { orderId: String(orderId) },
+      orderBy: { createdAt: 'asc' },
+      select: { lat: true, lng: true, speed: true, heading: true, createdAt: true }
+    });
+    res.json({ success: true, data: history });
   } catch (err) {
     next(err);
   }
@@ -1770,5 +1822,6 @@ module.exports = {
   getReturnSettings,
   updateReturnSettings,
   updateDeliveryLocationHttp,
-  getDeliveryTracking
+  getDeliveryTracking,
+  getDeliveryLocationHistory
 };

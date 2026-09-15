@@ -629,7 +629,7 @@ export default function Delivery() {
 
   const openWsConnection = () => {
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    return new WebSocket(`${wsProtocol}//${window.location.host}/ws/cskh`);
+    return new WebSocket(`${wsProtocol}//${window.location.host}/ws/tracking`);
   };
 
   const closeGpsSocket = useCallback(() => {

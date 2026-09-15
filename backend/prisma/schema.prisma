@@ -282,6 +282,7 @@ model Order {
   workOrders     WorkOrder[]
   returnRequests ReturnRequest[]
   serialNumbers  SerialNumber[]
+  locationHistory LocationHistory[]
 
   @@index([customerId, createdAt])
   @@index([status])
@@ -319,6 +320,24 @@ model OrderStatusHistory {
   order     Order    @relation(fields: [orderId], references: [orderId], onDelete: Cascade)
 
   @@map("order_status_history")
+}
+
+// Vệt di chuyển đầy đủ của Shipper cho mỗi đơn (khác với Order.lastLat/lastLng
+// chỉ giữ điểm cuối) — phục vụ xem lại lộ trình đã đi khi có khiếu nại, và là
+// nền cho các báo cáo lộ trình sau này.
+model LocationHistory {
+  id        Int      @id @default(autoincrement())
+  orderId   String   @map("order_id") @db.VarChar(50)
+  lat       Float
+  lng       Float
+  speed     Float?
+  heading   Float?
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  order     Order    @relation(fields: [orderId], references: [orderId], onDelete: Cascade)
+
+  @@index([orderId, createdAt])
+  @@map("location_history")
 }
 
 model OrderPayment {

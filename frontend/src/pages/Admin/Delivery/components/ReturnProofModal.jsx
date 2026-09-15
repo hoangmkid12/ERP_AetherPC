@@ -105,17 +105,23 @@ export default function ReturnProofModal({ order: ord, onClose, onConfirm }) {
     <div className="delivery-fullscreen-modal">
       <div className="delivery-fullscreen-modal-inner">
         {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.85rem 1rem', background: 'var(--bg-primary)', borderBottom: '1px solid var(--border-glass)', flexShrink: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            {step === 'details' && (
-              <button type="button" onClick={retakePhoto} className="delivery-icon-btn"><ChevronLeft size={18} /></button>
-            )}
-            <div>
-              <strong style={{ fontSize: '0.9rem', color: 'var(--text-primary)' }}>Hoàn Kho #{ord.orderId || ord.id}</strong>
-              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Chụp ảnh minh chứng kiện hàng trước khi bàn giao kho</div>
+        <div style={{ flexShrink: 0, background: 'var(--bg-primary)', borderBottom: '1px solid var(--border-glass)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.85rem 1rem 0.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              {step === 'details' && (
+                <button type="button" onClick={retakePhoto} className="delivery-icon-btn"><ChevronLeft size={18} /></button>
+              )}
+              <div>
+                <strong style={{ fontSize: '0.9rem', color: 'var(--text-primary)' }}>Hoàn Kho #{ord.orderId || ord.id}</strong>
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Chụp ảnh minh chứng kiện hàng trước khi bàn giao kho</div>
+              </div>
             </div>
+            <button type="button" onClick={onClose} className="delivery-icon-btn"><X size={18} /></button>
           </div>
-          <button type="button" onClick={onClose} className="delivery-icon-btn"><X size={18} /></button>
+          <div style={{ display: 'flex', gap: '0.3rem', padding: '0 1rem 0.7rem' }}>
+            <span style={{ flex: 1, height: '3px', borderRadius: '999px', backgroundColor: 'var(--warning)' }} />
+            <span style={{ flex: 1, height: '3px', borderRadius: '999px', backgroundColor: step === 'details' ? 'var(--warning)' : 'var(--border-glass)' }} />
+          </div>
         </div>
 
         {step === 'camera' ? (
@@ -168,6 +174,7 @@ export default function ReturnProofModal({ order: ord, onClose, onConfirm }) {
             <div style={{ padding: '1rem', background: 'var(--bg-primary)', borderTop: '1px solid var(--border-glass)', flexShrink: 0 }}>
               <button
                 type="button"
+                className="delivery-tap-target"
                 onClick={capturePhoto}
                 disabled={!isCameraActive}
                 style={{
@@ -181,6 +188,7 @@ export default function ReturnProofModal({ order: ord, onClose, onConfirm }) {
               </button>
               <button
                 type="button"
+                className="delivery-tap-target"
                 onClick={() => onConfirm({ returnProofPhoto: '', returnNote: returnNote.trim(), returnedAt: new Date().toISOString() })}
                 style={{ width: '100%', marginTop: '0.5rem', padding: '0.55rem', fontSize: '0.76rem', fontWeight: 700, backgroundColor: 'transparent', color: 'var(--text-muted)', border: '1px solid var(--border-glass)', borderRadius: 'var(--radius-md)', cursor: 'pointer' }}
               >
@@ -223,6 +231,7 @@ export default function ReturnProofModal({ order: ord, onClose, onConfirm }) {
             <div style={{ padding: '1rem', background: 'var(--bg-primary)', borderTop: '1px solid var(--border-glass)', flexShrink: 0 }}>
               <button
                 type="button"
+                className="delivery-tap-target"
                 onClick={handleSubmit}
                 style={{ width: '100%', backgroundColor: 'var(--warning)', color: '#fff', border: 'none', borderRadius: 'var(--radius-md)', padding: '0.75rem', fontSize: '0.85rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
               >

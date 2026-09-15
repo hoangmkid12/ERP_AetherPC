@@ -123,6 +123,22 @@ router.get('/employees', authMiddleware(['HR', 'CEO', 'ADMIN']), async (req, res
   } catch (err) { next(err); }
 });
 
+// GET /api/v1/hr/employees/shippers – danh sách shipper nội bộ (role DELIVERY)
+// rút gọn, chỉ đủ trường để phân công vận chuyển (KHÔNG có baseSalary/email
+// như /hr/employees) — dùng cho RegionalShipperModal (Warehouse.jsx). Route
+// /hr/employees đầy đủ chỉ dành HR/CEO/ADMIN vì lộ lương nhân viên, nhưng
+// Thủ Kho/Quản Lý Kho vẫn cần biết có shipper nào để bấm "Xác Nhận Xuất Kho".
+router.get('/employees/shippers', authMiddleware(['WAREHOUSE', 'WAREHOUSE_MANAGER', 'SALES', 'SALES_MANAGER', 'CEO', 'ADMIN', 'HR']), async (req, res, next) => {
+  try {
+    const shippers = await prisma.employee.findMany({
+      where: { role: 'DELIVERY', status: 'ACTIVE' },
+      select: { id: true, employeeCode: true, fullName: true, phone: true, deliveryRegion: true },
+      orderBy: { id: 'asc' }
+    });
+    res.json({ success: true, data: shippers });
+  } catch (err) { next(err); }
+});
+
 // POST /api/v1/hr/employees – tạo nhân viên mới (Admin)
 router.post('/employees', authMiddleware(['ADMIN', 'HR', 'CEO']), async (req, res, next) => {
   try {

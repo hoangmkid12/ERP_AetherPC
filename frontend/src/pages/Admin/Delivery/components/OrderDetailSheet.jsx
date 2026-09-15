@@ -1,6 +1,7 @@
 import React from 'react';
-import { X, Phone, MapPin, Package, CheckCircle, AlertTriangle } from 'lucide-react';
+import { X, Phone, MapPin, Package, CheckCircle, AlertTriangle, Camera, CreditCard } from 'lucide-react';
 import { ORDER_STATUS, getStatusLabel, getStatusInfo } from '../../../../utils/statusLabels';
+import DeliveryProgressStepper from '../../../../components/DeliveryProgressStepper';
 
 // Full-screen order detail view. Replaces the old dead "Xem Chi Tiết & Ảnh
 // POD" button which used to set `selectedOrder` but had no modal reading it.
@@ -43,6 +44,10 @@ export default function OrderDetailSheet({ order: ord, onClose, fmt, actions = {
           </span>
 
           <div className="delivery-card" style={{ marginBottom: '0.85rem' }}>
+            <DeliveryProgressStepper status={ord.status} />
+          </div>
+
+          <div className="delivery-card" style={{ marginBottom: '0.85rem' }}>
             <div style={{ fontWeight: 800, fontSize: '0.88rem', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--text-primary)' }}>
               <Package size={16} /> Thông Tin Khách Hàng
             </div>
@@ -57,8 +62,8 @@ export default function OrderDetailSheet({ order: ord, onClose, fmt, actions = {
           </div>
 
           <div className="delivery-card" style={{ marginBottom: '0.85rem' }}>
-            <div style={{ fontWeight: 800, fontSize: '0.88rem', marginBottom: '0.5rem', color: 'var(--text-primary)' }}>
-              Thanh Toán
+            <div style={{ fontWeight: 800, fontSize: '0.88rem', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--text-primary)' }}>
+              <CreditCard size={16} /> Thanh Toán
             </div>
             <Row label="Hình thức" value={isPrepaid ? 'Đã trả online' : 'Thu hộ COD'} />
             <Row label="Số tiền" value={isPrepaid ? '0 đ' : fmt(codAmount)} />
@@ -124,14 +129,16 @@ export default function OrderDetailSheet({ order: ord, onClose, fmt, actions = {
           <div style={{ display: 'flex', gap: '0.6rem', padding: '0.85rem 1rem', borderTop: '1px solid var(--border-glass)', background: 'var(--bg-primary)', flexShrink: 0 }}>
             <button
               type="button"
+              className="delivery-tap-target"
               onClick={() => { onClose(); actions.onDeliver(ord); }}
-              style={{ flex: 1, backgroundColor: 'var(--success)', color: '#fff', border: 'none', borderRadius: 'var(--radius-md)', padding: '0.65rem', fontSize: '0.82rem', fontWeight: 800, cursor: 'pointer' }}
+              style={{ flex: 1, backgroundColor: 'var(--success)', color: '#fff', border: 'none', borderRadius: 'var(--radius-md)', padding: '0.65rem', fontSize: '0.82rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
             >
-              Giao Thành Công
+              <Camera size={16} /> Giao Thành Công
             </button>
             {actions.onFail && (
               <button
                 type="button"
+                className="delivery-tap-target"
                 onClick={() => { onClose(); actions.onFail(ord); }}
                 style={{ backgroundColor: 'transparent', color: 'var(--danger)', border: '1px solid var(--danger)', borderRadius: 'var(--radius-md)', padding: '0.65rem 0.9rem', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}
               >
