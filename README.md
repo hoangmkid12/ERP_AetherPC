@@ -1,8 +1,8 @@
-# XÂY DỰNG VÀ TRIỂN KHAI HỆ THỐNG ERP CHO DOANH NGHIỆP BÁN LẺ & LẮP RÁP LINH KIỆN MÁY TÍNH AETHERPC
+# XÂY DỰNG VÀ TRIỂN KHAI HỆ THỐNG ERP CHO DOANH NGHIỆP AETHERPC
 
 > **Khóa Luận Tốt Nghiệp Đại Học — Trường Đại Học Công Nghiệp TP. Hồ Chí Minh (IUH)**  
 > **Chuyên Ngành**: Hệ Thống Thông Tin — Khoa Công Nghệ Thông Tin  
-> **Tên Đề Tài**: Xây dựng và triển khai hệ thống ERP cho doanh nghiệp bán lẻ & lắp ráp linh kiện máy tính (**AetherPC ERP & Storefront**).
+> **Tên Đề Tài**: Xây dựng và triển khai hệ thống ERP cho doanh nghiệp (**AetherPC ERP & Storefront**).
 
 ---
 
