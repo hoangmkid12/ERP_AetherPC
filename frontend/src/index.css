@@ -1419,6 +1419,28 @@ select.input-field option {
   .container {
     padding: 0 1rem !important;
   }
+
+  /* Announcement bar: tighter padding, smaller font so it wraps cleanly */
+  .announcement-bar {
+    font-size: 0.72rem !important;
+    padding: 0.4rem 0.75rem !important;
+    letter-spacing: 0 !important;
+  }
+
+  /* Hide the text label of the user button on mobile — keep only the avatar
+     circle so the header has room for Cart, Bell AND User without overflow */
+  .header-user-name-span {
+    display: none !important;
+  }
+
+  /* Constrain user dropdown so it never spills beyond the left edge of the
+     viewport on narrow phones (390px wide device). */
+  .header-user-dropdown {
+    right: 0 !important;
+    left: auto !important;
+    width: min(280px, calc(100vw - 2rem)) !important;
+    max-width: calc(100vw - 2rem) !important;
+  }
 }
 
 /* Responsive Styles for MyOrders & Delivery Tracking */

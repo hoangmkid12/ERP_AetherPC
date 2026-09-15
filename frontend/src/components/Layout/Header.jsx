@@ -552,8 +552,8 @@ export default function Header() {
                   }}>
                     {(user.fullname || user.name || 'K').charAt(0)}
                   </div>
-                  <span style={{ 
-                    maxWidth: '140px', 
+                  <span className="header-user-name-span" style={{ 
+                    maxWidth: '120px', 
                     overflow: 'hidden', 
                     textOverflow: 'ellipsis', 
                     whiteSpace: 'nowrap',
@@ -566,11 +566,11 @@ export default function Header() {
 
                 {/* Dropdown Menu */}
                 {userDropdownOpen && (
-                  <div style={{
+                  <div className="header-user-dropdown" style={{
                     position: 'absolute',
                     top: '100%',
                     right: 0,
-                    paddingTop: '0.5rem', // Bridge the gap between the button and the dropdown
+                    paddingTop: '0.5rem',
                     zIndex: 10000000,
                     animation: 'fadeIn 0.2s ease-out'
                   }}>
