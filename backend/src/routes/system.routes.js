@@ -19,7 +19,16 @@ router.get('/settings', authMiddleware(['ADMIN', 'CEO']), getSettings);
 router.put('/settings', authMiddleware(['ADMIN']), updateSettings);
 
 // @route   GET/PUT /api/v1/system/rbac
-router.get('/rbac', authMiddleware(['ADMIN']), getRolePermissions);
+// GET is any authenticated role, not just ADMIN — every logged-in user's
+// frontend calls loadRbacFromServer() (rbacEngine.js) on login to know which
+// modules/operations THEY personally can see, not just admins configuring the
+// screen. Restricting this to ADMIN meant every other role's GET 403'd, the
+// frontend silently fell back to the hardcoded DEFAULT_OPERATIONAL_MATRIX,
+// and any customization an admin saved was invisible to the very roles it
+// was meant to restrict/allow (CEO happened to still work — authMiddleware
+// always lets CEO through regardless of the roles array). PUT stays
+// ADMIN-only since that's the actual sensitive write.
+router.get('/rbac', authMiddleware(), getRolePermissions);
 router.put('/rbac', authMiddleware(['ADMIN']), updateRolePermissions);
 
 // @route   GET /api/v1/system/backup
