@@ -18,6 +18,7 @@ import QuickFailSheet from './components/QuickFailSheet';
 import ReturnProofModal from './components/ReturnProofModal';
 import OrderDetailSheet from './components/OrderDetailSheet';
 import DeliveryNavigationModal from './components/DeliveryNavigationModal';
+import RejectAssignmentSheet from './components/RejectAssignmentSheet';
 import { getDeliveryIncidentStatus } from './deliveryHelpers';
 
 // Refetch orders/returns while the tab is visible, paused otherwise.
@@ -29,6 +30,7 @@ export default function Delivery() {
   const getReturnRequests = useSalesStore(state => state.getReturnRequests);
   const updateOrderStatus = useSalesStore(state => state.updateOrderStatus);
   const claimOrderForDelivery = useSalesStore(state => state.claimOrderForDelivery);
+  const rejectAssignment = useSalesStore(state => state.rejectAssignment);
   const updateReturnStatus = useSalesStore(state => state.updateReturnStatus);
   const { user } = useAuth();
   const { addNotification } = useNotification();
@@ -215,6 +217,8 @@ export default function Delivery() {
   const [deliverModal, setDeliverModal] = useState(null);
   // Return-to-Warehouse Photo Proof Modal State
   const [returnModal, setReturnModal] = useState(null);
+  // Reject-pending-assignment reason sheet (tab "Chờ Nhận")
+  const [rejectAssignmentOrder, setRejectAssignmentOrder] = useState(null);
 
   const isManagerOrAdmin = ['CEO', 'ADMIN', 'WAREHOUSE_MANAGER', 'SALES_MANAGER'].includes(user?.role);
   const userIdStr = String(user?.id || user?.username || '');
@@ -225,6 +229,22 @@ export default function Delivery() {
   const uUser = String(user?.username || '').toLowerCase();
   const uPhone = String(user?.phone || '').replace(/\D/g, '');
   const shipperRegion = user?.deliveryRegion || 'HCM_KV1';
+
+  // Đơn TÔI vừa bấm "Từ Chối" không được rơi lại vào pool tự nhận theo khu vực
+  // của chính mình — assignedShipperId bị gỡ về null sau khi từ chối, và
+  // nhánh dự phòng theo khu vực bên dưới sẽ khớp lại NGAY chính shipper vừa
+  // từ chối (vì Kho vốn đã gán đúng khu vực của họ), khiến nút Từ Chối trông
+  // như vô tác dụng. Không có cột DB nào lưu "đã từng bị ai từ chối" (schema
+  // không có), nên ghi nhận tạm theo thiết bị — giống cách file này đã dùng
+  // localStorage cho các state theo-shipper khác (VD aether_active_gps_order_id).
+  // Nếu Kho chủ động gán lại đúng shipper này, isDirectlyAssigned ở trên sẽ
+  // luôn thắng trước khi chạm tới danh sách loại trừ này.
+  const REJECTED_ASSIGNMENTS_KEY = `aether_rejected_assignments_${userIdStr}`;
+  const getRejectedAssignmentIds = () => {
+    try {
+      return new Set(JSON.parse(localStorage.getItem(REJECTED_ASSIGNMENTS_KEY) || '[]'));
+    } catch (_) { return new Set(); }
+  };
 
   const isShipperMatched = (o) => {
     if (isManagerOrAdmin) return true;
@@ -243,6 +263,9 @@ export default function Delivery() {
     if (isDirectlyAssigned) return true;
 
     if (o.assignedShipperId || o.assignedShipper || o.assignedShipperUsername) return false;
+
+    const orderIdStr = String(o.orderId || o.id || '');
+    if (orderIdStr && getRejectedAssignmentIds().has(orderIdStr)) return false;
 
     if (shipperRegion === 'ALL') return true;
     const orderRegion = o.deliveryRegion || detectDeliveryRegion(o.shippingAddress || o.address || '');
@@ -507,7 +530,11 @@ export default function Delivery() {
     try {
       await updateOrderStatus(ordId, 'SHIPPING_FAILED', payload);
       if (payload.isAwaitingCallback) {
-        addNotification(`Đã đưa đơn #${ordId} vào danh sách "Chờ khách gọi lại (24h)". Sau 24h hệ thống sẽ tự động hoàn kho.`, 'warning', '/admin/delivery?tab=active');
+        // Hệ thống KHÔNG có job nào tự động hoàn kho sau 24h — đơn sẽ treo mãi
+        // ở "Chờ Gọi Lại" nếu Shipper không tự bấm "Khách Đã Gọi Lại" hoặc
+        // "Hoàn Kho" thủ công. Trước đây thông báo hứa hẹn sai là hệ thống tự
+        // làm việc này, khiến Shipper chủ quan bỏ quên đơn.
+        addNotification(`Đã đưa đơn #${ordId} vào danh sách "Chờ khách gọi lại (24h)". Lưu ý: bạn cần tự xử lý (gọi lại hoặc bấm Hoàn Kho) — hệ thống KHÔNG tự động hoàn kho.`, 'warning', '/admin/delivery?tab=active');
       } else {
         addNotification(`Đã cập nhật trạng thái đơn #${ordId}: Giao Thất Bại / Hẹn Lại.`, 'warning', '/admin/delivery?tab=history');
       }
@@ -537,8 +564,53 @@ export default function Delivery() {
     }
   };
 
-  const handleEscalateToCSKH = (orderId) => {
-    addNotification(`Đã gửi thông báo khẩn đến bộ phận CSKH để liên hệ hỗ trợ cứu đơn hàng #${orderId}!`, 'info', '/admin/delivery?tab=active');
+  // Trước đây nút "Báo CSKH" chỉ hiện toast cục bộ trên máy Shipper, không hề
+  // gọi API hay báo thật cho CSKH nào — tạo hẳn 1 phiên chat CSKH thật (cùng
+  // API/hạ tầng websocket mà 1 khách vãng lai dùng để chat vào), hiện ngay
+  // trong danh sách phiên của nhân viên CSKH đang trực để họ chủ động liên hệ.
+  const handleEscalateToCSKH = async (orderId) => {
+    const shipperName = user?.fullname || user?.name || user?.username || 'Shipper';
+    const sessionId = `SHIPPER-ESCALATE-${orderId}-${Date.now()}`;
+    try {
+      await api.post('/chat/cskh/send', {
+        sessionId,
+        customerName: `⚠️ Shipper ${shipperName} báo sự cố đơn #${orderId}`,
+        text: `Đơn hàng #${orderId} đang gặp sự cố giao hàng (khách từ chối nhận / không liên lạc được), cần CSKH hỗ trợ liên hệ khách gấp.`
+      });
+      addNotification(`Đã gửi yêu cầu hỗ trợ tới CSKH cho đơn #${orderId} — CSKH sẽ liên hệ qua khung chat hỗ trợ.`, 'success', '/admin/delivery?tab=active');
+    } catch (err) {
+      addNotification(`Không gửi được yêu cầu hỗ trợ CSKH: ${err.message}`, 'error');
+    }
+  };
+
+  const handleOpenRejectAssignment = (ord) => {
+    setRejectAssignmentOrder(ord);
+  };
+
+  const handleConfirmRejectAssignment = async (reason) => {
+    if (!rejectAssignmentOrder) return;
+    const ordId = rejectAssignmentOrder.orderId || rejectAssignmentOrder.id;
+    setRejectAssignmentOrder(null);
+    setApiOrders(prev => prev.map(o => (String(o.orderId || o.id) === String(ordId) ? { ...o, assignedShipperId: null, assignedShipperName: null } : o)));
+    try {
+      const ids = JSON.parse(localStorage.getItem(REJECTED_ASSIGNMENTS_KEY) || '[]');
+      if (!ids.includes(String(ordId))) {
+        ids.push(String(ordId));
+        localStorage.setItem(REJECTED_ASSIGNMENTS_KEY, JSON.stringify(ids));
+      }
+    } catch (_) {}
+    try {
+      const result = await rejectAssignment(ordId, user, reason);
+      if (result?.success) {
+        addNotification(`Đã từ chối đơn #${ordId}. Kho sẽ phân công lại cho shipper khác.`, 'info');
+      } else {
+        addNotification(result?.message || `Không thể từ chối đơn #${ordId}.`, 'error');
+      }
+    } catch (err) {
+      addNotification(`Lỗi từ chối đơn #${ordId}: ${err.message}`, 'error');
+    } finally {
+      fetchApiData(true);
+    }
   };
 
   // Opens the photo-proof modal instead of returning the order immediately —
@@ -913,6 +985,7 @@ export default function Delivery() {
 
   const actions = {
     onClaim: handleClaimOrder,
+    onRejectAssignment: handleOpenRejectAssignment,
     onDeliver: setDeliverModal,
     onFail: setFailModal,
     onResume: handleResumeDelivery,
@@ -1093,6 +1166,14 @@ export default function Delivery() {
           order={returnModal}
           onClose={() => setReturnModal(null)}
           onConfirm={handleConfirmReturn}
+        />
+      )}
+
+      {rejectAssignmentOrder && (
+        <RejectAssignmentSheet
+          order={rejectAssignmentOrder}
+          onClose={() => setRejectAssignmentOrder(null)}
+          onConfirm={handleConfirmRejectAssignment}
         />
       )}
 

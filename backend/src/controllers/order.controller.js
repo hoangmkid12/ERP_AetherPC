@@ -479,6 +479,12 @@ const updateOrderStatus = async (req, res, next) => {
       return res.status(400).json({ success: false, message: `Trạng thái đơn hàng không hợp lệ: ${status}` });
     }
 
+    // Đặt bên ngoài transaction để còn đọc được sau khi transaction đóng (email
+    // gửi ở ngoài, dưới khối này) — true khi thao tác không có gì đáng để báo
+    // cho khách (VD shipper từ chối nhận đơn: trạng thái đơn với khách hàng
+    // không hề đổi, chỉ là nội bộ đổi người giao).
+    let skipCustomerEmail = false;
+
     const order = await prisma.$transaction(async (tx) => {
       const existingOrder = await tx.order.findUnique({
         where: { orderId: id },
@@ -679,6 +685,20 @@ const updateOrderStatus = async (req, res, next) => {
       const receivedType = req.body.receivedByType || 'DIRECT_CUSTOMER';
       const receiverName = req.body.receiverNameActual || (receivedType === 'DIRECT_CUSTOMER' ? (existingOrder.customer?.name || 'Khách hàng') : 'Người nhận thay');
 
+      // Chặn xác nhận "khách đã chuyển khoản" mà không kèm mã giao dịch ngân
+      // hàng nào — trước đây route này chấp nhận actualPaymentMethod=
+      // BANK_TRANSFER với bankRefCode rỗng, vẫn ghi paymentStatus=PAID và tạo
+      // OrderPayment SUCCESS ngay lập tức, tức là chấp nhận lời khai của
+      // Shipper mà không có bằng chứng nào (khác tiền mặt — Shipper đang cầm
+      // tiền thật trong tay, đối soát COD với Kế Toán sau). Validate lại ở
+      // đây vì giao diện chỉ chặn được thao tác qua UI, không chặn được ai
+      // gọi thẳng API này.
+      if (status === 'DELIVERED' && actualPayMethod === 'BANK_TRANSFER' && !req.body.bankRefCode) {
+        const error = new Error('Cần nhập Mã Giao Dịch Ngân Hàng trước khi xác nhận đã nhận chuyển khoản.');
+        error.statusCode = 400;
+        throw error;
+      }
+
       // Kho "Xác Nhận Xuất Kho" gửi kèm assignedShipperId/deliveryRegion khi
       // chuyển SHIPPED (Warehouse.jsx -> salesStore.updateOrderStatus), nhưng
       // route này trước đây bỏ qua hoàn toàn 2 field đó — Order.assignedShipperId
@@ -707,6 +727,27 @@ const updateOrderStatus = async (req, res, next) => {
         }
       }
 
+      // Shipper tự từ chối 1 đơn đang chờ nhận (nút "Từ Chối" ở tab Chờ Nhận
+      // của Delivery/index.jsx) — gỡ gán shipper để đơn quay lại hàng chờ cho
+      // Kho phân công người khác, KHÔNG đổi trạng thái đơn (vẫn READY_TO_SHIP).
+      // Trước đây không có đường nào để null hoá assignedShipperId, nên đơn bị
+      // gán sai/quá tải chỉ có Kho tự vào đổi lại được, shipper không tự xử
+      // lý được và Kho cũng không biết shipper đã từ chối.
+      const isRejectingAssignment = req.body.unassignShipper === true;
+      if (isRejectingAssignment) {
+        if (existingOrder.status !== 'READY_TO_SHIP') {
+          const error = new Error('Chỉ có thể từ chối đơn khi đơn còn đang chờ nhận (READY_TO_SHIP).');
+          error.statusCode = 400;
+          throw error;
+        }
+        if (req.user?.role === 'DELIVERY' && existingOrder.assignedShipperId && Number(existingOrder.assignedShipperId) !== Number(req.user?.id)) {
+          const error = new Error('Bạn không phải là shipper được phân công cho đơn này.');
+          error.statusCode = 403;
+          throw error;
+        }
+        skipCustomerEmail = true;
+      }
+
       const updatedOrder = await tx.order.update({
         where: { orderId: id },
         data: {
@@ -718,7 +759,7 @@ const updateOrderStatus = async (req, res, next) => {
           // Chuyến" mới chuyển sang SHIPPED) — nếu vẫn chỉ ghi lúc SHIPPED,
           // việc phân công sẽ bị lặng lẽ mất, đơn không lọc đúng theo shipper
           // ở tab Chờ Nhận nữa.
-          ...(assignedShipperIdInt !== null ? { assignedShipperId: assignedShipperIdInt } : {}),
+          ...(isRejectingAssignment ? { assignedShipperId: null } : (assignedShipperIdInt !== null ? { assignedShipperId: assignedShipperIdInt } : {})),
           ...(req.body.deliveryRegion !== undefined ? { deliveryRegion: req.body.deliveryRegion } : {}),
           ...(status === 'DELIVERED' ? {
             deliveredAt: new Date(),
@@ -768,7 +809,11 @@ const updateOrderStatus = async (req, res, next) => {
             orderId: id,
             method: actualPayMethod,
             amount: existingOrder.totalAmount,
-            transactionId: req.body.bankRefCode || `CASH-${id}-${Date.now().toString().slice(-4)}`,
+            // Trước đây luôn fallback về tiền tố "CASH-" kể cả khi phương thức
+            // thực tế là PREPAID (đơn đã trả online từ trước, Shipper không
+            // nhập mã GD lúc giao) — sai nhãn trên sổ giao dịch dùng để đối
+            // soát/audit sau này.
+            transactionId: req.body.bankRefCode || `${actualPayMethod}-${id}-${Date.now().toString().slice(-4)}`,
             status: 'SUCCESS'
           }
         }).catch(e => console.warn('[OrderPayment] Ghi nhận thanh toán:', e.message));
@@ -807,7 +852,7 @@ const updateOrderStatus = async (req, res, next) => {
       where: { orderId: id },
       include: { customer: true, items: { include: { product: true } } }
     });
-    if (updatedOrderFull?.customer?.email) {
+    if (!skipCustomerEmail && updatedOrderFull?.customer?.email) {
       sendOrderStatusUpdateEmail({
         toEmail: updatedOrderFull.customer.email,
         customerName: updatedOrderFull.customer.name,

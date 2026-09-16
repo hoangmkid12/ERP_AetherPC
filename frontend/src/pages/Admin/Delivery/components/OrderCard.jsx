@@ -102,14 +102,25 @@ export default function OrderCard({ order: ord, variant, fmt, getOrderTimeClassi
 
       {/* Actions */}
       {variant === 'pending' && (
-        <button
-          type="button"
-          className="delivery-tap-target"
-          onClick={(e) => { e.stopPropagation(); actions.onClaim && actions.onClaim(orderId); }}
-          style={{ width: '100%', backgroundColor: 'var(--primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-md)', padding: '0.65rem', fontSize: '0.82rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
-        >
-          <Truck size={16} /> Nhận Chuyến & Xuất Kho
-        </button>
+        <div style={{ display: 'flex', gap: '0.5rem' }} onClick={(e) => e.stopPropagation()}>
+          <button
+            type="button"
+            className="delivery-tap-target"
+            onClick={() => actions.onClaim && actions.onClaim(orderId)}
+            style={{ flex: 1, backgroundColor: 'var(--primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-md)', padding: '0.65rem', fontSize: '0.82rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
+          >
+            <Truck size={16} /> Nhận Chuyến & Xuất Kho
+          </button>
+          <button
+            type="button"
+            className="delivery-tap-target"
+            onClick={() => actions.onRejectAssignment && actions.onRejectAssignment(ord)}
+            title="Từ chối nhận đơn này — quay lại chờ Kho phân công cho shipper khác"
+            style={{ flexShrink: 0, backgroundColor: 'transparent', color: 'var(--danger)', border: '1px solid var(--danger)', borderRadius: 'var(--radius-md)', padding: '0.65rem 0.85rem', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer' }}
+          >
+            Từ Chối
+          </button>
+        </div>
       )}
 
       {variant === 'history' && (

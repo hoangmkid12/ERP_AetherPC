@@ -159,7 +159,12 @@ export default function PODCaptureSection({ order, user, fmt, onConfirm, onRejec
   const isPrepaid = order.paymentStatus === 'PAID' || order.paymentMethod === 'ONLINE_GATEWAY' || order.paymentMethod === 'BANK_TRANSFER' || codAmount === 0;
 
   const [proofPhoto, setProofPhoto] = useState('');
-  const [receiverNote, setReceiverNote] = useState('Khách đã đồng kiểm tem niêm phong và ký nhận đầy đủ.');
+  // Trước đây mặc định sẵn 1 câu khẳng định "khách đã ký nhận đầy đủ" dù
+  // KHÔNG có tính năng chụp/thu chữ ký thật nào trong màn hình này — nếu
+  // Shipper không sửa, hệ thống ghi nhận như thể khách đã ký nhận dù thực tế
+  // không có. Để trống, bắt Shipper tự gõ mô tả thật (hoặc để trống nếu không
+  // có gì đặc biệt) thay vì mặc định khẳng định 1 việc chưa chắc đã xảy ra.
+  const [receiverNote, setReceiverNote] = useState('');
   const [actualPaymentMethod, setActualPaymentMethod] = useState(isPrepaid ? 'PREPAID' : 'CASH');
   const [bankRefCode, setBankRefCode] = useState('');
   const [paymentProofPhoto, setPaymentProofPhoto] = useState('');
@@ -301,11 +306,18 @@ export default function PODCaptureSection({ order, user, fmt, onConfirm, onRejec
   const handleSubmit = () => {
     const payMethodFinal = isPrepaid ? 'PREPAID' : actualPaymentMethod;
     const receiverNameFinal = receivedByType === 'DIRECT_CUSTOMER' ? (order.customerName || 'Khách hàng') : (receiverNameActual || 'Người nhận thay');
-    const bankRefFinal = payMethodFinal === 'BANK_TRANSFER' ? (bankRefCode || `VQR-${Date.now().toString().slice(-6)}`) : null;
+    // KHÔNG tự bịa mã giao dịch "VQR-xxxxxx" khi để trống như trước đây — nút
+    // xác nhận đã bị khoá cho tới khi có mã thật (xem disabled ở
+    // SwipeConfirmButton bên dưới), bịa mã ở đây sẽ vô hiệu hoá hẳn tác dụng
+    // của việc khoá đó nếu có đường nào khác gọi tới hàm này.
+    const bankRefFinal = payMethodFinal === 'BANK_TRANSFER' ? (bankRefCode || null) : null;
 
     onConfirm({
       proofPhoto,
-      receiverNote: receiverNote || 'Khách đã ký nhận nguyên vẹn',
+      // KHÔNG fallback về câu khẳng định có sẵn khi để trống — không có tính
+      // năng thu chữ ký thật nào ở màn hình này, nên gán sẵn 1 câu khẳng định
+      // "khách đã ký nhận nguyên vẹn" tương đương ghi nhận sai sự thật.
+      receiverNote,
       actualPaymentMethod: payMethodFinal,
       bankRefCode: bankRefFinal,
       paymentProofPhoto: payMethodFinal === 'BANK_TRANSFER' ? paymentProofPhoto : null,
@@ -589,6 +601,7 @@ export default function PODCaptureSection({ order, user, fmt, onConfirm, onRejec
           type="text"
           value={receiverNote}
           onChange={e => setReceiverNote(e.target.value)}
+          placeholder="VD: Khách đồng kiểm tem niêm phong, nhận đủ hàng... (để trống nếu không có gì đặc biệt)"
           style={{ width: '100%', padding: '0.55rem 0.7rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-glass)', boxSizing: 'border-box', fontSize: '0.8rem' }}
         />
       </div>
@@ -602,9 +615,20 @@ export default function PODCaptureSection({ order, user, fmt, onConfirm, onRejec
         <div style={{ flex: 1 }}>
           <SwipeConfirmButton
             onConfirm={handleSubmit}
-            disabled={!proofPhoto}
+            // Chuyển khoản trước đây KHÔNG bắt buộc mã giao dịch — shipper có
+            // thể xác nhận "khách đã chuyển khoản" mà không có bằng chứng nào,
+            // hệ thống vẫn ghi paymentStatus=PAID + tạo OrderPayment SUCCESS
+            // ngay lập tức. Bắt buộc mã giao dịch trước khi cho trượt xác nhận
+            // để giảm rủi ro khai khống — tiền mặt thì không cần vì shipper
+            // đang giữ tiền thật, sẽ đối soát COD với Kế Toán sau.
+            disabled={!proofPhoto || (actualPaymentMethod === 'BANK_TRANSFER' && !isPrepaid && !bankRefCode.trim())}
             label={isPrepaid ? 'Trượt Để Xác Nhận Bàn Giao' : (actualPaymentMethod === 'BANK_TRANSFER' ? 'Trượt Để Xác Nhận Đã Nhận CK' : 'Trượt Để Xác Nhận Thu Tiền & Giao')}
           />
+          {!isPrepaid && actualPaymentMethod === 'BANK_TRANSFER' && !bankRefCode.trim() && (
+            <div style={{ fontSize: '0.72rem', color: 'var(--danger)', fontWeight: 600, marginTop: '0.3rem', textAlign: 'center' }}>
+              Cần nhập Mã Giao Dịch Ngân Hàng ở trên trước khi xác nhận.
+            </div>
+          )}
         </div>
         {onReject && (
           <button

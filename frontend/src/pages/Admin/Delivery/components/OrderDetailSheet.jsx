@@ -84,7 +84,7 @@ export default function OrderDetailSheet({ order: ord, onClose, fmt, actions = {
                 <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '0.6rem' }}>Không có ảnh minh chứng.</div>
               )}
               <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                {ord.receiverNote || 'Khách đã ký nhận nguyên vẹn.'}
+                {ord.receiverNote || 'Không có ghi chú.'}
               </div>
               {ord.deliveredAt && (
                 <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.35rem' }}>

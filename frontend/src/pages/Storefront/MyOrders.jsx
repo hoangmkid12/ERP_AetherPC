@@ -1290,12 +1290,14 @@ export default function MyOrders() {
                                       <span style={{ color: '#0f172a' }}>{new Date(selectedOrder.deliveredAt).toLocaleString('vi-VN')}</span>
                                     </div>
                                   )}
-                                  <div>
-                                    <strong style={{ color: '#0f172a' }}>Ghi chú bàn giao:</strong>{' '}
-                                    <span style={{ color: '#059669', fontWeight: 600 }}>
-                                      {selectedOrder.receiverNote || 'Khách hàng đã kiểm tra ngoại quan tem niêm phong và ký nhận đầy đủ.'}
-                                    </span>
-                                  </div>
+                                  {selectedOrder.receiverNote && (
+                                    <div>
+                                      <strong style={{ color: '#0f172a' }}>Ghi chú bàn giao:</strong>{' '}
+                                      <span style={{ color: '#059669', fontWeight: 600 }}>
+                                        {selectedOrder.receiverNote}
+                                      </span>
+                                    </div>
+                                  )}
 
                                   {selectedOrder.paymentProofPhoto && (
                                     <div style={{ marginTop: '0.35rem', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>

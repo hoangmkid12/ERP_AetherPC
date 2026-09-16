@@ -461,6 +461,42 @@ export const useSalesStore = create((set, get) => ({
   },
 
   /**
+   * Shipper từ chối 1 đơn đang chờ nhận — gỡ gán khỏi bản thân, đơn quay lại
+   * READY_TO_SHIP không gán ai để Kho phân công lại (xem "Từ Chối" ở tab Chờ
+   * Nhận, PendingTab/OrderCard.jsx).
+   */
+  rejectAssignment: async (orderId, shipperUser, reason) => {
+    const orders = get().orders;
+    const targetOrder = orders.find(o => o.orderId === orderId || String(o.id) === String(orderId));
+    if (!targetOrder) {
+      return { success: false, message: `Không tìm thấy đơn hàng ${orderId} trong hệ thống!` };
+    }
+
+    const shipperName = shipperUser?.fullname || shipperUser?.name || shipperUser?.username || 'Giao Hàng';
+    const noteText = `Shipper ${shipperName} đã từ chối nhận đơn (Lý do: ${reason || 'Không nêu lý do'}) — đơn quay lại chờ Kho phân công lại`;
+
+    try {
+      await get().updateOrderStatus(orderId, 'READY_TO_SHIP', noteText, {
+        unassignShipper: true,
+        rejectReason: reason || ''
+      });
+    } catch (err) {
+      return { success: false, message: `Không thể từ chối đơn hàng ${orderId}: ${err.message}` };
+    }
+
+    // updateOrderStatus() chỉ spread extraData vào order cục bộ (không tự biết
+    // phải null hoá assignedShipperId), tự dọn ở đây để đơn biến mất khỏi
+    // "Chờ Nhận" của shipper này ngay, không phải đợi lần fetch API kế tiếp.
+    set(state => ({
+      orders: state.orders.map(o => (o.orderId === orderId || String(o.id) === String(orderId))
+        ? { ...o, assignedShipperId: null, assignedShipperName: null }
+        : o)
+    }));
+
+    return { success: true, message: `Đã từ chối đơn hàng ${orderId}.` };
+  },
+
+  /**
    * Add a new return request (Customer / CSKH)
    */
   addReturnRequest: async (returnData) => {
