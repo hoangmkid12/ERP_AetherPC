@@ -2228,6 +2228,7 @@ export default function Warehouse() {
   const [showCreatePrForm, setShowCreatePrForm] = useState(false);
   const [prForm, setPrForm] = useState({ productId: '', quantity: '', reason: '' });
   const [viewingPR, setViewingPR] = useState(null); // PR đang xem/in dưới dạng chứng từ chuẩn
+  const [showAllPRs, setShowAllPRs] = useState(false);
 
   const loadPurchaseRequests = async () => {
     setLoadingPRs(true);
@@ -4850,14 +4851,37 @@ export default function Warehouse() {
                   {canApprovePr ? 'Ký duyệt đề xuất bổ sung hàng trước khi Mua Hàng lập RFQ gửi NCC.' : 'Đề xuất bổ sung hàng — chờ Quản Lý Kho ký duyệt.'}
                 </p>
               </div>
-              {canCreatePr && (
-                <button
-                  onClick={() => setShowCreatePrForm(v => !v)}
-                  style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.5rem 1rem', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
-                >
-                  {showCreatePrForm ? 'Đóng' : '+ Lập Phiếu Yêu Cầu'}
-                </button>
-              )}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                {purchaseRequests.length > 3 && (
+                  <button
+                    onClick={() => setShowAllPRs(v => !v)}
+                    style={{
+                      backgroundColor: showAllPRs ? '#f8fafc' : '#eff6ff',
+                      color: showAllPRs ? '#475569' : '#2563eb',
+                      border: '1px solid ' + (showAllPRs ? '#cbd5e1' : '#bfdbfe'),
+                      borderRadius: '6px',
+                      padding: '0.5rem 0.9rem',
+                      fontSize: '0.82rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    {showAllPRs ? 'Thu gọn (3 phiếu)' : `Xem tất cả (${purchaseRequests.length})`}
+                  </button>
+                )}
+                {canCreatePr && (
+                  <button
+                    onClick={() => setShowCreatePrForm(v => !v)}
+                    style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.5rem 1rem', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
+                  >
+                    {showCreatePrForm ? 'Đóng' : '+ Lập Phiếu Yêu Cầu'}
+                  </button>
+                )}
+              </div>
             </div>
 
             {showCreatePrForm && (
@@ -4913,7 +4937,7 @@ export default function Warehouse() {
                     </tr>
                   </thead>
                   <tbody>
-                    {purchaseRequests.map(pr => {
+                    {(showAllPRs ? purchaseRequests : purchaseRequests.slice(0, 3)).map(pr => {
                       const isBusy = prBusyId === pr.id;
                       const statusColor = pr.status === 'APPROVED' ? '#15803d' : pr.status === 'REJECTED' ? '#dc2626' : '#b45309';
                       const statusBg = pr.status === 'APPROVED' ? '#f0fdf4' : pr.status === 'REJECTED' ? '#fef2f2' : '#fffbeb';
@@ -4955,6 +4979,17 @@ export default function Warehouse() {
                     })}
                   </tbody>
                 </table>
+                {!showAllPRs && purchaseRequests.length > 3 && (
+                  <div style={{ textAlign: 'center', padding: '0.65rem', borderTop: '1px solid #e2e8f0', backgroundColor: '#f8fafc', fontSize: '0.8rem', color: '#64748b' }}>
+                    Đang hiển thị 3 trên tổng số {purchaseRequests.length} phiếu mới nhất.{' '}
+                    <button
+                      onClick={() => setShowAllPRs(true)}
+                      style={{ background: 'none', border: 'none', color: '#2563eb', fontWeight: 700, cursor: 'pointer', textDecoration: 'underline', padding: 0 }}
+                    >
+                      Xem tất cả ({purchaseRequests.length}) &rarr;
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>

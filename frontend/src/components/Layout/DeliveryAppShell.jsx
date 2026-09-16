@@ -1,12 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { useSalesStore, useHRStore } from '../../stores';
-import { notify } from '../../context/NotificationContext';
-import { LEAVE_STATUS, getStatusInfo, getStatusLabel } from '../../utils/statusLabels';
+import { useSalesStore } from '../../stores';
+import { api } from '../../services/api';
 import useSafeViewportHeight from '../../hooks/useSafeViewportHeight';
-import { detectDeliveryRegion } from '../../utils/deliveryRegions';
-import { Home, Package, Truck, Undo2, History, Bell, LogOut, CalendarCheck, X, Send } from 'lucide-react';
+import { detectDeliveryRegion, DELIVERY_REGIONS } from '../../utils/deliveryRegions';
+import { Home, Package, Truck, Undo2, History, Bell, LogOut, MessageCircle, X, Send } from 'lucide-react';
 
 const TABS = [
   { id: 'overview', label: 'Tổng Quan', icon: Home },
