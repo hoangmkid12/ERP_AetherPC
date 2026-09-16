@@ -1175,7 +1175,7 @@ export default function SupplierPortal() {
                   <th style={{ padding: '0.75rem 1rem', textAlign: 'left' }}>Linh Kiện Cung Cấp</th>
                   <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Tổng Số Lượng</th>
                   <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Doanh Thu (VNĐ)</th>
-                  <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Dòng Tiền Thanh Toán ERP</th>
+                  <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Trạng Thái</th>
                   <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Thao Tác</th>
                 </tr>
               </thead>
