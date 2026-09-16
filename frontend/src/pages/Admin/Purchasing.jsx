@@ -2362,12 +2362,12 @@ export default function Purchasing() {
               <thead>
                 <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569' }}>
                   <th style={{ padding: '0.75rem 1rem', whiteSpace: 'nowrap' }}>Tham Chiếu</th>
-                  <th style={{ padding: '0.75rem 1rem' }}>Nhà Cung Cấp</th>
+                  <th style={{ padding: '0.75rem 1rem', minWidth: '220px' }}>Nhà Cung Cấp</th>
                   <th style={{ padding: '0.75rem 0.85rem', whiteSpace: 'nowrap' }}>Bên Mua</th>
                   <th style={{ padding: '0.75rem 0.85rem', textAlign: 'center', whiteSpace: 'nowrap' }}>Hạn Đặt Hàng</th>
                   <th style={{ padding: '0.75rem 1rem', textAlign: 'right', whiteSpace: 'nowrap' }}>Tổng Tiền</th>
                   <th style={{ padding: '0.75rem 0.85rem', textAlign: 'center', whiteSpace: 'nowrap' }}>Trạng Thái</th>
-                  <th style={{ padding: '0.75rem 1rem', textAlign: 'right', width: '255px', minWidth: '255px', whiteSpace: 'nowrap' }}>Hành Động</th>
+                  <th style={{ padding: '0.75rem 1rem', textAlign: 'right', width: '215px', minWidth: '215px', whiteSpace: 'nowrap' }}>Hành Động</th>
                 </tr>
               </thead>
               <tbody>
@@ -2387,7 +2387,7 @@ export default function Purchasing() {
                         <td style={{ padding: '0.75rem 1rem', fontWeight: 700, color: '#2563eb', whiteSpace: 'nowrap' }}>
                           {formatPurchaseReference(po)}
                         </td>
-                        <td style={{ padding: '0.75rem 1rem', fontWeight: 600, color: '#0f172a' }}>
+                        <td style={{ padding: '0.75rem 1rem', fontWeight: 600, color: '#0f172a', minWidth: '220px', lineHeight: 1.4 }}>
                           {getSupplierName(po)}
                         </td>
                         <td style={{ padding: '0.75rem 0.85rem', color: '#475569', whiteSpace: 'nowrap' }}>
@@ -2422,7 +2422,7 @@ export default function Purchasing() {
                             {badge.text}
                           </span>
                         </td>
-                        <td style={{ padding: '0.75rem 1rem', textAlign: 'right', width: '255px', minWidth: '255px', whiteSpace: 'nowrap' }}>
+                        <td style={{ padding: '0.75rem 1rem', textAlign: 'right', width: '215px', minWidth: '215px', whiteSpace: 'nowrap' }}>
                           <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.4rem' }}>
                             {po.status === 'QUOTED' && isPurchasingConfirmer && (
                               <button
@@ -2526,25 +2526,24 @@ export default function Purchasing() {
                             )}
                             <button
                               onClick={() => setSelectedPO(po)}
+                              title="Xem Chi Tiết Đơn Hàng"
                               style={{
                                 backgroundColor: '#ffffff',
                                 color: '#2563eb',
                                 border: '1px solid #cbd5e1',
                                 borderRadius: '4px',
-                                padding: '0.3rem 0.65rem',
-                                fontSize: '0.75rem',
-                                fontWeight: 700,
-                                cursor: 'pointer',
-                                minWidth: '65px',
+                                padding: '0.3rem',
+                                width: '32px',
                                 height: '28px',
                                 display: 'inline-flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
+                                cursor: 'pointer',
                                 boxSizing: 'border-box',
-                                whiteSpace: 'nowrap'
+                                flexShrink: 0
                               }}
                             >
-                              Chi Tiết
+                              <Eye size={15} />
                             </button>
                           </div>
                         </td>
