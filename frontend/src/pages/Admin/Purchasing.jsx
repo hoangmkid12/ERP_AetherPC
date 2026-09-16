@@ -4948,25 +4948,82 @@ export default function Purchasing() {
                   )}
                 </div>
 
-                {/* Chữ ký 3 bên — cân đối đều 3 cột */}
+                {/* Chữ ký 3 bên — Chữ ký số theo tiến trình duyệt */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem', textAlign: 'center', marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px dashed #cbd5e1' }}>
                   <div>
                     <strong style={{ fontSize: '0.76rem', color: '#0f172a' }}>NGƯỜI LẬP PHIẾU</strong>
                     <div style={{ fontSize: '0.68rem', color: '#94a3b8', marginTop: '0.2rem' }}>(Ký, ghi rõ họ tên)</div>
-                    <div style={{ height: '44px' }} />
+                    <div style={{ minHeight: '62px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0.35rem 0' }}>
+                      <div style={{
+                        border: '1.5px dashed #2563eb',
+                        borderRadius: '6px',
+                        backgroundColor: '#eff6ff',
+                        padding: '0.3rem 0.5rem',
+                        maxWidth: '185px',
+                        width: '100%',
+                        boxSizing: 'border-box'
+                      }}>
+                        <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#1d4ed8', letterSpacing: '0.3px' }}>
+                          ✓ ĐÃ KÝ SỐ
+                        </div>
+                        <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#0f172a', marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {user?.fullname || user?.name || user?.code || 'Nhân Viên Mua Hàng'}
+                        </div>
+                        <div style={{ fontSize: '0.62rem', color: '#64748b', marginTop: '1px' }}>
+                          {formatDate(new Date())}
+                        </div>
+                      </div>
+                    </div>
                     <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#0f172a' }}>{user?.fullname || user?.name || user?.code || 'Nhân Viên Mua Hàng'}</div>
                   </div>
                   <div>
                     <strong style={{ fontSize: '0.76rem', color: '#0f172a' }}>TRƯỞNG PHÒNG MUA HÀNG</strong>
                     <div style={{ fontSize: '0.68rem', color: '#94a3b8', marginTop: '0.2rem' }}>(Ký, ghi rõ họ tên)</div>
-                    <div style={{ height: '44px' }} />
-                    <div style={{ fontSize: '0.76rem', color: '#94a3b8', fontStyle: 'italic' }}>Chờ ký duyệt</div>
+                    <div style={{ minHeight: '62px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0.35rem 0' }}>
+                      <div style={{
+                        border: '1.5px dashed #059669',
+                        borderRadius: '6px',
+                        backgroundColor: '#ecfdf5',
+                        padding: '0.3rem 0.5rem',
+                        maxWidth: '185px',
+                        width: '100%',
+                        boxSizing: 'border-box'
+                      }}>
+                        <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#047857', letterSpacing: '0.3px' }}>
+                          ✓ ĐÃ KÝ SỐ
+                        </div>
+                        <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#0f172a', marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          Phòng Mua Hàng AetherPC
+                        </div>
+                        <div style={{ fontSize: '0.62rem', color: '#64748b', marginTop: '1px' }}>
+                          {formatDate(new Date())}
+                        </div>
+                      </div>
+                    </div>
+                    <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#0f172a' }}>Phòng Mua Hàng AetherPC</div>
                   </div>
                   <div>
                     <strong style={{ fontSize: '0.76rem', color: '#0f172a' }}>GIÁM ĐỐC DUYỆT</strong>
-                    <div style={{ fontSize: '0.68rem', color: '#94a3b8', marginTop: '0.2rem' }}>(Ký, ghi rõ họ tên)</div>
-                    <div style={{ height: '44px' }} />
-                    <div style={{ fontSize: '0.76rem', color: '#94a3b8', fontStyle: 'italic' }}>Chờ phê duyệt</div>
+                    <div style={{ fontSize: '0.68rem', color: '#94a3b8', marginTop: '0.2rem' }}>(Ký, đóng dấu)</div>
+                    <div style={{ minHeight: '62px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0.35rem 0' }}>
+                      <div style={{
+                        border: '1px dashed #cbd5e1',
+                        borderRadius: '6px',
+                        backgroundColor: '#f8fafc',
+                        padding: '0.35rem 0.5rem',
+                        maxWidth: '185px',
+                        width: '100%',
+                        boxSizing: 'border-box'
+                      }}>
+                        <div style={{ fontSize: '0.68rem', color: '#94a3b8', fontStyle: 'italic' }}>
+                          (Chưa ký duyệt)
+                        </div>
+                        <div style={{ fontSize: '0.62rem', color: '#cbd5e1', marginTop: '2px' }}>
+                          Chờ Giám Đốc ký số
+                        </div>
+                      </div>
+                    </div>
+                    <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#0f172a' }}>Ban Giám Đốc</div>
                   </div>
                 </div>
               </div>
@@ -5145,6 +5202,12 @@ export default function Purchasing() {
         const supplierInfo = printPOTarget.supplier || {};
         const isCeoApproved = ['PO', 'CONFIRMED_BY_SUPPLIER', 'QA', 'QA_PASSED', 'QA_PARTIAL', 'QA_REJECTED', 'RECEIVED', 'DONE', 'COMPLETED'].includes(printPOTarget.status);
         const isPendingCeo = printPOTarget.status === 'QUOTED_PENDING_CEO';
+        const ceoApprovalEntry = (printPOTarget.statusHistory || []).find(h => ['PO', 'APPROVED'].includes(h.status));
+        const ceoSignerName = ceoApprovalEntry?.changedBy || 'Ban Giám Đốc AetherPC';
+        const ceoSignDate = ceoApprovalEntry?.timestamp ? formatDate(ceoApprovalEntry.timestamp) : formatDate(printPOTarget.updatedAt || new Date());
+        const creatorSignerName = printPOTarget.buyerName || user?.fullname || user?.name || user?.code || 'Nhân Viên Mua Hàng';
+        const creatorSignDate = formatDate(printPOTarget.createdAt || new Date());
+        const purchasingManagerDate = formatDate(printPOTarget.createdAt || new Date());
         return (
           <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(6px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '1.5rem' }}>
             <style>{`
@@ -5170,7 +5233,7 @@ export default function Purchasing() {
                     <p style={{ margin: '0.3rem 0 0', fontSize: '0.8rem', color: '#64748b' }}>
                       Số PO: <strong style={{ color: '#0f172a' }}>{printPOTarget.poNumber || formatPurchaseReference(printPOTarget)}</strong>
                       {' • '}Ngày lập: <strong style={{ color: '#0f172a' }}>{formatDate(printPOTarget.createdAt || new Date())}</strong>
-                      {' • '}Người lập: <strong style={{ color: '#0f172a' }}>{printPOTarget.buyerName || user?.fullname || user?.name || user?.code || 'Nhân Viên Mua Hàng'}</strong>
+                      {' • '}Người lập: <strong style={{ color: '#0f172a' }}>{creatorSignerName}</strong>
                     </p>
                   </div>
                   <button onClick={() => setPrintPOTarget(null)} className="aetherpc-no-print" style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#475569', cursor: 'pointer', padding: '0.4rem', borderRadius: '6px', display: 'flex' }}>
@@ -5269,25 +5332,106 @@ export default function Purchasing() {
                   </div>
                 </div>
 
-                {/* Chữ ký 3 bên — cân đối 3 cột */}
+                {/* Chữ ký 3 bên — Chữ ký số theo tiến trình duyệt */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem', textAlign: 'center', marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px dashed #cbd5e1' }}>
                   <div>
                     <strong style={{ fontSize: '0.76rem', color: '#0f172a' }}>NGƯỜI LẬP PHIẾU</strong>
                     <div style={{ fontSize: '0.68rem', color: '#94a3b8', marginTop: '0.2rem' }}>(Ký, ghi rõ họ tên)</div>
-                    <div style={{ height: '48px' }} />
-                    <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#0f172a' }}>{printPOTarget.buyerName || user?.fullname || user?.name || user?.code || 'Nhân Viên Mua Hàng'}</div>
+                    <div style={{ minHeight: '62px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0.35rem 0' }}>
+                      <div style={{
+                        border: '1.5px dashed #2563eb',
+                        borderRadius: '6px',
+                        backgroundColor: '#eff6ff',
+                        padding: '0.3rem 0.5rem',
+                        maxWidth: '185px',
+                        width: '100%',
+                        boxSizing: 'border-box'
+                      }}>
+                        <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#1d4ed8', letterSpacing: '0.3px' }}>
+                          ✓ ĐÃ KÝ SỐ
+                        </div>
+                        <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#0f172a', marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {creatorSignerName}
+                        </div>
+                        <div style={{ fontSize: '0.62rem', color: '#64748b', marginTop: '1px' }}>
+                          {creatorSignDate}
+                        </div>
+                      </div>
+                    </div>
+                    <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#0f172a' }}>{creatorSignerName}</div>
                   </div>
+
                   <div>
                     <strong style={{ fontSize: '0.76rem', color: '#0f172a' }}>TRƯỞNG PHÒNG MUA HÀNG</strong>
                     <div style={{ fontSize: '0.68rem', color: '#94a3b8', marginTop: '0.2rem' }}>(Ký, ghi rõ họ tên)</div>
-                    <div style={{ height: '48px' }} />
+                    <div style={{ minHeight: '62px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0.35rem 0' }}>
+                      <div style={{
+                        border: '1.5px dashed #059669',
+                        borderRadius: '6px',
+                        backgroundColor: '#ecfdf5',
+                        padding: '0.3rem 0.5rem',
+                        maxWidth: '185px',
+                        width: '100%',
+                        boxSizing: 'border-box'
+                      }}>
+                        <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#047857', letterSpacing: '0.3px' }}>
+                          ✓ ĐÃ KÝ SỐ
+                        </div>
+                        <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#0f172a', marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          Phòng Mua Hàng AetherPC
+                        </div>
+                        <div style={{ fontSize: '0.62rem', color: '#64748b', marginTop: '1px' }}>
+                          {purchasingManagerDate}
+                        </div>
+                      </div>
+                    </div>
                     <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#0f172a' }}>Phòng Mua Hàng AetherPC</div>
                   </div>
+
                   <div>
                     <strong style={{ fontSize: '0.76rem', color: '#0f172a' }}>GIÁM ĐỐC DUYỆT</strong>
                     <div style={{ fontSize: '0.68rem', color: '#94a3b8', marginTop: '0.2rem' }}>(Ký, đóng dấu)</div>
-                    <div style={{ height: '48px' }} />
-                    <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#0f172a' }}>Ban Giám Đốc</div>
+                    <div style={{ minHeight: '62px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0.35rem 0' }}>
+                      {isCeoApproved ? (
+                        <div style={{
+                          border: '1.5px dashed #dc2626',
+                          borderRadius: '6px',
+                          backgroundColor: '#fef2f2',
+                          padding: '0.3rem 0.5rem',
+                          maxWidth: '185px',
+                          width: '100%',
+                          boxSizing: 'border-box'
+                        }}>
+                          <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#b91c1c', letterSpacing: '0.3px' }}>
+                            ✓ ĐÃ KÝ SỐ (PHÊ DUYỆT)
+                          </div>
+                          <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#0f172a', marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {ceoSignerName}
+                          </div>
+                          <div style={{ fontSize: '0.62rem', color: '#64748b', marginTop: '1px' }}>
+                            {ceoSignDate}
+                          </div>
+                        </div>
+                      ) : (
+                        <div style={{
+                          border: '1px dashed #cbd5e1',
+                          borderRadius: '6px',
+                          backgroundColor: '#f8fafc',
+                          padding: '0.35rem 0.5rem',
+                          maxWidth: '185px',
+                          width: '100%',
+                          boxSizing: 'border-box'
+                        }}>
+                          <div style={{ fontSize: '0.68rem', color: '#94a3b8', fontStyle: 'italic' }}>
+                            (Chưa ký duyệt)
+                          </div>
+                          <div style={{ fontSize: '0.62rem', color: '#cbd5e1', marginTop: '2px' }}>
+                            Chờ Giám Đốc ký số
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#0f172a' }}>{isCeoApproved ? ceoSignerName : 'Ban Giám Đốc'}</div>
                   </div>
                 </div>
               </div>
