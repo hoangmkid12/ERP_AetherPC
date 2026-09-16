@@ -579,7 +579,7 @@ export default function SupplierPortal() {
     .reduce((sum, po) => sum + getPoPaidAmount(po), 0);
 
   const pendingRevenue = myPOs
-    .filter(po => AWAITING_PAYMENT_STATUSES.includes(po.status))
+    .filter(po => AWAITING_PAYMENT_STATUSES.includes(po.status) && po.status !== 'CONVERTED')
     .reduce((sum, po) => sum + Math.max(0, getPoBilledAmount(po) - getPoPaidAmount(po)), 0);
 
   // "Đơn Hàng Đã Cung Cấp" = orders the supplier has actually shipped — 'PO' alone
@@ -587,8 +587,16 @@ export default function SupplierPortal() {
   const fulfilledCount = myPOs.filter(po => SUPPLIED_STATUSES.includes(po.status)).length;
 
   const totalQuotedVal = myPOs
-    .filter(po => ['QUOTED', ...AWAITING_PAYMENT_STATUSES, 'DONE'].includes(po.status))
+    .filter(po => ['QUOTED', ...AWAITING_PAYMENT_STATUSES, 'DONE'].includes(po.status) && po.status !== 'CONVERTED')
     .reduce((sum, po) => sum + getPoBilledAmount(po), 0);
+
+  // Báo Cáo Doanh Thu & Dòng Tiền: Chỉ ghi nhận các đơn PO chính thức, loại trừ RFQ đã CONVERTED
+  // để tránh việc 1 đơn hàng (AMD Ryzen 3 4100 x23) xuất hiện 2 lần gây nhầm lẫn là 2 đơn!
+  const financePOs = myPOs.filter(po => {
+    if (po.status === 'CONVERTED') return false;
+    if (['RFQ', 'RFQ_SENT', 'SENT'].includes(po.status)) return false;
+    return true;
+  });
 
   // Covers the full PO lifecycle — the old chip list only had 6 exact-match statuses
   // (RFQ_SENT/QUOTED/PO/DONE/CANCELLED) out of ~13 real ones, so any order sitting in
@@ -607,7 +615,14 @@ export default function SupplierPortal() {
 
   const filteredMyPOs = myPOs
     .filter(po => {
-      if (statusFilter === 'ALL') return true;
+      if (statusFilter === 'ALL') {
+        // Khi xem "Tất cả", nếu một RFQ đã CONVERTED sang đơn PO chính thức thì ẩn đơn RFQ trung gian này,
+        // chỉ hiển thị đơn PO chính thức đang được xử lý, tránh hiển thị song song 2 đơn (1 RFQ + 1 PO)
+        // khiến NCC hiểu nhầm là bên Mua đặt 2 lần 2 đơn giống nhau.
+        // NCC vẫn có thể tra cứu đơn RFQ cũ bất kỳ lúc nào khi chọn bộ lọc "Đã Báo Giá" (QUOTED).
+        if (po.status === 'CONVERTED') return false;
+        return true;
+      }
       const group = STATUS_FILTER_GROUPS.find(g => g.id === statusFilter);
       return group ? group.match.includes(po.status) : po.status === statusFilter;
     })
@@ -841,6 +856,16 @@ export default function SupplierPortal() {
                           <h4 style={{ fontWeight: 700, color: '#6366f1', fontSize: '0.9rem', margin: 0, fontFamily: 'monospace' }}>
                             {po.poNumber || formatPurchaseReference(po)}
                           </h4>
+                          {po.status === 'CONVERTED' && (
+                            <span style={{ fontSize: '0.72rem', color: '#16a34a', backgroundColor: '#f0fdf4', padding: '1px 7px', borderRadius: '4px', border: '1px solid #bbf7d0', fontWeight: 700 }}>
+                              ✓ Đã chuyển thành đơn PO{po.derivedPOs?.[0]?.poNumber ? `: ${po.derivedPOs[0].poNumber}` : ''}
+                            </span>
+                          )}
+                          {po.sourceRfq && (
+                            <span style={{ fontSize: '0.72rem', color: '#2563eb', backgroundColor: '#eff6ff', padding: '1px 7px', borderRadius: '4px', border: '1px solid #bfdbfe', fontWeight: 600 }}>
+                              Lập từ báo giá {po.sourceRfq.poNumber || formatPurchaseReference(po.sourceRfq)}
+                            </span>
+                          )}
                         </div>
                         <div style={{ fontSize: '0.84rem', color: '#0f172a', marginTop: '0.3rem', fontWeight: 600, lineHeight: 1.35 }}>
                           {itemNames}
@@ -1155,14 +1180,14 @@ export default function SupplierPortal() {
                 </tr>
               </thead>
               <tbody>
-                {myPOs.length === 0 ? (
+                {financePOs.length === 0 ? (
                   <tr>
                     <td colSpan="6" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.88rem' }}>
                       Chưa có lịch sử giao dịch phát sinh doanh thu.
                     </td>
                   </tr>
                 ) : (
-                  myPOs.map(po => {
+                  financePOs.map(po => {
                     const totalQty = po.items?.reduce((s, i) => s + (parseInt(i.quantity) || 1), 0) || po.quantity || 1;
                     const itemNames = po.items?.map(i => `${i.product?.name || i.name} (x${i.quantity})`).join(', ') || po.productName || 'Linh kiện';
                     const poTotal = getPoBilledAmount(po);
@@ -1342,6 +1367,25 @@ export default function SupplierPortal() {
                 <X size={18} />
               </button>
             </div>
+
+            {/* Liên kết chéo giữa RFQ và PO */}
+            {selectedPO.status === 'CONVERTED' && (
+              <div style={{ padding: '0.85rem 1rem', backgroundColor: '#f0fdf4', border: '1.5px solid #bbf7d0', borderRadius: '10px', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <CheckCircle size={20} color="#16a34a" style={{ flexShrink: 0 }} />
+                <div style={{ fontSize: '0.84rem' }}>
+                  <span style={{ color: '#15803d', fontWeight: 700 }}>Báo giá này đã được duyệt và lập thành Đơn Đặt Hàng chính thức: </span>
+                  <strong style={{ color: '#2563eb' }}>{selectedPO.derivedPOs?.[0]?.poNumber || 'Xem trong danh sách Đơn Hàng'}</strong>
+                </div>
+              </div>
+            )}
+            {selectedPO.sourceRfq && (
+              <div style={{ padding: '0.75rem 1rem', backgroundColor: '#eff6ff', border: '1.5px solid #bfdbfe', borderRadius: '10px', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <FileText size={18} color="#2563eb" style={{ flexShrink: 0 }} />
+                <div style={{ fontSize: '0.84rem', color: '#1e40af' }}>
+                  Đơn đặt hàng này được chuyển đổi từ yêu cầu báo giá gốc: <strong>{selectedPO.sourceRfq.poNumber || formatPurchaseReference(selectedPO.sourceRfq)}</strong>
+                </div>
+              </div>
+            )}
 
             {/* Ghi chú/điều khoản Phòng Mua Hàng nhập khi lập Phiếu Mua Hàng — NCC
                 cần thấy để biết yêu cầu đóng gói, thanh toán, giao hàng... */}
