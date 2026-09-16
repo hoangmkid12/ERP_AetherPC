@@ -2367,7 +2367,7 @@ export default function Purchasing() {
                   <th style={{ padding: '0.75rem 0.85rem', textAlign: 'center', whiteSpace: 'nowrap' }}>Hạn Đặt Hàng</th>
                   <th style={{ padding: '0.75rem 1rem', textAlign: 'right', whiteSpace: 'nowrap' }}>Tổng Tiền</th>
                   <th style={{ padding: '0.75rem 0.85rem', textAlign: 'center', whiteSpace: 'nowrap' }}>Trạng Thái</th>
-                  <th style={{ padding: '0.75rem 1rem', textAlign: 'right', whiteSpace: 'nowrap' }}>Hành Động</th>
+                  <th style={{ padding: '0.75rem 1rem', textAlign: 'right', width: '255px', minWidth: '255px', whiteSpace: 'nowrap' }}>Hành Động</th>
                 </tr>
               </thead>
               <tbody>
@@ -2422,7 +2422,7 @@ export default function Purchasing() {
                             {badge.text}
                           </span>
                         </td>
-                        <td style={{ padding: '0.75rem 1rem', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                        <td style={{ padding: '0.75rem 1rem', textAlign: 'right', width: '255px', minWidth: '255px', whiteSpace: 'nowrap' }}>
                           <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.4rem' }}>
                             {po.status === 'QUOTED' && isPurchasingConfirmer && (
                               <button
@@ -2437,7 +2437,7 @@ export default function Purchasing() {
                                   fontSize: '0.75rem',
                                   fontWeight: 700,
                                   cursor: 'pointer',
-                                  minWidth: '58px',
+                                  minWidth: '74px',
                                   height: '28px',
                                   display: 'inline-flex',
                                   alignItems: 'center',
@@ -4766,9 +4766,9 @@ export default function Purchasing() {
                 .aetherpc-print-only { display: block !important; }
               }
             `}</style>
-            <div className="aetherpc-po-print" style={{ width: '100%', maxWidth: '680px', maxHeight: '90vh', overflowY: 'auto', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.15)' }}>
+            <div className="aetherpc-po-print" style={{ width: '100%', maxWidth: '680px', maxHeight: '90vh', display: 'flex', flexDirection: 'column', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.15)', overflow: 'hidden' }}>
               {/* Header — trình bày như tiêu đề một chứng từ thật */}
-              <div style={{ padding: '1.5rem', borderBottom: '2px solid #0f172a' }}>
+              <div style={{ padding: '1.25rem 1.5rem', borderBottom: '2px solid #0f172a', flexShrink: 0, backgroundColor: '#ffffff' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
@@ -4785,7 +4785,7 @@ export default function Purchasing() {
                 </div>
               </div>
 
-              <div style={{ padding: '1.5rem' }}>
+              <div style={{ padding: '1.25rem 1.5rem', flex: 1, overflowY: 'auto' }}>
                 {/* Bên Mua / Bên Bán — chứng từ mua hàng thật luôn thể hiện đủ 2 bên */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.25rem' }}>
                   <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.85rem 1rem' }}>
@@ -4837,28 +4837,30 @@ export default function Purchasing() {
                   Bằng chữ: {formatCurrencyInWords(issuePOTarget.totalAmount)}.
                 </p>
 
-                {/* Thông tin bổ sung của Phiếu — form phù hợp một chứng từ mua hàng thật */}
-                <div className="aetherpc-no-print" style={{ marginBottom: '1rem' }}>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#334155', marginBottom: '0.35rem' }}>Ngày Giao Hàng Dự Kiến</label>
-                  <input
-                    type="date"
-                    value={issuePOForm.expectedDeliveryDate}
-                    onChange={(e) => setIssuePOForm(f => ({ ...f, expectedDeliveryDate: e.target.value }))}
-                    style={{ width: '100%', padding: '0.5rem 0.65rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.85rem' }}
-                  />
-                </div>
-                <div className="aetherpc-no-print" style={{ marginBottom: '0.5rem' }}>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#334155', marginBottom: '0.35rem' }}>Ghi Chú / Điều Khoản</label>
-                  <textarea
-                    value={issuePOForm.notes}
-                    onChange={(e) => setIssuePOForm(f => ({ ...f, notes: e.target.value }))}
-                    placeholder="VD: Điều khoản thanh toán, yêu cầu đóng gói, bảo hành..."
-                    rows={3}
-                    style={{ width: '100%', padding: '0.5rem 0.65rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.85rem', fontFamily: 'inherit', resize: 'vertical' }}
-                  />
+                {/* Thông tin bổ sung của Phiếu — bố trí gọn gàng, cân đối */}
+                <div className="aetherpc-no-print" style={{ display: 'grid', gridTemplateColumns: 'minmax(200px, 240px) 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#334155', marginBottom: '0.35rem' }}>Ngày Giao Hàng Dự Kiến</label>
+                    <input
+                      type="date"
+                      value={issuePOForm.expectedDeliveryDate}
+                      onChange={(e) => setIssuePOForm(f => ({ ...f, expectedDeliveryDate: e.target.value }))}
+                      style={{ width: '100%', padding: '0.5rem 0.65rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.85rem', boxSizing: 'border-box' }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#334155', marginBottom: '0.35rem' }}>Ghi Chú / Điều Khoản</label>
+                    <input
+                      type="text"
+                      value={issuePOForm.notes}
+                      onChange={(e) => setIssuePOForm(f => ({ ...f, notes: e.target.value }))}
+                      placeholder="VD: Điều khoản thanh toán, đóng gói, bảo hành..."
+                      style={{ width: '100%', padding: '0.5rem 0.65rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.85rem', boxSizing: 'border-box' }}
+                    />
+                  </div>
                 </div>
 
-                {/* Bản in tĩnh của ngày giao/ghi chú — input/textarea ở trên chỉ để chỉnh sửa trên màn hình */}
+                {/* Bản in tĩnh của ngày giao/ghi chú — input ở trên chỉ để chỉnh sửa trên màn hình */}
                 <div style={{ display: 'none' }} className="aetherpc-print-only">
                   <div style={{ marginBottom: '0.5rem', fontSize: '0.85rem' }}>
                     <strong style={{ color: '#334155' }}>Ngày Giao Hàng Dự Kiến:</strong> {issuePOForm.expectedDeliveryDate ? new Date(issuePOForm.expectedDeliveryDate).toLocaleDateString('vi-VN') : '—'}
@@ -4870,47 +4872,49 @@ export default function Purchasing() {
                   )}
                 </div>
 
-                {/* Chữ ký 3 bên — bản in để trình ký/lưu hồ sơ giấy */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem', textAlign: 'center', marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px dashed #cbd5e1' }}>
+                {/* Chữ ký 3 bên — cân đối đều 3 cột */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem', textAlign: 'center', marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px dashed #cbd5e1' }}>
                   <div>
                     <strong style={{ fontSize: '0.76rem', color: '#0f172a' }}>NGƯỜI LẬP PHIẾU</strong>
                     <div style={{ fontSize: '0.68rem', color: '#94a3b8', marginTop: '0.2rem' }}>(Ký, ghi rõ họ tên)</div>
-                    <div style={{ height: '52px' }} />
-                    <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#0f172a' }}>{user?.fullname || user?.name || user?.code || ''}</div>
+                    <div style={{ height: '44px' }} />
+                    <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#0f172a' }}>{user?.fullname || user?.name || user?.code || 'Nhân Viên Mua Hàng'}</div>
                   </div>
                   <div>
                     <strong style={{ fontSize: '0.76rem', color: '#0f172a' }}>TRƯỞNG PHÒNG MUA HÀNG</strong>
                     <div style={{ fontSize: '0.68rem', color: '#94a3b8', marginTop: '0.2rem' }}>(Ký, ghi rõ họ tên)</div>
-                    <div style={{ height: '52px' }} />
+                    <div style={{ height: '44px' }} />
+                    <div style={{ fontSize: '0.76rem', color: '#94a3b8', fontStyle: 'italic' }}>Chờ ký duyệt</div>
                   </div>
                   <div>
                     <strong style={{ fontSize: '0.76rem', color: '#0f172a' }}>GIÁM ĐỐC DUYỆT</strong>
                     <div style={{ fontSize: '0.68rem', color: '#94a3b8', marginTop: '0.2rem' }}>(Ký, ghi rõ họ tên)</div>
-                    <div style={{ height: '52px' }} />
+                    <div style={{ height: '44px' }} />
+                    <div style={{ fontSize: '0.76rem', color: '#94a3b8', fontStyle: 'italic' }}>Chờ phê duyệt</div>
                   </div>
                 </div>
               </div>
 
-              <div className="aetherpc-no-print" style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem', padding: '1.25rem 1.5rem', borderTop: '1px solid #f1f5f9' }}>
+              <div className="aetherpc-no-print" style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem', padding: '1rem 1.5rem', borderTop: '1px solid #f1f5f9', flexShrink: 0, backgroundColor: '#ffffff' }}>
                 <button
                   onClick={() => setIssuePOTarget(null)}
                   disabled={issuingPO}
-                  style={{ backgroundColor: '#ffffff', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.5rem 1.1rem', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
+                  style={{ backgroundColor: '#ffffff', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.5rem 1.25rem', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
                 >
                   Hủy
                 </button>
                 <button
                   onClick={() => window.print()}
-                  style={{ backgroundColor: '#ffffff', color: '#2563eb', border: '1px solid #bfdbfe', borderRadius: '6px', padding: '0.5rem 1.1rem', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+                  style={{ backgroundColor: '#ffffff', color: '#2563eb', border: '1px solid #bfdbfe', borderRadius: '6px', padding: '0.5rem 1.25rem', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
                 >
                   <Printer size={15} /> In Phiếu
                 </button>
                 <button
                   onClick={handleIssuePO}
                   disabled={issuingPO}
-                  style={{ backgroundColor: issuingPO ? '#9ca3af' : '#2563eb', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.5rem 1.25rem', fontSize: '0.82rem', fontWeight: 800, cursor: issuingPO ? 'not-allowed' : 'pointer' }}
+                  style={{ backgroundColor: issuingPO ? '#9ca3af' : '#2563eb', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.5rem 1.5rem', fontSize: '0.82rem', fontWeight: 800, cursor: issuingPO ? 'not-allowed' : 'pointer' }}
                 >
-                  {issuingPO ? 'Đang lập phiếu...' : 'Lập Phiếu & Trình CEO Duyệt'}
+                  {issuingPO ? 'Đang xử lý...' : 'Xác Nhận'}
                 </button>
               </div>
             </div>
