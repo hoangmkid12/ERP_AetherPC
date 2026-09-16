@@ -19,7 +19,7 @@ import {
   Legend 
 } from 'chart.js';
 import { 
-  ShieldCheck, ShieldAlert, CheckCircle, XCircle, AlertTriangle, 
+  ShieldCheck, ShieldAlert, CheckCircle, CheckCircle2, XCircle, AlertTriangle, 
   Package, Search, Eye, Filter, RefreshCw, Truck, FileText, 
   Check, X, ChevronRight, Award, BarChart2, Calendar, User, Building, 
   AlertCircle, ArrowRight, Printer, CheckSquare, Layers, Clock, ThumbsUp, ThumbsDown,
