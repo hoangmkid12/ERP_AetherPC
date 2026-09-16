@@ -4832,12 +4832,53 @@ export default function Purchasing() {
         const items = issuePOTarget.items || [];
         const supplierInfo = issuePOTarget.supplier || {};
         return (
-          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(6px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '1.5rem' }}>
+          <div className="aetherpc-print-backdrop-issue" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(6px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '1.5rem' }}>
             <style>{`
+              @page {
+                size: A4 portrait;
+                margin: 8mm 10mm;
+              }
               @media print {
-                body * { visibility: hidden; }
-                .aetherpc-po-print, .aetherpc-po-print * { visibility: visible; }
-                .aetherpc-po-print { position: fixed; inset: 0; margin: 0 auto; padding: 28px; max-width: 100%; box-shadow: none !important; border: none !important; }
+                html, body {
+                  width: 100% !important;
+                  height: auto !important;
+                  margin: 0 !important;
+                  padding: 0 !important;
+                  background: #ffffff !important;
+                  overflow: visible !important;
+                  -webkit-print-color-adjust: exact !important;
+                  print-color-adjust: exact !important;
+                }
+                body * { visibility: hidden !important; }
+                .aetherpc-print-backdrop-issue {
+                  position: static !important;
+                  inset: auto !important;
+                  padding: 0 !important;
+                  margin: 0 !important;
+                  background: transparent !important;
+                  backdrop-filter: none !important;
+                  display: block !important;
+                  width: 100% !important;
+                  height: auto !important;
+                  overflow: visible !important;
+                }
+                .aetherpc-po-print, .aetherpc-po-print * { visibility: visible !important; }
+                .aetherpc-po-print {
+                  position: static !important;
+                  inset: auto !important;
+                  width: 100% !important;
+                  max-width: 100% !important;
+                  height: auto !important;
+                  max-height: none !important;
+                  overflow: visible !important;
+                  padding: 0 !important;
+                  margin: 0 auto !important;
+                  border: none !important;
+                  box-shadow: none !important;
+                  border-radius: 0 !important;
+                  page-break-after: avoid !important;
+                  page-break-inside: avoid !important;
+                }
                 .aetherpc-no-print { display: none !important; }
                 .aetherpc-print-only { display: block !important; }
               }
@@ -5037,12 +5078,6 @@ export default function Purchasing() {
                   Hủy
                 </button>
                 <button
-                  onClick={() => window.print()}
-                  style={{ backgroundColor: '#ffffff', color: '#2563eb', border: '1px solid #bfdbfe', borderRadius: '6px', padding: '0.5rem 1.25rem', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
-                >
-                  <Printer size={15} /> In Phiếu
-                </button>
-                <button
                   onClick={handleIssuePO}
                   disabled={issuingPO}
                   style={{ backgroundColor: issuingPO ? '#9ca3af' : '#2563eb', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.5rem 1.5rem', fontSize: '0.82rem', fontWeight: 800, cursor: issuingPO ? 'not-allowed' : 'pointer' }}
@@ -5075,7 +5110,7 @@ export default function Purchasing() {
               }
             `}</style>
             <div className="aetherpc-quote-print" style={{ width: '100%', maxWidth: '680px', maxHeight: '90vh', overflowY: 'auto', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.15)' }}>
-              <div style={{ padding: '1.5rem', borderBottom: '2px solid #0f172a' }}>
+              <div style={{ padding: '1.25rem 1.5rem', borderBottom: '2px solid #0f172a' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
@@ -5092,44 +5127,44 @@ export default function Purchasing() {
                 </div>
               </div>
 
-              <div style={{ padding: '1.5rem' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.25rem' }}>
-                  <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.85rem 1rem' }}>
+              <div style={{ padding: '1.25rem 1.5rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '1rem' }}>
+                  <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.75rem' }}>
                     <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#2563eb', textTransform: 'uppercase' }}>Bên Yêu Cầu Báo Giá</span>
-                    <div style={{ fontSize: '0.85rem', color: '#0f172a', fontWeight: 700, marginTop: '0.3rem' }}>Công Ty TNHH Công Nghệ AetherPC</div>
-                    <div style={{ fontSize: '0.76rem', color: '#64748b', marginTop: '0.15rem' }}>175 Nguyễn Thị Minh Khai, Quận 1, TP. HCM</div>
+                    <div style={{ fontSize: '0.85rem', color: '#0f172a', fontWeight: 700, marginTop: '0.25rem' }}>Công Ty TNHH Công Nghệ AetherPC</div>
+                    <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.1rem' }}>175 Nguyễn Thị Minh Khai, Quận 1, TP. HCM</div>
                   </div>
-                  <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.85rem 1rem' }}>
+                  <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.75rem' }}>
                     <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#b45309', textTransform: 'uppercase' }}>Nhà Cung Cấp Báo Giá</span>
-                    <div style={{ fontSize: '0.85rem', color: '#0f172a', fontWeight: 700, marginTop: '0.3rem' }}>{getSupplierName(printQuoteTarget)}</div>
-                    <div style={{ fontSize: '0.76rem', color: '#64748b', marginTop: '0.15rem' }}>
+                    <div style={{ fontSize: '0.85rem', color: '#0f172a', fontWeight: 700, marginTop: '0.25rem' }}>{getSupplierName(printQuoteTarget)}</div>
+                    <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.1rem' }}>
                       Mã NCC: {printQuoteTarget.supplierCode}
                       {supplierInfo.phone ? ` • ĐT: ${supplierInfo.phone}` : ''}
                     </div>
                     {supplierInfo.address && (
-                      <div style={{ fontSize: '0.76rem', color: '#64748b', marginTop: '0.1rem' }}>{supplierInfo.address}</div>
+                      <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.05rem' }}>{supplierInfo.address}</div>
                     )}
                   </div>
                 </div>
 
-                <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '0.5rem', fontSize: '0.82rem' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '0.4rem', fontSize: '0.8rem' }}>
                   <thead>
                     <tr style={{ borderBottom: '2px solid #0f172a' }}>
-                      <th style={{ textAlign: 'left', padding: '0.5rem 0.25rem', color: '#475569' }}>Sản Phẩm</th>
-                      <th style={{ textAlign: 'center', padding: '0.5rem 0.25rem', color: '#475569', width: '60px' }}>SL</th>
-                      <th style={{ textAlign: 'right', padding: '0.5rem 0.25rem', color: '#475569', width: '110px' }}>Đơn Giá NCC Báo</th>
-                      <th style={{ textAlign: 'right', padding: '0.5rem 0.25rem', color: '#475569', width: '120px' }}>Thành Tiền</th>
+                      <th style={{ textAlign: 'left', padding: '0.4rem 0.25rem', color: '#475569' }}>Sản Phẩm</th>
+                      <th style={{ textAlign: 'center', padding: '0.4rem 0.25rem', color: '#475569', width: '60px' }}>SL</th>
+                      <th style={{ textAlign: 'right', padding: '0.4rem 0.25rem', color: '#475569', width: '110px' }}>Đơn Giá NCC Báo</th>
+                      <th style={{ textAlign: 'right', padding: '0.4rem 0.25rem', color: '#475569', width: '120px' }}>Thành Tiền</th>
                     </tr>
                   </thead>
                   <tbody>
                     {items.map(it => (
                       <tr key={it.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ padding: '0.5rem 0.25rem', color: '#0f172a' }}>{it.product?.name || it.productId}</td>
-                        <td style={{ padding: '0.5rem 0.25rem', textAlign: 'center', color: '#475569' }}>{it.quantity}</td>
-                        <td style={{ padding: '0.5rem 0.25rem', textAlign: 'right', color: '#475569' }}>
+                        <td style={{ padding: '0.4rem 0.25rem', color: '#0f172a' }}>{it.product?.name || it.productId}</td>
+                        <td style={{ padding: '0.4rem 0.25rem', textAlign: 'center', color: '#475569' }}>{it.quantity}</td>
+                        <td style={{ padding: '0.4rem 0.25rem', textAlign: 'right', color: '#475569' }}>
                           {parseFloat(it.unitCost) > 0 ? formatCurrency(it.unitCost) : <span style={{ fontStyle: 'italic', color: '#94a3b8' }}>Chưa báo giá</span>}
                         </td>
-                        <td style={{ padding: '0.5rem 0.25rem', textAlign: 'right', color: '#0f172a', fontWeight: 700 }}>
+                        <td style={{ padding: '0.4rem 0.25rem', textAlign: 'right', color: '#0f172a', fontWeight: 700 }}>
                           {parseFloat(it.unitCost) > 0 ? formatCurrency(it.totalCost) : '—'}
                         </td>
                       </tr>
@@ -5137,18 +5172,18 @@ export default function Purchasing() {
                   </tbody>
                   <tfoot>
                     <tr>
-                      <td colSpan={3} style={{ padding: '0.6rem 0.25rem', textAlign: 'right', fontWeight: 700, color: '#475569' }}>Tổng Cộng:</td>
-                      <td style={{ padding: '0.6rem 0.25rem', textAlign: 'right', fontWeight: 800, fontSize: '0.95rem', color: '#16a34a' }}>{formatCurrency(printQuoteTarget.totalAmount)}</td>
+                      <td colSpan={3} style={{ padding: '0.5rem 0.25rem', textAlign: 'right', fontWeight: 700, color: '#475569' }}>Tổng Cộng:</td>
+                      <td style={{ padding: '0.5rem 0.25rem', textAlign: 'right', fontWeight: 800, fontSize: '0.92rem', color: '#16a34a' }}>{formatCurrency(printQuoteTarget.totalAmount)}</td>
                     </tr>
                   </tfoot>
                 </table>
                 {parseFloat(printQuoteTarget.totalAmount) > 0 && (
-                  <p style={{ fontSize: '0.78rem', color: '#64748b', fontStyle: 'italic', margin: '0 0 1rem' }}>
+                  <p style={{ fontSize: '0.76rem', color: '#64748b', fontStyle: 'italic', margin: '0 0 0.75rem' }}>
                     Bằng chữ: {formatCurrencyInWords(printQuoteTarget.totalAmount)}.
                   </p>
                 )}
 
-                <div style={{ marginBottom: '1.5rem', fontSize: '0.85rem' }}>
+                <div style={{ marginBottom: '1rem', fontSize: '0.82rem' }}>
                   <span style={{ color: '#64748b' }}>Trạng thái:</span> <strong style={{ color: '#0f172a' }}>{statusLabel}</strong>
                   {printQuoteTarget.expectedDeliveryDate && (
                     <span style={{ color: '#64748b' }}> — Ngày giao dự kiến: <strong style={{ color: '#0f172a' }}>{formatDate(printQuoteTarget.expectedDeliveryDate)}</strong></span>
@@ -5156,28 +5191,28 @@ export default function Purchasing() {
                 </div>
 
                 {/* Chữ ký 3 bên — bản in để trình ký/lưu hồ sơ giấy */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem', textAlign: 'center', marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px dashed #cbd5e1' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem', textAlign: 'center', marginTop: '1rem', paddingTop: '0.75rem', borderTop: '1px dashed #cbd5e1' }}>
                   <div>
-                    <strong style={{ fontSize: '0.76rem', color: '#0f172a' }}>NGƯỜI LẬP YÊU CẦU</strong>
-                    <div style={{ fontSize: '0.68rem', color: '#94a3b8', marginTop: '0.2rem' }}>(Ký, ghi rõ họ tên)</div>
-                    <div style={{ height: '52px' }} />
-                    <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#0f172a' }}>{printQuoteTarget.createdBy || ''}</div>
+                    <strong style={{ fontSize: '0.74rem', color: '#0f172a' }}>NGƯỜI LẬP YÊU CẦU</strong>
+                    <div style={{ fontSize: '0.66rem', color: '#94a3b8', marginTop: '0.15rem' }}>(Ký, ghi rõ họ tên)</div>
+                    <div style={{ height: '48px' }} />
+                    <div style={{ fontSize: '0.76rem', fontWeight: 700, color: '#0f172a' }}>{printQuoteTarget.createdBy || ''}</div>
                   </div>
                   <div>
-                    <strong style={{ fontSize: '0.76rem', color: '#0f172a' }}>NHÀ CUNG CẤP BÁO GIÁ & XÁC NHẬN</strong>
-                    <div style={{ fontSize: '0.68rem', color: '#94a3b8', marginTop: '0.2rem' }}>(Ký, đóng dấu)</div>
-                    <div style={{ height: '52px' }} />
-                    <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#0f172a' }}>{getSupplierName(printQuoteTarget)}</div>
+                    <strong style={{ fontSize: '0.74rem', color: '#0f172a' }}>NHÀ CUNG CẤP BÁO GIÁ & XÁC NHẬN</strong>
+                    <div style={{ fontSize: '0.66rem', color: '#94a3b8', marginTop: '0.15rem' }}>(Ký, đóng dấu)</div>
+                    <div style={{ height: '48px' }} />
+                    <div style={{ fontSize: '0.76rem', fontWeight: 700, color: '#0f172a' }}>{getSupplierName(printQuoteTarget)}</div>
                   </div>
                   <div>
-                    <strong style={{ fontSize: '0.76rem', color: '#0f172a' }}>TRƯỞNG PHÒNG MUA HÀNG DUYỆT</strong>
-                    <div style={{ fontSize: '0.68rem', color: '#94a3b8', marginTop: '0.2rem' }}>(Ký, ghi rõ họ tên)</div>
-                    <div style={{ height: '52px' }} />
+                    <strong style={{ fontSize: '0.74rem', color: '#0f172a' }}>TRƯỞNG PHÒNG MUA HÀNG DUYỆT</strong>
+                    <div style={{ fontSize: '0.66rem', color: '#94a3b8', marginTop: '0.15rem' }}>(Ký, ghi rõ họ tên)</div>
+                    <div style={{ height: '48px' }} />
                   </div>
                 </div>
               </div>
 
-              <div className="aetherpc-no-print" style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem', padding: '1.25rem 1.5rem', borderTop: '1px solid #f1f5f9' }}>
+              <div className="aetherpc-no-print" style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem', padding: '1rem 1.5rem', borderTop: '1px solid #f1f5f9' }}>
                 <button
                   onClick={() => setPrintQuoteTarget(null)}
                   style={{ backgroundColor: '#ffffff', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.5rem 1.1rem', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
@@ -5196,7 +5231,7 @@ export default function Purchasing() {
         );
       })()}
 
-      {/* ================= PHIẾU ĐƠN MUA HÀNG (PO) — chứng từ chuẩn xem & in ================= */}
+      {/* ================= PHIẾU ĐƠN MUA HÀNG (PO) — CHỨNG TỪ CHUẨN IN VỪA KHÍT 1 TRANG A4 ================= */}
       {printPOTarget && (() => {
         const items = printPOTarget.items || [];
         const supplierInfo = printPOTarget.supplier || {};
@@ -5209,100 +5244,149 @@ export default function Purchasing() {
         const creatorSignDate = formatDate(printPOTarget.createdAt || new Date());
         const purchasingManagerDate = formatDate(printPOTarget.createdAt || new Date());
         return (
-          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(6px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '1.5rem' }}>
+          <div className="aetherpc-print-backdrop" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(6px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '1rem' }}>
             <style>{`
+              @page {
+                size: A4 portrait;
+                margin: 5mm 8mm;
+              }
               @media print {
-                body * { visibility: hidden; }
-                .aetherpc-po-doc-print, .aetherpc-po-doc-print * { visibility: visible; }
-                .aetherpc-po-doc-print { position: fixed; inset: 0; margin: 0 auto; padding: 28px; max-width: 100%; box-shadow: none !important; border: none !important; }
-                .aetherpc-no-print { display: none !important; }
-                .aetherpc-print-only { display: block !important; }
+                html, body {
+                  width: 100% !important;
+                  height: 100% !important;
+                  margin: 0 !important;
+                  padding: 0 !important;
+                  background: #ffffff !important;
+                  overflow: hidden !important;
+                  -webkit-print-color-adjust: exact !important;
+                  print-color-adjust: exact !important;
+                }
+                body * {
+                  visibility: hidden !important;
+                }
+                .aetherpc-print-backdrop {
+                  position: absolute !important;
+                  top: 0 !important;
+                  left: 0 !important;
+                  width: 100% !important;
+                  height: auto !important;
+                  padding: 0 !important;
+                  margin: 0 !important;
+                  background: transparent !important;
+                  backdrop-filter: none !important;
+                  display: block !important;
+                  overflow: visible !important;
+                }
+                .aetherpc-po-doc-print, .aetherpc-po-doc-print * {
+                  visibility: visible !important;
+                }
+                .aetherpc-po-doc-print {
+                  position: absolute !important;
+                  top: 0 !important;
+                  left: 0 !important;
+                  width: 100% !important;
+                  max-width: 100% !important;
+                  min-width: 100% !important;
+                  height: auto !important;
+                  max-height: none !important;
+                  overflow: visible !important;
+                  padding: 0 !important;
+                  margin: 0 !important;
+                  border: none !important;
+                  box-shadow: none !important;
+                  border-radius: 0 !important;
+                  page-break-after: avoid !important;
+                  page-break-inside: avoid !important;
+                }
+                .aetherpc-no-print {
+                  display: none !important;
+                }
               }
             `}</style>
-            <div className="aetherpc-po-doc-print" style={{ width: '100%', maxWidth: '720px', maxHeight: '92vh', overflowY: 'auto', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.15)' }}>
+            <div className="aetherpc-po-doc-print" style={{ width: '100%', maxWidth: '720px', maxHeight: '92vh', overflowY: 'auto', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.15)', boxSizing: 'border-box' }}>
               {/* Header chứng từ */}
-              <div style={{ padding: '1.5rem', borderBottom: '2px solid #0f172a' }}>
+              <div style={{ padding: '0.65rem 1rem 0.5rem', borderBottom: '2px solid #0f172a' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
                       CÔNG TY TNHH CÔNG NGHỆ AETHERPC — PHÒNG MUA HÀNG
                     </div>
-                    <h2 style={{ margin: '0.35rem 0 0', fontSize: '1.35rem', fontWeight: 800, color: '#0f172a' }}>
+                    <h2 style={{ margin: '0.15rem 0 0.1rem', fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.3px' }}>
                       ĐƠN ĐẶT HÀNG (PURCHASE ORDER)
                     </h2>
-                    <p style={{ margin: '0.3rem 0 0', fontSize: '0.8rem', color: '#64748b' }}>
+                    <p style={{ margin: '0', fontSize: '0.74rem', color: '#64748b', lineHeight: 1.3 }}>
                       Số PO: <strong style={{ color: '#0f172a' }}>{printPOTarget.poNumber || formatPurchaseReference(printPOTarget)}</strong>
                       {' • '}Ngày lập: <strong style={{ color: '#0f172a' }}>{formatDate(printPOTarget.createdAt || new Date())}</strong>
                       {' • '}Người lập: <strong style={{ color: '#0f172a' }}>{creatorSignerName}</strong>
                     </p>
                   </div>
-                  <button onClick={() => setPrintPOTarget(null)} className="aetherpc-no-print" style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#475569', cursor: 'pointer', padding: '0.4rem', borderRadius: '6px', display: 'flex' }}>
-                    <X size={18} />
+                  <button onClick={() => setPrintPOTarget(null)} className="aetherpc-no-print" style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#475569', cursor: 'pointer', padding: '0.35rem', borderRadius: '6px', display: 'flex' }}>
+                    <X size={16} />
                   </button>
                 </div>
               </div>
 
               {/* Nội dung chứng từ */}
-              <div style={{ padding: '1.5rem' }}>
+              <div style={{ padding: '0.65rem 1rem' }}>
                 {/* Khối Bên Mua & Bên Bán */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.25rem' }}>
-                  <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.85rem 1rem' }}>
-                    <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#2563eb', textTransform: 'uppercase' }}>Bên Mua Hàng (Bên A)</span>
-                    <div style={{ fontSize: '0.88rem', color: '#0f172a', fontWeight: 700, marginTop: '0.3rem' }}>Công Ty TNHH Công Nghệ AetherPC</div>
-                    <div style={{ fontSize: '0.76rem', color: '#64748b', marginTop: '0.2rem' }}>Địa chỉ: 175 Nguyễn Thị Minh Khai, Quận 1, TP. HCM</div>
-                    <div style={{ fontSize: '0.76rem', color: '#64748b', marginTop: '0.1rem' }}>Email: purchasing@kltn-erp.vn • Hotline: 1900 6868</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.65rem', marginBottom: '0.45rem' }}>
+                  <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '0.4rem 0.65rem', boxSizing: 'border-box' }}>
+                    <span style={{ fontSize: '0.64rem', fontWeight: 800, color: '#2563eb', textTransform: 'uppercase' }}>Bên Mua Hàng (Bên A)</span>
+                    <div style={{ fontSize: '0.78rem', color: '#0f172a', fontWeight: 700, marginTop: '0.15rem' }}>Công Ty TNHH Công Nghệ AetherPC</div>
+                    <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '0.05rem', lineHeight: 1.3 }}>Địa chỉ: 175 Nguyễn Thị Minh Khai, Quận 1, TP. HCM</div>
+                    <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '0.03rem' }}>Email: purchasing@kltn-erp.vn • Hotline: 1900 6868</div>
                   </div>
-                  <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.85rem 1rem' }}>
-                    <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#b45309', textTransform: 'uppercase' }}>Bên Bán (Bên B — Nhà Cung Cấp)</span>
-                    <div style={{ fontSize: '0.88rem', color: '#0f172a', fontWeight: 700, marginTop: '0.3rem' }}>{getSupplierName(printPOTarget)}</div>
-                    <div style={{ fontSize: '0.76rem', color: '#64748b', marginTop: '0.2rem' }}>
+                  <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '0.4rem 0.65rem', boxSizing: 'border-box' }}>
+                    <span style={{ fontSize: '0.64rem', fontWeight: 800, color: '#b45309', textTransform: 'uppercase' }}>Bên Bán (Bên B — Nhà Cung Cấp)</span>
+                    <div style={{ fontSize: '0.78rem', color: '#0f172a', fontWeight: 700, marginTop: '0.15rem' }}>{getSupplierName(printPOTarget)}</div>
+                    <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '0.05rem', lineHeight: 1.3 }}>
                       Mã NCC: {printPOTarget.supplierCode}
                       {supplierInfo.phone ? ` • ĐT: ${supplierInfo.phone}` : ''}
                     </div>
                     {supplierInfo.address && (
-                      <div style={{ fontSize: '0.76rem', color: '#64748b', marginTop: '0.1rem' }}>Địa chỉ: {supplierInfo.address}</div>
+                      <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '0.03rem', lineHeight: 1.3 }}>Địa chỉ: {supplierInfo.address}</div>
                     )}
                   </div>
                 </div>
 
-                {/* Bảng danh sách hàng hóa */}
-                <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '0.5rem', fontSize: '0.82rem' }}>
+                {/* Bảng danh sách hàng hóa — độ rộng cột rõ ràng, vừa khít lề */}
+                <table style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse', marginBottom: '0.3rem', fontSize: '0.74rem' }}>
                   <thead>
                     <tr style={{ borderBottom: '2px solid #0f172a', backgroundColor: '#f8fafc' }}>
-                      <th style={{ textAlign: 'center', padding: '0.55rem 0.35rem', color: '#475569', width: '36px' }}>STT</th>
-                      <th style={{ textAlign: 'left', padding: '0.55rem 0.5rem', color: '#475569' }}>Tên Sản Phẩm / Linh Kiện</th>
-                      <th style={{ textAlign: 'center', padding: '0.55rem 0.35rem', color: '#475569', width: '60px' }}>SL</th>
-                      <th style={{ textAlign: 'right', padding: '0.55rem 0.5rem', color: '#475569', width: '120px' }}>Đơn Giá</th>
-                      <th style={{ textAlign: 'right', padding: '0.55rem 0.5rem', color: '#475569', width: '130px' }}>Thành Tiền</th>
+                      <th style={{ textAlign: 'center', padding: '0.32rem 0.25rem', color: '#475569', width: '32px' }}>STT</th>
+                      <th style={{ textAlign: 'left', padding: '0.32rem 0.35rem', color: '#475569' }}>Tên Sản Phẩm / Linh Kiện</th>
+                      <th style={{ textAlign: 'center', padding: '0.32rem 0.25rem', color: '#475569', width: '45px' }}>SL</th>
+                      <th style={{ textAlign: 'right', padding: '0.32rem 0.35rem', color: '#475569', width: '100px' }}>Đơn Giá</th>
+                      <th style={{ textAlign: 'right', padding: '0.32rem 0.35rem', color: '#475569', width: '110px' }}>Thành Tiền</th>
                     </tr>
                   </thead>
                   <tbody>
                     {items.map((it, idx) => (
                       <tr key={it.id || idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ padding: '0.55rem 0.35rem', textAlign: 'center', color: '#64748b' }}>{idx + 1}</td>
-                        <td style={{ padding: '0.55rem 0.5rem', color: '#0f172a', fontWeight: 600 }}>{it.product?.name || it.productId}</td>
-                        <td style={{ padding: '0.55rem 0.35rem', textAlign: 'center', color: '#475569', fontWeight: 600 }}>{it.quantity}</td>
-                        <td style={{ padding: '0.55rem 0.5rem', textAlign: 'right', color: '#475569' }}>{formatCurrency(it.unitCost)}</td>
-                        <td style={{ padding: '0.55rem 0.5rem', textAlign: 'right', color: '#0f172a', fontWeight: 700 }}>{formatCurrency(it.totalCost)}</td>
+                        <td style={{ padding: '0.32rem 0.25rem', textAlign: 'center', color: '#64748b' }}>{idx + 1}</td>
+                        <td style={{ padding: '0.32rem 0.35rem', color: '#0f172a', fontWeight: 600, wordBreak: 'break-word', lineHeight: 1.3 }}>{it.product?.name || it.productId}</td>
+                        <td style={{ padding: '0.32rem 0.25rem', textAlign: 'center', color: '#475569', fontWeight: 600 }}>{it.quantity}</td>
+                        <td style={{ padding: '0.32rem 0.35rem', textAlign: 'right', color: '#475569', whiteSpace: 'nowrap' }}>{formatCurrency(it.unitCost)}</td>
+                        <td style={{ padding: '0.32rem 0.35rem', textAlign: 'right', color: '#0f172a', fontWeight: 700, whiteSpace: 'nowrap' }}>{formatCurrency(it.totalCost)}</td>
                       </tr>
                     ))}
                   </tbody>
                   <tfoot>
                     <tr style={{ borderTop: '2px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
-                      <td colSpan={4} style={{ padding: '0.65rem 0.5rem', textAlign: 'right', fontWeight: 700, color: '#334155' }}>Tổng Giá Trị Đơn Hàng (Đã gồm VAT):</td>
-                      <td style={{ padding: '0.65rem 0.5rem', textAlign: 'right', fontWeight: 800, fontSize: '0.98rem', color: '#16a34a' }}>{formatCurrency(printPOTarget.totalAmount)}</td>
+                      <td colSpan={4} style={{ padding: '0.35rem 0.35rem', textAlign: 'right', fontWeight: 700, color: '#334155' }}>Tổng Giá Trị Đơn Hàng (Đã gồm VAT):</td>
+                      <td style={{ padding: '0.35rem 0.35rem', textAlign: 'right', fontWeight: 800, fontSize: '0.88rem', color: '#16a34a', whiteSpace: 'nowrap' }}>{formatCurrency(printPOTarget.totalAmount)}</td>
                     </tr>
                   </tfoot>
                 </table>
 
                 {parseFloat(printPOTarget.totalAmount) > 0 && (
-                  <p style={{ fontSize: '0.78rem', color: '#64748b', fontStyle: 'italic', margin: '0.2rem 0 1rem' }}>
+                  <p style={{ fontSize: '0.7rem', color: '#64748b', fontStyle: 'italic', margin: '0.1rem 0 0.4rem' }}>
                     Bằng chữ: <strong style={{ color: '#334155' }}>{formatCurrencyInWords(printPOTarget.totalAmount)}</strong>.
                   </p>
                 )}
 
                 {/* Thông tin điều khoản & giao nhận */}
-                <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.75rem 1rem', marginBottom: '1.25rem', fontSize: '0.82rem', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '0.35rem 0.65rem', marginBottom: '0.45rem', fontSize: '0.72rem', display: 'flex', flexDirection: 'column', gap: '0.15rem', lineHeight: 1.35 }}>
                   <div>
                     <span style={{ color: '#64748b', fontWeight: 600 }}>Ngày giao hàng dự kiến: </span>
                     <strong style={{ color: '#0f172a' }}>
@@ -5319,9 +5403,9 @@ export default function Purchasing() {
                     <span style={{ color: '#64748b', fontWeight: 600 }}>Tình trạng phê duyệt: </span>
                     <span style={{
                       display: 'inline-block',
-                      fontSize: '0.75rem',
+                      fontSize: '0.68rem',
                       fontWeight: 700,
-                      padding: '2px 8px',
+                      padding: '1px 6px',
                       borderRadius: '4px',
                       backgroundColor: isPendingCeo ? '#fef3c7' : isCeoApproved ? '#dcfce7' : '#f1f5f9',
                       color: isPendingCeo ? '#b45309' : isCeoApproved ? '#16a34a' : '#475569',
@@ -5333,82 +5417,82 @@ export default function Purchasing() {
                 </div>
 
                 {/* Chữ ký 3 bên — Chữ ký số theo tiến trình duyệt */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem', textAlign: 'center', marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px dashed #cbd5e1' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem', textAlign: 'center', marginTop: '0.45rem', paddingTop: '0.45rem', borderTop: '1px dashed #cbd5e1' }}>
                   <div>
-                    <strong style={{ fontSize: '0.76rem', color: '#0f172a' }}>NGƯỜI LẬP PHIẾU</strong>
-                    <div style={{ fontSize: '0.68rem', color: '#94a3b8', marginTop: '0.2rem' }}>(Ký, ghi rõ họ tên)</div>
-                    <div style={{ minHeight: '62px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0.35rem 0' }}>
+                    <strong style={{ fontSize: '0.72rem', color: '#0f172a' }}>NGƯỜI LẬP PHIẾU</strong>
+                    <div style={{ fontSize: '0.62rem', color: '#94a3b8', marginTop: '0.1rem' }}>(Ký, ghi rõ họ tên)</div>
+                    <div style={{ minHeight: '46px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0.2rem 0' }}>
                       <div style={{
                         border: '1.5px dashed #2563eb',
                         borderRadius: '6px',
                         backgroundColor: '#eff6ff',
-                        padding: '0.3rem 0.5rem',
-                        maxWidth: '185px',
+                        padding: '0.2rem 0.4rem',
+                        maxWidth: '165px',
                         width: '100%',
                         boxSizing: 'border-box'
                       }}>
-                        <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#1d4ed8', letterSpacing: '0.3px' }}>
+                        <div style={{ fontSize: '0.62rem', fontWeight: 800, color: '#1d4ed8', letterSpacing: '0.2px' }}>
                           ✓ ĐÃ KÝ SỐ
                         </div>
-                        <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#0f172a', marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#0f172a', marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {creatorSignerName}
                         </div>
-                        <div style={{ fontSize: '0.62rem', color: '#64748b', marginTop: '1px' }}>
+                        <div style={{ fontSize: '0.58rem', color: '#64748b', marginTop: '1px' }}>
                           {creatorSignDate}
                         </div>
                       </div>
                     </div>
-                    <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#0f172a' }}>{creatorSignerName}</div>
+                    <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#0f172a' }}>{creatorSignerName}</div>
                   </div>
 
                   <div>
-                    <strong style={{ fontSize: '0.76rem', color: '#0f172a' }}>TRƯỞNG PHÒNG MUA HÀNG</strong>
-                    <div style={{ fontSize: '0.68rem', color: '#94a3b8', marginTop: '0.2rem' }}>(Ký, ghi rõ họ tên)</div>
-                    <div style={{ minHeight: '62px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0.35rem 0' }}>
+                    <strong style={{ fontSize: '0.72rem', color: '#0f172a' }}>TRƯỞNG PHÒNG MUA HÀNG</strong>
+                    <div style={{ fontSize: '0.62rem', color: '#94a3b8', marginTop: '0.1rem' }}>(Ký, ghi rõ họ tên)</div>
+                    <div style={{ minHeight: '46px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0.2rem 0' }}>
                       <div style={{
                         border: '1.5px dashed #059669',
                         borderRadius: '6px',
                         backgroundColor: '#ecfdf5',
-                        padding: '0.3rem 0.5rem',
-                        maxWidth: '185px',
+                        padding: '0.2rem 0.4rem',
+                        maxWidth: '165px',
                         width: '100%',
                         boxSizing: 'border-box'
                       }}>
-                        <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#047857', letterSpacing: '0.3px' }}>
+                        <div style={{ fontSize: '0.62rem', fontWeight: 800, color: '#047857', letterSpacing: '0.2px' }}>
                           ✓ ĐÃ KÝ SỐ
                         </div>
-                        <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#0f172a', marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#0f172a', marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           Phòng Mua Hàng AetherPC
                         </div>
-                        <div style={{ fontSize: '0.62rem', color: '#64748b', marginTop: '1px' }}>
+                        <div style={{ fontSize: '0.58rem', color: '#64748b', marginTop: '1px' }}>
                           {purchasingManagerDate}
                         </div>
                       </div>
                     </div>
-                    <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#0f172a' }}>Phòng Mua Hàng AetherPC</div>
+                    <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#0f172a' }}>Phòng Mua Hàng AetherPC</div>
                   </div>
 
                   <div>
-                    <strong style={{ fontSize: '0.76rem', color: '#0f172a' }}>GIÁM ĐỐC DUYỆT</strong>
-                    <div style={{ fontSize: '0.68rem', color: '#94a3b8', marginTop: '0.2rem' }}>(Ký, đóng dấu)</div>
-                    <div style={{ minHeight: '62px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0.35rem 0' }}>
+                    <strong style={{ fontSize: '0.72rem', color: '#0f172a' }}>GIÁM ĐỐC DUYỆT</strong>
+                    <div style={{ fontSize: '0.62rem', color: '#94a3b8', marginTop: '0.1rem' }}>(Ký, đóng dấu)</div>
+                    <div style={{ minHeight: '46px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0.2rem 0' }}>
                       {isCeoApproved ? (
                         <div style={{
                           border: '1.5px dashed #dc2626',
                           borderRadius: '6px',
                           backgroundColor: '#fef2f2',
-                          padding: '0.3rem 0.5rem',
-                          maxWidth: '185px',
+                          padding: '0.2rem 0.4rem',
+                          maxWidth: '165px',
                           width: '100%',
                           boxSizing: 'border-box'
                         }}>
-                          <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#b91c1c', letterSpacing: '0.3px' }}>
+                          <div style={{ fontSize: '0.62rem', fontWeight: 800, color: '#b91c1c', letterSpacing: '0.2px' }}>
                             ✓ ĐÃ KÝ SỐ (PHÊ DUYỆT)
                           </div>
-                          <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#0f172a', marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#0f172a', marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {ceoSignerName}
                           </div>
-                          <div style={{ fontSize: '0.62rem', color: '#64748b', marginTop: '1px' }}>
+                          <div style={{ fontSize: '0.58rem', color: '#64748b', marginTop: '1px' }}>
                             {ceoSignDate}
                           </div>
                         </div>
@@ -5417,36 +5501,40 @@ export default function Purchasing() {
                           border: '1px dashed #cbd5e1',
                           borderRadius: '6px',
                           backgroundColor: '#f8fafc',
-                          padding: '0.35rem 0.5rem',
-                          maxWidth: '185px',
+                          padding: '0.25rem 0.4rem',
+                          maxWidth: '165px',
                           width: '100%',
                           boxSizing: 'border-box'
                         }}>
-                          <div style={{ fontSize: '0.68rem', color: '#94a3b8', fontStyle: 'italic' }}>
+                          <div style={{ fontSize: '0.64rem', color: '#94a3b8', fontStyle: 'italic' }}>
                             (Chưa ký duyệt)
                           </div>
-                          <div style={{ fontSize: '0.62rem', color: '#cbd5e1', marginTop: '2px' }}>
+                          <div style={{ fontSize: '0.58rem', color: '#cbd5e1', marginTop: '2px' }}>
                             Chờ Giám Đốc ký số
                           </div>
                         </div>
                       )}
                     </div>
-                    <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#0f172a' }}>{isCeoApproved ? ceoSignerName : 'Ban Giám Đốc'}</div>
+                    <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#0f172a' }}>{isCeoApproved ? ceoSignerName : 'Ban Giám Đốc'}</div>
                   </div>
                 </div>
               </div>
 
               {/* Nút hành động */}
-              <div className="aetherpc-no-print" style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem', padding: '1.25rem 1.5rem', borderTop: '1px solid #f1f5f9', backgroundColor: '#ffffff' }}>
+              <div className="aetherpc-no-print" style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem', padding: '0.75rem 1rem', borderTop: '1px solid #f1f5f9', backgroundColor: '#ffffff' }}>
                 <button
                   onClick={() => setPrintPOTarget(null)}
-                  style={{ backgroundColor: '#ffffff', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.5rem 1.1rem', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
+                  style={{ backgroundColor: '#ffffff', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.45rem 1rem', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
                 >
                   Đóng
                 </button>
                 <button
-                  onClick={() => window.print()}
-                  style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.5rem 1.35rem', fontSize: '0.82rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+                  onClick={() => {
+                    const el = document.querySelector('.aetherpc-po-doc-print');
+                    if (el) el.scrollTop = 0;
+                    setTimeout(() => window.print(), 80);
+                  }}
+                  style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.45rem 1.25rem', fontSize: '0.82rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
                 >
                   <Printer size={15} /> In Phiếu PO
                 </button>
