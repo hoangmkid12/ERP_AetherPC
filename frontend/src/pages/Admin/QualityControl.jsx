@@ -3028,7 +3028,7 @@ export default function QualityControl() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <FileText size={17} style={{ color: '#2563eb' }} />
                   <span style={{ fontSize: '0.84rem', fontWeight: 800, color: '#0f172a' }}>
-                    Xem & In Biên Bản Nghiệm Thu Kỹ Thuật (A4)
+                    Xem & In Biên Bản Nghiệm Thu Kỹ Thuật
                   </span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
@@ -3036,7 +3036,7 @@ export default function QualityControl() {
                     onClick={handlePrintQCCertificate}
                     style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.45rem 0.95rem', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.35rem', boxShadow: '0 1px 3px rgba(37,99,235,0.3)' }}
                   >
-                    <Printer size={15} /> In Biên Bản (A4)
+                    <Printer size={15} /> In Biên Bản
                   </button>
                   <button
                     onClick={() => setViewingLog(null)}
@@ -3069,9 +3069,6 @@ export default function QualityControl() {
                       <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', color: '#16a34a', padding: '0.2rem 0.6rem', borderRadius: '6px', fontSize: '0.68rem', fontWeight: 800 }}>
                         <CheckCircle2 size={13} />
                         CHỨNG TỪ ERP HỢP LỆ
-                      </div>
-                      <div style={{ fontSize: '0.64rem', color: '#94a3b8', marginTop: '0.2rem' }}>
-                        Khổ in tiêu chuẩn: A4 Portrait
                       </div>
                     </div>
                   </div>
@@ -3286,17 +3283,13 @@ export default function QualityControl() {
               </div>
 
               {/* MODAL FOOTER CONTROLS (CỐ ĐỊNH Ở ĐÁY MODAL, KHÔNG IN) */}
-              <div className="aetherpc-no-print" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.7rem 1.5rem', borderTop: '1px solid #e2e8f0', backgroundColor: '#f8fafc', flexShrink: 0 }}>
-                <div style={{ fontSize: '0.75rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                  <CheckCircle2 size={15} style={{ color: '#16a34a' }} />
-                  <span>Định dạng in: <strong>Khổ A4 tiêu chuẩn (210mm x 297mm) - Tự động cân đối 1 trang</strong></span>
-                </div>
+              <div className="aetherpc-no-print" style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', padding: '0.75rem 1.5rem', borderTop: '1px solid #e2e8f0', backgroundColor: '#f8fafc', flexShrink: 0 }}>
                 <div style={{ display: 'flex', gap: '0.6rem' }}>
                   <button
                     onClick={handlePrintQCCertificate}
                     style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.5rem 1.25rem', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem', boxShadow: '0 1px 3px rgba(37,99,235,0.3)' }}
                   >
-                    <Printer size={15} /> In Biên Bản (A4)
+                    <Printer size={15} /> In Biên Bản
                   </button>
                   <button
                     onClick={() => setViewingLog(null)}
