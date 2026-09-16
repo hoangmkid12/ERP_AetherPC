@@ -10,7 +10,7 @@ import {
   Clock, X, Plus, User, Phone, Mail, Filter, Search, 
   ArrowRight, Package, Tag, Send, Eye, Star, ThumbsUp, ShieldCheck,
   TrendingUp, Award, Check, AlertTriangle, FileText, ChevronRight,
-  Zap, CheckCheck, ToggleLeft, ToggleRight
+  Zap, CheckCheck, ToggleLeft, ToggleRight, Trash2
 } from 'lucide-react';
 import { Bar, Doughnut } from 'react-chartjs-2';
 import {
@@ -218,6 +218,14 @@ export default function CustomerService() {
               if (data.sessions && data.sessions.length > 0) {
                 setLiveChatSessions(data.sessions);
               }
+              // Backend broadcast riêng deletedSessionId (không kèm sessions,
+              // xem handleWsMessage 'DELETE_SESSION' ở websocketService.js) —
+              // gỡ phiên đó khỏi danh sách cục bộ ngay, không chờ round-trip
+              // fetch lại toàn bộ danh sách.
+              if (data.deletedSessionId) {
+                setLiveChatSessions(prev => prev.filter(s => s.id !== data.deletedSessionId));
+                setActiveSessionId(prev => (prev === data.deletedSessionId ? null : prev));
+              }
             }
           } catch (e) {}
         };
@@ -251,6 +259,22 @@ export default function CustomerService() {
       wsRef.current.send(JSON.stringify({ type: 'STAFF_SEND_MSG', payload }));
     }
     if (!customTxt) setStaffInputMsg('');
+  };
+
+  // Xóa vĩnh viễn 1 phiên chat (và toàn bộ tin nhắn) — backend đã có sẵn xử lý
+  // DELETE_SESSION (websocketService.js), chỉ chưa có nút bấm nào gọi tới.
+  // Không thể khôi phục sau khi xóa (xoá cứng khỏi DB), nên bắt xác nhận trước.
+  const handleDeleteSession = (sessionId, customerName) => {
+    if (!window.confirm(`Xóa vĩnh viễn cuộc trò chuyện với "${customerName}"? Toàn bộ tin nhắn sẽ mất, không thể khôi phục.`)) {
+      return;
+    }
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: 'DELETE_SESSION', payload: { sessionId } }));
+    }
+    // Cập nhật lạc quan ngay trên UI — không chờ broadcast xác nhận quay lại,
+    // để cảm giác bấm-là-mất-ngay thay vì có độ trễ khó chịu.
+    setLiveChatSessions(prev => prev.filter(s => s.id !== sessionId));
+    setActiveSessionId(prev => (prev === sessionId ? null : prev));
   };
 
   // KPI Calculations
@@ -585,11 +609,11 @@ export default function CustomerService() {
         <div style={{ display: 'grid', gridTemplateColumns: '300px minmax(0, 1fr)', gap: '1rem', backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', height: '620px', overflow: 'hidden', boxSizing: 'border-box' }}>
           
           {/* Left: Chat Session List */}
-          <div style={{ borderRight: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+          <div style={{ borderRight: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0 }}>
             <div style={{ padding: '0.85rem 1rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
               <h3 style={{ fontSize: '0.88rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>Khách Hàng Trực Tuyến</h3>
             </div>
-            <div style={{ flex: 1, overflowY: 'auto' }}>
+            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
               {liveChatSessions.map(s => {
                 const isActive = s.id === activeSessionId;
                 return (
@@ -604,9 +628,19 @@ export default function CustomerService() {
                       borderLeft: isActive ? '3px solid #2563eb' : '3px solid transparent'
                     }}
                   >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.15rem' }}>
-                      <strong style={{ fontSize: '0.8rem', color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.customerName}</strong>
-                      <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#16a34a', flexShrink: 0, marginLeft: '0.35rem' }}></span>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.15rem', gap: '0.35rem' }}>
+                      <strong style={{ fontSize: '0.8rem', color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0 }}>{s.customerName}</strong>
+                      <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#16a34a', flexShrink: 0 }}></span>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); handleDeleteSession(s.id, s.customerName); }}
+                        title="Xóa cuộc trò chuyện này"
+                        style={{ flexShrink: 0, width: '22px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', borderRadius: '4px', backgroundColor: 'transparent', color: '#94a3b8', cursor: 'pointer' }}
+                        onMouseEnter={e => { e.currentTarget.style.backgroundColor = '#fef2f2'; e.currentTarget.style.color = '#ef4444'; }}
+                        onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = '#94a3b8'; }}
+                      >
+                        <Trash2 size={13} />
+                      </button>
                     </div>
                     <span style={{ fontSize: '0.7rem', color: '#64748b', display: 'block' }}>{s.phone}</span>
                     <p style={{ fontSize: '0.73rem', color: '#475569', margin: '0.25rem 0 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -615,22 +649,40 @@ export default function CustomerService() {
                   </div>
                 );
               })}
+              {liveChatSessions.length === 0 && (
+                <div style={{ padding: '2rem 1rem', textAlign: 'center', color: '#94a3b8', fontSize: '0.8rem' }}>
+                  Không có phiên chat nào.
+                </div>
+              )}
             </div>
           </div>
 
           {/* Right: Message Window */}
-          <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minWidth: 0, overflow: 'hidden' }}>
-            
+          <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minWidth: 0, minHeight: 0, overflow: 'hidden' }}>
+            {!activeChat ? (
+              <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontSize: '0.85rem' }}>
+                Chưa có cuộc trò chuyện nào để hiển thị.
+              </div>
+            ) : (
+              <>
             {/* Header */}
             <div style={{ padding: '0.75rem 1.25rem', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#f8fafc', flexShrink: 0 }}>
               <div>
                 <strong style={{ fontSize: '0.88rem', color: '#0f172a' }}>{activeChat.customerName}</strong>
                 <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block' }}>SĐT: {activeChat.phone} — Trạng thái: <strong style={{ color: '#16a34a' }}>Đang trực tuyến</strong></span>
               </div>
+              <button
+                type="button"
+                onClick={() => handleDeleteSession(activeChat.id, activeChat.customerName)}
+                title="Xóa cuộc trò chuyện này"
+                style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.4rem 0.7rem', border: '1px solid #fecaca', borderRadius: '6px', backgroundColor: '#fff', color: '#ef4444', fontSize: '0.74rem', fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}
+              >
+                <Trash2 size={13} /> Xóa Chat
+              </button>
             </div>
 
             {/* Messages Body */}
-            <div style={{ flex: 1, padding: '1rem 1.25rem', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.75rem', backgroundColor: '#fdfdfd' }}>
+            <div style={{ flex: 1, minHeight: 0, padding: '1rem 1.25rem', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.75rem', backgroundColor: '#fdfdfd' }}>
               {activeChat.messages.map((m, mIdx) => {
                 const isStaff = m.sender === 'staff';
                 return (
@@ -689,7 +741,8 @@ export default function CustomerService() {
                 <Send size={15} /> Gửi
               </button>
             </div>
-
+              </>
+            )}
           </div>
 
         </div>
