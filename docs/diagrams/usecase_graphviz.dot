@@ -103,12 +103,12 @@ digraph UseCaseAetherPC {
     // nhiều actor khác nhau: kiểm tra/trừ tồn kho.
     uc_tonkho   [label="Kiểm Tra & Cập\nNhật Tồn Kho"];
 
-    // 2 use case của actor tổng quát «Nhân Viên» (a18, xem GENERALIZATION
+    // 3 use case của actor tổng quát «Nhân Viên» (a18, xem GENERALIZATION
     // bên dưới) — KHÁC với uc_tonkho ở trên: đây không phải sub-flow
-    // <<include>> của actor khác, mà là 2 nghiệp vụ tự phục vụ actor
+    // <<include>> của actor khác, mà là nghiệp vụ tự phục vụ actor
     // "Nhân Viên" trực tiếp thực hiện, được MỌI vai trò nhân viên nội bộ kế
-    // thừa qua generalization. Có bằng chứng route thật, mở cho ĐỦ 13 vai
-    // trò nhân viên (không riêng ai): GET/POST /hr/leaves (hr.routes.js
+    // thừa qua generalization. Có bằng chứng route/trang thật, mở cho ĐỦ 13
+    // vai trò nhân viên (không riêng ai): GET/POST /hr/leaves (hr.routes.js
     // dòng 22/34, authMiddleware liệt kê đủ CEO/ADMIN/HR/SALES/SALES_MANAGER/
     // WAREHOUSE/WAREHOUSE_MANAGER/ASSEMBLY/ACCOUNTANT/PURCHASING/CSKH/
     // DELIVERY/QC_ROLES) và GET /hr/payrolls/mine (dòng 303, cùng danh sách
@@ -120,6 +120,16 @@ digraph UseCaseAetherPC {
     // chính mình, chủ thể thực hiện khác nhau dù cùng phân hệ HR.
     uc_xinnghi  [label="Xin Nghỉ Phép\n(Đơn Của Tôi)"];
     uc_luongtoi [label="Tra Cứu Bảng\nLương Của Tôi"];
+    // uc_xemtongquan là use case TRỪU TƯỢNG (abstract) — mỗi actor con hiện
+    // thực hoá bằng đúng trang "Tổng Quan" riêng của phân hệ mình khi đăng
+    // nhập (có thật: Warehouse.jsx, QualityControl.jsx, Delivery/index.jsx,
+    // Accountant.jsx, HRManager.jsx, Assembly.jsx, SalesPOS.jsx,
+    // CustomerService.jsx, Purchasing.jsx, SystemAdmin.jsx, Dashboard.jsx
+    // đều có tab/trang "Tổng Quan" riêng). Generalization ở actor kéo theo
+    // use case này cũng mang tính kế thừa — mỗi actor con override nội dung
+    // cụ thể, giống nguyên tắc kế thừa trong OOP, không phải 12 trang giống
+    // hệt nhau.
+    uc_xemtongquan [label="Xem Tổng Quan\nCông Việc"];
 
     // Cầu nối rank vô hình cột 3 → cột 4: cạnh include thật duy nhất nối
     // 2 cụm này (uc_xuatkho -> uc_tonkho) bị đánh dấu constraint=false
@@ -131,9 +141,9 @@ digraph UseCaseAetherPC {
     // trọng số thường — từng gặp lỗi này (nhãn «include» trôi lạc gần
     // Chấm Công/Nhà Cung Cấp do đường từ Đặt Hàng/POS phải kéo dài hết cỡ
     // xuống đáy). weight cao ép nó đứng ngay đầu stack, sát uc_grn.
-    // uc_xinnghi/uc_luongtoi dùng chung nguyên tắc này (cùng rank cột 4) để
-    // cả cụm "use case dùng chung" đứng liền nhau, không rời rạc.
-    uc_tonkho -> uc_xinnghi -> uc_luongtoi -> uc_grn [style=invis, weight=100];
+    // uc_xinnghi/uc_luongtoi/uc_xemtongquan dùng chung nguyên tắc này (cùng
+    // rank cột 4) để cả cụm "use case dùng chung" đứng liền nhau, không rời rạc.
+    uc_tonkho -> uc_xinnghi -> uc_luongtoi -> uc_xemtongquan -> uc_grn [style=invis, weight=100];
 
     // ---------- CỘT 4 — USE CASE CỦA CÁC ACTOR CỘT 5 ----------
     // Nhân Viên Kho (1 — đã gộp "Xem Lịch Sử Điều Chuyển Kho" vào GRN:
@@ -182,7 +192,7 @@ digraph UseCaseAetherPC {
 
     { rank=same;
       uc_tonkho;
-      uc_xinnghi; uc_luongtoi;
+      uc_xinnghi; uc_luongtoi; uc_xemtongquan;
       uc_grn;
       uc_xuatkho; uc_kiemke; uc_danhmucsp;
       uc_nhanlenh; uc_tiendo;
@@ -297,7 +307,7 @@ digraph UseCaseAetherPC {
   // đúng rank ngay sau cột 4 (nơi uc_xinnghi/uc_luongtoi đang đứng), tránh
   // lỗi layout đã gặp: a18 và note_nhanvien bị đẩy lên tận đầu sơ đồ do
   // không còn ràng buộc rank hợp lệ.
-  uc_xinnghi -> a18; uc_luongtoi -> a18;
+  uc_xinnghi -> a18; uc_luongtoi -> a18; uc_xemtongquan -> a18;
   // Hệ Thống Email có 3 hàm thật trong emailService.js: sendOrderConfirmationEmail
   // (order.controller.js dòng ~280, trong createOrder — backing uc_dathang),
   // sendWelcomeEmail (auth.controller.js, trong registerCustomer — backing
@@ -359,9 +369,16 @@ digraph UseCaseAetherPC {
   // che giấu thông tin, chỉ đổi cách trình bày). Danh sách 11 actor vẫn
   // đúng logic bắc cầu như bản trước: không liệt kê Quản Lý Bán Hàng/Quản
   // Lý Kho vì đã kế thừa qua Nhân Viên Bán Hàng/Nhân Viên Kho.
+  // Nội dung note rút ngắn tối đa theo yêu cầu — chỉ giữ Ý CHÍNH (ai kế
+  // thừa, kế thừa gì), bỏ trích dẫn route/code (đã có đủ ở comment phía
+  // trên khi khai báo uc_xinnghi/uc_luongtoi/uc_xemtongquan) và bỏ chú
+  // thích "bắc cầu" (đã giải thích ở 2 generalization vẽ tường minh phía
+  // trên) để note dễ đọc lướt qua trong vài giây, không cần đọc hết.
+  // Dùng "Kế Thừa" (tiếng Việt) thay "generalization" — nhất quán yêu cầu
+  // toàn bộ chữ hiển thị trên sơ đồ phải là tiếng Việt thuần.
   note_nhanvien [shape=note, style=filled, fillcolor="#fffde7", color="#999999",
     fontsize=9, fontname="Arial", margin=0.15,
-    label="«generalization»\nActor «Nhân Viên» là actor cha chung (kế thừa\ntoàn bộ 2 use case tự phục vụ ở trên) của 11 actor:\nNV Bán Hàng, NV CSKH, NV Mua Hàng, NV QC, NV Kho,\nNV Lắp Ráp, NV Giao Hàng, NV Kế Toán, NV Nhân Sự,\nQuản Trị Viên, Ban Giám Đốc. (Quản Lý Bán Hàng và\nQuản Lý Kho kế thừa bắc cầu qua NV Bán Hàng/NV Kho,\nkhông liệt kê trùng — xem 2 generalization phía trên).\nCăn cứ: cả 11 actor đều có trong danh sách role của\nGET/POST /hr/leaves và GET /hr/payrolls/mine."];
+    label="«Kế Thừa»: Nhân Viên là actor cha của toàn bộ\nnhân viên nội bộ (Bán Hàng, CSKH, Mua Hàng, QC,\nKho, Lắp Ráp, Giao Hàng, Kế Toán, Nhân Sự,\nQuản Trị Viên, Ban Giám Đốc) — mỗi vai trò có thêm\nquyền riêng ngoài 3 chức năng chung ở trên."];
   a18 -> note_nhanvien [style=dashed, arrowhead=none, constraint=false, weight=0];
 
   // NOTE thứ 2 — giải thích trực quan NGAY TRÊN sơ đồ vì sao không có use
@@ -370,9 +387,13 @@ digraph UseCaseAetherPC {
   // ghi lại thành note gắn vào ranh giới hệ thống (lhead=cluster_system) để
   // người xem ảnh render cũng biết đây là quyết định có chủ đích, không
   // phải thiếu sót.
+  // Rút ngắn tương tự note trên: bỏ thuật ngữ "Precondition"/"JWT"/«include»
+  // (giữ tiếng Việt thuần cho phần hiển thị), bỏ câu giải thích "ghi ở cột
+  // Precondition của Bảng Đặc Tả Use Case" (chi tiết học thuật này đã có ở
+  // comment .dot phía trên khai báo use case cột 3, không cần lặp lại trên note).
   note_login [shape=note, style=filled, fillcolor="#fffde7", color="#999999",
     fontsize=9, fontname="Arial", margin=0.15,
-    label="Precondition: MỌI use case trong ranh giới hệ thống\n(trừ 3 use case công khai của Khách Vãng Lai) đều yêu\ncầu actor đã Đăng Nhập Hệ Thống (xác thực JWT) thành\ncông. Không vẽ \"Đăng Nhập\" thành use case/«include» vì\nđó là điều kiện tiên quyết của gần như mọi luồng, không\nphải 1 bước con bên trong 1 use case cụ thể — ghi ở cột\nPrecondition của Bảng Đặc Tả Use Case mới đúng chuẩn UML."];
+    label="Phải đăng nhập thành công mới dùng được các\nchức năng trong hệ thống (trừ 3 chức năng công\nkhai của Khách Vãng Lai) — vì vậy không vẽ riêng\n\"Đăng Nhập\" thành 1 use case."];
   note_login -> uc_xemsp [style=dashed, arrowhead=none, constraint=false, weight=0, lhead=cluster_system];
 
   // ============================================================
