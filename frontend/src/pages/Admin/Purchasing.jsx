@@ -2357,17 +2357,17 @@ export default function Purchasing() {
           </div>
 
           {/* Orders Data Table */}
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', overflow: 'hidden' }}>
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.83rem' }}>
               <thead>
                 <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569' }}>
-                  <th style={{ padding: '0.75rem 1rem', whiteSpace: 'nowrap' }}>Tham Chiếu</th>
-                  <th style={{ padding: '0.75rem 1rem', minWidth: '220px' }}>Nhà Cung Cấp</th>
-                  <th style={{ padding: '0.75rem 0.85rem', whiteSpace: 'nowrap' }}>Bên Mua</th>
-                  <th style={{ padding: '0.75rem 0.85rem', textAlign: 'center', whiteSpace: 'nowrap' }}>Hạn Đặt Hàng</th>
-                  <th style={{ padding: '0.75rem 1rem', textAlign: 'right', whiteSpace: 'nowrap' }}>Tổng Tiền</th>
-                  <th style={{ padding: '0.75rem 0.85rem', textAlign: 'center', whiteSpace: 'nowrap' }}>Trạng Thái</th>
-                  <th style={{ padding: '0.75rem 1rem', textAlign: 'right', width: '215px', minWidth: '215px', whiteSpace: 'nowrap' }}>Hành Động</th>
+                  <th style={{ padding: '0.75rem 0.85rem', width: '135px', whiteSpace: 'nowrap' }}>Tham Chiếu</th>
+                  <th style={{ padding: '0.75rem 0.85rem', maxWidth: '170px' }}>Nhà Cung Cấp</th>
+                  <th style={{ padding: '0.75rem 0.65rem', maxWidth: '140px', whiteSpace: 'nowrap' }}>Bên Mua</th>
+                  <th style={{ padding: '0.75rem 0.5rem', textAlign: 'center', width: '95px', whiteSpace: 'nowrap' }}>Hạn Đặt Hàng</th>
+                  <th style={{ padding: '0.75rem 0.75rem', textAlign: 'right', width: '115px', whiteSpace: 'nowrap' }}>Tổng Tiền</th>
+                  <th style={{ padding: '0.75rem 0.65rem', textAlign: 'center', width: '135px', whiteSpace: 'nowrap' }}>Trạng Thái</th>
+                  <th style={{ padding: '0.75rem 0.85rem', textAlign: 'right', width: '190px', minWidth: '190px', whiteSpace: 'nowrap' }}>Hành Động</th>
                 </tr>
               </thead>
               <tbody>
@@ -2384,31 +2384,35 @@ export default function Purchasing() {
 
                     return (
                       <tr key={po.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ padding: '0.75rem 1rem', fontWeight: 700, color: '#2563eb', whiteSpace: 'nowrap' }}>
+                        <td style={{ padding: '0.75rem 0.85rem', fontWeight: 700, color: '#2563eb', whiteSpace: 'nowrap' }}>
                           {formatPurchaseReference(po)}
                         </td>
-                        <td style={{ padding: '0.75rem 1rem', fontWeight: 600, color: '#0f172a', minWidth: '220px', lineHeight: 1.4 }}>
-                          {getSupplierName(po)}
-                        </td>
-                        <td style={{ padding: '0.75rem 0.85rem', color: '#475569', whiteSpace: 'nowrap' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                            <div style={{ width: '22px', height: '22px', borderRadius: '50%', backgroundColor: '#e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.65rem', fontWeight: 700, color: '#475569' }}>
-                              {(po.createdBy || 'P')[0]?.toUpperCase()}
-                            </div>
-                            <span>{po.createdBy || 'Phòng Mua Hàng'}</span>
+                        <td style={{ padding: '0.75rem 0.85rem', fontWeight: 600, color: '#0f172a', maxWidth: '170px' }} title={getSupplierName(po)}>
+                          <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {getSupplierName(po)}
                           </div>
                         </td>
-                        <td style={{ padding: '0.75rem 0.85rem', textAlign: 'center', color: '#475569', whiteSpace: 'nowrap' }}>
+                        <td style={{ padding: '0.75rem 0.65rem', color: '#475569', maxWidth: '140px' }} title={po.createdBy || 'Phòng Mua Hàng'}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                            <div style={{ width: '20px', height: '20px', borderRadius: '50%', backgroundColor: '#e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.62rem', fontWeight: 700, color: '#475569', flexShrink: 0 }}>
+                              {(po.createdBy || 'P')[0]?.toUpperCase()}
+                            </div>
+                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '0.8rem' }}>
+                              {po.createdBy || 'Phòng Mua Hàng'}
+                            </span>
+                          </div>
+                        </td>
+                        <td style={{ padding: '0.75rem 0.5rem', textAlign: 'center', color: '#475569', whiteSpace: 'nowrap' }}>
                           {formatDate(po.expectedDeliveryDate || po.createdAt)}
                         </td>
-                        <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 700, color: isRfqPending ? '#d97706' : '#16a34a', whiteSpace: 'nowrap' }}>
+                        <td style={{ padding: '0.75rem 0.75rem', textAlign: 'right', fontWeight: 700, color: isRfqPending ? '#d97706' : '#16a34a', whiteSpace: 'nowrap' }}>
                           {isRfqPending ? (
                             <span style={{ fontStyle: 'italic', fontSize: '0.78rem' }}>Chờ NCC báo giá</span>
                           ) : (
                             formatCurrency(po.totalAmount)
                           )}
                         </td>
-                        <td style={{ padding: '0.75rem 0.85rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                        <td style={{ padding: '0.75rem 0.65rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
                           <span style={{
                             display: 'inline-block',
                             padding: '0.2rem 0.65rem',
@@ -2422,8 +2426,8 @@ export default function Purchasing() {
                             {badge.text}
                           </span>
                         </td>
-                        <td style={{ padding: '0.75rem 1rem', textAlign: 'right', width: '215px', minWidth: '215px', whiteSpace: 'nowrap' }}>
-                          <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.4rem' }}>
+                        <td style={{ padding: '0.75rem 0.85rem', textAlign: 'right', width: '190px', minWidth: '190px', whiteSpace: 'nowrap' }}>
+                          <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.35rem' }}>
                             {po.status === 'QUOTED' && isPurchasingConfirmer && (
                               <button
                                 onClick={() => handleUpdateStatus(po.id, 'PENDING_PO_DRAFT')}
@@ -2433,11 +2437,11 @@ export default function Purchasing() {
                                   color: '#ffffff',
                                   border: 'none',
                                   borderRadius: '4px',
-                                  padding: '0.3rem 0.65rem',
-                                  fontSize: '0.75rem',
+                                  padding: '0.3rem 0.5rem',
+                                  fontSize: '0.74rem',
                                   fontWeight: 700,
                                   cursor: 'pointer',
-                                  minWidth: '74px',
+                                  minWidth: '68px',
                                   height: '28px',
                                   display: 'inline-flex',
                                   alignItems: 'center',
@@ -2458,11 +2462,11 @@ export default function Purchasing() {
                                   color: '#ffffff',
                                   border: 'none',
                                   borderRadius: '4px',
-                                  padding: '0.3rem 0.65rem',
-                                  fontSize: '0.75rem',
+                                  padding: '0.3rem 0.5rem',
+                                  fontSize: '0.74rem',
                                   fontWeight: 700,
                                   cursor: 'pointer',
-                                  minWidth: '74px',
+                                  minWidth: '70px',
                                   height: '28px',
                                   display: 'inline-flex',
                                   alignItems: 'center',
@@ -2482,8 +2486,8 @@ export default function Purchasing() {
                                   color: '#ffffff',
                                   border: 'none',
                                   borderRadius: '4px',
-                                  padding: '0.3rem 0.65rem',
-                                  fontSize: '0.75rem',
+                                  padding: '0.3rem 0.5rem',
+                                  fontSize: '0.74rem',
                                   fontWeight: 700,
                                   cursor: 'pointer',
                                   minWidth: '58px',
@@ -2507,15 +2511,15 @@ export default function Purchasing() {
                                   color: '#2563eb',
                                   border: '1px solid #bfdbfe',
                                   borderRadius: '4px',
-                                  padding: '0.3rem 0.65rem',
-                                  fontSize: '0.75rem',
+                                  padding: '0.3rem 0.5rem',
+                                  fontSize: '0.74rem',
                                   fontWeight: 700,
                                   cursor: 'pointer',
                                   display: 'inline-flex',
                                   alignItems: 'center',
                                   justifyContent: 'center',
-                                  gap: '4px',
-                                  minWidth: '84px',
+                                  gap: '3px',
+                                  minWidth: '74px',
                                   height: '28px',
                                   boxSizing: 'border-box',
                                   whiteSpace: 'nowrap'
@@ -2532,8 +2536,8 @@ export default function Purchasing() {
                                 color: '#2563eb',
                                 border: '1px solid #cbd5e1',
                                 borderRadius: '4px',
-                                padding: '0.3rem',
-                                width: '32px',
+                                padding: '0',
+                                width: '28px',
                                 height: '28px',
                                 display: 'inline-flex',
                                 alignItems: 'center',
@@ -2543,7 +2547,7 @@ export default function Purchasing() {
                                 flexShrink: 0
                               }}
                             >
-                              <Eye size={15} />
+                              <Eye size={14} />
                             </button>
                           </div>
                         </td>
