@@ -2367,7 +2367,7 @@ export default function Purchasing() {
                   <th style={{ padding: '0.75rem 0.5rem', textAlign: 'center', width: '95px', whiteSpace: 'nowrap' }}>Hạn Đặt Hàng</th>
                   <th style={{ padding: '0.75rem 0.75rem', textAlign: 'right', width: '115px', whiteSpace: 'nowrap' }}>Tổng Tiền</th>
                   <th style={{ padding: '0.75rem 0.65rem', textAlign: 'center', width: '135px', whiteSpace: 'nowrap' }}>Trạng Thái</th>
-                  <th style={{ padding: '0.75rem 0.85rem', textAlign: 'right', width: '190px', minWidth: '190px', whiteSpace: 'nowrap' }}>Hành Động</th>
+                  <th style={{ padding: '0.75rem 0.85rem', textAlign: 'center', width: '190px', minWidth: '190px', whiteSpace: 'nowrap' }}>Hành Động</th>
                 </tr>
               </thead>
               <tbody>
