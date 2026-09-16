@@ -21,8 +21,10 @@ import {
 import { 
   DollarSign, ShoppingBag, AlertTriangle, Users, TrendingUp, Truck, Wrench, 
   Bell, Check, ArrowRight, Eye, X, Package, Calendar, ShieldCheck, FileText, 
-  Sparkles, CheckCircle2, XCircle, Clock, PieChart, Layers, ArrowUpRight, Award, ChevronLeft
+  Sparkles, CheckCircle2, XCircle, Clock, PieChart, Layers, ArrowUpRight, Award, ChevronLeft,
+  Printer
 } from 'lucide-react';
+import { formatCurrencyInWords } from '../../utils/numberToWords';
 import OrderDetailModal from '../../components/OrderDetailModal';
 
 // Register ChartJS modules
@@ -117,6 +119,13 @@ const formatPrice = (price) => {
   return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price || 0);
 };
 
+const formatDate = (val) => {
+  if (!val) return '';
+  const d = new Date(val);
+  if (isNaN(d.getTime())) return String(val);
+  return d.toLocaleDateString('vi-VN');
+};
+
 export default function Dashboard() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -146,6 +155,7 @@ export default function Dashboard() {
   const [loadingQuoted, setLoadingQuoted] = useState(false);
   const [selectedDetailOrder, setSelectedDetailOrder] = useState(null);
   const [selectedDetailPO, setSelectedDetailPO] = useState(null);
+  const [printPOTarget, setPrintPOTarget] = useState(null);
   const [showKPIDetailModal, setShowKPIDetailModal] = useState(false);
   const [dateFilterPeriod, setDateFilterPeriod] = useState('ALL');
   const [customStartDate, setCustomStartDate] = useState('');
@@ -296,6 +306,36 @@ export default function Dashboard() {
     }
 
     return raw || '';
+  };
+
+  // Resolve full purchase order details (items, supplier, prices) for document printing
+  const resolvePODocument = (poInput) => {
+    if (!poInput) return null;
+    const coreId = getPoCoreId(poInput);
+    const targetIdStr = String(poInput.id || poInput.poNumber || '');
+    
+    // 1. Check purchaseOrders
+    const foundPO = purchaseOrders.find(p => (coreId && getPoCoreId(p) === coreId) || String(p.id) === targetIdStr || String(p.poNumber) === targetIdStr);
+    if (foundPO && Array.isArray(foundPO.items) && foundPO.items.length > 0) {
+      return { ...foundPO, ...poInput, items: foundPO.items };
+    }
+
+    // 2. Check quotedOrders
+    const foundQuoted = quotedOrders.find(q => (coreId && getPoCoreId(q) === coreId) || String(q.id) === targetIdStr || String(q.poNumber) === targetIdStr);
+    if (foundQuoted && Array.isArray(foundQuoted.items) && foundQuoted.items.length > 0) {
+      return { ...foundQuoted, ...poInput, items: foundQuoted.items };
+    }
+
+    // 3. Check localStorage
+    try {
+      const local = JSON.parse(localStorage.getItem('erp_pos') || '[]');
+      const foundLocal = local.find(p => (coreId && getPoCoreId(p) === coreId) || String(p.id) === targetIdStr || String(p.poNumber) === targetIdStr);
+      if (foundLocal && Array.isArray(foundLocal.items) && foundLocal.items.length > 0) {
+        return { ...foundLocal, ...poInput, items: foundLocal.items };
+      }
+    } catch (_) {}
+
+    return poInput;
   };
 
   // Fetch quoted purchase orders from backend & localStorage
@@ -1598,6 +1638,12 @@ export default function Dashboard() {
               >
                 Đóng
               </button>
+              <button
+                onClick={() => setPrintPOTarget(selectedDetailPO)}
+                style={{ backgroundColor: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', borderRadius: '6px', padding: '0.5rem 1.15rem', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+              >
+                <Printer size={15} /> Xem & In Phiếu
+              </button>
               {/* Chỉ đơn còn ở giai đoạn chờ CEO duyệt báo giá mới cần nút này — một đơn
                   mở từ Lịch Sử Duyệt có thể đã đi xa hơn (PO, NCC xác nhận...), lúc đó
                   việc "duyệt lại" không còn ý nghĩa và dễ gây hiểu nhầm. */}
@@ -1725,14 +1771,33 @@ export default function Dashboard() {
                               {activeGroup.poNumber}
                             </strong> — {activeGroup.supplierName} ({activeGroup.entries.length} lượt thay đổi)
                           </div>
-                          {activeGroup.po && (
+                          <div style={{ display: 'flex', gap: '0.5rem' }}>
+                            {activeGroup.po && (
+                              <button
+                                onClick={() => { setShowApprovalHistory(false); setSelectedDetailPO(activeGroup.po); }}
+                                style={{ backgroundColor: '#ffffff', color: '#2563eb', border: '1px solid #bfdbfe', borderRadius: '4px', padding: '0.3rem 0.75rem', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer' }}
+                              >
+                                Xem Chi Tiết
+                              </button>
+                            )}
                             <button
-                              onClick={() => { setShowApprovalHistory(false); setSelectedDetailPO(activeGroup.po); }}
-                              style={{ backgroundColor: '#ffffff', color: '#2563eb', border: '1px solid #bfdbfe', borderRadius: '4px', padding: '0.3rem 0.75rem', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer' }}
+                              onClick={() => {
+                                const rawPo = activeGroup.po || {
+                                  poNumber: activeGroup.poNumber,
+                                  supplierName: activeGroup.supplierName,
+                                  status: activeGroup.latestStatus,
+                                  updatedAt: activeGroup.latestTimestamp,
+                                  createdAt: activeGroup.entries[activeGroup.entries.length - 1]?.timestamp || activeGroup.latestTimestamp,
+                                  statusHistory: activeGroup.entries,
+                                  items: []
+                                };
+                                setPrintPOTarget(resolvePODocument(rawPo));
+                              }}
+                              style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '4px', padding: '0.3rem 0.75rem', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
                             >
-                              Xem Phiếu Đơn Hàng
+                              <Printer size={13} /> In Phiếu Đơn
                             </button>
-                          )}
+                          </div>
                         </div>
                         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
                           <thead>
@@ -1781,6 +1846,7 @@ export default function Dashboard() {
                           <th style={{ padding: '0.65rem 0.75rem', textAlign: 'center' }}>Trạng Thái Hiện Tại</th>
                           <th style={{ padding: '0.65rem 0.75rem', textAlign: 'center' }}>Số Lượt Thay Đổi</th>
                           <th style={{ padding: '0.65rem 0.75rem', whiteSpace: 'nowrap' }}>Cập Nhật Gần Nhất</th>
+                          <th style={{ padding: '0.65rem 0.75rem', textAlign: 'center', width: '125px' }}>Thao Tác</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1823,6 +1889,39 @@ export default function Dashboard() {
                             </td>
                             <td style={{ padding: '0.65rem 0.75rem', whiteSpace: 'nowrap', color: '#64748b' }}>
                               {g.latestTimestamp ? new Date(g.latestTimestamp).toLocaleString('vi-VN') : ''}
+                            </td>
+                            <td style={{ padding: '0.65rem 0.75rem', textAlign: 'center' }}>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const rawPo = g.po || {
+                                    poNumber: g.poNumber,
+                                    supplierName: g.supplierName,
+                                    status: g.latestStatus,
+                                    updatedAt: g.latestTimestamp,
+                                    createdAt: g.entries[g.entries.length - 1]?.timestamp || g.latestTimestamp,
+                                    statusHistory: g.entries,
+                                    items: []
+                                  };
+                                  setPrintPOTarget(resolvePODocument(rawPo));
+                                }}
+                                title="Xem và in phiếu đơn hàng"
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '0.35rem',
+                                  backgroundColor: '#eff6ff',
+                                  color: '#2563eb',
+                                  border: '1px solid #bfdbfe',
+                                  borderRadius: '5px',
+                                  padding: '0.3rem 0.65rem',
+                                  fontSize: '0.74rem',
+                                  fontWeight: 700,
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                <Printer size={13} /> In Phiếu
+                              </button>
                             </td>
                           </tr>
                         ))}
@@ -1916,6 +2015,364 @@ export default function Dashboard() {
           onClose={() => setSelectedDetailOrder(null)}
         />
       )}
+
+      {/* ================= MODAL XEM & IN PHIẾU ĐƠN MUA HÀNG (PO/RFQ) — CHUẨN IN A4 ================= */}
+      {printPOTarget && (() => {
+        const items = (printPOTarget.items && printPOTarget.items.length > 0)
+          ? printPOTarget.items
+          : [{
+              name: printPOTarget.productName || printPOTarget.name || 'Linh Kiện Máy Tính',
+              quantity: printPOTarget.quantity || 1,
+              unitCost: printPOTarget.unitCost || printPOTarget.unitPrice || (printPOTarget.totalAmount ? Math.round(printPOTarget.totalAmount / (printPOTarget.quantity || 1)) : 0),
+              totalCost: printPOTarget.totalCost || printPOTarget.totalAmount || 0
+            }];
+        const supplierInfo = printPOTarget.supplier || {};
+        const isCeoApproved = ['PO', 'CONFIRMED_BY_SUPPLIER', 'QA', 'QA_PASSED', 'QA_PARTIAL', 'QA_REJECTED', 'RECEIVED', 'DONE', 'COMPLETED'].includes(printPOTarget.status);
+        const isPendingCeo = ['QUOTED_PENDING_CEO', 'AWAITING_CEO_APPROVAL'].includes(printPOTarget.status);
+        const ceoApprovalEntry = (printPOTarget.statusHistory || []).find(h => ['PO', 'APPROVED'].includes(h.status));
+        const ceoSignerName = ceoApprovalEntry?.changedBy || 'Ban Giám Đốc AetherPC';
+        const ceoSignDate = ceoApprovalEntry?.timestamp ? formatDate(ceoApprovalEntry.timestamp) : formatDate(printPOTarget.updatedAt || new Date());
+        const creatorSignerName = printPOTarget.buyerName || printPOTarget.createdBy || 'Nhân Viên Mua Hàng';
+        const creatorSignDate = formatDate(printPOTarget.createdAt || new Date());
+        const purchasingManagerDate = formatDate(printPOTarget.createdAt || new Date());
+
+        const handlePrintPODocument = () => {
+          const printableArea = document.getElementById('aetherpc-dashboard-po-print');
+          if (!printableArea) {
+            window.print();
+            return;
+          }
+
+          const oldIframe = document.getElementById('aetherpc-dashboard-print-frame');
+          if (oldIframe) oldIframe.remove();
+
+          const iframe = document.createElement('iframe');
+          iframe.id = 'aetherpc-dashboard-print-frame';
+          iframe.style.position = 'fixed';
+          iframe.style.top = '-9999px';
+          iframe.style.left = '-9999px';
+          iframe.style.width = '210mm';
+          iframe.style.height = '297mm';
+          iframe.style.border = 'none';
+          document.body.appendChild(iframe);
+
+          const pri = iframe.contentWindow || iframe.contentDocument;
+          pri.document.open();
+          pri.document.write(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+              <meta charset="utf-8">
+              <title>PO_${printPOTarget.poNumber || formatPurchaseReference(printPOTarget)}</title>
+              <style>
+                @page {
+                  size: A4 portrait;
+                  margin: 8mm 12mm;
+                }
+                * {
+                  box-sizing: border-box;
+                  margin: 0;
+                  padding: 0;
+                  -webkit-print-color-adjust: exact !important;
+                  print-color-adjust: exact !important;
+                }
+                body {
+                  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+                  color: #0f172a;
+                  background: #ffffff;
+                  width: 100%;
+                  line-height: 1.35;
+                  padding: 0;
+                  margin: 0;
+                }
+                table {
+                  width: 100%;
+                  border-collapse: collapse;
+                }
+                .aetherpc-no-print {
+                  display: none !important;
+                }
+              </style>
+            </head>
+            <body>
+              ${printableArea.innerHTML}
+            </body>
+            </html>
+          `);
+          pri.document.close();
+
+          setTimeout(() => {
+            pri.focus();
+            pri.print();
+            setTimeout(() => {
+              iframe.remove();
+            }, 2000);
+          }, 250);
+        };
+
+        return (
+          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(6px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1100, padding: '1rem' }}>
+            <div style={{ width: '100%', maxWidth: '720px', maxHeight: '92vh', overflowY: 'auto', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.15)', boxSizing: 'border-box' }}>
+              
+              {/* VÙNG IN NGUYÊN BẢN — SẠCH SẼ & CÂN ĐỐI TRÊN KHỔ A4 */}
+              <div id="aetherpc-dashboard-po-print">
+                {/* Header chứng từ */}
+                <div style={{ padding: '0.75rem 1.1rem 0.55rem', borderBottom: '2px solid #0f172a' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+                        CÔNG TY TNHH CÔNG NGHỆ AETHERPC — PHÒNG MUA HÀNG
+                      </div>
+                      <h2 style={{ margin: '0.15rem 0 0.1rem', fontSize: '1.18rem', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.3px' }}>
+                        ĐƠN ĐẶT HÀNG (PURCHASE ORDER)
+                      </h2>
+                      <p style={{ margin: '0', fontSize: '0.75rem', color: '#64748b', lineHeight: 1.3 }}>
+                        Số PO: <strong style={{ color: '#0f172a' }}>{printPOTarget.poNumber || formatPurchaseReference(printPOTarget)}</strong>
+                        {' • '}Ngày lập: <strong style={{ color: '#0f172a' }}>{formatDate(printPOTarget.createdAt || new Date())}</strong>
+                        {' • '}Người lập: <strong style={{ color: '#0f172a' }}>{creatorSignerName}</strong>
+                      </p>
+                    </div>
+                    <button onClick={() => setPrintPOTarget(null)} className="aetherpc-no-print" style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#475569', cursor: 'pointer', padding: '0.35rem', borderRadius: '6px', display: 'flex' }}>
+                      <X size={16} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Nội dung chứng từ */}
+                <div style={{ padding: '0.65rem 1.1rem' }}>
+                  {/* Khối Bên Mua & Bên Bán — dùng bảng để 2 cột luôn song song tuyệt đối */}
+                  <table style={{ width: '100%', borderCollapse: 'collapse', border: 'none', marginBottom: '0.45rem' }}>
+                    <tbody>
+                      <tr>
+                        <td style={{ width: '50%', verticalAlign: 'top', paddingRight: '0.35rem' }}>
+                          <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '0.4rem 0.65rem', boxSizing: 'border-box' }}>
+                            <span style={{ fontSize: '0.64rem', fontWeight: 800, color: '#2563eb', textTransform: 'uppercase' }}>Bên Mua Hàng (Bên A)</span>
+                            <div style={{ fontSize: '0.78rem', color: '#0f172a', fontWeight: 700, marginTop: '0.15rem' }}>Công Ty TNHH Công Nghệ AetherPC</div>
+                            <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '0.05rem', lineHeight: 1.3 }}>Địa chỉ: 175 Nguyễn Thị Minh Khai, Quận 1, TP. HCM</div>
+                            <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '0.03rem' }}>Email: purchasing@kltn-erp.vn • Hotline: 1900 6868</div>
+                          </div>
+                        </td>
+                        <td style={{ width: '50%', verticalAlign: 'top', paddingLeft: '0.35rem' }}>
+                          <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '0.4rem 0.65rem', boxSizing: 'border-box' }}>
+                            <span style={{ fontSize: '0.64rem', fontWeight: 800, color: '#b45309', textTransform: 'uppercase' }}>Bên Bán (Bên B — Nhà Cung Cấp)</span>
+                            <div style={{ fontSize: '0.78rem', color: '#0f172a', fontWeight: 700, marginTop: '0.15rem' }}>{getSupplierName(printPOTarget)}</div>
+                            <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '0.05rem', lineHeight: 1.3 }}>
+                              Mã NCC: {printPOTarget.supplierCode || 'NCC-DEFAULT'}
+                              {supplierInfo.phone ? ` • ĐT: ${supplierInfo.phone}` : ''}
+                            </div>
+                            {supplierInfo.address && (
+                              <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '0.03rem', lineHeight: 1.3 }}>Địa chỉ: {supplierInfo.address}</div>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+
+                  {/* Bảng danh sách hàng hóa — độ rộng cột rõ ràng, vừa khít 100% trang A4 */}
+                  <table style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse', marginBottom: '0.3rem', fontSize: '0.74rem' }}>
+                    <thead>
+                      <tr style={{ borderBottom: '2px solid #0f172a', backgroundColor: '#f8fafc' }}>
+                        <th style={{ textAlign: 'center', padding: '0.32rem 0.25rem', color: '#475569', width: '34px' }}>STT</th>
+                        <th style={{ textAlign: 'left', padding: '0.32rem 0.35rem', color: '#475569' }}>Tên Sản Phẩm / Linh Kiện</th>
+                        <th style={{ textAlign: 'center', padding: '0.32rem 0.25rem', color: '#475569', width: '46px' }}>SL</th>
+                        <th style={{ textAlign: 'right', padding: '0.32rem 0.35rem', color: '#475569', width: '100px' }}>Đơn Giá</th>
+                        <th style={{ textAlign: 'right', padding: '0.32rem 0.35rem', color: '#475569', width: '110px' }}>Thành Tiền</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {items.map((it, idx) => {
+                        const itName = it.product?.name || it.productName || it.name || it.productId || 'Linh Kiện Máy Tính';
+                        const itQty = parseInt(it.quantity) || 1;
+                        const itUnit = Number(it.unitCost || it.unitPrice || (printPOTarget.totalAmount ? Math.round(printPOTarget.totalAmount / itQty) : 0));
+                        const itTotal = Number(it.totalCost || it.totalAmount || (itQty * itUnit) || 0);
+                        return (
+                          <tr key={it.id || idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                            <td style={{ padding: '0.32rem 0.25rem', textAlign: 'center', color: '#64748b' }}>{idx + 1}</td>
+                            <td style={{ padding: '0.32rem 0.35rem', color: '#0f172a', fontWeight: 600, wordBreak: 'break-word', lineHeight: 1.3 }}>{itName}</td>
+                            <td style={{ padding: '0.32rem 0.25rem', textAlign: 'center', color: '#475569', fontWeight: 600 }}>{itQty}</td>
+                            <td style={{ padding: '0.32rem 0.35rem', textAlign: 'right', color: '#475569', whiteSpace: 'nowrap' }}>{formatPrice(itUnit)}</td>
+                            <td style={{ padding: '0.32rem 0.35rem', textAlign: 'right', color: '#0f172a', fontWeight: 700, whiteSpace: 'nowrap' }}>{formatPrice(itTotal)}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                    <tfoot>
+                      <tr style={{ borderTop: '2px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
+                        <td colSpan={4} style={{ padding: '0.35rem 0.35rem', textAlign: 'right', fontWeight: 700, color: '#334155' }}>Tổng Giá Trị Đơn Hàng (Đã gồm VAT):</td>
+                        <td style={{ padding: '0.35rem 0.35rem', textAlign: 'right', fontWeight: 800, fontSize: '0.88rem', color: '#16a34a', whiteSpace: 'nowrap' }}>{formatPrice(printPOTarget.totalAmount)}</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+
+                  {parseFloat(printPOTarget.totalAmount) > 0 && (
+                    <p style={{ fontSize: '0.7rem', color: '#64748b', fontStyle: 'italic', margin: '0.1rem 0 0.4rem' }}>
+                      Bằng chữ: <strong style={{ color: '#334155' }}>{formatCurrencyInWords(printPOTarget.totalAmount)}</strong>.
+                    </p>
+                  )}
+
+                  {/* Thông tin điều khoản & giao nhận */}
+                  <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '0.35rem 0.65rem', marginBottom: '0.45rem', fontSize: '0.72rem', display: 'flex', flexDirection: 'column', gap: '0.15rem', lineHeight: 1.35 }}>
+                    <div>
+                      <span style={{ color: '#64748b', fontWeight: 600 }}>Ngày giao hàng dự kiến: </span>
+                      <strong style={{ color: '#0f172a' }}>
+                        {printPOTarget.expectedDeliveryDate ? formatDate(printPOTarget.expectedDeliveryDate) : 'Theo thỏa thuận đơn hàng'}
+                      </strong>
+                    </div>
+                    <div>
+                      <span style={{ color: '#64748b', fontWeight: 600 }}>Ghi chú / Điều khoản: </span>
+                      <span style={{ color: '#334155' }}>
+                        {printPOTarget.notes || 'Hàng mới 100%, bảo hành chính hãng, đầy đủ CO/CQ và hóa đơn VAT kèm theo biên bản giao nhận.'}
+                      </span>
+                    </div>
+                    <div>
+                      <span style={{ color: '#64748b', fontWeight: 600 }}>Tình trạng phê duyệt: </span>
+                      <span style={{
+                        display: 'inline-block',
+                        fontSize: '0.68rem',
+                        fontWeight: 700,
+                        padding: '1px 6px',
+                        borderRadius: '4px',
+                        backgroundColor: isPendingCeo ? '#fef3c7' : isCeoApproved ? '#dcfce7' : '#f1f5f9',
+                        color: isPendingCeo ? '#b45309' : isCeoApproved ? '#16a34a' : '#475569',
+                        border: `1px solid ${isPendingCeo ? '#fde68a' : isCeoApproved ? '#bbf7d0' : '#cbd5e1'}`
+                      }}>
+                        {isPendingCeo ? 'Chờ Giám Đốc Duyệt' : isCeoApproved ? 'Đã Phê Duyệt' : getStatusLabel(PO_STATUS, printPOTarget.status)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Chữ ký 3 bên — DÙNG TABLE 3 CỘT ĐẢM BẢO 100% LUÔN THẲNG HÀNG NGANG */}
+                  <table style={{ width: '100%', borderCollapse: 'collapse', border: 'none', marginTop: '0.45rem', borderTop: '1px dashed #cbd5e1', paddingTop: '0.45rem' }}>
+                    <tbody>
+                      <tr>
+                        {/* CỘT 1: NGƯỜI LẬP PHIẾU */}
+                        <td style={{ width: '33.33%', textAlign: 'center', verticalAlign: 'top', padding: '0.35rem 0.2rem 0' }}>
+                          <strong style={{ fontSize: '0.72rem', color: '#0f172a', display: 'block' }}>NGƯỜI LẬP PHIẾU</strong>
+                          <div style={{ fontSize: '0.62rem', color: '#94a3b8', marginTop: '0.1rem' }}>(Ký, ghi rõ họ tên)</div>
+                          <div style={{ minHeight: '46px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0.2rem auto' }}>
+                            <div style={{
+                              border: '1.5px dashed #2563eb',
+                              borderRadius: '6px',
+                              backgroundColor: '#eff6ff',
+                              padding: '0.2rem 0.4rem',
+                              width: '100%',
+                              maxWidth: '155px',
+                              boxSizing: 'border-box'
+                            }}>
+                              <div style={{ fontSize: '0.62rem', fontWeight: 800, color: '#1d4ed8', letterSpacing: '0.2px' }}>
+                                ✓ ĐÃ KÝ SỐ
+                              </div>
+                              <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#0f172a', marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {creatorSignerName}
+                              </div>
+                              <div style={{ fontSize: '0.58rem', color: '#64748b', marginTop: '1px' }}>
+                                {creatorSignDate}
+                              </div>
+                            </div>
+                          </div>
+                          <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#0f172a', marginTop: '2px' }}>{creatorSignerName}</div>
+                        </td>
+
+                        {/* CỘT 2: TRƯỞNG PHÒNG MUA HÀNG */}
+                        <td style={{ width: '33.33%', textAlign: 'center', verticalAlign: 'top', padding: '0.35rem 0.2rem 0' }}>
+                          <strong style={{ fontSize: '0.72rem', color: '#0f172a', display: 'block' }}>TRƯỞNG PHÒNG MUA HÀNG</strong>
+                          <div style={{ fontSize: '0.62rem', color: '#94a3b8', marginTop: '0.1rem' }}>(Ký, ghi rõ họ tên)</div>
+                          <div style={{ minHeight: '46px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0.2rem auto' }}>
+                            <div style={{
+                              border: '1.5px dashed #059669',
+                              borderRadius: '6px',
+                              backgroundColor: '#ecfdf5',
+                              padding: '0.2rem 0.4rem',
+                              width: '100%',
+                              maxWidth: '155px',
+                              boxSizing: 'border-box'
+                            }}>
+                              <div style={{ fontSize: '0.62rem', fontWeight: 800, color: '#047857', letterSpacing: '0.2px' }}>
+                                ✓ ĐÃ KÝ SỐ
+                              </div>
+                              <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#0f172a', marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                Phòng Mua Hàng AetherPC
+                              </div>
+                              <div style={{ fontSize: '0.58rem', color: '#64748b', marginTop: '1px' }}>
+                                {purchasingManagerDate}
+                              </div>
+                            </div>
+                          </div>
+                          <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#0f172a', marginTop: '2px' }}>Phòng Mua Hàng AetherPC</div>
+                        </td>
+
+                        {/* CỘT 3: GIÁM ĐỐC DUYỆT */}
+                        <td style={{ width: '33.33%', textAlign: 'center', verticalAlign: 'top', padding: '0.35rem 0.2rem 0' }}>
+                          <strong style={{ fontSize: '0.72rem', color: '#0f172a', display: 'block' }}>GIÁM ĐỐC DUYỆT</strong>
+                          <div style={{ fontSize: '0.62rem', color: '#94a3b8', marginTop: '0.1rem' }}>(Ký, đóng dấu)</div>
+                          <div style={{ minHeight: '46px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0.2rem auto' }}>
+                            {isCeoApproved ? (
+                              <div style={{
+                                border: '1.5px dashed #dc2626',
+                                borderRadius: '6px',
+                                backgroundColor: '#fef2f2',
+                                padding: '0.2rem 0.4rem',
+                                width: '100%',
+                                maxWidth: '155px',
+                                boxSizing: 'border-box'
+                              }}>
+                                <div style={{ fontSize: '0.62rem', fontWeight: 800, color: '#b91c1c', letterSpacing: '0.2px' }}>
+                                  ✓ ĐÃ KÝ SỐ (PHÊ DUYỆT)
+                                </div>
+                                <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#0f172a', marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {ceoSignerName}
+                                </div>
+                                <div style={{ fontSize: '0.58rem', color: '#64748b', marginTop: '1px' }}>
+                                  {ceoSignDate}
+                                </div>
+                              </div>
+                            ) : (
+                              <div style={{
+                                border: '1px dashed #cbd5e1',
+                                borderRadius: '6px',
+                                backgroundColor: '#f8fafc',
+                                padding: '0.25rem 0.4rem',
+                                width: '100%',
+                                maxWidth: '155px',
+                                boxSizing: 'border-box'
+                              }}>
+                                <div style={{ fontSize: '0.64rem', color: '#94a3b8', fontStyle: 'italic' }}>
+                                  (Chưa ký duyệt)
+                                </div>
+                                <div style={{ fontSize: '0.58rem', color: '#cbd5e1', marginTop: '2px' }}>
+                                  Chờ Giám Đốc ký số
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                          <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#0f172a', marginTop: '2px' }}>{isCeoApproved ? ceoSignerName : 'Ban Giám Đốc'}</div>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Nút hành động */}
+              <div className="aetherpc-no-print" style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem', padding: '0.75rem 1.1rem', borderTop: '1px solid #f1f5f9', backgroundColor: '#ffffff' }}>
+                <button
+                  onClick={() => setPrintPOTarget(null)}
+                  style={{ backgroundColor: '#ffffff', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.45rem 1rem', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
+                >
+                  Đóng
+                </button>
+                <button
+                  onClick={handlePrintPODocument}
+                  style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.45rem 1.25rem', fontSize: '0.82rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+                >
+                  <Printer size={15} /> In Phiếu PO
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
     </div>
   );
