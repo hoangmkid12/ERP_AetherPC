@@ -300,7 +300,7 @@ export default function Delivery() {
     o && ['READY_TO_SHIP', 'SHIPPED', 'DELIVERED', 'SHIPPING_FAILED', 'RETURNING_TO_WAREHOUSE', 'CANCELLED', 'CONFIRMED'].includes(o.status)
   );
 
-  const readyCount = myDeliveryOrders.filter(o => o.status === 'READY_TO_SHIP').length;
+  const readyCount = myDeliveryOrders.filter(o => o.status === 'READY_TO_SHIP' && isShipperMatched(o)).length;
   const activeOrdersList = myDeliveryOrders.filter(o =>
     ['SHIPPED', 'SHIPPING_FAILED', 'RETURNING_TO_WAREHOUSE', 'CANCELLED'].includes(o.status) && isShipperMatched(o)
   );
