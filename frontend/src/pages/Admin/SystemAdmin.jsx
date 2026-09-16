@@ -31,7 +31,6 @@ import {
   getRoleRelevantModules,
   OPERATIONAL_PERMISSIONS,
   DEFAULT_OPERATIONAL_MATRIX,
-  BACKEND_ENFORCED_OPERATIONS,
   getOperationalRbac,
   saveOperationalRbac
 } from '../../utils/rbacEngine';
@@ -1293,26 +1292,6 @@ export default function SystemAdmin() {
                   </button>
                 );
               })}
-            </div>
-
-            {/* Phần lớn ma trận này vẫn chỉ điều khiển việc ẨN/HIỆN menu và khoá/mở
-                nút trên giao diện — quyền gọi API cho đa số tác vụ vẫn do
-                authMiddleware() ở từng route backend quyết định độc lập, không
-                đọc ma trận này. Danh sách các tác vụ rủi ro cao ĐÃ được backend
-                thực sự kiểm tra qua bảng này (checkOperationalPermission /
-                hasOperationalPermission, xem rbac.middleware.js) được lấy trực
-                tiếp từ BACKEND_ENFORCED_OPERATIONS (rbacEngine.js) — cùng 1 cờ
-                backendEnforced cũng đánh dấu badge "Backend thực thi" trên từng
-                dòng bên dưới, nên banner này và badge không thể lệch nhau như
-                câu chữ cố định trước đây (từng ghi thiếu 2/8 tác vụ thật). Hiển
-                thị cho cả 3 khung nhìn vì áp dụng chung 1 khái niệm. */}
-            <div style={{ backgroundColor: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px', padding: '0.75rem 1rem', fontSize: '0.8rem', color: '#92400e', display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
-              <AlertTriangle size={16} style={{ flexShrink: 0, marginTop: '1px' }} />
-              <span>
-                Phần lớn đây là cấu hình <strong>hiển thị giao diện</strong> (ẩn/hiện menu, khoá nút) theo vai trò —
-                quyền gọi API cho đa số tác vụ vẫn do backend kiểm soát độc lập theo vai trò đăng nhập.
-                Riêng <strong>{BACKEND_ENFORCED_OPERATIONS.length} tác vụ rủi ro cao</strong> ({BACKEND_ENFORCED_OPERATIONS.map(op => op.name).join(', ')}) đã được backend <strong>thực sự chặn API</strong> theo đúng thiết lập ở đây — nhận biết qua nhãn <ShieldCheck size={12} style={{ display: 'inline', verticalAlign: '-2px' }} /> <strong>Backend thực thi</strong>.
-              </span>
             </div>
 
             {/* ============ KHUNG NHÌN 1: MA TRẬN TỔNG QUAN ============
