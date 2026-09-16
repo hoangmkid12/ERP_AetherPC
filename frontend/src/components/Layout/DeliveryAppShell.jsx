@@ -5,6 +5,7 @@ import { useSalesStore, useHRStore } from '../../stores';
 import { notify } from '../../context/NotificationContext';
 import { LEAVE_STATUS, getStatusInfo, getStatusLabel } from '../../utils/statusLabels';
 import useSafeViewportHeight from '../../hooks/useSafeViewportHeight';
+import { detectDeliveryRegion } from '../../utils/deliveryRegions';
 import { Home, Package, Truck, Undo2, History, Bell, LogOut, CalendarCheck, X, Send } from 'lucide-react';
 
 const TABS = [
@@ -101,18 +102,51 @@ export default function DeliveryAppShell({ children }) {
     } catch (e) {}
   };
 
-  // Badge count — exact same computation as ActorNotificationBar's
-  // `role === 'DELIVERY'` branch (my SHIPPED orders + READY_TO_SHIP at warehouse).
+  // Badge count — must match the same shipper/region matching Delivery/index.jsx
+  // uses for its "Chờ Nhận"/"Đang Giao" lists (isShipperMatched), otherwise the
+  // bottom-nav badge shows a system-wide count while the tab's real list is
+  // scoped to this shipper's region and comes up empty.
   const uName = String(user?.fullname || user?.name || '').toLowerCase();
   const uUser = String(user?.username || '').toLowerCase();
   const uPhone = String(user?.phone || '').replace(/\D/g, '');
+  const userIdStr = String(user?.id || user?.username || '').toLowerCase();
+  const shipperRegion = user?.deliveryRegion || 'HCM_KV1';
 
-  const myAssignedOrders = (orders || []).filter(o => {
-    if (!o || o.status !== 'SHIPPED') return false;
-    const s = String(o.assignedShipper || '').toLowerCase();
-    return (uName && s.includes(uName)) || (uUser && s.includes(uUser)) || (uPhone && s.includes(uPhone)) || String(o.assignedShipperId) === String(user?.id);
-  });
-  const readyAtWarehouse = (orders || []).filter(o => o && o.status === 'READY_TO_SHIP');
+  const REJECTED_ASSIGNMENTS_KEY = `aether_rejected_assignments_${userIdStr}`;
+  const getRejectedAssignmentIds = () => {
+    try {
+      return new Set(JSON.parse(localStorage.getItem(REJECTED_ASSIGNMENTS_KEY) || '[]'));
+    } catch (_) { return new Set(); }
+  };
+
+  const isShipperMatched = (o) => {
+    const shipperStr = String(o.assignedShipper || o.assignedShipperName || '').toLowerCase();
+    const assignedIdStr = String(o.assignedShipperId || o.assignedShipperUsername || '').toLowerCase();
+
+    const isDirectlyAssigned = (assignedIdStr && (
+        assignedIdStr === userIdStr ||
+        assignedIdStr === uUser ||
+        (user?.id && assignedIdStr === String(user.id).toLowerCase())
+      )) ||
+      (uName && shipperStr && shipperStr.includes(uName)) ||
+      (uUser && shipperStr && shipperStr.includes(uUser)) ||
+      (uPhone && shipperStr && shipperStr.includes(uPhone));
+
+    if (isDirectlyAssigned) return true;
+    if (o.assignedShipperId || o.assignedShipper || o.assignedShipperUsername) return false;
+
+    const orderIdStr = String(o.orderId || o.id || '');
+    if (orderIdStr && getRejectedAssignmentIds().has(orderIdStr)) return false;
+
+    if (shipperRegion === 'ALL') return true;
+    const orderRegion = o.deliveryRegion || detectDeliveryRegion(o.shippingAddress || o.address || '');
+    return orderRegion === shipperRegion;
+  };
+
+  const myAssignedOrders = (orders || []).filter(o =>
+    o && ['SHIPPED', 'SHIPPING_FAILED', 'RETURNING_TO_WAREHOUSE', 'CANCELLED'].includes(o.status) && isShipperMatched(o)
+  );
+  const readyAtWarehouse = (orders || []).filter(o => o && o.status === 'READY_TO_SHIP' && isShipperMatched(o));
   const totalDeliveryTasks = myAssignedOrders.length + readyAtWarehouse.length;
 
   // Per-tab badge counts for the bottom nav — splits the same aggregate the
