@@ -304,6 +304,11 @@ export default function SystemAdmin() {
   const [rbacMatrix, setRbacMatrix] = useState(() => getOperationalRbac());
   const [showOnlyRelevant, setShowOnlyRelevant] = useState(true);
   const [showSaveConfirmModal, setShowSaveConfirmModal] = useState(false);
+  // 3 khung nhìn của trang RBAC: Tổng Quan (ma trận so sánh mọi vai trò),
+  // Chỉnh Sửa (biên tập chi tiết theo từng vai trò — cùng logic cũ), và
+  // Lịch Sử (audit log thật đã ghi mỗi lần Lưu Phân Quyền, lọc theo module).
+  const [rbacView, setRbacView] = useState('overview');
+  const [rbacSearchQuery, setRbacSearchQuery] = useState('');
 
   // rbacMatrix/savedRbacMatrix above may have been captured before
   // loadRbacFromServer() (stores/index.js) finished its first real fetch — once
@@ -500,6 +505,7 @@ export default function SystemAdmin() {
             user: l.actorName || 'Hệ thống',
             action: l.action,
             module: l.module,
+            note: l.note || '',
             timestamp: new Date(l.createdAt).toLocaleString('vi-VN'),
             ip: l.ipAddress || '—',
             status: l.status
@@ -1216,7 +1222,7 @@ export default function SystemAdmin() {
       )}
 
       {/* ========================================================================= */}
-      {/* TAB 3: RBAC (DANH MỤC PHÂN QUYỀN THEO NGHIỆP VỤ THỰC TẾ) */}
+      {/* TAB 3: RBAC — Ma Trận Tổng Quan / Chỉnh Sửa Theo Vai Trò / Lịch Sử Thay Đổi */}
       {/* ========================================================================= */}
       {activeTab === 'rbac' && (() => {
         const currentRoleObj = ERP_ROLES.find(r => r.code === selectedRbacRole) || ERP_ROLES[0];
@@ -1228,9 +1234,12 @@ export default function SystemAdmin() {
           ? ERP_SYSTEM_MODULES.filter(m => relevantModuleIds.includes(m.id))
           : ERP_SYSTEM_MODULES;
 
+        const searchQuery = rbacSearchQuery.trim().toLowerCase();
+        const matchesSearch = (op) => !searchQuery || op.name.toLowerCase().includes(searchQuery) || op.desc.toLowerCase().includes(searchQuery);
+
         // Get operations for displayed modules
-        const displayedOperations = OPERATIONAL_PERMISSIONS.filter(op => 
-          displayedModules.some(m => m.id === op.moduleId)
+        const displayedOperations = OPERATIONAL_PERMISSIONS.filter(op =>
+          displayedModules.some(m => m.id === op.moduleId) && matchesSearch(op)
         );
 
         let activeOpsCount = 0;
@@ -1244,8 +1253,47 @@ export default function SystemAdmin() {
           return mOps.some(op => rolePerms[op.id]);
         }).length;
 
+        // Lịch sử thay đổi phân quyền — lọc thẳng từ auditLogs thật (đã ghi bởi
+        // logAudit trong updateRolePermissions, xem system.controller.js) thay vì
+        // dựng thêm bảng/API riêng chỉ để phục vụ 1 khung nhìn hiển thị.
+        const rbacAuditLogs = auditLogs.filter(l => l.action === 'UPDATE_RBAC');
+
+        const jumpToRole = (roleCode) => {
+          setSelectedRbacRole(roleCode);
+          setRbacView('editor');
+        };
+
         return (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+
+            {/* 0. Sub-navigation — 3 khung nhìn của trang RBAC */}
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              {[
+                { id: 'overview', label: 'Ma Trận Tổng Quan', icon: Layers },
+                { id: 'editor', label: 'Chỉnh Sửa Theo Vai Trò', icon: Edit },
+                { id: 'history', label: rbacAuditLogs.length > 0 ? `Lịch Sử Thay Đổi (${rbacAuditLogs.length})` : 'Lịch Sử Thay Đổi', icon: Activity }
+              ].map(v => {
+                const VIcon = v.icon;
+                const isActive = rbacView === v.id;
+                return (
+                  <button
+                    key={v.id}
+                    type="button"
+                    onClick={() => setRbacView(v.id)}
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
+                      padding: '0.55rem 1rem', borderRadius: '6px',
+                      border: isActive ? '1.5px solid #2563eb' : '1px solid #cbd5e1',
+                      backgroundColor: isActive ? '#eff6ff' : '#ffffff',
+                      color: isActive ? '#1d4ed8' : '#475569',
+                      fontSize: '0.82rem', fontWeight: isActive ? 700 : 600, cursor: 'pointer'
+                    }}
+                  >
+                    <VIcon size={15} /> {v.label}
+                  </button>
+                );
+              })}
+            </div>
 
             {/* Phần lớn ma trận này vẫn chỉ điều khiển việc ẨN/HIỆN menu và khoá/mở
                 nút trên giao diện — quyền gọi API cho đa số tác vụ vẫn do
@@ -1256,365 +1304,517 @@ export default function SystemAdmin() {
                 tiếp từ BACKEND_ENFORCED_OPERATIONS (rbacEngine.js) — cùng 1 cờ
                 backendEnforced cũng đánh dấu badge "Backend thực thi" trên từng
                 dòng bên dưới, nên banner này và badge không thể lệch nhau như
-                câu chữ cố định trước đây (từng ghi thiếu 2/8 tác vụ thật). */}
+                câu chữ cố định trước đây (từng ghi thiếu 2/8 tác vụ thật). Hiển
+                thị cho cả 3 khung nhìn vì áp dụng chung 1 khái niệm. */}
             <div style={{ backgroundColor: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px', padding: '0.75rem 1rem', fontSize: '0.8rem', color: '#92400e', display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
               <AlertTriangle size={16} style={{ flexShrink: 0, marginTop: '1px' }} />
               <span>
                 Phần lớn đây là cấu hình <strong>hiển thị giao diện</strong> (ẩn/hiện menu, khoá nút) theo vai trò —
                 quyền gọi API cho đa số tác vụ vẫn do backend kiểm soát độc lập theo vai trò đăng nhập.
-                Riêng <strong>{BACKEND_ENFORCED_OPERATIONS.length} tác vụ rủi ro cao</strong> ({BACKEND_ENFORCED_OPERATIONS.map(op => op.name).join(', ')}) đã được backend <strong>thực sự chặn API</strong> theo đúng thiết lập ở đây — nhận biết qua nhãn <ShieldCheck size={12} style={{ display: 'inline', verticalAlign: '-2px' }} /> <strong>Backend thực thi</strong> trên từng dòng.
+                Riêng <strong>{BACKEND_ENFORCED_OPERATIONS.length} tác vụ rủi ro cao</strong> ({BACKEND_ENFORCED_OPERATIONS.map(op => op.name).join(', ')}) đã được backend <strong>thực sự chặn API</strong> theo đúng thiết lập ở đây — nhận biết qua nhãn <ShieldCheck size={12} style={{ display: 'inline', verticalAlign: '-2px' }} /> <strong>Backend thực thi</strong>.
               </span>
             </div>
 
-            {/* 1. Header Toolbar */}
-            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-              <div>
-                <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
-                  Bảng Phân Quyền Theo Nghiệp Vụ Thực Tế
-                </h3>
-                <p style={{ color: '#64748b', fontSize: '0.8rem', margin: '0.25rem 0 0' }}>
-                  Tích chọn phân hệ để mở các tác vụ chi tiết. Thiết lập quyền thao tác (POS, duyệt chiết khấu, đóng gói, phân shipper...) cho từng vai trò.
-                </p>
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                {hasUnsavedChanges && (
-                  <span style={{
-                    fontSize: '0.74rem',
-                    fontWeight: 700,
-                    color: '#b45309',
-                    backgroundColor: '#fef3c7',
-                    padding: '0.35rem 0.65rem',
-                    borderRadius: '4px',
-                    border: '1px solid #fde68a',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.3rem'
-                  }}>
-                    ● Có thay đổi chưa lưu
-                  </span>
-                )}
-
-                {hasUnsavedChanges && (
-                  <button
-                    type="button"
-                    onClick={handleDiscardChanges}
-                    style={{ backgroundColor: '#ffffff', color: '#dc2626', border: '1px solid #fca5a5', borderRadius: '6px', padding: '0.45rem 0.85rem', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer' }}
-                  >
-                    Hủy Thay Đổi
-                  </button>
-                )}
-
-                <button
-                  type="button"
-                  onClick={handleResetDefaultRbac}
-                  style={secondaryBtnStyle}
-                >
-                  Khôi Phục Mặc Định
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleOpenSaveConfirm}
-                  style={{ ...primaryBtnStyle, padding: '0.45rem 1.25rem', boxShadow: '0 2px 4px rgba(37,99,235,0.2)' }}
-                >
-                  Lưu Phân Quyền
-                </button>
-              </div>
-            </div>
-
-            {/* 2. Role Selector Ribbon */}
-            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1rem 1.25rem' }}>
-              <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#64748b', marginBottom: '0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span>Chọn vai trò cần thiết lập quyền thao tác:</span>
-                <span style={{ color: '#2563eb' }}>Đang chọn: <strong>{currentRoleObj.name}</strong></span>
-              </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.45rem', alignItems: 'center' }}>
-                {ERP_ROLES.map((r) => {
-                  const isSelected = selectedRbacRole === r.code;
-                  return (
-                    <button
-                      key={r.code}
-                      type="button"
-                      onClick={() => setSelectedRbacRole(r.code)}
-                      style={{
-                        height: '36px',
-                        padding: '0 0.9rem',
-                        borderRadius: '6px',
-                        border: isSelected ? '1.5px solid #2563eb' : '1px solid #cbd5e1',
-                        backgroundColor: isSelected ? '#eff6ff' : '#ffffff',
-                        color: isSelected ? '#1d4ed8' : '#334155',
-                        fontSize: '0.8rem',
-                        fontWeight: isSelected ? 700 : 500,
-                        cursor: 'pointer',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        whiteSpace: 'nowrap',
-                        transition: 'all 0.15s ease',
-                        boxShadow: isSelected ? '0 1px 2px rgba(37,99,235,0.1)' : 'none'
-                      }}
-                    >
-                      {r.name}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* 3. Operational Permissions Panel */}
-            <div style={cardStyle}>
-              
-              {/* Active Role Header Banner */}
-              <div style={{
-                padding: '0.9rem 1.1rem',
-                borderRadius: '6px',
-                backgroundColor: '#f8fafc',
-                border: '1px solid #e2e8f0',
-                marginBottom: '1.25rem',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                flexWrap: 'wrap',
-                gap: '0.75rem'
-              }}>
-                <div>
-                  <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: '#0f172a' }}>
-                    {currentRoleObj.name}
-                  </h4>
-                  <p style={{ margin: '0.2rem 0 0', fontSize: '0.78rem', color: '#64748b' }}>
-                    {currentRoleObj.desc} • <strong>{isAdminRole ? 'Toàn quyền cấu hình & điều hành hệ thống' : `Đang bật ${activeModulesCount}/${displayedModules.length} phân hệ (${activeOpsCount}/${displayedOperations.length} nghiệp vụ)`}</strong>
+            {/* ============ KHUNG NHÌN 1: MA TRẬN TỔNG QUAN ============
+                Trước đây trang RBAC chỉ cho xem 1 vai trò tại 1 thời điểm —
+                muốn so sánh "role nào đang có quyền gì trên phân hệ nào" phải
+                bấm qua lại từng vai trò. Ma trận này cho cái nhìn tổng thể toàn
+                hệ thống (11 phân hệ × 13 vai trò) ngay trên 1 màn hình, bấm vào
+                ô để nhảy thẳng sang khung Chỉnh Sửa đúng vai trò đó. */}
+            {rbacView === 'overview' && (
+              <div style={{ ...cardStyle, padding: 0, overflow: 'hidden' }}>
+                <div style={{ padding: '1.1rem 1.25rem', borderBottom: '1px solid #e2e8f0' }}>
+                  <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#0f172a' }}>Ma Trận Quyền Truy Cập Theo Phân Hệ</h3>
+                  <p style={{ margin: '0.3rem 0 0', fontSize: '0.78rem', color: '#64748b' }}>
+                    So sánh nhanh mức độ truy cập của mọi vai trò trên từng phân hệ nghiệp vụ. Bấm vào một ô để mở chỉnh sửa chi tiết cho vai trò đó.
                   </p>
+                  <div style={{ display: 'flex', gap: '1rem', marginTop: '0.65rem', fontSize: '0.72rem', color: '#64748b', flexWrap: 'wrap' }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}><span style={{ width: '12px', height: '12px', borderRadius: '3px', backgroundColor: '#16a34a', display: 'inline-block' }} /> Toàn quyền</span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}><span style={{ width: '12px', height: '12px', borderRadius: '3px', backgroundColor: '#fbbf24', display: 'inline-block' }} /> Một phần</span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}><span style={{ width: '12px', height: '12px', borderRadius: '3px', backgroundColor: '#e2e8f0', display: 'inline-block' }} /> Không có quyền</span>
+                  </div>
                 </div>
 
-                {/* Batch Action Buttons */}
-                {!isAdminRole && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: '0.74rem' }}>
+                    <thead>
+                      <tr>
+                        <th style={{ position: 'sticky', left: 0, zIndex: 2, backgroundColor: '#f8fafc', padding: '0.6rem 0.85rem', textAlign: 'left', borderBottom: '2px solid #e2e8f0', borderRight: '1px solid #e2e8f0', minWidth: '170px', color: '#475569' }}>
+                          Phân Hệ \ Vai Trò
+                        </th>
+                        {ERP_ROLES.map(r => (
+                          <th key={r.code} style={{ padding: '0.6rem 0.4rem', backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', minWidth: '84px', fontWeight: 700, color: '#475569', whiteSpace: 'nowrap' }}>
+                            <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: r.color, marginRight: '4px' }} />
+                            {r.name}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {ERP_SYSTEM_MODULES.map((mod, mIdx) => {
+                        const modOps = OPERATIONAL_PERMISSIONS.filter(op => op.moduleId === mod.id);
+                        const rowBg = mIdx % 2 === 0 ? '#ffffff' : '#fbfcfe';
+                        return (
+                          <tr key={mod.id} style={{ backgroundColor: rowBg }}>
+                            <td style={{ position: 'sticky', left: 0, zIndex: 1, backgroundColor: rowBg, padding: '0.55rem 0.85rem', borderRight: '1px solid #e2e8f0', borderBottom: '1px solid #f1f5f9', fontWeight: 700, color: '#0f172a' }}>
+                              {mod.name}
+                              <div style={{ fontSize: '0.66rem', color: '#94a3b8', fontWeight: 500 }}>{modOps.length} tác vụ</div>
+                            </td>
+                            {ERP_ROLES.map(r => {
+                              const isAdmin = r.code === 'ADMIN';
+                              const rPerms = rbacMatrix[r.code] || {};
+                              const enabledCount = isAdmin ? modOps.length : modOps.filter(op => rPerms[op.id]).length;
+                              const ratio = modOps.length ? enabledCount / modOps.length : 0;
+                              const bg = ratio === 0 ? '#e2e8f0' : ratio === 1 ? '#16a34a' : '#fbbf24';
+                              const textColor = ratio === 0 ? '#94a3b8' : '#ffffff';
+                              return (
+                                <td
+                                  key={r.code}
+                                  onClick={() => jumpToRole(r.code)}
+                                  title={`${r.name} — ${mod.name}: ${enabledCount}/${modOps.length} tác vụ${isAdmin ? ' (toàn quyền mặc định)' : ''}`}
+                                  style={{ padding: '0.45rem', borderBottom: '1px solid #f1f5f9', textAlign: 'center', cursor: 'pointer' }}
+                                >
+                                  <div style={{
+                                    margin: '0 auto', minWidth: '36px', height: '22px', borderRadius: '5px',
+                                    backgroundColor: bg, color: textColor, fontSize: '0.68rem', fontWeight: 800,
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center'
+                                  }}>
+                                    {enabledCount}/{modOps.length}
+                                  </div>
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* ============ KHUNG NHÌN 2: CHỈNH SỬA THEO VAI TRÒ ============ */}
+            {rbacView === 'editor' && (
+              <>
+                {/* 1. Header Toolbar */}
+                <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+                  <div>
+                    <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                      Bảng Phân Quyền Theo Nghiệp Vụ Thực Tế
+                    </h3>
+                    <p style={{ color: '#64748b', fontSize: '0.8rem', margin: '0.25rem 0 0' }}>
+                      Tích chọn phân hệ để mở các tác vụ chi tiết. Thiết lập quyền thao tác (POS, duyệt chiết khấu, đóng gói, phân shipper...) cho từng vai trò.
+                    </p>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    {hasUnsavedChanges && (
+                      <span style={{
+                        fontSize: '0.74rem',
+                        fontWeight: 700,
+                        color: '#b45309',
+                        backgroundColor: '#fef3c7',
+                        padding: '0.35rem 0.65rem',
+                        borderRadius: '4px',
+                        border: '1px solid #fde68a',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.3rem'
+                      }}>
+                        ● Có thay đổi chưa lưu
+                      </span>
+                    )}
+
+                    {hasUnsavedChanges && (
+                      <button
+                        type="button"
+                        onClick={handleDiscardChanges}
+                        style={{ backgroundColor: '#ffffff', color: '#dc2626', border: '1px solid #fca5a5', borderRadius: '6px', padding: '0.45rem 0.85rem', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer' }}
+                      >
+                        Hủy Thay Đổi
+                      </button>
+                    )}
+
                     <button
                       type="button"
-                      onClick={() => handleBatchSetRoleOperations(selectedRbacRole, 'ENABLE_ALL')}
-                      style={{ padding: '0.35rem 0.65rem', fontSize: '0.74rem', fontWeight: 700, backgroundColor: '#ffffff', color: '#2563eb', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer' }}
+                      onClick={handleResetDefaultRbac}
+                      style={secondaryBtnStyle}
                     >
-                      Bật Tất Cả Phân Hệ
+                      Khôi Phục Mặc Định
                     </button>
+
                     <button
                       type="button"
-                      onClick={() => handleBatchSetRoleOperations(selectedRbacRole, 'CLEAR_ALL')}
-                      style={{ padding: '0.35rem 0.65rem', fontSize: '0.74rem', fontWeight: 700, backgroundColor: '#ffffff', color: '#dc2626', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer' }}
+                      onClick={handleOpenSaveConfirm}
+                      style={{ ...primaryBtnStyle, padding: '0.45rem 1.25rem', boxShadow: '0 2px 4px rgba(37,99,235,0.2)' }}
                     >
-                      Tắt Tất Cả
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleBatchSetRoleOperations(selectedRbacRole, 'RESET_DEFAULT')}
-                      style={{ padding: '0.35rem 0.65rem', fontSize: '0.74rem', fontWeight: 700, backgroundColor: '#ffffff', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer' }}
-                    >
-                      Mặc Định Vai Trò
+                      Lưu Phân Quyền
                     </button>
                   </div>
-                )}
-              </div>
+                </div>
 
-              {/* Filter Info Bar */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#475569' }}>
-                  Danh sách phân hệ nghiệp vụ ({displayedModules.length}/{ERP_SYSTEM_MODULES.length}) — Tích vào ô phân hệ để bật/tắt
-                </span>
-                {!isAdminRole && (
-                  <button
-                    type="button"
-                    onClick={() => setShowOnlyRelevant(!showOnlyRelevant)}
-                    style={{
-                      backgroundColor: 'transparent',
-                      border: 'none',
-                      color: '#2563eb',
-                      fontSize: '0.75rem',
-                      fontWeight: 600,
-                      cursor: 'pointer'
-                    }}
-                  >
-                    {showOnlyRelevant ? 'Hiển thị toàn bộ 11 phân hệ' : 'Thu gọn về phân hệ liên quan'}
-                  </button>
-                )}
-              </div>
+                {/* 2. Role Selector Ribbon */}
+                <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1rem 1.25rem' }}>
+                  <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#64748b', marginBottom: '0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span>Chọn vai trò cần thiết lập quyền thao tác:</span>
+                    <span style={{ color: '#2563eb' }}>Đang chọn: <strong>{currentRoleObj.name}</strong></span>
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.45rem', alignItems: 'center' }}>
+                    {ERP_ROLES.map((r) => {
+                      const isSelected = selectedRbacRole === r.code;
+                      return (
+                        <button
+                          key={r.code}
+                          type="button"
+                          onClick={() => setSelectedRbacRole(r.code)}
+                          style={{
+                            height: '36px',
+                            padding: '0 0.9rem',
+                            borderRadius: '6px',
+                            border: isSelected ? '1.5px solid #2563eb' : '1px solid #cbd5e1',
+                            backgroundColor: isSelected ? '#eff6ff' : '#ffffff',
+                            color: isSelected ? '#1d4ed8' : '#334155',
+                            fontSize: '0.8rem',
+                            fontWeight: isSelected ? 700 : 500,
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            whiteSpace: 'nowrap',
+                            transition: 'all 0.15s ease',
+                            boxShadow: isSelected ? '0 1px 2px rgba(37,99,235,0.1)' : 'none'
+                          }}
+                        >
+                          {r.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
 
-              {/* Modules & Granular Operations List */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-                {displayedModules.map((mod) => {
-                  const moduleOps = OPERATIONAL_PERMISSIONS.filter(op => op.moduleId === mod.id);
-                  if (moduleOps.length === 0) return null;
+                {/* 3. Operational Permissions Panel */}
+                <div style={cardStyle}>
 
-                  const isModuleActive = isAdminRole ? true : moduleOps.some(op => Boolean(rolePerms[op.id]));
-                  const isAllModActive = moduleOps.every(op => Boolean(rolePerms[op.id]));
+                  {/* Active Role Header Banner */}
+                  <div style={{
+                    padding: '0.9rem 1.1rem',
+                    borderRadius: '6px',
+                    backgroundColor: '#f8fafc',
+                    border: '1px solid #e2e8f0',
+                    marginBottom: '1.25rem',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    flexWrap: 'wrap',
+                    gap: '0.75rem'
+                  }}>
+                    <div>
+                      <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: '#0f172a' }}>
+                        {currentRoleObj.name}
+                      </h4>
+                      <p style={{ margin: '0.2rem 0 0', fontSize: '0.78rem', color: '#64748b' }}>
+                        {currentRoleObj.desc} • <strong>{isAdminRole ? 'Toàn quyền cấu hình & điều hành hệ thống' : `Đang bật ${activeModulesCount}/${displayedModules.length} phân hệ (${activeOpsCount}/${displayedOperations.length} nghiệp vụ)`}</strong>
+                      </p>
+                    </div>
 
-                  return (
-                    <div
-                      key={mod.id}
-                      style={{
-                        border: isModuleActive ? '1px solid #93c5fd' : '1px solid #e2e8f0',
-                        borderRadius: '8px',
-                        overflow: 'hidden',
-                        backgroundColor: '#ffffff',
-                        boxShadow: isModuleActive ? '0 1px 3px rgba(37,99,235,0.05)' : 'none',
-                        transition: 'all 0.15s ease'
-                      }}
-                    >
-                      {/* Module Header Bar with Module-level Checkbox */}
-                      <div style={{
-                        padding: '0.85rem 1.15rem',
-                        backgroundColor: isModuleActive ? '#f0f7ff' : '#f8fafc',
-                        borderBottom: isModuleActive ? '1px solid #dbeafe' : 'none',
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        gap: '1rem',
-                        flexWrap: 'wrap'
-                      }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
-                          <input
-                            type="checkbox"
-                            checked={isModuleActive}
-                            disabled={isAdminRole}
-                            onChange={(e) => handleToggleModule(selectedRbacRole, mod.id, e.target.checked)}
-                            style={{
-                              width: '20px',
-                              height: '20px',
-                              cursor: isAdminRole ? 'not-allowed' : 'pointer',
-                              accentColor: '#2563eb'
-                            }}
-                          />
-                          <div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                              <span style={{ fontSize: '0.72rem', fontWeight: 700, padding: '2px 6px', borderRadius: '4px', backgroundColor: isModuleActive ? '#dbeafe' : '#e2e8f0', color: isModuleActive ? '#1e40af' : '#475569' }}>
-                                {mod.category}
-                              </span>
-                              <span style={{ fontWeight: 800, fontSize: '0.92rem', color: isModuleActive ? '#0f172a' : '#64748b' }}>
-                                {mod.name}
-                              </span>
-                            </div>
-                            <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '0.15rem' }}>
-                              {mod.desc}
-                            </div>
-                          </div>
-                        </div>
-
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-                          <span style={{
-                            fontSize: '0.72rem',
-                            fontWeight: 700,
-                            padding: '3px 8px',
-                            borderRadius: '4px',
-                            backgroundColor: isModuleActive ? '#dcfce7' : '#f1f5f9',
-                            color: isModuleActive ? '#15803d' : '#64748b',
-                            border: isModuleActive ? '1px solid #bbf7d0' : '1px solid #cbd5e1'
-                          }}>
-                            {isModuleActive ? 'Đang kích hoạt phân hệ' : 'Đã tắt phân hệ'}
-                          </span>
-
-                          {isModuleActive && !isAdminRole && (
-                            <button
-                              type="button"
-                              onClick={() => handleSetAllForModuleOps(selectedRbacRole, mod.id, !isAllModActive)}
-                              style={{
-                                padding: '0.25rem 0.65rem',
-                                fontSize: '0.72rem',
-                                fontWeight: 600,
-                                borderRadius: '4px',
-                                border: '1px solid #cbd5e1',
-                                backgroundColor: '#ffffff',
-                                color: isAllModActive ? '#dc2626' : '#2563eb',
-                                cursor: 'pointer'
-                              }}
-                            >
-                              {isAllModActive ? 'Tắt Hết Tác Vụ' : 'Bật Hết Tác Vụ'}
-                            </button>
-                          )}
-                        </div>
+                    {/* Batch Action Buttons */}
+                    {!isAdminRole && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                        <button
+                          type="button"
+                          onClick={() => handleBatchSetRoleOperations(selectedRbacRole, 'ENABLE_ALL')}
+                          style={{ padding: '0.35rem 0.65rem', fontSize: '0.74rem', fontWeight: 700, backgroundColor: '#ffffff', color: '#2563eb', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer' }}
+                        >
+                          Bật Tất Cả Phân Hệ
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleBatchSetRoleOperations(selectedRbacRole, 'CLEAR_ALL')}
+                          style={{ padding: '0.35rem 0.65rem', fontSize: '0.74rem', fontWeight: 700, backgroundColor: '#ffffff', color: '#dc2626', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer' }}
+                        >
+                          Tắt Tất Cả
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleBatchSetRoleOperations(selectedRbacRole, 'RESET_DEFAULT')}
+                          style={{ padding: '0.35rem 0.65rem', fontSize: '0.74rem', fontWeight: 700, backgroundColor: '#ffffff', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer' }}
+                        >
+                          Mặc Định Vai Trò
+                        </button>
                       </div>
+                    )}
+                  </div>
 
-                      {/* Operations Table / List (Only shown when module is active) */}
-                      {isModuleActive ? (
-                        <div style={{ padding: '0.25rem 0' }}>
-                          {moduleOps.map((op, opIdx) => {
-                            const isEnabled = isAdminRole ? true : Boolean(rolePerms[op.id]);
+                  {/* Filter Info Bar — thêm ô tìm kiếm tác vụ theo tên/mô tả */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                    <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#475569' }}>
+                      Danh sách phân hệ nghiệp vụ ({displayedModules.length}/{ERP_SYSTEM_MODULES.length}) — Tích vào ô phân hệ để bật/tắt
+                    </span>
+                    {!isAdminRole && (
+                      <button
+                        type="button"
+                        onClick={() => setShowOnlyRelevant(!showOnlyRelevant)}
+                        style={{
+                          backgroundColor: 'transparent',
+                          border: 'none',
+                          color: '#2563eb',
+                          fontSize: '0.75rem',
+                          fontWeight: 600,
+                          cursor: 'pointer'
+                        }}
+                      >
+                        {showOnlyRelevant ? 'Hiển thị toàn bộ 11 phân hệ' : 'Thu gọn về phân hệ liên quan'}
+                      </button>
+                    )}
+                  </div>
+                  <div style={{ position: 'relative', marginBottom: '1rem' }}>
+                    <Search size={14} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                    <input
+                      type="text"
+                      value={rbacSearchQuery}
+                      onChange={e => setRbacSearchQuery(e.target.value)}
+                      placeholder="Tìm tác vụ theo tên hoặc mô tả (VD: chiết khấu, seal, kệ...)"
+                      style={{ width: '100%', padding: '0.5rem 0.75rem 0.5rem 2.1rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.8rem', boxSizing: 'border-box' }}
+                    />
+                  </div>
 
-                            return (
-                              <div
-                                key={op.id}
+                  {/* Modules & Granular Operations List */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                    {displayedModules.map((mod) => {
+                      const moduleOps = OPERATIONAL_PERMISSIONS.filter(op => op.moduleId === mod.id);
+                      const visibleOps = moduleOps.filter(matchesSearch);
+                      if (visibleOps.length === 0) return null;
+
+                      const isModuleActive = isAdminRole ? true : moduleOps.some(op => Boolean(rolePerms[op.id]));
+                      const isAllModActive = moduleOps.every(op => Boolean(rolePerms[op.id]));
+
+                      return (
+                        <div
+                          key={mod.id}
+                          style={{
+                            border: isModuleActive ? '1px solid #93c5fd' : '1px solid #e2e8f0',
+                            borderRadius: '8px',
+                            overflow: 'hidden',
+                            backgroundColor: '#ffffff',
+                            boxShadow: isModuleActive ? '0 1px 3px rgba(37,99,235,0.05)' : 'none',
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          {/* Module Header Bar with Module-level Checkbox */}
+                          <div style={{
+                            padding: '0.85rem 1.15rem',
+                            backgroundColor: isModuleActive ? '#f0f7ff' : '#f8fafc',
+                            borderBottom: isModuleActive ? '1px solid #dbeafe' : 'none',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            gap: '1rem',
+                            flexWrap: 'wrap'
+                          }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+                              <input
+                                type="checkbox"
+                                checked={isModuleActive}
+                                disabled={isAdminRole}
+                                onChange={(e) => handleToggleModule(selectedRbacRole, mod.id, e.target.checked)}
                                 style={{
-                                  padding: '0.75rem 1.15rem',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'space-between',
-                                  borderBottom: opIdx < moduleOps.length - 1 ? '1px solid #f1f5f9' : 'none',
-                                  backgroundColor: isEnabled ? '#f0fdf4' : '#ffffff',
-                                  transition: 'background-color 0.15s ease'
+                                  width: '20px',
+                                  height: '20px',
+                                  cursor: isAdminRole ? 'not-allowed' : 'pointer',
+                                  accentColor: '#2563eb'
                                 }}
-                              >
-                                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem', flex: 1, paddingRight: '1rem' }}>
-                                  <input
-                                    type="checkbox"
-                                    checked={isEnabled}
-                                    disabled={isAdminRole}
-                                    onChange={(e) => handleToggleOperation(selectedRbacRole, op.id, e.target.checked)}
-                                    style={{
-                                      width: '18px',
-                                      height: '18px',
-                                      marginTop: '2px',
-                                      cursor: isAdminRole ? 'not-allowed' : 'pointer',
-                                      accentColor: '#16a34a'
-                                    }}
-                                  />
-                                  <div>
-                                    <div style={{ fontSize: '0.82rem', fontWeight: 700, color: isEnabled ? '#15803d' : '#334155', display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-                                      {op.name}
-                                      {op.backendEnforced && (
-                                        <span
-                                          title="Backend thực sự chặn API theo đúng thiết lập này (không chỉ ẩn nút trên giao diện)"
-                                          style={{
-                                            display: 'inline-flex', alignItems: 'center', gap: '3px',
-                                            fontSize: '0.66rem', fontWeight: 800, padding: '1px 6px', borderRadius: '999px',
-                                            backgroundColor: '#fef3c7', color: '#92400e', border: '1px solid #fde68a'
-                                          }}
-                                        >
-                                          <ShieldCheck size={11} /> Backend thực thi
-                                        </span>
-                                      )}
-                                    </div>
-                                    <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '0.15rem' }}>
-                                      {op.desc}
-                                    </div>
-                                  </div>
-                                </div>
-
-                                <div>
-                                  <span style={{
-                                    fontSize: '0.72rem',
-                                    fontWeight: 700,
-                                    padding: '3px 8px',
-                                    borderRadius: '4px',
-                                    backgroundColor: isEnabled ? '#dcfce7' : '#f1f5f9',
-                                    color: isEnabled ? '#15803d' : '#64748b'
-                                  }}>
-                                    {isEnabled ? 'Cho phép thao tác' : 'Chỉ xem dữ liệu'}
+                              />
+                              <div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                  <span style={{ fontSize: '0.72rem', fontWeight: 700, padding: '2px 6px', borderRadius: '4px', backgroundColor: isModuleActive ? '#dbeafe' : '#e2e8f0', color: isModuleActive ? '#1e40af' : '#475569' }}>
+                                    {mod.category}
+                                  </span>
+                                  <span style={{ fontWeight: 800, fontSize: '0.92rem', color: isModuleActive ? '#0f172a' : '#64748b' }}>
+                                    {mod.name}
                                   </span>
                                 </div>
+                                <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '0.15rem' }}>
+                                  {mod.desc}
+                                </div>
                               </div>
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        <div style={{ padding: '0.75rem 1.15rem', color: '#94a3b8', fontSize: '0.75rem', fontStyle: 'italic', backgroundColor: '#fafafa' }}>
-                          Phân hệ này đang bị tắt đối với vai trò {currentRoleObj.name}. Hãy tích vào ô vuông ở thanh tiêu đề để kích hoạt và phân quyền chi tiết.
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+                            </div>
 
-            {/* 4. MODAL XÁC NHẬN LƯU PHÂN QUYỀN */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                              <span style={{
+                                fontSize: '0.72rem',
+                                fontWeight: 700,
+                                padding: '3px 8px',
+                                borderRadius: '4px',
+                                backgroundColor: isModuleActive ? '#dcfce7' : '#f1f5f9',
+                                color: isModuleActive ? '#15803d' : '#64748b',
+                                border: isModuleActive ? '1px solid #bbf7d0' : '1px solid #cbd5e1'
+                              }}>
+                                {isModuleActive ? 'Đang kích hoạt phân hệ' : 'Đã tắt phân hệ'}
+                              </span>
+
+                              {isModuleActive && !isAdminRole && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleSetAllForModuleOps(selectedRbacRole, mod.id, !isAllModActive)}
+                                  style={{
+                                    padding: '0.25rem 0.65rem',
+                                    fontSize: '0.72rem',
+                                    fontWeight: 600,
+                                    borderRadius: '4px',
+                                    border: '1px solid #cbd5e1',
+                                    backgroundColor: '#ffffff',
+                                    color: isAllModActive ? '#dc2626' : '#2563eb',
+                                    cursor: 'pointer'
+                                  }}
+                                >
+                                  {isAllModActive ? 'Tắt Hết Tác Vụ' : 'Bật Hết Tác Vụ'}
+                                </button>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Operations Table / List (Only shown when module is active) */}
+                          {isModuleActive ? (
+                            <div style={{ padding: '0.25rem 0' }}>
+                              {visibleOps.map((op, opIdx) => {
+                                const isEnabled = isAdminRole ? true : Boolean(rolePerms[op.id]);
+
+                                return (
+                                  <div
+                                    key={op.id}
+                                    style={{
+                                      padding: '0.75rem 1.15rem',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'space-between',
+                                      borderBottom: opIdx < visibleOps.length - 1 ? '1px solid #f1f5f9' : 'none',
+                                      backgroundColor: isEnabled ? '#f0fdf4' : '#ffffff',
+                                      transition: 'background-color 0.15s ease'
+                                    }}
+                                  >
+                                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem', flex: 1, paddingRight: '1rem' }}>
+                                      <input
+                                        type="checkbox"
+                                        checked={isEnabled}
+                                        disabled={isAdminRole}
+                                        onChange={(e) => handleToggleOperation(selectedRbacRole, op.id, e.target.checked)}
+                                        style={{
+                                          width: '18px',
+                                          height: '18px',
+                                          marginTop: '2px',
+                                          cursor: isAdminRole ? 'not-allowed' : 'pointer',
+                                          accentColor: '#16a34a'
+                                        }}
+                                      />
+                                      <div>
+                                        <div style={{ fontSize: '0.82rem', fontWeight: 700, color: isEnabled ? '#15803d' : '#334155', display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                                          {op.name}
+                                          {op.backendEnforced && (
+                                            <span
+                                              title="Backend thực sự chặn API theo đúng thiết lập này (không chỉ ẩn nút trên giao diện)"
+                                              style={{
+                                                display: 'inline-flex', alignItems: 'center', gap: '3px',
+                                                fontSize: '0.66rem', fontWeight: 800, padding: '1px 6px', borderRadius: '999px',
+                                                backgroundColor: '#fef3c7', color: '#92400e', border: '1px solid #fde68a'
+                                              }}
+                                            >
+                                              <ShieldCheck size={11} /> Backend thực thi
+                                            </span>
+                                          )}
+                                        </div>
+                                        <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '0.15rem' }}>
+                                          {op.desc}
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    <div>
+                                      <span style={{
+                                        fontSize: '0.72rem',
+                                        fontWeight: 700,
+                                        padding: '3px 8px',
+                                        borderRadius: '4px',
+                                        backgroundColor: isEnabled ? '#dcfce7' : '#f1f5f9',
+                                        color: isEnabled ? '#15803d' : '#64748b'
+                                      }}>
+                                        {isEnabled ? 'Cho phép thao tác' : 'Chỉ xem dữ liệu'}
+                                      </span>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <div style={{ padding: '0.75rem 1.15rem', color: '#94a3b8', fontSize: '0.75rem', fontStyle: 'italic', backgroundColor: '#fafafa' }}>
+                              Phân hệ này đang bị tắt đối với vai trò {currentRoleObj.name}. Hãy tích vào ô vuông ở thanh tiêu đề để kích hoạt và phân quyền chi tiết.
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                    {displayedModules.every(mod => OPERATIONAL_PERMISSIONS.filter(op => op.moduleId === mod.id && matchesSearch(op)).length === 0) && (
+                      <div style={{ padding: '1.5rem', textAlign: 'center', color: '#94a3b8', fontSize: '0.82rem' }}>
+                        Không tìm thấy tác vụ nào khớp với "{rbacSearchQuery}".
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* ============ KHUNG NHÌN 3: LỊCH SỬ THAY ĐỔI ============
+                Mỗi lần bấm "Lưu Phân Quyền" đều gọi PUT /system/rbac, và
+                updateRolePermissions (system.controller.js) ghi 1 dòng
+                logAudit({ action: 'UPDATE_RBAC', ... }) — khung này chỉ lọc
+                lại đúng các dòng đó từ auditLogs đã có sẵn trong state (không
+                gọi thêm API), cho biết ai đổi phân quyền, khi nào, từ đâu. */}
+            {rbacView === 'history' && (
+              <div style={cardStyle}>
+                <h3 style={sectionTitleStyle}>
+                  <Activity size={18} style={{ color: '#2563eb' }} />
+                  <span>Lịch Sử Thay Đổi Phân Quyền</span>
+                </h3>
+                <p style={{ fontSize: '0.78rem', color: '#64748b', margin: '0.35rem 0 1rem' }}>
+                  Trích từ Nhật Ký Kiểm Toán (tab "Nhật Ký Kiểm Toán"), chỉ hiển thị các sự kiện lưu ma trận phân quyền.
+                </p>
+
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+                    <thead>
+                      <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569' }}>
+                        <th style={{ padding: '0.65rem 0.85rem' }}>Thời Gian</th>
+                        <th style={{ padding: '0.65rem 0.85rem' }}>Quản Trị Viên Thực Hiện</th>
+                        <th style={{ padding: '0.65rem 0.85rem' }}>Nội Dung</th>
+                        <th style={{ padding: '0.65rem 0.85rem' }}>Địa Chỉ IP</th>
+                        <th style={{ padding: '0.65rem 0.85rem', textAlign: 'center' }}>Kết Quả</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {loadingAuditLogs ? (
+                        <tr><td colSpan={5} style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>Đang tải nhật ký...</td></tr>
+                      ) : rbacAuditLogs.length === 0 ? (
+                        <tr><td colSpan={5} style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>Chưa có thay đổi phân quyền nào được ghi nhận.</td></tr>
+                      ) : rbacAuditLogs.map(log => (
+                        <tr key={log.id} style={{ borderBottom: '1px solid #f1f5f9', backgroundColor: log.status === 'FAILED' ? '#fef2f2' : undefined }}>
+                          <td style={{ padding: '0.65rem 0.85rem', color: '#64748b', fontFamily: 'monospace' }}>{log.timestamp}</td>
+                          <td style={{ padding: '0.65rem 0.85rem', fontWeight: 600, color: '#0f172a' }}>{log.user}</td>
+                          <td style={{ padding: '0.65rem 0.85rem', color: '#475569' }}>{log.note || '—'}</td>
+                          <td style={{ padding: '0.65rem 0.85rem', color: '#64748b', fontFamily: 'monospace' }}>{log.ip}</td>
+                          <td style={{ padding: '0.65rem 0.85rem', textAlign: 'center' }}>
+                            <span style={badgeStyle(log.status === 'SUCCESS' ? 'success' : 'danger')}>
+                              {getStatusLabel(AUDIT_LOG_STATUS, log.status)}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* MODAL XÁC NHẬN LƯU PHÂN QUYỀN — chỉ mở được từ khung Chỉnh Sửa,
+                nhưng đặt ngoài 3 khung nhìn để không mất state khi đổi view. */}
             {showSaveConfirmModal && (
               <div style={{
                 position: 'fixed',
