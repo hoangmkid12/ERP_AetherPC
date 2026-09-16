@@ -4318,7 +4318,7 @@ export default function Purchasing() {
             <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', borderTop: '1px solid #f1f5f9', paddingTop: '1rem', gap: '0.65rem' }}>
               <button
                 onClick={() => setSelectedPO(null)}
-                style={{ backgroundColor: '#ffffff', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.5rem 1rem', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
+                style={{ backgroundColor: '#ffffff', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.5rem 1rem', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
               >
                 Đóng
               </button>
@@ -4327,7 +4327,7 @@ export default function Purchasing() {
                 <button
                   onClick={() => handleDuplicatePO(selectedPO)}
                   title="Tạo đơn mua mới với cùng NCC và toàn bộ linh kiện/đơn giá của đơn này"
-                  style={{ backgroundColor: '#ffffff', color: '#2563eb', border: '1px solid #bfdbfe', borderRadius: '6px', padding: '0.5rem 1rem', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
+                  style={{ backgroundColor: '#ffffff', color: '#2563eb', border: '1px solid #bfdbfe', borderRadius: '6px', padding: '0.5rem 1rem', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
                 >
                   Tạo Đơn Lặp Lại
                 </button>
@@ -4336,7 +4336,7 @@ export default function Purchasing() {
               {['QUOTED_PENDING_CEO', 'PO', 'CONFIRMED_BY_SUPPLIER', 'QA', 'RECEIVED', 'DONE', 'COMPLETED'].includes(selectedPO.status) && (
                 <button
                   onClick={() => setPrintPOTarget(selectedPO)}
-                  title="Xem & In Phiếu Đơn Mua Hàng"
+                  title="Xem & In Phiếu Đơn Mua Hàng (PO)"
                   style={{
                     backgroundColor: '#eff6ff',
                     color: '#2563eb',
@@ -4348,7 +4348,9 @@ export default function Purchasing() {
                     cursor: 'pointer',
                     display: 'inline-flex',
                     alignItems: 'center',
-                    gap: '5px'
+                    gap: '5px',
+                    whiteSpace: 'nowrap',
+                    flexShrink: 0
                   }}
                 >
                   <Printer size={14} /> In Phiếu PO
@@ -4514,59 +4516,17 @@ export default function Purchasing() {
                       })()}
                     </div>
                   ) : (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: '0.78rem', color: '#d97706', fontWeight: 700, backgroundColor: '#fef3c7', padding: '0.4rem 0.8rem', borderRadius: '6px', border: '1px solid #fde68a' }}>
-                        ⏳ Đơn Mua Hàng đang chờ CEO / Ban Giám Đốc Phê Duyệt
-                      </span>
-                      <button
-                        onClick={() => setPrintPOTarget(selectedPO)}
-                        title="Xem và In Phiếu Mua Hàng (PO)"
-                        style={{
-                          backgroundColor: '#eff6ff',
-                          color: '#2563eb',
-                          border: '1px solid #bfdbfe',
-                          borderRadius: '6px',
-                          padding: '0.4rem 0.8rem',
-                          fontSize: '0.78rem',
-                          fontWeight: 700,
-                          cursor: 'pointer',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '5px'
-                        }}
-                      >
-                        <Printer size={13} /> Xem & In Phiếu
-                      </button>
-                    </div>
+                    <span style={{ fontSize: '0.78rem', color: '#d97706', fontWeight: 700, backgroundColor: '#fef3c7', padding: '0.45rem 0.85rem', borderRadius: '6px', border: '1px solid #fde68a', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                      ⏳ Đơn Mua Hàng đang chờ Giám Đốc Phê Duyệt
+                    </span>
                   )}
                 </>
               )}
 
               {selectedPO.status === 'PO' && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: '0.78rem', color: '#16a34a', fontWeight: 700, backgroundColor: '#dcfce7', padding: '0.4rem 0.8rem', borderRadius: '6px', border: '1px solid #bbf7d0' }}>
-                    ✓ Đã phát hành PO chính thức (Chờ NCC giao & QA/Kho nghiệm thu)
-                  </span>
-                  <button
-                    onClick={() => setPrintPOTarget(selectedPO)}
-                    title="Xem và In Phiếu Mua Hàng (PO)"
-                    style={{
-                      backgroundColor: '#eff6ff',
-                      color: '#2563eb',
-                      border: '1px solid #bfdbfe',
-                      borderRadius: '6px',
-                      padding: '0.4rem 0.8rem',
-                      fontSize: '0.78rem',
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '5px'
-                    }}
-                  >
-                    <Printer size={13} /> In Phiếu PO
-                  </button>
-                </div>
+                <span style={{ fontSize: '0.78rem', color: '#16a34a', fontWeight: 700, backgroundColor: '#dcfce7', padding: '0.45rem 0.85rem', borderRadius: '6px', border: '1px solid #bbf7d0', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                  ✓ Đã phát hành PO chính thức (Chờ NCC giao & QA/Kho nghiệm thu)
+                </span>
               )}
               {selectedPO.status === 'CONVERTED' && (
                 <span style={{ fontSize: '0.78rem', color: '#475569', fontWeight: 700, backgroundColor: '#f1f5f9', padding: '0.4rem 0.8rem', borderRadius: '6px', border: '1px solid #cbd5e1' }}>
@@ -5314,31 +5274,19 @@ export default function Purchasing() {
                   <div>
                     <strong style={{ fontSize: '0.76rem', color: '#0f172a' }}>NGƯỜI LẬP PHIẾU</strong>
                     <div style={{ fontSize: '0.68rem', color: '#94a3b8', marginTop: '0.2rem' }}>(Ký, ghi rõ họ tên)</div>
-                    <div style={{ height: '38px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <span style={{ fontSize: '0.72rem', color: '#16a34a', fontWeight: 700, backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', padding: '1px 6px', borderRadius: '4px' }}>✓ Đã Xác Nhận</span>
-                    </div>
+                    <div style={{ height: '48px' }} />
                     <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#0f172a' }}>{printPOTarget.buyerName || user?.fullname || user?.name || user?.code || 'Nhân Viên Mua Hàng'}</div>
                   </div>
                   <div>
                     <strong style={{ fontSize: '0.76rem', color: '#0f172a' }}>TRƯỞNG PHÒNG MUA HÀNG</strong>
                     <div style={{ fontSize: '0.68rem', color: '#94a3b8', marginTop: '0.2rem' }}>(Ký, ghi rõ họ tên)</div>
-                    <div style={{ height: '38px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <span style={{ fontSize: '0.72rem', color: '#16a34a', fontWeight: 700, backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', padding: '1px 6px', borderRadius: '4px' }}>✓ Đã Xác Nhận</span>
-                    </div>
+                    <div style={{ height: '48px' }} />
                     <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#0f172a' }}>Phòng Mua Hàng AetherPC</div>
                   </div>
                   <div>
-                    <strong style={{ fontSize: '0.76rem', color: '#0f172a' }}>GIÁM ĐỐC / CEO PHÊ DUYỆT</strong>
+                    <strong style={{ fontSize: '0.76rem', color: '#0f172a' }}>GIÁM ĐỐC DUYỆT</strong>
                     <div style={{ fontSize: '0.68rem', color: '#94a3b8', marginTop: '0.2rem' }}>(Ký, đóng dấu)</div>
-                    <div style={{ height: '38px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      {isPendingCeo ? (
-                        <span style={{ fontSize: '0.72rem', color: '#d97706', fontWeight: 700, backgroundColor: '#fef3c7', border: '1px solid #fde68a', padding: '1px 6px', borderRadius: '4px' }}>⏳ Chờ CEO Phê Duyệt</span>
-                      ) : isCeoApproved ? (
-                        <span style={{ fontSize: '0.72rem', color: '#16a34a', fontWeight: 700, backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', padding: '1px 6px', borderRadius: '4px' }}>✓ ĐÃ PHÊ DUYỆT</span>
-                      ) : (
-                        <span style={{ fontSize: '0.74rem', color: '#94a3b8', fontStyle: 'italic' }}>Chờ ký duyệt</span>
-                      )}
-                    </div>
+                    <div style={{ height: '48px' }} />
                     <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#0f172a' }}>Ban Giám Đốc</div>
                   </div>
                 </div>
