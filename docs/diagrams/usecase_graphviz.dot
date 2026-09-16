@@ -233,19 +233,23 @@ digraph UseCaseAetherPC {
   a14 [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="2"><TR><TD><IMG SRC="actor_icon.png"/></TD></TR><TR><TD>Nhân Viên<BR/>Nhân Sự</TD></TR></TABLE>>];
   a15 [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="2"><TR><TD><IMG SRC="actor_icon.png"/></TD></TR><TR><TD>Quản Trị Viên</TD></TR></TABLE>>];
   a16 [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="2"><TR><TD><IMG SRC="actor_icon.png"/></TD></TR><TR><TD>Ban Giám Đốc</TD></TR></TABLE>>];
-  { rank=same; a9; a10; a11; a12; a17; a13; a14; a15; a16; }
-  // a17 (Hệ Thống Email) đặt cạnh Giao Hàng vì email trạng thái đơn
-  // hàng gắn với bước xuất kho/giao hàng — không đi vòng xa.
-  a9 -> a10 -> a11 -> a12 -> a17 -> a13 -> a14 -> a15 -> a16 [style=invis];
-
   // ============================================================
   // ACTOR TỔNG QUÁT (a18) — «Nhân Viên», actor cha chung cho toàn bộ
-  // 13 vai trò nhân viên nội bộ. Đứng cạnh cột 3 (use case dùng chung)
-  // vì 2 use case của actor này ở đúng cột đó — không xếp vào cột 1
-  // hay cột 5 để tránh đường association dài xuyên qua các cột use
-  // case cụ thể ở giữa.
-  // ============================================================
+  // 13 vai trò nhân viên nội bộ. Khai báo TRƯỚC khi dùng trong rank=same
+  // bên dưới (dot yêu cầu node tồn tại trước khi gán rank cùng node khác).
+  // Xếp CÙNG RANK với cột 5 (không phải cột riêng): 2 use case của a18
+  // (uc_xinnghi/uc_luongtoi) đã bị ép vào rank cột 4 (xem khai báo use
+  // case), nên actor sở hữu chúng phải đứng đúng 1 rank sau đó — y hệt
+  // logic uc_grn -> a9, uc_xuatkho -> a10... Xếp a18 rời khỏi rank này
+  // (như thử ban đầu) khiến dot không còn đủ ràng buộc hợp lệ và đẩy cả
+  // a18 lẫn note_nhanvien lên tận đầu sơ đồ — lỗi đã gặp và sửa ở đây.
   a18 [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="2"><TR><TD><IMG SRC="actor_icon.png"/></TD></TR><TR><TD>Nhân Viên</TD></TR></TABLE>>];
+  { rank=same; a9; a10; a11; a12; a17; a13; a14; a15; a16; a18; }
+  // a17 (Hệ Thống Email) đặt cạnh Giao Hàng vì email trạng thái đơn
+  // hàng gắn với bước xuất kho/giao hàng — không đi vòng xa. a18 đặt
+  // CUỐI chuỗi (sau a16) vì nó chỉ liên quan use case ở cuối cột 4
+  // (uc_xinnghi/uc_luongtoi đứng sau uc_tonkho, sát uc_grn).
+  a9 -> a10 -> a11 -> a12 -> a17 -> a13 -> a14 -> a15 -> a16 -> a18 [style=invis];
 
   // ============================================================
   // ASSOCIATION — Actor cột 1 ↔ Use case cột 2 (liền kề)
@@ -274,11 +278,6 @@ digraph UseCaseAetherPC {
   a7 -> uc_taopo;
   a8 -> uc_qa;
   a8 -> uc_qctra;
-  // Nhân Viên (a18 — actor tổng quát, cột 3): 2 use case tự phục vụ, xem
-  // chú thích khai báo uc_xinnghi/uc_luongtoi ở trên để có trích dẫn route.
-  a18 -> uc_xinnghi;
-  a18 -> uc_luongtoi;
-
   // ============================================================
   // ASSOCIATION — Use case cột 4 ↔ Actor cột 5 (liền kề)
   // Chiều edge phải là uc -> actor (không phải actor -> uc) để dot xếp
@@ -293,6 +292,12 @@ digraph UseCaseAetherPC {
   uc_hosonv -> a14; uc_chamcong -> a14; uc_lapluong -> a14; uc_nghiphep -> a14;
   uc_qltk -> a15; uc_backup -> a15;
   uc_duyetpo -> a16; uc_duyetluong -> a16; uc_dashboard -> a16;
+  // Nhân Viên (a18): CHIỀU EDGE uc -> actor giống các actor cột 5 khác ở
+  // trên (không phải actor -> uc như thử ban đầu) — bắt buộc để a18 nằm
+  // đúng rank ngay sau cột 4 (nơi uc_xinnghi/uc_luongtoi đang đứng), tránh
+  // lỗi layout đã gặp: a18 và note_nhanvien bị đẩy lên tận đầu sơ đồ do
+  // không còn ràng buộc rank hợp lệ.
+  uc_xinnghi -> a18; uc_luongtoi -> a18;
   // Hệ Thống Email có 3 hàm thật trong emailService.js: sendOrderConfirmationEmail
   // (order.controller.js dòng ~280, trong createOrder — backing uc_dathang),
   // sendWelcomeEmail (auth.controller.js, trong registerCustomer — backing
@@ -322,12 +327,14 @@ digraph UseCaseAetherPC {
   uc_giaohang -> a17 [style=dashed];
 
   // ============================================================
-  // GENERALIZATION — 14 quan hệ, tam giác rỗng LUÔN nằm ở đầu actor
-  // TỔNG QUÁT (cha), mũi tên hướng TỪ actor cụ thể (con) ĐẾN actor
-  // tổng quát — đã sửa lỗi chiều mũi tên (mục 5): trước đây dùng
-  // dir=back + arrowtail khiến tam giác rơi vào đầu Khách Hàng thay
-  // vì Khách Vãng Lai. Cách đúng: dir=forward (mặc định) + arrowhead=
-  // empty, vì head của cạnh actor_con -> actor_cha CHÍNH LÀ actor cha.
+  // GENERALIZATION — 3 quan hệ vẽ tường minh (tam giác rỗng LUÔN nằm ở
+  // đầu actor TỔNG QUÁT/cha, mũi tên hướng TỪ actor cụ thể/con ĐẾN actor
+  // tổng quát — đã sửa lỗi chiều mũi tên (mục 5): trước đây dùng dir=back
+  // + arrowtail khiến tam giác rơi vào đầu Khách Hàng thay vì Khách Vãng
+  // Lai. Cách đúng: dir=forward (mặc định) + arrowhead=empty, vì head của
+  // cạnh actor_con -> actor_cha CHÍNH LÀ actor cha) + 1 quan hệ generalization
+  // thứ 4 (Nhân Viên) ghi bằng NOTE thay vì vẽ 11 mũi tên riêng — xem giải
+  // thích ở khai báo note_nhanvien bên dưới.
   // ============================================================
   a2  -> a1 [arrowhead=empty, style=solid, constraint=false, weight=0];
   // Quản Lý Kho làm được mọi việc Nhân Viên Kho làm (toàn bộ route
@@ -339,29 +346,34 @@ digraph UseCaseAetherPC {
   // làm (POS, xử lý đơn) cộng thêm quyền duyệt hủy đơn riêng.
   a5  -> a4 [arrowhead=empty, style=solid, constraint=false, weight=0];
 
-  // 11 quan hệ mới: MỌI actor nhân viên nội bộ kế thừa từ «Nhân Viên»
-  // (a18) — chỉ vẽ từ actor "gốc" của mỗi nhánh, KHÔNG vẽ thêm từ a5/a10
-  // (Quản Lý Bán Hàng/Quản Lý Kho) vì generalization có tính bắc cầu:
-  // a5->a4 và a4->a18 đã đủ suy ra a5 kế thừa a18, vẽ thêm là association
-  // trùng — đúng nguyên tắc đã áp dụng cho a2->a1 ở khai báo uc_xemsp phía
-  // trên. Cả 11 actor dưới đây đều có mặt trong danh sách role của route
-  // GET/POST /hr/leaves và GET /hr/payrolls/mine (xem chú thích
-  // uc_xinnghi/uc_luongtoi) nên đều đủ điều kiện. constraint=false, weight=0
-  // giống 3 quan hệ trên: không ép a18 lệch rank theo hướng nào, tránh phá
-  // layout cột đã tối ưu — đổi lại 11 đường hội tụ về a18 là đặc điểm cố
-  // hữu của việc mô hình hoá "1 actor cha chung cho toàn bộ nhân viên",
-  // không phải lỗi vẽ.
-  a4  -> a18 [arrowhead=empty, style=solid, constraint=false, weight=0];
-  a6  -> a18 [arrowhead=empty, style=solid, constraint=false, weight=0];
-  a7  -> a18 [arrowhead=empty, style=solid, constraint=false, weight=0];
-  a8  -> a18 [arrowhead=empty, style=solid, constraint=false, weight=0];
-  a9  -> a18 [arrowhead=empty, style=solid, constraint=false, weight=0];
-  a11 -> a18 [arrowhead=empty, style=solid, constraint=false, weight=0];
-  a12 -> a18 [arrowhead=empty, style=solid, constraint=false, weight=0];
-  a13 -> a18 [arrowhead=empty, style=solid, constraint=false, weight=0];
-  a14 -> a18 [arrowhead=empty, style=solid, constraint=false, weight=0];
-  a15 -> a18 [arrowhead=empty, style=solid, constraint=false, weight=0];
-  a16 -> a18 [arrowhead=empty, style=solid, constraint=false, weight=0];
+  // Ban đầu thử vẽ đủ 11 mũi tên generalization riêng lẻ từ mỗi actor gốc
+  // (Bán Hàng, CSKH, Mua Hàng, QC, Kho, Lắp Ráp, Giao Hàng, Kế Toán, Nhân
+  // Sự, Quản Trị Viên, Ban Giám Đốc) hội tụ về a18 — nhưng 11 đường cắt
+  // ngang gần hết bề rộng sơ đồ (nhiều actor ở cột 1, nhiều actor ở cột 5,
+  // 1 actor cha ở giữa) làm rối hơn là làm rõ, phản tác dụng với mục đích
+  // của UML use case diagram (dễ đọc tổng quan). Thay bằng 1 NOTE (chuẩn
+  // UML: hình chữ nhật gấp góc, nối actor bằng đường nối không mũi tên) —
+  // đây là cách xử lý được chấp nhận trong thực hành UML khi 1 actor cha
+  // có quá nhiều actor con để vẽ generalization tường minh mà vẫn giữ sơ
+  // đồ dễ đọc, miễn ghi rõ đầy đủ danh sách quan hệ bằng văn bản (không
+  // che giấu thông tin, chỉ đổi cách trình bày). Danh sách 11 actor vẫn
+  // đúng logic bắc cầu như bản trước: không liệt kê Quản Lý Bán Hàng/Quản
+  // Lý Kho vì đã kế thừa qua Nhân Viên Bán Hàng/Nhân Viên Kho.
+  note_nhanvien [shape=note, style=filled, fillcolor="#fffde7", color="#999999",
+    fontsize=9, fontname="Arial", margin=0.15,
+    label="«generalization»\nActor «Nhân Viên» là actor cha chung (kế thừa\ntoàn bộ 2 use case tự phục vụ ở trên) của 11 actor:\nNV Bán Hàng, NV CSKH, NV Mua Hàng, NV QC, NV Kho,\nNV Lắp Ráp, NV Giao Hàng, NV Kế Toán, NV Nhân Sự,\nQuản Trị Viên, Ban Giám Đốc. (Quản Lý Bán Hàng và\nQuản Lý Kho kế thừa bắc cầu qua NV Bán Hàng/NV Kho,\nkhông liệt kê trùng — xem 2 generalization phía trên).\nCăn cứ: cả 11 actor đều có trong danh sách role của\nGET/POST /hr/leaves và GET /hr/payrolls/mine."];
+  a18 -> note_nhanvien [style=dashed, arrowhead=none, constraint=false, weight=0];
+
+  // NOTE thứ 2 — giải thích trực quan NGAY TRÊN sơ đồ vì sao không có use
+  // case "Đăng Nhập Hệ Thống": trước đây lý do này chỉ nằm trong comment mã
+  // nguồn .dot (không ai đọc được khi chỉ xem file .svg/.png xuất ra), nay
+  // ghi lại thành note gắn vào ranh giới hệ thống (lhead=cluster_system) để
+  // người xem ảnh render cũng biết đây là quyết định có chủ đích, không
+  // phải thiếu sót.
+  note_login [shape=note, style=filled, fillcolor="#fffde7", color="#999999",
+    fontsize=9, fontname="Arial", margin=0.15,
+    label="Precondition: MỌI use case trong ranh giới hệ thống\n(trừ 3 use case công khai của Khách Vãng Lai) đều yêu\ncầu actor đã Đăng Nhập Hệ Thống (xác thực JWT) thành\ncông. Không vẽ \"Đăng Nhập\" thành use case/«include» vì\nđó là điều kiện tiên quyết của gần như mọi luồng, không\nphải 1 bước con bên trong 1 use case cụ thể — ghi ở cột\nPrecondition của Bảng Đặc Tả Use Case mới đúng chuẩn UML."];
+  note_login -> uc_xemsp [style=dashed, arrowhead=none, constraint=false, weight=0, lhead=cluster_system];
 
   // ============================================================
   // INCLUDE — nhóm 1: 3 quan hệ cùng trỏ về use case dùng chung duy
