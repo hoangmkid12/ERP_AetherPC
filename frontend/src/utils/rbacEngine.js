@@ -35,11 +35,11 @@ export const ERP_ROLES = [
 export const OPERATIONAL_PERMISSIONS = [
   // 1. Phân Hệ Bán Hàng & Đơn Hàng
   { id: 'sales_pos_checkout', moduleId: 'sales', name: 'Bán lẻ tại quầy POS & in phiếu thu', desc: 'Mở ca thu ngân, quét mã vạch linh kiện và thanh toán tại quầy' },
-  { id: 'sales_approve_discount', moduleId: 'sales', name: 'Duyệt chiết khấu bán lẻ vượt hạn mức (> 10%)', desc: 'Phê duyệt mức giảm giá đặc biệt cho khách hàng thân thiết hoặc đơn lớn' },
-  { id: 'sales_cancel_order', moduleId: 'sales', name: 'Duyệt hủy đơn hàng & hoàn tiền khách', desc: 'Xác nhận hủy đơn hàng và cho phép hoàn tiền theo quy định' },
-  { id: 'sales_manage_promotions', moduleId: 'sales', name: 'Quản lý bảng giá & chương trình khuyến mãi', desc: 'Thêm sửa xóa các mã giảm giá và chiến dịch khuyến mãi' },
+  { id: 'sales_approve_discount', moduleId: 'sales', name: 'Duyệt chiết khấu bán lẻ vượt hạn mức (> 10%)', desc: 'Phê duyệt mức giảm giá đặc biệt cho khách hàng thân thiết hoặc đơn lớn', backendEnforced: true },
+  { id: 'sales_cancel_order', moduleId: 'sales', name: 'Duyệt hủy đơn hàng & hoàn tiền khách', desc: 'Xác nhận hủy đơn hàng và cho phép hoàn tiền theo quy định', backendEnforced: true },
+  { id: 'sales_manage_promotions', moduleId: 'sales', name: 'Quản lý bảng giá & chương trình khuyến mãi', desc: 'Thêm sửa xóa các mã giảm giá và chiến dịch khuyến mãi', backendEnforced: true },
   { id: 'sales_view_orders', moduleId: 'sales', name: 'Xem danh sách và tra cứu lịch sử đơn hàng', desc: 'Tra cứu toàn bộ đơn hàng của cửa hàng và trạng thái xử lý' },
-  { id: 'sales_manage_customers', moduleId: 'sales', name: 'Thêm, sửa, vô hiệu hóa & xóa tài khoản khách hàng', desc: 'Quản lý tài khoản khách hàng thật trong hệ thống (tab Khách Hàng CRM)' },
+  { id: 'sales_manage_customers', moduleId: 'sales', name: 'Thêm, sửa, vô hiệu hóa & xóa tài khoản khách hàng', desc: 'Quản lý tài khoản khách hàng thật trong hệ thống (tab Khách Hàng CRM)', backendEnforced: true },
 
   // 2. Phân Hệ Kho Vận & Tồn Kho
   { id: 'warehouse_pack_scan', moduleId: 'warehouse', name: 'Đóng gói & quét mã vạch niêm phong (Thủ kho)', desc: 'Thao tác vật lý: lấy linh kiện, kiểm tra seal và quét mã đóng gói kiện hàng' },
@@ -54,7 +54,7 @@ export const OPERATIONAL_PERMISSIONS = [
   // 3. Phân Hệ Mua Hàng & Nhà Cung Cấp
   { id: 'purchasing_create_rfq', moduleId: 'purchasing', name: 'Lập & gửi Yêu Cầu Báo Giá (RFQ) đa NCC', desc: 'Tiếp nhận PR từ kho, chọn danh sách nhà cung cấp phù hợp và gửi RFQ' },
   { id: 'purchasing_compare_quotes', moduleId: 'purchasing', name: 'So sánh bảng giá NCC & lập tờ trình báo giá', desc: 'Tổng hợp ma trận đánh giá giá cả, hạn mức nợ và chất lượng để trình cấp trên' },
-  { id: 'purchasing_approve_po', moduleId: 'purchasing', name: 'Ký duyệt Báo Giá / Đơn PO (Ban Giám Đốc)', desc: 'CEO phê duyệt chính thức bảng chào giá để phát hành đơn mua hàng PO' },
+  { id: 'purchasing_approve_po', moduleId: 'purchasing', name: 'Ký duyệt Báo Giá / Đơn PO (Ban Giám Đốc)', desc: 'CEO phê duyệt chính thức bảng chào giá để phát hành đơn mua hàng PO', backendEnforced: true },
   { id: 'purchasing_issue_po', moduleId: 'purchasing', name: 'Phát hành & gửi Đơn Mua Hàng (PO) tới NCC', desc: 'Ký hợp đồng và gửi đơn PO chính thức yêu cầu nhà cung cấp giao hàng' },
   { id: 'purchasing_manage_suppliers', moduleId: 'purchasing', name: 'Quản lý danh bạ & đánh giá Nhà Cung Cấp', desc: 'Thêm mới thông tin NCC, thời hạn thanh toán và chấm điểm chất lượng' },
   { id: 'purchasing_view_orders', moduleId: 'purchasing', name: 'Tra cứu đơn mua hàng & nhà cung cấp', desc: 'Xem danh sách PO, báo giá và hồ sơ NCC mà không thao tác tạo/duyệt' },
@@ -78,7 +78,7 @@ export const OPERATIONAL_PERMISSIONS = [
   // 7. Phân Hệ Kế Toán & Tài Chính
   { id: 'accounting_pay_po', moduleId: 'accounting', name: 'Chi trả tiền hàng cho Nhà Cung Cấp theo đơn PO', desc: 'Đối soát hóa đơn và thực hiện lệnh chuyển khoản thanh toán cho NCC' },
   { id: 'accounting_settle_cod', moduleId: 'accounting', name: 'Đối soát & thu hồi tiền COD từ đội ngũ Shipper', desc: 'Thu tiền mặt và chốt sổ dòng tiền giao hàng hàng ngày' },
-  { id: 'accounting_disburse_payroll', moduleId: 'accounting', name: 'Giải ngân chi trả bảng lương nhân sự', desc: 'Thực hiện chuyển khoản lương định kỳ sau khi CEO đã phê duyệt' },
+  { id: 'accounting_disburse_payroll', moduleId: 'accounting', name: 'Giải ngân chi trả bảng lương nhân sự', desc: 'Thực hiện chuyển khoản lương định kỳ sau khi CEO đã phê duyệt', backendEnforced: true },
   { id: 'accounting_manage_invoices', moduleId: 'accounting', name: 'Quản lý sổ quỹ thu chi & xuất hóa đơn VAT', desc: 'Ghi nhận mọi bút toán thu chi và phát hành hóa đơn tài chính' },
 
   // 8. Phân Hệ Chăm Sóc Khách Hàng (CSKH)
@@ -86,14 +86,24 @@ export const OPERATIONAL_PERMISSIONS = [
   { id: 'cskh_approve_exchange', moduleId: 'cskh', name: 'Duyệt phương án đổi mới / bồi hoàn cho khách', desc: 'Xác nhận giải pháp hỗ trợ sau khi có kết quả thẩm định từ phòng QA/QC' },
 
   // 9. Phân Hệ Quản Trị Nhân Sự (HR)
-  { id: 'hr_manage_employees', moduleId: 'hr', name: 'Quản lý hồ sơ nhân viên, chấm công & ngày phép', desc: 'Theo dõi hợp đồng lao động, dữ liệu vân tay chấm công và đơn xin nghỉ phép' },
+  { id: 'hr_manage_employees', moduleId: 'hr', name: 'Quản lý hồ sơ nhân viên, chấm công & ngày phép', desc: 'Theo dõi hợp đồng lao động, dữ liệu vân tay chấm công và đơn xin nghỉ phép', backendEnforced: true },
   { id: 'hr_prepare_payroll', moduleId: 'hr', name: 'Tổng hợp công & lập Bảng lương hàng tháng', desc: 'Tính toán thưởng phạt, bảo hiểm và lập bảng lương hoàn chỉnh trình CEO' },
-  { id: 'hr_approve_payroll_ceo', moduleId: 'hr', name: 'Phê duyệt Bảng lương toàn công ty (Ban Giám Đốc)', desc: 'CEO kiểm tra tổng quỹ lương và ký duyệt giải ngân' },
+  { id: 'hr_approve_payroll_ceo', moduleId: 'hr', name: 'Phê duyệt Bảng lương toàn công ty (Ban Giám Đốc)', desc: 'CEO kiểm tra tổng quỹ lương và ký duyệt giải ngân', backendEnforced: true },
 
   // 10. Phân Hệ Báo Cáo Tổng Quan & Quản Trị
   { id: 'dashboard_view_kpi', moduleId: 'dashboard', name: 'Xem báo cáo tổng thể KPI, doanh thu & lợi nhuận P&L', desc: 'Theo dõi bức tranh tài chính, dòng tiền và hiệu quả kinh doanh toàn doanh nghiệp' },
   { id: 'system_admin_full', moduleId: 'system', name: 'Toàn quyền cấu hình hệ thống, tài khoản & sao lưu', desc: 'Quản lý phân quyền RBAC, kiểm soát bảo mật và sao lưu dữ liệu' }
 ];
+
+// Tập con các nghiệp vụ mà backend THỰC SỰ chặn API qua
+// checkOperationalPermission()/hasOperationalPermission() (rbac.middleware.js)
+// — nguồn duy nhất cho biết toggle nào trong ma trận là kiểm soát bảo mật thật,
+// khác với phần còn lại chỉ ẩn/hiện giao diện. Đánh dấu trực tiếp trên từng
+// entry (backendEnforced: true) ở trên thay vì một danh sách tách rời, để
+// không thể lệch nhau khi có route mới thêm/bớt enforcement — mọi nơi cần
+// biết (banner cảnh báo, badge trên từng dòng trong ma trận) đều đọc từ đây.
+export const BACKEND_ENFORCED_OPERATIONS = OPERATIONAL_PERMISSIONS.filter(op => op.backendEnforced);
+export const BACKEND_ENFORCED_OPERATION_IDS = BACKEND_ENFORCED_OPERATIONS.map(op => op.id);
 
 // Ma trận quyền hạn nghiệp vụ mặc định chuẩn hóa theo đúng vai trò thực tế
 export const DEFAULT_OPERATIONAL_MATRIX = {
@@ -125,7 +135,15 @@ export const DEFAULT_OPERATIONAL_MATRIX = {
     qc_view_logs: true,
     cskh_approve_exchange: true,
     delivery_view_dashboard: true,
-    assembly_view_dashboard: true
+    assembly_view_dashboard: true,
+    // hr.routes.js PATCH /employees/:id/status (vô hiệu hóa/kích hoạt nhân
+    // viên) cấp quyền thật cho CEO ở authMiddleware(['ADMIN','HR','CEO']) —
+    // trước đây thiếu ở đây nên checkOperationalPermission('hr_manage_employees')
+    // vẫn chặn CEO dù route đã cho phép (ma trận này 403 dù authMiddleware pass).
+    hr_manage_employees: true,
+    // promotion.routes.js MANAGE_ROLES = ['SALES_MANAGER','CEO','ADMIN'] cấp
+    // quyền thật cho CEO tạo/sửa/xóa khuyến mãi — cùng lỗi thiếu như trên.
+    sales_manage_promotions: true
   },
   SALES_MANAGER: {
     sales_view_orders: true,

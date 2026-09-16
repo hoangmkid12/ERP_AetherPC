@@ -31,6 +31,7 @@ import {
   getRoleRelevantModules,
   OPERATIONAL_PERMISSIONS,
   DEFAULT_OPERATIONAL_MATRIX,
+  BACKEND_ENFORCED_OPERATIONS,
   getOperationalRbac,
   saveOperationalRbac
 } from '../../utils/rbacEngine';
@@ -1249,19 +1250,19 @@ export default function SystemAdmin() {
             {/* Phần lớn ma trận này vẫn chỉ điều khiển việc ẨN/HIỆN menu và khoá/mở
                 nút trên giao diện — quyền gọi API cho đa số tác vụ vẫn do
                 authMiddleware() ở từng route backend quyết định độc lập, không
-                đọc ma trận này. Ngoại lệ: 6 tác vụ rủi ro cao nhất (duyệt PO,
-                CEO duyệt lương, giải ngân lương, hủy đơn & hoàn tiền, vô hiệu
-                hóa nhân viên, quản lý tài khoản khách hàng) ĐÃ được backend
-                thực sự kiểm tra qua bảng này (checkOperationalPermission, xem
-                rbac.middleware.js) — tắt 1 trong 6 quyền đó sẽ chặn thật API
-                tương ứng, không chỉ ẩn nút. */}
+                đọc ma trận này. Danh sách các tác vụ rủi ro cao ĐÃ được backend
+                thực sự kiểm tra qua bảng này (checkOperationalPermission /
+                hasOperationalPermission, xem rbac.middleware.js) được lấy trực
+                tiếp từ BACKEND_ENFORCED_OPERATIONS (rbacEngine.js) — cùng 1 cờ
+                backendEnforced cũng đánh dấu badge "Backend thực thi" trên từng
+                dòng bên dưới, nên banner này và badge không thể lệch nhau như
+                câu chữ cố định trước đây (từng ghi thiếu 2/8 tác vụ thật). */}
             <div style={{ backgroundColor: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px', padding: '0.75rem 1rem', fontSize: '0.8rem', color: '#92400e', display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
               <AlertTriangle size={16} style={{ flexShrink: 0, marginTop: '1px' }} />
               <span>
                 Phần lớn đây là cấu hình <strong>hiển thị giao diện</strong> (ẩn/hiện menu, khoá nút) theo vai trò —
                 quyền gọi API cho đa số tác vụ vẫn do backend kiểm soát độc lập theo vai trò đăng nhập.
-                Riêng <strong>6 tác vụ rủi ro cao</strong> (Ký duyệt Báo Giá/PO, Phê duyệt Bảng lương, Giải ngân lương,
-                Duyệt hủy đơn & hoàn tiền, Quản lý hồ sơ nhân viên, Quản lý tài khoản khách hàng) đã được backend <strong>thực sự chặn API</strong> theo đúng thiết lập ở đây.
+                Riêng <strong>{BACKEND_ENFORCED_OPERATIONS.length} tác vụ rủi ro cao</strong> ({BACKEND_ENFORCED_OPERATIONS.map(op => op.name).join(', ')}) đã được backend <strong>thực sự chặn API</strong> theo đúng thiết lập ở đây — nhận biết qua nhãn <ShieldCheck size={12} style={{ display: 'inline', verticalAlign: '-2px' }} /> <strong>Backend thực thi</strong> trên từng dòng.
               </span>
             </div>
 
@@ -1565,8 +1566,20 @@ export default function SystemAdmin() {
                                     }}
                                   />
                                   <div>
-                                    <div style={{ fontSize: '0.82rem', fontWeight: 700, color: isEnabled ? '#15803d' : '#334155' }}>
+                                    <div style={{ fontSize: '0.82rem', fontWeight: 700, color: isEnabled ? '#15803d' : '#334155', display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
                                       {op.name}
+                                      {op.backendEnforced && (
+                                        <span
+                                          title="Backend thực sự chặn API theo đúng thiết lập này (không chỉ ẩn nút trên giao diện)"
+                                          style={{
+                                            display: 'inline-flex', alignItems: 'center', gap: '3px',
+                                            fontSize: '0.66rem', fontWeight: 800, padding: '1px 6px', borderRadius: '999px',
+                                            backgroundColor: '#fef3c7', color: '#92400e', border: '1px solid #fde68a'
+                                          }}
+                                        >
+                                          <ShieldCheck size={11} /> Backend thực thi
+                                        </span>
+                                      )}
                                     </div>
                                     <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '0.15rem' }}>
                                       {op.desc}

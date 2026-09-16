@@ -10,18 +10,28 @@ const prisma = new PrismaClient();
 // the RBAC screen yet. Only seeds rows for these enforced operations, not
 // the full 56-operation matrix — that one stays a display-only concern for
 // the frontend to seed via its own UI, per the scoped Phase 3 plan.
+// Danh sách này phải là tập con đầy đủ của DEFAULT_OPERATIONAL_MATRIX phía
+// frontend (rbacEngine.js) ứng với các operationId có backendEnforced: true —
+// thiếu 1 cặp ở đây nghĩa là màn hình RBAC hiển thị ô đã tích (✓ Cho phép thao
+// tác) cho vai trò đó, nhưng gọi API thật vẫn bị 403 cho tới khi có admin nào
+// đó mở trang RBAC và bấm Lưu. Đã từng xảy ra: SALES_MANAGER hiển thị đủ 4
+// quyền sales_* nhưng seed cũ chỉ cấp đúng 1 (sales_cancel_order); CEO thiếu
+// hr_manage_employees dù route hr.routes.js cho phép CEO. Khi thêm quyền mới
+// vào DEFAULT_OPERATIONAL_MATRIX cho 1 trong 8 operationId backendEnforced,
+// nhớ thêm cặp tương ứng ở đây.
 const DEFAULT_GRANTS = [
   { role: 'CEO', operationId: 'purchasing_approve_po' },
   { role: 'CEO', operationId: 'hr_approve_payroll_ceo' },
-  { role: 'ACCOUNTANT', operationId: 'accounting_disburse_payroll' },
-  { role: 'SALES_MANAGER', operationId: 'sales_cancel_order' },
-  { role: 'HR', operationId: 'hr_manage_employees' },
+  { role: 'CEO', operationId: 'hr_manage_employees' },
   { role: 'CEO', operationId: 'sales_manage_customers' },
-  { role: 'SALES_MANAGER', operationId: 'sales_manage_customers' },
   { role: 'CEO', operationId: 'sales_approve_discount' },
-  { role: 'SALES_MANAGER', operationId: 'sales_approve_discount' },
   { role: 'CEO', operationId: 'sales_manage_promotions' },
-  { role: 'SALES_MANAGER', operationId: 'sales_manage_promotions' }
+  { role: 'SALES_MANAGER', operationId: 'sales_cancel_order' },
+  { role: 'SALES_MANAGER', operationId: 'sales_manage_customers' },
+  { role: 'SALES_MANAGER', operationId: 'sales_approve_discount' },
+  { role: 'SALES_MANAGER', operationId: 'sales_manage_promotions' },
+  { role: 'ACCOUNTANT', operationId: 'accounting_disburse_payroll' },
+  { role: 'HR', operationId: 'hr_manage_employees' }
 ];
 
 async function run() {
