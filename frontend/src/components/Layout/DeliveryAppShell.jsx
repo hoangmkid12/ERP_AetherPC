@@ -43,50 +43,6 @@ export default function DeliveryAppShell({ children }) {
 
   const [shipperStatus, setShipperStatus] = useState(() => getInitialShipperStatus(user));
 
-  // Shipper tự xin nghỉ phép của chính mình — cùng API self-service /hr/leaves
-  // đã dùng ở Sidebar.jsx cho các actor khác, vì DeliveryAppShell là shell
-  // riêng (không dùng Sidebar) nên phải khai báo lại ở đây.
-  const createMyLeaveRequest = useHRStore(state => state.createMyLeaveRequest);
-  const getMyLeaveRequests = useHRStore(state => state.getMyLeaveRequests);
-  const [showLeaveModal, setShowLeaveModal] = useState(false);
-  const [myLeaves, setMyLeaves] = useState([]);
-  const [loadingMyLeaves, setLoadingMyLeaves] = useState(false);
-  const [submittingLeave, setSubmittingLeave] = useState(false);
-  const [leaveForm, setLeaveForm] = useState({ type: 'Phép Năm', startDate: '', endDate: '', reason: '' });
-
-  const openLeaveModal = async () => {
-    setShowLeaveModal(true);
-    if (typeof getMyLeaveRequests !== 'function') return;
-    setLoadingMyLeaves(true);
-    try {
-      const data = await getMyLeaveRequests();
-      setMyLeaves(Array.isArray(data) ? data : []);
-    } catch (err) {
-      notify(err.message || 'Không thể tải đơn nghỉ phép của bạn.', 'error');
-    } finally {
-      setLoadingMyLeaves(false);
-    }
-  };
-
-  const handleSubmitLeaveRequest = async () => {
-    if (!leaveForm.startDate || !leaveForm.endDate) {
-      notify('Vui lòng chọn ngày bắt đầu và kết thúc.', 'error');
-      return;
-    }
-    if (typeof createMyLeaveRequest !== 'function') return;
-    setSubmittingLeave(true);
-    try {
-      const created = await createMyLeaveRequest(leaveForm);
-      setMyLeaves(prev => [created, ...prev]);
-      setLeaveForm({ type: 'Phép Năm', startDate: '', endDate: '', reason: '' });
-      notify('Đã gửi đơn xin nghỉ phép, chờ HR/CEO phê duyệt.', 'success');
-    } catch (err) {
-      notify(err.message || 'Không thể gửi đơn xin nghỉ phép.', 'error');
-    } finally {
-      setSubmittingLeave(false);
-    }
-  };
-
   const toggleShipperStatus = () => {
     const online = !shipperStatus.isOnline;
     const newStatus = { isOnline: online, reason: '', updatedAt: new Date().toISOString() };
@@ -157,12 +113,105 @@ export default function DeliveryAppShell({ children }) {
     active: myAssignedOrders.length
   };
 
+  const displayName = user?.fullname || 'Nhân Viên Giao Hàng';
+
+  // ── Chat trực tiếp với CSKH (xử lý đơn có vấn đề) — dùng chung hạ tầng
+  // /ws/cskh + REST fallback /chat/cskh/send mà widget CSKH của khách hàng
+  // (Chatbot.jsx) và nút "Báo CSKH" trong Delivery/index.jsx đã dùng. sessionId
+  // riêng theo shipper để không trộn lẫn với phiên chat của khách hàng, và
+  // customerName gắn rõ "Shipper" + khu vực để CSKH nhận ra ngay trong danh
+  // sách phiên của họ.
+  const regionShortName = DELIVERY_REGIONS.find(r => r.code === shipperRegion)?.shortName || shipperRegion;
+  const cskhSessionId = `session_shipper_${userIdStr || 'unknown'}`;
+  const cskhCustomerName = `🚚 Shipper ${displayName} (${regionShortName})`;
+  const cskhGreeting = () => ({
+    sender: 'cskh',
+    text: 'Xin chào! Đây là kênh chat trực tiếp với CSKH dành cho Shipper — hãy nhắn nếu đơn hàng đang giao gặp vấn đề (khách từ chối nhận, sai địa chỉ, không liên lạc được...), CSKH sẽ hỗ trợ ngay.',
+    time: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
+  });
+
+  const [showChatModal, setShowChatModal] = useState(false);
+  const [chatMessages, setChatMessages] = useState(() => [cskhGreeting()]);
+  const [chatInput, setChatInput] = useState('');
+  const [hasUnreadChat, setHasUnreadChat] = useState(false);
+  const chatWsRef = useRef(null);
+  const chatMessagesEndRef = useRef(null);
+
+  useEffect(() => {
+    let reconnectTimeout = null;
+
+    const connectChatWS = () => {
+      try {
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const ws = new WebSocket(`${wsProtocol}//${window.location.host}/ws/cskh`);
+        chatWsRef.current = ws;
+
+        ws.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            if (data.type === 'UPDATE_SESSIONS' && data.newMsg?.sessionId === cskhSessionId) {
+              if (data.newMsg.sender === 'staff') {
+                setChatMessages(prev => [...prev, { sender: 'cskh', text: data.newMsg.text, time: data.newMsg.time }]);
+                setShowChatModal(current => {
+                  if (!current) setHasUnreadChat(true);
+                  return current;
+                });
+              }
+            }
+          } catch (_) {}
+        };
+
+        ws.onclose = () => {
+          reconnectTimeout = setTimeout(connectChatWS, 3000);
+        };
+      } catch (_) {
+        reconnectTimeout = setTimeout(connectChatWS, 3000);
+      }
+    };
+
+    connectChatWS();
+
+    return () => {
+      if (chatWsRef.current) chatWsRef.current.close();
+      if (reconnectTimeout) clearTimeout(reconnectTimeout);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cskhSessionId]);
+
+  useEffect(() => {
+    if (showChatModal) chatMessagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [chatMessages, showChatModal]);
+
+  const openChatModal = () => {
+    setShowChatModal(true);
+    setHasUnreadChat(false);
+  };
+
+  const handleSendChat = async (textToSend) => {
+    const text = (textToSend || chatInput).trim();
+    if (!text) return;
+
+    const time = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+    setChatMessages(prev => [...prev, { sender: 'user', text, time }]);
+    setChatInput('');
+
+    const payload = { sessionId: cskhSessionId, sender: 'customer', text, time, customerName: cskhCustomerName };
+
+    if (chatWsRef.current && chatWsRef.current.readyState === WebSocket.OPEN) {
+      chatWsRef.current.send(JSON.stringify({ type: 'CUSTOMER_SEND_MSG', payload }));
+    } else {
+      try {
+        await api.post('/chat/cskh/send', payload);
+      } catch (err) {
+        console.warn('Failed to send shipper CSKH message', err);
+      }
+    }
+  };
+
   const handleLogout = () => {
     logout();
     navigate('/login');
   };
-
-  const displayName = user?.fullname || 'Nhân Viên Giao Hàng';
 
   const goToTab = (tabId) => {
     navigate(`/admin/delivery?tab=${tabId}`);
@@ -225,8 +274,15 @@ export default function DeliveryAppShell({ children }) {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-            <button type="button" onClick={openLeaveModal} className="delivery-icon-btn" title="Xin nghỉ phép">
-              <CalendarCheck size={18} />
+            <button type="button" onClick={openChatModal} className="delivery-icon-btn" title="Chat với CSKH" style={{ position: 'relative' }}>
+              <MessageCircle size={18} />
+              {hasUnreadChat && (
+                <span style={{
+                  position: 'absolute', top: '2px', right: '2px',
+                  width: '9px', height: '9px', borderRadius: '999px',
+                  backgroundColor: 'var(--danger)', border: '1.5px solid var(--bg-primary)'
+                }} />
+              )}
             </button>
             <button
               type="button"
@@ -295,73 +351,78 @@ export default function DeliveryAppShell({ children }) {
         </div>
       </div>
 
-      {showLeaveModal && (
+      {showChatModal && (
         <div
           style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(6px)', zIndex: 100000001, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
-          onClick={() => setShowLeaveModal(false)}
+          onClick={() => setShowChatModal(false)}
         >
           <div
-            style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', width: '100%', maxWidth: '420px', padding: '1.25rem', maxHeight: '85vh', overflowY: 'auto' }}
+            style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', width: '100%', maxWidth: '420px', height: '75vh', maxHeight: '560px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
             onClick={e => e.stopPropagation()}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <CalendarCheck size={17} style={{ color: '#7c3aed' }} />
-                Nghỉ Phép Của Tôi
+            <div style={{ padding: '0.85rem 1rem', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+              <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <MessageCircle size={17} style={{ color: '#2563eb' }} />
+                Chat Với CSKH
               </h3>
-              <button onClick={() => setShowLeaveModal(false)} style={{ background: '#f1f5f9', border: 'none', padding: '0.4rem', borderRadius: '6px', cursor: 'pointer' }}><X size={16} /></button>
+              <button onClick={() => setShowChatModal(false)} style={{ background: '#f1f5f9', border: 'none', padding: '0.4rem', borderRadius: '6px', cursor: 'pointer' }}><X size={16} /></button>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', fontSize: '0.8rem', marginBottom: '1rem', padding: '0.75rem', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-              <select
-                value={leaveForm.type}
-                onChange={e => setLeaveForm(p => ({ ...p, type: e.target.value }))}
-                style={{ width: '100%', padding: '0.4rem 0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1', boxSizing: 'border-box', fontSize: '0.8rem' }}
-              >
-                <option value="Phép Năm">Phép Năm</option>
-                <option value="Nghỉ Ốm">Nghỉ Ốm</option>
-                <option value="Việc Riêng">Việc Riêng</option>
-                <option value="Không Lương">Không Lương</option>
-              </select>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-                <input type="date" value={leaveForm.startDate} onChange={e => setLeaveForm(p => ({ ...p, startDate: e.target.value }))} style={{ width: '100%', padding: '0.4rem 0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1', boxSizing: 'border-box', fontSize: '0.8rem' }} />
-                <input type="date" value={leaveForm.endDate} onChange={e => setLeaveForm(p => ({ ...p, endDate: e.target.value }))} style={{ width: '100%', padding: '0.4rem 0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1', boxSizing: 'border-box', fontSize: '0.8rem' }} />
-              </div>
-              <input type="text" placeholder="Lý do xin nghỉ" value={leaveForm.reason} onChange={e => setLeaveForm(p => ({ ...p, reason: e.target.value }))} style={{ width: '100%', padding: '0.4rem 0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1', boxSizing: 'border-box', fontSize: '0.8rem' }} />
-              <button
-                onClick={handleSubmitLeaveRequest}
-                disabled={submittingLeave}
-                style={{ backgroundColor: submittingLeave ? '#9ca3af' : '#7c3aed', color: '#fff', border: 'none', borderRadius: '6px', padding: '0.5rem', fontSize: '0.8rem', fontWeight: 800, cursor: submittingLeave ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}
-              >
-                <Send size={14} /> {submittingLeave ? 'Đang gửi...' : 'Gửi Đơn Xin Nghỉ'}
-              </button>
-            </div>
-
-            {loadingMyLeaves ? (
-              <p style={{ fontSize: '0.8rem', color: '#64748b' }}>Đang tải...</p>
-            ) : myLeaves.length === 0 ? (
-              <p style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Bạn chưa gửi đơn xin nghỉ phép nào.</p>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                {myLeaves.map((lv, idx) => (
-                  <div key={lv.id || idx} style={{ padding: '0.55rem 0.7rem', borderRadius: '6px', border: '1px solid #e2e8f0', backgroundColor: '#fff', fontSize: '0.76rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <strong style={{ color: '#0f172a' }}>{lv.type || 'Phép Năm'}</strong>
-                      <span style={{
-                        padding: '2px 8px', borderRadius: '10px', fontSize: '0.66rem', fontWeight: 800,
-                        backgroundColor: getStatusInfo(LEAVE_STATUS, ['APPROVED', 'REJECTED'].includes(lv.status) ? lv.status : 'PENDING').bg,
-                        color: getStatusInfo(LEAVE_STATUS, ['APPROVED', 'REJECTED'].includes(lv.status) ? lv.status : 'PENDING').color
-                      }}>
-                        {getStatusLabel(LEAVE_STATUS, ['APPROVED', 'REJECTED'].includes(lv.status) ? lv.status : 'PENDING')}
-                      </span>
-                    </div>
-                    <span style={{ color: '#64748b' }}>
-                      {lv.startDate ? new Date(lv.startDate).toLocaleDateString('vi-VN') : '---'} → {lv.endDate ? new Date(lv.endDate).toLocaleDateString('vi-VN') : '---'}
-                    </span>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', backgroundColor: '#f8fafc' }}>
+              {chatMessages.map((msg, i) => (
+                <div key={i} style={{ alignSelf: msg.sender === 'user' ? 'flex-end' : 'flex-start', maxWidth: '85%', display: 'flex', flexDirection: 'column', alignItems: msg.sender === 'user' ? 'flex-end' : 'flex-start' }}>
+                  <div style={{
+                    padding: '0.65rem 0.9rem',
+                    borderRadius: msg.sender === 'user' ? '14px 14px 2px 14px' : '14px 14px 14px 2px',
+                    background: msg.sender === 'user' ? 'linear-gradient(135deg, #2563eb, #1d4ed8)' : '#ffffff',
+                    border: msg.sender === 'user' ? 'none' : '1.5px solid #e2e8f0',
+                    color: msg.sender === 'user' ? '#ffffff' : '#0f172a',
+                    fontSize: '0.83rem',
+                    lineHeight: '1.5'
+                  }}>
+                    {msg.text}
                   </div>
-                ))}
-              </div>
-            )}
+                  <span style={{ fontSize: '0.65rem', color: '#64748b', marginTop: '0.2rem', fontWeight: 600 }}>{msg.time}</span>
+                </div>
+              ))}
+              <div ref={chatMessagesEndRef} />
+            </div>
+
+            <div style={{ padding: '0.5rem 0.75rem', borderTop: '1px solid #e2e8f0', backgroundColor: '#ffffff', display: 'flex', gap: '0.4rem', overflowX: 'auto', flexShrink: 0 }}>
+              {[
+                'Khách từ chối nhận hàng',
+                'Không liên lạc được khách',
+                'Địa chỉ giao hàng sai/không tìm thấy'
+              ].map((label, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => handleSendChat(label)}
+                  style={{ padding: '0.35rem 0.7rem', fontSize: '0.72rem', borderRadius: '20px', border: '1.5px solid #bfdbfe', backgroundColor: '#eff6ff', color: '#2563eb', fontWeight: 700, cursor: 'pointer', flexShrink: 0, whiteSpace: 'nowrap' }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            <form
+              onSubmit={(e) => { e.preventDefault(); handleSendChat(); }}
+              style={{ padding: '0.75rem', borderTop: '1px solid #cbd5e1', display: 'flex', gap: '0.5rem', alignItems: 'center', backgroundColor: '#ffffff', flexShrink: 0 }}
+            >
+              <input
+                type="text"
+                placeholder="Nhắn tin với CSKH về đơn hàng gặp vấn đề..."
+                value={chatInput}
+                onChange={e => setChatInput(e.target.value)}
+                style={{ flex: 1, padding: '0.55rem 0.85rem', backgroundColor: '#f8fafc', border: '1.5px solid #cbd5e1', borderRadius: '12px', color: '#0f172a', fontSize: '0.85rem', outline: 'none' }}
+              />
+              <button
+                type="submit"
+                style={{ width: '38px', height: '38px', borderRadius: '10px', backgroundColor: '#2563eb', border: 'none', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}
+              >
+                <Send size={16} />
+              </button>
+            </form>
           </div>
         </div>
       )}
