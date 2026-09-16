@@ -4163,7 +4163,6 @@ export default function Warehouse() {
                   <th style={{ padding: '0.75rem 1rem' }}>Mã Phiếu GRN</th>
                   <th style={{ padding: '0.75rem 1rem' }}>Mã Đơn PO</th>
                   <th style={{ padding: '0.75rem 1rem' }}>Nhà Cung Cấp</th>
-                  <th style={{ padding: '0.75rem 1rem' }}>Ngày Khởi Tạo</th>
                   <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Trạng Thái QA/QC</th>
                   <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Trạng Thái Kho</th>
                   <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Hành Động</th>
@@ -4172,7 +4171,7 @@ export default function Warehouse() {
               <tbody>
                 {filteredReceiptsList.length === 0 ? (
                   <tr>
-                    <td colSpan="7" style={{ textAlign: 'center', padding: '3rem', color: '#64748b' }}>
+                    <td colSpan="6" style={{ textAlign: 'center', padding: '3rem', color: '#64748b' }}>
                       Không có phiếu nhập kho nào phù hợp.
                     </td>
                   </tr>
@@ -4188,7 +4187,6 @@ export default function Warehouse() {
                       <td style={{ padding: '0.75rem 1rem', fontWeight: 700, color: '#2563eb' }}>{r.receiptNumber}</td>
                       <td style={{ padding: '0.75rem 1rem', color: '#0f172a' }}>{r.po?.poNumber || r.poId || '---'}</td>
                       <td style={{ padding: '0.75rem 1rem', color: '#475569' }}>{r.po?.supplier?.name || r.supplierName || 'Intel Vietnam'}</td>
-                      <td style={{ padding: '0.75rem 1rem', color: '#64748b' }}>{formatDateTime ? formatDateTime(r.createdAt) : new Date(r.createdAt).toLocaleDateString('vi-VN')}</td>
                       <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
                         {(() => {
                           const qcBadge = getReceiptQcBadge(r);
