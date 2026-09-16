@@ -2,6 +2,13 @@
 // Mặc định gọi server demo công khai (không có SLA); trỏ VITE_OSRM_BASE_URL
 const OSRM_BASE_URL = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_OSRM_BASE_URL) || 'https://router.project-osrm.org';
 
+// Goong Maps (rsapi.goong.io) - dịch vụ geocode của Việt Nam, dữ liệu số
+// nhà/tên đường/phường-xã (kể cả sau sáp nhập hành chính 2024-2025) chính xác
+// hơn hẳn Nominatim/OSM cho địa chỉ VN. Tương thích định dạng Google Maps
+// Geocoding API. Cần VITE_GOONG_API_KEY (đăng ký miễn phí tại goong.io) —
+// nếu chưa cấu hình, toàn bộ hệ thống tự động dùng lại Nominatim như trước.
+const GOONG_API_KEY = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_GOONG_API_KEY) || '';
+
 export async function fetchRoadRoute(origin, destination) {
   if (!origin?.lat || !origin?.lng || !destination?.lat || !destination?.lng) {
     return null;
@@ -81,6 +88,24 @@ export function sampleRoutePoints(coordinates, count = 35) {
 // theo mỗi lần cập nhật GPS (8s/lần đã đủ thưa nhưng vẫn nên throttle ở caller).
 export async function reverseGeocode(lat, lng) {
   if (typeof lat !== 'number' || typeof lng !== 'number') return null;
+
+  if (GOONG_API_KEY) {
+    try {
+      const url = `https://rsapi.goong.io/Geocode?latlng=${lat},${lng}&api_key=${GOONG_API_KEY}`;
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      const res = await fetch(url, { signal: controller.signal });
+      clearTimeout(timeoutId);
+      if (res.ok) {
+        const data = await res.json();
+        const address = data?.results?.[0]?.formatted_address;
+        if (address) return address;
+      }
+    } catch (err) {
+      console.warn('Không thể lấy địa chỉ hiện tại (Goong):', err.message);
+    }
+  }
+
   try {
     const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=17&addressdetails=0`;
     const controller = new AbortController();
@@ -123,83 +148,144 @@ const ADMIN_FALLBACK_COORDS = [
 // Forward Geocoding thông minh cho địa chỉ Việt Nam (tự động thích ứng cả địa phương 2 cấp và 3 cấp)
 const geocodeCache = new Map();
 
+// Gọi 1 query lên Goong Geocoding API — trả {lat,lng,displayName} hoặc null.
+async function geocodeQueryGoong(q) {
+  if (!GOONG_API_KEY) return null;
+  try {
+    const url = `https://rsapi.goong.io/geocode?address=${encodeURIComponent(q)}&api_key=${GOONG_API_KEY}`;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 4000);
+    const res = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeoutId);
+    if (res.ok) {
+      const data = await res.json();
+      const top = data?.results?.[0];
+      const loc = top?.geometry?.location;
+      if (loc && typeof loc.lat === 'number' && typeof loc.lng === 'number') {
+        return { lat: loc.lat, lng: loc.lng, displayName: top.formatted_address || q };
+      }
+    }
+  } catch (err) {
+    console.warn('Không thể geocode qua Goong:', err.message);
+  }
+  return null;
+}
+
+// Gọi 1 query lên Nominatim — trả {lat,lng,displayName} hoặc null.
+async function geocodeQueryNominatim(q) {
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&countrycodes=vn&limit=1`;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3500);
+    const res = await fetch(url, {
+      signal: controller.signal,
+      headers: { Accept: 'application/json', 'User-Agent': 'AetherPC-ERP/1.0' }
+    });
+    clearTimeout(timeoutId);
+    if (res.ok) {
+      const list = await res.json();
+      if (Array.isArray(list) && list.length > 0 && list[0].lat && list[0].lon) {
+        return { lat: parseFloat(list[0].lat), lng: parseFloat(list[0].lon), displayName: list[0].display_name };
+      }
+    }
+  } catch (_) {
+    // Tiếp tục fallback query tiếp theo
+  }
+  return null;
+}
+
 export async function forwardGeocode(address) {
   if (!address || typeof address !== 'string') return null;
   const cleanKey = address.trim().toLowerCase();
   if (geocodeCache.has(cleanKey)) return geocodeCache.get(cleanKey);
 
-  // 1. Làm sạch sơ bộ chuỗi địa chỉ
+  // 1. Làm sạch sơ bộ chuỗi địa chỉ — CHỈ bỏ ghi chú/tổ dân phố, GIỮ NGUYÊN số
+  // nhà/tên đường. Trước đây hàm này cắt bỏ hẳn "Số ..." khỏi mọi query, khiến
+  // không lần tra cứu nào còn đủ chi tiết để định vị đúng nhà — bản đồ vì vậy
+  // chỉ hiện tâm phường/xã (không đúng vị trí thực tế).
   const cleanAddr = address
     .replace(/\(Ghi chú:[^)]*\)/gi, '')
     .replace(/\s*\(gồm[^)]*\)/gi, '')
     .replace(/^Tổ\s+\d+[^,]*,/i, '')
-    .replace(/^Số\s+[^,]*,/i, '')
     .trim();
+  // Biến thể bỏ riêng chữ "Số" (giữ số nhà) — định dạng Nominatim dễ khớp hơn
+  const cleanAddrNoSoTu = cleanAddr.replace(/\bSố\s+(?=\d)/gi, '');
 
   // Tách các thành phần cách nhau bởi dấu phẩy
   const rawParts = cleanAddr.split(',').map(s => s.trim()).filter(Boolean);
 
-  // Bỏ từ định danh hành chính (Phường, Xã, Quận, Huyện, Thị xã, TP...)
+  // Bỏ từ định danh hành chính (Phường, Xã, Quận, Huyện, Thị xã, TP...). Ghi
+  // chú: buildStandardAddress() (vietnamProvinces.js) ghép nhãn phường/xã
+  // chưa rõ loại thành "Phường/Xã Tên" — khớp "Phường/Xã" trước (dài nhất) rồi
+  // mới tới từng từ đơn, và cho phép dấu "/" hoặc khoảng trắng sau tiền tố,
+  // nếu không "Phường/Xã Thắng Nhất" sẽ chỉ bị cắt nửa vời thành "Phường/Thắng
+  // Nhất" (còn sót "Phường/") do "Phường" không có khoảng trắng theo ngay sau.
   const stripPrefix = str => str
-    .replace(/\b(Phường|Xã|Thị trấn|Thị xã|Quận|Huyện|Thành phố|Tỉnh|TP\.?)\s+/gi, '')
+    .replace(/\b(Phường\/Xã|Xã\/Phường|Phường|Xã|Thị trấn|Thị xã|Quận|Huyện|Thành phố|Tỉnh|TP\.?)[\s/]+/gi, '')
     .trim();
 
   const cleanParts = rawParts.map(stripPrefix).filter(Boolean);
 
+  // Xác định các cấp hành chính theo SỐ LƯỢNG phần tử thực tế thay vì luôn coi 3
+  // phần tử cuối là Phường/Quận/Tỉnh — địa chỉ "2 cấp" (sau sáp nhập, không còn
+  // quận/huyện) chỉ có [Số nhà+đường, Phường/Xã, Tỉnh/TP] = 3 phần tử. Coi nhầm
+  // sẽ khiến tên đường bị tra như tên phường ⇒ ra toạ độ sai/nhảy lung tung.
+  let street = null, ward = null, district = null, province = null;
+  if (cleanParts.length >= 4) {
+    province = cleanParts[cleanParts.length - 1];
+    district = cleanParts[cleanParts.length - 2];
+    ward = cleanParts[cleanParts.length - 3];
+    street = cleanParts.slice(0, cleanParts.length - 3).join(', ');
+  } else if (cleanParts.length === 3) {
+    province = cleanParts[2];
+    ward = cleanParts[1];
+    street = cleanParts[0];
+  } else if (cleanParts.length === 2) {
+    province = cleanParts[1];
+    ward = cleanParts[0];
+  } else if (cleanParts.length === 1) {
+    ward = cleanParts[0];
+  }
+
+  // Danh sách tỉnh/thành trong vietnamProvinces.js đã gộp theo "siêu tỉnh" sau
+  // sáp nhập 2025 (VD nhiều quận/huyện vốn thuộc Bình Dương, Bà Rịa-Vũng Tàu...
+  // giờ đều gắn nhãn tỉnh "Thành phố Hồ Chí Minh"), trong khi CSDL bản đồ
+  // (Goong/Nominatim) vẫn dùng tên tỉnh THỰC TẾ cũ. Nhét nhãn tỉnh sai vào query
+  // có thể khiến geocoder khớp NHẦM sang 1 phường/xã trùng tên ở tỉnh khác hẳn
+  // — đã kiểm chứng thực tế: "Thị xã Phú Mỹ, Thành phố Hồ Chí Minh" bị Goong
+  // khớp nhầm sang phường Phú Mỹ ở Quận 7 thay vì đúng Thị xã Phú Mỹ, Bà
+  // Rịa-Vũng Tàu (cách nhau ~100km), trong khi bỏ hẳn tỉnh ra thì khớp đúng.
+  // Quận/huyện/phường-xã tự nó đã đủ đặc trưng để geocoder tự suy ra đúng tỉnh
+  // thật, nên luôn thử KHÔNG kèm tỉnh trước, kèm tỉnh sau cùng làm dự phòng.
   const queries = [];
 
-  if (cleanParts.length >= 3) {
-    // Trường hợp 3 cấp: [Phường/Xã], [Quận/Huyện], [Tỉnh/TP]
-    const ward = cleanParts[cleanParts.length - 3];
-    const district = cleanParts[cleanParts.length - 2];
-    const province = cleanParts[cleanParts.length - 1];
+  if (street && ward && district) queries.push(`${street}, ${ward}, ${district}`);
+  if (ward && district) queries.push(`${ward}, ${district}`);
+  if (street && ward) queries.push(`${street}, ${ward}`);
+  if (ward) queries.push(ward);
 
-    queries.push(`${ward}, ${district}`);               // Thử 1: "Tân Phước, Phú Mỹ" (chuẩn nhất OSM)
-    queries.push(`${ward}, ${province}`);               // Thử 2: "Bến Nghé, Hồ Chí Minh"
-    queries.push(`${ward}, ${district}, ${province}`);   // Thử 3: Đầy đủ 3 cấp không tiền tố
-    queries.push(`${district}, ${province}`);           // Thử 4: "Phú Mỹ, Hồ Chí Minh"
-  } else if (cleanParts.length === 2) {
-    // Trường hợp 2 cấp: [Phường/Xã], [Tỉnh/TP]
-    const wardOrDist = cleanParts[0];
-    const province = cleanParts[1];
-
-    queries.push(`${wardOrDist}, ${province}`);         // Thử 1: "Bến Nghé, Hồ Chí Minh"
-    queries.push(wardOrDist);                           // Thử 2: Tên xã/phường
+  // Sau đó mới thử kèm tỉnh/thành — vẫn cần cho các tỉnh KHÔNG bị gộp (tên vẫn
+  // đúng thực tế) hoặc khi thiếu quận/huyện (địa chỉ 2 cấp).
+  queries.push(rawParts.join(', '));
+  queries.push(cleanAddrNoSoTu);
+  queries.push(cleanParts.join(', '));
+  if (street && ward) {
+    queries.push(`${street}, ${ward}, ${district || province}`);
+    if (district) queries.push(`${street}, ${ward}, ${province}`);
   }
+  if (ward && district) queries.push(`${ward}, ${district}, ${province}`);
+  if (ward && province) queries.push(`${ward}, ${province}`);
+  if (district && province) queries.push(`${district}, ${province}`);
 
-  // Thử thêm chuỗi đã bỏ tiền tố và chuỗi nguyên bản
-  if (cleanParts.length > 0) {
-    queries.push(cleanParts.join(', '));
-  }
   queries.push(cleanAddr);
 
   const uniqueQueries = [...new Set(queries.filter(q => q && q.length > 2))];
 
   for (const q of uniqueQueries) {
-    try {
-      const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&countrycodes=vn&limit=1`;
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3500);
-      const res = await fetch(url, {
-        signal: controller.signal,
-        headers: { Accept: 'application/json', 'User-Agent': 'AetherPC-ERP/1.0' }
-      });
-      clearTimeout(timeoutId);
-
-      if (res.ok) {
-        const list = await res.json();
-        if (Array.isArray(list) && list.length > 0 && list[0].lat && list[0].lon) {
-          const result = {
-            lat: parseFloat(list[0].lat),
-            lng: parseFloat(list[0].lon),
-            displayName: list[0].display_name
-          };
-          geocodeCache.set(cleanKey, result);
-          return result;
-        }
-      }
-    } catch (_) {
-      // Tiếp tục fallback query tiếp theo
+    const result = (await geocodeQueryGoong(q)) || (await geocodeQueryNominatim(q));
+    if (result) {
+      geocodeCache.set(cleanKey, result);
+      return result;
     }
   }
 

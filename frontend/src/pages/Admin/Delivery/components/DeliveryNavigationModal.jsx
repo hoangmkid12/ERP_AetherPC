@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { X, Navigation, Phone, MapPin, Compass, AlertCircle, Gauge, ExternalLink, Pause } from 'lucide-react';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
+import '@goongmaps/goong-js/dist/goong-js.css';
 import { fetchRoadRoute, forwardGeocode } from '../../../../utils/routingService';
-import { TILE_URL, TILE_ATTRIBUTION, TILE_MAX_ZOOM, WAREHOUSE_ICON, DESTINATION_ICON, SHIPPER_ICON } from '../../../../utils/mapIcons';
+import { goongjs, GOONG_STYLE_URL, createWarehouseElement, createDestinationElement, createShipperElement } from '../../../../utils/mapIcons';
 import PODCaptureSection from './PODCaptureSection';
 
 function haversineKm(a, b) {
@@ -15,6 +14,28 @@ function haversineKm(a, b) {
   const lat2 = b.lat * Math.PI / 180;
   const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
   return R * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+}
+
+// fetchRoadRoute trả toạ độ dạng [lat,lng] (quy ước dùng chung với tính năng
+// giả lập GPS ở Delivery/index.jsx) — goong-js (GeoJSON/mapbox-gl) cần
+// [lng,lat], nên đổi thứ tự ngay tại nơi tiêu thụ.
+const EMPTY_LINE = { type: 'Feature', geometry: { type: 'LineString', coordinates: [] } };
+const toLineFeature = (coordsLatLng) => ({
+  type: 'Feature',
+  geometry: { type: 'LineString', coordinates: coordsLatLng.map(([lat, lng]) => [lng, lat]) }
+});
+
+// goong-js (mapbox-gl) không có LngLatBounds.pad() như Leaflet — tự nới rộng
+// bounds thêm 1 tỉ lệ % trước khi kiểm tra contains().
+function padLngLatBounds(bounds, ratio) {
+  const sw = bounds.getSouthWest();
+  const ne = bounds.getNorthEast();
+  const lngPad = (ne.lng - sw.lng) * ratio;
+  const latPad = (ne.lat - sw.lat) * ratio;
+  return new goongjs.LngLatBounds(
+    [sw.lng - lngPad, sw.lat - latPad],
+    [ne.lng + lngPad, ne.lat + latPad]
+  );
 }
 
 // Màn hình "Bắt Đầu Giao" gộp — CỐ Ý render theo dòng chảy tài liệu bình
@@ -47,7 +68,6 @@ export default function DeliveryNavigationModal({
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const markersRef = useRef({});
-  const routeLayersRef = useRef([]);
   const routeCoordsRef = useRef([]);
 
   const [routeInfo, setRouteInfo] = useState(null);
@@ -100,27 +120,54 @@ export default function DeliveryNavigationModal({
     ? `https://www.google.com/maps/dir/?api=1&destination=${exactDestination.lat},${exactDestination.lng}&travelmode=driving`
     : `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(address)}&travelmode=driving`;
 
-  // 1. Khởi tạo bản đồ Leaflet
+  // 1. Khởi tạo bản đồ goong-js
+  const styleReadyRef = useRef(false);
+  const [styleReadyTick, setStyleReadyTick] = useState(0);
+
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
-    const map = L.map(containerRef.current, {
-      zoomControl: true,
+    const map = new goongjs.Map({
+      container: containerRef.current,
+      style: GOONG_STYLE_URL,
+      center: [108.2022, 16.0544],
+      zoom: 5,
       attributionControl: true
     });
-    L.tileLayer(TILE_URL, {
-      maxZoom: TILE_MAX_ZOOM,
-      attribution: TILE_ATTRIBUTION,
-      subdomains: ['a', 'b', 'c']
-    }).addTo(map);
-    map.setView([16.0544, 108.2022], 5);
+    map.addControl(new goongjs.NavigationControl(), 'top-left');
+
+    // Nguồn/lớp vẽ tuyến đường chỉ tạo được sau khi style load xong — tạo 1
+    // lần rồi từ nay chỉ setData() lên nguồn có sẵn, tránh nháy bản đồ.
+    map.on('load', () => {
+      if (!mapRef.current) return;
+      map.addSource('main-route', { type: 'geojson', data: EMPTY_LINE });
+      map.addLayer({
+        id: 'main-route-line',
+        type: 'line',
+        source: 'main-route',
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: { 'line-color': '#9aa0a6', 'line-width': 4, 'line-opacity': 0.85 }
+      });
+      map.addSource('remaining-route', { type: 'geojson', data: EMPTY_LINE });
+      map.addLayer({
+        id: 'remaining-route-line',
+        type: 'line',
+        source: 'remaining-route',
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: { 'line-color': '#1a73e8', 'line-width': 5, 'line-opacity': 0.95 }
+      });
+      styleReadyRef.current = true;
+      setStyleReadyTick((t) => t + 1);
+    });
+
     mapRef.current = map;
     setTimeout(() => {
-      if (mapRef.current) mapRef.current.invalidateSize();
+      if (mapRef.current) mapRef.current.resize();
     }, 200);
 
     return () => {
       map.remove();
       mapRef.current = null;
+      styleReadyRef.current = false;
     };
   }, []);
 
@@ -151,37 +198,42 @@ export default function DeliveryNavigationModal({
     );
   }, []);
 
-  // 3. Tính toán và vẽ lộ trình đường bộ tối ưu qua OSRM
+  // Tần suất tính lại lộ trình "còn lại" theo GPS sống của Shipper. GPS thực
+  // tế bắn toạ độ mới mỗi vài giây (kể cả lúc đứng yên, do sai số vệ tinh) —
+  // nếu effect vẽ route phụ thuộc thẳng vào shipperLoc và xoá/vẽ lại toàn bộ
+  // marker + gọi fitBounds ở MỌI lần đó, bản đồ sẽ nháy liên tục và tự động
+  // zoom-out về khung nhìn toàn tuyến, đè mất thao tác zoom tay của người
+  // dùng. Throttle + tách riêng phần vẽ lại (3b) khỏi phần khởi tạo (3a) để
+  // chỉ fitBounds đúng 1 lần lúc đầu, giống cách DeliveryMap.jsx đã làm.
+  const LIVE_RECALC_INTERVAL_MS = 15000;
+  const lastLiveRecalcRef = useRef(0);
+
+  // 3a. Vẽ lộ trình gốc (Kho → Điểm giao) + marker + fitBounds — chỉ chạy lại
+  // khi Kho/Điểm giao đổi, KHÔNG phụ thuộc vị trí GPS sống của Shipper.
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !exactDestination) return;
-
-    // Điểm xuất phát ưu tiên: Vị trí thực tế của Shipper, nếu chưa có thì dùng vị trí Kho
-    const origin = shipperLoc || warehouse;
-    if (!origin) return;
+    if (!map || !styleReadyRef.current || !warehouse || !exactDestination) return;
 
     setLoadingRoute(true);
+    lastLiveRecalcRef.current = 0;
 
-    // Xoá các marker & layer cũ
+    // Xoá các marker cũ; đường "còn lại" reset về rỗng
     if (markersRef.current.warehouse) markersRef.current.warehouse.remove();
     if (markersRef.current.destination) markersRef.current.destination.remove();
-    routeLayersRef.current.forEach(layer => layer.remove());
-    routeLayersRef.current = [];
+    map.getSource('remaining-route')?.setData(EMPTY_LINE);
 
-    // Marker Điểm xuất phát (Kho hoặc Shipper)
-    if (warehouse) {
-      markersRef.current.warehouse = L.marker([warehouse.lat, warehouse.lng], { icon: WAREHOUSE_ICON })
-        .addTo(map)
-        .bindPopup(`<strong>🏬 Kho Xuất Phát:</strong><br/>${warehouse.name || 'Kho AetherPC'}`);
-    }
+    markersRef.current.warehouse = new goongjs.Marker({ element: createWarehouseElement(), anchor: 'bottom' })
+      .setLngLat([warehouse.lng, warehouse.lat])
+      .setPopup(new goongjs.Popup({ offset: 28 }).setHTML(`<strong>🏬 Kho Xuất Phát:</strong><br/>${warehouse.name || 'Kho AetherPC'}`))
+      .addTo(map);
 
-    // Marker Điểm nhận hàng của Khách
-    markersRef.current.destination = L.marker([exactDestination.lat, exactDestination.lng], { icon: DESTINATION_ICON })
-      .addTo(map)
-      .bindPopup(`<strong>🏠 Điểm Giao Hàng:</strong><br/>${customerName}<br/>${address}`);
+    markersRef.current.destination = new goongjs.Marker({ element: createDestinationElement(), anchor: 'bottom' })
+      .setLngLat([exactDestination.lng, exactDestination.lat])
+      .setPopup(new goongjs.Popup({ offset: 28 }).setHTML(`<strong>🏠 Điểm Giao Hàng:</strong><br/>${customerName}<br/>${address}`))
+      .addTo(map);
 
     let isMounted = true;
-    fetchRoadRoute(origin, exactDestination).then(route => {
+    fetchRoadRoute(warehouse, exactDestination).then(route => {
       if (!isMounted || !mapRef.current) return;
       setLoadingRoute(false);
 
@@ -189,42 +241,59 @@ export default function DeliveryNavigationModal({
         setRouteInfo(route);
         routeCoordsRef.current = route.coordinates;
 
-        const mainLine = L.polyline(route.coordinates, {
-          color: '#1a73e8',
-          weight: 5,
-          opacity: 0.95,
-          lineCap: 'round',
-          lineJoin: 'round'
-        }).addTo(mapRef.current);
+        const feature = toLineFeature(route.coordinates);
+        mapRef.current.getSource('main-route')?.setData(feature);
 
-        routeLayersRef.current = [mainLine];
-
-        // Căn góc nhìn bao trọn tuyến đường
-        const bounds = L.latLngBounds(route.coordinates);
-        if (shipperLoc) bounds.extend([shipperLoc.lat, shipperLoc.lng]);
-        mapRef.current.fitBounds(bounds, { padding: [40, 40] });
+        // Căn góc nhìn bao trọn tuyến đường — chỉ làm 1 lần lúc khởi tạo
+        const coords = feature.geometry.coordinates;
+        const bounds = coords.reduce((b, c) => b.extend(c), new goongjs.LngLatBounds(coords[0], coords[0]));
+        if (shipperLoc) bounds.extend([shipperLoc.lng, shipperLoc.lat]);
+        mapRef.current.fitBounds(bounds, { padding: 40 });
       }
     });
 
     return () => { isMounted = false; };
-  }, [warehouse?.lat, warehouse?.lng, exactDestination?.lat, exactDestination?.lng, shipperLoc?.lat, shipperLoc?.lng]);
+  }, [warehouse?.lat, warehouse?.lng, exactDestination?.lat, exactDestination?.lng, styleReadyTick]);
+
+  // 3b. Tính lại lộ trình "còn lại" (Shipper hiện tại → Điểm giao) mỗi khi có
+  // GPS mới — có throttle theo LIVE_RECALC_INTERVAL_MS, chỉ vẽ đè 1 đường màu
+  // xanh, KHÔNG đụng tới marker Kho/Điểm giao và KHÔNG gọi fitBounds, nên
+  // không làm mất zoom người dùng vừa chỉnh tay.
+  useEffect(() => {
+    if (!mapRef.current || !styleReadyRef.current || !shipperLoc || !exactDestination) return;
+    const now = Date.now();
+    if (now - lastLiveRecalcRef.current < LIVE_RECALC_INTERVAL_MS) return;
+    lastLiveRecalcRef.current = now;
+
+    let cancelled = false;
+    fetchRoadRoute(shipperLoc, exactDestination).then(route => {
+      if (cancelled || !mapRef.current || !route?.coordinates?.length) return;
+      setRouteInfo(route);
+      routeCoordsRef.current = route.coordinates;
+      mapRef.current.getSource('remaining-route')?.setData(toLineFeature(route.coordinates));
+    });
+
+    return () => { cancelled = true; };
+  }, [shipperLoc?.lat, shipperLoc?.lng, exactDestination?.lat, exactDestination?.lng, styleReadyTick]);
 
   // 4. Cập nhật vị trí Marker Shipper theo thời gian thực
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !shipperLoc) return;
-    const pos = [shipperLoc.lat, shipperLoc.lng];
+    const pos = [shipperLoc.lng, shipperLoc.lat];
 
     if (markersRef.current.shipper) {
-      markersRef.current.shipper.setLatLng(pos);
+      markersRef.current.shipper.setLngLat(pos);
     } else {
-      markersRef.current.shipper = L.marker(pos, { icon: SHIPPER_ICON, zIndexOffset: 1000 })
-        .addTo(map)
-        .bindPopup(`<strong>🛵 Vị Trí Của Bạn (Shipper)</strong><br/><span style="color:#16a34a;">● Đang phát tín hiệu GPS trực tiếp</span>`);
+      markersRef.current.shipper = new goongjs.Marker({ element: createShipperElement() })
+        .setLngLat(pos)
+        .setPopup(new goongjs.Popup({ offset: 18 }).setHTML(`<strong>🛵 Vị Trí Của Bạn (Shipper)</strong><br/><span style="color:#16a34a;">● Đang phát tín hiệu GPS trực tiếp</span>`))
+        .addTo(map);
     }
 
-    if (!map.getBounds().pad(0.15).contains(pos)) {
-      map.panTo(pos, { animate: true, duration: 0.8 });
+    const bounds = map.getBounds();
+    if (bounds && !padLngLatBounds(bounds, 0.15).contains(pos)) {
+      map.panTo(pos, { animate: true, duration: 800 });
     }
   }, [shipperLoc]);
 
@@ -257,7 +326,9 @@ export default function DeliveryNavigationModal({
     const map = mapRef.current;
     if (!map) return;
     if (routeCoordsRef.current.length > 0) {
-      map.fitBounds(L.latLngBounds(routeCoordsRef.current), { padding: [40, 40], animate: true });
+      const coords = routeCoordsRef.current.map(([lat, lng]) => [lng, lat]);
+      const bounds = coords.reduce((b, c) => b.extend(c), new goongjs.LngLatBounds(coords[0], coords[0]));
+      map.fitBounds(bounds, { padding: 40, animate: true });
     }
   }, []);
 

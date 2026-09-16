@@ -1,8 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
+import '@goongmaps/goong-js/dist/goong-js.css';
 import { fetchRoadRoute, reverseGeocode, forwardGeocode } from '../utils/routingService';
-import { TILE_URL, TILE_ATTRIBUTION, TILE_MAX_ZOOM, WAREHOUSE_ICON, DESTINATION_ICON, SHIPPER_ICON } from '../utils/mapIcons';
+import { goongjs, GOONG_STYLE_URL, createWarehouseElement, createDestinationElement, createShipperElement } from '../utils/mapIcons';
 
 // Tần suất gọi lại OSRM/Nominatim khi Shipper di chuyển — GPS gửi mỗi 8s
 // (xem GPS_SEND_INTERVAL_MS ở trang Delivery), nhưng không cần tính lại
@@ -25,6 +24,30 @@ function haversineKm(a, b) {
   return R * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
 }
 
+// fetchRoadRoute trả toạ độ dạng [lat,lng] (quy ước Leaflet cũ, vẫn được
+// dùng nguyên cho tính năng giả lập GPS ở Delivery/index.jsx) — goong-js
+// (GeoJSON/mapbox-gl) cần [lng,lat], nên đổi thứ tự ngay tại nơi tiêu thụ
+// thay vì đổi hợp đồng chung của routingService.js.
+const EMPTY_LINE = { type: 'Feature', geometry: { type: 'LineString', coordinates: [] } };
+const toLineFeature = (coordsLatLng) => ({
+  type: 'Feature',
+  geometry: { type: 'LineString', coordinates: coordsLatLng.map(([lat, lng]) => [lng, lat]) }
+});
+
+// goong-js (mapbox-gl) không có LngLatBounds.pad() như Leaflet — tự nới rộng
+// bounds thêm 1 tỉ lệ % trước khi kiểm tra contains(), để tránh panTo quá
+// nhạy mỗi khi marker chỉ lệch nhẹ khỏi khung nhìn.
+function padLngLatBounds(bounds, ratio) {
+  const sw = bounds.getSouthWest();
+  const ne = bounds.getNorthEast();
+  const lngPad = (ne.lng - sw.lng) * ratio;
+  const latPad = (ne.lat - sw.lat) * ratio;
+  return new goongjs.LngLatBounds(
+    [sw.lng - lngPad, sw.lat - latPad],
+    [ne.lng + lngPad, ne.lat + latPad]
+  );
+}
+
 export default function DeliveryMap({
   warehouse,
   destination,
@@ -36,15 +59,17 @@ export default function DeliveryMap({
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const markersRef = useRef({});
-  const routeLayersRef = useRef([]);
+  const styleReadyRef = useRef(false);
   const [routeInfo, setRouteInfo] = useState(null);
   const [lastUpdatedLabel, setLastUpdatedLabel] = useState('');
   const routeCoordsRef = useRef([]);
   const animFrameRef = useRef(null);
-  const remainingLayerRef = useRef(null);
   const lastLiveRecalcRef = useRef(0);
   const [remainingInfo, setRemainingInfo] = useState(null);
   const [currentAddress, setCurrentAddress] = useState('');
+  // Đổi mỗi khi style/nguồn dữ liệu bản đồ đã sẵn sàng — dùng làm dependency
+  // để các effect vẽ route chạy lại đúng 1 lần ngay khi map load xong.
+  const [styleReadyTick, setStyleReadyTick] = useState(0);
 
   // Tự động phân giải địa chỉ thực tế (Forward Geocoding) để lấy toạ độ chính xác thay vì chỉ toạ độ khu vực
   const [exactDestination, setExactDestination] = useState(destination);
@@ -69,38 +94,54 @@ export default function DeliveryMap({
     return () => { isMounted = false; };
   }, [destination?.label]);
 
-  // Hủy animation trượt marker khi component unmount, tránh setState/setLatLng
+  // Hủy animation trượt marker khi component unmount, tránh setState/setLngLat
   // trên marker đã bị gỡ khỏi map.
   useEffect(() => () => {
     if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
   }, []);
 
-  // Khởi tạo bản đồ Leaflet 1 lần
+  // Khởi tạo bản đồ goong-js 1 lần
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
-    const map = L.map(containerRef.current, {
-      zoomControl: true,
+    const map = new goongjs.Map({
+      container: containerRef.current,
+      style: GOONG_STYLE_URL,
+      center: [108.2022, 16.0544],
+      zoom: 5,
       attributionControl: true
     });
-    // Nền bản đồ Wikimedia (dựa trên dữ liệu OSM, tông nhạt/ít nhãn rườm rà
-    // hơn tile OSM chuẩn) — miễn phí, không cần API key, khác với CartoDB
-    // Positron (đã thử nhưng CartoDB giờ bắt buộc phải có key mới hiện tile).
-    L.tileLayer(TILE_URL, {
-      maxZoom: TILE_MAX_ZOOM,
-      attribution: TILE_ATTRIBUTION,
-      subdomains: ['a', 'b', 'c']
-    }).addTo(map);
-    // Leaflet ném lỗi "Set map center and zoom first" nếu gọi getBounds()/panTo()
-    // trước khi map có view — có thể xảy ra khi shipperPosition đã có sẵn (từ
-    // lastLocation tải qua REST) nhưng route OSRM (fitBounds ở effect dưới)
-    // chưa kịp trả về. Đặt 1 view mặc định (toàn quốc) ngay từ đầu để luôn có
-    // center/zoom hợp lệ, effect route sẽ tự fitBounds đè lên khi có dữ liệu.
-    map.setView([16.0544, 108.2022], 5);
+    map.addControl(new goongjs.NavigationControl(), 'top-left');
+
+    // Nguồn/lớp vẽ tuyến đường chỉ tạo được sau khi style load xong — tạo 1
+    // lần rồi từ nay chỉ setData() lên nguồn có sẵn (không remove/add lại
+    // layer mỗi lần cập nhật), tránh nháy bản đồ.
+    map.on('load', () => {
+      if (!mapRef.current) return;
+      map.addSource('main-route', { type: 'geojson', data: EMPTY_LINE });
+      map.addLayer({
+        id: 'main-route-line',
+        type: 'line',
+        source: 'main-route',
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: { 'line-color': '#9aa0a6', 'line-width': 4, 'line-opacity': 0.85 }
+      });
+      map.addSource('remaining-route', { type: 'geojson', data: EMPTY_LINE });
+      map.addLayer({
+        id: 'remaining-route-line',
+        type: 'line',
+        source: 'remaining-route',
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: { 'line-color': '#1a73e8', 'line-width': 5, 'line-opacity': 0.95 }
+      });
+      styleReadyRef.current = true;
+      setStyleReadyTick((t) => t + 1);
+    });
+
     mapRef.current = map;
 
     const handleResize = () => {
       if (mapRef.current) {
-        setTimeout(() => mapRef.current?.invalidateSize(), 150);
+        setTimeout(() => mapRef.current?.resize(), 150);
       }
     };
     window.addEventListener('resize', handleResize);
@@ -109,36 +150,34 @@ export default function DeliveryMap({
       window.removeEventListener('resize', handleResize);
       map.remove();
       mapRef.current = null;
+      styleReadyRef.current = false;
     };
   }, []);
 
   // Tải và vẽ lộ trình đường bộ thực tế (OSRM Road Routing) giữa Kho và Nhà khách
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !warehouse || !exactDestination) return;
+    if (!map || !styleReadyRef.current || !warehouse || !exactDestination) return;
 
     // Xóa marker cũ
     if (markersRef.current.warehouse) markersRef.current.warehouse.remove();
     if (markersRef.current.destination) markersRef.current.destination.remove();
-    routeLayersRef.current.forEach(layer => layer.remove());
-    routeLayersRef.current = [];
-    if (remainingLayerRef.current) {
-      remainingLayerRef.current.remove();
-      remainingLayerRef.current = null;
-    }
+    map.getSource('remaining-route')?.setData(EMPTY_LINE);
     setRemainingInfo(null);
     setCurrentAddress('');
     lastLiveRecalcRef.current = 0;
 
     // Marker Kho
-    markersRef.current.warehouse = L.marker([warehouse.lat, warehouse.lng], { icon: WAREHOUSE_ICON })
-      .addTo(map)
-      .bindPopup(`<div style="padding:2px 4px;font-size:0.82rem;"><strong>Kho xuất phát</strong><br/>${warehouse.name || 'Kho AetherPC'}<br/><span style="font-size:0.75rem;color:#5f6368;">${warehouse.address || ''}</span></div>`);
+    markersRef.current.warehouse = new goongjs.Marker({ element: createWarehouseElement(), anchor: 'bottom' })
+      .setLngLat([warehouse.lng, warehouse.lat])
+      .setPopup(new goongjs.Popup({ offset: 28 }).setHTML(`<div style="padding:2px 4px;font-size:0.82rem;"><strong>Kho xuất phát</strong><br/>${warehouse.name || 'Kho AetherPC'}<br/><span style="font-size:0.75rem;color:#5f6368;">${warehouse.address || ''}</span></div>`))
+      .addTo(map);
 
     // Marker Nhà khách
-    markersRef.current.destination = L.marker([exactDestination.lat, exactDestination.lng], { icon: DESTINATION_ICON })
-      .addTo(map)
-      .bindPopup(`<div style="padding:2px 4px;font-size:0.82rem;"><strong>Điểm nhận hàng</strong><br/>${exactDestination.label || destination?.label || 'Địa chỉ nhận hàng'}</div>`);
+    markersRef.current.destination = new goongjs.Marker({ element: createDestinationElement(), anchor: 'bottom' })
+      .setLngLat([exactDestination.lng, exactDestination.lat])
+      .setPopup(new goongjs.Popup({ offset: 28 }).setHTML(`<div style="padding:2px 4px;font-size:0.82rem;"><strong>Điểm nhận hàng</strong><br/>${exactDestination.label || destination?.label || 'Địa chỉ nhận hàng'}</div>`))
+      .addTo(map);
 
     let isMounted = true;
 
@@ -150,51 +189,44 @@ export default function DeliveryMap({
         setRouteInfo(route);
         routeCoordsRef.current = route.coordinates;
 
-        // 1 đường mảnh, màu xám nhạt — thể hiện toàn tuyến dự kiến. Đoạn
-        // "còn lại" (effect live-recalc bên dưới) sẽ vẽ đè lên bằng màu xanh
-        // đậm, giống cách Google Maps làm mờ phần đã đi qua.
-        const mainLine = L.polyline(route.coordinates, {
-          color: '#9aa0a6',
-          weight: 4,
-          opacity: 0.85,
-          lineCap: 'round',
-          lineJoin: 'round'
-        }).addTo(mapRef.current);
-
-        routeLayersRef.current = [mainLine];
+        const feature = toLineFeature(route.coordinates);
+        mapRef.current.getSource('main-route')?.setData(feature);
 
         // Tự động căn góc nhìn bao trọn toàn bộ con đường
-        const bounds = L.latLngBounds(route.coordinates);
-        if (shipperPosition) bounds.extend([shipperPosition.lat, shipperPosition.lng]);
-        mapRef.current.fitBounds(bounds, { padding: [45, 45] });
+        const coords = feature.geometry.coordinates;
+        const bounds = coords.reduce((b, c) => b.extend(c), new goongjs.LngLatBounds(coords[0], coords[0]));
+        if (shipperPosition) bounds.extend([shipperPosition.lng, shipperPosition.lat]);
+        mapRef.current.fitBounds(bounds, { padding: 45 });
       }
     });
 
     return () => {
       isMounted = false;
     };
-  }, [warehouse?.lat, warehouse?.lng, destination?.lat, destination?.lng]);
+  }, [warehouse?.lat, warehouse?.lng, exactDestination?.lat, exactDestination?.lng, styleReadyTick]);
 
   // Marker Shipper — trượt mượt giữa 2 điểm GPS liên tiếp thay vì nhảy tức thời
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !shipperPosition) return;
-    const newPos = L.latLng(shipperPosition.lat, shipperPosition.lng);
+    const newLngLat = [shipperPosition.lng, shipperPosition.lat];
 
     if (!markersRef.current.shipper) {
-      markersRef.current.shipper = L.marker(newPos, { icon: SHIPPER_ICON, zIndexOffset: 1000 })
-        .addTo(map)
-        .bindPopup(`<div style="font-size:0.82rem;"><strong>${shipperName || 'Shipper AetherPC'}</strong>${shipperPhone ? `<br/>${shipperPhone}` : ''}<br/><span style="font-size:0.74rem;color:#1a73e8;">Đang di chuyển giao hàng</span></div>`);
+      markersRef.current.shipper = new goongjs.Marker({ element: createShipperElement() })
+        .setLngLat(newLngLat)
+        .setPopup(new goongjs.Popup({ offset: 18 }).setHTML(`<div style="font-size:0.82rem;"><strong>${shipperName || 'Shipper AetherPC'}</strong>${shipperPhone ? `<br/>${shipperPhone}` : ''}<br/><span style="font-size:0.74rem;color:#1a73e8;">Đang di chuyển giao hàng</span></div>`))
+        .addTo(map);
     } else {
       const marker = markersRef.current.shipper;
-      const startPos = marker.getLatLng();
+      const start = marker.getLngLat();
+      const startLngLat = [start.lng, start.lat];
       if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
       const startTime = performance.now();
       const tick = (time) => {
         const t = Math.min(1, (time - startTime) / MARKER_TWEEN_MS);
-        marker.setLatLng([
-          startPos.lat + (newPos.lat - startPos.lat) * t,
-          startPos.lng + (newPos.lng - startPos.lng) * t
+        marker.setLngLat([
+          startLngLat[0] + (newLngLat[0] - startLngLat[0]) * t,
+          startLngLat[1] + (newLngLat[1] - startLngLat[1]) * t
         ]);
         if (t < 1) {
           animFrameRef.current = requestAnimationFrame(tick);
@@ -205,8 +237,9 @@ export default function DeliveryMap({
       animFrameRef.current = requestAnimationFrame(tick);
     }
 
-    if (!map.getBounds().pad(0.15).contains(newPos)) {
-      map.panTo(newPos, { animate: true, duration: 0.8 });
+    const bounds = map.getBounds();
+    if (bounds && !padLngLatBounds(bounds, 0.15).contains(newLngLat)) {
+      map.panTo(newLngLat, { animate: true, duration: 800 });
     }
 
     if (shipperPosition.updatedAt) {
@@ -220,7 +253,7 @@ export default function DeliveryMap({
   // từ Kho), cộng thêm địa chỉ hiện tại (reverse geocode) kiểu Grab. Throttle
   // theo LIVE_RECALC_INTERVAL_MS để không gọi OSRM/Nominatim ở mọi lần GPS gửi.
   useEffect(() => {
-    if (!shipperPosition || !exactDestination) return;
+    if (!shipperPosition || !exactDestination || !styleReadyRef.current) return;
     const now = Date.now();
     if (now - lastLiveRecalcRef.current < LIVE_RECALC_INTERVAL_MS) return;
     lastLiveRecalcRef.current = now;
@@ -230,14 +263,7 @@ export default function DeliveryMap({
     fetchRoadRoute(shipperPosition, exactDestination).then((route) => {
       if (cancelled || !mapRef.current || !route?.coordinates?.length) return;
       setRemainingInfo(route);
-      if (remainingLayerRef.current) remainingLayerRef.current.remove();
-      remainingLayerRef.current = L.polyline(route.coordinates, {
-        color: '#1a73e8',
-        weight: 5,
-        opacity: 0.95,
-        lineCap: 'round',
-        lineJoin: 'round'
-      }).addTo(mapRef.current);
+      mapRef.current.getSource('remaining-route')?.setData(toLineFeature(route.coordinates));
     });
 
     reverseGeocode(shipperPosition.lat, shipperPosition.lng).then((address) => {
@@ -245,15 +271,19 @@ export default function DeliveryMap({
     });
 
     return () => { cancelled = true; };
-  }, [shipperPosition, exactDestination]);
+  }, [shipperPosition, exactDestination, styleReadyTick]);
 
   const fitFullRoute = useCallback(() => {
     const map = mapRef.current;
     if (!map) return;
     if (routeCoordsRef.current.length > 0) {
-      map.fitBounds(L.latLngBounds(routeCoordsRef.current), { padding: [45, 45], animate: true });
+      const coords = routeCoordsRef.current.map(([lat, lng]) => [lng, lat]);
+      const bounds = coords.reduce((b, c) => b.extend(c), new goongjs.LngLatBounds(coords[0], coords[0]));
+      map.fitBounds(bounds, { padding: 45, animate: true });
     } else if (warehouse && exactDestination) {
-      map.fitBounds(L.latLngBounds([[warehouse.lat, warehouse.lng], [exactDestination.lat, exactDestination.lng]]), { padding: [45, 45], animate: true });
+      const bounds = new goongjs.LngLatBounds([warehouse.lng, warehouse.lat], [warehouse.lng, warehouse.lat])
+        .extend([exactDestination.lng, exactDestination.lat]);
+      map.fitBounds(bounds, { padding: 45, animate: true });
     }
   }, [warehouse, exactDestination]);
 
@@ -370,4 +400,3 @@ export default function DeliveryMap({
     </div>
   );
 }
-
