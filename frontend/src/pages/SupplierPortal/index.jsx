@@ -1298,56 +1298,49 @@ export default function SupplierPortal() {
               borderBottom: '1px solid #e2e8f0',
               paddingBottom: '1rem',
               marginBottom: '1.25rem',
-              gap: '1rem',
-              flexWrap: 'wrap'
+              gap: '1rem'
             }}>
-              <div style={{ flex: '1 1 auto', minWidth: '280px' }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
                 <h2 style={{
-                  fontSize: '1.25rem',
+                  fontSize: '1.28rem',
                   color: '#0f172a',
                   margin: 0,
                   fontWeight: 800,
-                  lineHeight: 1.35,
-                  display: 'flex',
-                  alignItems: 'center',
-                  flexWrap: 'wrap',
-                  gap: '6px'
+                  lineHeight: 1.35
                 }}>
-                  <span>{needsPriceInput(selectedPO) ? 'Nhập Báo Giá' : 'Chi Tiết Đơn Hàng'}:</span>
-                  <span style={{ color: 'var(--primary, #2563eb)', whiteSpace: 'nowrap', display: 'inline-block' }}>
+                  {needsPriceInput(selectedPO) ? 'Nhập Báo Giá' : 'Chi Tiết Đơn Hàng'}:{' '}
+                  <span style={{ color: 'var(--primary, #2563eb)', whiteSpace: 'nowrap' }}>
                     {selectedPO.poNumber || formatPurchaseReference(selectedPO)}
                   </span>
                 </h2>
-                <span style={{ fontSize: '0.8rem', color: '#64748b', display: 'block', marginTop: '4px' }}>
-                  Ngày đặt hàng: {selectedPO.createdAt ? new Date(selectedPO.createdAt).toLocaleDateString('vi-VN') : 'N/A'}
-                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: '0.82rem', color: '#64748b' }}>
+                    Ngày đặt hàng: {selectedPO.createdAt ? new Date(selectedPO.createdAt).toLocaleDateString('vi-VN') : 'N/A'}
+                  </span>
+                  <span style={{ color: '#cbd5e1' }}>•</span>
+                  {getStatusBadge(selectedPO.status)}
+                </div>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap', flexShrink: 0, justifyContent: 'flex-end' }}>
-                {getStatusBadge(selectedPO.status)}
-                <button
-                  onClick={() => setPrintPOTarget(selectedPO)}
-                  title="Xem và in phiếu đặt hàng PO"
-                  style={{
-                    background: '#eff6ff',
-                    border: '1px solid #bfdbfe',
-                    color: '#1d4ed8',
-                    cursor: 'pointer',
-                    padding: '6px 12px',
-                    borderRadius: '8px',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    fontSize: '0.82rem',
-                    fontWeight: 700,
-                    transition: 'all 0.15s ease'
-                  }}
-                >
-                  <Printer size={15} /> Xem Phiếu
-                </button>
-                <button onClick={() => setSelectedPO(null)} style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#475569', cursor: 'pointer', padding: '6px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <X size={18} />
-                </button>
-              </div>
+
+              {/* Nút X ở góc trên bên phải */}
+              <button
+                onClick={() => setSelectedPO(null)}
+                title="Đóng"
+                style={{
+                  background: '#f1f5f9',
+                  border: '1px solid #cbd5e1',
+                  color: '#475569',
+                  cursor: 'pointer',
+                  padding: '6px',
+                  borderRadius: '8px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0
+                }}
+              >
+                <X size={18} />
+              </button>
             </div>
 
             {/* Ghi chú/điều khoản Phòng Mua Hàng nhập khi lập Phiếu Mua Hàng — NCC
