@@ -1254,6 +1254,16 @@ export default function Purchasing() {
   const RFQ_FILTER_STATUSES = ['RFQ', 'RFQ_SENT', 'QUOTED', 'PENDING_PO_DRAFT', 'CONVERTED'];
   const PO_FILTER_STATUSES = ['QUOTED_PENDING_CEO', 'PO', 'CONFIRMED_BY_SUPPLIER', 'QA_PASSED', 'QA_PARTIAL', 'QA_REJECTED', 'RECEIVED', 'DONE', 'CANCELLED'];
 
+  // QA_PASSED/QA_PARTIAL/QA_REJECTED chỉ là kết quả nghiệm thu TẠM THỜI: ngay
+  // khi kho nhận hàng xong + hóa đơn NCC được thanh toán, checkAndUpdatePoCompletion
+  // (backend) ghi đè PurchaseOrder.status thẳng thành 'DONE', không phân biệt lúc
+  // trước đó đạt toàn phần hay một phần. Nên 1 đơn "nghiệm thu 1 phần" đã hoàn tất
+  // kho sẽ không còn po.status === 'QA_PARTIAL' để lọc theo trạng thái hiện tại
+  // nữa — nhưng quyết định đó vẫn còn nguyên trong statusHistory (mỗi lần đổi
+  // trạng thái đều ghi 1 dòng lịch sử, API /purchasing/orders trả kèm). Với 3
+  // trạng thái QA này, lọc cả theo lịch sử để không "mất" các đơn đã đi qua đó.
+  const QA_OUTCOME_STATUSES = ['QA_PASSED', 'QA_PARTIAL', 'QA_REJECTED'];
+
   // Filtered orders list based on active tab & filters
   const filteredOrders = orders
     .filter(po => {
@@ -1264,7 +1274,8 @@ export default function Purchasing() {
       const matchesSearch = (po.poNumber || po.id || '').toString().toLowerCase().includes(searchTerm.toLowerCase()) || 
         (po.supplier?.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         (po.supplierCode || '').toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesStatus = statusFilter === 'ALL' || po.status === statusFilter;
+      const matchesStatus = statusFilter === 'ALL' || po.status === statusFilter ||
+        (QA_OUTCOME_STATUSES.includes(statusFilter) && (po.statusHistory || []).some(h => h.status === statusFilter));
       const matchesSup = supplierFilter === 'ALL' || (po.supplier?.name === supplierFilter) || (po.supplierCode === supplierFilter);
       const matchesDate = isDateInRange(po.createdAt || po.date || po.issueDate, poStartDate, poEndDate);
       return matchesSearch && matchesStatus && matchesSup && matchesDate;
