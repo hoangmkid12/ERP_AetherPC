@@ -152,141 +152,6 @@ const ProductGalleryField = ({ coverFile, coverUrl, onCoverSelect, existingImage
   );
 };
 
-const DEFAULT_SAMPLE_MOVEMENTS = [
-  {
-    id: 'MOV-2026-001',
-    type: 'IN',
-    reference: 'GRN-PO-2026-0801',
-    productName: 'Intel Core i9-14900K',
-    quantity: 15,
-    timestamp: new Date(Date.now() - 3600000 * 24 * 2).toISOString(),
-    actor: 'Thủ Kho - Lê Văn C',
-    note: 'Nhập kho từ đơn mua #PO-2026-0801 (Nghiệm thu QA/QC Đạt 100%)'
-  },
-  {
-    id: 'MOV-2026-002',
-    type: 'IN',
-    reference: 'GRN-PO-2026-0802',
-    productName: 'ASUS ROG STRIX RTX 4090 24GB',
-    quantity: 10,
-    timestamp: new Date(Date.now() - 3600000 * 24 * 1.5).toISOString(),
-    actor: 'Thủ Kho - Lê Văn C',
-    note: 'Nhập kho từ đơn mua #PO-2026-0802'
-  },
-  {
-    id: 'MOV-2026-003',
-    type: 'OUT',
-    reference: 'ORD-2026-9041',
-    productName: 'RAM Corsair Vengeance RGB 32GB DDR5',
-    quantity: 2,
-    timestamp: new Date(Date.now() - 3600000 * 12).toISOString(),
-    actor: 'Thủ Kho - Lê Văn C',
-    note: 'Xuất kho giao hàng cho đơn ORD-2026-9041'
-  },
-  {
-    id: 'MOV-2026-004',
-    type: 'IN',
-    reference: 'DIR-INT-2026-09',
-    productName: 'SSD Samsung 990 PRO 2TB NVMe',
-    quantity: 20,
-    timestamp: new Date(Date.now() - 3600000 * 4).toISOString(),
-    actor: 'Thủ Kho - Lê Văn C',
-    note: 'Nhập kho trực tiếp / Kiểm kê bổ sung dư hàng'
-  }
-];
-
-const DEFAULT_SAMPLE_RECEIPTS = [
-  {
-    id: 'GRN-PO-2026-0801',
-    receiptNumber: 'GRN-PO-2026-0801',
-    poId: 'PO-2026-0801',
-    supplierName: 'Intel Vietnam',
-    status: 'READY',
-    createdAt: new Date(Date.now() - 3600000 * 5).toISOString(),
-    po: {
-      id: 'PO-2026-0801',
-      poNumber: 'PO-2026-0801',
-      status: 'QA_PASSED',
-      supplier: { name: 'Intel Vietnam' },
-      items: [
-        { productId: 101, name: 'Intel Core i9-14900K', quantity: 10, unitCost: 14500000 }
-      ]
-    }
-  },
-  {
-    id: 'GRN-PO-2026-0802',
-    receiptNumber: 'GRN-PO-2026-0802',
-    poId: 'PO-2026-0802',
-    supplierName: 'Mai Hoàng Distribution',
-    status: 'READY',
-    createdAt: new Date(Date.now() - 3600000 * 18).toISOString(),
-    po: {
-      id: 'PO-2026-0802',
-      poNumber: 'PO-2026-0802',
-      status: 'QA_PASSED',
-      supplier: { name: 'Mai Hoàng Distribution' },
-      items: [
-        { productId: 102, name: 'ASUS ROG STRIX RTX 4090 24GB', quantity: 5, unitCost: 48000000 }
-      ]
-    }
-  },
-  {
-    id: 'GRN-PO-2026-0800',
-    receiptNumber: 'GRN-PO-2026-0800',
-    poId: 'PO-2026-0800',
-    supplierName: 'Vĩnh Xuân PSC',
-    status: 'DONE',
-    createdAt: new Date(Date.now() - 3600000 * 48).toISOString(),
-    po: {
-      id: 'PO-2026-0800',
-      poNumber: 'PO-2026-0800',
-      status: 'DONE',
-      supplier: { name: 'Vĩnh Xuân PSC' },
-      items: [
-        { productId: 103, name: 'RAM Corsair Vengeance RGB 32GB DDR5', quantity: 20, unitCost: 3200000 }
-      ]
-    }
-  }
-];
-
-const DEFAULT_SAMPLE_RETURNS = [
-  {
-    id: 'RMA-2026-001',
-    rmaNumber: 'RMA-2026-001',
-    orderId: 'ORD-2026-9035',
-    customerName: 'Lê Văn Tuấn',
-    productName: 'RAM Corsair Vengeance RGB 32GB DDR5',
-    quantity: 1,
-    reason: 'Lỗi khe cắm - Khách báo không nhận Bus 6000MHz',
-    status: 'PENDING_INSPECTION',
-    createdAt: new Date(Date.now() - 3600000 * 24).toISOString(),
-    customerPhone: '0908 123 456'
-  },
-  {
-    id: 'RMA-2026-002',
-    rmaNumber: 'RMA-2026-002',
-    orderId: 'ORD-2026-8942',
-    customerName: 'Nguyễn Hoàng Nam',
-    productName: 'ASUS ROG STRIX RTX 4090 24GB',
-    quantity: 1,
-    reason: 'Quạt tản nhiệt có tiếng rít bất thường khi Full Load',
-    status: 'INSPECTED_SCRAP',
-    createdAt: new Date(Date.now() - 3600000 * 48).toISOString(),
-    customerPhone: '0912 987 654'
-  },
-  {
-    id: 'RMA-2026-003',
-    rmaNumber: 'RMA-2026-003',
-    orderId: 'ORD-2026-8810',
-    customerName: 'Phạm Minh Trí',
-    productName: 'Nguồn Corsair RM1000x 1000W 80 Plus Gold',
-    quantity: 1,
-    reason: 'Đổi trả do khách đặt nhầm công suất hệ thống',
-    status: 'RESTOCKED',
-    createdAt: new Date(Date.now() - 3600000 * 72).toISOString(),
-    customerPhone: '0988 555 222'
-  }
-];
 
 const parseDateVal = (val) => {
   if (!val) return null;
@@ -2546,11 +2411,7 @@ export default function Warehouse() {
     return () => window.removeEventListener('erp-notification-sent', handleNotifSent);
   }, []);
 
-  // Ensure default sample movements if stockMovements is empty
-  const usingSampleMovements = !(stockMovements && stockMovements.length > 0);
-  const effectiveStockMovements = usingSampleMovements
-    ? DEFAULT_SAMPLE_MOVEMENTS
-    : stockMovements;
+  const effectiveStockMovements = stockMovements || [];
 
   // Sync receipts & PO status
   const fetchReceipts = async (silent = false) => {
@@ -3237,10 +3098,8 @@ export default function Warehouse() {
       (rfqStockStatusFilter === 'LOW_STOCK' && Number(item.stock) > 0);
     return matchSearch && matchSupplier && matchStatus;
   });
-  const usingSampleReceipts = !(receipts && receipts.length > 0);
-  const effectiveReceipts = usingSampleReceipts ? DEFAULT_SAMPLE_RECEIPTS : receipts;
-  const usingSampleReturns = !(returnRequests && returnRequests.length > 0);
-  const effectiveReturnRequests = usingSampleReturns ? DEFAULT_SAMPLE_RETURNS : returnRequests;
+  const effectiveReceipts = receipts || [];
+  const effectiveReturnRequests = returnRequests || [];
   const readyReceipts = effectiveReceipts.filter(r => r.status === 'READY');
   // Shared with the Delivery tab's default "PENDING" filter (below) so the
   // Overview KPI card always matches the count the linked tab actually shows.
@@ -3527,13 +3386,6 @@ export default function Warehouse() {
               Tổng Quan Tồn Kho
             </h2>
           </div>
-
-          {(usingSampleReceipts || usingSampleReturns || usingSampleMovements) && (
-            <div style={{ backgroundColor: '#fef9c3', border: '1px solid #fde047', borderRadius: '8px', padding: '0.65rem 0.9rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.6rem', fontSize: '0.8rem', color: '#854d0e', fontWeight: 600 }}>
-              <AlertCircle size={16} style={{ flexShrink: 0 }} />
-              Một số số liệu bên dưới là <strong>dữ liệu minh họa</strong> (chưa có phiếu nhập kho/trả hàng/lịch sử thật nào trong hệ thống).
-            </div>
-          )}
 
           {/* Cards Grid */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.25rem' }}>
@@ -4127,13 +3979,6 @@ export default function Warehouse() {
               Tiếp nhận lô hàng từ Nhà cung cấp sau khi đã nghiệm thu QA/QC
             </p>
           </div>
-
-          {usingSampleReceipts && (
-            <div style={{ backgroundColor: '#fef9c3', border: '1px solid #fde047', borderRadius: '8px', padding: '0.65rem 0.9rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.6rem', fontSize: '0.8rem', color: '#854d0e', fontWeight: 600 }}>
-              <AlertCircle size={16} style={{ flexShrink: 0 }} />
-              Chưa có phiếu nhập kho thật nào — danh sách bên dưới là <strong>dữ liệu minh họa</strong>.
-            </div>
-          )}
 
           {/* Filter bar */}
           <div style={{ backgroundColor: '#ffffff', padding: '1rem', borderRadius: '8px', border: '1px solid #cbd5e1', marginBottom: '1.25rem', display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
@@ -5191,12 +5036,6 @@ export default function Warehouse() {
               <p style={{ fontSize: '0.82rem', color: '#64748b', margin: '0.25rem 0 0 0' }}>
                 Tiếp nhận linh kiện trả về từ khách hàng, kiểm định lỗi kỹ thuật, phân luồng lưu trữ kệ kho (A1/B3/C2/D) và chuyển tiếp hoàn tiền hoặc đổi mới.
               </p>
-              {usingSampleReturns && (
-                <div style={{ backgroundColor: '#fef9c3', border: '1px solid #fde047', borderRadius: '8px', padding: '0.5rem 0.8rem', marginTop: '0.6rem', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.76rem', color: '#854d0e', fontWeight: 600 }}>
-                  <AlertCircle size={14} style={{ flexShrink: 0 }} />
-                  Chưa có hồ sơ trả hàng thật nào — danh sách bên dưới là dữ liệu minh họa.
-                </div>
-              )}
             </div>
 
             <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
@@ -6020,13 +5859,6 @@ export default function Warehouse() {
               Nhật ký xuất nhập kho hai chiều ghi nhận tất cả biến động linh kiện (Nhấn vào bất kỳ dòng nào để xem chi tiết)
             </p>
           </div>
-
-          {usingSampleMovements && (
-            <div style={{ backgroundColor: '#fef9c3', border: '1px solid #fde047', borderRadius: '8px', padding: '0.65rem 0.9rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.6rem', fontSize: '0.8rem', color: '#854d0e', fontWeight: 600 }}>
-              <AlertCircle size={16} style={{ flexShrink: 0 }} />
-              Chưa có lịch sử điều chuyển kho thật nào — danh sách bên dưới là <strong>dữ liệu minh họa</strong>.
-            </div>
-          )}
 
           {/* Filter Toolbar */}
           <div style={{ backgroundColor: '#ffffff', padding: '1rem', borderRadius: '8px', border: '1px solid #cbd5e1', marginBottom: '1.25rem', display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
