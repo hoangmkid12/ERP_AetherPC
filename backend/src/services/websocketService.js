@@ -221,7 +221,9 @@ const handleWSMessage = async (ws, data) => {
   if (!data || !data.type) return;
 
   const { type, payload } = data;
-  const time = payload?.time || new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+  // Chỉ dùng khi client không tự gửi kèm `time` — luôn chỉ định rõ timeZone,
+  // không phụ thuộc múi giờ mặc định của máy chủ (production thường chạy UTC).
+  const time = payload?.time || new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Ho_Chi_Minh' });
 
   try {
     if (type === 'CLIENT_IDENTIFY') {
@@ -516,7 +518,7 @@ const addCustomerMessage = async ({ sessionId, text, customerName, time }) => {
     broadcast({
       type: 'UPDATE_SESSIONS',
       sessions: [session],
-      newMsg: { sender: 'customer', text, time: time || new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }), sessionId: session.sessionId }
+      newMsg: { sender: 'customer', text, time: time || new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Ho_Chi_Minh' }), sessionId: session.sessionId }
     }, client => client._isStaff || client._sessionId === session.sessionId);
 
     return session;
@@ -535,7 +537,7 @@ const addStaffMessage = async ({ sessionId, text, time }) => {
     broadcast({
       type: 'UPDATE_SESSIONS',
       sessions: [session],
-      newMsg: { sender: 'staff', text, time: time || new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }), sessionId }
+      newMsg: { sender: 'staff', text, time: time || new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Ho_Chi_Minh' }), sessionId }
     }, client => client._isStaff || client._sessionId === sessionId);
 
     return session;

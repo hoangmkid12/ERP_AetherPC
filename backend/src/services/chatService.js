@@ -1,5 +1,13 @@
 const prisma = require('../config/database');
 
+// Múi giờ hiển thị cố định — server (Railway) chạy theo giờ hệ điều hành của
+// container, mặc định thường là UTC chứ không phải giờ Việt Nam. Trước đây
+// toLocaleTimeString('vi-VN', {...}) KHÔNG truyền timeZone nên tự lấy múi giờ
+// mặc định của máy chủ: chạy đúng trên máy dev (đã để giờ ICT) nhưng lên
+// production (UTC) thì mọi tin nhắn hiển thị lệch múi giờ. Luôn truyền rõ
+// timeZone để không phụ thuộc vào cấu hình máy chủ đang chạy ở đâu.
+const VN_TIMEZONE = 'Asia/Ho_Chi_Minh';
+
 // Định dạng 1 tin nhắn cho client — dùng chung ở mọi hàm trả về session bên
 // dưới để tránh lặp lại (và lỡ quên field) ở 4 nơi khác nhau. `timestamp` là
 // mốc ISO thật (khác `time` chỉ để hiển thị) — cần cho việc so sánh với
@@ -8,7 +16,7 @@ const prisma = require('../config/database');
 const formatMessage = (msg) => ({
   sender: msg.sender,
   text: msg.text,
-  time: msg.timestamp.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+  time: msg.timestamp.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', timeZone: VN_TIMEZONE }),
   timestamp: msg.timestamp.toISOString(),
   senderName: msg.senderName
 });
