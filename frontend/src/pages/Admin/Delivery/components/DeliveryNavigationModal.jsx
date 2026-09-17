@@ -38,6 +38,11 @@ function padLngLatBounds(bounds, ratio) {
   );
 }
 
+// Sau khi Shipper tự tay kéo/zoom bản đồ (vd để xem trước ngã rẽ sắp tới),
+// tạm ngừng auto-pan-theo-GPS trong khoảng thời gian này để không đè mất
+// thao tác đó. Bấm nút "Xem toàn tuyến" sẽ bật lại auto-follow ngay.
+const AUTO_FOLLOW_PAUSE_MS = 15000;
+
 // Màn hình "Bắt Đầu Giao" gộp — CỐ Ý render theo dòng chảy tài liệu bình
 // thường (không position:fixed, không sticky, không vh/dvh/svh) thay vì
 // modal toàn màn hình như 3 lần sửa trước. Lý do: sau 3 lần vá bằng CSS
@@ -69,6 +74,7 @@ export default function DeliveryNavigationModal({
   const mapRef = useRef(null);
   const markersRef = useRef({});
   const routeCoordsRef = useRef([]);
+  const lastUserInteractionRef = useRef(0);
 
   const [routeInfo, setRouteInfo] = useState(null);
   const [loadingRoute, setLoadingRoute] = useState(true);
@@ -134,6 +140,12 @@ export default function DeliveryNavigationModal({
       attributionControl: true
     });
     map.addControl(new goongjs.NavigationControl(), 'top-left');
+
+    // originalEvent chỉ có mặt khi thao tác đến từ chuột/chạm thật của Shipper —
+    // panTo()/fitBounds() gọi bằng code không set field này.
+    const markUserInteraction = (e) => { if (e.originalEvent) lastUserInteractionRef.current = Date.now(); };
+    map.on('dragstart', markUserInteraction);
+    map.on('zoomstart', markUserInteraction);
 
     // Nguồn/lớp vẽ tuyến đường chỉ tạo được sau khi style load xong — tạo 1
     // lần rồi từ nay chỉ setData() lên nguồn có sẵn, tránh nháy bản đồ.
@@ -292,7 +304,8 @@ export default function DeliveryNavigationModal({
     }
 
     const bounds = map.getBounds();
-    if (bounds && !padLngLatBounds(bounds, 0.15).contains(pos)) {
+    const autoFollowPaused = Date.now() - lastUserInteractionRef.current < AUTO_FOLLOW_PAUSE_MS;
+    if (bounds && !autoFollowPaused && !padLngLatBounds(bounds, 0.15).contains(pos)) {
       map.panTo(pos, { animate: true, duration: 800 });
     }
   }, [shipperLoc]);
@@ -325,6 +338,9 @@ export default function DeliveryNavigationModal({
   const fitFullRoute = useCallback(() => {
     const map = mapRef.current;
     if (!map) return;
+    // Bấm nút này là tín hiệu Shipper chủ động muốn quay lại theo dõi toàn
+    // tuyến — bật lại auto-follow ngay, không đợi hết cooldown.
+    lastUserInteractionRef.current = 0;
     if (routeCoordsRef.current.length > 0) {
       const coords = routeCoordsRef.current.map(([lat, lng]) => [lng, lat]);
       const bounds = coords.reduce((b, c) => b.extend(c), new goongjs.LngLatBounds(coords[0], coords[0]));

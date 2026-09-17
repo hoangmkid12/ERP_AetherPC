@@ -11,6 +11,10 @@ const LIVE_RECALC_INTERVAL_MS = 18000;
 // Thời lượng "trượt" marker giữa 2 điểm GPS liên tiếp — ngắn hơn chu kỳ gửi
 // GPS để marker kịp đứng yên trước khi có điểm mới, tránh giật.
 const MARKER_TWEEN_MS = 2200;
+// Sau khi người xem tự tay kéo/zoom bản đồ, tạm ngừng auto-pan-theo-shipper
+// trong khoảng thời gian này (~2 chu kỳ GPS) để không đè mất thao tác của họ.
+// Bấm nút "Xem toàn tuyến" sẽ bật lại auto-follow ngay lập tức.
+const AUTO_FOLLOW_PAUSE_MS = 15000;
 
 // Haversine — khoảng cách đường chim bay giữa 2 toạ độ (km)
 function haversineKm(a, b) {
@@ -65,6 +69,7 @@ export default function DeliveryMap({
   const routeCoordsRef = useRef([]);
   const animFrameRef = useRef(null);
   const lastLiveRecalcRef = useRef(0);
+  const lastUserInteractionRef = useRef(0);
   const [remainingInfo, setRemainingInfo] = useState(null);
   const [currentAddress, setCurrentAddress] = useState('');
   // Đổi mỗi khi style/nguồn dữ liệu bản đồ đã sẵn sàng — dùng làm dependency
@@ -111,6 +116,13 @@ export default function DeliveryMap({
       attributionControl: true
     });
     map.addControl(new goongjs.NavigationControl(), 'top-left');
+
+    // originalEvent chỉ có mặt khi thao tác đến từ chuột/chạm thật của người
+    // dùng — panTo()/fitBounds() gọi bằng code không set field này, nên đây
+    // là cách phân biệt "người dùng tự kéo/zoom" với "code tự di chuyển bản đồ".
+    const markUserInteraction = (e) => { if (e.originalEvent) lastUserInteractionRef.current = Date.now(); };
+    map.on('dragstart', markUserInteraction);
+    map.on('zoomstart', markUserInteraction);
 
     // Nguồn/lớp vẽ tuyến đường chỉ tạo được sau khi style load xong — tạo 1
     // lần rồi từ nay chỉ setData() lên nguồn có sẵn (không remove/add lại
@@ -238,7 +250,8 @@ export default function DeliveryMap({
     }
 
     const bounds = map.getBounds();
-    if (bounds && !padLngLatBounds(bounds, 0.15).contains(newLngLat)) {
+    const autoFollowPaused = Date.now() - lastUserInteractionRef.current < AUTO_FOLLOW_PAUSE_MS;
+    if (bounds && !autoFollowPaused && !padLngLatBounds(bounds, 0.15).contains(newLngLat)) {
       map.panTo(newLngLat, { animate: true, duration: 800 });
     }
 
@@ -276,6 +289,9 @@ export default function DeliveryMap({
   const fitFullRoute = useCallback(() => {
     const map = mapRef.current;
     if (!map) return;
+    // Bấm nút này là tín hiệu người dùng chủ động muốn quay lại theo dõi
+    // toàn tuyến — bật lại auto-follow ngay, không đợi hết cooldown.
+    lastUserInteractionRef.current = 0;
     if (routeCoordsRef.current.length > 0) {
       const coords = routeCoordsRef.current.map(([lat, lng]) => [lng, lat]);
       const bounds = coords.reduce((b, c) => b.extend(c), new goongjs.LngLatBounds(coords[0], coords[0]));
