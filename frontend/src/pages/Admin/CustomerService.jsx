@@ -558,9 +558,8 @@ export default function CustomerService() {
                 <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569' }}>
                   <th style={{ padding: '0.75rem 0.85rem', width: '120px', whiteSpace: 'nowrap' }}>Mã Ticket</th>
                   <th style={{ padding: '0.75rem 0.85rem', width: '170px', whiteSpace: 'nowrap' }}>Khách Hàng & SĐT</th>
-                  <th style={{ padding: '0.75rem 0.85rem', minWidth: '240px' }}>Tiêu Đề Khiếu Nại</th>
+                  <th style={{ padding: '0.75rem 0.85rem', minWidth: '260px' }}>Tiêu Đề Khiếu Nại</th>
                   <th style={{ padding: '0.75rem 0.85rem', width: '150px', whiteSpace: 'nowrap' }}>Mã Đơn</th>
-                  <th style={{ padding: '0.75rem 0.85rem', width: '110px', textAlign: 'center', whiteSpace: 'nowrap' }}>Mức Độ</th>
                   <th style={{ padding: '0.75rem 0.85rem', width: '140px', textAlign: 'center', whiteSpace: 'nowrap' }}>Trạng Thái</th>
                   <th style={{ padding: '0.75rem 0.85rem', width: '100px', textAlign: 'center', whiteSpace: 'nowrap' }}>Thao Tác</th>
                 </tr>
@@ -568,7 +567,7 @@ export default function CustomerService() {
               <tbody>
                 {filteredComplaints.length === 0 ? (
                   <tr>
-                    <td colSpan={7} style={{ textAlign: 'center', padding: '3.5rem 1rem', color: '#64748b' }}>
+                    <td colSpan={6} style={{ textAlign: 'center', padding: '3.5rem 1rem', color: '#64748b' }}>
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.6rem' }}>
                         <div style={{ width: '48px', height: '48px', borderRadius: '12px', backgroundColor: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2563eb' }}>
                           <HeadphonesIcon size={24} />
@@ -606,7 +605,6 @@ export default function CustomerService() {
                       ? (String(comp.id).length > 10 ? `#TK-${String(comp.id).slice(0, 8).toUpperCase()}` : `#TK-${comp.id}`)
                       : `#TK-${cIdx + 101}`;
                     const statusInfo = getStatusInfo(COMPLAINT_STATUS, comp.status);
-                    const priorityColor = PRIORITY_COLORS[comp.priority] || '#10b981';
 
                     return (
                       <tr key={comp.id || cIdx} style={{ borderBottom: '1px solid #f1f5f9', transition: 'background-color 0.15s' }}>
@@ -620,7 +618,7 @@ export default function CustomerService() {
                         <td style={{ padding: '0.75rem 0.85rem' }}>
                           <div style={{ fontWeight: 600, color: '#0f172a', lineHeight: 1.4 }}>{comp.title}</div>
                           {comp.description && (
-                            <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '0.2rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '380px' }} title={comp.description}>
+                            <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '0.2rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '420px' }} title={comp.description}>
                               {comp.description}
                             </div>
                           )}
@@ -633,22 +631,6 @@ export default function CustomerService() {
                           ) : (
                             <span style={{ color: '#94a3b8', fontSize: '0.75rem' }}>N/A</span>
                           )}
-                        </td>
-                        <td style={{ padding: '0.75rem 0.85rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
-                          <span style={{
-                            display: 'inline-block',
-                            padding: '3px 10px',
-                            borderRadius: '6px',
-                            fontSize: '0.72rem',
-                            fontWeight: 800,
-                            letterSpacing: '0.3px',
-                            backgroundColor: `${priorityColor}15`,
-                            color: priorityColor,
-                            border: `1px solid ${priorityColor}30`,
-                            whiteSpace: 'nowrap'
-                          }}>
-                            {comp.priority || 'MEDIUM'}
-                          </span>
                         </td>
                         <td style={{ padding: '0.75rem 0.85rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
                           <span style={{
