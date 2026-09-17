@@ -59,6 +59,16 @@
       "id": "power_supply_safety",
       "keywords": ["nguồn kém chất lượng có sao không", "nguồn rẻ có an toàn không", "nguồn máy tính quan trọng không"],
       "answer": "Nguồn (PSU) là linh kiện **ảnh hưởng trực tiếp tới độ an toàn và tuổi thọ cả dàn máy** — nguồn kém chất lượng có thể gây chập cháy, hỏng linh kiện khác. AetherPC chỉ phân phối nguồn từ các hãng uy tín (Corsair, FSP, Cooler Master...) đạt chuẩn 80 Plus trở lên."
+    },
+    {
+      "id": "blue_screen",
+      "keywords": ["màn hình xanh", "may bi xanh man hinh", "lỗi màn hình xanh", "máy tự khởi động lại", "máy bị đơ liên tục", "máy hay bị treo"],
+      "answer": "Máy bị màn hình xanh (BSOD) thường do xung đột driver, RAM lỗi, hoặc quá nhiệt CPU/VGA. Bạn thử: (1) cập nhật driver VGA mới nhất, (2) chạy Windows Memory Diagnostic kiểm tra RAM, (3) kiểm tra nhiệt độ máy khi chạy nặng. Nếu vẫn còn lỗi và máy còn bảo hành tại AetherPC, mang máy đến showroom hoặc bấm **\"Gặp NV CSKH\"** để kỹ thuật viên kiểm tra miễn phí."
+    },
+    {
+      "id": "no_display",
+      "keywords": ["máy không lên hình", "bật không lên màn hình", "máy chạy nhưng không lên hình", "cắm màn hình không hiện gì"],
+      "answer": "Máy chạy (đèn nguồn sáng, quạt quay) nhưng không lên hình thường do: cắm nhầm cổng màn hình (cắm vào mainboard thay vì VGA rời), RAM/VGA lỏng chân cắm, hoặc màn hình sai nguồn tín hiệu (input). Bạn thử tháo lắp lại RAM/VGA và kiểm tra đã cắm dây màn hình đúng cổng của card đồ họa rời (nếu có) chưa nhé. Nếu vẫn không được, mang máy tới AetherPC để kiểm tra miễn phí."
     }
   ]
 }

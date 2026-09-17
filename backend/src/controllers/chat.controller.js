@@ -158,8 +158,15 @@ const extractEntities = (text, categoriesList, brandsList) => {
     'man-hinh': ['màn hình', 'man hinh', 'monitor', 'hiển thị']
   };
 
+  // Vài cụm quán ngữ chứa "màn hình" nhưng KHÔNG phải hỏi mua màn hình (báo
+  // lỗi kỹ thuật, vd "màn hình xanh" = BSOD) — cắt các cụm này ra trước khi so
+  // khớp category, tránh điều hướng nhầm câu hỏi khắc phục sự cố sang
+  // product_search chỉ vì trùng chữ "màn hình".
+  const NON_SHOPPING_PHRASES = ['màn hình xanh', 'man hinh xanh', 'màn hình đen', 'man hinh den', 'màn hình chớp', 'man hinh chop'];
+  const categoryMatchText = NON_SHOPPING_PHRASES.reduce((txt, phrase) => txt.split(phrase).join(''), cleanText);
+
   for (const [slug, synonyms] of Object.entries(categorySynonyms)) {
-    if (synonyms.some(syn => cleanText.includes(syn))) {
+    if (synonyms.some(syn => categoryMatchText.includes(syn))) {
       const matchedCat = categoriesList.find(c => c.slug.toLowerCase() === slug);
       if (matchedCat) {
         entities.category = matchedCat;
@@ -213,6 +220,53 @@ const extractEntities = (text, categoriesList, brandsList) => {
   return entities;
 };
 
+// % ngân sách phân bổ cho từng linh kiện chính khi gợi ý cấu hình PC — theo
+// tỉ lệ thường dùng để lên cấu hình gaming/phổ thông (VGA quan trọng nhất
+// với hiệu năng chơi game, kế đến CPU). Phần còn lại (~18%) coi như dành cho
+// nguồn/case/tản nhiệt không liệt kê cụ thể trong gợi ý này.
+const BUILD_BUDGET_ALLOCATION = {
+  'bo-vi-xu-ly': 0.25,
+  'card-man-hinh': 0.35,
+  'ram-pc': 0.12,
+  'o-cung-ssd': 0.10
+};
+
+/**
+ * Chọn 1 bộ CPU/VGA/RAM/Ổ cứng theo đúng ngân sách phân bổ cho từng loại,
+ * thay vì lấy sản phẩm đắt nhất còn dưới TOÀN BỘ ngân sách cho MỖI linh kiện
+ * (bug cũ: 4 món cộng lại luôn vượt xa ngân sách khách đưa ra vì mỗi món đều
+ * được phép "ăn" gần hết ngân sách tổng). Trong từng danh mục, ưu tiên sản
+ * phẩm đắt nhất còn nằm trong phần ngân sách được chia (best-fit), nếu không
+ * món nào vừa thì lấy sản phẩm rẻ nhất còn có sẵn của danh mục đó.
+ * @param {number} targetBudget
+ * @returns {Promise<{picks: object, totalPrice: number}>}
+ */
+const pickBudgetAwareBuild = async (targetBudget) => {
+  const slugs = Object.keys(BUILD_BUDGET_ALLOCATION);
+  const categoryIds = categoriesCache.filter(c => slugs.includes(c.slug)).map(c => c.id);
+
+  const allCandidates = await prisma.product.findMany({
+    where: { available: true, categoryId: { in: categoryIds } },
+    include: { category: true, brand: true, images: { take: 1 } },
+    orderBy: { price: 'desc' }
+  });
+
+  const picks = {};
+  let totalPrice = 0;
+  for (const [slug, pct] of Object.entries(BUILD_BUDGET_ALLOCATION)) {
+    const subBudget = targetBudget * pct;
+    // allCandidates đã sắp xếp giảm dần theo giá — lọc theo danh mục vẫn giữ
+    // nguyên thứ tự đó.
+    const inCategory = allCandidates.filter(p => p.category?.slug === slug);
+    if (inCategory.length === 0) continue;
+    const bestFit = inCategory.find(p => parseFloat(p.price) <= subBudget);
+    const chosen = bestFit || inCategory[inCategory.length - 1]; // không món nào vừa -> lấy rẻ nhất
+    picks[slug] = chosen;
+    totalPrice += parseFloat(chosen.price) || 0;
+  }
+  return { picks, totalPrice };
+};
+
 // Main Chat Handler
 const handleChat = async (req, res, next) => {
   try {
@@ -237,12 +291,17 @@ const handleChat = async (req, res, next) => {
     //
     // Bộ phân loại bag-of-words của node-nlp với ~150 câu mẫu không thực sự
     // hiểu ngữ nghĩa — 1 câu hoàn toàn lạ (vd "shop có tuyển nhân viên
-    // không") vẫn có thể bị gán nhầm vào 1 intent đã huấn luyện với điểm tin
-    // cậy khá cao do trùng từ ngẫu nhiên. Đặt ngưỡng tin cậy tối thiểu để
-    // những câu mơ hồ hơn được nhường lại cho kho tri thức FAQ (tra theo từ
-    // khóa, ít nhất còn bám đúng chủ đề) thay vì trả lời sai chủ đề nhưng
-    // "tự tin".
-    const INTENT_CONFIDENCE_THRESHOLD = 0.8;
+    // không", "máy tính bị màn hình xanh phải làm sao") vẫn có thể bị gán
+    // nhầm vào 1 intent đã huấn luyện với điểm tin cậy khá cao do trùng từ
+    // ngẫu nhiên. Đo thực tế: câu khớp đúng luôn đạt ~0.92-1.0, còn các câu
+    // bị gán nhầm mà tôi bắt được đều nằm trong khoảng 0.62-0.91 — 0.9 là
+    // ngưỡng tách được phần lớn các trường hợp gán nhầm rõ ràng mà vẫn giữ
+    // được các câu khớp đúng, nhường câu mơ hồ lại cho kho tri thức FAQ (tra
+    // theo từ khóa, ít nhất còn bám đúng chủ đề) thay vì trả lời sai chủ đề
+    // nhưng "tự tin". Không thể lọc tuyệt đối 100% vì bản chất bag-of-words
+    // không phân biệt được ngữ nghĩa thật sự — đây là giới hạn cố hữu khi
+    // không dùng LLM ngoài.
+    const INTENT_CONFIDENCE_THRESHOLD = 0.9;
     const intent = (result.intent && result.intent !== 'None' && result.score >= INTENT_CONFIDENCE_THRESHOLD)
       ? result.intent
       : 'general';
@@ -319,39 +378,22 @@ const handleChat = async (req, res, next) => {
 
       // Query database for recommended setup
       try {
-        const keyProducts = await prisma.product.findMany({
-          where: { available: true },
-          include: { category: true, brand: true, images: { take: 1 } },
-          take: 50
-        });
-
         const budgetStr = new Intl.NumberFormat('vi-VN').format(targetBudget) + '₫';
+        const { picks, totalPrice } = await pickBudgetAwareBuild(targetBudget);
+        const totalStr = new Intl.NumberFormat('vi-VN').format(totalPrice) + '₫';
+
         reply = `💡 **Gợi ý cấu hình PC phù hợp nhu cầu của bạn (Tầm giá ~${budgetStr}):**\n\n`;
-        
-        // Pick best matching parts from store inventory. Slug phải khớp DÚNG
-        // slug thật trong DB (xem chú thích ở extractEntities/categorySynonyms
-        // phía trên) — bản cũ dùng slug tự đặt 'cpu'/'vga'/'ram'/'storage'
-        // không khớp gì cả, nên gợi ý cấu hình trước đây luôn chọn đại 4 sản
-        // phẩm đầu tiên trong danh sách thay vì thật sự là CPU/VGA/RAM/Ổ cứng.
-        const cpus = keyProducts.filter(p => p.category?.slug === 'bo-vi-xu-ly');
-        const vgas = keyProducts.filter(p => p.category?.slug === 'card-man-hinh');
-        const rams = keyProducts.filter(p => p.category?.slug === 'ram-pc');
-        const storages = keyProducts.filter(p => p.category?.slug === 'o-cung-ssd');
-
-        const pickedCpu = cpus[0];
-        const pickedVga = vgas[0];
-        const pickedRam = rams[0];
-        const pickedStorage = storages[0];
-
-        if (pickedCpu) reply += `- **CPU**: ${pickedCpu.name}\n`;
-        if (pickedVga) reply += `- **VGA**: ${pickedVga.name}\n`;
-        if (pickedRam) reply += `- **RAM**: ${pickedRam.name}\n`;
-        if (pickedStorage) reply += `- **Ổ cứng**: ${pickedStorage.name}\n`;
+        if (picks['bo-vi-xu-ly']) reply += `- **CPU**: ${picks['bo-vi-xu-ly'].name}\n`;
+        if (picks['card-man-hinh']) reply += `- **VGA**: ${picks['card-man-hinh'].name}\n`;
+        if (picks['ram-pc']) reply += `- **RAM**: ${picks['ram-pc'].name}\n`;
+        if (picks['o-cung-ssd']) reply += `- **Ổ cứng**: ${picks['o-cung-ssd'].name}\n`;
         reply += `- **Nguồn & Case**: Nguồn 650W 80 Plus & Vỏ case Tản nhiệt thoáng khí\n\n`;
+        reply += `💰 **Tổng 4 linh kiện chính: ~${totalStr}** (chưa gồm nguồn/case/tản nhiệt)\n\n`;
         reply += `👉 Bộ linh kiện bên dưới được tự động lọc sẵn từ kho AetherPC theo tiêu chuẩn mượt mà nhất. Bạn có thể nhấn **"Thêm vào giỏ"** để sở hữu ngay!`;
 
-        matchedProducts = [pickedCpu, pickedVga, pickedRam, pickedStorage].filter(Boolean).slice(0, 4);
+        matchedProducts = Object.values(picks).filter(Boolean).slice(0, 4);
       } catch (err) {
+        console.error('[Chatbot] game_advice build error:', err);
         reply = 'Dạ, để chơi mượt mà các tựa game bạn yêu cầu, bạn có thể tham khảo các dòng cấu hình PC Gaming từ 12tr - 18tr tại AetherPC!';
       }
     } else if (intent === 'pc_build') {
@@ -360,32 +402,20 @@ const handleChat = async (req, res, next) => {
       const budgetStr = new Intl.NumberFormat('vi-VN').format(targetBudget) + '₫';
 
       try {
-        const dbProducts = await prisma.product.findMany({
-          where: { available: true, price: { lte: targetBudget } },
-          include: { category: true, brand: true, images: { take: 1 } },
-          orderBy: { price: 'desc' },
-          take: 30
-        });
-
         reply = `🖥️ **AetherPC - Cấu hình PC đề xuất tối ưu theo ngân sách ~${budgetStr}:**\n\n`;
-        const cpus = dbProducts.filter(p => p.category?.slug === 'bo-vi-xu-ly');
-        const vgas = dbProducts.filter(p => p.category?.slug === 'card-man-hinh');
-        const rams = dbProducts.filter(p => p.category?.slug === 'ram-pc');
-        const storages = dbProducts.filter(p => p.category?.slug === 'o-cung-ssd');
 
-        const chosenCpu = cpus[0] || dbProducts[0];
-        const chosenVga = vgas[0] || dbProducts[1];
-        const chosenRam = rams[0] || dbProducts[2];
-        const chosenStorage = storages[0] || dbProducts[3];
-
-        matchedProducts = [chosenCpu, chosenVga, chosenRam, chosenStorage].filter(Boolean).slice(0, 4);
+        const { picks, totalPrice } = await pickBudgetAwareBuild(targetBudget);
+        matchedProducts = [picks['bo-vi-xu-ly'], picks['card-man-hinh'], picks['ram-pc'], picks['o-cung-ssd']].filter(Boolean);
 
         matchedProducts.forEach((p, idx) => {
           const pPriceStr = new Intl.NumberFormat('vi-VN').format(parseFloat(p.price)) + '₫';
           reply += `${idx + 1}. **${p.name}** - ${pPriceStr}\n`;
         });
-        reply += `\n✨ Tất cả linh kiện đều sẵn hàng tại showroom, bảo hành chính hãng 36 tháng. Bấm **"Thêm vào giỏ"** để đặt hàng ngay!`;
+        const totalStr = new Intl.NumberFormat('vi-VN').format(totalPrice) + '₫';
+        reply += `\n💰 **Tổng 4 linh kiện chính: ~${totalStr}** (chưa gồm nguồn/case/tản nhiệt)\n\n`;
+        reply += `✨ Tất cả linh kiện đều sẵn hàng tại showroom, bảo hành chính hãng 36 tháng. Bấm **"Thêm vào giỏ"** để đặt hàng ngay!`;
       } catch (err) {
+        console.error('[Chatbot] pc_build error:', err);
         reply = `Dạ, tôi đã ghi nhận ngân sách khoảng **${budgetStr}**. Vui lòng tham khảo các cấu hình gợi ý bên dưới hoặc bấm nút **"Gặp NV CSKH"** để nhân viên hỗ trợ tùy chỉnh theo ý muốn!`;
       }
     } else if (intent === 'product_search' || intent === 'product_compare' || entities.category || entities.brand || entities.specs.length > 0) {
