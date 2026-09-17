@@ -834,7 +834,12 @@ model ChatSession {
   closedAt      DateTime? @map("closed_at") @db.Timestamptz()
   lastActivityAt DateTime @default(now()) @updatedAt @map("last_activity_at") @db.Timestamptz()
   notes         String?  @db.Text
-  
+  // Mốc thời gian mỗi bên lần cuối xem cuộc hội thoại này — dùng để tính trạng
+  // thái "Đã gửi/Đã nhận/Đã xem" (kiểu Zalo) hiển thị dưới tin nhắn của chính
+  // mình: 1 tin nhắn có timestamp <= lastReadAt của phía bên kia là "Đã xem".
+  customerLastReadAt DateTime? @map("customer_last_read_at") @db.Timestamptz()
+  staffLastReadAt    DateTime? @map("staff_last_read_at") @db.Timestamptz()
+
   messages      ChatMessage[]
 
   @@index([customerName])

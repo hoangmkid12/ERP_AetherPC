@@ -192,7 +192,11 @@ export default function CustomerService() {
   // Effect kết nối WS dùng deps [] nên đóng gói activeSessionId cũ (stale) —
   // dùng ref để luôn đọc được giá trị mới nhất bên trong ws.onmessage.
   const activeSessionIdRef = useRef(null);
-  useEffect(() => { activeSessionIdRef.current = activeSessionId; }, [activeSessionId]);
+  useEffect(() => {
+    activeSessionIdRef.current = activeSessionId;
+    if (activeSessionId) sendMarkRead(activeSessionId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSessionId]);
 
   // WebSocket connection for CSKH Livechat
   useEffect(() => {
@@ -226,11 +230,18 @@ export default function CustomerService() {
                   return Array.from(updatedMap.values());
                 });
               }
-              // Tin khách vừa gửi tới 1 phiên KHÁC phiên đang mở xem — đánh dấu
-              // chưa đọc để hiện số đỏ, thay vì phải bấm từng phiên mới biết.
-              if (data.newMsg && data.newMsg.sender === 'customer' && data.newMsg.sessionId && data.newMsg.sessionId !== activeSessionIdRef.current) {
-                const unreadSessionId = data.newMsg.sessionId;
-                setUnreadCounts(prev => ({ ...prev, [unreadSessionId]: (prev[unreadSessionId] || 0) + 1 }));
+              if (data.newMsg && data.newMsg.sender === 'customer' && data.newMsg.sessionId) {
+                if (data.newMsg.sessionId !== activeSessionIdRef.current) {
+                  // Tin khách vừa gửi tới 1 phiên KHÁC phiên đang mở xem — đánh
+                  // dấu chưa đọc để hiện số đỏ, thay vì phải bấm từng phiên
+                  // mới biết.
+                  const unreadSessionId = data.newMsg.sessionId;
+                  setUnreadCounts(prev => ({ ...prev, [unreadSessionId]: (prev[unreadSessionId] || 0) + 1 }));
+                } else {
+                  // Tin tới đúng phiên đang mở xem — coi như đã xem ngay, báo
+                  // cho khách biết để cập nhật trạng thái "Đã xem" bên họ.
+                  sendMarkRead(data.newMsg.sessionId);
+                }
               }
               if (data.deletedSessionId) {
                 setLiveChatSessions(prev => prev.filter(s => s.id !== data.deletedSessionId));
@@ -255,6 +266,12 @@ export default function CustomerService() {
                   return s;
                 }));
               }
+            } else if (data.type === 'READ_RECEIPT' && data.readBy === 'customer') {
+              // Khách vừa xem cuộc hội thoại — cập nhật để tin nhắn CỦA STAFF
+              // trong phiên đó chuyển từ "Đã nhận" sang "Đã xem".
+              setLiveChatSessions(prev => prev.map(s =>
+                s.id === data.sessionId ? { ...s, customerLastReadAt: data.readAt } : s
+              ));
             }
           } catch (e) {}
         };
@@ -269,6 +286,27 @@ export default function CustomerService() {
       if (reconnectTimeout) clearTimeout(reconnectTimeout);
     };
   }, []);
+
+  // Trạng thái Đã gửi/Đã nhận/Đã xem (kiểu Zalo) cho MỘT tin nhắn CỦA STAFF —
+  // không áp dụng cho tin của khách (chỉ hiện trạng thái dưới tin mình gửi).
+  // "Đã nhận" chỉ mang tính tương đối (khách đang mở kết nối), không phải xác
+  // nhận đã tới thiết bị thật như SMS — nhưng đủ để phân biệt với "Đã gửi".
+  const getStaffMessageStatus = (msg, session) => {
+    if (!msg.timestamp) return 'Đã gửi';
+    if (session?.customerLastReadAt && new Date(msg.timestamp) <= new Date(session.customerLastReadAt)) {
+      return 'Đã xem';
+    }
+    const customerOnline = session?.status === 'ONLINE' || session?.isOnline === true;
+    return customerOnline ? 'Đã nhận' : 'Đã gửi';
+  };
+
+  // Báo cho khách biết staff vừa xem cuộc hội thoại (kiểu Zalo: tin nhắn của
+  // khách chuyển từ "Đã nhận" sang "Đã xem"). Gọi khi chọn 1 phiên và khi có
+  // tin khách gửi tới đúng phiên đang mở.
+  const sendMarkRead = (sessionId) => {
+    if (!sessionId || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
+    wsRef.current.send(JSON.stringify({ type: 'MARK_READ', payload: { sessionId } }));
+  };
 
   const handleSendStaffMessage = (customTxt = '') => {
     const msgToSend = customTxt || staffInputMsg;
@@ -880,6 +918,7 @@ export default function CustomerService() {
                     </div>
                     <span style={{ fontSize: '0.68rem', color: '#94a3b8', display: 'block', marginTop: '0.2rem', textAlign: isStaff ? 'right' : 'left' }}>
                       {m.time}
+                      {isStaff && ` · ${getStaffMessageStatus(m, activeChat)}`}
                     </span>
                   </div>
                 );

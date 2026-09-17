@@ -1,6 +1,6 @@
 const WebSocket = require('ws');
 const jwt = require('jsonwebtoken');
-const { getAllSessions, createOrUpdateSession, markSessionOnlineIfExists, addMessage, closeSession, deleteSession } = require('./chatService');
+const { getAllSessions, createOrUpdateSession, markSessionOnlineIfExists, markRead, addMessage, closeSession, deleteSession } = require('./chatService');
 const prisma = require('../config/database');
 
 let wss = null; // CSKH chat — path /ws/cskh
@@ -308,6 +308,29 @@ const handleWSMessage = async (ws, data) => {
         sessions: [session],
         newMsg: { sender: 'staff', text, time, sessionId }
       }, client => client._isStaff || client._sessionId === sessionId);
+    }
+    else if (type === 'MARK_READ') {
+      // Bên gửi (customer hoặc staff) báo "tôi vừa xem cuộc hội thoại này" —
+      // dùng để tính trạng thái Đã xem cho tin nhắn CỦA PHÍA BÊN KIA. Vai trò
+      // suy ra thẳng từ ws._isStaff (đã xác thực lúc connect qua cookie JWT),
+      // không tin theo payload để tránh 1 client tự khai man vai trò.
+      const { sessionId } = payload || {};
+      if (!sessionId) return;
+
+      const role = ws._isStaff ? 'staff' : 'customer';
+      const readAt = await markRead(sessionId, role);
+      if (!readAt) return;
+
+      const receipt = { type: 'READ_RECEIPT', sessionId, readAt, readBy: role };
+      if (role === 'staff') {
+        // Staff vừa xem — khách (đúng phiên này) cần biết để cập nhật trạng
+        // thái tin nhắn CỦA HỌ đã gửi trước đó thành "Đã xem".
+        broadcast(receipt, client => !client._isStaff && client._sessionId === sessionId);
+      } else {
+        // Khách vừa xem — mọi nhân viên CSKH đang mở danh sách cần biết (bất
+        // kỳ ai trong số họ có thể đang xem/trả lời phiên này).
+        broadcast(receipt, client => client._isStaff);
+      }
     }
     else if (type === 'DELETE_SESSION') {
       const { sessionId } = payload || {};

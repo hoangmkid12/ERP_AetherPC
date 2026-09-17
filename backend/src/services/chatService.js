@@ -1,5 +1,18 @@
 const prisma = require('../config/database');
 
+// Định dạng 1 tin nhắn cho client — dùng chung ở mọi hàm trả về session bên
+// dưới để tránh lặp lại (và lỡ quên field) ở 4 nơi khác nhau. `timestamp` là
+// mốc ISO thật (khác `time` chỉ để hiển thị) — cần cho việc so sánh với
+// customerLastReadAt/staffLastReadAt để suy ra trạng thái Đã gửi/Đã nhận/Đã
+// xem (kiểu Zalo) ở phía frontend.
+const formatMessage = (msg) => ({
+  sender: msg.sender,
+  text: msg.text,
+  time: msg.timestamp.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+  timestamp: msg.timestamp.toISOString(),
+  senderName: msg.senderName
+});
+
 /**
  * Get all active chat sessions from database
  * @returns {Promise<Array>} Array of chat sessions with messages
@@ -32,12 +45,9 @@ const getAllSessions = async (onlineSessionIds = new Set()) => {
         customerName: session.customerName,
         status: isOnline ? 'ONLINE' : 'OFFLINE',
         isOnline,
-        messages: session.messages.map(msg => ({
-          sender: msg.sender,
-          text: msg.text,
-          time: msg.timestamp.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
-          senderName: msg.senderName
-        }))
+        customerLastReadAt: session.customerLastReadAt ? session.customerLastReadAt.toISOString() : null,
+        staffLastReadAt: session.staffLastReadAt ? session.staffLastReadAt.toISOString() : null,
+        messages: session.messages.map(formatMessage)
       };
     });
   } catch (err) {
@@ -69,12 +79,9 @@ const getSessionById = async (sessionId) => {
       sessionId: session.sessionId,
       customerName: session.customerName,
       status: session.status,
-      messages: session.messages.map(msg => ({
-        sender: msg.sender,
-        text: msg.text,
-        time: msg.timestamp.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
-        senderName: msg.senderName
-      }))
+      customerLastReadAt: session.customerLastReadAt ? session.customerLastReadAt.toISOString() : null,
+      staffLastReadAt: session.staffLastReadAt ? session.staffLastReadAt.toISOString() : null,
+      messages: session.messages.map(formatMessage)
     };
   } catch (err) {
     console.error('[ChatService] Error getting session:', err);
@@ -123,12 +130,9 @@ const createOrUpdateSession = async (sessionId, customerName, customerId = null,
       sessionId: session.sessionId,
       customerName: session.customerName,
       status: session.status,
-      messages: session.messages.map(msg => ({
-        sender: msg.sender,
-        text: msg.text,
-        time: msg.timestamp.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
-        senderName: msg.senderName
-      }))
+      customerLastReadAt: session.customerLastReadAt ? session.customerLastReadAt.toISOString() : null,
+      staffLastReadAt: session.staffLastReadAt ? session.staffLastReadAt.toISOString() : null,
+      messages: session.messages.map(formatMessage)
     };
   } catch (err) {
     console.error('[ChatService] Error creating/updating session:', err);
@@ -168,12 +172,9 @@ const markSessionOnlineIfExists = async (sessionId) => {
       sessionId: session.sessionId,
       customerName: session.customerName,
       status: session.status,
-      messages: session.messages.map(msg => ({
-        sender: msg.sender,
-        text: msg.text,
-        time: msg.timestamp.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
-        senderName: msg.senderName
-      }))
+      customerLastReadAt: session.customerLastReadAt ? session.customerLastReadAt.toISOString() : null,
+      staffLastReadAt: session.staffLastReadAt ? session.staffLastReadAt.toISOString() : null,
+      messages: session.messages.map(formatMessage)
     };
   } catch (err) {
     console.error('[ChatService] Error marking session online:', err);
@@ -264,12 +265,9 @@ const closeSession = async (sessionId, notes = null) => {
       sessionId: session.sessionId,
       customerName: session.customerName,
       status: session.status,
-      messages: session.messages.map(msg => ({
-        sender: msg.sender,
-        text: msg.text,
-        time: msg.timestamp.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
-        senderName: msg.senderName
-      }))
+      customerLastReadAt: session.customerLastReadAt ? session.customerLastReadAt.toISOString() : null,
+      staffLastReadAt: session.staffLastReadAt ? session.staffLastReadAt.toISOString() : null,
+      messages: session.messages.map(formatMessage)
     };
   } catch (err) {
     console.error('[ChatService] Error closing session:', err);
@@ -315,12 +313,9 @@ const getSessionsByStatus = async (status) => {
       sessionId: session.sessionId,
       customerName: session.customerName,
       status: session.status,
-      messages: session.messages.map(msg => ({
-        sender: msg.sender,
-        text: msg.text,
-        time: msg.timestamp.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
-        senderName: msg.senderName
-      }))
+      customerLastReadAt: session.customerLastReadAt ? session.customerLastReadAt.toISOString() : null,
+      staffLastReadAt: session.staffLastReadAt ? session.staffLastReadAt.toISOString() : null,
+      messages: session.messages.map(formatMessage)
     }));
   } catch (err) {
     console.error('[ChatService] Error getting sessions by status:', err);
@@ -354,11 +349,37 @@ const clearOldSessions = async (daysOld = 30) => {
   }
 };
 
+/**
+ * Đánh dấu 1 bên (customer hoặc staff) vừa xem cuộc hội thoại tới thời điểm
+ * hiện tại — dùng để tính trạng thái "Đã xem" (kiểu Zalo) cho tin nhắn của
+ * PHÍA BÊN KIA. Không throw nếu phiên chưa tồn tại (vd staff bấm vào 1 phiên
+ * vừa bị khách xoá) — chỉ là no-op.
+ * @param {string} sessionId
+ * @param {'customer'|'staff'} role
+ * @returns {Promise<string|null>} ISO timestamp vừa ghi nhận, null nếu phiên không tồn tại
+ */
+const markRead = async (sessionId, role) => {
+  try {
+    const readAt = new Date();
+    const field = role === 'staff' ? 'staffLastReadAt' : 'customerLastReadAt';
+    await prisma.chatSession.update({
+      where: { sessionId },
+      data: { [field]: readAt }
+    });
+    return readAt.toISOString();
+  } catch (err) {
+    // P2025 = record not found — phiên đã bị xoá hoặc sai id, không phải lỗi thật
+    if (err.code !== 'P2025') console.error('[ChatService] Error marking read:', err);
+    return null;
+  }
+};
+
 module.exports = {
   getAllSessions,
   getSessionById,
   createOrUpdateSession,
   markSessionOnlineIfExists,
+  markRead,
   addMessage,
   closeSession,
   deleteSession,

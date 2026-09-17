@@ -275,6 +275,16 @@ export default function Chatbot() {
   // server báo qua STAFF_ONLINE_STATUS, cả lúc vừa identify lẫn khi có
   // staff vào/thoát trong lúc khung chat đang mở sẵn.
   const [staffOnline, setStaffOnline] = useState(false);
+  // Mốc thời gian staff lần cuối xem cuộc hội thoại — dùng để tính trạng thái
+  // Đã gửi/Đã nhận/Đã xem (kiểu Zalo) cho tin nhắn CỦA MÌNH (khách).
+  const [staffLastReadAt, setStaffLastReadAt] = useState(null);
+  // ws.onmessage đóng gói trong effect deps [user] nên isOpen/chatMode có thể
+  // stale — dùng ref để luôn đọc được giá trị mới nhất khi quyết định có nên
+  // tự động MARK_READ (khách đang thực sự xem hội thoại) hay không.
+  const isOpenRef = useRef(false);
+  const chatModeRef = useRef('ai');
+  useEffect(() => { isOpenRef.current = isOpen; }, [isOpen]);
+  useEffect(() => { chatModeRef.current = chatMode; }, [chatMode]);
 
   // Get dynamic session ID & customer name based on logged in user
   const getCSKHSessionInfo = () => {
@@ -309,6 +319,23 @@ export default function Chatbot() {
     custName = `Khách Hàng Trực Tuyến (#${storedGuestId.replace('session_guest_', '')})`;
     return { sessId, custName };
   };
+
+  // Báo cho staff biết mình vừa xem cuộc hội thoại (kiểu Zalo: tin nhắn của
+  // mình chuyển từ "Đã nhận" sang "Đã xem"). Gọi khi mở khung chat ở chế độ
+  // CSKH, khi chuyển sang chế độ CSKH, và khi có tin nhắn mới từ staff tới
+  // trong lúc đang mở xem.
+  const sendMarkRead = () => {
+    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
+    const { sessId } = getCSKHSessionInfo();
+    wsRef.current.send(JSON.stringify({ type: 'MARK_READ', payload: { sessionId: sessId } }));
+  };
+
+  // Mở khung chat trong lúc đang ở chế độ CSKH, hoặc chuyển sang chế độ CSKH
+  // trong lúc khung đang mở sẵn — cả 2 đều là lúc khách bắt đầu thực sự xem.
+  useEffect(() => {
+    if (isOpen && chatMode === 'cskh') sendMarkRead();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, chatMode]);
 
   // Reset CSKH messages when user switches accounts
   useEffect(() => {
@@ -359,9 +386,17 @@ export default function Chatbot() {
                 const mapped = currentSession.messages.map(m => ({
                   sender: m.sender === 'staff' ? 'cskh' : 'user',
                   text: m.text,
-                  time: m.time
+                  time: m.time,
+                  timestamp: m.timestamp
                 }));
                 setCskhMessages(mapped);
+                setStaffLastReadAt(currentSession.staffLastReadAt || null);
+
+                // Đang thực sự mở xem hội thoại CSKH — báo ngay cho staff biết
+                // (kể cả khi tin vừa về là do staff gửi, không chỉ lúc mở lại).
+                if (isOpenRef.current && chatModeRef.current === 'cskh') {
+                  sendMarkRead();
+                }
               } else {
                 setCskhMessages([
                   {
@@ -373,6 +408,8 @@ export default function Chatbot() {
               }
             } else if (data.type === 'STAFF_ONLINE_STATUS') {
               setStaffOnline(Boolean(data.online));
+            } else if (data.type === 'READ_RECEIPT' && data.readBy === 'staff') {
+              setStaffLastReadAt(data.readAt);
             }
           } catch (e) {}
         };
@@ -429,7 +466,8 @@ export default function Chatbot() {
       const cskhUserMsg = {
         sender: 'user',
         text: text,
-        time: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
+        time: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+        timestamp: new Date().toISOString()
       };
       setCskhMessages(prev => [...prev, cskhUserMsg]);
       if (!textToSend) setInput('');
@@ -668,6 +706,14 @@ export default function Chatbot() {
   };
 
   const currentActiveMessages = chatMode === 'cskh' ? cskhMessages : messages;
+
+  // Trạng thái Đã gửi/Đã nhận/Đã xem (kiểu Zalo) cho tin nhắn CỦA KHÁCH — chỉ
+  // có ý nghĩa ở chế độ CSKH (chat với người thật), không áp dụng cho AI.
+  const getCustomerMessageStatus = (msg) => {
+    if (!msg.timestamp) return 'Đã gửi';
+    if (staffLastReadAt && new Date(msg.timestamp) <= new Date(staffLastReadAt)) return 'Đã xem';
+    return staffOnline ? 'Đã nhận' : 'Đã gửi';
+  };
 
   return (
     <div style={{ position: 'fixed', bottom: '2rem', right: '2rem', zIndex: 9999 }}>
@@ -1068,7 +1114,10 @@ export default function Chatbot() {
                   )}
 
                 </div>
-                <span style={{ fontSize: '0.65rem', color: '#64748b', marginTop: '0.25rem', fontWeight: 600 }}>{msg.time}</span>
+                <span style={{ fontSize: '0.65rem', color: '#64748b', marginTop: '0.25rem', fontWeight: 600 }}>
+                  {msg.time}
+                  {chatMode === 'cskh' && msg.sender === 'user' && ` · ${getCustomerMessageStatus(msg)}`}
+                </span>
               </div>
             ))}
 
