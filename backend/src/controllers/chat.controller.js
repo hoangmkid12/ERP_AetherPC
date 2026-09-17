@@ -328,11 +328,15 @@ const handleChat = async (req, res, next) => {
         const budgetStr = new Intl.NumberFormat('vi-VN').format(targetBudget) + '₫';
         reply = `💡 **Gợi ý cấu hình PC phù hợp nhu cầu của bạn (Tầm giá ~${budgetStr}):**\n\n`;
         
-        // Pick best matching parts from store inventory
-        const cpus = keyProducts.filter(p => p.category?.slug === 'cpu');
-        const vgas = keyProducts.filter(p => p.category?.slug === 'vga');
-        const rams = keyProducts.filter(p => p.category?.slug === 'ram');
-        const storages = keyProducts.filter(p => p.category?.slug === 'storage');
+        // Pick best matching parts from store inventory. Slug phải khớp DÚNG
+        // slug thật trong DB (xem chú thích ở extractEntities/categorySynonyms
+        // phía trên) — bản cũ dùng slug tự đặt 'cpu'/'vga'/'ram'/'storage'
+        // không khớp gì cả, nên gợi ý cấu hình trước đây luôn chọn đại 4 sản
+        // phẩm đầu tiên trong danh sách thay vì thật sự là CPU/VGA/RAM/Ổ cứng.
+        const cpus = keyProducts.filter(p => p.category?.slug === 'bo-vi-xu-ly');
+        const vgas = keyProducts.filter(p => p.category?.slug === 'card-man-hinh');
+        const rams = keyProducts.filter(p => p.category?.slug === 'ram-pc');
+        const storages = keyProducts.filter(p => p.category?.slug === 'o-cung-ssd');
 
         const pickedCpu = cpus[0];
         const pickedVga = vgas[0];
@@ -364,10 +368,10 @@ const handleChat = async (req, res, next) => {
         });
 
         reply = `🖥️ **AetherPC - Cấu hình PC đề xuất tối ưu theo ngân sách ~${budgetStr}:**\n\n`;
-        const cpus = dbProducts.filter(p => p.category?.slug === 'cpu');
-        const vgas = dbProducts.filter(p => p.category?.slug === 'vga');
-        const rams = dbProducts.filter(p => p.category?.slug === 'ram');
-        const storages = dbProducts.filter(p => p.category?.slug === 'storage');
+        const cpus = dbProducts.filter(p => p.category?.slug === 'bo-vi-xu-ly');
+        const vgas = dbProducts.filter(p => p.category?.slug === 'card-man-hinh');
+        const rams = dbProducts.filter(p => p.category?.slug === 'ram-pc');
+        const storages = dbProducts.filter(p => p.category?.slug === 'o-cung-ssd');
 
         const chosenCpu = cpus[0] || dbProducts[0];
         const chosenVga = vgas[0] || dbProducts[1];
