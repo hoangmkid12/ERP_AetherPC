@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import { useFinanceStore, useUtilityStore, useSalesStore, useInventoryStore } from '../../stores';
 import { useAuth } from '../../context/AuthContext';
 import { usePermission } from '../../hooks/usePermission';
+import { useAutoRefresh } from '../../hooks/useAutoRefresh';
 import { notify } from '../../context/NotificationContext';
 import { api } from '../../services/api';
 import { Bar, Doughnut } from 'react-chartjs-2';
@@ -235,8 +236,8 @@ export default function QualityControl() {
     return false;
   };
 
-  const fetchData = async () => {
-    setLoading(true);
+  const fetchData = async (silent = false) => {
+    if (!silent) setLoading(true);
     let list = [];
     try {
       const res = await api.get('/purchasing/orders');
@@ -306,12 +307,16 @@ export default function QualityControl() {
     });
 
     setOrders(finalCombined);
-    setLoading(false);
+    if (!silent) setLoading(false);
   };
 
   useEffect(() => {
     fetchData();
   }, [purchaseOrders]);
+
+  // Làm mới nền định kỳ + ngay khi quay lại tab (silent) — danh sách PO chờ
+  // QC luôn khớp với NCC/Mua Hàng thao tác ở nơi khác mà không cần F5.
+  useAutoRefresh(fetchData);
 
   const saveQaLogs = (newLogs) => {
     const deduped = newLogs.filter((log, index, all) =>

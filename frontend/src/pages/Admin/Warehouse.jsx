@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useInventoryStore, useSalesStore, useFinanceStore, useUtilityStore } from '../../stores';
 import { useAuth } from '../../context/AuthContext';
 import { usePermission } from '../../hooks/usePermission';
+import { useAutoRefresh } from '../../hooks/useAutoRefresh';
 import { useNotification, notify, confirm } from '../../context/NotificationContext';
 import { DELIVERY_REGIONS, detectDeliveryRegion } from '../../utils/deliveryRegions';
 import { QC_STATUS, getStatusInfo } from '../../utils/statusLabels';
@@ -2095,15 +2096,15 @@ export default function Warehouse() {
   const [viewingPR, setViewingPR] = useState(null); // PR đang xem/in dưới dạng chứng từ chuẩn
   const [showAllPRs, setShowAllPRs] = useState(false);
 
-  const loadPurchaseRequests = async () => {
-    setLoadingPRs(true);
+  const loadPurchaseRequests = async (silent = false) => {
+    if (!silent) setLoadingPRs(true);
     try {
       const res = await api.get('/warehouse/purchase-requests');
       setPurchaseRequests(res.data || []);
     } catch (err) {
-      notify(err?.message || 'Không thể tải danh sách Phiếu Yêu Cầu Mua Hàng.', 'error');
+      if (!silent) notify(err?.message || 'Không thể tải danh sách Phiếu Yêu Cầu Mua Hàng.', 'error');
     } finally {
-      setLoadingPRs(false);
+      if (!silent) setLoadingPRs(false);
     }
   };
 
@@ -2531,9 +2532,9 @@ export default function Warehouse() {
 
       setReceipts(combinedReceipts);
     } catch (err) {
-      setReceiptsError('Không thể tải phiếu nhập kho');
+      if (!silent) setReceiptsError('Không thể tải phiếu nhập kho');
     } finally {
-      setReceiptsLoading(false);
+      if (!silent) setReceiptsLoading(false);
     }
   };
 
@@ -2546,6 +2547,12 @@ export default function Warehouse() {
     if (activeTab === 'locations') loadWarehouseLocations();
     if (activeTab === 'categories') loadCategories();
   }, [activeTab]);
+
+  // Làm mới nền định kỳ + ngay khi quay lại tab (silent) để phiếu nhập kho/
+  // lịch sử điều chuyển và (khi đang mở tab Yêu Cầu Mua Hàng) danh sách PR
+  // luôn khớp với thao tác của người khác mà không cần F5.
+  useAutoRefresh((silent) => fetchReceipts(silent));
+  useAutoRefresh((silent) => loadPurchaseRequests(silent), { enabled: activeTab === 'rfq' });
 
   // Real Supplier directory (Purchasing's Danh Bạ NCC) — the product edit form used
   // to offer a hardcoded list of supplier NAMES (STANDARD_SUPPLIERS) with no relation

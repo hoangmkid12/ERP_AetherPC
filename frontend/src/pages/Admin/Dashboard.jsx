@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useSalesStore, useInventoryStore, useHRStore, useFinanceStore, useUtilityStore } from '../../stores';
 import { api } from '../../services/api';
+import { useAutoRefresh } from '../../hooks/useAutoRefresh';
 import { notify, confirm } from '../../context/NotificationContext';
 import { PO_STATUS, ORDER_STATUS, getStatusLabel, getStatusInfo } from '../../utils/statusLabels';
 import { Bar, Doughnut, Line } from 'react-chartjs-2';
@@ -339,8 +340,8 @@ export default function Dashboard() {
   };
 
   // Fetch quoted purchase orders from backend & localStorage
-  const fetchQuotedOrders = async () => {
-    setLoadingQuoted(true);
+  const fetchQuotedOrders = async (silent = false) => {
+    if (!silent) setLoadingQuoted(true);
     try {
       let apiPOs = [];
       try {
@@ -471,7 +472,7 @@ export default function Dashboard() {
         });
       setQuotedOrders(quoted);
     }
-    setLoadingQuoted(false);
+    if (!silent) setLoadingQuoted(false);
   };
 
   useEffect(() => {
@@ -489,6 +490,10 @@ export default function Dashboard() {
     // stale context data from overriding localStorage after approval
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Làm mới nền định kỳ + ngay khi quay lại tab (silent) — CEO thấy PO mới
+  // chờ duyệt mà không cần F5.
+  useAutoRefresh(fetchQuotedOrders);
 
   // Status badge colors for the Approval History table — sourced from the shared
   // PO_STATUS dictionary (statusLabels.js) instead of a separate local map, so a

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { usePermission } from '../../hooks/usePermission';
+import { useAutoRefresh } from '../../hooks/useAutoRefresh';
 import { useInventoryStore, useSalesStore, useFinanceStore } from '../../stores';
 import { notify, promptText } from '../../context/NotificationContext';
 import { PO_STATUS, VENDOR_BILL_STATUS, getStatusInfo, getStatusLabel } from '../../utils/statusLabels';
@@ -496,9 +497,11 @@ export default function Purchasing() {
     return raw || '';
   };
 
-  const fetchData = async () => {
-    setLoading(true);
-    setError(null);
+  const fetchData = async (silent = false) => {
+    if (!silent) {
+      setLoading(true);
+      setError(null);
+    }
     try {
       const [ordersRes, suppliersRes, productsRes] = await Promise.all([
         api.get('/purchasing/orders'),
@@ -629,17 +632,19 @@ export default function Purchasing() {
         ...o,
         poNumber: formatPurchaseReference(o)
       }));
-      setOrders(formattedFallback);
-      if (formattedFallback.length === 0) {
-        setError('Lỗi kết nối tới server.');
+      if (!silent) {
+        setOrders(formattedFallback);
+        if (formattedFallback.length === 0) {
+          setError('Lỗi kết nối tới server.');
+        }
       }
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
-  const loadPurchaseRequests = async () => {
-    setLoadingPRs(true);
+  const loadPurchaseRequests = async (silent = false) => {
+    if (!silent) setLoadingPRs(true);
     let dbReqs = [];
     try {
       const res = await api.get('/purchasing/requests');
@@ -740,7 +745,7 @@ export default function Purchasing() {
 
     const list = Array.from(map.values()).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
     setPurchaseRequests(list);
-    setLoadingPRs(false);
+    if (!silent) setLoadingPRs(false);
   };
 
   const handleApprovePR = async (pr, showNotification = true) => {
@@ -865,6 +870,13 @@ export default function Purchasing() {
       window.removeEventListener('storage', handlePoUpdate);
     };
   }, []);
+
+  // Làm mới nền định kỳ + ngay khi quay lại tab (silent, không hiện loading)
+  // để danh sách RFQ/PO/Yêu Cầu Mua Hàng luôn khớp với người khác vừa thao
+  // tác, không cần F5 thủ công.
+  useAutoRefresh(async (silent) => {
+    await Promise.all([fetchData(silent), loadPurchaseRequests(silent)]);
+  });
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount || 0);

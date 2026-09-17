@@ -269,9 +269,46 @@ const PageManager = () => {
   return null;
 };
 
+// Toàn bộ dữ liệu ERP (orders, inventory, HR, finance, complaints...) trước
+// đây chỉ tải đúng 1 lần lúc app mount qua initializeAllStores() — nếu người
+// khác vừa tạo/đổi gì đó ở nơi khác, trang của mình không hề hay biết cho
+// tới khi tự tay F5. Nền tảng WebSocket hiện có (ws/cskh, GPS) chỉ phục vụ
+// đúng 2 luồng đó; dựng thêm 1 kênh sự kiện realtime bắn từ MỌI API tạo/sửa
+// trên toàn hệ thống là việc backend rất lớn, rủi ro cao nếu làm vội. Polling
+// nền + refetch ngay khi quay lại tab là cách nhẹ, an toàn, và là kiểu mẫu
+// chuẩn (React Query/SWR mặc định làm y hệt) để mọi trang "tự làm mới" mà
+// không cần người dùng bấm reload.
+const BACKGROUND_REFRESH_INTERVAL_MS = 45000;
+// Không refetch lại nếu lần gần nhất chưa đủ khoảng này — tránh gọi dồn dập
+// khi người dùng chuyển tab qua lại liên tục (visibilitychange bắn nhiều lần).
+const MIN_REFRESH_GAP_MS = 15000;
+
 export default function App() {
   useEffect(() => {
-    initializeAllStores();
+    let lastRunAt = 0;
+    let isRunning = false;
+    const runRefresh = () => {
+      const now = Date.now();
+      if (isRunning || now - lastRunAt < MIN_REFRESH_GAP_MS) return;
+      isRunning = true;
+      lastRunAt = now;
+      initializeAllStores().finally(() => { isRunning = false; });
+    };
+
+    runRefresh();
+
+    const intervalId = setInterval(runRefresh, BACKGROUND_REFRESH_INTERVAL_MS);
+    const handleVisibility = () => { if (document.visibilityState === 'visible') runRefresh(); };
+    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('focus', runRefresh);
+    window.addEventListener('online', runRefresh);
+
+    return () => {
+      clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('focus', runRefresh);
+      window.removeEventListener('online', runRefresh);
+    };
   }, []);
 
   return (

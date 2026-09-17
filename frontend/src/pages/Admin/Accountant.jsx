@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useFinanceStore, useHRStore, useSalesStore } from '../../stores';
 import { useAuth } from '../../context/AuthContext';
+import { useAutoRefresh } from '../../hooks/useAutoRefresh';
 import { api } from '../../services/api';
 import { notify, confirm } from '../../context/NotificationContext';
 import { PO_STATUS, VENDOR_BILL_STATUS, getStatusInfo, formatRmaCode } from '../../utils/statusLabels';
@@ -73,15 +74,15 @@ export default function Accountant() {
   const [loadingCod, setLoadingCod] = useState(false);
   const [settlingShipperId, setSettlingShipperId] = useState(null);
 
-  const loadCodSettlement = async () => {
-    setLoadingCod(true);
+  const loadCodSettlement = async (silent = false) => {
+    if (!silent) setLoadingCod(true);
     try {
       const res = await api.get('/ledger/cod-settlement');
       setCodGroups(res.data || []);
     } catch (err) {
-      notify(err?.message || 'Không thể tải danh sách đối soát COD.', 'error');
+      if (!silent) notify(err?.message || 'Không thể tải danh sách đối soát COD.', 'error');
     } finally {
-      setLoadingCod(false);
+      if (!silent) setLoadingCod(false);
     }
   };
 
@@ -169,6 +170,11 @@ export default function Accountant() {
   useEffect(() => {
     fetchBackendPOs();
   }, [purchaseOrders]);
+
+  // Làm mới nền định kỳ + ngay khi quay lại tab (silent) cho các state cục
+  // bộ không đi qua Zustand store (COD chưa đối soát, danh sách PO local).
+  useAutoRefresh(fetchBackendPOs);
+  useAutoRefresh(loadCodSettlement);
 
   const formatLedgerDate = (dateStr) => {
     if (!dateStr) return '—';
