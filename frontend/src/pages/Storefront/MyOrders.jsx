@@ -904,7 +904,7 @@ export default function MyOrders() {
                       }}
                     >
                       <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#ef4444', boxShadow: '0 0 6px #ef4444' }} />
-                      <MapPin size={13} /> Theo Dõi Trực Tiếp (Live GPS)
+                      Theo Dõi Trực Tiếp
                     </button>
                   )}
                 </div>
