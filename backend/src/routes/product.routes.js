@@ -1,12 +1,26 @@
 const express = require('express');
 const router = express.Router();
-const { getProducts, getProductById, getAIRecommendations, getProductReviews, addProductReview, createProduct, updateProduct, updateProductVisibility, deleteProductImage, deleteProduct } = require('../controllers/product.controller');
-const { authMiddleware } = require('../middlewares/auth.middleware');
+const { getProducts, getProductById, getAIRecommendations, getBestSellers, getPersonalizedRecommendations, getProductReviews, addProductReview, createProduct, updateProduct, updateProductVisibility, deleteProductImage, deleteProduct } = require('../controllers/product.controller');
+const { authMiddleware, optionalAuthMiddleware } = require('../middlewares/auth.middleware');
 const { uploadProductImage } = require('../middlewares/upload.middleware');
 
 // @route   GET /api/v1/products
 // @desc    Query products list with pagination & filters
 router.get('/', getProducts);
+
+// Các route path cố định (best-sellers, personalized) PHẢI khai báo TRƯỚC
+// route động '/:id' bên dưới — Express khớp theo thứ tự đăng ký, nếu để sau
+// thì '/:id' sẽ "nuốt" mất, coi "best-sellers"/"personalized" như 1 productId.
+
+// @route   GET /api/v1/products/best-sellers
+// @desc    Top sản phẩm bán chạy thật (tính từ OrderItem, không phải số giả)
+router.get('/best-sellers', getBestSellers);
+
+// @route   GET /api/v1/products/personalized
+// @desc    Gợi ý theo lịch sử mua hàng thật của khách đang đăng nhập (nếu có);
+//          optionalAuthMiddleware để khách vãng lai vẫn gọi được, nhận về
+//          bán chạy nhất toàn shop thay vì bị chặn đăng nhập.
+router.get('/personalized', optionalAuthMiddleware, getPersonalizedRecommendations);
 
 // @route   GET /api/v1/products/:id
 // @desc    Get detailed product by ID

@@ -131,40 +131,216 @@ const getProductById = async (req, res, next) => {
   }
 };
 
-// AI Recommender mock matching specs
-const getAIRecommendations = async (req, res, next) => {
+// Đơn hàng bị hủy/hoàn không phản ánh nhu cầu mua thật — loại khỏi mọi phép
+// tính "hành vi mua sắm" (bán chạy, mua cùng, gợi ý cá nhân hóa) bên dưới.
+const VALID_SALE_ORDER_STATUSES_EXCLUDE = ['CANCELLED', 'RETURNED', 'REFUNDED'];
+
+const PRODUCT_RELATIONS_INCLUDE = {
+  category: { select: { name: true, slug: true } },
+  brand: { select: { name: true } },
+  images: { take: 1, orderBy: { sortOrder: 'asc' } }
+};
+
+/**
+ * Tính "bán chạy nhất" từ số lượng thật đã bán trong OrderItem — thay cho
+ * cách cũ dùng p.id % 11 sinh số rating/review giả ở frontend (Home.jsx),
+ * không phản ánh chút hành vi mua sắm thật nào của khách hàng.
+ * @param {number} limit
+ * @param {string[]} excludeIds - productId cần loại trừ (vd khách đã mua rồi)
+ */
+const computeBestSellers = async (limit = 8, excludeIds = []) => {
+  const salesAgg = await prisma.orderItem.groupBy({
+    by: ['productId'],
+    where: {
+      order: { status: { notIn: VALID_SALE_ORDER_STATUSES_EXCLUDE } },
+      productId: { notIn: excludeIds }
+    },
+    _sum: { quantity: true },
+    orderBy: { _sum: { quantity: 'desc' } },
+    take: limit * 3 // đệm dư phòng vài sản phẩm đã ngừng bán (available=false)
+  });
+
+  if (salesAgg.length === 0) return [];
+
+  const productIds = salesAgg.map(s => s.productId);
+  const products = await prisma.product.findMany({
+    where: { productId: { in: productIds }, available: true },
+    include: PRODUCT_RELATIONS_INCLUDE
+  });
+  const productMap = new Map(products.map(p => [p.productId, p]));
+
+  return salesAgg
+    .map(s => {
+      const p = productMap.get(s.productId);
+      return p ? { ...p, soldQuantity: s._sum.quantity || 0 } : null;
+    })
+    .filter(Boolean)
+    .slice(0, limit);
+};
+
+// GET /api/v1/products/best-sellers — Top sản phẩm bán chạy THẬT, thay cho
+// "Sản Phẩm Bán Chạy Nhất" trên Home.jsx trước đây tính bằng công thức giả.
+const getBestSellers = async (req, res, next) => {
   try {
-    const { id } = req.params;
-    
-    // Get current product details
-    const product = await prisma.product.findUnique({
-      where: { productId: id }
-    });
-
-    if (!product) {
-      return res.status(404).json({ success: false, message: 'Product not found' });
-    }
-
-    // Retrieve other products in the same category
-    const similarProducts = await prisma.product.findMany({
-      where: {
-        categoryId: product.categoryId,
-        productId: { not: product.productId },
-        available: true
-      },
-      take: 5
-    });
-
-    res.json({
-      success: true,
-      algorithm: 'Content-Based Filtering (JSONB specs matching)',
-      data: similarProducts
-    });
+    const limit = parseInt(req.query.limit, 10) || 8;
+    const data = await computeBestSellers(limit);
+    res.json({ success: true, data });
   } catch (err) {
     next(err);
   }
 };
 
+// GET /api/v1/products/personalized — Gợi ý theo lịch sử mua hàng thật của
+// CHÍNH khách đang đăng nhập: xem họ hay mua danh mục/hãng nào, đề xuất thêm
+// sản phẩm CÙNG danh mục/hãng đó mà họ CHƯA mua. Khách vãng lai hoặc khách
+// mới chưa có đơn nào thì trả về bán chạy nhất toàn shop (personalized:false)
+// để frontend biết hiển thị tiêu đề phù hợp thay vì giả vờ đã cá nhân hóa.
+const getPersonalizedRecommendations = async (req, res, next) => {
+  try {
+    const limit = parseInt(req.query.limit, 10) || 8;
+
+    if (!req.user || req.user.role !== 'CUSTOMER') {
+      return res.json({ success: true, personalized: false, data: await computeBestSellers(limit) });
+    }
+
+    const pastItems = await prisma.orderItem.findMany({
+      where: {
+        order: { customerId: req.user.id, status: { notIn: VALID_SALE_ORDER_STATUSES_EXCLUDE } }
+      },
+      select: { productId: true }
+    });
+
+    if (pastItems.length === 0) {
+      return res.json({ success: true, personalized: false, data: await computeBestSellers(limit) });
+    }
+
+    const purchasedIds = [...new Set(pastItems.map(i => i.productId))];
+    const purchasedProducts = await prisma.product.findMany({
+      where: { productId: { in: purchasedIds } },
+      select: { categoryId: true, brandId: true }
+    });
+
+    // Tần suất danh mục/hãng khách đã mua — đại diện cho "gu" mua sắm của họ.
+    const categoryFreq = {};
+    const brandFreq = {};
+    purchasedProducts.forEach(p => {
+      categoryFreq[p.categoryId] = (categoryFreq[p.categoryId] || 0) + 1;
+      brandFreq[p.brandId] = (brandFreq[p.brandId] || 0) + 1;
+    });
+    const topCategoryIds = Object.entries(categoryFreq)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([catId]) => parseInt(catId, 10));
+
+    const candidates = await prisma.product.findMany({
+      where: {
+        categoryId: { in: topCategoryIds },
+        productId: { notIn: purchasedIds }, // không gợi ý lại thứ đã mua
+        available: true
+      },
+      include: PRODUCT_RELATIONS_INCLUDE,
+      take: 40
+    });
+
+    if (candidates.length === 0) {
+      return res.json({ success: true, personalized: false, data: await computeBestSellers(limit, purchasedIds) });
+    }
+
+    const scored = candidates
+      .map(p => ({
+        ...p,
+        _score: (brandFreq[p.brandId] || 0) * 2 + (categoryFreq[p.categoryId] || 0)
+      }))
+      .sort((a, b) => b._score - a._score)
+      .slice(0, limit);
+
+    res.json({ success: true, personalized: true, data: scored });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// GET /api/v1/products/:id/recommendations — trước đây chỉ lấy đại 5 sản
+// phẩm "cùng danh mục" (không include category/brand/images nên frontend
+// hiện brand rỗng, không ảnh) dù tự gắn nhãn "AI/Content-Based Filtering".
+// Giờ có 2 tầng thật:
+//   1. "Khách mua sản phẩm này cũng thường mua" — lọc cộng tác (collaborative
+//      filtering) thật từ OrderItem: những đơn có sản phẩm này còn có sản
+//      phẩm nào khác đi kèm, xếp theo tần suất.
+//   2. Lấp đầy bằng gợi ý theo nội dung (cùng danh mục, ưu tiên cùng hãng và
+//      mức giá gần nhau) khi chưa đủ dữ liệu mua cùng (sản phẩm mới/ít bán).
+const getAIRecommendations = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const limit = parseInt(req.query.limit, 10) || 8;
+
+    const product = await prisma.product.findUnique({ where: { productId: id } });
+    if (!product) {
+      return res.status(404).json({ success: false, message: 'Product not found' });
+    }
+
+    const coOrders = await prisma.orderItem.findMany({
+      where: { productId: id, order: { status: { notIn: VALID_SALE_ORDER_STATUSES_EXCLUDE } } },
+      select: { orderId: true }
+    });
+    const orderIds = [...new Set(coOrders.map(i => i.orderId))];
+
+    let togetherProducts = [];
+    if (orderIds.length > 0) {
+      const togetherAgg = await prisma.orderItem.groupBy({
+        by: ['productId'],
+        where: { orderId: { in: orderIds }, productId: { not: id } },
+        _count: { productId: true },
+        orderBy: { _count: { productId: 'desc' } },
+        take: limit
+      });
+      const togetherIds = togetherAgg.map(t => t.productId);
+      if (togetherIds.length > 0) {
+        const found = await prisma.product.findMany({
+          where: { productId: { in: togetherIds }, available: true },
+          include: PRODUCT_RELATIONS_INCLUDE
+        });
+        const foundMap = new Map(found.map(p => [p.productId, p]));
+        // Giữ đúng thứ tự xếp hạng theo tần suất mua cùng, không theo thứ tự trả về của findMany.
+        togetherProducts = togetherIds.map(pid => foundMap.get(pid)).filter(Boolean);
+      }
+    }
+
+    const usedAlgorithms = [];
+    if (togetherProducts.length > 0) usedAlgorithms.push('Collaborative Filtering (mua cùng đơn hàng)');
+
+    let combined = togetherProducts;
+    if (combined.length < limit) {
+      const excludeIds = [product.productId, ...combined.map(p => p.productId)];
+      const sameCategory = await prisma.product.findMany({
+        where: { categoryId: product.categoryId, productId: { notIn: excludeIds }, available: true },
+        include: PRODUCT_RELATIONS_INCLUDE,
+        take: 30
+      });
+      const currentPrice = parseFloat(product.price) || 0;
+      const contentScored = sameCategory
+        .map(p => {
+          let score = 0;
+          if (p.brandId === product.brandId) score += 2;
+          const priceDiffRatio = currentPrice > 0 ? Math.abs(parseFloat(p.price) - currentPrice) / currentPrice : 1;
+          if (priceDiffRatio <= 0.3) score += 1;
+          return { ...p, _score: score };
+        })
+        .sort((a, b) => b._score - a._score);
+
+      if (contentScored.length > 0) usedAlgorithms.push('Content-Based Filtering (cùng danh mục/hãng/mức giá)');
+      combined = [...combined, ...contentScored].slice(0, limit);
+    }
+
+    res.json({
+      success: true,
+      algorithm: usedAlgorithms.join(' + ') || 'Content-Based Filtering',
+      data: combined
+    });
+  } catch (err) {
+    next(err);
+  }
+};
 
 
 // Get all reviews for a product
@@ -236,7 +412,7 @@ const addProductReview = async (req, res, next) => {
   }
 };
 
-module.exports = { getProducts, getProductById, getAIRecommendations, getProductReviews, addProductReview };
+module.exports = { getProducts, getProductById, getAIRecommendations, getBestSellers, getPersonalizedRecommendations, getProductReviews, addProductReview };
 
 // ======================
 // Admin Product CRUD

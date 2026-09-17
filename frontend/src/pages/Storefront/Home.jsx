@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useCart } from '../../context/CartContext';
+import { useAuth } from '../../context/AuthContext';
 import { notify } from '../../context/NotificationContext';
-import { api } from '../../services/api';
+import { api, normalizeProduct } from '../../services/api';
 import { Search, ShoppingCart, Eye, ArrowRight, Zap, Clock, ChevronLeft, ChevronRight, Star, Cpu, Gamepad2, Database, Layers, HardDrive, Box, Wind, Shield, Truck, Wrench, CreditCard, Calendar, Monitor, Keyboard, Mouse, Flame, TrendingUp, Filter, X, RotateCcw, SlidersHorizontal, Check, Sparkles, Trophy, Tag, ThumbsUp, Award } from 'lucide-react';
 import BrandLogo from '../../components/BrandLogo';
 
@@ -692,15 +693,19 @@ function ProductCard({ p, onAddCart, onCompare }) {
 }
 
 // ─── Best Seller Card Component ──────────────────────────────────────────────
-function BestSellerCard({ p, onAddCart, onCompare }) {
+// badgeText/badgeIcon cho phép tái dùng card này ở khu vực không phải "bán
+// chạy" (vd Gợi Ý Dành Riêng Cho Bạn) mà không hiện nhãn sai ý nghĩa.
+function BestSellerCard({ p, onAddCart, onCompare, badgeText = 'BÁN CHẠY', BadgeIcon = Flame }) {
   const navigate = useNavigate();
   const rating = (4.0 + (p.id % 11) / 10).toFixed(1);
   const reviews = 10 + (p.id % 90);
   const showDiscount = p.discountPercent > 0;
-  
-  // Deterministic sales statistics based on ID
-  const soldCount = 50 + (p.id % 120);
-  const totalStock = 180 + (p.id % 40);
+
+  // p.soldQuantity: số lượng bán THẬT (từ GET /products/best-sellers, tính
+  // trên OrderItem) khi có sẵn — chỉ dùng số ước lượng theo ID cho phần còn
+  // thiếu dữ liệu (vd sản phẩm gợi ý cá nhân hóa chưa có lịch sử bán riêng nó).
+  const soldCount = p.soldQuantity ?? (50 + (p.id % 120));
+  const totalStock = Math.max(p.stockQuantity || 0, soldCount + 30) || (180 + (p.id % 40));
   const percentSold = Math.round((soldCount / totalStock) * 100);
   const remaining = totalStock - soldCount;
 
@@ -750,7 +755,7 @@ function BestSellerCard({ p, onAddCart, onCompare }) {
           letterSpacing: '0.05em',
           boxShadow: '0 0 10px rgba(245, 158, 11, 0.3)',
         }}>
-          <Flame size={12} fill="#fff" style={{ filter: 'drop-shadow(0 0 2px rgba(255,255,255,0.5))' }} /> BÁN CHẠY
+          <BadgeIcon size={12} fill="#fff" style={{ filter: 'drop-shadow(0 0 2px rgba(255,255,255,0.5))' }} /> {badgeText}
         </div>
         {showDiscount && (
           <span style={{
@@ -1932,10 +1937,38 @@ const PRICE_PRESETS = [
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function Home() {
+  const { user } = useAuth() || {};
   const [products, setProducts] = useState(() => {
     const cached = localStorage.getItem('aetherpc_products');
     return cached ? JSON.parse(cached) : FALLBACK_PRODUCTS;
   });
+  // Bán chạy nhất — số lượng bán THẬT tính từ OrderItem (GET /products/best-sellers),
+  // thay cho công thức giả getPopularityScore() cũ (sinh rating/review ảo từ p.id % 11).
+  const [realBestSellers, setRealBestSellers] = useState([]);
+  // Gợi ý theo lịch sử mua hàng thật của khách đang đăng nhập (GET /products/personalized) —
+  // rỗng/không cá nhân hóa cho khách vãng lai hoặc khách chưa từng mua gì.
+  const [personalizedProducts, setPersonalizedProducts] = useState([]);
+  const [isPersonalized, setIsPersonalized] = useState(false);
+
+  useEffect(() => {
+    api.get('/products/best-sellers?limit=8')
+      .then(res => {
+        const list = res?.data || res;
+        if (Array.isArray(list)) setRealBestSellers(list.map(normalizeProduct));
+      })
+      .catch(() => {});
+
+    api.get('/products/personalized?limit=8')
+      .then(res => {
+        const list = res?.data || res;
+        if (Array.isArray(list)) {
+          setPersonalizedProducts(list.map(normalizeProduct));
+          setIsPersonalized(Boolean(res?.personalized));
+        }
+      })
+      .catch(() => {});
+  }, [user?.id]);
+
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('ALL');
   const [loading, setLoading] = useState(() => {
@@ -2237,15 +2270,11 @@ export default function Home() {
     productsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
-  // Sort and select top 4 best-sellers
-  const getPopularityScore = (p) => {
-    const rating = 4.0 + (p.id % 11) / 10;
-    const reviews = 10 + (p.id % 90);
-    return rating * 10 + reviews;
-  };
-  const bestSellers = [...products]
-    .sort((a, b) => getPopularityScore(b) - getPopularityScore(a))
-    .slice(0, 4);
+  // Bán chạy nhất — lấy từ realBestSellers (số lượng bán thật, xem effect ở
+  // trên). Khi API chưa kịp trả về (mới vào trang), tạm hiện 4 sản phẩm đầu
+  // của danh sách catalog thay vì để trống hẳn, rồi tự thay bằng dữ liệu thật
+  // ngay khi có.
+  const bestSellers = (realBestSellers.length > 0 ? realBestSellers : products).slice(0, 4);
 
   return (
     <div style={{ paddingBottom: '4rem' }}>
@@ -2314,6 +2343,28 @@ export default function Home() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '1.5rem' }}>
             {bestSellers.map((p) => (
               <BestSellerCard key={`best-${p.id}`} p={p} onAddCart={(item) => addToCart(item, 1)} onCompare={handleQuickCompare} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* ── GỢI Ý DÀNH RIÊNG CHO BẠN (cá nhân hóa theo lịch sử mua hàng thật) ── */}
+      {isPersonalized && personalizedProducts.length > 0 && (
+        <section className="container" style={{ marginBottom: '4rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.75rem' }}>
+            <ThumbsUp size={24} style={{ color: '#2563eb' }} />
+            <div>
+              <h2 style={{ fontSize: '1.5rem', fontWeight: 800, letterSpacing: '-0.02em' }}>
+                Gợi Ý <span style={{ background: 'linear-gradient(135deg, #2563eb, #7c3aed)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Dành Riêng Cho Bạn</span>
+              </h2>
+              <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)', marginTop: '0.1rem' }}>
+                Dựa trên các danh mục và thương hiệu bạn từng mua tại AetherPC
+              </p>
+            </div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '1.5rem' }}>
+            {personalizedProducts.slice(0, 4).map((p) => (
+              <BestSellerCard key={`personal-${p.id}`} p={p} onAddCart={(item) => addToCart(item, 1)} onCompare={handleQuickCompare} badgeText="GỢI Ý CHO BẠN" BadgeIcon={ThumbsUp} />
             ))}
           </div>
         </section>
