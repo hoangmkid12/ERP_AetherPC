@@ -1,6 +1,6 @@
 const WebSocket = require('ws');
 const jwt = require('jsonwebtoken');
-const { getAllSessions, createOrUpdateSession, addMessage, closeSession, deleteSession } = require('./chatService');
+const { getAllSessions, createOrUpdateSession, markSessionOnlineIfExists, addMessage, closeSession, deleteSession } = require('./chatService');
 const prisma = require('../config/database');
 
 let wss = null; // CSKH chat — path /ws/cskh
@@ -202,24 +202,29 @@ const handleWSMessage = async (ws, data) => {
       ws._sessionId = sessionId;
       ws._customerName = customerName;
 
-      let name = customerName;
-      if (!name || name.includes('undefined')) {
-        name = 'Khách Hàng Vãng Lai';
-      }
-
+      // CLIENT_IDENTIFY bắn ngay khi widget chat (Chatbot.jsx) hoặc app Shipper
+      // (DeliveryAppShell.jsx) mở kết nối WebSocket — TRƯỚC KHI khách/shipper
+      // gõ chữ nào. Trước đây dùng createOrUpdateSession (upsert) nên mọi
+      // khách ghé site đều tự động tạo 1 phiên chat rỗng, khiến CSKH thấy họ
+      // "đang chat" dù chưa gửi tin nào. Chỉ cập nhật trạng thái ONLINE nếu
+      // phiên đó đã tồn tại thật (đã từng gửi ít nhất 1 tin) — phiên mới chỉ
+      // được tạo thật sự ở CUSTOMER_SEND_MSG khi có tin nhắn đầu tiên.
+      let existingSession = null;
       try {
-        await createOrUpdateSession(sessionId, name, ws._userId, 'ONLINE');
+        existingSession = await markSessionOnlineIfExists(sessionId);
       } catch (_) {}
 
-      // Broadcast ONLINE status to staff
-      broadcast({
-        type: 'ONLINE_STATUS_UPDATE',
-        payload: {
-          sessionId,
-          status: 'ONLINE',
-          isOnline: true
-        }
-      }, client => client._isStaff);
+      if (existingSession) {
+        // Broadcast ONLINE status to staff — chỉ khi đây là 1 cuộc chat có thật
+        broadcast({
+          type: 'ONLINE_STATUS_UPDATE',
+          payload: {
+            sessionId,
+            status: 'ONLINE',
+            isOnline: true
+          }
+        }, client => client._isStaff);
+      }
     }
     else if (type === 'CUSTOMER_SEND_MSG') {
       const { sessionId, text, customerName } = payload || {};

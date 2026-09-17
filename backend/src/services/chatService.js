@@ -7,6 +7,12 @@ const prisma = require('../config/database');
 const getAllSessions = async (onlineSessionIds = new Set()) => {
   try {
     const sessions = await prisma.chatSession.findMany({
+      // Chỉ liệt kê phiên đã có ÍT NHẤT 1 tin nhắn thật — CLIENT_IDENTIFY (gửi
+      // ngay khi widget chat kết nối WebSocket, kể cả khi khách chưa gõ gì)
+      // trước đây upsert tạo sẵn 1 dòng ChatSession rỗng, khiến CSKH thấy
+      // "khách đang chat" dù họ chưa từng gửi tin nào. Lọc ở đây chặn luôn cả
+      // các dòng rỗng cũ đã lỡ tạo trước khi sửa markSessionOnlineIfExists.
+      where: { messages: { some: {} } },
       include: {
         messages: {
           orderBy: { timestamp: 'asc' }
@@ -127,6 +133,30 @@ const createOrUpdateSession = async (sessionId, customerName, customerId = null,
   } catch (err) {
     console.error('[ChatService] Error creating/updating session:', err);
     throw err;
+  }
+};
+
+/**
+ * Đánh dấu 1 phiên đang ONLINE — CHỈ khi phiên đó đã tồn tại thật (đã từng
+ * gửi ít nhất 1 tin nhắn). Dùng cho CLIENT_IDENTIFY, bắn ngay khi widget chat
+ * mở kết nối WebSocket — trước khi khách gõ gì cả — nên KHÔNG được phép tạo
+ * mới bản ghi (khác createOrUpdateSession dùng upsert, sẽ tạo 1 dòng rỗng và
+ * làm CSKH tưởng khách đang chat dù họ chưa gửi tin nào).
+ * @param {string} sessionId
+ * @returns {Promise<Object|null>} bản ghi session nếu tồn tại, null nếu chưa từng chat
+ */
+const markSessionOnlineIfExists = async (sessionId) => {
+  try {
+    const existing = await prisma.chatSession.findUnique({ where: { sessionId } });
+    if (!existing) return null;
+    const session = await prisma.chatSession.update({
+      where: { sessionId },
+      data: { status: 'ONLINE', lastActivityAt: new Date() }
+    });
+    return session;
+  } catch (err) {
+    console.error('[ChatService] Error marking session online:', err);
+    return null;
   }
 };
 
@@ -307,6 +337,7 @@ module.exports = {
   getAllSessions,
   getSessionById,
   createOrUpdateSession,
+  markSessionOnlineIfExists,
   addMessage,
   closeSession,
   deleteSession,
