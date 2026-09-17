@@ -556,13 +556,13 @@ export default function CustomerService() {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
               <thead>
                 <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569' }}>
-                  <th style={{ padding: '0.65rem 0.85rem' }}>Mã Ticket</th>
-                  <th style={{ padding: '0.65rem 0.85rem' }}>Khách Hàng & SĐT</th>
-                  <th style={{ padding: '0.65rem 0.85rem' }}>Tiêu Đề Khiếu Nại</th>
-                  <th style={{ padding: '0.65rem 0.85rem' }}>Mã Đơn</th>
-                  <th style={{ padding: '0.65rem 0.85rem' }}>Mức Độ</th>
-                  <th style={{ padding: '0.65rem 0.85rem' }}>Trạng Thái</th>
-                  <th style={{ padding: '0.65rem 0.85rem', textAlign: 'center' }}>Thao Tác</th>
+                  <th style={{ padding: '0.75rem 0.85rem', width: '120px', whiteSpace: 'nowrap' }}>Mã Ticket</th>
+                  <th style={{ padding: '0.75rem 0.85rem', width: '170px', whiteSpace: 'nowrap' }}>Khách Hàng & SĐT</th>
+                  <th style={{ padding: '0.75rem 0.85rem', minWidth: '240px' }}>Tiêu Đề Khiếu Nại</th>
+                  <th style={{ padding: '0.75rem 0.85rem', width: '150px', whiteSpace: 'nowrap' }}>Mã Đơn</th>
+                  <th style={{ padding: '0.75rem 0.85rem', width: '110px', textAlign: 'center', whiteSpace: 'nowrap' }}>Mức Độ</th>
+                  <th style={{ padding: '0.75rem 0.85rem', width: '140px', textAlign: 'center', whiteSpace: 'nowrap' }}>Trạng Thái</th>
+                  <th style={{ padding: '0.75rem 0.85rem', width: '100px', textAlign: 'center', whiteSpace: 'nowrap' }}>Thao Tác</th>
                 </tr>
               </thead>
               <tbody>
@@ -601,39 +601,105 @@ export default function CustomerService() {
                     </td>
                   </tr>
                 ) : (
-                  filteredComplaints.map((comp, cIdx) => (
-                    <tr key={comp.id || cIdx} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                      <td style={{ padding: '0.65rem 0.85rem', fontWeight: 700, color: '#2563eb' }}>#TK-{comp.id || cIdx + 101}</td>
-                      <td style={{ padding: '0.65rem 0.85rem' }}>
-                        <strong style={{ display: 'block', color: '#0f172a' }}>{comp.customerName}</strong>
-                        <span style={{ fontSize: '0.72rem', color: '#64748b' }}>{comp.phone}</span>
-                      </td>
-                      <td style={{ padding: '0.65rem 0.85rem', fontWeight: 600, color: '#0f172a' }}>{comp.title}</td>
-                      <td style={{ padding: '0.65rem 0.85rem' }}>
-                        <code style={{ fontSize: '0.78rem', color: '#2563eb', backgroundColor: '#eff6ff', padding: '2px 6px', borderRadius: '4px' }}>
-                          {comp.orderId || 'N/A'}
-                        </code>
-                      </td>
-                      <td style={{ padding: '0.65rem 0.85rem' }}>
-                        <span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 800, backgroundColor: `${PRIORITY_COLORS[comp.priority] || '#10b981'}15`, color: PRIORITY_COLORS[comp.priority] || '#10b981' }}>
-                          {comp.priority || 'MEDIUM'}
-                        </span>
-                      </td>
-                      <td style={{ padding: '0.65rem 0.85rem' }}>
-                        <span style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 800, backgroundColor: `${getStatusInfo(COMPLAINT_STATUS, comp.status).color}15`, color: getStatusInfo(COMPLAINT_STATUS, comp.status).color }}>
-                          {getStatusLabel(COMPLAINT_STATUS, comp.status)}
-                        </span>
-                      </td>
-                      <td style={{ padding: '0.65rem 0.85rem', textAlign: 'center' }}>
-                        <button
-                          onClick={() => setSelectedTicket(comp)}
-                          style={{ backgroundColor: '#ffffff', color: '#2563eb', border: '1px solid #bfdbfe', borderRadius: '4px', padding: '0.3rem 0.65rem', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
-                        >
-                          <Eye size={12} /> Xử Lý
-                        </button>
-                      </td>
-                    </tr>
-                  ))
+                  filteredComplaints.map((comp, cIdx) => {
+                    const ticketCode = comp.id
+                      ? (String(comp.id).length > 10 ? `#TK-${String(comp.id).slice(0, 8).toUpperCase()}` : `#TK-${comp.id}`)
+                      : `#TK-${cIdx + 101}`;
+                    const statusInfo = getStatusInfo(COMPLAINT_STATUS, comp.status);
+                    const priorityColor = PRIORITY_COLORS[comp.priority] || '#10b981';
+
+                    return (
+                      <tr key={comp.id || cIdx} style={{ borderBottom: '1px solid #f1f5f9', transition: 'background-color 0.15s' }}>
+                        <td style={{ padding: '0.75rem 0.85rem', fontWeight: 700, color: '#2563eb', whiteSpace: 'nowrap' }} title={`ID gốc: ${comp.id}`}>
+                          {ticketCode}
+                        </td>
+                        <td style={{ padding: '0.75rem 0.85rem', whiteSpace: 'nowrap' }}>
+                          <strong style={{ display: 'block', color: '#0f172a', fontWeight: 700 }}>{comp.customerName}</strong>
+                          <span style={{ fontSize: '0.74rem', color: '#64748b' }}>{comp.phone || 'Chưa có SĐT'}</span>
+                        </td>
+                        <td style={{ padding: '0.75rem 0.85rem' }}>
+                          <div style={{ fontWeight: 600, color: '#0f172a', lineHeight: 1.4 }}>{comp.title}</div>
+                          {comp.description && (
+                            <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '0.2rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '380px' }} title={comp.description}>
+                              {comp.description}
+                            </div>
+                          )}
+                        </td>
+                        <td style={{ padding: '0.75rem 0.85rem', whiteSpace: 'nowrap' }}>
+                          {comp.orderId ? (
+                            <code style={{ fontSize: '0.78rem', color: '#2563eb', backgroundColor: '#eff6ff', border: '1px solid #dbeafe', padding: '3px 8px', borderRadius: '5px', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                              {comp.orderId}
+                            </code>
+                          ) : (
+                            <span style={{ color: '#94a3b8', fontSize: '0.75rem' }}>N/A</span>
+                          )}
+                        </td>
+                        <td style={{ padding: '0.75rem 0.85rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                          <span style={{
+                            display: 'inline-block',
+                            padding: '3px 10px',
+                            borderRadius: '6px',
+                            fontSize: '0.72rem',
+                            fontWeight: 800,
+                            letterSpacing: '0.3px',
+                            backgroundColor: `${priorityColor}15`,
+                            color: priorityColor,
+                            border: `1px solid ${priorityColor}30`,
+                            whiteSpace: 'nowrap'
+                          }}>
+                            {comp.priority || 'MEDIUM'}
+                          </span>
+                        </td>
+                        <td style={{ padding: '0.75rem 0.85rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                          <span style={{
+                            display: 'inline-block',
+                            padding: '3px 12px',
+                            borderRadius: '999px',
+                            fontSize: '0.72rem',
+                            fontWeight: 800,
+                            backgroundColor: `${statusInfo.color}15`,
+                            color: statusInfo.color,
+                            border: `1px solid ${statusInfo.color}30`,
+                            whiteSpace: 'nowrap'
+                          }}>
+                            {getStatusLabel(COMPLAINT_STATUS, comp.status)}
+                          </span>
+                        </td>
+                        <td style={{ padding: '0.75rem 0.85rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedTicket(comp)}
+                            style={{
+                              backgroundColor: '#ffffff',
+                              color: '#2563eb',
+                              border: '1px solid #bfdbfe',
+                              borderRadius: '6px',
+                              padding: '0.35rem 0.75rem',
+                              fontSize: '0.75rem',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.3rem',
+                              whiteSpace: 'nowrap',
+                              transition: 'all 0.15s'
+                            }}
+                            onMouseEnter={e => {
+                              e.currentTarget.style.backgroundColor = '#eff6ff';
+                              e.currentTarget.style.borderColor = '#93c5fd';
+                            }}
+                            onMouseLeave={e => {
+                              e.currentTarget.style.backgroundColor = '#ffffff';
+                              e.currentTarget.style.borderColor = '#bfdbfe';
+                            }}
+                          >
+                            <Eye size={13} />
+                            <span>Xử Lý</span>
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
