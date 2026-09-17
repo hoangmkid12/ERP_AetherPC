@@ -51,6 +51,7 @@ export default function CustomerService() {
   const getReturnSettings = useSalesStore(state => state.getReturnSettings);
   const updateReturnSettings = useSalesStore(state => state.updateReturnSettings);
   const getReturnRequests = useSalesStore(state => state.getReturnRequests);
+  const getComplaints = useSalesStore(state => state.getComplaints);
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -79,7 +80,7 @@ export default function CustomerService() {
   const [rejectModal, setRejectModal] = useState(null); // { returnItem, reason }
   const [actionLoadingId, setActionLoadingId] = useState(null);
 
-  // Load return auto-approve setting
+  // Load return auto-approve setting & complaints list
   useEffect(() => {
     if (typeof getReturnSettings === 'function') {
       getReturnSettings().then(res => {
@@ -88,7 +89,10 @@ export default function CustomerService() {
         }
       });
     }
-  }, [getReturnSettings]);
+    if (typeof getComplaints === 'function') {
+      getComplaints().catch(() => {});
+    }
+  }, [getReturnSettings, getComplaints]);
 
   const handleToggleAutoApprove = async () => {
     const nextVal = !autoApproveReturns;
@@ -562,39 +566,75 @@ export default function CustomerService() {
                 </tr>
               </thead>
               <tbody>
-                {filteredComplaints.map((comp, cIdx) => (
-                  <tr key={comp.id || cIdx} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                    <td style={{ padding: '0.65rem 0.85rem', fontWeight: 700, color: '#2563eb' }}>#TK-{comp.id || cIdx + 101}</td>
-                    <td style={{ padding: '0.65rem 0.85rem' }}>
-                      <strong style={{ display: 'block', color: '#0f172a' }}>{comp.customerName}</strong>
-                      <span style={{ fontSize: '0.72rem', color: '#64748b' }}>{comp.phone}</span>
-                    </td>
-                    <td style={{ padding: '0.65rem 0.85rem', fontWeight: 600, color: '#0f172a' }}>{comp.title}</td>
-                    <td style={{ padding: '0.65rem 0.85rem' }}>
-                      <code style={{ fontSize: '0.78rem', color: '#2563eb', backgroundColor: '#eff6ff', padding: '2px 6px', borderRadius: '4px' }}>
-                        {comp.orderId || 'N/A'}
-                      </code>
-                    </td>
-                    <td style={{ padding: '0.65rem 0.85rem' }}>
-                      <span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 800, backgroundColor: `${PRIORITY_COLORS[comp.priority] || '#10b981'}15`, color: PRIORITY_COLORS[comp.priority] || '#10b981' }}>
-                        {comp.priority || 'MEDIUM'}
-                      </span>
-                    </td>
-                    <td style={{ padding: '0.65rem 0.85rem' }}>
-                      <span style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 800, backgroundColor: `${getStatusInfo(COMPLAINT_STATUS, comp.status).color}15`, color: getStatusInfo(COMPLAINT_STATUS, comp.status).color }}>
-                        {getStatusLabel(COMPLAINT_STATUS, comp.status)}
-                      </span>
-                    </td>
-                    <td style={{ padding: '0.65rem 0.85rem', textAlign: 'center' }}>
-                      <button
-                        onClick={() => setSelectedTicket(comp)}
-                        style={{ backgroundColor: '#ffffff', color: '#2563eb', border: '1px solid #bfdbfe', borderRadius: '4px', padding: '0.3rem 0.65rem', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
-                      >
-                        <Eye size={12} /> Xử Lý
-                      </button>
+                {filteredComplaints.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} style={{ textAlign: 'center', padding: '3.5rem 1rem', color: '#64748b' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.6rem' }}>
+                        <div style={{ width: '48px', height: '48px', borderRadius: '12px', backgroundColor: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2563eb' }}>
+                          <HeadphonesIcon size={24} />
+                        </div>
+                        <strong style={{ fontSize: '0.95rem', color: '#0f172a' }}>Chưa có ticket khiếu nại nào</strong>
+                        <p style={{ margin: 0, fontSize: '0.8rem', color: '#64748b', maxWidth: '360px' }}>
+                          Hiện tại chưa có ticket khiếu nại nào phù hợp với bộ lọc tìm kiếm hoặc trạng thái đã chọn.
+                        </p>
+                        <button
+                          onClick={() => setShowAddTicket(true)}
+                          style={{
+                            marginTop: '0.5rem',
+                            backgroundColor: '#2563eb',
+                            color: '#ffffff',
+                            border: 'none',
+                            borderRadius: '6px',
+                            padding: '0.45rem 1rem',
+                            fontSize: '0.78rem',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.35rem'
+                          }}
+                        >
+                          <Plus size={15} />
+                          <span>Tạo Ticket Mới</span>
+                        </button>
+                      </div>
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  filteredComplaints.map((comp, cIdx) => (
+                    <tr key={comp.id || cIdx} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                      <td style={{ padding: '0.65rem 0.85rem', fontWeight: 700, color: '#2563eb' }}>#TK-{comp.id || cIdx + 101}</td>
+                      <td style={{ padding: '0.65rem 0.85rem' }}>
+                        <strong style={{ display: 'block', color: '#0f172a' }}>{comp.customerName}</strong>
+                        <span style={{ fontSize: '0.72rem', color: '#64748b' }}>{comp.phone}</span>
+                      </td>
+                      <td style={{ padding: '0.65rem 0.85rem', fontWeight: 600, color: '#0f172a' }}>{comp.title}</td>
+                      <td style={{ padding: '0.65rem 0.85rem' }}>
+                        <code style={{ fontSize: '0.78rem', color: '#2563eb', backgroundColor: '#eff6ff', padding: '2px 6px', borderRadius: '4px' }}>
+                          {comp.orderId || 'N/A'}
+                        </code>
+                      </td>
+                      <td style={{ padding: '0.65rem 0.85rem' }}>
+                        <span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 800, backgroundColor: `${PRIORITY_COLORS[comp.priority] || '#10b981'}15`, color: PRIORITY_COLORS[comp.priority] || '#10b981' }}>
+                          {comp.priority || 'MEDIUM'}
+                        </span>
+                      </td>
+                      <td style={{ padding: '0.65rem 0.85rem' }}>
+                        <span style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 800, backgroundColor: `${getStatusInfo(COMPLAINT_STATUS, comp.status).color}15`, color: getStatusInfo(COMPLAINT_STATUS, comp.status).color }}>
+                          {getStatusLabel(COMPLAINT_STATUS, comp.status)}
+                        </span>
+                      </td>
+                      <td style={{ padding: '0.65rem 0.85rem', textAlign: 'center' }}>
+                        <button
+                          onClick={() => setSelectedTicket(comp)}
+                          style={{ backgroundColor: '#ffffff', color: '#2563eb', border: '1px solid #bfdbfe', borderRadius: '4px', padding: '0.3rem 0.65rem', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
+                        >
+                          <Eye size={12} /> Xử Lý
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
