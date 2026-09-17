@@ -3128,9 +3128,18 @@ export default function Purchasing() {
       {/* TAB 7: REPORTS (BÁO CÁO & PHÂN TÍCH MUA HÀNG CHUYÊN SÂU) */}
       {/* ========================================================================= */}
       {activeTab === 'reports' && (() => {
+        // Chỉ tính trên các PO đã thực sự phát sinh chi phí (cùng định nghĩa
+        // ISSUED_PO_STATUSES dùng cho totalSpent ở tab Tổng Quan) — loại bỏ
+        // RFQ còn đang chào giá (RFQ/RFQ_SENT/QUOTED/PENDING_PO_DRAFT), đơn đã
+        // hủy (CANCELLED), và RFQ đã CONVERTED (bản ghi RFQ gốc đã "đóng" sau
+        // khi tạo ra 1 PO thật riêng — tính cả 2 sẽ đếm trùng cùng 1 khoản chi).
+        // Trước đây dùng thẳng `orders` khiến "Tổng Chi Phí Đã Mua" tính luôn
+        // cả đơn nháp/đã hủy/RFQ đã đóng, thổi phồng số liệu báo cáo.
+        const reportOrders = orders.filter(po => ISSUED_PO_STATUSES.includes(po.status));
+
         // 1. Calculate spending breakdown by Category
         const catSpendMap = {};
-        orders.forEach(po => {
+        reportOrders.forEach(po => {
           (po.items || []).forEach(item => {
             const prod = effectiveCatalog.find(p => String(p.productId || p.id) === String(item.productId || item.id || item.name))
               || effectiveCatalog.find(p => String(p.sku) === String(item.productId || item.sku));
@@ -3145,7 +3154,7 @@ export default function Purchasing() {
 
         // 2. Calculate top spending suppliers
         const supSpendList = suppliers.map(s => {
-          const sOrders = orders.filter(o => o.supplierCode === s.code || o.supplier?.name === s.name);
+          const sOrders = reportOrders.filter(o => o.supplierCode === s.code || o.supplier?.name === s.name);
           const spend = sOrders.reduce((sum, o) => sum + (parseFloat(o.totalAmount) || 0), 0);
           return { ...s, orderCount: sOrders.length, totalSpend: spend };
         }).sort((a, b) => b.totalSpend - a.totalSpend);
@@ -3154,7 +3163,7 @@ export default function Purchasing() {
 
         // 3. Top 5 most purchased items (resolve real name from catalog)
         const itemStatsMap = {};
-        orders.forEach(po => {
+        reportOrders.forEach(po => {
           (po.items || []).forEach(item => {
             const prod = effectiveCatalog.find(p => String(p.productId || p.id) === String(item.productId || item.id || item.name))
               || effectiveCatalog.find(p => String(p.sku) === String(item.productId || item.sku))
