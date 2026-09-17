@@ -301,7 +301,7 @@ const getPurchaseOrders = async (req, res, next) => {
 const createPurchaseOrder = async (req, res, next) => {
   try {
     const { supplierCode, expectedDeliveryDate, items, isBlanket, blanketCapAmount, blanketValidUntil, blanketRefId } = req.body;
-    const createdBy = req.user ? req.user.email || req.user.code || 'Staff' : 'Staff';
+    const createdBy = req.user ? req.user.name || req.user.email || req.user.code || 'Staff' : 'Staff';
 
     if (!supplierCode || !items || items.length === 0) {
       return res.status(400).json({ success: false, message: 'Supplier and items are required' });
@@ -1082,7 +1082,7 @@ const validateReceipt = async (req, res, next) => {
     // that line. Required for every category (see utils/serialAllocation.js —
     // this is the only real intake point that can create AVAILABLE serials).
     const serials = req.body?.serials || {};
-    const receivedBy = req.user ? req.user.email || req.user.code || 'Warehouse Staff' : 'Warehouse Staff';
+    const receivedBy = req.user ? req.user.name || req.user.email || req.user.code || 'Warehouse Staff' : 'Warehouse Staff';
 
     const updatedReceipt = await prisma.$transaction(async (tx) => {
       // Atomically claim this receipt first: the conditional updateMany

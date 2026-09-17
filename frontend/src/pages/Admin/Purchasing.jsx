@@ -674,7 +674,7 @@ export default function Purchasing() {
         quantity: r.quantity,
         reason: r.reason || 'Tồn kho chạm ngưỡng tối thiểu',
         status: r.status || 'PENDING',
-        requestedBy: r.requestedBy || 'Thủ Kho AetherPC',
+        requestedBy: r.requestedBy || 'Thủ Kho',
         approvedBy: r.approvedBy || null,
         approvedAt: r.approvedAt || null,
         createdAt: r.createdAt || new Date().toISOString(),
@@ -696,7 +696,7 @@ export default function Purchasing() {
           quantity: r.quantity || 10,
           reason: r.reason || 'Đề xuất bổ sung hàng',
           status: r.status || 'PENDING',
-          requestedBy: r.requestedBy || 'Thủ Kho AetherPC',
+          requestedBy: r.requestedBy || 'Thủ Kho',
           approvedBy: r.approvedBy || null,
           approvedAt: r.approvedAt || null,
           createdAt: r.createdAt || new Date().toISOString(),
@@ -721,7 +721,7 @@ export default function Purchasing() {
           quantity: log.requestedQty || log.quantity || 14,
           reason: log.reason || log.alertReason || 'Tồn kho chạm ngưỡng tối thiểu',
           status: log.status === 'HANDLED' || log.handled ? 'APPROVED' : 'PENDING',
-          requestedBy: log.requestedBy || 'Thủ Kho (Cảnh Báo Tồn)',
+          requestedBy: log.requestedBy || 'Thủ Kho',
           approvedBy: log.handledBy || null,
           approvedAt: null,
           createdAt: log.createdAt || log.timestamp || new Date().toISOString(),
@@ -2042,7 +2042,7 @@ export default function Purchasing() {
                               <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', color: '#475569' }}>
                                 <User size={13} style={{ color: '#94a3b8', flexShrink: 0 }} />
                                 <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '105px' }} title={pr.requestedBy}>
-                                  {pr.requestedBy?.includes('@') ? pr.requestedBy.split('@')[0] : (pr.requestedBy || 'Thủ Kho')}
+                                  {pr.requestedBy || 'Thủ Kho'}
                                 </span>
                               </div>
                             </td>

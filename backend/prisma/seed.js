@@ -769,33 +769,33 @@ async function main() {
 
     const poSeeds = [
       {
-        poNumber: 'RFQ-2026-0001', supplierCode: s1, status: 'RFQ', createdBy: 'purchasing', createdAt: new Date('2026-06-01T08:00:00Z'),
+        poNumber: 'RFQ-2026-0001', supplierCode: s1, status: 'RFQ', createdBy: 'Nhân Viên Mua Hàng', createdAt: new Date('2026-06-01T08:00:00Z'),
         items: [
           { productId: sampleProducts[0].productId, quantity: 20, unitCost: 1500000, totalCost: 30000000 },
           { productId: sampleProducts[1].productId, quantity: 15, unitCost: 4500000, totalCost: 67500000 }
         ]
       },
       {
-        poNumber: 'RFQ-2026-0002', supplierCode: s2, status: 'SENT', createdBy: 'purchasing', createdAt: new Date('2026-06-05T09:30:00Z'),
+        poNumber: 'RFQ-2026-0002', supplierCode: s2, status: 'SENT', createdBy: 'Nhân Viên Mua Hàng', createdAt: new Date('2026-06-05T09:30:00Z'),
         items: [{ productId: sampleProducts[2].productId, quantity: 10, unitCost: 8200000, totalCost: 82000000 }]
       },
       {
-        poNumber: 'PO-2026-0003', supplierCode: s1, status: 'QUOTED', createdBy: 'purchasing', createdAt: new Date('2026-06-10T10:15:00Z'),
+        poNumber: 'PO-2026-0003', supplierCode: s1, status: 'QUOTED', createdBy: 'Nhân Viên Mua Hàng', createdAt: new Date('2026-06-10T10:15:00Z'),
         items: [
           { productId: sampleProducts[3].productId, quantity: 25, unitCost: 2100000, totalCost: 52500000 },
           { productId: sampleProducts[4].productId, quantity: 12, unitCost: 12500000, totalCost: 150000000 }
         ]
       },
       {
-        poNumber: 'PO-2026-0004', supplierCode: s2, status: 'QUOTED', createdBy: 'purchasing', createdAt: new Date('2026-06-12T14:00:00Z'),
+        poNumber: 'PO-2026-0004', supplierCode: s2, status: 'QUOTED', createdBy: 'Nhân Viên Mua Hàng', createdAt: new Date('2026-06-12T14:00:00Z'),
         items: [{ productId: sampleProducts[5].productId, quantity: 30, unitCost: 1800000, totalCost: 54000000 }]
       },
       {
-        poNumber: 'PO-2026-0005', supplierCode: s1, status: 'PO', createdBy: 'purchasing', createdAt: new Date('2026-06-15T11:00:00Z'),
+        poNumber: 'PO-2026-0005', supplierCode: s1, status: 'PO', createdBy: 'Nhân Viên Mua Hàng', createdAt: new Date('2026-06-15T11:00:00Z'),
         items: [{ productId: sampleProducts[6].productId, quantity: 50, unitCost: 950000, totalCost: 47500000 }]
       },
       {
-        poNumber: 'PO-2026-0006', supplierCode: s2, status: 'COMPLETED', createdBy: 'purchasing', createdAt: new Date('2026-05-20T09:00:00Z'),
+        poNumber: 'PO-2026-0006', supplierCode: s2, status: 'COMPLETED', createdBy: 'Nhân Viên Mua Hàng', createdAt: new Date('2026-05-20T09:00:00Z'),
         items: [{ productId: sampleProducts[7].productId, quantity: 40, unitCost: 1100000, totalCost: 44000000 }]
       }
     ];

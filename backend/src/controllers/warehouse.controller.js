@@ -416,7 +416,7 @@ const adjustInventory = async (req, res, next) => {
     const { productId, quantity, warehouseId, location, reason, note, refCode, serials } = req.body;
     const qty = parseInt(quantity, 10);
     const whId = parseInt(warehouseId, 10) || 1;
-    const actor = req.user?.fullname || req.user?.email || req.user?.code || 'Thủ Kho';
+    const actor = req.user?.name || req.user?.email || req.user?.code || 'Thủ Kho';
 
     if (!productId || !Number.isInteger(qty) || qty <= 0) {
       return res.status(400).json({ success: false, message: 'Cần chọn sản phẩm và số lượng nhập là số nguyên dương.' });
@@ -502,7 +502,7 @@ const auditDecreaseInventory = async (req, res, next) => {
     const { productId, quantity, warehouseId, reason, note, serials } = req.body;
     const qty = parseInt(quantity, 10);
     const whId = parseInt(warehouseId, 10) || 1;
-    const actor = req.user?.fullname || req.user?.email || req.user?.code || 'Quản Lý Kho';
+    const actor = req.user?.name || req.user?.email || req.user?.code || 'Quản Lý Kho';
 
     if (!productId || !Number.isInteger(qty) || qty <= 0) {
       return res.status(400).json({ success: false, message: 'Cần chọn sản phẩm và số lượng điều chỉnh giảm là số nguyên dương.' });
@@ -627,7 +627,7 @@ const createPurchaseRequest = async (req, res, next) => {
         quantity: qty,
         reason: reason || null,
         status: 'PENDING',
-        requestedBy: req.user?.fullname || req.user?.email || req.user?.code || 'Thủ Kho'
+        requestedBy: req.user?.name || req.user?.email || req.user?.code || 'Thủ Kho'
       },
       include: { product: { select: { name: true, sku: true } } }
     });
@@ -651,7 +651,7 @@ const approvePurchaseRequest = async (req, res, next) => {
       where: { id: existing.id },
       data: {
         status: 'APPROVED',
-        approvedBy: req.user?.fullname || req.user?.email || req.user?.code || 'Quản Lý Kho',
+        approvedBy: req.user?.name || req.user?.email || req.user?.code || 'Quản Lý Kho',
         approvedAt: new Date()
       },
       include: { product: { select: { name: true, sku: true } } }
@@ -677,7 +677,7 @@ const rejectPurchaseRequest = async (req, res, next) => {
       where: { id: existing.id },
       data: {
         status: 'REJECTED',
-        approvedBy: req.user?.fullname || req.user?.email || req.user?.code || 'Quản Lý Kho',
+        approvedBy: req.user?.name || req.user?.email || req.user?.code || 'Quản Lý Kho',
         approvedAt: new Date(),
         reason: reason ? `${existing.reason || ''} [Từ chối: ${reason}]`.trim() : existing.reason
       }
