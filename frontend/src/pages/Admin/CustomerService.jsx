@@ -185,6 +185,14 @@ export default function CustomerService() {
   const [activeSessionId, setActiveSessionId] = useState(null);
   const [staffInputMsg, setStaffInputMsg] = useState('');
   const wsRef = useRef(null);
+  // Số tin nhắn chưa đọc theo từng phiên — chỉ đếm khi tin nhắn khách gửi tới
+  // KHÔNG phải phiên đang mở xem, để CSKH dễ nhận ra phiên nào có tin mới mà
+  // không cần bấm vào từng phiên để kiểm tra.
+  const [unreadCounts, setUnreadCounts] = useState({});
+  // Effect kết nối WS dùng deps [] nên đóng gói activeSessionId cũ (stale) —
+  // dùng ref để luôn đọc được giá trị mới nhất bên trong ws.onmessage.
+  const activeSessionIdRef = useRef(null);
+  useEffect(() => { activeSessionIdRef.current = activeSessionId; }, [activeSessionId]);
 
   // WebSocket connection for CSKH Livechat
   useEffect(() => {
@@ -218,9 +226,19 @@ export default function CustomerService() {
                   return Array.from(updatedMap.values());
                 });
               }
+              // Tin khách vừa gửi tới 1 phiên KHÁC phiên đang mở xem — đánh dấu
+              // chưa đọc để hiện số đỏ, thay vì phải bấm từng phiên mới biết.
+              if (data.newMsg && data.newMsg.sender === 'customer' && data.newMsg.sessionId && data.newMsg.sessionId !== activeSessionIdRef.current) {
+                const unreadSessionId = data.newMsg.sessionId;
+                setUnreadCounts(prev => ({ ...prev, [unreadSessionId]: (prev[unreadSessionId] || 0) + 1 }));
+              }
               if (data.deletedSessionId) {
                 setLiveChatSessions(prev => prev.filter(s => s.id !== data.deletedSessionId));
                 setActiveSessionId(prev => (prev === data.deletedSessionId ? null : prev));
+                setUnreadCounts(prev => {
+                  const { [data.deletedSessionId]: _removed, ...rest } = prev;
+                  return rest;
+                });
               }
             } else if (data.type === 'ONLINE_STATUS_UPDATE') {
               const { sessionId, status, isOnline } = data.payload || {};
@@ -717,11 +735,15 @@ export default function CustomerService() {
               {liveChatSessions.map(s => {
                 const isActive = s.id === activeSessionId;
                 const isOnline = s.status === 'ONLINE' || s.isOnline === true;
+                const unreadCount = unreadCounts[s.id] || 0;
 
                 return (
                   <div
                     key={s.id}
-                    onClick={() => setActiveSessionId(s.id)}
+                    onClick={() => {
+                      setActiveSessionId(s.id);
+                      if (unreadCount > 0) setUnreadCounts(prev => ({ ...prev, [s.id]: 0 }));
+                    }}
                     style={{
                       padding: '0.75rem 0.85rem',
                       borderBottom: '1px solid #f1f5f9',
@@ -732,9 +754,32 @@ export default function CustomerService() {
                     }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.2rem', gap: '0.35rem' }}>
-                      <strong style={{ fontSize: '0.8rem', color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0 }}>
-                        {s.customerName}
-                      </strong>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flex: 1, minWidth: 0 }}>
+                        {unreadCount > 0 && (
+                          <span
+                            title={`${unreadCount} tin nhắn chưa đọc`}
+                            style={{
+                              flexShrink: 0,
+                              minWidth: '18px',
+                              height: '18px',
+                              padding: '0 5px',
+                              borderRadius: '9px',
+                              backgroundColor: '#ef4444',
+                              color: '#ffffff',
+                              fontSize: '0.68rem',
+                              fontWeight: 800,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center'
+                            }}
+                          >
+                            {unreadCount > 9 ? '9+' : unreadCount}
+                          </span>
+                        )}
+                        <strong style={{ fontSize: '0.8rem', color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: unreadCount > 0 ? 800 : 700 }}>
+                          {s.customerName}
+                        </strong>
+                      </div>
                       <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', flexShrink: 0 }}>
                         <span
                           style={{
@@ -795,12 +840,12 @@ export default function CustomerService() {
                   {activeChat.status === 'ONLINE' || activeChat.isOnline ? (
                     <strong style={{ color: '#16a34a', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
                       <span style={{ width: '7px', height: '7px', borderRadius: '50%', backgroundColor: '#16a34a', boxShadow: '0 0 6px #16a34a' }} />
-                      Đang trực tuyến (Online)
+                      Đang trực tuyến
                     </strong>
                   ) : (
                     <strong style={{ color: '#64748b', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
                       <span style={{ width: '7px', height: '7px', borderRadius: '50%', backgroundColor: '#94a3b8' }} />
-                      Ngoại tuyến (Offline)
+                      Ngoại tuyến
                     </strong>
                   )}
                 </div>
