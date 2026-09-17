@@ -271,6 +271,10 @@ export default function Chatbot() {
   };
 
   const wsRef = useRef(null);
+  // Có nhân viên CSKH nào đang trực (đang mở kết nối /ws/cskh) hay không —
+  // server báo qua STAFF_ONLINE_STATUS, cả lúc vừa identify lẫn khi có
+  // staff vào/thoát trong lúc khung chat đang mở sẵn.
+  const [staffOnline, setStaffOnline] = useState(false);
 
   // Get dynamic session ID & customer name based on logged in user
   const getCSKHSessionInfo = () => {
@@ -367,11 +371,14 @@ export default function Chatbot() {
                   }
                 ]);
               }
+            } else if (data.type === 'STAFF_ONLINE_STATUS') {
+              setStaffOnline(Boolean(data.online));
             }
           } catch (e) {}
         };
 
         ws.onclose = () => {
+          setStaffOnline(false);
           reconnectTimeout = setTimeout(connectWS, 3000);
         };
       } catch (e) {
@@ -727,14 +734,14 @@ export default function Chatbot() {
                 }}>
                   {chatMode === 'ai' ? <Sparkles size={20} /> : <Headphones size={20} />}
                 </div>
-                <div style={{ width: '10px', height: '10px', background: '#22c55e', borderRadius: '50%', border: '2px solid #2563eb', position: 'absolute', bottom: 0, right: 0 }} />
+                <div style={{ width: '10px', height: '10px', background: (chatMode === 'ai' || staffOnline) ? '#22c55e' : '#94a3b8', borderRadius: '50%', border: '2px solid #2563eb', position: 'absolute', bottom: 0, right: 0, transition: 'background-color 0.2s' }} />
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <h4 style={{ fontSize: '0.92rem', fontWeight: 800, margin: 0, color: '#ffffff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {chatMode === 'ai' ? 'Trợ lý AI AetherPC' : 'CSKH AetherPC'}
                 </h4>
                 <div style={{ fontSize: '0.72rem', color: '#dbeafe', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {chatMode === 'ai' ? 'Hỗ trợ tự động 24/7' : 'Sẵn sàng chat live'}
+                  {chatMode === 'ai' ? 'Hỗ trợ tự động 24/7' : (staffOnline ? 'Đã kết nối' : 'Đang đợi kết nối')}
                 </div>
               </div>
             </div>
@@ -779,9 +786,23 @@ export default function Chatbot() {
 
           {/* Active Mode Banner */}
           {chatMode === 'cskh' && (
-            <div style={{ backgroundColor: '#eff6ff', borderBottom: '1px solid #bfdbfe', padding: '0.4rem 0.85rem', fontSize: '0.75rem', color: '#1d4ed8', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              <UserCheck size={14} color="#2563eb" />
-              <span>Đang kết nối live chat với Chuyên viên CSKH AetherPC</span>
+            <div style={{
+              backgroundColor: staffOnline ? '#eff6ff' : '#fffbeb',
+              borderBottom: `1px solid ${staffOnline ? '#bfdbfe' : '#fde68a'}`,
+              padding: '0.4rem 0.85rem',
+              fontSize: '0.75rem',
+              color: staffOnline ? '#1d4ed8' : '#b45309',
+              fontWeight: 700,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.4rem'
+            }}>
+              <UserCheck size={14} color={staffOnline ? '#2563eb' : '#b45309'} />
+              <span>
+                {staffOnline
+                  ? 'Đã kết nối với Chuyên viên CSKH AetherPC'
+                  : 'Đang đợi kết nối — tin nhắn của bạn vẫn được gửi và Chuyên viên CSKH sẽ phản hồi ngay khi trực tuyến'}
+              </span>
             </div>
           )}
 

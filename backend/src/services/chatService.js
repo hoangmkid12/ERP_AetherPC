@@ -142,8 +142,13 @@ const createOrUpdateSession = async (sessionId, customerName, customerId = null,
  * mở kết nối WebSocket — trước khi khách gõ gì cả — nên KHÔNG được phép tạo
  * mới bản ghi (khác createOrUpdateSession dùng upsert, sẽ tạo 1 dòng rỗng và
  * làm CSKH tưởng khách đang chat dù họ chưa gửi tin nào).
+ * Kèm theo toàn bộ lịch sử tin nhắn (định dạng giống createOrUpdateSession) để
+ * websocketService có thể gửi thẳng lại lịch sử cho đúng client vừa identify —
+ * trước đây INIT_SESSIONS chỉ trả sessions=[] cho khách (không phải staff),
+ * nên khách mở lại khung chat không thấy tin nhắn cũ, phải gửi 1 tin mới thì
+ * UPDATE_SESSIONS mới vô tình mang lịch sử về.
  * @param {string} sessionId
- * @returns {Promise<Object|null>} bản ghi session nếu tồn tại, null nếu chưa từng chat
+ * @returns {Promise<Object|null>} session kèm messages nếu tồn tại, null nếu chưa từng chat
  */
 const markSessionOnlineIfExists = async (sessionId) => {
   try {
@@ -151,9 +156,25 @@ const markSessionOnlineIfExists = async (sessionId) => {
     if (!existing) return null;
     const session = await prisma.chatSession.update({
       where: { sessionId },
-      data: { status: 'ONLINE', lastActivityAt: new Date() }
+      data: { status: 'ONLINE', lastActivityAt: new Date() },
+      include: {
+        messages: {
+          orderBy: { timestamp: 'asc' }
+        }
+      }
     });
-    return session;
+    return {
+      id: session.sessionId,
+      sessionId: session.sessionId,
+      customerName: session.customerName,
+      status: session.status,
+      messages: session.messages.map(msg => ({
+        sender: msg.sender,
+        text: msg.text,
+        time: msg.timestamp.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+        senderName: msg.senderName
+      }))
+    };
   } catch (err) {
     console.error('[ChatService] Error marking session online:', err);
     return null;

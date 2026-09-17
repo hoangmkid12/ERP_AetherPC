@@ -106,6 +106,12 @@ const isCustomerSessionOnline = (sessionId) => {
       console.error('[WebSocket] Error initializing sessions:', err);
     }
 
+    // Nhân viên CSKH vừa vào — báo ngay cho mọi khách đang mở sẵn widget chat
+    // biết là đã có người trực, không cần đợi họ tự gửi CLIENT_IDENTIFY lại.
+    if (ws._isStaff) {
+      broadcast({ type: 'STAFF_ONLINE_STATUS', online: true }, client => !client._isStaff);
+    }
+
     ws.on('message', async (messageStr) => {
       try {
         const data = JSON.parse(messageStr);
@@ -137,6 +143,17 @@ const isCustomerSessionOnline = (sessionId) => {
                 isOnline: false
               }
             }, client => client._isStaff);
+          }
+        }, 300);
+      }
+
+      // Nhân viên CSKH vừa thoát — chỉ báo "hết người trực" cho khách khi
+      // KHÔNG còn ai khác đang trực (setTimeout để tránh báo sai khi họ chỉ
+      // đang F5/chuyển mạng, giống cách xử lý customer offline ở trên).
+      if (ws._isStaff) {
+        setTimeout(() => {
+          if (!isAnyStaffOnline()) {
+            broadcast({ type: 'STAFF_ONLINE_STATUS', online: false }, client => !client._isStaff);
           }
         }, 300);
       }
@@ -189,6 +206,17 @@ const broadcast = (data, predicate = () => true, target = wss) => {
 
 const broadcastTracking = (data, predicate = () => true) => broadcast(data, predicate, wssTracking);
 
+// Có ít nhất 1 nhân viên CSKH/quản lý đang mở kết nối /ws/cskh hay không — dùng
+// để bao cho widget chat khach hang biet ("Da ket noi" vs "Dang doi ket noi")
+// thay vi luon hien "San sang chat live" du chang co ai truc.
+const isAnyStaffOnline = () => {
+  if (!wss) return false;
+  for (const client of wss.clients) {
+    if (client.readyState === WebSocket.OPEN && client._isStaff) return true;
+  }
+  return false;
+};
+
 const handleWSMessage = async (ws, data) => {
   if (!data || !data.type) return;
 
@@ -215,6 +243,18 @@ const handleWSMessage = async (ws, data) => {
       } catch (_) {}
 
       if (existingSession) {
+        // Gửi thẳng lịch sử hội thoại lại cho đúng client vừa identify — không
+        // phải staff nên INIT_SESSIONS lúc connect luôn nhận sessions=[], phải
+        // trả riêng ở đây thì khung chat mới hiện được tin nhắn cũ ngay khi mở
+        // lại (trước đây phải gửi 1 tin mới thì UPDATE_SESSIONS mới vô tình
+        // mang lịch sử về).
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({
+            type: 'UPDATE_SESSIONS',
+            sessions: [existingSession]
+          }));
+        }
+
         // Broadcast ONLINE status to staff — chỉ khi đây là 1 cuộc chat có thật
         broadcast({
           type: 'ONLINE_STATUS_UPDATE',
@@ -224,6 +264,12 @@ const handleWSMessage = async (ws, data) => {
             isOnline: true
           }
         }, client => client._isStaff);
+      }
+
+      // Bao cho khach biet ngay CSKH co dang truc hay khong (STAFF_ONLINE_STATUS) —
+      // chi gui cho client khong phai staff, staff tu biet minh dang online.
+      if (!ws._isStaff && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'STAFF_ONLINE_STATUS', online: isAnyStaffOnline() }));
       }
     }
     else if (type === 'CUSTOMER_SEND_MSG') {
