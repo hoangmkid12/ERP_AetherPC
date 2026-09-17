@@ -146,6 +146,15 @@ export default function DeliveryAppShell({ children }) {
         const ws = new WebSocket(`${wsProtocol}//${window.location.host}/ws/cskh`);
         chatWsRef.current = ws;
 
+        ws.onopen = () => {
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({
+              type: 'CLIENT_IDENTIFY',
+              payload: { sessionId: cskhSessionId, customerName: cskhCustomerName }
+            }));
+          }
+        };
+
         ws.onmessage = (event) => {
           try {
             const data = JSON.parse(event.data);

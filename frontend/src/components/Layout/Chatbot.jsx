@@ -308,7 +308,13 @@ export default function Chatbot() {
 
   // Reset CSKH messages when user switches accounts
   useEffect(() => {
-    const { custName } = getCSKHSessionInfo();
+    const { sessId, custName } = getCSKHSessionInfo();
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({
+        type: 'CLIENT_IDENTIFY',
+        payload: { sessionId: sessId, customerName: custName }
+      }));
+    }
     setCskhMessages([
       {
         sender: 'cskh',
@@ -327,6 +333,16 @@ export default function Chatbot() {
         const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const ws = new WebSocket(`${wsProtocol}//${window.location.host}/ws/cskh`);
         wsRef.current = ws;
+
+        ws.onopen = () => {
+          const { sessId, custName } = getCSKHSessionInfo();
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({
+              type: 'CLIENT_IDENTIFY',
+              payload: { sessionId: sessId, customerName: custName }
+            }));
+          }
+        };
 
         ws.onmessage = (event) => {
           try {

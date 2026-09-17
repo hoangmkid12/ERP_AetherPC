@@ -181,29 +181,8 @@ export default function CustomerService() {
   });
 
   // CSKH Live Chat Realtime state
-  const [liveChatSessions, setLiveChatSessions] = useState([
-    {
-      id: 'session_default',
-      customerName: 'Trần Minh Nam (Khách Hàng Website)',
-      phone: '0988.123.456',
-      status: 'ONLINE',
-      messages: [
-        { sender: 'customer', text: 'Xin chào CSKH AetherPC, mình cần tư vấn gấp cấu hình PC đồ họa 3D Blender 25 triệu!', time: '09:15' },
-        { sender: 'staff', text: 'Chào bạn! Mình là NV CSKH AetherPC đây ạ. Với ngân sách 25tr làm Blender, bên mình khuyên dùng i5 13400F + RTX 3060 12GB VRAM để dựng hình mượt mà nhé!', time: '09:16' }
-      ]
-    },
-    {
-      id: 'session_2',
-      customerName: 'Lê Hoàng Yến',
-      phone: '0912.888.999',
-      status: 'ONLINE',
-      messages: [
-        { sender: 'customer', text: 'Shop ơi đơn hàng #ORD-2026-081 của mình giao tới đâu rồi ạ?', time: '10:30' },
-        { sender: 'staff', text: 'Dạ đơn của bạn đã được Shipper nhận giao, dự kiến giao trong chiều nay bạn nhé!', time: '10:31' }
-      ]
-    }
-  ]);
-  const [activeSessionId, setActiveSessionId] = useState('session_default');
+  const [liveChatSessions, setLiveChatSessions] = useState([]);
+  const [activeSessionId, setActiveSessionId] = useState(null);
   const [staffInputMsg, setStaffInputMsg] = useState('');
   const wsRef = useRef(null);
 
@@ -218,17 +197,45 @@ export default function CustomerService() {
         ws.onmessage = (event) => {
           try {
             const data = JSON.parse(event.data);
-            if (data.type === 'INIT_SESSIONS' || data.type === 'UPDATE_SESSIONS') {
-              if (data.sessions && data.sessions.length > 0) {
+            if (data.type === 'INIT_SESSIONS') {
+              if (Array.isArray(data.sessions)) {
                 setLiveChatSessions(data.sessions);
+                if (data.sessions.length > 0) {
+                  setActiveSessionId(prev => {
+                    const exists = data.sessions.some(s => s.id === prev);
+                    return exists ? prev : data.sessions[0].id;
+                  });
+                }
               }
-              // Backend broadcast riêng deletedSessionId (không kèm sessions,
-              // xem handleWsMessage 'DELETE_SESSION' ở websocketService.js) —
-              // gỡ phiên đó khỏi danh sách cục bộ ngay, không chờ round-trip
-              // fetch lại toàn bộ danh sách.
+            } else if (data.type === 'UPDATE_SESSIONS') {
+              if (data.sessions && data.sessions.length > 0) {
+                setLiveChatSessions(prev => {
+                  const updatedMap = new Map(prev.map(s => [s.id, s]));
+                  data.sessions.forEach(ns => {
+                    const existing = updatedMap.get(ns.id);
+                    updatedMap.set(ns.id, { ...existing, ...ns });
+                  });
+                  return Array.from(updatedMap.values());
+                });
+              }
               if (data.deletedSessionId) {
                 setLiveChatSessions(prev => prev.filter(s => s.id !== data.deletedSessionId));
                 setActiveSessionId(prev => (prev === data.deletedSessionId ? null : prev));
+              }
+            } else if (data.type === 'ONLINE_STATUS_UPDATE') {
+              const { sessionId, status, isOnline } = data.payload || {};
+              if (sessionId) {
+                setLiveChatSessions(prev => prev.map(s => {
+                  if (s.id === sessionId || s.sessionId === sessionId) {
+                    const nextOnline = isOnline !== undefined ? isOnline : (status === 'ONLINE');
+                    return {
+                      ...s,
+                      status: nextOnline ? 'ONLINE' : 'OFFLINE',
+                      isOnline: nextOnline
+                    };
+                  }
+                  return s;
+                }));
               }
             }
           } catch (e) {}
@@ -698,12 +705,17 @@ export default function CustomerService() {
           
           {/* Left: Chat Session List */}
           <div style={{ borderRight: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0 }}>
-            <div style={{ padding: '0.85rem 1rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
-              <h3 style={{ fontSize: '0.88rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>Khách Hàng Trực Tuyến</h3>
+            <div style={{ padding: '0.85rem 1rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ fontSize: '0.88rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>Hội Thoại Trực Tuyến</h3>
+              <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#2563eb', backgroundColor: '#eff6ff', padding: '2px 8px', borderRadius: '10px' }}>
+                {liveChatSessions.filter(s => s.status === 'ONLINE' || s.isOnline).length} Online
+              </span>
             </div>
             <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
               {liveChatSessions.map(s => {
                 const isActive = s.id === activeSessionId;
+                const isOnline = s.status === 'ONLINE' || s.isOnline === true;
+
                 return (
                   <div
                     key={s.id}
@@ -713,24 +725,42 @@ export default function CustomerService() {
                       borderBottom: '1px solid #f1f5f9',
                       cursor: 'pointer',
                       backgroundColor: isActive ? '#eff6ff' : 'transparent',
-                      borderLeft: isActive ? '3px solid #2563eb' : '3px solid transparent'
+                      borderLeft: isActive ? '3px solid #2563eb' : '3px solid transparent',
+                      transition: 'all 0.15s'
                     }}
                   >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.15rem', gap: '0.35rem' }}>
-                      <strong style={{ fontSize: '0.8rem', color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0 }}>{s.customerName}</strong>
-                      <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#16a34a', flexShrink: 0 }}></span>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.2rem', gap: '0.35rem' }}>
+                      <strong style={{ fontSize: '0.8rem', color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0 }}>
+                        {s.customerName}
+                      </strong>
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', flexShrink: 0 }}>
+                        <span
+                          style={{
+                            width: '8px',
+                            height: '8px',
+                            borderRadius: '50%',
+                            backgroundColor: isOnline ? '#16a34a' : '#94a3b8',
+                            boxShadow: isOnline ? '0 0 6px rgba(22, 163, 74, 0.6)' : 'none',
+                            transition: 'all 0.2s'
+                          }}
+                          title={isOnline ? 'Đang trực tuyến' : 'Ngoại tuyến'}
+                        />
+                        <span style={{ fontSize: '0.68rem', fontWeight: 700, color: isOnline ? '#16a34a' : '#94a3b8' }}>
+                          {isOnline ? 'Online' : 'Offline'}
+                        </span>
+                      </div>
                       <button
                         type="button"
                         onClick={(e) => { e.stopPropagation(); handleDeleteSession(s.id, s.customerName); }}
                         title="Xóa cuộc trò chuyện này"
-                        style={{ flexShrink: 0, width: '22px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', borderRadius: '4px', backgroundColor: 'transparent', color: '#94a3b8', cursor: 'pointer' }}
+                        style={{ flexShrink: 0, width: '22px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', borderRadius: '4px', backgroundColor: 'transparent', color: '#94a3b8', cursor: 'pointer', marginLeft: '0.2rem' }}
                         onMouseEnter={e => { e.currentTarget.style.backgroundColor = '#fef2f2'; e.currentTarget.style.color = '#ef4444'; }}
                         onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = '#94a3b8'; }}
                       >
                         <Trash2 size={13} />
                       </button>
                     </div>
-                    <span style={{ fontSize: '0.7rem', color: '#64748b', display: 'block' }}>{s.phone}</span>
+                    {s.phone && <span style={{ fontSize: '0.7rem', color: '#64748b', display: 'block' }}>{s.phone}</span>}
                     <p style={{ fontSize: '0.73rem', color: '#475569', margin: '0.25rem 0 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {s.messages[s.messages.length - 1]?.text || 'Bắt đầu cuộc trò chuyện...'}
                     </p>
@@ -749,15 +779,29 @@ export default function CustomerService() {
           <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minWidth: 0, minHeight: 0, overflow: 'hidden' }}>
             {!activeChat ? (
               <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontSize: '0.85rem' }}>
-                Chưa có cuộc trò chuyện nào để hiển thị.
+                Chưa có cuộc trò chuyện nào được chọn.
               </div>
             ) : (
               <>
             {/* Header */}
             <div style={{ padding: '0.75rem 1.25rem', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#f8fafc', flexShrink: 0 }}>
               <div>
-                <strong style={{ fontSize: '0.88rem', color: '#0f172a' }}>{activeChat.customerName}</strong>
-                <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block' }}>SĐT: {activeChat.phone} — Trạng thái: <strong style={{ color: '#16a34a' }}>Đang trực tuyến</strong></span>
+                <strong style={{ fontSize: '0.9rem', color: '#0f172a' }}>{activeChat.customerName}</strong>
+                <div style={{ fontSize: '0.74rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '0.6rem', marginTop: '0.2rem' }}>
+                  {activeChat.phone && <span>SĐT: {activeChat.phone} •</span>}
+                  <span>Trạng thái: </span>
+                  {activeChat.status === 'ONLINE' || activeChat.isOnline ? (
+                    <strong style={{ color: '#16a34a', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                      <span style={{ width: '7px', height: '7px', borderRadius: '50%', backgroundColor: '#16a34a', boxShadow: '0 0 6px #16a34a' }} />
+                      Đang trực tuyến (Online)
+                    </strong>
+                  ) : (
+                    <strong style={{ color: '#64748b', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                      <span style={{ width: '7px', height: '7px', borderRadius: '50%', backgroundColor: '#94a3b8' }} />
+                      Ngoại tuyến (Offline)
+                    </strong>
+                  )}
+                </div>
               </div>
               <button
                 type="button"

@@ -4,7 +4,7 @@ const prisma = require('../config/database');
  * Get all active chat sessions from database
  * @returns {Promise<Array>} Array of chat sessions with messages
  */
-const getAllSessions = async () => {
+const getAllSessions = async (onlineSessionIds = new Set()) => {
   try {
     const sessions = await prisma.chatSession.findMany({
       include: {
@@ -15,18 +15,25 @@ const getAllSessions = async () => {
       orderBy: { lastActivityAt: 'desc' }
     });
 
-    return sessions.map(session => ({
-      id: session.sessionId,
-      sessionId: session.sessionId,
-      customerName: session.customerName,
-      status: session.status,
-      messages: session.messages.map(msg => ({
-        sender: msg.sender,
-        text: msg.text,
-        time: msg.timestamp.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
-        senderName: msg.senderName
-      }))
-    }));
+    return sessions.map(session => {
+      const isOnline = onlineSessionIds instanceof Set
+        ? onlineSessionIds.has(session.sessionId)
+        : session.status === 'ONLINE';
+
+      return {
+        id: session.sessionId,
+        sessionId: session.sessionId,
+        customerName: session.customerName,
+        status: isOnline ? 'ONLINE' : 'OFFLINE',
+        isOnline,
+        messages: session.messages.map(msg => ({
+          sender: msg.sender,
+          text: msg.text,
+          time: msg.timestamp.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+          senderName: msg.senderName
+        }))
+      };
+    });
   } catch (err) {
     console.error('[ChatService] Error getting sessions:', err);
     return [];

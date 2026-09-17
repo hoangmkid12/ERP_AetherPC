@@ -62,6 +62,27 @@ const initWebSocket = async (server) => {
   console.log('[WebSocket] Storage: PostgreSQL Database');
   console.log('==================================================');
 
+const getOnlineCustomerSessionIds = () => {
+  const set = new Set();
+  if (!wss) return set;
+  for (const client of wss.clients) {
+    if (client.readyState === WebSocket.OPEN && client._sessionId && !client._isStaff) {
+      set.add(client._sessionId);
+    }
+  }
+  return set;
+};
+
+const isCustomerSessionOnline = (sessionId) => {
+  if (!wss || !sessionId) return false;
+  for (const client of wss.clients) {
+    if (client.readyState === WebSocket.OPEN && client._sessionId === sessionId && !client._isStaff) {
+      return true;
+    }
+  }
+  return false;
+};
+
   wss.on('connection', async (ws, request) => {
     // Browser WebSockets automatically include the HttpOnly auth cookie.
     // Unauthenticated connections are treated as guest customers and never
@@ -74,8 +95,9 @@ const initWebSocket = async (server) => {
     ws._sessionId = null;
 
     try {
-      // Load all sessions from database on connection
-      const sessions = ws._isStaff ? await getAllSessions() : [];
+      // Load all sessions from database on connection with true online status
+      const onlineSet = getOnlineCustomerSessionIds();
+      const sessions = ws._isStaff ? await getAllSessions(onlineSet) : [];
       ws.send(JSON.stringify({
         type: 'INIT_SESSIONS',
         sessions
@@ -95,6 +117,29 @@ const initWebSocket = async (server) => {
 
     ws.on('close', () => {
       console.log('[WebSocket] Chat client disconnected');
+      const sessionId = ws._sessionId;
+      if (sessionId && !ws._isStaff) {
+        setTimeout(async () => {
+          const stillOnline = isCustomerSessionOnline(sessionId);
+          if (!stillOnline) {
+            try {
+              await prisma.chatSession.updateMany({
+                where: { sessionId },
+                data: { status: 'OFFLINE' }
+              });
+            } catch (_) {}
+
+            broadcast({
+              type: 'ONLINE_STATUS_UPDATE',
+              payload: {
+                sessionId,
+                status: 'OFFLINE',
+                isOnline: false
+              }
+            }, client => client._isStaff);
+          }
+        }, 300);
+      }
     });
 
     ws.on('error', (err) => {
@@ -151,7 +196,32 @@ const handleWSMessage = async (ws, data) => {
   const time = payload?.time || new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
 
   try {
-    if (type === 'CUSTOMER_SEND_MSG') {
+    if (type === 'CLIENT_IDENTIFY') {
+      const { sessionId, customerName } = payload || {};
+      if (!sessionId) return;
+      ws._sessionId = sessionId;
+      ws._customerName = customerName;
+
+      let name = customerName;
+      if (!name || name.includes('undefined')) {
+        name = 'Khách Hàng Vãng Lai';
+      }
+
+      try {
+        await createOrUpdateSession(sessionId, name, ws._userId, 'ONLINE');
+      } catch (_) {}
+
+      // Broadcast ONLINE status to staff
+      broadcast({
+        type: 'ONLINE_STATUS_UPDATE',
+        payload: {
+          sessionId,
+          status: 'ONLINE',
+          isOnline: true
+        }
+      }, client => client._isStaff);
+    }
+    else if (type === 'CUSTOMER_SEND_MSG') {
       const { sessionId, text, customerName } = payload || {};
       if (!text || !sessionId) return;
       ws._sessionId = sessionId;
@@ -168,7 +238,7 @@ const handleWSMessage = async (ws, data) => {
       // Broadcast to all connected clients
       broadcast({
         type: 'UPDATE_SESSIONS',
-        sessions: [session],
+        sessions: [{ ...session, status: 'ONLINE', isOnline: true }],
         newMsg: { sender: 'customer', text, time, sessionId: session.sessionId }
       }, client => client._isStaff || client === ws || client._sessionId === session.sessionId);
     } 
