@@ -251,11 +251,19 @@ const AdminIndexRedirect = () => {
   }
 };
 
-const ScrollToTop = () => {
+const PageManager = () => {
   const { pathname } = useLocation();
 
   useEffect(() => {
     window.scrollTo(0, 0);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (pathname.startsWith('/admin')) {
+      document.title = 'AetherPC ERP';
+    } else {
+      document.title = 'AetherPC';
+    }
   }, [pathname]);
 
   return null;
@@ -272,7 +280,7 @@ export default function App() {
         <CartProvider>
 
             <Router>
-              <ScrollToTop />
+              <PageManager />
               <Suspense fallback={<RouteLoadingFallback />}>
               <Routes>
                 {/* Storefront Layout Routes */}

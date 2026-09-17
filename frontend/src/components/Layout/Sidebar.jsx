@@ -671,7 +671,7 @@ export default function Sidebar({ isOpen = false, onClose }) {
           </div>
           <div>
             <h1 style={{ fontSize: '0.98rem', fontWeight: 800, margin: 0, color: '#0f172a', letterSpacing: '-0.02em' }}>
-              Quản Lý ERP
+              AetherPC ERP
             </h1>
             <p style={{ fontSize: '0.7rem', color: '#64748b', margin: 0, fontWeight: 500 }}>
               Hệ thống Doanh Nghiệp

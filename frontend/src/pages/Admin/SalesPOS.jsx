@@ -2261,7 +2261,7 @@ export default function SalesPOS() {
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(6px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '1.5rem' }}>
           <div style={{ width: '100%', maxWidth: '480px', maxHeight: '90vh', overflowY: 'auto', padding: '2rem', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
             <div style={{ textAlign: 'center', borderBottom: '2px dashed #e2e8f0', paddingBottom: '1rem', marginBottom: '1rem' }}>
-              <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#0f172a' }}>HỆ THỐNG KLTN ERP</h3>
+              <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#0f172a' }}>HỆ THỐNG AETHERPC ERP</h3>
               <p style={{ margin: '0.2rem 0', fontSize: '0.78rem', color: '#64748b' }}>Cửa Hàng Linh Kiện Máy Tính Cao Cấp</p>
               <h4 style={{ margin: '0.5rem 0 0', fontSize: '1rem', fontWeight: 800, color: '#2563eb' }}>PHIẾU THANH TOÁN BÁN LẺ</h4>
               <span style={{ fontSize: '0.75rem', color: '#475569' }}>Mã: #{printedReceipt.orderId}</span>
