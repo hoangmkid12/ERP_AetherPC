@@ -3356,7 +3356,7 @@ export default function Warehouse() {
     // 3. Search query
     if (returnSearch.trim()) {
       const q = returnSearch.toLowerCase().trim();
-      const rmaCode = String(item.rmaNumber || item.code || (item.id ? `RET-${String(item.id).padStart(3, '0')}` : '')).toLowerCase();
+      const rmaCode = String(item.rmaCode || item.rmaNumber || item.code || (item.id ? `RET-${String(item.id).padStart(3, '0')}` : '')).toLowerCase();
       const ordCode = String(item.orderId || item.orderNumber || '').toLowerCase();
       const prod = String(item.productName || item.product?.name || (typeof item.product === 'string' ? item.product : '') || item.items?.[0]?.name || '').toLowerCase();
       const cust = String(item.customerName || item.customer?.fullname || item.customer?.name || (typeof item.customer === 'string' ? item.customer : '') || '').toLowerCase();
@@ -5430,7 +5430,7 @@ export default function Warehouse() {
                         {/* Mã RMA */}
                         <td style={{ padding: '0.85rem 1rem', verticalAlign: 'middle' }}>
                           <span style={{ fontWeight: 800, color: '#2563eb', fontSize: '0.88rem' }}>
-                            {item.rmaNumber || item.code || (item.id ? `RET-${String(item.id).padStart(3, '0')}` : `RET-${String(index + 1).padStart(3, '0')}`)}
+                            {item.rmaCode || item.rmaNumber || item.code || (item.id ? `RET-${String(item.id).padStart(3, '0')}` : `RET-${String(index + 1).padStart(3, '0')}`)}
                           </span>
                         </td>
 
@@ -6703,7 +6703,7 @@ export default function Warehouse() {
         const reasonText = typeof item.reason === 'string'
           ? item.reason
           : (item.description || item.note || 'Hàng đổi trả / bảo hành');
-        const rmaNum = item.rmaNumber || item.code || (item.id ? `RET-${String(item.id).padStart(3, '0')}` : 'RET-001');
+        const rmaNum = item.rmaCode || item.rmaNumber || item.code || (item.id ? `RET-${String(item.id).padStart(3, '0')}` : 'RET-001');
         const ordId = item.orderId || item.orderNumber || 'N/A';
         const st = item.status || 'PENDING';
         // Warehouse may only shelve/scrap a return AFTER QC has actually
@@ -7019,12 +7019,12 @@ export default function Warehouse() {
                       // Lấy base list từ returnRequests hoặc effectiveReturnRequests
                       const baseList = (returnRequests && returnRequests.length > 0) ? [...returnRequests] : [...effectiveReturnRequests];
                       const targetId = String(item.id || '');
-                      const targetRma = String(item.rmaNumber || item.code || '');
+                      const targetRma = String(item.rmaCode || item.rmaNumber || item.code || '');
                       const targetOrder = String(item.orderId || '');
 
                       const updated = baseList.map(r => {
                         const matchId = targetId && String(r.id) === targetId;
-                        const matchRma = targetRma && (String(r.rmaNumber) === targetRma || String(r.code) === targetRma);
+                        const matchRma = targetRma && (String(r.rmaCode) === targetRma || String(r.rmaNumber) === targetRma || String(r.code) === targetRma);
                         const matchOrder = targetOrder && String(r.orderId) === targetOrder;
                         if (matchId || matchRma || matchOrder) {
                           return {

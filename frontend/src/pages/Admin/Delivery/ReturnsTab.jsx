@@ -153,7 +153,7 @@ export default function ReturnsTab({
               <div key={ret.id || rIdx} className="delivery-card">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem', gap: '0.5rem' }}>
                   <div>
-                    <strong style={{ fontSize: '0.88rem', color: '#7c3aed' }}>#RMA-{ret.id}</strong>
+                    <strong style={{ fontSize: '0.88rem', color: '#7c3aed' }}>#{ret.rmaCode || `RMA-${ret.id}`}</strong>
                     <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Đơn: #{ret.orderId}</div>
                   </div>
                   <span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '0.68rem', fontWeight: 800, backgroundColor: statusBadge.bg, color: statusBadge.color, whiteSpace: 'nowrap' }}>

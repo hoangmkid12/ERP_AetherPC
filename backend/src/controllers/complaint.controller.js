@@ -41,8 +41,16 @@ const createComplaint = async (req, res, next) => {
       throw error;
     }
 
+    // Mã ticket ngắn hiển thị cho CSKH/khách hàng (vd "TK-260917-4821") — cùng
+    // quy ước dateStr+randCode với PO-.../PR-... ở các module khác, thay cho
+    // việc cắt UUID `id` ra hiển thị trực tiếp (khó đọc, dễ nhầm với nội bộ).
+    const dateStr = new Date().toISOString().slice(2, 10).replace(/-/g, '');
+    const randCode = Math.floor(1000 + Math.random() * 9000);
+    const ticketCode = `TK-${dateStr}-${randCode}`;
+
     const complaint = await prisma.complaint.create({
       data: {
+        ticketCode,
         customerId: req.user?.role === 'CUSTOMER' ? req.user.id : null,
         orderId: orderId || null,
         customerName: String(customerName).trim(),

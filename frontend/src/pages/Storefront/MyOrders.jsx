@@ -1522,7 +1522,7 @@ export default function MyOrders() {
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.4rem', borderBottom: '1px solid #bbf7d0', paddingBottom: '0.5rem' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontWeight: 800, fontSize: '0.9rem', color: '#15803d' }}>
                           <CheckCircle size={18} color="#16a34a" />
-                          <span>Kế Toán Đã Hoàn Tiền 100% (Phiếu #RMA-{existingReturn.id})</span>
+                          <span>Kế Toán Đã Hoàn Tiền 100% (Phiếu #{existingReturn.rmaCode || `RMA-${existingReturn.id}`})</span>
                         </div>
                         <span style={{ fontSize: '0.76rem', fontWeight: 800, padding: '0.2rem 0.65rem', borderRadius: '12px', backgroundColor: '#dcfce7', border: '1px solid #86efac', color: '#15803d' }}>
                           Napas247: {formatPrice(parseFloat(existingReturn.refundAmount || selectedOrder.totalAmount || 0))}
@@ -1648,7 +1648,7 @@ export default function MyOrders() {
                       </span>
                     </div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.35rem 1rem', fontSize: '0.8rem', color: '#334155' }}>
-                      <div><span style={{ color: '#64748b', fontWeight: 600 }}>Mã yêu cầu:</span> <strong style={{ color: '#0f172a' }}>#RMA-{existingReturn.id}</strong></div>
+                      <div><span style={{ color: '#64748b', fontWeight: 600 }}>Mã yêu cầu:</span> <strong style={{ color: '#0f172a' }}>#{existingReturn.rmaCode || `RMA-${existingReturn.id}`}</strong></div>
                       <div><span style={{ color: '#64748b', fontWeight: 600 }}>Hình thức:</span> <strong style={{ color: sc.color, fontWeight: 800 }}>{typeLabel}</strong></div>
                       <div style={{ gridColumn: '1 / -1' }}><span style={{ color: '#64748b', fontWeight: 600 }}>Lý do:</span> <strong style={{ color: '#0f172a' }}>{existingReturn.reason}</strong></div>
 

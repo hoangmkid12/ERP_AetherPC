@@ -166,7 +166,7 @@ export default function OverviewTab({
           {pendingReturns.slice(0, 3).map((r, rIdx) => (
             <div key={r.id || rIdx} style={{ padding: '0.6rem 0.7rem', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-app)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
               <div style={{ minWidth: 0 }}>
-                <strong style={{ fontSize: '0.78rem', color: 'var(--text-primary)', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>#RMA-{r.id} — {r.customerName}</strong>
+                <strong style={{ fontSize: '0.78rem', color: 'var(--text-primary)', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>#{r.rmaCode || `RMA-${r.id}`} — {r.customerName}</strong>
                 <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>{r.phone}</span>
               </div>
               <button

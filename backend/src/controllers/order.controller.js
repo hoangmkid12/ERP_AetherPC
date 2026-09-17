@@ -930,9 +930,17 @@ const createReturnRequest = async (req, res, next) => {
 
     const initialStatus = isAutoApprove ? 'RETURN_APPROVED' : 'PENDING';
 
+    // Mã RMA ngắn hiển thị cho CSKH/Kho/khách hàng (vd "RMA-260917-4821") — cùng
+    // quy ước dateStr+randCode với PO-.../PR-... ở các module khác, thay cho
+    // việc hiển thị thẳng UUID `id` (rất dài, không phù hợp hiển thị).
+    const rmaDateStr = new Date().toISOString().slice(2, 10).replace(/-/g, '');
+    const rmaRandCode = Math.floor(1000 + Math.random() * 9000);
+    const rmaCode = `RMA-${rmaDateStr}-${rmaRandCode}`;
+
     // 1. Tạo bản ghi ReturnRequest chi tiết
     const returnReq = await prisma.returnRequest.create({
       data: {
+        rmaCode,
         orderId: order.orderId,
         customerId: order.customerId,
         customerName: customerName || order.customer?.name,

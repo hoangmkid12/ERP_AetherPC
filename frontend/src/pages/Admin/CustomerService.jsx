@@ -608,9 +608,11 @@ export default function CustomerService() {
                   </tr>
                 ) : (
                   filteredComplaints.map((comp, cIdx) => {
-                    const ticketCode = comp.id
-                      ? (String(comp.id).length > 10 ? `#TK-${String(comp.id).slice(0, 8).toUpperCase()}` : `#TK-${comp.id}`)
-                      : `#TK-${cIdx + 101}`;
+                    const ticketCode = comp.ticketCode
+                      ? `#${comp.ticketCode}`
+                      : comp.id
+                        ? (String(comp.id).length > 10 ? `#TK-${String(comp.id).slice(0, 8).toUpperCase()}` : `#TK-${comp.id}`)
+                        : `#TK-${cIdx + 101}`;
                     const statusInfo = getStatusInfo(COMPLAINT_STATUS, comp.status);
 
                     return (
@@ -1106,7 +1108,7 @@ export default function CustomerService() {
                               }}
                               title="Bấm xem chi tiết yêu cầu đổi trả"
                             >
-                              #RMA-{ret.id || rIdx + 1}
+                              {ret.rmaCode ? `#${ret.rmaCode}` : `#RMA-${ret.id || rIdx + 1}`}
                             </span>
                           </td>
                           <td style={{ padding: '0.65rem 0.85rem' }}>
@@ -1477,7 +1479,7 @@ export default function CustomerService() {
               <div>
                 <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                   <RefreshCw size={20} style={{ color: '#8b5cf6' }} />
-                  <span>Hồ Sơ Đổi Trả #RMA-{selectedReturnDetail.id}</span>
+                  <span>Hồ Sơ Đổi Trả #{selectedReturnDetail.rmaCode || `RMA-${selectedReturnDetail.id}`}</span>
                 </h3>
                 <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Đơn hàng gốc: <strong style={{ color: '#2563eb' }}>{selectedReturnDetail.orderId}</strong></span>
               </div>

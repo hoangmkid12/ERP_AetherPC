@@ -882,6 +882,9 @@ model SerialNumber {
 
 model ReturnRequest {
   id                  String    @id @default(uuid()) @map("id")
+  // Mã RMA ngắn, dễ đọc hiển thị cho CSKH/Kho/khách hàng (vd "RMA-260917-4821") —
+  // `id` (UUID) chỉ dùng làm khóa chính nội bộ, không phù hợp hiển thị trực tiếp.
+  rmaCode             String?   @unique @map("rma_code") @db.VarChar(30)
   orderId             String    @map("order_id") @db.VarChar(50)
   customerId          String?   @map("customer_id") @db.VarChar(50)
   type                String    @default("EXCHANGE") @db.VarChar(30) // EXCHANGE, REFUND, WARRANTY
@@ -938,6 +941,9 @@ model ReturnRequest {
 
 model Complaint {
   id             String    @id @default(uuid()) @map("id")
+  // Mã ticket ngắn, dễ đọc hiển thị cho CSKH/khách hàng (vd "TK-260917-4821") —
+  // `id` (UUID) chỉ dùng làm khóa chính nội bộ, không phù hợp hiển thị trực tiếp.
+  ticketCode     String?   @unique @map("ticket_code") @db.VarChar(30)
   customerId     String?   @map("customer_id") @db.VarChar(50)
   // Tham chiếu mềm tới Order.orderId (không FK cứng — khách có thể gõ sai
   // mã đơn, hoặc khiếu nại không gắn với đơn nào). CustomerService.jsx đọc
