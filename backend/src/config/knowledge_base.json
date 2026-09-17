@@ -1,0 +1,64 @@
+{
+  "entries": [
+    {
+      "id": "order_how_to",
+      "keywords": ["đặt hàng", "mua hàng như thế nào", "cách đặt hàng", "làm sao để mua", "cách mua hàng online", "đặt hàng online"],
+      "answer": "Bạn chỉ cần chọn sản phẩm ưng ý, bấm **\"Thêm vào giỏ\"**, sau đó vào giỏ hàng và **\"Thanh toán\"** — điền địa chỉ giao hàng và chọn phương thức thanh toán là hoàn tất. Đơn hàng sẽ được xử lý ngay sau khi đặt thành công."
+    },
+    {
+      "id": "order_cancel",
+      "keywords": ["hủy đơn", "huỷ đơn hàng", "muốn hủy đơn", "hủy đơn hàng được không", "đổi ý không muốn mua nữa"],
+      "answer": "Bạn có thể hủy đơn miễn phí nếu đơn **chưa được xác nhận/xuất kho**. Vào mục **\"Đơn Mua Của Tôi\"** để hủy trực tiếp, hoặc bấm **\"Gặp NV CSKH\"** để được hỗ trợ nhanh nếu đơn đã chuyển sang bước xử lý."
+    },
+    {
+      "id": "return_process_time",
+      "keywords": ["đổi trả mất bao lâu", "xử lý đổi trả bao lâu", "bao lâu thì được hoàn tiền", "hoàn tiền mất bao lâu", "thời gian hoàn tiền"],
+      "answer": "Sau khi gửi yêu cầu đổi/trả, kỹ thuật viên sẽ thẩm định trong **24-48h** kể từ lúc nhận lại sản phẩm. Nếu đạt điều kiện bảo hành, tiền sẽ được hoàn về tài khoản trong **3-5 ngày làm việc**, hoặc đổi máy mới ngay khi có hàng."
+    },
+    {
+      "id": "second_hand",
+      "keywords": ["hàng cũ", "hàng trưng bày", "hàng like new", "hàng qua sử dụng", "có bán hàng cũ không"],
+      "answer": "AetherPC chỉ kinh doanh **linh kiện mới 100%, nguyên seal chính hãng** — không bán hàng cũ/trưng bày/like new, để đảm bảo chất lượng và thời hạn bảo hành đầy đủ cho khách hàng."
+    },
+    {
+      "id": "privacy_policy",
+      "keywords": ["bảo mật thông tin", "thông tin cá nhân có an toàn không", "lộ thông tin khách hàng", "chính sách bảo mật"],
+      "answer": "Thông tin cá nhân và lịch sử mua hàng của bạn được bảo mật theo đúng quy định, chỉ dùng để xử lý đơn hàng và chăm sóc khách hàng — không chia sẻ cho bên thứ ba vì mục đích thương mại."
+    },
+    {
+      "id": "invoice_vat",
+      "keywords": ["hóa đơn vat", "hóa đơn đỏ", "xuất hóa đơn công ty", "hóa đơn giá trị gia tăng"],
+      "answer": "Shop hỗ trợ **xuất hóa đơn VAT/hóa đơn đỏ** cho khách hàng doanh nghiệp — bạn vui lòng cung cấp thông tin công ty (MST, tên, địa chỉ) ngay khi đặt hàng hoặc báo nhân viên CSKH trong vòng 24h sau khi nhận hàng."
+    },
+    {
+      "id": "install_support",
+      "keywords": ["lắp đặt tại nhà", "hỗ trợ lắp ráp", "cài đặt máy tính", "lắp windows", "cài win"],
+      "answer": "Với đơn hàng mua nguyên bộ PC lắp ráp, AetherPC hỗ trợ **cài đặt Windows bản quyền + driver đầy đủ miễn phí** trước khi giao. Với đơn giao tận nhà nội thành, có thể yêu cầu kỹ thuật viên lắp đặt tại chỗ (phụ phí nhỏ tùy khu vực)."
+    },
+    {
+      "id": "student_discount",
+      "keywords": ["giảm giá sinh viên", "ưu đãi học sinh sinh viên", "sinh viên có được giảm giá không"],
+      "answer": "AetherPC có chính sách **ưu đãi thêm cho học sinh - sinh viên** khi build PC học tập/lập trình — bạn liên hệ **\"Gặp NV CSKH\"** kèm thẻ sinh viên để được áp dụng mã giảm giá riêng nhé."
+    },
+    {
+      "id": "how_to_track",
+      "keywords": ["theo dõi vận chuyển", "xem shipper đang ở đâu", "định vị đơn hàng", "theo dõi giao hàng trực tiếp"],
+      "answer": "Khi đơn hàng đang được giao, bạn vào mục **\"Đơn Mua Của Tôi\"** → chọn đơn đó để xem **bản đồ theo dõi vị trí Shipper theo thời gian thực**, kèm thời gian dự kiến đến nơi."
+    },
+    {
+      "id": "prebuilt_vs_custom",
+      "keywords": ["mua pc dựng sẵn hay tự ráp", "nên mua bộ có sẵn hay đặt riêng", "pc lắp sẵn có tốt không"],
+      "answer": "Cả hai đều được bảo hành như nhau. Mua **cấu hình dựng sẵn** tiết kiệm thời gian, đã được kiểm định tương thích; **đặt ráp theo yêu cầu** giúp bạn tùy chỉnh đúng ý (màu sắc, RGB, hãng linh kiện...). Bạn có thể dùng tính năng **Tư vấn build PC** ở đây để mình gợi ý cấu hình phù hợp ngân sách."
+    },
+    {
+      "id": "upgrade_advice",
+      "keywords": ["nâng cấp máy tính", "có nên nâng cấp không", "nâng cấp ram hay vga trước", "máy cũ nâng cấp"],
+      "answer": "Nếu máy hiện tại giật/lag khi đa nhiệm: ưu tiên **nâng cấp RAM** trước (rẻ, hiệu quả ngay). Nếu chơi game/đồ họa yếu khung hình: ưu tiên **nâng cấp VGA**. Gửi cấu hình máy hiện tại của bạn (CPU, RAM, VGA) để mình tư vấn cụ thể hơn nhé!"
+    },
+    {
+      "id": "power_supply_safety",
+      "keywords": ["nguồn kém chất lượng có sao không", "nguồn rẻ có an toàn không", "nguồn máy tính quan trọng không"],
+      "answer": "Nguồn (PSU) là linh kiện **ảnh hưởng trực tiếp tới độ an toàn và tuổi thọ cả dàn máy** — nguồn kém chất lượng có thể gây chập cháy, hỏng linh kiện khác. AetherPC chỉ phân phối nguồn từ các hãng uy tín (Corsair, FSP, Cooler Master...) đạt chuẩn 80 Plus trở lên."
+    }
+  ]
+}

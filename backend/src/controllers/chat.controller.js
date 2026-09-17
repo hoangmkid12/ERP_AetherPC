@@ -2,6 +2,48 @@ const fs = require('fs');
 const path = require('path');
 const { NlpManager } = require('node-nlp');
 const prisma = require('../config/database');
+const { findBestKnowledgeMatch } = require('../utils/chatKnowledgeBase');
+
+const formatVnd = (val) => new Intl.NumberFormat('vi-VN').format(parseFloat(val) || 0) + '₫';
+
+// Nhãn tiếng Việt cho Order.status — bản rút gọn của ORDER_STATUS ở
+// frontend/src/utils/statusLabels.js, chỉ giữ phần label vì chatbot chỉ cần
+// hiển thị chữ, không cần màu badge.
+const ORDER_STATUS_VI = {
+  PENDING: 'Chờ Xác Nhận',
+  WAITING_PAYMENT: 'Chờ Thanh Toán',
+  CONFIRMED: 'Đã Xác Nhận',
+  PACKED: 'Đã Đóng Gói',
+  PROCESSING: 'Đang Chuẩn Bị Hàng',
+  AWAITING_STOCK: 'Chờ Nhập Hàng',
+  READY_TO_SHIP: 'Sẵn Sàng Giao',
+  SHIPPED: 'Đang Giao Hàng',
+  DELIVERED: 'Đã Giao Hàng',
+  COMPLETED: 'Hoàn Tất',
+  CANCELLED: 'Đã Hủy',
+  FAILED_DELIVERY: 'Giao Thất Bại',
+  SHIPPING_FAILED: 'Giao Thất Bại - Hẹn Lại',
+  RETURNING_TO_WAREHOUSE: 'Đang Hoàn Về Kho',
+  RETURN_REQUESTED: 'Yêu Cầu Trả Hàng',
+  RETURN_APPROVED: 'Đã Duyệt Trả Hàng',
+  RETURNING: 'Đang Trả Hàng',
+  RETURNED: 'Đã Trả Hàng',
+  REFUNDED: 'Đã Hoàn Tiền'
+};
+
+const TIER_LABEL_VI = {
+  REGULAR: 'Thường',
+  BRONZE: 'Đồng',
+  SILVER: 'Bạc',
+  GOLD: 'Vàng',
+  PLATINUM: 'Bạch Kim',
+  DIAMOND: 'Kim Cương'
+};
+
+// Chọn ngẫu nhiên 1 trong nhiều cách diễn đạt cho cùng 1 ý — tránh bot trả
+// lời y hệt từng từ mỗi lần, cảm giác tự nhiên/"thông minh" hơn hẳn so với
+// 1 câu cố định lặp lại mãi.
+const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
 // Cache for Categories and Brands to keep entities extraction fast and dynamic
 let categoriesCache = [];
@@ -90,20 +132,30 @@ const extractEntities = (text, categoriesList, brandsList) => {
     }
   }
 
-  // 2. Category extraction mapping common synonyms to DB categories
+  // 2. Category extraction mapping common synonyms to DB categories.
+  // QUAN TRỌNG: các key dưới đây phải khớp ĐÚNG slug thật trong DB (category
+  // Prisma) — bản cũ dùng slug tiếng Anh tự đặt (vd 'cpu', 'vga', 'ram') mà
+  // DB thật lại lưu slug tiếng Việt có dấu-gạch-ngang (vd 'bo-vi-xu-ly',
+  // 'card-man-hinh', 'ram-pc'/'ram-laptop' tách riêng 2 danh mục) nên
+  // `categoriesList.find(c => c.slug === slug)` KHÔNG BAO GIỜ khớp — suốt
+  // thời gian qua chatbot chưa từng thực sự lọc được theo danh mục, chỉ âm
+  // thầm rơi về tìm kiếm chuỗi con kém chính xác hơn nhiều. Thứ tự khai báo
+  // có ý nghĩa: cụm cụ thể hơn (vd "ram laptop", "hdd") phải đứng TRƯỚC cụm
+  // chung chung hơn (vd "ram", "ssd") để không bị match nhầm.
   const categorySynonyms = {
-    'cpu': ['cpu', 'bộ vi xử lý', 'vi xử lý', 'chip'],
-    'mainboard': ['mainboard', 'main', 'bo mạch chủ', 'bo mach chu'],
-    'ram': ['ram', 'bộ nhớ trong', 'bo nho trong'],
-    'vga': ['vga', 'card màn hình', 'card man hinh', 'card đồ họa', 'card do hoa', 'gpu', 'geforce', 'radeon'],
-    'psu': ['nguồn', 'nguon', 'psu', 'nguồn máy tính'],
-    'storage': ['ssd', 'hdd', 'ổ cứng', 'o cung', 'nvme', 'm2 sata', 'm2 nvme'],
-    'case': ['case', 'vỏ case', 'vỏ máy', 'vo case', 'vo may', 'thùng máy'],
-    'cooler': ['tản nhiệt', 'tan nhiet', 'cooler', 'quạt tản nhiệt', 'tản nước', 'tản khí'],
-    'monitor': ['màn hình', 'man hinh', 'monitor', 'hiển thị'],
-    'mouse': ['chuột', 'chuot', 'mouse'],
-    'keyboard': ['bàn phím', 'ban phim', 'keyboard'],
-    'other': ['tai nghe', 'headphone', 'lót chuột', 'lot chuot', 'mousepad', 'bàn di']
+    'bo-vi-xu-ly': ['cpu', 'bộ vi xử lý', 'vi xử lý', 'chip', 'ryzen', 'core i3', 'core i5', 'core i7', 'core i9'],
+    'card-man-hinh': ['vga', 'card màn hình', 'card man hinh', 'card đồ họa', 'card do hoa', 'gpu', 'geforce', 'radeon', 'rtx', 'gtx'],
+    'ram-laptop': ['ram laptop', 'ram cho laptop'],
+    'ram-pc': ['ram', 'bộ nhớ trong', 'bo nho trong'],
+    'o-cung-hdd': ['hdd', 'ổ cứng hdd', 'o cung hdd'],
+    'o-cung-ssd': ['ssd', 'nvme', 'm2 sata', 'm2 nvme', 'ổ cứng', 'o cung'],
+    'bo-mach-chu': ['mainboard', 'main', 'bo mạch chủ', 'bo mach chu'],
+    'nguon-may-tinh': ['nguồn', 'nguon', 'psu', 'nguồn máy tính'],
+    'vo-may-tinh': ['case', 'vỏ case', 'vỏ máy', 'vo case', 'vo may', 'thùng máy'],
+    'tan-nhiet': ['tản nhiệt', 'tan nhiet', 'cooler', 'quạt tản nhiệt', 'tản nước', 'tản khí'],
+    'ban-phim': ['bàn phím', 'ban phim', 'keyboard'],
+    'chuot-may-tinh': ['chuột', 'chuot', 'mouse'],
+    'man-hinh': ['màn hình', 'man hinh', 'monitor', 'hiển thị']
   };
 
   for (const [slug, synonyms] of Object.entries(categorySynonyms)) {
@@ -164,7 +216,7 @@ const extractEntities = (text, categoriesList, brandsList) => {
 // Main Chat Handler
 const handleChat = async (req, res, next) => {
   try {
-    const { message } = req.body;
+    const { message, history } = req.body;
 
     if (!message) {
       return res.status(400).json({ success: false, message: 'Message is required' });
@@ -178,21 +230,62 @@ const handleChat = async (req, res, next) => {
 
     // Classify user intent
     const result = await manager.process('vi', message);
-    const intent = result.intent || 'general';
+    // node-nlp trả intent 'None' (không phải null/undefined) khi không phân
+    // loại được câu nào đủ tin cậy — trước đây `|| 'general'` không bắt được
+    // trường hợp này nên mọi câu lạ đều lọt qua nhánh product_search/hardcode
+    // fallback cứng nhắc, chưa từng thử tra kho tri thức FAQ.
+    //
+    // Bộ phân loại bag-of-words của node-nlp với ~150 câu mẫu không thực sự
+    // hiểu ngữ nghĩa — 1 câu hoàn toàn lạ (vd "shop có tuyển nhân viên
+    // không") vẫn có thể bị gán nhầm vào 1 intent đã huấn luyện với điểm tin
+    // cậy khá cao do trùng từ ngẫu nhiên. Đặt ngưỡng tin cậy tối thiểu để
+    // những câu mơ hồ hơn được nhường lại cho kho tri thức FAQ (tra theo từ
+    // khóa, ít nhất còn bám đúng chủ đề) thay vì trả lời sai chủ đề nhưng
+    // "tự tin".
+    const INTENT_CONFIDENCE_THRESHOLD = 0.8;
+    const intent = (result.intent && result.intent !== 'None' && result.score >= INTENT_CONFIDENCE_THRESHOLD)
+      ? result.intent
+      : 'general';
 
     // Parse entities
-    const entities = extractEntities(message, categoriesCache, brandsCache);
+    let entities = extractEntities(message, categoriesCache, brandsCache);
 
+    // Kế thừa ngữ cảnh câu hỏi TRƯỚC nếu câu hiện tại là 1 câu nối tiếp ngắn
+    // không tự nêu lại ngân sách/danh mục (vd "còn màu khác không", "rẻ hơn
+    // được không") — tránh bot "quên" ngay sau câu đầu tiên, đúng tinh thần
+    // "trả lời linh hoạt" thay vì chỉ xử lý từng câu độc lập.
+    if (Array.isArray(history) && history.length > 0 && !entities.category && !entities.brand && entities.budget === 0) {
+      for (let i = history.length - 1; i >= 0; i--) {
+        if (history[i]?.sender === 'user' && typeof history[i].text === 'string') {
+          const prevEntities = extractEntities(history[i].text, categoriesCache, brandsCache);
+          if (prevEntities.category || prevEntities.brand || prevEntities.budget > 0) {
+            entities = {
+              category: entities.category || prevEntities.category,
+              brand: entities.brand || prevEntities.brand,
+              budget: entities.budget || prevEntities.budget,
+              specs: entities.specs.length > 0 ? entities.specs : prevEntities.specs
+            };
+          }
+          break;
+        }
+      }
+    }
     let reply = '';
     let replyIntent = 'general';
     let matchedProducts = [];
 
     // Intent Routing
     if (intent === 'greeting') {
-      reply = 'Xin chào bạn! 👋 Tôi là Trợ lý AI tự huấn luyện của AetherPC. Tôi có thể tư vấn cấu hình PC theo đúng ngân sách, tìm kiếm linh kiện chuẩn 100% tương thích và giải đáp chính sách cửa hàng cho bạn.';
+      reply = pick([
+        'Xin chào bạn! 👋 Tôi là Trợ lý AI của AetherPC. Tôi có thể tư vấn cấu hình PC theo đúng ngân sách, tìm kiếm linh kiện chuẩn 100% tương thích, tra cứu đơn hàng/khuyến mãi và giải đáp chính sách cửa hàng cho bạn.',
+        'Chào bạn! 😊 Mình là Trợ lý AI AetherPC đây. Bạn cần tư vấn cấu hình PC, tìm linh kiện, kiểm tra đơn hàng hay hỏi về chính sách shop, cứ nhắn mình nhé!'
+      ]);
       replyIntent = 'general';
     } else if (intent === 'goodbye') {
-      reply = 'Cảm ơn bạn đã liên hệ AetherPC! 👋 Hẹn gặp lại bạn sớm. Chúc bạn một ngày tốt lành!';
+      reply = pick([
+        'Cảm ơn bạn đã liên hệ AetherPC! 👋 Hẹn gặp lại bạn sớm. Chúc bạn một ngày tốt lành!',
+        'Dạ vâng, hẹn gặp lại bạn nhé! Nếu cần hỗ trợ thêm cứ quay lại nhắn mình bất cứ lúc nào ạ. 👋'
+      ]);
       replyIntent = 'general';
     } else if (intent === 'thanks') {
       reply = 'Dạ không có gì ạ! 😊 Rất vui được hỗ trợ bạn. Bạn cần tư vấn thêm về cấu hình hay linh kiện nào cứ nhắn tôi nhé!';
@@ -291,8 +384,9 @@ const handleChat = async (req, res, next) => {
       } catch (err) {
         reply = `Dạ, tôi đã ghi nhận ngân sách khoảng **${budgetStr}**. Vui lòng tham khảo các cấu hình gợi ý bên dưới hoặc bấm nút **"Gặp NV CSKH"** để nhân viên hỗ trợ tùy chỉnh theo ý muốn!`;
       }
-    } else if (intent === 'product_search' || entities.category || entities.brand || entities.specs.length > 0) {
+    } else if (intent === 'product_search' || intent === 'product_compare' || entities.category || entities.brand || entities.specs.length > 0) {
       replyIntent = 'product_search';
+      const isCompareRequest = intent === 'product_compare';
 
       // Build database query filters
       const whereClause = { available: true };
@@ -386,29 +480,123 @@ const handleChat = async (req, res, next) => {
         matchedProducts = scored.slice(0, 4);
 
         let desc = '';
-        if (entities.category) {
+        if (isCompareRequest) {
+          desc += `Dạ, để so sánh bạn xem chi tiết ${matchedProducts.length} sản phẩm phù hợp nhất bên dưới nhé (giá, thương hiệu, thông số đầy đủ):\n\n`;
+        } else if (entities.category) {
           desc += `Dạ, tôi tìm thấy **${dbProducts.length} mẫu ${entities.category.name}** phù hợp. `;
         } else {
           desc += `Dạ, tôi tìm thấy linh kiện phù hợp theo yêu cầu của bạn. `;
         }
-        if (entities.budget > 0) {
+        if (!isCompareRequest && entities.budget > 0) {
           const budgetStr = new Intl.NumberFormat('vi-VN').format(entities.budget) + '₫';
           desc += `ở tầm giá dưới **${budgetStr}** `;
         }
-        desc += 'tại cửa hàng:\n\n';
+        if (!isCompareRequest) desc += 'tại cửa hàng:\n\n';
 
         matchedProducts.forEach((p, index) => {
           const priceStr = new Intl.NumberFormat('vi-VN').format(parseFloat(p.price)) + '₫';
           desc += `${index + 1}. **${p.name}**\n   - Hãng: ${p.brand.name} | Giá: **${priceStr}**\n`;
         });
-        desc += '\nBạn xem thông số các sản phẩm này bên dưới và nhấn **"Thêm vào giỏ"** nếu ưng ý nhé!';
+        desc += isCompareRequest
+          ? '\nBạn có thể xem đầy đủ thông số kỹ thuật của từng sản phẩm bên dưới để đối chiếu trực tiếp nhé!'
+          : '\nBạn xem thông số các sản phẩm này bên dưới và nhấn **"Thêm vào giỏ"** nếu ưng ý nhé!';
         reply = desc;
       } else {
         reply = 'Xin lỗi bạn, hiện tại dòng sản phẩm này ở tầm giá bạn yêu cầu đang tạm hết hàng hoặc chưa có sẵn tại AetherPC. Bạn có thể thử tìm từ khóa khác hoặc bấm nút **"Gặp NV CSKH"** để nhân viên hỗ trợ ngay nhé!';
       }
-    } else {
-      reply = 'Tôi là Trợ lý AI tự huấn luyện của AetherPC. Tôi có thể hỗ trợ bạn:\n- **Tư vấn cấu hình PC**: "Build PC chơi game 15 triệu", "Chơi Valorant cần máy bao nhiêu"...\n- **Tìm kiếm linh kiện**: "Tìm màn hình 144Hz dưới 4 triệu", "RAM 16GB"...\n- **Thông tin dịch vụ**: "Chính sách bảo hành thế nào?", "Shop có trả góp không?"...';
+    } else if (intent === 'order_status') {
+      replyIntent = 'order_status';
+      const orderCodeMatch = message.toUpperCase().match(/ORD[-_]?\d+/);
+
+      try {
+        if (orderCodeMatch) {
+          const orderId = orderCodeMatch[0].replace('_', '-');
+          const order = await prisma.order.findFirst({ where: { orderId: { equals: orderId, mode: 'insensitive' } } });
+          // Chỉ cho xem đơn của CHÍNH khách đó nếu đang đăng nhập bằng vai trò
+          // CUSTOMER — tránh 1 khách gõ đại mã đơn để dò thông tin đơn người khác.
+          const ownedByRequester = order && (req.user?.role !== 'CUSTOMER' || order.customerId === req.user.id);
+          if (order && ownedByRequester) {
+            reply = `📦 **Đơn hàng ${order.orderId}**\n- Trạng thái: **${ORDER_STATUS_VI[order.status] || order.status}**\n- Tổng tiền: **${formatVnd(order.totalAmount)}**\n- Ngày đặt: ${new Date(order.createdAt).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}\n\nXem chi tiết đầy đủ (lịch sử xử lý, vị trí giao hàng) tại mục **"Đơn Mua Của Tôi"** nhé!`;
+          } else {
+            reply = `Xin lỗi, tôi không tìm thấy đơn hàng **${orderId}** khớp với tài khoản của bạn. Bạn kiểm tra lại mã đơn hoặc bấm **"Gặp NV CSKH"** để được hỗ trợ tra cứu trực tiếp nhé.`;
+          }
+        } else if (req.user?.role === 'CUSTOMER') {
+          const recentOrders = await prisma.order.findMany({
+            where: { customerId: req.user.id },
+            orderBy: { createdAt: 'desc' },
+            take: 3
+          });
+          if (recentOrders.length > 0) {
+            reply = `**Các đơn hàng gần đây của bạn:**\n\n` +
+              recentOrders.map(o => `- Đơn **${o.orderId}**: ${ORDER_STATUS_VI[o.status] || o.status} — ${formatVnd(o.totalAmount)}`).join('\n') +
+              `\n\nXem đầy đủ chi tiết & theo dõi vị trí giao hàng tại mục **"Đơn Mua Của Tôi"** nhé!`;
+          } else {
+            reply = 'Bạn chưa có đơn hàng nào tại AetherPC. Khám phá ngay các sản phẩm hot tại cửa hàng nhé!';
+          }
+        } else {
+          reply = 'Để tra cứu đơn hàng, bạn vui lòng **đăng nhập tài khoản** hoặc cho tôi biết **mã đơn hàng** (ví dụ: ORD-576569) để tôi kiểm tra giúp bạn nhé!';
+        }
+      } catch (err) {
+        console.error('[Chatbot] Order lookup error:', err);
+        reply = 'Xin lỗi, hệ thống đang gặp sự cố khi tra cứu đơn hàng. Bạn vui lòng bấm **"Gặp NV CSKH"** để được hỗ trợ trực tiếp.';
+      }
+    } else if (intent === 'promotion_inquiry') {
+      replyIntent = 'promotion';
+      try {
+        const promos = await prisma.promotion.findMany({
+          where: {
+            status: 'ACTIVE',
+            OR: [{ expiresAt: null }, { expiresAt: { gte: new Date() } }]
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 5
+        });
+
+        if (promos.length > 0) {
+          reply = `🎁 **Chương trình khuyến mãi đang áp dụng tại AetherPC:**\n\n` +
+            promos.map(p => {
+              const discountStr = p.discountType === 'PERCENT' ? `giảm **${parseFloat(p.discountValue)}%**` : `giảm **${formatVnd(p.discountValue)}**`;
+              const minSpendStr = parseFloat(p.minSpend) > 0 ? ` cho đơn từ ${formatVnd(p.minSpend)}` : '';
+              return `- **${p.title}** (mã \`${p.code}\`): ${discountStr}${minSpendStr}`;
+            }).join('\n') +
+            `\n\nNhập mã tương ứng ở bước thanh toán để được áp dụng nhé!`;
+        } else {
+          reply = 'Hiện tại chưa có chương trình khuyến mãi nào đang áp dụng, nhưng shop luôn có giá tốt sẵn trên từng sản phẩm. Theo dõi trang **Khuyến Mãi** để cập nhật sớm nhất nhé!';
+        }
+      } catch (err) {
+        console.error('[Chatbot] Promotion lookup error:', err);
+        reply = 'Bạn xem các chương trình khuyến mãi mới nhất tại trang **Khuyến Mãi** trên website nhé!';
+      }
+    } else if (intent === 'member_tier') {
       replyIntent = 'general';
+      if (req.user?.role === 'CUSTOMER') {
+        try {
+          const customer = await prisma.customer.findUnique({
+            where: { customerId: req.user.id },
+            select: { loyaltyPoints: true, tier: true }
+          });
+          if (customer) {
+            reply = `Bạn hiện đang ở hạng **${TIER_LABEL_VI[customer.tier] || customer.tier}** với **${customer.loyaltyPoints.toLocaleString('vi-VN')} điểm** tích lũy.\n\n📊 Mốc thăng hạng: Bạc (1.000 điểm), Vàng (5.000 điểm), Bạch Kim (15.000 điểm). Cứ mỗi **10.000đ thanh toán = 1 điểm** cơ bản, nhân thêm theo % hạng hiện tại. Xem chi tiết đầy đủ tại trang **Hạng Thành Viên**.`;
+          }
+        } catch (err) {
+          console.error('[Chatbot] Member tier lookup error:', err);
+        }
+      }
+      if (!reply) {
+        reply = '**Chính sách hạng thành viên AetherPC:**\n- Cứ **10.000đ thanh toán = 1 điểm** tích lũy (nhân thêm theo % hạng).\n- Mốc thăng hạng: **Bạc** (1.000 điểm), **Vàng** (5.000 điểm), **Bạch Kim** (15.000 điểm), **Kim Cương** (cao nhất).\n- Hạng càng cao, % tích điểm, freeship và ưu đãi dịch vụ càng lớn.\n\nĐăng nhập tài khoản để xem điểm và hạng hiện tại của bạn tại trang **Hạng Thành Viên**.';
+      }
+    } else {
+      // Không khớp bất kỳ intent đã huấn luyện nào — tra kho tri thức FAQ tự
+      // xây (chấm điểm từ khóa) trước khi rơi về câu giới thiệu chung chung,
+      // để bot vẫn trả lời được đúng trọng tâm với các câu hỏi mới lạ.
+      const kbMatch = findBestKnowledgeMatch(message);
+      if (kbMatch) {
+        reply = kbMatch.answer;
+        replyIntent = 'general';
+      } else {
+        reply = 'Tôi là Trợ lý AI của AetherPC. Tôi có thể hỗ trợ bạn:\n- **Tư vấn cấu hình PC**: "Build PC chơi game 15 triệu", "Chơi Valorant cần máy bao nhiêu"...\n- **Tìm kiếm linh kiện**: "Tìm màn hình 144Hz dưới 4 triệu", "RAM 16GB"...\n- **Tra cứu đơn hàng & khuyến mãi**: "Đơn hàng của tôi tới đâu rồi", "Có mã giảm giá không"...\n- **Thông tin dịch vụ**: "Chính sách bảo hành thế nào?", "Shop có trả góp không?"...';
+        replyIntent = 'general';
+      }
     }
 
     res.json({

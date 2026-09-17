@@ -1,10 +1,14 @@
 const express = require('express');
 const router = express.Router();
-const { authMiddleware } = require('../middlewares/auth.middleware');
+const { authMiddleware, optionalAuthMiddleware } = require('../middlewares/auth.middleware');
 const { handleChat, getCskhSessions, sendCskhCustomerMessage, sendCskhStaffMessage } = require('../controllers/chat.controller');
 
 // @route   POST /api/v1/chat
-router.post('/', handleChat);
+// optionalAuthMiddleware: chatbot vẫn trả lời được cho khách vãng lai chưa
+// đăng nhập (req.user = null), nhưng nếu có JWT hợp lệ (khách đã đăng nhập)
+// thì req.user sẽ có sẵn để tra cứu đơn hàng/hạng thành viên CỦA ĐÚNG khách
+// đó (order_status, member_tier) — không bắt buộc đăng nhập mới chat được.
+router.post('/', optionalAuthMiddleware, handleChat);
 
 // CSKH Realtime Sync Endpoints
 router.get('/cskh/sessions', authMiddleware(['CSKH', 'SALES_MANAGER', 'CEO', 'ADMIN']), getCskhSessions);

@@ -22,7 +22,13 @@
         "tư vấn cho mình bộ pc",
         "shop tư vấn em với",
         "shop ơi",
-        "ad ơi"
+        "ad ơi",
+        "cho em hỏi",
+        "cho mình hỏi tí",
+        "hey",
+        "chào buổi sáng",
+        "chào buổi tối",
+        "alo có ai không"
       ]
     },
     {
@@ -36,7 +42,10 @@
         "hẹn gặp lại shop",
         "mình đi nha",
         "tạm biệt ad",
-        "cảm ơn hẹn gặp lại"
+        "cảm ơn hẹn gặp lại",
+        "vậy thôi nhé",
+        "để mình suy nghĩ thêm",
+        "để suy nghĩ đã"
       ]
     },
     {
@@ -52,7 +61,9 @@
         "ok cảm ơn bạn",
         "ok cám ơn",
         "tư vấn tuyệt vời cảm ơn shop",
-        "đã hiểu cảm ơn bạn nhiều"
+        "đã hiểu cảm ơn bạn nhiều",
+        "hữu ích quá cảm ơn",
+        "oke thanks"
       ]
     },
     {
@@ -85,7 +96,11 @@
         "build pc 12tr",
         "dàn máy 18 triệu",
         "tư vấn cấu hình máy tính 15tr",
-        "build dàn máy 25tr"
+        "build dàn máy 25tr",
+        "lên đồ pc theo ngân sách",
+        "giúp mình chọn linh kiện ráp máy",
+        "tư vấn 1 bộ pc mới",
+        "mình có 20 triệu build pc được cấu hình gì"
       ]
     },
     {
@@ -118,7 +133,11 @@
         "có nguồn corsair 850w gold không",
         "cho xem các mẫu màn hình",
         "bàn phím cơ giá bao nhiêu",
-        "card màn hình rẻ nhất"
+        "card màn hình rẻ nhất",
+        "shop có bán linh kiện lẻ không",
+        "muốn xem thêm sản phẩm khác",
+        "còn mẫu nào rẻ hơn không",
+        "có màu khác không"
       ]
     },
     {
@@ -147,7 +166,11 @@
         "gửi bảo hành ở đâu",
         "thời gian bảo hành mất bao lâu",
         "chính sách đổi trả sản phẩm",
-        "đổi mới trong bao lâu"
+        "đổi mới trong bao lâu",
+        "bảo hành có mất phí không",
+        "hết hạn bảo hành thì sao",
+        "quy trình gửi bảo hành như thế nào",
+        "bao lâu thì nhận lại máy bảo hành"
       ]
     },
     {
@@ -164,7 +187,10 @@
         "chính sách vận chuyển",
         "có ship cod không",
         "ship hà nội hcm bao nhiêu tiền",
-        "ship các tỉnh khác bao nhiêu"
+        "ship các tỉnh khác bao nhiêu",
+        "có được kiểm tra hàng trước khi nhận không",
+        "shop có giao lắp đặt tận nhà không",
+        "có hỗ trợ lắp ráp tại nhà không"
       ]
     },
     {
@@ -178,7 +204,10 @@
         "chuyển khoản ngân hàng được không",
         "thanh toán momo được không",
         "lãi suất trả góp là bao nhiêu",
-        "có hỗ trợ trả góp 0% không"
+        "có hỗ trợ trả góp 0% không",
+        "có xuất hóa đơn vat không",
+        "có xuất hóa đơn đỏ không",
+        "công ty mua hàng có xuất hóa đơn không"
       ]
     },
     {
@@ -204,7 +233,71 @@
         "chơi game chọn card nvidia hay radeon",
         "cần bao nhiêu ram để edit video 4k",
         "tản khí hay tản nước tốt hơn",
-        "nguồn 650w có đủ chạy rtx 4070 không"
+        "nguồn 650w có đủ chạy rtx 4070 không",
+        "nên mua ssd hay hdd",
+        "màn hình ips hay va tốt hơn",
+        "bao nhiêu ram là đủ dùng",
+        "cpu và vga cái nào quan trọng hơn"
+      ]
+    },
+    {
+      "intent": "order_status",
+      "utterances": [
+        "đơn hàng của tôi tới đâu rồi",
+        "kiểm tra đơn hàng của tôi",
+        "đơn hàng của mình đang ở đâu",
+        "theo dõi đơn hàng",
+        "đơn hàng bao giờ giao tới",
+        "đơn hàng của tôi đã giao chưa",
+        "check đơn hàng giúp mình",
+        "xem trạng thái đơn hàng",
+        "đơn hàng của em xử lý tới đâu rồi ạ",
+        "cho mình hỏi đơn hàng",
+        "đơn của tôi bị gì vậy",
+        "sao chưa thấy giao hàng",
+        "đơn hàng gần nhất của tôi",
+        "tôi muốn tra cứu đơn hàng",
+        "shipper giao tới đâu rồi",
+        "kiểm tra tình trạng đơn hàng"
+      ]
+    },
+    {
+      "intent": "promotion_inquiry",
+      "utterances": [
+        "có khuyến mãi gì không",
+        "mã giảm giá nào đang có",
+        "có mã giảm giá không",
+        "hiện đang có chương trình khuyến mãi gì",
+        "có sale không shop",
+        "có ưu đãi gì không",
+        "có coupon giảm giá không",
+        "hôm nay có giảm giá không",
+        "cho mình xin mã giảm giá",
+        "có chương trình ưu đãi nào không",
+        "flash sale khi nào"
+      ]
+    },
+    {
+      "intent": "member_tier",
+      "utterances": [
+        "hạng thành viên là gì",
+        "tích điểm thành viên thế nào",
+        "làm sao lên hạng vip",
+        "quyền lợi thành viên vàng là gì",
+        "điểm thưởng dùng để làm gì",
+        "cách tích lũy điểm mua hàng",
+        "hạng thành viên có ưu đãi gì"
+      ]
+    },
+    {
+      "intent": "product_compare",
+      "utterances": [
+        "so sánh 2 sản phẩm giúp mình",
+        "sản phẩm nào tốt hơn",
+        "nên mua cái nào hơn",
+        "khác nhau giữa 2 mẫu này là gì",
+        "cái nào đáng mua hơn",
+        "so sánh giúp tôi 2 con card này"
       ]
     }
   ]
