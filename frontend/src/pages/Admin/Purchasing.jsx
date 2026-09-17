@@ -114,7 +114,15 @@ export default function Purchasing() {
   const [supplierFilter, setSupplierFilter] = useState('ALL');
   const [poStartDate, setPoStartDate] = useState('');
   const [poEndDate, setPoEndDate] = useState('');
-  
+
+  // RFQ và Orders có bộ giá trị trạng thái riêng biệt (xem RFQ_FILTER_STATUSES /
+  // PO_FILTER_STATUSES) — nếu không reset, chuyển tab vẫn giữ nguyên statusFilter
+  // của tab cũ (vd 'DONE' chọn ở tab Orders), khớp với 0 dòng nào ở tab RFQ và
+  // âm thầm hiện bảng rỗng mà không rõ lý do.
+  useEffect(() => {
+    setStatusFilter('ALL');
+  }, [activeTab]);
+
   // Supplier tab search
   const [supplierSearch, setSupplierSearch] = useState('');
 
@@ -1237,6 +1245,15 @@ export default function Purchasing() {
   };
   const RFQ_STAGE_STATUSES = ['RFQ', 'RFQ_SENT', 'SENT', 'QUOTED', 'PENDING_PO_DRAFT', 'CONVERTED'];
 
+  // Danh sách trạng thái cho dropdown lọc — chỉ liệt kê các giá trị mà
+  // backend thực sự gán được cho PurchaseOrder.status (xem allowedTransitions
+  // và validStatuses trong purchase.controller.js). 'PENDING_QA'/'APPROVED'
+  // trước đây có mặt ở đây nhưng không code path nào set chúng, nên lọc theo
+  // 2 giá trị đó luôn ra danh sách rỗng — nhãn lấy qua getStatusText() để
+  // luôn khớp với badge hiển thị trong bảng, tránh 2 nơi ghi text lệch nhau.
+  const RFQ_FILTER_STATUSES = ['RFQ', 'RFQ_SENT', 'QUOTED', 'PENDING_PO_DRAFT', 'CONVERTED'];
+  const PO_FILTER_STATUSES = ['QUOTED_PENDING_CEO', 'PO', 'CONFIRMED_BY_SUPPLIER', 'QA_PASSED', 'QA_PARTIAL', 'QA_REJECTED', 'RECEIVED', 'DONE', 'CANCELLED'];
+
   // Filtered orders list based on active tab & filters
   const filteredOrders = orders
     .filter(po => {
@@ -2280,28 +2297,9 @@ export default function Purchasing() {
               }}
             >
               <option value="ALL">Tất cả trạng thái ({filteredOrders.length})</option>
-              {activeTab === 'rfq' ? (
-                <>
-                  <option value="RFQ">Bản nháp (RFQ)</option>
-                  <option value="RFQ_SENT">Đã gửi NCC</option>
-                  <option value="QUOTED">NCC đã báo giá (chờ duyệt)</option>
-                  <option value="PENDING_PO_DRAFT">Đã duyệt — chờ lập phiếu</option>
-                  <option value="CONVERTED">Đã lập phiếu mua hàng</option>
-                </>
-              ) : (
-                <>
-                  <option value="QUOTED_PENDING_CEO">Chờ CEO duyệt</option>
-                  <option value="PO">Đơn mua hàng (PO)</option>
-                  <option value="CONFIRMED_BY_SUPPLIER">NCC đã xác nhận</option>
-                  <option value="PENDING_QA">Chờ nghiệm thu QC</option>
-                  <option value="QA_PASSED">QC đạt chuẩn</option>
-                  <option value="QA_PARTIAL">QC đạt một phần</option>
-                  <option value="QA_REJECTED">QC từ chối</option>
-                  <option value="RECEIVED">Đã nhận hàng</option>
-                  <option value="DONE">Hoàn tất</option>
-                  <option value="CANCELLED">Đã hủy</option>
-                </>
-              )}
+              {(activeTab === 'rfq' ? RFQ_FILTER_STATUSES : PO_FILTER_STATUSES).map(s => (
+                <option key={s} value={s}>{getStatusText(s)}</option>
+              ))}
             </select>
 
             <select
