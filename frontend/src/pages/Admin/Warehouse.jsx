@@ -5430,7 +5430,7 @@ export default function Warehouse() {
                         {/* Mã RMA */}
                         <td style={{ padding: '0.85rem 1rem', verticalAlign: 'middle' }}>
                           <span style={{ fontWeight: 800, color: '#2563eb', fontSize: '0.88rem' }}>
-                            {item.rmaCode || item.rmaNumber || item.code || (item.id ? `RET-${String(item.id).padStart(3, '0')}` : `RET-${String(index + 1).padStart(3, '0')}`)}
+                            {item.rmaCode || item.rmaNumber || item.code || (item.id ? `RET-${String(item.id).replace(/[^a-zA-Z0-9]/g, '').slice(-6).toUpperCase()}` : `RET-${String(index + 1).padStart(3, '0')}`)}
                           </span>
                         </td>
 
@@ -6703,7 +6703,7 @@ export default function Warehouse() {
         const reasonText = typeof item.reason === 'string'
           ? item.reason
           : (item.description || item.note || 'Hàng đổi trả / bảo hành');
-        const rmaNum = item.rmaCode || item.rmaNumber || item.code || (item.id ? `RET-${String(item.id).padStart(3, '0')}` : 'RET-001');
+        const rmaNum = item.rmaCode || item.rmaNumber || item.code || (item.id ? `RET-${String(item.id).replace(/[^a-zA-Z0-9]/g, '').slice(-6).toUpperCase()}` : 'RET-001');
         const ordId = item.orderId || item.orderNumber || 'N/A';
         const st = item.status || 'PENDING';
         // Warehouse may only shelve/scrap a return AFTER QC has actually

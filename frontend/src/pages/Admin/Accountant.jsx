@@ -4,7 +4,7 @@ import { useFinanceStore, useHRStore, useSalesStore } from '../../stores';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../services/api';
 import { notify, confirm } from '../../context/NotificationContext';
-import { PO_STATUS, VENDOR_BILL_STATUS, getStatusInfo } from '../../utils/statusLabels';
+import { PO_STATUS, VENDOR_BILL_STATUS, getStatusInfo, formatRmaCode } from '../../utils/statusLabels';
 import { 
   DollarSign, ArrowUpRight, ArrowDownLeft, FileText, CheckCircle, ShoppingBag,
   Search, PlusCircle, Download, X, Eye, Printer, Calendar, CreditCard, Users,
@@ -909,7 +909,7 @@ export default function Accountant() {
                       return (
                         <tr key={ret.id || rIdx} style={{ borderBottom: '1px solid #f1f5f9' }}>
                           <td style={{ padding: '0.65rem 0.85rem', fontWeight: 800, color: '#7c3aed' }}>
-                            <div>#{ret.rmaCode || `RMA-${ret.id}`}</div>
+                            <div>{formatRmaCode(ret, rIdx + 1)}</div>
                             <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>Đơn: #{ret.orderId}</span>
                           </td>
                           <td style={{ padding: '0.65rem 0.85rem' }}>
@@ -1911,7 +1911,7 @@ export default function Accountant() {
                   PHIẾU ĐỀ NGHỊ CHI HOÀN TIỀN
                 </h3>
                 <div style={{ fontSize: '0.75rem', color: '#2563eb', fontWeight: 700, marginTop: '2px' }}>
-                  Số phiếu: #PC-{viewingRefundVoucher.rmaCode || `RMA-${viewingRefundVoucher.id}`} (Đơn: #{viewingRefundVoucher.orderId})
+                  Số phiếu: {formatRmaCode(viewingRefundVoucher)} (Đơn: #{viewingRefundVoucher.orderId})
                 </div>
               </div>
               <button onClick={() => setViewingRefundVoucher(null)} style={{ background: '#f1f5f9', border: 'none', padding: '0.4rem', borderRadius: '6px', cursor: 'pointer' }}><X size={18} /></button>

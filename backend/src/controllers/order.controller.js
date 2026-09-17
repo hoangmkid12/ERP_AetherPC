@@ -1527,7 +1527,12 @@ const processRefund = async (req, res, next) => {
       // exactly what Accountant.jsx's refund flow does when a return has no
       // linked orderId). Only `id` is a real, matchable field here.
       const retReq = await prisma.returnRequest.findFirst({
-        where: { id },
+        where: {
+          OR: [
+            { id },
+            { rmaCode: id }
+          ]
+        },
         include: { order: { include: { customer: true } } }
       });
       if (retReq && retReq.order) {
@@ -1665,9 +1670,22 @@ const getReturnRequests = async (req, res, next) => {
       orderBy: { createdAt: 'desc' }
     });
 
+    const sanitizedReturns = returnRequests.map(r => {
+      let code = r.rmaCode;
+      if (!code) {
+        const dStr = new Date(r.createdAt || Date.now()).toISOString().slice(2, 10).replace(/-/g, '');
+        const idPart = String(r.id || '').replace(/[^a-zA-Z0-9]/g, '').slice(-4).toUpperCase() || '1001';
+        code = `RMA-${dStr}-${idPart}`;
+      }
+      return {
+        ...r,
+        rmaCode: code
+      };
+    });
+
     res.json({
       success: true,
-      data: returnRequests
+      data: sanitizedReturns
     });
   } catch (err) {
     next(err);

@@ -4,7 +4,7 @@ import { useSalesStore } from '../../stores';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../services/api';
 import { notify } from '../../context/NotificationContext';
-import { COMPLAINT_STATUS, RETURN_STATUS, getStatusLabel, getStatusInfo } from '../../utils/statusLabels';
+import { COMPLAINT_STATUS, RETURN_STATUS, getStatusLabel, getStatusInfo, formatRmaCode } from '../../utils/statusLabels';
 import {
   HeadphonesIcon, AlertCircle, MessageSquare, RefreshCw, CheckCircle,
   Clock, X, Plus, User, Phone, Mail, Filter, Search, 
@@ -1099,16 +1099,22 @@ export default function CustomerService() {
                               onClick={() => setSelectedReturnDetail(ret)}
                               style={{
                                 fontWeight: 800,
-                                color: '#8b5cf6',
+                                color: '#7c3aed',
+                                backgroundColor: '#f5f3ff',
+                                border: '1px solid #ede9fe',
+                                padding: '3px 8px',
+                                borderRadius: '4px',
                                 cursor: 'pointer',
                                 textDecoration: 'none',
                                 display: 'inline-flex',
                                 alignItems: 'center',
-                                gap: '0.2rem'
+                                gap: '0.2rem',
+                                fontSize: '0.8rem',
+                                letterSpacing: '0.2px'
                               }}
                               title="Bấm xem chi tiết yêu cầu đổi trả"
                             >
-                              {ret.rmaCode ? `#${ret.rmaCode}` : `#RMA-${ret.id || rIdx + 1}`}
+                              {formatRmaCode(ret, rIdx + 1)}
                             </span>
                           </td>
                           <td style={{ padding: '0.65rem 0.85rem' }}>
@@ -1479,7 +1485,7 @@ export default function CustomerService() {
               <div>
                 <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                   <RefreshCw size={20} style={{ color: '#8b5cf6' }} />
-                  <span>Hồ Sơ Đổi Trả #{selectedReturnDetail.rmaCode || `RMA-${selectedReturnDetail.id}`}</span>
+                  <span>Hồ Sơ Đổi Trả {formatRmaCode(selectedReturnDetail)}</span>
                 </h3>
                 <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Đơn hàng gốc: <strong style={{ color: '#2563eb' }}>{selectedReturnDetail.orderId}</strong></span>
               </div>

@@ -180,3 +180,22 @@ export const CHAT_SESSION_STATUS = {
   OFFLINE: { label: 'Ngoại Tuyến', color: '#64748b', bg: '#f1f5f9', border: '#cbd5e1' },
   CLOSED: { label: 'Đã Đóng', color: '#64748b', bg: '#f1f5f9', border: '#cbd5e1' }
 };
+
+/**
+ * Định dạng mã RMA chuẩn nghiệp vụ ngắn gọn, chuyên nghiệp (ví dụ #RMA-260917-4821 hoặc #RMA-A9B168)
+ * Tuyệt đối không hiển thị chuỗi UUID 36 ký tự thô ra giao diện người dùng.
+ */
+export const formatRmaCode = (ret, fallbackIndex) => {
+  if (!ret) return '';
+  const rawCode = typeof ret === 'string' ? ret : (ret.rmaCode || ret.rmaNumber || ret.code);
+  if (rawCode) {
+    const trimmed = String(rawCode).trim();
+    return trimmed.startsWith('#') ? trimmed : `#${trimmed}`;
+  }
+  const idStr = ret && ret.id ? String(ret.id).replace(/[^a-zA-Z0-9]/g, '') : '';
+  if (idStr) {
+    return `#RMA-${idStr.slice(-6).toUpperCase()}`;
+  }
+  const idx = fallbackIndex != null ? String(fallbackIndex).padStart(4, '0') : '0001';
+  return `#RMA-${idx}`;
+};
