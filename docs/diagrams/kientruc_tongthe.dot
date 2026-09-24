@@ -1,70 +1,78 @@
 // ============================================================================
-// Sơ đồ kiến trúc tổng thể hệ thống AetherPC ERP (Client - API - Database -
-// Queue Worker). Nguồn đối chiếu trực tiếp: docker-compose.yml (5 service:
-// db, redis, backend, worker, frontend), backend/src/server.js,
-// backend/src/services/websocketService.js, orderQueue.js/orderWorker.js,
-// frontend/vite.config.js.
-//
-// Lưu ý độ chính xác: enqueueOrder (orderQueue.js) hiện chỉ được gọi từ
-// backend/src/enqueue_demo.js - không có route/controller nghiệp vụ thật nào
-// gọi tới, nên luồng Backend -> Redis -> Worker được vẽ NÉT ĐỨT kèm ghi chú,
-// phân biệt với các luồng đang thực sự được dùng (nét liền).
+// Sơ đồ kiến trúc tổng thể hệ thống AetherPC.
+// Đối chiếu: docker-compose.yml (redis, backend, worker, frontend; CSDL
+// PostgreSQL chạy trên Railway, không còn container db), frontend/vite.config.js
+// (proxy /api và /ws), backend/src/server.js, services/emailService.js
+// (Resend / Brevo / Gmail SMTP), frontend/src/utils/routingService.js
+// (Goong, OSRM, Nominatim/OpenStreetMap).
+// Luồng Backend -> Redis vẽ nét đứt: enqueueOrder chỉ được gọi từ
+// backend/scripts/enqueue_demo.js, chưa gắn vào luồng tạo đơn thật.
 // ============================================================================
 digraph KienTrucTongThe {
   charset="UTF-8";
   newrank=true;
-  graph [rankdir=TB, splines=ortho, overlap=false, nodesep=0.7, ranksep=1.35,
+  graph [rankdir=TB, splines=spline, overlap=false, nodesep=0.6, ranksep=0.9,
          fontname="Arial", bgcolor=white, compound=true,
-         label="Sơ Đồ Kiến Trúc Tổng Thể Hệ Thống AetherPC ERP",
+         label="Sơ Đồ Kiến Trúc Tổng Thể Hệ Thống AetherPC",
          labelloc=t, fontsize=20, fontcolor="#111111"];
   node [shape=box, style="rounded,filled", fillcolor=white, color="#333333",
-        fontname="Arial", fontsize=11, margin="0.18,0.12"];
-  edge [color="#333333", fontname="Arial", fontsize=9, arrowsize=0.8, penwidth=0.9];
+        fontname="Arial", fontsize=11, margin="0.2,0.12"];
+  edge [color="#333333", fontname="Arial", fontsize=9.5, arrowsize=0.8, penwidth=1.0];
 
-  client [label="Trình Duyệt Người Dùng\n(Client - Browser)", shape=box, style="rounded,filled", fillcolor="#F5F5F5"];
+  // ---------- Tầng người dùng ----------
+  subgraph cluster_client {
+    label="Tầng Người Dùng (Trình Duyệt)"; fontsize=13; fontname="Arial Bold"; style=rounded; color="#666666"; margin=16;
+    u_kh  [label="Cửa Hàng Trực Tuyến\n(Khách Hàng)"];
+    u_nv  [label="Trang Quản Trị ERP\n(Nhân Viên, Ban Giám Đốc)"];
+    u_gh  [label="Ứng Dụng Giao Hàng\n(Nhân Viên Giao Hàng)"];
+    u_ncc [label="Cổng Nhà Cung Cấp\n(Nhà Cung Cấp)"];
+  }
 
+  // ---------- Máy chủ ứng dụng (Docker Compose) ----------
   subgraph cluster_compose {
-    label="Docker Compose (docker-compose.yml)";
-    fontsize=13; fontname="Arial Bold"; labelloc=t; style=dashed; color="#666666"; margin=24;
+    label="Máy Chủ Ứng Dụng (Docker Compose)"; fontsize=13; fontname="Arial Bold"; style=dashed; color="#666666"; margin=20;
 
-    subgraph cluster_frontend {
-      label="Container: frontend"; fontsize=11; fontname="Arial"; labelloc=t; style=solid; color="#888888"; margin=12;
-      frontend [label="Frontend\nReact SPA (Vite)\ncổng 3000"];
+    subgraph cluster_fe {
+      label="Giao Diện"; fontsize=11; fontname="Arial"; style=solid; color="#888888"; margin=12;
+      frontend [label="Ứng Dụng Web React\n(Vite, cổng 3000)\nChuyển tiếp /api và /ws tới máy chủ API"];
     }
 
-    subgraph cluster_backend {
-      label="Container: backend"; fontsize=11; fontname="Arial"; labelloc=t; style=solid; color="#888888"; margin=12;
-      backend [label="Backend - Express API\ncổng 5000\n(REST API + WebSocket /ws/cskh\n+ orderScheduler cron, 1 tiến trình)"];
+    subgraph cluster_be {
+      label="Máy Chủ API"; fontsize=11; fontname="Arial"; style=solid; color="#888888"; margin=12;
+      backend [label="Máy Chủ Express (cổng 5000)\n─────────────────────\nAPI REST /api/v1 + xác thực JWT, phân quyền\nKênh WebSocket /ws/cskh (chat CSKH, định vị giao hàng)\nBộ hẹn giờ tự duyệt đơn hàng\nTruy cập dữ liệu qua Prisma"];
     }
 
     subgraph cluster_worker {
-      label="Container: worker"; fontsize=11; fontname="Arial"; labelloc=t; style=solid; color="#888888"; margin=12;
-      worker [label="Worker\nnpm run queue:worker\n(BRPOP orders:queue)"];
+      label="Tiến Trình Nền"; fontsize=11; fontname="Arial"; style=solid; color="#888888"; margin=12;
+      worker [label="Bộ Xử Lý Hàng Đợi\nĐơn Hàng"];
     }
 
     subgraph cluster_redis {
-      label="Container: redis"; fontsize=11; fontname="Arial"; labelloc=t; style=solid; color="#888888"; margin=12;
-      redis [label="Redis\ncổng 6379", shape=cylinder, style=filled, fillcolor="#F5F5F5"];
-    }
-
-    subgraph cluster_db {
-      label="Container: db"; fontsize=11; fontname="Arial"; labelloc=t; style=solid; color="#888888"; margin=12;
-      db [label="PostgreSQL\ncổng 5432", shape=cylinder, style=filled, fillcolor="#F5F5F5"];
+      label="Bộ Nhớ Đệm"; fontsize=11; fontname="Arial"; style=solid; color="#888888"; margin=12;
+      redis [label="Redis\n(hàng đợi đơn hàng,\ncổng 6379)", shape=cylinder, style=filled, fillcolor="#F5F5F5"];
     }
   }
 
-  // ---------- Luồng đang thực sự được dùng (nét liền) ----------
-  client -> frontend [xlabel="tải SPA (HTTP)"];
-  client -> backend [xlabel="REST /api/* + WebSocket /ws/cskh"];
-  worker -> redis [xlabel="BRPOP orders:queue"];
-  worker -> db [xlabel="Prisma (worker)"];
-  backend -> db [xlabel="Prisma (backend)"];
+  // ---------- Dịch vụ đám mây & bên ngoài ----------
+  subgraph cluster_cloud {
+    label="Dịch Vụ Đám Mây & Bên Ngoài"; fontsize=13; fontname="Arial Bold"; style=rounded; color="#666666"; margin=16;
+    db    [label="Cơ Sở Dữ Liệu PostgreSQL\n(Railway)", shape=cylinder, style=filled, fillcolor="#F5F5F5"];
+    email [label="Dịch Vụ Gửi Email\n(Resend / Brevo / Gmail SMTP)"];
+    maps  [label="Dịch Vụ Bản Đồ & Chỉ Đường\n(Goong, OSRM, OpenStreetMap)"];
+  }
 
-  // ---------- Luồng đã triển khai hạ tầng nhưng CHƯA gọi từ nghiệp vụ thật ----------
-  backend -> redis [xlabel="enqueueOrder *", style=dashed, color="#999999", arrowhead=vee];
+  { rank=same; u_kh; u_nv; u_gh; u_ncc; }
+  { rank=same; worker; redis; }
 
-  footnote [shape=plaintext, fontsize=10, fontcolor="#555555",
-            label="* Đường nét đứt: enqueueOrder (orderQueue.js) hiện chỉ được gọi từ backend/src/enqueue_demo.js,\nchưa có route/controller nghiệp vụ thật nào gọi tới - hạ tầng hàng đợi đã triển khai nhưng chưa gắn vào luồng tạo đơn."];
-  db -> footnote [style=invis];
-  redis -> footnote [style=invis];
+  u_kh  -> frontend;
+  u_nv  -> frontend;
+  u_gh  -> frontend;
+  u_ncc -> frontend;
+  frontend -> backend [label="Gọi API REST\n+ WebSocket"];
+  backend  -> db      [label="Đọc / ghi dữ liệu"];
+  worker   -> db      [label="Cập nhật đơn hàng"];
+  redis    -> worker  [label=" Lấy đơn\n cần xử lý", dir=back];
+  backend  -> redis   [label="Đẩy đơn vào hàng đợi\n(chưa sử dụng)", style=dashed, color="#888888"];
+  backend  -> email   [label="Gửi email\nthông báo đơn hàng"];
+  u_gh     -> maps    [label="Tải bản đồ,\ntìm đường giao hàng"];
 }
