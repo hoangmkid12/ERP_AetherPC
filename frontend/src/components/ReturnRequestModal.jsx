@@ -35,6 +35,11 @@ export default function ReturnRequestModal({ show, onClose, order }) {
   const handleFileUpload = (e) => {
     const file = e.target.files?.[0];
     if (file) {
+      if (file.size > 8 * 1024 * 1024) {
+        setErrorMsg('Ảnh đính kèm quá lớn (tối đa 8MB). Vui lòng chọn ảnh khác.');
+        return;
+      }
+      setErrorMsg('');
       const reader = new FileReader();
       reader.onload = (uploadEvent) => {
         setEvidenceUrl(uploadEvent.target.result);
@@ -65,6 +70,8 @@ export default function ReturnRequestModal({ show, onClose, order }) {
       reason,
       description,
       evidenceUrl,
+      image: evidenceUrl,
+      evidence: evidenceUrl,
       type: returnType,
       refundAmount: parseFloat(order.totalAmount || order.total || 0),
       bankName: returnType === 'REFUND' ? bankName : '',
@@ -246,9 +253,21 @@ export default function ReturnRequestModal({ show, onClose, order }) {
               </label>
             </div>
             {evidenceUrl && (
-              <div style={{ marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <img src={evidenceUrl} alt="Minh chứng lỗi" style={{ width: '50px', height: '50px', objectFit: 'cover', borderRadius: '4px', border: '1px solid #cbd5e1' }} />
-                <span style={{ fontSize: '0.75rem', color: '#16a34a', fontWeight: 700 }}>✓ Đã đính kèm ảnh minh chứng</span>
+              <div style={{ marginTop: '0.6rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.5rem 0.75rem', backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                  <img src={evidenceUrl} alt="Minh chứng lỗi" style={{ width: '52px', height: '52px', objectFit: 'cover', borderRadius: '6px', border: '1.5px solid #86efac' }} />
+                  <div>
+                    <span style={{ fontSize: '0.78rem', color: '#15803d', fontWeight: 700, display: 'block' }}>✓ Đã tải ảnh minh chứng</span>
+                    <span style={{ fontSize: '0.7rem', color: '#64748b' }}>CSKH và Kỹ thuật QC sẽ xem ảnh này khi thẩm định</span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEvidenceUrl('')}
+                  style={{ background: '#ffffff', border: '1px solid #fca5a5', borderRadius: '6px', padding: '4px 8px', fontSize: '0.72rem', color: '#dc2626', fontWeight: 700, cursor: 'pointer' }}
+                >
+                  Gỡ ảnh
+                </button>
               </div>
             )}
           </div>

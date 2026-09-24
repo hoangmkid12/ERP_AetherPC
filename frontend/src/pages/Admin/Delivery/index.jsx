@@ -19,7 +19,8 @@ import ReturnProofModal from './components/ReturnProofModal';
 import OrderDetailSheet from './components/OrderDetailSheet';
 import DeliveryNavigationModal from './components/DeliveryNavigationModal';
 import RejectAssignmentSheet from './components/RejectAssignmentSheet';
-import { getDeliveryIncidentStatus } from './deliveryHelpers';
+import NextOrderPromptModal from './components/NextOrderPromptModal';
+import { getDeliveryIncidentStatus, getDefaultDateFilter, matchesDateFilter, getOrderDateTime, getDateFilterLabel } from './deliveryHelpers';
 
 // Refetch orders/returns while the tab is visible, paused otherwise.
 const POLL_INTERVAL_MS = 35000;
@@ -172,17 +173,14 @@ export default function Delivery() {
   const [regionFilter, setRegionFilter] = useState('ALL');
   const [paymentFilter, setPaymentFilter] = useState('ALL');
   const [incidentFilter, setIncidentFilter] = useState('ALL');
-  const [dateFilterPeriod, setDateFilterPeriod] = useState('ALL');
-  const [customStartDate, setCustomStartDate] = useState('');
-  const [customEndDate, setCustomEndDate] = useState('');
+  // Mặc định lọc đơn hàng là ngày realtime (Hôm nay)
+  const [orderDateFilter, setOrderDateFilter] = useState(getDefaultDateFilter);
   const [sortOrder, setSortOrder] = useState('NEWEST');
   const [selectedOrder, setSelectedOrder] = useState(null);
 
-  // RMA Pickup Tab Filters State
+  // RMA Pickup Tab Filters State (Mặc định lọc trả hàng là ngày realtime Hôm nay)
   const [rmaSearch, setRmaSearch] = useState('');
-  const [rmaDateFilter, setRmaDateFilter] = useState('ALL');
-  const [rmaCustomStartDate, setRmaCustomStartDate] = useState('');
-  const [rmaCustomEndDate, setRmaCustomEndDate] = useState('');
+  const [rmaDateFilter, setRmaDateFilter] = useState(getDefaultDateFilter);
   const [rmaStatusFilter, setRmaStatusFilter] = useState('ALL');
 
   const getTimeAgo = (dateStr) => {
@@ -327,7 +325,7 @@ export default function Delivery() {
     .reduce((sum, o) => sum + (o.paymentMethod === 'COD' || !o.paymentMethod ? (parseFloat(o.totalAmount || o.total || 0)) : 0), 0);
 
   const pendingReturns = allReturnRequests.filter(r => {
-    const isRmaStatus = ['PENDING', 'RETURN_APPROVED', 'RETURNING_TO_WAREHOUSE', 'RETURN_REQUESTED', 'DELIVERED_TO_WAREHOUSE', 'PROCESSING'].includes(r.status);
+    const isRmaStatus = ['PENDING', 'RETURN_APPROVED', 'RETURNING_TO_WAREHOUSE', 'RETURN_REQUESTED', 'DELIVERED_TO_WAREHOUSE', 'PROCESSING', 'REJECTED', 'RETURNING_TO_CUSTOMER', 'RETURNED_TO_CUSTOMER'].includes(r.status);
     if (!isRmaStatus) return false;
 
     if (isManagerOrAdmin) return true;
@@ -380,46 +378,10 @@ export default function Delivery() {
       if (incidentFilter === 'REJECTED' && !incidentState.isRejected) return false;
       if (incidentFilter === 'RETURNING' && !incidentState.isReturning) return false;
 
-      const getOrderDateTime = (ord) => {
-        const dateVal = ord.deliveredAt || ord.shippedAt || ord.updatedAt || ord.createdAt || ord.packedAt || ord.date;
-        if (!dateVal) return null;
-        const d = new Date(dateVal);
-        return isNaN(d.getTime()) ? null : d;
-      };
-
       const ordDate = getOrderDateTime(o);
-      if (dateFilterPeriod !== 'ALL' && ordDate) {
-        const now = new Date();
-        const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
-        const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
-
-        if (dateFilterPeriod === 'TODAY') {
-          if (ordDate < startOfToday || ordDate > endOfToday) return false;
-        } else if (dateFilterPeriod === 'YESTERDAY') {
-          const startOfYesterday = new Date(startOfToday);
-          startOfYesterday.setDate(startOfYesterday.getDate() - 1);
-          const endOfYesterday = new Date(endOfToday);
-          endOfYesterday.setDate(endOfYesterday.getDate() - 1);
-          if (ordDate < startOfYesterday || ordDate > endOfYesterday) return false;
-        } else if (dateFilterPeriod === 'LAST_7_DAYS') {
-          const past7 = new Date(startOfToday);
-          past7.setDate(past7.getDate() - 7);
-          if (ordDate < past7 || ordDate > endOfToday) return false;
-        } else if (dateFilterPeriod === 'LAST_30_DAYS') {
-          const past30 = new Date(startOfToday);
-          past30.setDate(past30.getDate() - 30);
-          if (ordDate < past30 || ordDate > endOfToday) return false;
-        } else if (dateFilterPeriod === 'CUSTOM') {
-          if (customStartDate) {
-            const fromD = new Date(customStartDate);
-            if (!isNaN(fromD.getTime()) && ordDate < fromD) return false;
-          }
-          if (customEndDate) {
-            const toD = new Date(customEndDate);
-            toD.setHours(23, 59, 59, 999);
-            if (!isNaN(toD.getTime()) && ordDate > toD) return false;
-          }
-        }
+      // Khi chọn xem "Đơn Tồn" (BACKLOG), không ép lọc theo ngày hiện tại để người dùng xem được danh sách đơn cũ
+      if (incidentFilter !== 'BACKLOG') {
+        if (!matchesDateFilter(ordDate, orderDateFilter)) return false;
       }
 
       const matchesShipper = isShipperMatched(o);
@@ -452,7 +414,7 @@ export default function Delivery() {
       return 0;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [myDeliveryOrders, search, regionFilter, paymentFilter, incidentFilter, dateFilterPeriod, customStartDate, customEndDate, sortOrder, activeTab, userIdStr, isManagerOrAdmin, user]);
+  }, [myDeliveryOrders, search, regionFilter, paymentFilter, incidentFilter, orderDateFilter, sortOrder, activeTab, userIdStr, isManagerOrAdmin, user]);
 
   const handleClaimOrder = async (orderId) => {
     const sId = user?.id || user?.username || 'SHIPPER';
@@ -689,6 +651,44 @@ export default function Delivery() {
     }
   };
 
+  const handleRedeliverPickup = async (ret) => {
+    if (!isManagerOrAdmin) {
+      const matchedOrder = orders.find(o => String(o.orderId || o.id) === String(ret.orderId));
+      if (matchedOrder && !isShipperMatched(matchedOrder)) {
+        notify(`Chỉ Shipper phụ trách đơn #${ret.orderId} mới có quyền nhận hàng trả lại cho khách!`, 'error');
+        return;
+      }
+    }
+    try {
+      await updateReturnStatus(ret.id, 'RETURNING_TO_CUSTOMER', {
+        note: `Shipper ${user?.fullname || user?.username} đã nhận kiện hàng bị QC từ chối từ kho, đang vận chuyển trả khách.`
+      });
+      setApiReturns(prev => prev.map(item => item.id === ret.id ? { ...item, status: 'RETURNING_TO_CUSTOMER' } : item));
+      addNotification('Đã nhận hàng từ kho! Đang trên đường giao trả cho khách hàng.', 'success');
+    } catch (err) {
+      addNotification(`Không thể nhận hàng trả: ${err.message || 'lỗi kết nối'}.`, 'error');
+    }
+  };
+
+  const handleRedeliverComplete = async (ret) => {
+    if (!isManagerOrAdmin) {
+      const matchedOrder = orders.find(o => String(o.orderId || o.id) === String(ret.orderId));
+      if (matchedOrder && !isShipperMatched(matchedOrder)) {
+        notify(`Chỉ Shipper phụ trách đơn #${ret.orderId} mới có quyền xác nhận hoàn trả!`, 'error');
+        return;
+      }
+    }
+    try {
+      await updateReturnStatus(ret.id, 'RETURNED_TO_CUSTOMER', {
+        note: `Shipper ${user?.fullname || user?.username} đã giao trả kiện hàng bị từ chối tận tay khách hàng thành công.`
+      });
+      setApiReturns(prev => prev.map(item => item.id === ret.id ? { ...item, status: 'RETURNED_TO_CUSTOMER' } : item));
+      addNotification('Đã xác nhận hoàn trả kiện hàng cho khách thành công!', 'success');
+    } catch (err) {
+      addNotification(`Không thể cập nhật hoàn trả: ${err.message || 'lỗi kết nối'}.`, 'error');
+    }
+  };
+
   // ─── Live GPS Tracking (Shipper phát vị trí cho Khách hàng theo dõi) ───
   const [gpsOrderId, setGpsOrderId] = useState(() => {
     try {
@@ -699,6 +699,9 @@ export default function Delivery() {
   });
   const [simulatingOrderId, setSimulatingOrderId] = useState(null);
   const [navigationModalOrder, setNavigationModalOrder] = useState(null);
+  const [optimizedRouteQueue, setOptimizedRouteQueue] = useState(null); // null | [{orderId, ...}]
+  const [currentRouteOrigin, setCurrentRouteOrigin] = useState(null); // null | { originMode: 'gps'|'manual'|'warehouse', originCoord: {lat, lng, name, address} }
+  const [nextRouteOrderPrompt, setNextRouteOrderPrompt] = useState(null); // null | {deliveredOrder, nextOrder, remainingCount}
   // Màn hình "Bắt Đầu Giao" giờ hiện cùng lúc với thanh tab dưới cùng (không
   // còn là modal fixed che hết nữa) nên khi Shipper bấm sang tab khác (Tổng
   // Quan/Chờ Nhận/...) — đổi activeTab qua URL, xử lý ở DeliveryAppShell,
@@ -711,6 +714,22 @@ export default function Delivery() {
       setNavigationModalOrder(null);
     }
   }, [activeTab]);
+
+  // Khi Shipper bấm "Bắt đầu ca giao" từ RouteOptimizerPanel,
+  // mở ngay DeliveryNavigationModal cho đơn đầu tiên và lưu hàng đợi các đơn còn lại kèm thông tin điểm xuất phát.
+  const handleStartOptimized = (optimizedRoute, originInfo = null) => {
+    if (!optimizedRoute || optimizedRoute.length === 0) return;
+    setOptimizedRouteQueue(optimizedRoute);
+    if (originInfo) {
+      setCurrentRouteOrigin(originInfo);
+    }
+    // Tìm object đơn hàng đầu tiên trong orders thực tế (có đủ fields để render modal)
+    const firstStop = optimizedRoute[0];
+    const firstOrder = orders.find(o => (o.orderId || o.id) === firstStop.orderId);
+    if (firstOrder) {
+      setNavigationModalOrder(firstOrder);
+    }
+  };
   const gpsSocketRef = useRef(null);
   const watchIdRef = useRef(null);
   const lastSentAtRef = useRef(0);
@@ -749,7 +768,15 @@ export default function Delivery() {
   }, [closeGpsSocket]);
 
   const sendLocation = (orderId, coords) => {
-    const payload = { orderId, lat: coords.lat, lng: coords.lng, speed: coords.speed ?? null, heading: coords.heading ?? null };
+    const payload = {
+      orderId,
+      lat: coords.lat,
+      lng: coords.lng,
+      speed: coords.speed ?? null,
+      heading: coords.heading ?? null,
+      originType: currentRouteOrigin?.originMode || 'warehouse',
+      originCoord: currentRouteOrigin?.originCoord || null
+    };
     const ws = gpsSocketRef.current;
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({ type: 'SHIPPER_UPDATE_LOCATION', payload }));
@@ -760,7 +787,7 @@ export default function Delivery() {
     }
   };
 
-  const startGps = (orderId, initialCoords = null, isSilent = false) => {
+  const startGps = (orderId, initialCoords = null, isSilent = false, originType = 'warehouse') => {
     if (!navigator.geolocation) {
       if (!isSilent) addNotification('Trình duyệt này không hỗ trợ định vị GPS.', 'error');
       return;
@@ -773,7 +800,14 @@ export default function Delivery() {
     const ws = openWsConnection();
     gpsSocketRef.current = ws;
     ws.onopen = () => {
-      ws.send(JSON.stringify({ type: 'SHIPPER_JOIN_DELIVERY', payload: { orderId } }));
+      ws.send(JSON.stringify({
+        type: 'SHIPPER_JOIN_DELIVERY',
+        payload: {
+          orderId,
+          originType: originType || currentRouteOrigin?.originMode || 'warehouse',
+          originCoord: initialCoords || currentRouteOrigin?.originCoord || null
+        }
+      }));
     };
     ws.onmessage = (evt) => {
       try {
@@ -943,16 +977,20 @@ export default function Delivery() {
   };
 
   const handleStartDeliveryWithGps = async (ord, initialCoords = null) => {
-    const orderId = String(ord.orderId || ord.id);
+    const orderId = String(ord?.orderId || ord?.id || '');
+    if (!orderId) return;
+    if (gpsOrderId && gpsOrderId !== orderId) stopGps();
+    const effectiveOriginCoord = initialCoords || currentRouteOrigin?.originCoord;
+    const effectiveOriginMode = currentRouteOrigin?.originMode || (effectiveOriginCoord ? 'manual' : 'warehouse');
     const nowIso = new Date().toISOString();
     const payload = {
       status: 'SHIPPED',
       note: 'Shipper đã xuất phát giao hàng — Bật live GPS thời gian thực',
       shippedAt: nowIso
     };
-    if (initialCoords && typeof initialCoords.lat === 'number') {
-      payload.lat = initialCoords.lat;
-      payload.lng = initialCoords.lng;
+    if (effectiveOriginCoord && typeof effectiveOriginCoord.lat === 'number') {
+      payload.lat = effectiveOriginCoord.lat;
+      payload.lng = effectiveOriginCoord.lng;
     }
 
     try {
@@ -970,16 +1008,18 @@ export default function Delivery() {
     }
 
     // Nếu có tọa độ tức thời, bắn ngay lập tức tới endpoint REST fallback
-    if (initialCoords && typeof initialCoords.lat === 'number') {
+    if (effectiveOriginCoord && typeof effectiveOriginCoord.lat === 'number') {
       api.post(`/orders/${orderId}/location`, {
-        lat: initialCoords.lat,
-        lng: initialCoords.lng,
-        speed: initialCoords.speed ?? null,
-        heading: initialCoords.heading ?? null
+        lat: effectiveOriginCoord.lat,
+        lng: effectiveOriginCoord.lng,
+        speed: effectiveOriginCoord.speed ?? null,
+        heading: effectiveOriginCoord.heading ?? null,
+        originType: effectiveOriginMode,
+        originCoord: effectiveOriginCoord
       }).catch(() => {});
     }
 
-    startGps(orderId, initialCoords);
+    startGps(orderId, effectiveOriginCoord, false, effectiveOriginMode);
     addNotification(`Đã xác nhận bắt đầu giao đơn #${orderId}! GPS thực tế đang được phát sóng trực tiếp tới khách hàng.`, 'success');
   };
 
@@ -1003,9 +1043,13 @@ export default function Delivery() {
     regionFilter, setRegionFilter,
     paymentFilter, setPaymentFilter,
     incidentFilter, setIncidentFilter,
-    dateFilterPeriod, setDateFilterPeriod,
-    customStartDate, setCustomStartDate,
-    customEndDate, setCustomEndDate,
+    orderDateFilter, setOrderDateFilter,
+    dateFilterPeriod: orderDateFilter.period,
+    setDateFilterPeriod: (p) => setOrderDateFilter(prev => ({ ...prev, period: p })),
+    customStartDate: orderDateFilter.customStartDate,
+    setCustomStartDate: (d) => setOrderDateFilter(prev => ({ ...prev, customStartDate: d })),
+    customEndDate: orderDateFilter.customEndDate,
+    setCustomEndDate: (d) => setOrderDateFilter(prev => ({ ...prev, customEndDate: d })),
     sortOrder, setSortOrder
   };
 
@@ -1032,7 +1076,13 @@ export default function Delivery() {
         <DeliveryNavigationModal
           order={navigationModalOrder}
           user={user}
-          warehouse={getOriginForRegion(navigationModalOrder.deliveryRegion || detectDeliveryRegion(navigationModalOrder.shippingAddress || navigationModalOrder.address || ''))}
+          warehouse={
+            currentRouteOrigin?.originCoord?.lat && currentRouteOrigin?.originCoord?.lng
+              ? currentRouteOrigin.originCoord
+              : getOriginForRegion(navigationModalOrder.deliveryRegion || detectDeliveryRegion(navigationModalOrder.shippingAddress || navigationModalOrder.address || ''))
+          }
+          originType={currentRouteOrigin?.originMode || 'warehouse'}
+          originCoord={currentRouteOrigin?.originCoord}
           destination={{
             ...(REGION_COORDS[navigationModalOrder.deliveryRegion || detectDeliveryRegion(navigationModalOrder.shippingAddress || navigationModalOrder.address || '')] || REGION_COORDS.ALL),
             label: navigationModalOrder.shippingAddress || navigationModalOrder.address || 'Địa chỉ nhận hàng'
@@ -1042,6 +1092,28 @@ export default function Delivery() {
           onStopGps={stopGps}
           onConfirmDelivered={(payload) => {
             handleConfirmDelivered(navigationModalOrder, payload);
+
+            // Nếu đang đi theo lộ trình tối ưu và còn đơn tiếp theo trong hàng đợi
+            if (optimizedRouteQueue && optimizedRouteQueue.length > 1) {
+              const currentId = String(navigationModalOrder.orderId || navigationModalOrder.id);
+              const remainingQueue = optimizedRouteQueue.filter(item => String(item.orderId) !== currentId);
+              setOptimizedRouteQueue(remainingQueue);
+
+              const nextStop = remainingQueue[0];
+              const nextOrder = orders.find(o => String(o.orderId || o.id) === String(nextStop?.orderId));
+
+              if (nextOrder) {
+                setNextRouteOrderPrompt({
+                  deliveredOrder: navigationModalOrder,
+                  nextOrder: nextOrder,
+                  remainingCount: remainingQueue.length
+                });
+                setNavigationModalOrder(null);
+                return;
+              }
+            }
+
+            setOptimizedRouteQueue(null);
             setNavigationModalOrder(null);
           }}
           onReject={(ord) => {
@@ -1057,7 +1129,9 @@ export default function Delivery() {
         <OverviewTab
           fmt={fmt}
           orders={orders}
+          myDeliveryOrders={myDeliveryOrders}
           pendingReturns={pendingReturns}
+          isShipperMatched={isShipperMatched}
           readyCount={readyCount}
           activeCount={activeCount}
           doneCount={doneCount}
@@ -1097,6 +1171,7 @@ export default function Delivery() {
           onGoToPending={() => setTab('pending')}
           gpsOrderId={gpsOrderId}
           simulatingOrderId={simulatingOrderId}
+          onStartOptimized={handleStartOptimized}
         />
       )}
 
@@ -1109,14 +1184,12 @@ export default function Delivery() {
           setRmaSearch={setRmaSearch}
           rmaDateFilter={rmaDateFilter}
           setRmaDateFilter={setRmaDateFilter}
-          rmaCustomStartDate={rmaCustomStartDate}
-          setRmaCustomStartDate={setRmaCustomStartDate}
-          rmaCustomEndDate={rmaCustomEndDate}
-          setRmaCustomEndDate={setRmaCustomEndDate}
           rmaStatusFilter={rmaStatusFilter}
           setRmaStatusFilter={setRmaStatusFilter}
           onPickup={handleReturnPickedUp}
           onDeliverWarehouse={handleReturnDeliveredToWarehouse}
+          onRedeliverPickup={handleRedeliverPickup}
+          onRedeliverComplete={handleRedeliverComplete}
           pullHandlers={pullHandlers}
           isRefreshing={isRefreshing}
           pullDistance={pullDistance}
@@ -1185,6 +1258,23 @@ export default function Delivery() {
           actions={{
             onDeliver: setDeliverModal,
             onFail: setFailModal
+          }}
+        />
+      )}
+
+      {/* Modal chuyển tiếp mượt mà sang đơn tiếp theo theo lộ trình */}
+      {nextRouteOrderPrompt && (
+        <NextOrderPromptModal
+          deliveredOrder={nextRouteOrderPrompt.deliveredOrder}
+          nextOrder={nextRouteOrderPrompt.nextOrder}
+          remainingCount={nextRouteOrderPrompt.remainingCount}
+          onContinue={() => {
+            setNavigationModalOrder(nextRouteOrderPrompt.nextOrder);
+            setNextRouteOrderPrompt(null);
+          }}
+          onBackToList={() => {
+            setNextRouteOrderPrompt(null);
+            setOptimizedRouteQueue(null);
           }}
         />
       )}

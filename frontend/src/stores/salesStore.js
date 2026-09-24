@@ -107,11 +107,22 @@ export const useSalesStore = create((set, get) => ({
           return oid && !apiIds.has(oid) && isNew;
         });
 
-        const merged = [...localOnlyOrders, ...apiOrders];
+        const now = Date.now();
+        const fortyEightHoursMs = 48 * 60 * 60 * 1000;
+        const processed = merged.map(o => {
+          if (o.status === 'DELIVERED') {
+            const deliveredAtTime = o.deliveredAt ? new Date(o.deliveredAt).getTime() : (o.date ? new Date(o.date).getTime() : null);
+            if (deliveredAtTime && (now - deliveredAtTime >= fortyEightHoursMs)) {
+              return { ...o, status: 'COMPLETED', paymentStatus: 'PAID' };
+            }
+          }
+          return o;
+        });
+
         try {
-          localStorage.setItem(STORAGE_KEYS.orders, JSON.stringify(merged));
+          localStorage.setItem(STORAGE_KEYS.orders, JSON.stringify(processed));
         } catch (e) {}
-        return { orders: merged };
+        return { orders: processed };
       });
 
       return apiOrders;
@@ -162,10 +173,12 @@ export const useSalesStore = create((set, get) => ({
 
       const merged = Array.from(map.values()).map(r => {
         const linkedOrder = r.orderId ? orderMap.get(String(r.orderId)) : null;
+        const proof = r.evidenceUrl || r.evidence_url || r.image || r.evidence || '';
+        const item = { ...r, evidenceUrl: proof, image: proof };
         if (linkedOrder && (linkedOrder.paymentStatus === 'REFUNDED' || linkedOrder.status === 'REFUNDED')) {
-          return { ...r, status: 'REFUNDED' };
+          return { ...item, status: 'REFUNDED' };
         }
-        return r;
+        return item;
       });
       set({ returnRequests: merged });
       try {
@@ -424,6 +437,37 @@ export const useSalesStore = create((set, get) => ({
   },
 
   /**
+   * Khách hàng xác nhận đã nhận được hàng -> chuyển sang COMPLETED
+   */
+  confirmReceivedOrder: async (orderId, note = null) => {
+    try {
+      await api.post(`/orders/${orderId}/confirm-received`, { note });
+    } catch (err) {
+      console.warn('[SalesStore] confirmReceivedOrder API warning:', err.message);
+    }
+
+    set(state => {
+      const orders = (state.orders || []).map(o => {
+        if (String(o.orderId) === String(orderId) || String(o.id) === String(orderId)) {
+          return {
+            ...o,
+            status: 'COMPLETED',
+            paymentStatus: 'PAID',
+            completedAt: new Date().toISOString()
+          };
+        }
+        return o;
+      });
+      try {
+        localStorage.setItem(STORAGE_KEYS.orders, JSON.stringify(orders));
+      } catch (e) {}
+      return { orders };
+    });
+
+    return { success: true };
+  },
+
+  /**
    * Claim order for delivery
    */
   claimOrderForDelivery: async (orderId, shipperUser) => {
@@ -512,13 +556,16 @@ export const useSalesStore = create((set, get) => ({
 
     const determinedStatus = apiReturn?.status || returnData.status || 'PENDING';
 
+    const finalProof = returnData.evidenceUrl || returnData.image || returnData.evidence || apiReturn?.evidenceUrl || apiReturn?.image || '';
     const newReturn = {
       id: apiReturn?.id || returnData.id || `RMA-${Date.now().toString().slice(-6)}`,
       createdAt: apiReturn?.createdAt || new Date().toISOString(),
       status: determinedStatus,
       type: returnData.type || 'REFUND',
       ...returnData,
-      ...(apiReturn || {})
+      ...(apiReturn || {}),
+      evidenceUrl: finalProof,
+      image: finalProof
     };
 
     set(state => {
@@ -646,7 +693,9 @@ export const useSalesStore = create((set, get) => ({
           'RESTOCKED': 'RESTOCKED',
           'EXCHANGED': 'EXCHANGED',
           'REFUNDED': 'REFUNDED',
-          'REJECTED': 'DELIVERED'
+          'REJECTED': 'REJECTED',
+          'RETURNING_TO_CUSTOMER': 'RETURNING_TO_CUSTOMER',
+          'RETURNED_TO_CUSTOMER': 'DELIVERED'
         };
         const mappedOrderStatus = orderStatusMap[status];
         if (mappedOrderStatus) {
@@ -665,13 +714,19 @@ export const useSalesStore = create((set, get) => ({
     if (status === 'RETURN_APPROVED') {
       await api.patch(`/orders/returns/${targetApiId}/review`, { decision: 'APPROVE', note: extraObj.note });
     } else if (status === 'REJECTED') {
-      await api.patch(`/orders/returns/${targetApiId}/review`, { decision: 'REJECT', rejectReason: extraObj.note || extraObj.reason });
+      if (extraObj.qcDecision || extraObj.qcProofPhoto || extraObj.qcDefectType || extraObj.actualSerial) {
+        await api.patch(`/orders/returns/${targetApiId}/qc-inspect`, extraObj);
+      } else {
+        await api.patch(`/orders/returns/${targetApiId}/review`, { decision: 'REJECT', rejectReason: extraObj.note || extraObj.reason });
+      }
     } else if (status === 'RETURNING_TO_WAREHOUSE') {
       await api.patch(`/orders/returns/${targetApiId}/pickup`, extraObj);
     } else if (status === 'DELIVERED_TO_WAREHOUSE') {
       await api.patch(`/orders/returns/${targetApiId}/deliver-warehouse`, extraObj);
     } else if (status === 'QC_PASSED') {
       await api.patch(`/orders/returns/${targetApiId}/qc-inspect`, extraObj);
+    } else if (status === 'RETURNING_TO_CUSTOMER' || status === 'RETURNED_TO_CUSTOMER') {
+      await api.patch(`/orders/returns/${targetApiId}/redeliver`, { status, ...extraObj });
     } else if (['RESTOCKED', 'EXCHANGED', 'VENDOR_WARRANTY', 'INSPECTED_SCRAP'].includes(status)) {
       await api.patch(`/orders/returns/${targetApiId}/restock`, extraObj);
     } else if (status === 'REFUNDED') {

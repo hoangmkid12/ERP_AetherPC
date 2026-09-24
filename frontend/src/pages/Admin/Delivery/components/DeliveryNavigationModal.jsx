@@ -122,9 +122,15 @@ export default function DeliveryNavigationModal({
     return () => { isMounted = false; };
   }, [address]);
 
-  const googleMapsUrl = exactDestination?.lat && exactDestination?.lng
-    ? `https://www.google.com/maps/dir/?api=1&destination=${exactDestination.lat},${exactDestination.lng}&travelmode=driving`
-    : `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(address)}&travelmode=driving`;
+  const googleMapsUrl = (() => {
+    const dest = (exactDestination?.lat && exactDestination?.lng)
+      ? `${exactDestination.lat},${exactDestination.lng}`
+      : encodeURIComponent(address);
+    const originParam = (shipperLoc?.lat && shipperLoc?.lng)
+      ? `&origin=${shipperLoc.lat},${shipperLoc.lng}`
+      : '';
+    return `https://www.google.com/maps/dir/?api=1${originParam}&destination=${dest}&travelmode=driving`;
+  })();
 
   // 1. Khởi tạo bản đồ goong-js
   const styleReadyRef = useRef(false);
@@ -462,6 +468,36 @@ export default function DeliveryNavigationModal({
       <div style={{ position: 'relative', height: '280px' }}>
         <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
 
+        {/* Nút nổi mở Google Maps trực tiếp trên bản đồ */}
+        <a
+          href={googleMapsUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          title="Mở Google Maps để nghe chỉ đường bằng giọng nói"
+          style={{
+            position: 'absolute',
+            top: '10px',
+            left: '10px',
+            zIndex: 999,
+            backgroundColor: '#ffffff',
+            color: '#1a73e8',
+            textDecoration: 'none',
+            padding: '7px 12px',
+            borderRadius: '999px',
+            fontSize: '0.74rem',
+            fontWeight: 800,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.4rem',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
+            border: '1.5px solid rgba(26,115,232,0.25)'
+          }}
+        >
+          <Navigation size={13} style={{ transform: 'rotate(45deg)' }} />
+          <span>Google Maps</span>
+          <ExternalLink size={12} />
+        </a>
+
         {/* Nút căn góc nhìn — tròn tối giản, nhất quán với DeliveryMap.jsx */}
         <button
           type="button"
@@ -548,6 +584,42 @@ export default function DeliveryNavigationModal({
           <Gauge size={16} color="#7c3aed" />
           {speedKmh > 0 ? `${speedKmh} km/h` : 'Đang dừng'}
         </div>
+      </div>
+
+      {/* Nút Mở Google Maps Dẫn Đường Giọng Nói — To, nổi bật, dễ bấm bằng 1 ngón tay khi đang đi xe */}
+      <div style={{ padding: '0.75rem 1rem 0', backgroundColor: 'var(--bg-app)' }}>
+        <a
+          href={googleMapsUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '0.6rem',
+            padding: '0.75rem 1rem',
+            borderRadius: 'var(--radius-md)',
+            background: 'linear-gradient(135deg, #1a73e8 0%, #1557b0 100%)',
+            color: '#ffffff',
+            textDecoration: 'none',
+            fontWeight: 800,
+            fontSize: '0.86rem',
+            boxShadow: '0 3px 12px rgba(26,115,232,0.35)',
+            border: 'none',
+            cursor: 'pointer'
+          }}
+        >
+          <div style={{
+            width: 26, height: 26, borderRadius: '50%', backgroundColor: '#ffffff',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+          }}>
+            <Navigation size={15} color="#1a73e8" style={{ transform: 'rotate(45deg)' }} />
+          </div>
+          <span style={{ flex: 1, textAlign: 'center' }}>
+            🧭 Mở Google Maps Dẫn Đường Giọng Nói
+          </span>
+          <ExternalLink size={15} style={{ opacity: 0.85 }} />
+        </a>
       </div>
 
       {/* Cảnh báo nếu chưa có toạ độ thực tế */}

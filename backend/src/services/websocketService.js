@@ -376,7 +376,7 @@ const handleTrackingMessage = async (ws, data) => {
 
   try {
     if (type === 'SHIPPER_JOIN_DELIVERY') {
-      const { orderId } = payload || {};
+      const { orderId, originType, originCoord } = payload || {};
       if (!orderId) return;
       ws._shipperOrderId = String(orderId);
 
@@ -406,15 +406,26 @@ const handleTrackingMessage = async (ws, data) => {
           return ws.send(JSON.stringify({ type: 'ERROR', message: 'Bạn không phải Shipper được giao đơn này.' }));
         }
       }
+
+      if (originType || originCoord) {
+        const existing = activeDeliveries.get(String(orderId)) || {};
+        activeDeliveries.set(String(orderId), {
+          ...existing,
+          originType: originType || existing.originType || 'warehouse',
+          originCoord: originCoord || existing.originCoord || null,
+          updatedAt: new Date()
+        });
+      }
+
       ws.send(JSON.stringify({ type: 'SHIPPER_JOIN_ACK', orderId }));
     }
     else if (type === 'SHIPPER_UPDATE_LOCATION') {
-      const { orderId, lat, lng, speed, heading } = payload || {};
+      const { orderId, lat, lng, speed, heading, originType, originCoord } = payload || {};
       if (!orderId || typeof lat !== 'number' || typeof lng !== 'number') return;
       if (!ws._shipperOrderId) {
         ws._shipperOrderId = String(orderId);
       }
-      await updateDeliveryLocation(String(orderId), { lat, lng, speed, heading, shipperName: ws._userName });
+      await updateDeliveryLocation(String(orderId), { lat, lng, speed, heading, shipperName: ws._userName, originType, originCoord });
     }
     else if (type === 'SHIPPER_LEAVE_DELIVERY') {
       ws._shipperOrderId = null;
@@ -442,6 +453,8 @@ const handleTrackingMessage = async (ws, data) => {
           speed: live?.speed ?? null,
           heading: live?.heading ?? null,
           shipperName: live?.shipperName ?? null,
+          originType: live?.originType || (lat ? 'gps' : 'warehouse'),
+          originCoord: live?.originCoord || null,
           updatedAt: live?.updatedAt ?? order.locationUpdatedAt
         }));
       }
@@ -460,13 +473,19 @@ const handleTrackingMessage = async (ws, data) => {
 // POST /orders/:orderId/location, for when a shipper's WebSocket connection
 // drops mid-delivery) — one place persists + broadcasts, so the two entry
 // points can never disagree on what a "location update" does.
-const updateDeliveryLocation = async (orderId, { lat, lng, speed, heading, shipperName }) => {
+const updateDeliveryLocation = async (orderId, { lat, lng, speed, heading, shipperName, originType, originCoord }) => {
   const updatedAt = new Date();
+  const existing = activeDeliveries.get(orderId) || {};
+  const currentOriginType = originType || existing.originType || 'gps';
+  const currentOriginCoord = originCoord || existing.originCoord || (lat && lng ? { lat, lng } : null);
+
   activeDeliveries.set(orderId, {
     lat, lng,
     speed: speed ?? null,
     heading: heading ?? null,
-    shipperName: shipperName || activeDeliveries.get(orderId)?.shipperName || null,
+    shipperName: shipperName || existing.shipperName || null,
+    originType: currentOriginType,
+    originCoord: currentOriginCoord,
     updatedAt
   });
 
@@ -490,9 +509,13 @@ const updateDeliveryLocation = async (orderId, { lat, lng, speed, heading, shipp
     speed: speed ?? null,
     heading: heading ?? null,
     shipperName: activeDeliveries.get(orderId)?.shipperName || null,
+    originType: currentOriginType,
+    originCoord: currentOriginCoord,
     updatedAt
   }, client => client._isStaff || client._trackingOrderId === orderId);
 };
+
+const getActiveDelivery = (orderId) => activeDeliveries.get(String(orderId)) || null;
 
 const getSessions = async () => {
   try {
@@ -553,5 +576,6 @@ module.exports = {
   getSessions,
   addCustomerMessage,
   addStaffMessage,
-  updateDeliveryLocation
+  updateDeliveryLocation,
+  getActiveDelivery
 };

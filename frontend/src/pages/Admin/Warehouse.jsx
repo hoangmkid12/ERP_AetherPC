@@ -750,6 +750,7 @@ function RegionalShipperModal({
 
   const initialRegion = orderToAssign.deliveryRegion || detectDeliveryRegion(orderToAssign.shippingAddress || orderToAssign.address || '');
   const [selectedRegion, setSelectedRegion] = useState(initialRegion);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const currentRegionObj = DELIVERY_REGIONS.find(r => r.code === selectedRegion) || DELIVERY_REGIONS[0];
   const isHCM = selectedRegion.startsWith('HCM');
@@ -985,8 +986,10 @@ function RegionalShipperModal({
         </div>
 
         <form
-          onSubmit={(e) => {
+          onSubmit={async (e) => {
             e.preventDefault();
+            if (isSubmitting) return;
+
             const formData = new FormData(e.target);
             const shipperVal = formData.get('shipperName') || '';
             const trackingCode = formData.get('trackingCode') || autoTrackingCode;
@@ -1006,61 +1009,66 @@ function RegionalShipperModal({
 
             const ordId = String(orderToAssign.orderId || orderToAssign.id || '');
 
-            // Phân công vẫn giữ đơn ở READY_TO_SHIP (không nhảy thẳng lên
-            // SHIPPED) — đơn phải nằm bên "Chờ Nhận" của đúng shipper được
-            // chọn, shipper phải tự bấm "Nhận Chuyến" thì mới chuyển sang
-            // SHIPPED/"Đang Giao". isShipperMatched() ở trang Delivery đã
-            // lọc theo assignedShipperId nên việc này không cần đổi gì thêm
-            // ở phía shipper — chỉ cần KHÔNG set status=SHIPPED ở đây.
-            if (typeof updateOrderStatus === 'function') {
-              updateOrderStatus(ordId, 'READY_TO_SHIP', `Đã phân công cho ${shipperDisplayName} [Mã VĐ: ${trackingCode}] - Khu vực: ${currentRegionObj.shortName}, chờ shipper xác nhận nhận đơn.`, {
-                assignedShipper: shipperDisplayName,
-                assignedShipperId: matchedShipperId,
-                assignedShipperUsername: foundEmp?.username || (typeof matchedShipperId === 'string' ? matchedShipperId : null),
-                assignedShipperName: foundEmp?.fullname || foundEmp?.name || shipperDisplayName,
-                deliveryRegion: selectedRegion,
-                trackingCode: trackingCode,
-                shippingNote: note
-              });
-            } else {
-              const updatedOrders = orders.map(o => {
-                if ((o.orderId && o.orderId === ordId) || o.id === ordId || String(o.id) === String(orderToAssign.id)) {
-                  return {
-                    ...o,
-                    status: 'READY_TO_SHIP',
-                    deliveryStatus: 'READY_TO_SHIP',
-                    assignedShipper: shipperDisplayName,
-                    assignedShipperId: matchedShipperId,
-                    assignedShipperUsername: foundEmp?.username || (typeof matchedShipperId === 'string' ? matchedShipperId : null),
-                    assignedShipperName: foundEmp?.fullname || foundEmp?.name || shipperDisplayName,
-                    deliveryRegion: selectedRegion,
-                    trackingCode: trackingCode,
-                    shippingNote: note,
-                    lastNote: `Đã phân công cho ${shipperDisplayName}, chờ xác nhận nhận đơn. Mã tra cứu: ${trackingCode}`
-                  };
+            setIsSubmitting(true);
+            try {
+              if (typeof updateOrderStatus === 'function') {
+                await updateOrderStatus(ordId, 'READY_TO_SHIP', `Đã phân công cho ${shipperDisplayName} [Mã VĐ: ${trackingCode}] - Khu vực: ${currentRegionObj.shortName}, chờ shipper xác nhận nhận đơn.`, {
+                  assignedShipper: shipperDisplayName,
+                  assignedShipperId: matchedShipperId,
+                  assignedShipperUsername: foundEmp?.username || (typeof matchedShipperId === 'string' ? matchedShipperId : null),
+                  assignedShipperName: foundEmp?.fullname || foundEmp?.name || shipperDisplayName,
+                  deliveryRegion: selectedRegion,
+                  trackingCode: trackingCode,
+                  shippingNote: note
+                });
+              } else {
+                const updatedOrders = orders.map(o => {
+                  if ((o.orderId && o.orderId === ordId) || o.id === ordId || String(o.id) === String(orderToAssign.id)) {
+                    return {
+                      ...o,
+                      status: 'READY_TO_SHIP',
+                      deliveryStatus: 'READY_TO_SHIP',
+                      assignedShipper: shipperDisplayName,
+                      assignedShipperId: matchedShipperId,
+                      assignedShipperUsername: foundEmp?.username || (typeof matchedShipperId === 'string' ? matchedShipperId : null),
+                      assignedShipperName: foundEmp?.fullname || foundEmp?.name || shipperDisplayName,
+                      deliveryRegion: selectedRegion,
+                      trackingCode: trackingCode,
+                      shippingNote: note,
+                      lastNote: `Đã phân công cho ${shipperDisplayName}, chờ xác nhận nhận đơn. Mã tra cứu: ${trackingCode}`
+                    };
+                  }
+                  return o;
+                });
+                if (typeof setOrders === 'function') {
+                  setOrders(updatedOrders);
                 }
-                return o;
-              });
-              if (typeof setOrders === 'function') {
-                setOrders(updatedOrders);
+                try { localStorage.setItem('erp_orders', JSON.stringify(updatedOrders)); } catch (_) {}
               }
-              try { localStorage.setItem('erp_orders', JSON.stringify(updatedOrders)); } catch (_) {}
-            }
 
-            if (sendSystemNotification) {
-              sendSystemNotification({
-                targetRoles: ['DELIVERY'],
-                title: `Đơn #${ordId} Chờ Bạn Nhận Chuyến`,
-                message: `Đơn hàng đã được phân công cho bạn (${currentRegionObj.shortName} - Mã VĐ: ${trackingCode}). Vào tab "Chờ Nhận" để xác nhận nhận chuyến.`,
-                type: 'INFO'
-              });
-            }
+              if (sendSystemNotification) {
+                sendSystemNotification({
+                  targetRoles: ['DELIVERY'],
+                  title: `Đơn #${ordId} Chờ Bạn Nhận Chuyến`,
+                  message: `Đơn hàng đã được phân công cho bạn (${currentRegionObj.shortName} - Mã VĐ: ${trackingCode}). Vào tab "Chờ Nhận" để xác nhận nhận chuyến.`,
+                  type: 'INFO'
+                });
+              }
 
-            if (typeof addNotification === 'function') {
-              addNotification(`Điều phối vận chuyển thành công! Đơn hàng #${ordId} [${currentRegionObj.shortName}] đã phân công cho ${shipperDisplayName}, đang chờ shipper xác nhận nhận đơn.`, 'success');
-            }
+              if (typeof addNotification === 'function') {
+                addNotification(`Điều phối vận chuyển thành công! Đơn hàng #${ordId} [${currentRegionObj.shortName}] đã phân công cho ${shipperDisplayName}, đang chờ shipper xác nhận nhận đơn.`, 'success');
+              }
 
-            onClose();
+              onClose();
+            } catch (err) {
+              console.error('Assign shipper error:', err);
+              const errMsg = err?.response?.data?.message || err?.message || 'Có lỗi khi phân công shipper.';
+              if (typeof addNotification === 'function') {
+                addNotification(`Không thể phân công shipper cho đơn #${ordId}: ${errMsg}`, 'error');
+              }
+            } finally {
+              setIsSubmitting(false);
+            }
           }}
           style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}
         >
@@ -1335,16 +1343,17 @@ function RegionalShipperModal({
               </button>
               <button
                 type="submit"
+                disabled={isSubmitting}
                 className="d-btn-submit"
                 style={{
                   padding: '0.5rem 1.25rem',
                   fontSize: '0.82rem',
                   border: 'none',
                   borderRadius: '6px',
-                  background: '#2563eb',
+                  background: isSubmitting ? '#93c5fd' : '#2563eb',
                   color: '#ffffff',
                   fontWeight: 700,
-                  cursor: 'pointer',
+                  cursor: isSubmitting ? 'not-allowed' : 'pointer',
                   boxShadow: '0 2px 4px rgba(37,99,235,0.25)',
                   display: 'flex',
                   alignItems: 'center',
@@ -1352,7 +1361,7 @@ function RegionalShipperModal({
                   whiteSpace: 'nowrap'
                 }}
               >
-                <Truck size={15} /> Xác Nhận
+                <Truck size={15} /> {isSubmitting ? 'Đang Xử Lý...' : 'Xác Nhận'}
               </button>
             </div>
           </div>
@@ -2873,13 +2882,11 @@ export default function Warehouse() {
   };
 
   // Called from PackAndScanModal when user clicks Xác Nhận Đóng Gói
-  const handleConfirmPack = (packedOrder, serials) => {
+  const handleConfirmPack = async (packedOrder, serials) => {
+    const ordId = String(packedOrder.orderId || packedOrder.id || '');
     try {
-      const ordId = String(packedOrder.orderId || packedOrder.id || '');
-
-      // Dùng updateOrderStatus từ ERPContext — đúng cách, không crash
       if (typeof updateOrderStatus === 'function') {
-        updateOrderStatus(ordId, 'READY_TO_SHIP', 'Kho đã hoàn tất đóng gói và kiểm tra Serial.', {
+        await updateOrderStatus(ordId, 'READY_TO_SHIP', 'Kho đã hoàn tất đóng gói và kiểm tra Serial.', {
           packedSerials: serials || [],
           packedAt: new Date().toISOString()
         });
@@ -2898,13 +2905,17 @@ export default function Warehouse() {
       if (typeof addNotification === 'function') {
         addNotification(`Đã hoàn tất đóng gói! Đơn hàng #${ordId} đã sẵn sàng phân công Shipper.`, 'success');
       }
+
+      // Đóng pack modal và mở shipper modal
+      setPackScanOrder(null);
+      setOrderToAssign({ ...packedOrder, status: 'READY_TO_SHIP', packedSerials: serials || [] });
     } catch (err) {
       console.error('handleConfirmPack error:', err);
+      const errMsg = err?.response?.data?.message || err?.message || 'Có lỗi xảy ra khi cập nhật đóng gói.';
+      if (typeof addNotification === 'function') {
+        addNotification(`Không thể đóng gói đơn #${ordId}: ${errMsg}`, 'error');
+      }
     }
-
-    // Đóng pack modal và mở shipper modal trong cùng render cycle
-    setPackScanOrder(null);
-    setOrderToAssign(packedOrder);
   };
 
   // Add Product Submit

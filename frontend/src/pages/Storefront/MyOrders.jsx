@@ -3,7 +3,7 @@ import { useSalesStore, useUtilityStore, useInventoryStore } from '../../stores'
 import { useAuth } from '../../context/AuthContext';
 import { useNotification, notify, confirm } from '../../context/NotificationContext';
 import { COMPLAINT_STATUS, getStatusInfo, getStatusLabel, formatRmaCode } from '../../utils/statusLabels';
-import { Search, Package, Clock, ShieldCheck, CheckCircle2, ChevronRight, HelpCircle, RefreshCw, X, AlertCircle, Sparkles, Eye, Upload, CheckCircle, MapPin } from 'lucide-react';
+import { Search, Package, Clock, ShieldCheck, CheckCircle2, ChevronRight, HelpCircle, RefreshCw, X, AlertCircle, Sparkles, Eye, Upload, CheckCircle, MapPin, Camera } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { api } from '../../services/api';
 import { REGION_COORDS, detectDeliveryRegion } from '../../utils/deliveryRegions';
@@ -17,6 +17,7 @@ export default function MyOrders() {
   const getReturnRequests = useSalesStore(state => state.getReturnRequests);
   const addReturnRequest = useSalesStore(state => state.addReturnRequest);
   const updateOrderStatus = useSalesStore(state => state.updateOrderStatus);
+  const confirmReceivedOrder = useSalesStore(state => state.confirmReceivedOrder);
   const updateOrderDetails = useSalesStore(state => state.updateOrderDetails);
   const updateReturnStatus = useSalesStore(state => state.updateReturnStatus);
   const addComplaint = useSalesStore(state => state.addComplaint);
@@ -28,11 +29,53 @@ export default function MyOrders() {
   const [phoneQuery, setPhoneQuery] = useState('');
   const [searched, setSearched] = useState(false);
   const [selectedOrderId, setSelectedOrderId] = useState(null);
+  const [confirmingReceivedId, setConfirmingReceivedId] = useState(null);
 
   useEffect(() => {
     if (typeof getOrders === 'function') getOrders().catch(() => {});
     if (typeof getReturnRequests === 'function') getReturnRequests().catch(() => {});
   }, [getOrders, getReturnRequests]);
+
+  // Tự động kiểm tra các đơn đã giao (DELIVERED) quá 48h -> tự động chuyển COMPLETED (nhận thành công)
+  useEffect(() => {
+    if (!orders || orders.length === 0) return;
+    const now = Date.now();
+    const fortyEightHoursMs = 48 * 60 * 60 * 1000;
+    orders.forEach(o => {
+      if (o.status === 'DELIVERED') {
+        const deliveredTime = o.deliveredAt ? new Date(o.deliveredAt).getTime() : (o.date ? new Date(o.date).getTime() : null);
+        if (deliveredTime && (now - deliveredTime >= fortyEightHoursMs)) {
+          if (typeof confirmReceivedOrder === 'function') {
+            confirmReceivedOrder(o.orderId, 'Hệ thống tự động chuyển Hoàn tất sau 48h').catch(() => {});
+          }
+        }
+      }
+    });
+  }, [orders, confirmReceivedOrder]);
+
+  const handleConfirmReceived = async (order) => {
+    if (!order) return;
+    if (!window.confirm(`Xác nhận bạn đã nhận được hàng cho đơn hàng #${order.orderId}? Trạng thái sẽ được chuyển sang Hoàn tất.`)) {
+      return;
+    }
+    setConfirmingReceivedId(order.orderId);
+    try {
+      if (typeof confirmReceivedOrder === 'function') {
+        await confirmReceivedOrder(order.orderId, 'Khách hàng xác nhận đã nhận được hàng');
+      } else if (typeof updateOrderStatus === 'function') {
+        await updateOrderStatus(order.orderId, 'COMPLETED', 'Khách hàng xác nhận đã nhận được hàng');
+      }
+      if (typeof addNotification === 'function') {
+        addNotification(`Đơn hàng #${order.orderId} đã được xác nhận nhận hàng thành công! Cảm ơn bạn.`, 'success');
+      }
+    } catch (err) {
+      if (typeof addNotification === 'function') {
+        addNotification(`Lỗi xác nhận nhận hàng: ${err.message || 'Lỗi kết nối máy chủ'}`, 'error');
+      }
+    } finally {
+      setConfirmingReceivedId(null);
+    }
+  };
   
   // Edit Order Modal State
   const [showEditModal, setShowEditModal] = useState(false);
@@ -282,7 +325,18 @@ export default function MyOrders() {
       try {
         const data = JSON.parse(evt.data);
         if (data.type === 'DELIVERY_LOCATION_UPDATE' && String(data.orderId) === String(trackingOrderId)) {
-          setLivePosition({ lat: data.lat, lng: data.lng, speed: data.speed, heading: data.heading, updatedAt: data.updatedAt });
+          setLivePosition({
+            lat: data.lat,
+            lng: data.lng,
+            speed: data.speed,
+            heading: data.heading,
+            originType: data.originType,
+            originCoord: data.originCoord,
+            updatedAt: data.updatedAt
+          });
+          if (data.originType || data.originCoord) {
+            setTrackingData(prev => prev ? ({ ...prev, originType: data.originType || prev.originType, originCoord: data.originCoord || prev.originCoord }) : prev);
+          }
         }
       } catch (_) { /* ignore malformed frame */ }
     };
@@ -374,6 +428,13 @@ export default function MyOrders() {
       case 'RETURNING':
       case 'RETURNED':
         return { text: 'Trả hàng / Hoàn tiền', color: '#ec4899', bg: 'rgba(236,72,153,0.1)', border: 'rgba(236,72,153,0.3)' };
+      case 'REJECTED':
+      case 'QC_REJECTED':
+        return { text: 'Từ chối đổi / trả', color: '#dc2626', bg: '#fee2e2', border: '#fca5a5' };
+      case 'RETURNING_TO_CUSTOMER':
+        return { text: 'Đang trả hàng cho bạn', color: '#ea580c', bg: '#fff7ed', border: '#fed7aa' };
+      case 'RETURNED_TO_CUSTOMER':
+        return { text: 'Đã hoàn trả khách', color: '#64748b', bg: '#f1f5f9', border: '#cbd5e1' };
       case 'CANCELLED':
         return { text: 'Đã hủy', color: '#ef4444', bg: 'rgba(239,68,68,0.1)', border: 'rgba(239,68,68,0.3)' };
       default:
@@ -504,10 +565,111 @@ export default function MyOrders() {
     const isReturnFlow = Boolean(
       returnItem ||
       isOrderRefunded ||
-      ['RETURN_REQUESTED', 'RETURN_APPROVED', 'RETURNING_TO_WAREHOUSE', 'DELIVERED_TO_WAREHOUSE', 'QC_PASSED', 'RESTOCKED', 'EXCHANGED', 'REFUNDED'].includes(status)
+      ['RETURN_REQUESTED', 'RETURN_APPROVED', 'RETURNING_TO_WAREHOUSE', 'DELIVERED_TO_WAREHOUSE', 'QC_PASSED', 'RESTOCKED', 'EXCHANGED', 'REFUNDED', 'REJECTED', 'RETURNING_TO_CUSTOMER', 'RETURNED_TO_CUSTOMER'].includes(status)
     );
 
     if (isReturnFlow) {
+      const isRejectedFlow = Boolean(
+        returnItem?.status === 'REJECTED' ||
+        returnItem?.status === 'RETURNING_TO_CUSTOMER' ||
+        returnItem?.status === 'RETURNED_TO_CUSTOMER' ||
+        returnItem?.status === 'QC_REJECTED' ||
+        status === 'REJECTED' ||
+        status === 'RETURNING_TO_CUSTOMER' ||
+        status === 'RETURNED_TO_CUSTOMER'
+      );
+
+      if (isRejectedFlow) {
+        const rmaStatus = returnItem?.status || status;
+        const rejectSteps = [
+          '1. Gửi yêu cầu',
+          '2. Shipper thu hồi',
+          '3. ❌ QC Từ chối',
+          '4. Shipper trả hàng',
+          '5. Đã hoàn trả khách'
+        ];
+
+        let activeIdx = 2; // Bước 3: QC Từ chối
+        if (rmaStatus === 'RETURNING_TO_CUSTOMER') {
+          activeIdx = 3; // Bước 4: Shipper trả hàng
+        } else if (rmaStatus === 'RETURNED_TO_CUSTOMER') {
+          activeIdx = 4; // Bước 5: Đã hoàn trả khách
+        }
+
+        const isCompletedAll = rmaStatus === 'RETURNED_TO_CUSTOMER';
+
+        return (
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative', width: '100%', padding: '0.5rem 0' }}>
+              {rejectSteps.map((stepName, idx) => {
+                const isDone = idx < activeIdx || (idx === activeIdx && isCompletedAll);
+                const isActive = idx === activeIdx && !isDone;
+                const isLineActive = idx <= activeIdx;
+                const isRejectedStep = idx === 2;
+
+                return (
+                  <React.Fragment key={idx}>
+                    {idx > 0 && (
+                      <div style={{
+                        flex: 1,
+                        height: '2.5px',
+                        backgroundColor: isLineActive ? (idx <= 2 ? '#dc2626' : '#ea580c') : '#e2e8f0',
+                        margin: '0 0.25rem',
+                        marginBottom: '1.25rem',
+                        transition: 'all 0.3s ease'
+                      }} />
+                    )}
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: '60px' }}>
+                      <div style={{
+                        width: '30px',
+                        height: '30px',
+                        borderRadius: '50%',
+                        backgroundColor: isRejectedStep ? '#dc2626' : (isDone ? '#16a34a' : (isActive ? '#fff7ed' : '#f8fafc')),
+                        border: isRejectedStep ? '2px solid #b91c1c' : (isActive ? '2px solid #ea580c' : (isDone ? '2px solid #16a34a' : '1.5px solid #cbd5e1')),
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: isRejectedStep ? '#ffffff' : (isDone ? '#ffffff' : (isActive ? '#ea580c' : '#64748b')),
+                        fontSize: '0.75rem',
+                        fontWeight: 800,
+                        boxShadow: isRejectedStep ? '0 0 10px rgba(220,38,38,0.45)' : (isActive ? '0 0 8px rgba(234,88,12,0.35)' : 'none'),
+                        transition: 'all 0.3s ease'
+                      }}>
+                        {isRejectedStep ? '✕' : (isDone ? '✓' : idx + 1)}
+                      </div>
+                      <span style={{
+                        fontSize: '0.7rem',
+                        color: isRejectedStep ? '#dc2626' : (isActive ? '#ea580c' : (isDone ? '#0f172a' : '#64748b')),
+                        marginTop: '0.4rem',
+                        textAlign: 'center',
+                        fontWeight: isActive || isDone || isRejectedStep ? 800 : 500,
+                        whiteSpace: 'nowrap'
+                      }}>
+                        {stepName}
+                      </span>
+                    </div>
+                  </React.Fragment>
+                );
+              })}
+            </div>
+
+            <div style={{ marginTop: '0.65rem', padding: '0.6rem 0.85rem', backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem', fontSize: '0.75rem' }}>
+              <span style={{ color: '#dc2626', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                <AlertCircle size={15} />
+                Tiến độ Đổi/Trả: QC Thẩm Định Từ Chối
+              </span>
+              <span style={{ color: '#991b1b', fontWeight: 600 }}>
+                Trạng thái: <strong>{
+                  rmaStatus === 'RETURNED_TO_CUSTOMER' ? 'Đã hoàn trả sản phẩm cho bạn' :
+                  rmaStatus === 'RETURNING_TO_CUSTOMER' ? 'Shipper đang trên đường giao trả lại hàng cho bạn' :
+                  'Kiện hàng lưu kho - Chờ Shipper nhận đi giao trả lại'
+                }</strong>
+              </span>
+            </div>
+          </div>
+        );
+      }
+
       const isExchange = returnItem?.type === 'EXCHANGE' || status === 'EXCHANGED';
       const rmaStatus = isOrderRefunded ? 'REFUNDED' : (returnItem?.status || status);
 
@@ -1125,9 +1287,10 @@ export default function MyOrders() {
                         </div>
                       </div>
 
-                      {/* Minh Chứng Bàn Giao Hàng Thành Công (Proof of Delivery - POD) */}
-                      {(selectedOrder.proofPhoto || selectedOrder.status === 'DELIVERED' || selectedOrder.status === 'COMPLETED') && (
+                      {/* Minh Chứng Bàn Giao Hàng (Proof of Delivery - POD) */}
+                      {Boolean(selectedOrder.proofPhoto || selectedOrder.proof_photo || selectedOrder.deliveryProofPhoto || ['SHIPPED', 'DELIVERED', 'COMPLETED', 'RETURNING_TO_WAREHOUSE', 'RETURN_REQUESTED'].includes(selectedOrder.status)) && (
                         (() => {
+                          const podPhoto = selectedOrder.proofPhoto || selectedOrder.proof_photo || selectedOrder.deliveryProofPhoto || null;
                           const hasRMAOrRefund = Boolean(
                             (returnRequests || []).some(r => String(r.orderId) === String(selectedOrder.orderId) || String(r.id) === String(selectedOrder.orderId)) ||
                             ['RETURN_REQUESTED', 'RETURNING_TO_WAREHOUSE', 'DELIVERED_TO_WAREHOUSE', 'QC_PASSED', 'RESTOCKED', 'EXCHANGED', 'REFUNDED'].includes(selectedOrder.status)
@@ -1151,13 +1314,13 @@ export default function MyOrders() {
                               }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
                                   <ShieldCheck size={16} color="#16a34a" />
-                                  <span>Kiện hàng ban đầu đã giao bởi: <strong>{selectedOrder.assignedShipper || 'Shipper Nội Bộ'}</strong></span>
+                                  <span>Kiện hàng ban đầu đã giao bởi: <strong>{selectedOrder.assignedShipper || selectedOrder.assignedShipperName || 'Shipper Nội Bộ'}</strong></span>
                                   {selectedOrder.deliveredAt && <span style={{ color: '#64748b' }}>({new Date(selectedOrder.deliveredAt).toLocaleDateString('vi-VN')})</span>}
                                 </div>
-                                {selectedOrder.proofPhoto && (
+                                {podPhoto && (
                                   <button
                                     type="button"
-                                    onClick={() => setViewProofImage(selectedOrder.proofPhoto)}
+                                    onClick={() => setViewProofImage(podPhoto)}
                                     style={{
                                       background: '#eff6ff',
                                       border: '1px solid #bfdbfe',
@@ -1183,57 +1346,74 @@ export default function MyOrders() {
                             <div style={{
                               marginTop: '1.25rem',
                               padding: '1.25rem 1.35rem',
-                              backgroundColor: '#f0fdf4',
+                              backgroundColor: podPhoto ? '#f0fdf4' : '#f8fafc',
                               borderRadius: '12px',
-                              border: '1.5px solid #86efac',
-                              boxShadow: '0 4px 12px rgba(16,185,129,0.08)'
+                              border: podPhoto ? '1.5px solid #86efac' : '1.5px solid #e2e8f0',
+                              boxShadow: podPhoto ? '0 4px 12px rgba(16,185,129,0.08)' : '0 2px 8px rgba(0,0,0,0.04)'
                             }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.85rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 800, fontSize: '0.95rem', color: '#15803d' }}>
-                                  <ShieldCheck size={22} color="#16a34a" />
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 800, fontSize: '0.95rem', color: podPhoto ? '#15803d' : '#1e293b' }}>
+                                  <ShieldCheck size={22} color={podPhoto ? '#16a34a' : '#3b82f6'} />
                                   <span>Minh Chứng Bàn Giao Hàng (Proof of Delivery - POD)</span>
                                 </div>
-                                <span style={{
-                                  fontSize: '0.75rem',
-                                  fontWeight: 700,
-                                  backgroundColor: '#dcfce7',
-                                  color: '#15803d',
-                                  padding: '0.25rem 0.65rem',
-                                  borderRadius: '6px',
-                                  border: '1px solid #bbf7d0',
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '0.3rem'
-                                }}>
-                                  ✓ Đã xác thực giao nhận
-                                </span>
+                                {podPhoto ? (
+                                  <span style={{
+                                    fontSize: '0.75rem',
+                                    fontWeight: 700,
+                                    backgroundColor: '#dcfce7',
+                                    color: '#15803d',
+                                    padding: '0.25rem 0.65rem',
+                                    borderRadius: '6px',
+                                    border: '1px solid #bbf7d0',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '0.3rem'
+                                  }}>
+                                    ✓ Đã xác thực giao nhận
+                                  </span>
+                                ) : (
+                                  <span style={{
+                                    fontSize: '0.75rem',
+                                    fontWeight: 700,
+                                    backgroundColor: '#eff6ff',
+                                    color: '#2563eb',
+                                    padding: '0.25rem 0.65rem',
+                                    borderRadius: '6px',
+                                    border: '1px solid #bfdbfe',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '0.3rem'
+                                  }}>
+                                    Đang chờ Shipper cập nhật ảnh
+                                  </span>
+                                )}
                               </div>
 
                               <div style={{
                                 display: 'grid',
-                                gridTemplateColumns: selectedOrder.proofPhoto ? 'repeat(auto-fit, minmax(170px, 1fr))' : '1fr',
+                                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
                                 gap: '1.25rem',
                                 alignItems: 'center'
                               }}>
-                                {selectedOrder.proofPhoto && (
+                                {podPhoto ? (
                                   <div
                                     style={{
                                       position: 'relative',
                                       width: '100%',
-                                      maxWidth: '220px',
-                                      height: '140px',
+                                      maxWidth: '240px',
+                                      height: '150px',
                                       borderRadius: '8px',
                                       overflow: 'hidden',
                                       border: '1.5px solid #cbd5e1',
                                       cursor: 'pointer',
                                       backgroundColor: '#0f172a',
-                                      boxShadow: '0 2px 6px rgba(0,0,0,0.1)'
+                                      boxShadow: '0 2px 8px rgba(0,0,0,0.12)'
                                     }}
-                                    onClick={() => setViewProofImage(selectedOrder.proofPhoto)}
+                                    onClick={() => setViewProofImage(podPhoto)}
                                     title="Nhấn để xem ảnh phóng to"
                                   >
                                     <img
-                                      src={selectedOrder.proofPhoto}
+                                      src={podPhoto}
                                       alt="Minh chứng giao hàng POD"
                                       style={{ width: '100%', height: '100%', objectFit: 'cover', transition: 'transform 0.25s ease' }}
                                       onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.06)'}
@@ -1244,9 +1424,9 @@ export default function MyOrders() {
                                       bottom: 0,
                                       left: 0,
                                       right: 0,
-                                      backgroundColor: 'rgba(15,23,42,0.8)',
+                                      backgroundColor: 'rgba(15,23,42,0.82)',
                                       color: '#ffffff',
-                                      fontSize: '0.7rem',
+                                      fontSize: '0.72rem',
                                       padding: '4px 6px',
                                       textAlign: 'center',
                                       fontWeight: 700,
@@ -1258,20 +1438,37 @@ export default function MyOrders() {
                                       <Eye size={13} /> Phóng to ảnh
                                     </div>
                                   </div>
+                                ) : (
+                                  <div style={{
+                                    padding: '1.25rem 1rem',
+                                    borderRadius: '8px',
+                                    border: '1.5px dashed #cbd5e1',
+                                    backgroundColor: '#ffffff',
+                                    textAlign: 'center',
+                                    color: '#64748b'
+                                  }}>
+                                    <Camera size={28} color="#94a3b8" style={{ margin: '0 auto 0.4rem', display: 'block' }} />
+                                    <strong style={{ fontSize: '0.84rem', color: '#334155', display: 'block' }}>Chưa Có Ảnh Chụp Minh Chứng</strong>
+                                    <span style={{ fontSize: '0.74rem', color: '#64748b', display: 'block', marginTop: '0.25rem', lineHeight: 1.4 }}>
+                                      Shipper sẽ chụp ảnh xác nhận kiện hàng và người nhận khi giao tới bạn. Ảnh chụp sẽ được cập nhật tự động tại đây.
+                                    </span>
+                                  </div>
                                 )}
 
                                 <div style={{ fontSize: '0.84rem', color: '#334155', display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
                                   <div>
                                     <strong style={{ color: '#0f172a' }}>Nhân viên giao hàng:</strong>{' '}
-                                    <span style={{ color: '#2563eb', fontWeight: 600 }}>{selectedOrder.assignedShipper || 'Shipper Nội Bộ AetherPC'}</span>
+                                    <span style={{ color: '#2563eb', fontWeight: 600 }}>{selectedOrder.assignedShipper || selectedOrder.assignedShipperName || 'Shipper Nội Bộ AetherPC'}</span>
                                   </div>
 
                                   <div>
                                     <strong style={{ color: '#0f172a' }}>Người nhận thực tế:</strong>{' '}
                                     <span style={{ color: '#0f172a', fontWeight: 600 }}>
-                                      {selectedOrder.receivedByType === 'REPRESENTATIVE'
-                                        ? `${selectedOrder.receiverNameActual || 'Người nhận thay'} (Nhận thay khách hàng)`
-                                        : `${selectedOrder.customerName || 'Khách hàng'} (Chính chủ nhận)`}
+                                      {selectedOrder.deliveredAt
+                                        ? (selectedOrder.receivedByType === 'REPRESENTATIVE'
+                                          ? `${selectedOrder.receiverNameActual || 'Người nhận thay'} (Nhận thay khách hàng)`
+                                          : `${selectedOrder.customerName || 'Khách hàng'} (Chính chủ nhận)`)
+                                        : `${selectedOrder.customerName || 'Khách hàng'} (${selectedOrder.phone || 'Chờ giao nhận'})`}
                                     </span>
                                   </div>
 
@@ -1284,12 +1481,13 @@ export default function MyOrders() {
                                     </span>
                                   </div>
 
-                                  {selectedOrder.deliveredAt && (
-                                    <div>
-                                      <strong style={{ color: '#0f172a' }}>Thời gian bàn giao:</strong>{' '}
-                                      <span style={{ color: '#0f172a' }}>{new Date(selectedOrder.deliveredAt).toLocaleString('vi-VN')}</span>
-                                    </div>
-                                  )}
+                                  <div>
+                                    <strong style={{ color: '#0f172a' }}>Thời gian bàn giao:</strong>{' '}
+                                    <span style={{ color: selectedOrder.deliveredAt ? '#0f172a' : '#2563eb' }}>
+                                      {selectedOrder.deliveredAt ? new Date(selectedOrder.deliveredAt).toLocaleString('vi-VN') : 'Shipper đang trên đường vận chuyển'}
+                                    </span>
+                                  </div>
+
                                   {selectedOrder.receiverNote && (
                                     <div>
                                       <strong style={{ color: '#0f172a' }}>Ghi chú bàn giao:</strong>{' '}
@@ -1458,8 +1656,199 @@ export default function MyOrders() {
                   );
                 }
 
-                // No return request yet — show button
+                // No return request yet — show actions
                 if (!existingReturn) {
+                  // Đơn đã giao (DELIVERED): Khách hàng có nút "Đã nhận được hàng" và đếm ngược 48h tự động hoàn tất
+                  if (selectedOrder.status === 'DELIVERED') {
+                    const deliveredTime = selectedOrder.deliveredAt ? new Date(selectedOrder.deliveredAt).getTime() : (selectedOrder.date ? new Date(selectedOrder.date).getTime() : Date.now());
+                    const deadline48h = deliveredTime + 48 * 60 * 60 * 1000;
+                    const diffMs = deadline48h - Date.now();
+                    const hoursRemaining = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60)));
+                    const minutesRemaining = Math.max(0, Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60)));
+
+                    return (
+                      <div style={{
+                        padding: '1.25rem 1.5rem',
+                        backgroundColor: '#f0fdf4',
+                        border: '1.5px solid #86efac',
+                        borderRadius: '12px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '0.85rem',
+                        boxShadow: '0 4px 12px rgba(16,185,129,0.08)'
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 800, fontSize: '0.95rem', color: '#15803d' }}>
+                            <CheckCircle2 size={20} color="#16a34a" />
+                            <span>Kiện Hàng Đã Giao Tới Bạn — Xác Nhận Nhận Hàng</span>
+                          </div>
+                          <span style={{
+                            fontSize: '0.74rem',
+                            fontWeight: 700,
+                            color: '#15803d',
+                            backgroundColor: '#dcfce7',
+                            padding: '0.25rem 0.65rem',
+                            borderRadius: '6px',
+                            border: '1px solid #bbf7d0',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.3rem'
+                          }}>
+                            ⏱ Tự động nhận thành công sau: {hoursRemaining}h {minutesRemaining}p
+                          </span>
+                        </div>
+
+                        <p style={{ fontSize: '0.82rem', color: '#166534', margin: 0, lineHeight: 1.5 }}>
+                          Vui lòng kiểm tra kỹ linh kiện và thiết bị. Nếu bạn đã nhận đủ hàng và hài lòng, hãy bấm <strong>"Đã nhận được hàng"</strong> để hoàn tất đơn hàng. (Nếu sau 48 giờ bạn không gửi yêu cầu đổi trả hoặc khiếu nại, hệ thống sẽ tự động xác nhận nhận hàng thành công).
+                        </p>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', marginTop: '0.2rem' }}>
+                          <button
+                            type="button"
+                            onClick={() => handleConfirmReceived(selectedOrder)}
+                            disabled={confirmingReceivedId === selectedOrder.orderId}
+                            style={{
+                              padding: '0.6rem 1.35rem',
+                              fontSize: '0.85rem',
+                              fontWeight: 700,
+                              backgroundColor: '#16a34a',
+                              color: '#ffffff',
+                              border: 'none',
+                              borderRadius: '8px',
+                              cursor: confirmingReceivedId === selectedOrder.orderId ? 'not-allowed' : 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.45rem',
+                              boxShadow: '0 2px 8px rgba(22,163,74,0.3)',
+                              transition: 'all 0.2s'
+                            }}
+                            onMouseEnter={e => e.currentTarget.style.backgroundColor = '#15803d'}
+                            onMouseLeave={e => e.currentTarget.style.backgroundColor = '#16a34a'}
+                          >
+                            <CheckCircle2 size={16} /> {confirmingReceivedId === selectedOrder.orderId ? 'Đang xác nhận...' : 'Đã Nhận Được Hàng'}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => { setReturnTargetOrder(selectedOrder); setShowReturnModal(true); }}
+                            style={{
+                              padding: '0.6rem 1rem',
+                              fontSize: '0.8rem',
+                              fontWeight: 600,
+                              backgroundColor: '#ffffff',
+                              color: '#ef4444',
+                              border: '1.5px solid #fca5a5',
+                              borderRadius: '8px',
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.35rem',
+                              transition: 'all 0.2s'
+                            }}
+                            onMouseEnter={e => e.currentTarget.style.backgroundColor = '#fef2f2'}
+                            onMouseLeave={e => e.currentTarget.style.backgroundColor = '#ffffff'}
+                          >
+                            <RefreshCw size={14} /> Gửi Yêu Cầu Đổi Trả / Hoàn Tiền
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  // Đơn hoàn tất (COMPLETED): Khách hàng đã xác nhận thành công
+                  if (selectedOrder.status === 'COMPLETED') {
+                    return (
+                      <div style={{
+                        padding: '1rem 1.35rem',
+                        backgroundColor: '#f0fdf4',
+                        border: '1.5px solid #86efac',
+                        borderRadius: '12px',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        flexWrap: 'wrap',
+                        gap: '0.75rem'
+                      }}>
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 800, fontSize: '0.9rem', color: '#15803d' }}>
+                            <CheckCircle2 size={18} color="#16a34a" />
+                            <span>Đã Nhận Hàng Thành Công (Đơn Hàng Hoàn Tất)</span>
+                          </div>
+                          <p style={{ fontSize: '0.75rem', color: '#166534', margin: '0.2rem 0 0' }}>
+                            Cảm ơn bạn đã tin tưởng mua sắm tại AetherPC! Bạn vẫn được hỗ trợ chính sách đổi trả / bảo hành trong vòng 7 ngày.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => { setReturnTargetOrder(selectedOrder); setShowReturnModal(true); }}
+                          style={{
+                            padding: '0.45rem 0.85rem',
+                            fontSize: '0.78rem',
+                            fontWeight: 600,
+                            backgroundColor: '#ffffff',
+                            color: '#ef4444',
+                            border: '1px solid #fca5a5',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.35rem'
+                          }}
+                        >
+                          <RefreshCw size={13} /> Đổi Trả Trong 7 Ngày
+                        </button>
+                      </div>
+                    );
+                  }
+
+                  // Đơn đang giao (SHIPPED): Có nút xác nhận nhận hàng sớm nếu shipper đã giao tới
+                  if (selectedOrder.status === 'SHIPPED') {
+                    return (
+                      <div style={{
+                        padding: '1rem 1.35rem',
+                        backgroundColor: '#eff6ff',
+                        border: '1.5px solid #bfdbfe',
+                        borderRadius: '12px',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        flexWrap: 'wrap',
+                        gap: '0.75rem'
+                      }}>
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700, fontSize: '0.88rem', color: '#1d4ed8' }}>
+                            <Package size={18} color="#2563eb" />
+                            <span>Đơn hàng đang trên đường giao đến bạn</span>
+                          </div>
+                          <p style={{ fontSize: '0.74rem', color: '#3b82f6', margin: '0.2rem 0 0' }}>
+                            Nếu Shipper đã giao kiện hàng đến tận tay bạn, bạn có thể bấm xác nhận ngay tại đây.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleConfirmReceived(selectedOrder)}
+                          disabled={confirmingReceivedId === selectedOrder.orderId}
+                          style={{
+                            padding: '0.55rem 1.15rem',
+                            fontSize: '0.82rem',
+                            fontWeight: 700,
+                            backgroundColor: '#16a34a',
+                            color: '#ffffff',
+                            border: 'none',
+                            borderRadius: '8px',
+                            cursor: confirmingReceivedId === selectedOrder.orderId ? 'not-allowed' : 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.4rem',
+                            boxShadow: '0 2px 6px rgba(22,163,74,0.25)'
+                          }}
+                        >
+                          <CheckCircle2 size={15} /> {confirmingReceivedId === selectedOrder.orderId ? 'Đang xử lý...' : 'Đã Nhận Được Hàng'}
+                        </button>
+                      </div>
+                    );
+                  }
+
                   return (
                     <div style={{ padding: '1rem 1.5rem', backgroundColor: 'rgba(239,68,68,0.05)', border: '1px solid rgba(239,68,68,0.15)', borderRadius: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
                       <div>
@@ -1637,6 +2026,146 @@ export default function MyOrders() {
                   );
                 }
 
+                // =========================================================================
+                // TRƯỜNG HỢP: QC TỪ CHỐI ĐỔI TRẢ -> HIỂN THỊ HỒ SƠ THẨM ĐỊNH QC RÕ RÀNG VÀ NÚT KHIẾU NẠI / PHÚC TRA
+                // =========================================================================
+                const isRejectedRma = ['REJECTED', 'RETURNING_TO_CUSTOMER', 'RETURNED_TO_CUSTOMER', 'QC_REJECTED'].includes(existingReturn?.status);
+                if (isRejectedRma) {
+                  const defectCategoryMap = {
+                    'SERIAL_MISMATCH': 'Số Serial không khớp với hóa đơn gốc (Nghi vấn tráo linh kiện ngoài)',
+                    'WARRANTY_SEAL_BROKEN': 'Rách vỡ tem niêm phong / mất tem bảo hành NSX',
+                    'PHYSICAL_DAMAGE_USER': 'Tác động ngoại lực (rơi vỡ, móp méo, cong vênh socket do người dùng)',
+                    'LIQUID_DAMAGE': 'Vào nước / ẩm mốc mạch / oxy hóa chân tiếp xúc',
+                    'UNAUTHORIZED_TAMPERING': 'Có dấu hiệu can thiệp, tự ý tháo mở sửa chữa ngoài hệ thống',
+                    'NOT_FAULTY': 'Kiểm tra hoạt động bình thường, không ghi nhận lỗi kỹ thuật',
+                    'EXPIRED_WARRANTY': 'Hết thời hạn đổi trả theo chính sách (quá 7 ngày)'
+                  };
+                  const defectLabel = defectCategoryMap[existingReturn.qcDefectType] || existingReturn.qcDefectType || 'Vi phạm điều kiện chính sách đổi trả';
+
+                  const redeliveryStatusMap = {
+                    'REJECTED': {
+                      title: 'Sản phẩm đang lưu kho AetherPC — Chờ Shipper xuất hoàn trả cho bạn',
+                      color: '#dc2626',
+                      bg: '#fee2e2',
+                      border: '#fca5a5'
+                    },
+                    'RETURNING_TO_CUSTOMER': {
+                      title: 'Shipper đang trên đường vận chuyển trả sản phẩm về lại địa chỉ nhận hàng của bạn',
+                      color: '#ea580c',
+                      bg: '#fff7ed',
+                      border: '#fed7aa'
+                    },
+                    'RETURNED_TO_CUSTOMER': {
+                      title: 'Shipper đã bàn giao trả lại sản phẩm cho quý khách thành công',
+                      color: '#15803d',
+                      bg: '#f0fdf4',
+                      border: '#bbf7d0'
+                    }
+                  };
+                  const rDeliv = redeliveryStatusMap[existingReturn.status] || redeliveryStatusMap.REJECTED;
+
+                  return (
+                    <div style={{ padding: '1.25rem 1.45rem', backgroundColor: '#fef2f2', border: '1.5px solid #f87171', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                      {/* Header */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', borderBottom: '1px solid #fecaca', paddingBottom: '0.6rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 800, fontSize: '0.92rem', color: '#b91c1c' }}>
+                          <AlertCircle size={20} color="#dc2626" />
+                          <span>Hồ Sơ Thẩm Định: QC Từ Chối Yêu Cầu Đổi / Trả</span>
+                        </div>
+                        <span style={{ fontSize: '0.75rem', fontWeight: 800, padding: '0.25rem 0.65rem', borderRadius: '8px', backgroundColor: '#fee2e2', border: '1px solid #fca5a5', color: '#b91c1c' }}>
+                          Mã phiếu: {formatRmaCode(existingReturn)}
+                        </span>
+                      </div>
+
+                      {/* Tình trạng vận chuyển trả hàng */}
+                      <div style={{ padding: '0.6rem 0.85rem', backgroundColor: rDeliv.bg, border: `1px solid ${rDeliv.border}`, borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.78rem', color: rDeliv.color, fontWeight: 700 }}>
+                        <span>🚚 Vận chuyển hoàn trả:</span>
+                        <span>{rDeliv.title}</span>
+                      </div>
+
+                      {/* Chi tiết thẩm định */}
+                      <div style={{ display: 'grid', gridTemplateColumns: existingReturn.qcProofPhoto ? '1fr 120px' : '1fr', gap: '1rem', alignItems: 'start' }}>
+                        <div style={{ fontSize: '0.8rem', color: '#334155', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                          <div>
+                            <span style={{ color: '#64748b', fontWeight: 600 }}>Hạng mục vi phạm:</span>{' '}
+                            <strong style={{ color: '#dc2626' }}>{defectLabel}</strong>
+                          </div>
+                          <div>
+                            <span style={{ color: '#64748b', fontWeight: 600 }}>Chi tiết kết luận kỹ thuật:</span>{' '}
+                            <span style={{ color: '#0f172a', fontWeight: 600, backgroundColor: '#ffffff', padding: '4px 8px', borderRadius: '6px', border: '1px solid #fecaca', display: 'inline-block', marginTop: '3px', lineHeight: 1.4 }}>
+                              {existingReturn.qcNotes || 'Sản phẩm không đáp ứng tiêu chuẩn đổi trả bảo hành theo quy định của nhà sản xuất.'}
+                            </span>
+                          </div>
+                          <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '2px' }}>
+                            Giám định viên: <strong style={{ color: '#0f172a' }}>{existingReturn.qcInspector || 'QA/QC Kỹ thuật AetherPC'}</strong>
+                            {existingReturn.qcInspectedAt && (
+                              <span> • {new Date(existingReturn.qcInspectedAt).toLocaleString('vi-VN')}</span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Ảnh minh chứng vi phạm có thể xem zoom */}
+                        {existingReturn.qcProofPhoto && (
+                          <div style={{ textAlign: 'center' }}>
+                            <img
+                              src={existingReturn.qcProofPhoto}
+                              alt="Ảnh minh chứng QC"
+                              onClick={() => setViewProofImage(existingReturn.qcProofPhoto)}
+                              style={{ width: '110px', height: '80px', objectFit: 'cover', borderRadius: '8px', border: '2px solid #f87171', cursor: 'pointer', boxShadow: '0 2px 6px rgba(220,38,38,0.15)' }}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setViewProofImage(existingReturn.qcProofPhoto)}
+                              style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', border: 'none', background: 'transparent', color: '#dc2626', fontSize: '0.7rem', fontWeight: 700, marginTop: '4px', cursor: 'pointer' }}
+                            >
+                              <Eye size={12} /> Xem ảnh gốc
+                            </button>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Các hành động: Gửi khiếu nại / phúc tra, Liên hệ CSKH */}
+                      <div style={{ borderTop: '1px solid #fecaca', paddingTop: '0.65rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                        <span style={{ fontSize: '0.74rem', color: '#64748b' }}>
+                          Nếu bạn cho rằng kết luận kiểm định chưa thỏa đáng, bạn có quyền gửi yêu cầu phúc tra:
+                        </span>
+                        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setComplaintForm({
+                                orderId: selectedOrder.orderId,
+                                title: `[Phúc tra RMA] Khiếu nại từ chối đổi trả đơn #${selectedOrder.orderId}`,
+                                description: `Tôi nhận được thông báo từ chối đổi trả đơn #${selectedOrder.orderId} (Phiếu ${formatRmaCode(existingReturn)}) với lý do: "${existingReturn.qcNotes || defectLabel}".\nTôi xin cung cấp thêm thông tin đối soát làm rõ để yêu cầu xem xét lại:\n`,
+                                priority: 'HIGH',
+                                evidenceUrl: ''
+                              });
+                              setShowComplaintModal(true);
+                            }}
+                            className="btn btn-primary"
+                            style={{
+                              fontSize: '0.78rem',
+                              padding: '0.45rem 0.9rem',
+                              borderRadius: '8px',
+                              backgroundColor: '#dc2626',
+                              border: 'none',
+                              color: '#fff',
+                              fontWeight: 700,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.35rem',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            <AlertCircle size={15} />
+                            Gửi Khiếu Nại / Phúc Tra
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }
+
                 return (
                   <div style={{ padding: '1.15rem 1.35rem', backgroundColor: sc.bg, border: '1px solid ' + sc.border, borderRadius: '12px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.4rem' }}>
@@ -1741,36 +2270,41 @@ export default function MyOrders() {
               {/* Theo Dõi Vị Trí Giao Hàng Trực Tiếp — chỉ hiện khi đơn đang được Shipper giao */}
               {selectedOrder.status === 'SHIPPED' && (
                 <div id="live-gps-tracking-card" className="card-glass" style={{ padding: 'clamp(1rem, 2.5vw, 1.5rem)', border: '1.5px solid #93c5fd', backgroundColor: '#f0f9ff', borderRadius: '14px', boxShadow: '0 8px 25px rgba(37,99,235,0.08)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.6rem' }}>
-                    <div>
-                      <h3 style={{ fontSize: 'clamp(1rem, 2vw, 1.15rem)', fontWeight: 800, margin: 0, display: 'flex', alignItems: 'center', gap: '0.55rem', color: '#1e3a8a' }}>
-                        <MapPin size={20} color="#2563eb" />
-                        Theo Dõi Vị Trí Giao Hàng Trực Tiếp
-                      </h3>
-                      <p style={{ margin: '0.25rem 0 0', fontSize: '0.78rem', color: '#64748b' }}>
-                        Tọa độ thực tế được truyền trực tiếp từ thiết bị định vị GPS của Shipper
-                      </p>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const link = `${window.location.origin}/track/${selectedOrder.orderId || selectedOrder.id}`;
-                          navigator.clipboard?.writeText(link)
-                            .then(() => addNotification('Đã sao chép link theo dõi đơn hàng!', 'success'))
-                            .catch(() => addNotification(link, 'info'));
-                        }}
-                        style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', backgroundColor: '#eff6ff', border: '1px solid #93c5fd', padding: '0.3rem 0.7rem', borderRadius: '999px', fontSize: '0.72rem', fontWeight: 700, color: '#1d4ed8', cursor: 'pointer' }}
-                      >
-                        🔗 Chia sẻ link theo dõi
-                      </button>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', backgroundColor: '#fee2e2', border: '1px solid #fca5a5', padding: '0.25rem 0.65rem', borderRadius: '999px', fontSize: '0.72rem', fontWeight: 800, color: '#b91c1c' }}>
-                        <span style={{ display: 'inline-block', width: '7px', height: '7px', borderRadius: '50%', backgroundColor: '#ef4444', boxShadow: '0 0 6px #ef4444' }} />
-                        ĐANG PHÁT ĐỊNH VỊ
-                      </div>
-                    </div>
-                  </div>
                   {(() => {
+                    const currentOriginType = livePosition?.originType || trackingData?.originType || 'warehouse';
+                    const currentOriginCoord = livePosition?.originCoord || trackingData?.originCoord || null;
+
+                    const badgeConfig = {
+                      gps: {
+                        bg: '#fee2e2',
+                        border: '#fca5a5',
+                        color: '#b91c1c',
+                        dot: '#ef4444',
+                        label: 'ĐANG PHÁT ĐỊNH VỊ TRỰC TIẾP',
+                        sub: 'Tọa độ thực tế được truyền trực tiếp từ thiết bị định vị GPS của Shipper'
+                      },
+                      manual: {
+                        bg: '#d1fae5',
+                        border: '#a7f3d0',
+                        color: '#047857',
+                        dot: '#10b981',
+                        label: 'XUẤT PHÁT TỪ ĐIỂM GIAO',
+                        sub: 'Shipper xuất phát từ trạm trung chuyển / điểm hẹn giao hàng'
+                      },
+                      warehouse: {
+                        bg: '#eff6ff',
+                        border: '#bfdbfe',
+                        color: '#1d4ed8',
+                        dot: '#2563eb',
+                        label: 'XUẤT PHÁT TỪ KHO HÀNG',
+                        sub: 'Kiện hàng được xuất kho và giao trực tiếp từ Kho AetherPC'
+                      }
+                    }[currentOriginType] || {
+                      bg: '#fee2e2', border: '#fca5a5', color: '#b91c1c', dot: '#ef4444',
+                      label: 'ĐANG PHÁT ĐỊNH VỊ',
+                      sub: 'Tọa độ thực tế được truyền trực tiếp từ thiết bị định vị GPS của Shipper'
+                    };
+
                     const orderRegion = trackingData?.deliveryRegion || detectDeliveryRegion(selectedOrder.shippingAddress || selectedOrder.address || '');
                     const orderWarehouse = trackingData?.warehouse || (orderRegion === 'HN_NORTH'
                       ? { lat: 21.0139, lng: 105.8228, name: 'Kho AetherPC Hà Nội', address: 'Quận Đống Đa, Hà Nội' }
@@ -1783,13 +2317,47 @@ export default function MyOrders() {
                     const orderShipperPhone = trackingData?.shipper?.phone || selectedOrder.shipperPhone || '1900.8888';
 
                     return (
-                      <DeliveryMap
-                        warehouse={orderWarehouse}
-                        destination={orderDestination}
-                        shipperPosition={livePosition}
-                        shipperName={orderShipperName}
-                        shipperPhone={orderShipperPhone}
-                      />
+                      <div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.6rem' }}>
+                          <div>
+                            <h3 style={{ fontSize: 'clamp(1rem, 2vw, 1.15rem)', fontWeight: 800, margin: 0, display: 'flex', alignItems: 'center', gap: '0.55rem', color: '#1e3a8a' }}>
+                              <MapPin size={20} color="#2563eb" />
+                              Theo Dõi Vị Trí Giao Hàng Trực Tiếp
+                            </h3>
+                            <p style={{ margin: '0.25rem 0 0', fontSize: '0.78rem', color: '#64748b' }}>
+                              {badgeConfig.sub}
+                            </p>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const link = `${window.location.origin}/track/${selectedOrder.orderId || selectedOrder.id}`;
+                                navigator.clipboard?.writeText(link)
+                                  .then(() => addNotification('Đã sao chép link theo dõi đơn hàng!', 'success'))
+                                  .catch(() => addNotification(link, 'info'));
+                              }}
+                              style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', backgroundColor: '#eff6ff', border: '1px solid #93c5fd', padding: '0.3rem 0.7rem', borderRadius: '999px', fontSize: '0.72rem', fontWeight: 700, color: '#1d4ed8', cursor: 'pointer' }}
+                            >
+                              🔗 Chia sẻ link theo dõi
+                            </button>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', backgroundColor: badgeConfig.bg, border: `1px solid ${badgeConfig.border}`, padding: '0.25rem 0.65rem', borderRadius: '999px', fontSize: '0.72rem', fontWeight: 800, color: badgeConfig.color }}>
+                              <span style={{ display: 'inline-block', width: '7px', height: '7px', borderRadius: '50%', backgroundColor: badgeConfig.dot, boxShadow: `0 0 6px ${badgeConfig.dot}` }} />
+                              {badgeConfig.label}
+                            </div>
+                          </div>
+                        </div>
+
+                        <DeliveryMap
+                          warehouse={orderWarehouse}
+                          destination={orderDestination}
+                          shipperPosition={livePosition}
+                          shipperName={orderShipperName}
+                          shipperPhone={orderShipperPhone}
+                          originType={currentOriginType}
+                          originCoord={currentOriginCoord}
+                        />
+                      </div>
                     );
                   })()}
                 </div>

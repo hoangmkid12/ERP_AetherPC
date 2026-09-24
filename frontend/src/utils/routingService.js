@@ -307,3 +307,204 @@ export async function forwardGeocode(address) {
   return null;
 }
 
+// ============================================================
+// Route Optimization Helpers (Nearest Neighbor + OSRM Table)
+// ============================================================
+
+/**
+ * Gọi OSRM Table API để lấy ma trận thời gian đi (giây) giữa N điểm.
+ * @param {Array<{lat: number, lng: number}>} coords - Index 0 là kho xuất phát
+ * @returns {Promise<number[][]>} - Ma trận duration (giây), null nếu lỗi
+ */
+export async function fetchOsrmTable(coords) {
+  if (!coords || coords.length < 2) return null;
+  const coordStr = coords.map(c => `${c.lng},${c.lat}`).join(';');
+  const url = `${OSRM_BASE_URL}/table/v1/driving/${coordStr}?annotations=duration`;
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    const res = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeoutId);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    if (data.code === 'Ok' && data.durations) return data.durations;
+  } catch (err) {
+    console.warn('[routingService] OSRM Table API lỗi:', err.message);
+  }
+  return null;
+}
+
+/**
+ * Thuật toán Nearest Neighbor Heuristic chạy hoàn toàn trên Frontend.
+ * Dùng làm fallback khi backend không khả dụng.
+ * @param {number[][]} matrix - Ma trận duration (giây)
+ * @param {number} startIdx - Index điểm xuất phát (kho = 0)
+ * @param {number[]} deliveryIndices - Danh sách index các điểm giao hàng
+ * @returns {Array<{index: number, durationFromPrev: number}>}
+ */
+export function nearestNeighborTSP(matrix, startIdx, deliveryIndices) {
+  const visited = new Set();
+  const route = [];
+  let current = startIdx;
+
+  while (route.length < deliveryIndices.length) {
+    let nearestIdx = -1;
+    let nearestDuration = Infinity;
+    for (const idx of deliveryIndices) {
+      if (visited.has(idx)) continue;
+      const d = matrix[current]?.[idx];
+      if (d != null && d < nearestDuration) {
+        nearestDuration = d;
+        nearestIdx = idx;
+      }
+    }
+    if (nearestIdx === -1) break;
+    visited.add(nearestIdx);
+    route.push({ index: nearestIdx, durationFromPrev: nearestDuration });
+    current = nearestIdx;
+  }
+  return route;
+}
+
+/**
+ * Lấy polyline đường bộ qua nhiều điểm dừng (multi-stop route).
+ * Gọi OSRM Route API với tất cả waypoints.
+ * @param {Array<{lat: number, lng: number}>} waypoints - Danh sách tọa độ theo thứ tự giao
+ * @returns {Promise<{coordinates: number[][], totalDistanceKm: string, totalDurationMinutes: number} | null>}
+ */
+export async function fetchMultiStopRoute(waypoints) {
+  if (!waypoints || waypoints.length < 2) return null;
+  const coordStr = waypoints.map(w => `${w.lng},${w.lat}`).join(';');
+  const url = `${OSRM_BASE_URL}/route/v1/driving/${coordStr}?overview=full&geometries=geojson`;
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+    const res = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeoutId);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    if (data.code === 'Ok' && data.routes?.length > 0) {
+      const r = data.routes[0];
+      return {
+        coordinates: r.geometry.coordinates.map(([lng, lat]) => [lat, lng]),
+        totalDistanceKm: (r.distance / 1000).toFixed(1),
+        totalDurationMinutes: Math.round(r.duration / 60)
+      };
+    }
+  } catch (err) {
+    console.warn('[routingService] OSRM multi-stop route lỗi:', err.message);
+  }
+  return null;
+}
+
+/**
+ * Tìm kiếm gợi ý địa chỉ (autocomplete) với Nominatim, Photon, Goong & Fallback địa phương.
+ * Phục vụ tìm kiếm địa chỉ chính xác, ngõ hẻm, đường phố kèm bản đồ.
+ * @param {string} query
+ * @returns {Promise<Array<{displayName: string, mainText: string, secondaryText: string, lat: number, lng: number}>>}
+ */
+export async function searchAddressSuggestions(query) {
+  if (!query || typeof query !== 'string' || query.trim().length < 2) return [];
+  const q = query.trim();
+
+  // 1. Thử Goong Geocoding nếu có key
+  if (GOONG_API_KEY) {
+    try {
+      const url = `https://rsapi.goong.io/geocode?address=${encodeURIComponent(q)}&api_key=${GOONG_API_KEY}&limit=5`;
+      const ctrl = new AbortController();
+      const tid = setTimeout(() => ctrl.abort(), 3500);
+      const res = await fetch(url, { signal: ctrl.signal });
+      clearTimeout(tid);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.results) && data.results.length > 0) {
+          return data.results.map(r => {
+            const parts = (r.formatted_address || '').split(',').map(s => s.trim());
+            return {
+              displayName: r.formatted_address,
+              mainText: parts[0] || q,
+              secondaryText: parts.slice(1).join(', '),
+              lat: r.geometry.location.lat,
+              lng: r.geometry.location.lng,
+            };
+          });
+        }
+      }
+    } catch (_) {}
+  }
+
+  // 2. Thử Nominatim (OpenStreetMap Search)
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&countrycodes=vn&limit=6&addressdetails=1`;
+    const ctrl = new AbortController();
+    const tid = setTimeout(() => ctrl.abort(), 3500);
+    const res = await fetch(url, {
+      signal: ctrl.signal,
+      headers: { Accept: 'application/json', 'User-Agent': 'AetherPC-ERP/1.0' }
+    });
+    clearTimeout(tid);
+    if (res.ok) {
+      const list = await res.json();
+      if (Array.isArray(list) && list.length > 0) {
+        return list.map(item => {
+          const parts = (item.display_name || '').split(',').map(s => s.trim());
+          const main = item.name || parts[0] || q;
+          const sub = parts.filter(p => p !== main).slice(0, 3).join(', ');
+          return {
+            displayName: item.display_name,
+            mainText: main,
+            secondaryText: sub || parts.slice(1, 3).join(', '),
+            lat: parseFloat(item.lat),
+            lng: parseFloat(item.lon),
+          };
+        });
+      }
+    }
+  } catch (_) {}
+
+  // 3. Fallback Photon (Komoot OSM - siêu nhanh, không rate limit)
+  try {
+    const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=6&lat=10.7769&lon=106.7009`;
+    const ctrl = new AbortController();
+    const tid = setTimeout(() => ctrl.abort(), 3000);
+    const res = await fetch(url, { signal: ctrl.signal });
+    clearTimeout(tid);
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data?.features) && data.features.length > 0) {
+        return data.features.map(f => {
+          const p = f.properties || {};
+          const coords = f.geometry?.coordinates || [];
+          const name = p.name || p.street || q;
+          const sub = [p.street, p.district, p.city || p.state, p.country].filter(Boolean).filter(s => s !== name).join(', ');
+          const full = [name, sub].filter(Boolean).join(', ');
+          return {
+            displayName: full || name,
+            mainText: name,
+            secondaryText: sub,
+            lat: coords[1],
+            lng: coords[0]
+          };
+        }).filter(r => typeof r.lat === 'number' && typeof r.lng === 'number');
+      }
+    }
+  } catch (_) {}
+
+  // 4. Fallback danh mục địa bàn phổ biến
+  const normalizedQ = q.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const matches = ADMIN_FALLBACK_COORDS.filter(item =>
+    item.keys.some(k => normalizedQ.includes(k) || k.includes(normalizedQ))
+  );
+  if (matches.length > 0) {
+    return matches.slice(0, 4).map(m => ({
+      displayName: m.name,
+      mainText: m.name,
+      secondaryText: 'Khu vực phổ biến',
+      lat: m.lat,
+      lng: m.lng
+    }));
+  }
+
+  return [];
+}
+

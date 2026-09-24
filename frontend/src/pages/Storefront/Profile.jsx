@@ -72,25 +72,35 @@ export default function Profile() {
       .catch(err => console.warn('AddressKit provinces fetch error:', err));
   }, []);
 
-  // Fetch live communes/wards for selected province code
-  const fetchCommunesForProvince = (provName) => {
-    const list = apiProvinces.length > 0 ? apiProvinces : VIETNAM_PROVINCES;
-    const found = list.find(p => p.name === provName || p.code === provName || p.id === provName);
-    const code = found?.code;
-    if (code) {
-      setLoadingCommunes(true);
-      api.get(`/address/provinces/${code}/communes`)
-        .then(res => {
-          const communes = res?.data?.communes;
-          if (Array.isArray(communes)) {
-            setApiCommunes(communes);
-          }
-        })
-        .catch(err => console.warn('AddressKit communes fetch error:', err))
-        .finally(() => setLoadingCommunes(false));
-    } else {
+  // Fetch live wards for selected province and district
+  const fetchWardsForDistrict = (provName, districtName) => {
+    if (!provName) {
       setApiCommunes([]);
+      return;
     }
+    setLoadingCommunes(true);
+    const params = new URLSearchParams();
+    params.set('province', provName);
+    if (districtName) params.set('district', districtName);
+
+    api.get(`/address/wards?${params.toString()}`)
+      .then(res => {
+        const wards = res?.data?.wards;
+        if (Array.isArray(wards) && wards.length > 0) {
+          setApiCommunes(wards);
+        } else {
+          // Fallback to communes
+          const list = apiProvinces.length > 0 ? apiProvinces : VIETNAM_PROVINCES;
+          const found = list.find(p => p.name === provName || p.code === provName || p.id === provName);
+          if (found?.code) {
+            return api.get(`/address/provinces/${found.code}/communes`).then(cRes => {
+              setApiCommunes(cRes?.data?.communes || []);
+            });
+          }
+        }
+      })
+      .catch(err => console.warn('Wards fetch error:', err))
+      .finally(() => setLoadingCommunes(false));
   };
 
   useEffect(() => {
@@ -225,7 +235,7 @@ export default function Profile() {
     setEditingAddress(address);
     setAddressForm({ ...emptyAddress, ...address });
     if (address.city) {
-      fetchCommunesForProvince(address.city);
+      fetchWardsForDistrict(address.city, address.district || '');
     } else {
       setApiCommunes([]);
     }
@@ -440,7 +450,8 @@ export default function Profile() {
           provinces={apiProvinces.length > 0 ? apiProvinces : VIETNAM_PROVINCES}
           communes={apiCommunes}
           loadingCommunes={loadingCommunes}
-          onProvinceChange={fetchCommunesForProvince}
+          onProvinceChange={(prov) => fetchWardsForDistrict(prov, '')}
+          onDistrictChange={(prov, dist) => fetchWardsForDistrict(prov, dist)}
         />
       )}
     </div>
@@ -589,7 +600,8 @@ function AddressModal({
   provinces = [],
   communes = [],
   loadingCommunes = false,
-  onProvinceChange
+  onProvinceChange,
+  onDistrictChange
 }) {
   const update = key => event => setForm({ ...form, [key]: event.target.type === 'checkbox' ? event.target.checked : event.target.value });
 
@@ -615,11 +627,12 @@ function AddressModal({
       ward: '',
       isTwoTier: !provHasDistricts
     }));
-    if (onProvinceChange) onProvinceChange(cityName);
+    if (onProvinceChange) onProvinceChange(cityName, '');
   };
 
   const handleDistrictChange = (districtName) => {
-    setForm(prev => ({ ...prev, district: districtName }));
+    setForm(prev => ({ ...prev, district: districtName, ward: '' }));
+    if (onDistrictChange) onDistrictChange(form.city, districtName);
   };
 
   const handleWardChange = (wardName) => {
@@ -673,8 +686,14 @@ function AddressModal({
               value={form.ward}
               onChange={handleWardChange}
               options={communes}
-              placeholder={!form.city ? "-- Chọn Tỉnh/TP trước --" : (loadingCommunes ? "-- Đang tải Phường/Xã... --" : "-- Chọn Phường / Xã --")}
-              disabled={!form.city || loadingCommunes}
+              placeholder={
+                !form.city
+                  ? "-- Chọn Tỉnh/TP trước --"
+                  : (!isTwoTier && !form.district)
+                  ? "-- Chọn Quận / Huyện trước --"
+                  : (loadingCommunes ? "-- Đang tải Phường/Xã... --" : "-- Chọn Phường / Xã --")
+              }
+              disabled={!form.city || (!isTwoTier && !form.district) || loadingCommunes}
               loading={loadingCommunes}
             />
           </Field>

@@ -360,8 +360,95 @@ const createPosOrder = async (req, res, next) => {
   }
 };
 
+const autoCompleteDeliveredOrders = async () => {
+  try {
+    const fortyEightHoursAgo = new Date(Date.now() - 48 * 60 * 60 * 1000);
+    const expiredOrders = await prisma.order.findMany({
+      where: {
+        status: 'DELIVERED',
+        deliveredAt: {
+          lte: fortyEightHoursAgo
+        }
+      },
+      select: { orderId: true }
+    });
+
+    if (expiredOrders && expiredOrders.length > 0) {
+      const orderIds = expiredOrders.map(o => o.orderId);
+      await prisma.order.updateMany({
+        where: { orderId: { in: orderIds } },
+        data: { status: 'COMPLETED' }
+      });
+
+      for (const oid of orderIds) {
+        await prisma.orderStatusHistory.create({
+          data: {
+            orderId: oid,
+            status: 'COMPLETED',
+            note: 'Hệ thống tự động chuyển Hoàn tất (sau 48 giờ kể từ khi giao hàng khách không khiếu nại).',
+            changedBy: 'Hệ Thống Tự Động'
+          }
+        }).catch(() => {});
+      }
+    }
+  } catch (e) {
+    // quiet catch
+  }
+};
+
+const confirmReceivedOrder = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { note } = req.body;
+
+    const order = await prisma.order.findUnique({
+      where: { orderId: id }
+    });
+
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy đơn hàng' });
+    }
+
+    if (!['SHIPPED', 'DELIVERED'].includes(order.status)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Chỉ có thể xác nhận đã nhận hàng khi đơn đang giao hoặc đã giao.'
+      });
+    }
+
+    const updated = await prisma.order.update({
+      where: { orderId: id },
+      data: {
+        status: 'COMPLETED',
+        paymentStatus: 'PAID',
+        deliveredAt: order.deliveredAt || new Date()
+      }
+    });
+
+    await prisma.orderStatusHistory.create({
+      data: {
+        orderId: id,
+        status: 'COMPLETED',
+        note: note || 'Khách hàng xác nhận đã nhận được hàng thành công.',
+        changedBy: req.user?.fullname || req.user?.name || req.user?.email || 'Khách hàng'
+      }
+    });
+
+    res.json({
+      success: true,
+      message: 'Xác nhận nhận hàng thành công! Cảm ơn bạn đã mua sắm tại AetherPC.',
+      data: updated
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 const getCustomerOrders = async (req, res, next) => {
   try {
+    // Tự động kiểm tra và chuyển các đơn đã giao quá 48h sang COMPLETED
+    await autoCompleteDeliveredOrders();
+
     const role = (req.user?.role || '').toUpperCase();
     const isCustomer = role === 'CUSTOMER';
     const isDelivery = role === 'DELIVERY';
@@ -550,29 +637,53 @@ const updateOrderStatus = async (req, res, next) => {
 
             totalCogs += Number(productBeforeUpdate?.averageCost || 0) * item.quantity;
 
-            // Trừ tồn kho vật lý tại kho chính (Warehouse 1)
-            const inventory = await tx.inventory.findFirst({
+            // Trừ tồn kho vật lý: ưu tiên kho 1 (nếu đủ), hoặc chọn kho có đủ số lượng tồn
+            let inventory = await tx.inventory.findFirst({
               where: {
                 productId: item.productId,
-                warehouseId: 1
+                warehouseId: 1,
+                quantityOnHand: { gte: item.quantity }
               }
             });
 
-            if (!inventory || inventory.quantityOnHand < item.quantity) {
-              const error = new Error(`Kho vật lý không đủ tồn cho sản phẩm ${item.productId}`);
-              error.statusCode = 409;
-              throw error;
+            if (!inventory) {
+              // Tìm kho có đủ tồn
+              inventory = await tx.inventory.findFirst({
+                where: {
+                  productId: item.productId,
+                  quantityOnHand: { gte: item.quantity }
+                },
+                orderBy: { quantityOnHand: 'desc' }
+              });
             }
-            await tx.inventory.update({
-              where: { id: inventory.id },
-              data: { quantityOnHand: { decrement: item.quantity } }
-            });
+
+            // Fallback: nếu không có kho nào đủ item.quantity nhưng Product.stockQuantity vẫn còn, lấy kho có số tồn lớn nhất
+            if (!inventory) {
+              inventory = await tx.inventory.findFirst({
+                where: { productId: item.productId },
+                orderBy: { quantityOnHand: 'desc' }
+              });
+            }
+
+            const chosenWarehouseId = inventory?.warehouseId || 1;
+
+            if (inventory && inventory.quantityOnHand >= item.quantity) {
+              await tx.inventory.update({
+                where: { id: inventory.id },
+                data: { quantityOnHand: { decrement: item.quantity } }
+              });
+            } else if (inventory && inventory.quantityOnHand > 0) {
+              await tx.inventory.update({
+                where: { id: inventory.id },
+                data: { quantityOnHand: 0 }
+              });
+            }
 
             // Ghi log xuất kho
             await tx.stockMovement.create({
               data: {
                 productId: item.productId,
-                fromWarehouseId: 1,
+                fromWarehouseId: chosenWarehouseId,
                 type: 'OUT',
                 quantity: item.quantity,
                 referenceId: id,
@@ -707,14 +818,27 @@ const updateOrderStatus = async (req, res, next) => {
       // Chỉ nhận khi là ID nhân viên nội bộ hợp lệ (số nguyên) — shipper ngoài
       // hệ thống (chọn tự do bằng tên) không có Employee thật để gắn FK vào.
       const shipperIdRaw = req.body.assignedShipperId;
-      const assignedShipperIdInt = /^\d+$/.test(String(shipperIdRaw ?? '')) ? parseInt(shipperIdRaw, 10) : null;
+      let assignedShipperIdInt = /^\d+$/.test(String(shipperIdRaw ?? '')) ? parseInt(shipperIdRaw, 10) : null;
 
-      // Chỉ chấp nhận gán cho nhân viên nội bộ thật có role DELIVERY — trước
-      // đây route này nhận bất kỳ số nguyên nào không kiểm tra gì, cho phép
-      // ghi 1 id không tồn tại hoặc id của nhân viên khác role vào
-      // assignedShipperId. Việc bỏ tuỳ chọn "đối tác vận chuyển ngoài" ở
-      // RegionalShipperModal (Warehouse.jsx) chỉ có ý nghĩa nếu backend cũng
-      // thực thi "chỉ shipper nội bộ" chứ không riêng dựa vào UI.
+      // Hỗ trợ trường hợp UI gửi employeeCode/username của shipper thay vì ID số
+      if (assignedShipperIdInt === null && (req.body.assignedShipperUsername || typeof shipperIdRaw === 'string')) {
+        const empCode = req.body.assignedShipperUsername || shipperIdRaw;
+        const matchedEmp = await tx.employee.findFirst({
+          where: {
+            OR: [
+              { employeeCode: String(empCode) },
+              { email: String(empCode) }
+            ],
+            role: 'DELIVERY'
+          },
+          select: { id: true, role: true }
+        });
+        if (matchedEmp) {
+          assignedShipperIdInt = matchedEmp.id;
+        }
+      }
+
+      // Chỉ chấp nhận gán cho nhân viên nội bộ thật có role DELIVERY
       if (assignedShipperIdInt !== null) {
         const shipperEmployee = await tx.employee.findUnique({
           where: { id: assignedShipperIdInt },
@@ -845,7 +969,7 @@ const updateOrderStatus = async (req, res, next) => {
       });
 
       return updatedOrder;
-    });
+    }, { maxWait: 10000, timeout: 30000 });
 
     // Gửi email cập nhật trạng thái cho khách hàng
     const updatedOrderFull = await prisma.order.findUnique({
@@ -899,9 +1023,12 @@ const createReturnRequest = async (req, res, next) => {
       phone,
       customerName,
       note,
-      evidenceUrl
+      evidenceUrl,
+      image,
+      evidence
     } = req.body;
 
+    const finalEvidenceUrl = evidenceUrl || image || evidence || '';
     const actualType = type || returnType || 'REFUND';
     const isExchange = actualType === 'EXCHANGE';
 
@@ -949,7 +1076,7 @@ const createReturnRequest = async (req, res, next) => {
         type: actualType,
         reason: reason || 'Khách hàng yêu cầu hoàn trả',
         note: note || '',
-        evidenceUrl: evidenceUrl || '',
+        evidenceUrl: finalEvidenceUrl,
         refundAmount: isExchange ? 0 : (refundAmount || order.totalAmount),
         bankName: isExchange ? '' : (bankName || ''),
         bankAccountNo: isExchange ? '' : (bankAccountNo || ''),
@@ -984,7 +1111,11 @@ const createReturnRequest = async (req, res, next) => {
       message: isAutoApprove
         ? `Yêu cầu ${loaiYeuCauText} đã được tự động duyệt. Shipper sẽ liên hệ thu hồi hàng.`
         : `Yêu cầu ${loaiYeuCauText} đã được tiếp nhận thành công. Nhân viên CSKH sẽ thẩm định và phản hồi sớm nhất!`,
-      data: returnReq
+      data: {
+        ...returnReq,
+        image: returnReq.evidenceUrl || finalEvidenceUrl || '',
+        evidenceUrl: returnReq.evidenceUrl || finalEvidenceUrl || ''
+      }
     });
   } catch (err) {
     next(err);
@@ -1306,17 +1437,75 @@ const qcInspectReturn = async (req, res, next) => {
     await prisma.orderStatusHistory.create({
       data: {
         orderId: returnReq.orderId,
-        status: isApproved ? 'QC_PASSED' : 'DELIVERED',
+        status: isApproved ? 'QC_PASSED' : 'REJECTED',
         note: note || (isApproved
           ? `QC Thẩm định: ĐẠT ĐIỀU KIỆN (${qcDefectType || 'Lỗi phần cứng'}). Xác nhận sản phẩm nguyên vẹn có ảnh minh chứng. (Giám định bởi ${inspectorName})`
-          : `QC Thẩm định: TỪ CHỐI ĐỔI TRẢ (${qcDefectType || 'Vi phạm điều kiện'}). Trả về trạng thái đã giao. (Giám định bởi ${inspectorName})`),
+          : `QC Thẩm định: TỪ CHỐI ĐỔI TRẢ (${qcDefectType || 'Vi phạm điều kiện'}). Chờ Shipper nhận hàng tại kho để giao trả lại cho khách. (Giám định bởi ${inspectorName})`),
         changedBy: inspectorName
       }
     });
 
     res.json({
       success: true,
-      message: isApproved ? 'QC thẩm định đạt chuẩn! Đã lưu ảnh minh chứng và chuyển Thủ kho nhập kệ.' : 'QC đã từ chối yêu cầu đổi trả.',
+      message: isApproved ? 'QC thẩm định đạt chuẩn! Đã lưu ảnh minh chứng và chuyển Thủ kho nhập kệ.' : 'QC đã từ chối yêu cầu đổi trả. Kiện hàng chuyển sang chờ Shipper giao trả lại khách.',
+      data: returnReq
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * 7b. SHIPPER GIAO TRẢ LẠI HÀNG BỊ QC TỪ CHỐI CHO KHÁCH
+ */
+const shipperRedeliverReturn = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { status, note } = req.body;
+    const shipperName = req.user?.fullname || req.user?.name || req.user?.username || 'Shipper';
+
+    const returnReq = await prisma.returnRequest.findFirst({
+      where: { OR: [{ id: id }, { orderId: id }] },
+      include: { order: true }
+    });
+
+    if (!returnReq) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy yêu cầu đổi trả' });
+    }
+
+    const targetStatus = status === 'RETURNED_TO_CUSTOMER' ? 'RETURNED_TO_CUSTOMER' : 'RETURNING_TO_CUSTOMER';
+    const isCompleted = targetStatus === 'RETURNED_TO_CUSTOMER';
+
+    await prisma.returnRequest.update({
+      where: { id: returnReq.id },
+      data: {
+        status: targetStatus
+      }
+    });
+
+    const statusNote = note || (isCompleted
+      ? `Shipper ${shipperName} đã hoàn trả kiện hàng không đủ điều kiện đổi trả tận tay khách hàng.`
+      : `Shipper ${shipperName} đã nhận kiện hàng bị QC từ chối từ kho và đang trên đường giao trả lại cho khách.`);
+
+    await prisma.orderStatusHistory.create({
+      data: {
+        orderId: returnReq.orderId,
+        status: targetStatus,
+        note: statusNote,
+        changedBy: shipperName
+      }
+    });
+
+    if (isCompleted) {
+      await prisma.order.update({
+        where: { orderId: returnReq.orderId },
+        data: { status: 'DELIVERED' }
+      });
+    }
+
+    res.json({
+      success: true,
+      message: isCompleted ? 'Đã hoàn tất giao trả lại kiện hàng cho khách.' : 'Đã nhận kiện hàng từ kho, đang giao trả lại cho khách.',
       data: returnReq
     });
   } catch (err) {
@@ -1679,7 +1868,9 @@ const getReturnRequests = async (req, res, next) => {
       }
       return {
         ...r,
-        rmaCode: code
+        rmaCode: code,
+        image: r.evidenceUrl || '',
+        evidenceUrl: r.evidenceUrl || ''
       };
     });
 
@@ -1840,11 +2031,18 @@ const getDeliveryTracking = async (req, res, next) => {
       select: { name: true, address: true, lat: true, lng: true }
     });
 
+    const { getActiveDelivery } = require('../services/websocketService');
+    const live = typeof getActiveDelivery === 'function' ? getActiveDelivery(String(orderId)) : null;
+    const originType = live?.originType || (order.lastLat != null ? 'gps' : 'warehouse');
+    const originCoord = live?.originCoord || null;
+
     res.json({
       success: true,
       data: {
         status: order.status,
         warehouse,
+        originType,
+        originCoord,
         deliveryRegion: order.deliveryRegion,
         shippingAddress: order.shippingAddress,
         shippingCity: order.shippingCity,
@@ -1897,6 +2095,7 @@ module.exports = {
   shipperPickupReturn,
   shipperDeliverWarehouseReturn,
   qcInspectReturn,
+  shipperRedeliverReturn,
   confirmReturnWarehouse,
   processRefund,
   getReturnRequests,
@@ -1908,5 +2107,6 @@ module.exports = {
   updateReturnSettings,
   updateDeliveryLocationHttp,
   getDeliveryTracking,
-  getDeliveryLocationHistory
+  getDeliveryLocationHistory,
+  confirmReceivedOrder
 };

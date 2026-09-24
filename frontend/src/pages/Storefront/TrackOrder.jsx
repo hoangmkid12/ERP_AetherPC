@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { MapPin, Phone, PackageSearch } from 'lucide-react';
+import { MapPin, Phone, PackageSearch, CheckCircle2 } from 'lucide-react';
 import { api } from '../../services/api';
 import DeliveryMap from '../../components/DeliveryMap';
 import DeliveryProgressStepper from '../../components/DeliveryProgressStepper';
@@ -15,6 +15,8 @@ export default function TrackOrder() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [livePosition, setLivePosition] = useState(null);
+  const [confirming, setConfirming] = useState(false);
+  const [confirmedMsg, setConfirmedMsg] = useState('');
 
   useEffect(() => {
     if (!orderId) return;
@@ -42,7 +44,18 @@ export default function TrackOrder() {
       try {
         const data = JSON.parse(evt.data);
         if (data.type === 'DELIVERY_LOCATION_UPDATE' && String(data.orderId) === String(orderId)) {
-          setLivePosition({ lat: data.lat, lng: data.lng, speed: data.speed, heading: data.heading, updatedAt: data.updatedAt });
+          setLivePosition({
+            lat: data.lat,
+            lng: data.lng,
+            speed: data.speed,
+            heading: data.heading,
+            originType: data.originType,
+            originCoord: data.originCoord,
+            updatedAt: data.updatedAt
+          });
+          if (data.originType || data.originCoord) {
+            setTracking(prev => prev ? ({ ...prev, originType: data.originType || prev.originType, originCoord: data.originCoord || prev.originCoord }) : prev);
+          }
         }
       } catch (_) { /* ignore malformed frame */ }
     };
@@ -91,6 +104,8 @@ export default function TrackOrder() {
           )}
 
           {tracking.status === 'SHIPPED' && tracking.warehouse && (() => {
+            const currentOriginType = livePosition?.originType || tracking.originType || 'warehouse';
+            const currentOriginCoord = livePosition?.originCoord || tracking.originCoord || null;
             const region = tracking.deliveryRegion || detectDeliveryRegion(tracking.shippingAddress || '');
             const destination = {
               ...(REGION_COORDS[region] || REGION_COORDS.ALL),
@@ -103,11 +118,88 @@ export default function TrackOrder() {
                 shipperPosition={livePosition}
                 shipperName={tracking.shipper?.name}
                 shipperPhone={tracking.shipper?.phone}
+                originType={currentOriginType}
+                originCoord={currentOriginCoord}
               />
             );
           })()}
 
-          {tracking.status !== 'SHIPPED' && (
+          {['SHIPPED', 'DELIVERED'].includes(tracking.status) && (
+            <div style={{
+              padding: '1.15rem 1.35rem',
+              backgroundColor: '#f0fdf4',
+              border: '1.5px solid #86efac',
+              borderRadius: '12px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: '0.75rem'
+            }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontWeight: 800, fontSize: '0.92rem', color: '#15803d' }}>
+                  <CheckCircle2 size={18} color="#16a34a" />
+                  <span>Xác Nhận Đã Nhận Hàng</span>
+                </div>
+                <p style={{ margin: '0.2rem 0 0', fontSize: '0.78rem', color: '#166534' }}>
+                  Nếu bạn đã nhận đủ kiện hàng từ Shipper, hãy xác nhận để hoàn tất đơn hàng. (Tự động hoàn tất sau 48h).
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!window.confirm('Xác nhận bạn đã nhận được kiện hàng này?')) return;
+                  setConfirming(true);
+                  try {
+                    await api.post(`/orders/${orderId}/confirm-received`, { note: 'Khách hàng xác nhận trên trang tra cứu' });
+                    setTracking(prev => ({ ...prev, status: 'COMPLETED' }));
+                    setConfirmedMsg('Đã xác nhận nhận hàng thành công! Cảm ơn bạn.');
+                  } catch (e) {
+                    alert('Lỗi khi xác nhận nhận hàng: ' + (e.message || 'Không thành công'));
+                  } finally {
+                    setConfirming(false);
+                  }
+                }}
+                disabled={confirming}
+                style={{
+                  padding: '0.55rem 1.25rem',
+                  fontSize: '0.84rem',
+                  fontWeight: 700,
+                  backgroundColor: '#16a34a',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: confirming ? 'not-allowed' : 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.4rem',
+                  boxShadow: '0 2px 8px rgba(22,163,74,0.25)'
+                }}
+              >
+                <CheckCircle2 size={16} /> {confirming ? 'Đang xử lý...' : 'Đã Nhận Được Hàng'}
+              </button>
+            </div>
+          )}
+
+          {tracking.status === 'COMPLETED' && (
+            <div style={{
+              padding: '1rem 1.25rem',
+              backgroundColor: '#f0fdf4',
+              border: '1px solid #86efac',
+              borderRadius: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              color: '#15803d',
+              fontWeight: 700,
+              fontSize: '0.88rem'
+            }}>
+              <CheckCircle2 size={20} color="#16a34a" />
+              <span>{confirmedMsg || 'Đơn hàng này đã được xác nhận nhận hàng thành công (Hoàn tất).'}</span>
+            </div>
+          )}
+
+          {tracking.status !== 'SHIPPED' && tracking.status !== 'COMPLETED' && (
             <div style={{ padding: '1rem', textAlign: 'center', color: '#64748b', fontSize: '0.85rem', backgroundColor: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
               Bản đồ định vị Shipper sẽ hiện khi đơn chuyển sang trạng thái "Đang giao hàng".
             </div>

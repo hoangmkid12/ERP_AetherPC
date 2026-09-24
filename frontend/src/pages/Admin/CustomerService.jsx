@@ -10,7 +10,7 @@ import {
   Clock, X, Plus, User, Phone, Mail, Filter, Search, 
   ArrowRight, Package, Tag, Send, Eye, Star, ThumbsUp, ShieldCheck,
   TrendingUp, Award, Check, AlertTriangle, FileText, ChevronRight,
-  Zap, CheckCheck, ToggleLeft, ToggleRight, Trash2
+  Zap, CheckCheck, ToggleLeft, ToggleRight, Trash2, Camera, ExternalLink
 } from 'lucide-react';
 import { Bar, Doughnut } from 'react-chartjs-2';
 import {
@@ -80,7 +80,7 @@ export default function CustomerService() {
   const [rejectModal, setRejectModal] = useState(null); // { returnItem, reason }
   const [actionLoadingId, setActionLoadingId] = useState(null);
 
-  // Load return auto-approve setting & complaints list
+  // Load return auto-approve setting, complaints list & return requests
   useEffect(() => {
     if (typeof getReturnSettings === 'function') {
       getReturnSettings().then(res => {
@@ -92,7 +92,17 @@ export default function CustomerService() {
     if (typeof getComplaints === 'function') {
       getComplaints().catch(() => {});
     }
-  }, [getReturnSettings, getComplaints]);
+    if (typeof getReturnRequests === 'function') {
+      getReturnRequests().catch(() => {});
+    }
+  }, [getReturnSettings, getComplaints, getReturnRequests]);
+
+  // Refetch returns when switching to returns tab
+  useEffect(() => {
+    if (activeTab === 'returns' && typeof getReturnRequests === 'function') {
+      getReturnRequests().catch(() => {});
+    }
+  }, [activeTab, getReturnRequests]);
 
   const handleToggleAutoApprove = async () => {
     const nextVal = !autoApproveReturns;
@@ -1511,6 +1521,27 @@ export default function CustomerService() {
                 <span style={{ fontSize: '0.75rem', color: '#64748b', display: 'block', marginTop: '0.2rem' }}>Khách: {selectedTicket.customerName} ({selectedTicket.phone})</span>
               </div>
 
+              {/* Ticket Attached Evidence Photo If Any */}
+              {(() => {
+                const ticketProof = selectedTicket.evidenceUrl || selectedTicket.evidence_url || selectedTicket.image || selectedTicket.evidence;
+                if (!ticketProof) return null;
+                return (
+                  <div>
+                    <strong style={{ display: 'block', fontSize: '0.78rem', color: '#0f172a', marginBottom: '0.35rem' }}>Minh Chứng Khách Gửi Kèm:</strong>
+                    <div style={{ position: 'relative', borderRadius: '8px', overflow: 'hidden', border: '1px solid #cbd5e1', backgroundColor: '#0f172a', textAlign: 'center' }}>
+                      <img src={ticketProof} alt="Minh chứng ticket" style={{ width: '100%', maxHeight: '220px', objectFit: 'contain', display: 'block', margin: '0 auto' }} />
+                      <button
+                        type="button"
+                        onClick={() => window.open(ticketProof, '_blank')}
+                        style={{ position: 'absolute', bottom: '8px', right: '8px', backgroundColor: 'rgba(15,23,42,0.85)', backdropFilter: 'blur(4px)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '6px', padding: '3px 8px', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                      >
+                        <ExternalLink size={12} /> Xem ảnh lớn
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()}
+
               <div>
                 <label style={{ display: 'block', fontWeight: 700, color: '#0f172a', marginBottom: '0.3rem' }}>Ghi chú giải pháp xử lý:</label>
                 <textarea
@@ -1609,12 +1640,53 @@ export default function CustomerService() {
 
               {/* Proof Image */}
               <div>
-                <strong style={{ display: 'block', fontSize: '0.82rem', color: '#0f172a', marginBottom: '0.4rem' }}>Hình Ảnh Bằng Chứng Lỗi (Khách Đính Kèm):</strong>
-                <img
-                  src={selectedReturnDetail.image || 'https://images.unsplash.com/photo-1587202372775-e229f172b9d7?w=600&auto=format&fit=crop&q=80'}
-                  alt="Proof"
-                  style={{ width: '100%', height: '200px', objectFit: 'cover', borderRadius: '6px', border: '1px solid #cbd5e1' }}
-                />
+                <strong style={{ display: 'block', fontSize: '0.82rem', color: '#0f172a', marginBottom: '0.4rem' }}>
+                  Hình Ảnh Bằng Chứng Lỗi (Khách Đính Kèm):
+                </strong>
+                {(() => {
+                  const proofImg = selectedReturnDetail.evidenceUrl || selectedReturnDetail.evidence_url || selectedReturnDetail.evidence || selectedReturnDetail.image || selectedReturnDetail.proofImage;
+                  if (proofImg) {
+                    return (
+                      <div style={{ position: 'relative', borderRadius: '8px', overflow: 'hidden', border: '1px solid #cbd5e1', backgroundColor: '#0f172a' }}>
+                        <img
+                          src={proofImg}
+                          alt="Minh chứng từ khách hàng"
+                          style={{ width: '100%', maxHeight: '340px', objectFit: 'contain', display: 'block', margin: '0 auto' }}
+                        />
+                        <div style={{ position: 'absolute', bottom: '8px', right: '8px' }}>
+                          <button
+                            type="button"
+                            onClick={() => window.open(proofImg, '_blank')}
+                            style={{
+                              backgroundColor: 'rgba(15,23,42,0.85)',
+                              backdropFilter: 'blur(4px)',
+                              color: '#ffffff',
+                              border: '1px solid rgba(255,255,255,0.25)',
+                              borderRadius: '6px',
+                              padding: '5px 12px',
+                              fontSize: '0.74rem',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              boxShadow: '0 2px 8px rgba(0,0,0,0.3)'
+                            }}
+                          >
+                            <ExternalLink size={13} /> Mở ảnh gốc phóng to
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  }
+                  return (
+                    <div style={{ padding: '1.25rem', textAlign: 'center', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px dashed #cbd5e1', color: '#64748b' }}>
+                      <Camera size={24} style={{ color: '#94a3b8', margin: '0 auto 0.35rem' }} />
+                      <div style={{ fontSize: '0.82rem', fontWeight: 600 }}>Khách hàng không đính kèm ảnh bằng chứng</div>
+                      <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '0.2rem' }}>CSKH có thể liên hệ khách hàng qua SĐT để yêu cầu gửi ảnh bổ sung qua Zalo / LiveChat.</div>
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* Actions */}

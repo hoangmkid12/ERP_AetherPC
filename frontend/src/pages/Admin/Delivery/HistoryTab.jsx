@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Filter, RefreshCw, History as HistoryIcon, Calendar } from 'lucide-react';
-
-const PAGE_SIZE = 25;
 import OrderCard from './components/OrderCard';
 import FilterSheet from './components/FilterSheet';
+import DateFilterControl from './components/DateFilterControl';
+import { getDefaultDateFilter, getDateFilterLabel } from './deliveryHelpers';
+
+const PAGE_SIZE = 25;
 
 const selectStyle = { width: '100%', padding: '0.55rem 0.65rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-glass)', fontSize: '0.8rem', backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)', fontWeight: 600, boxSizing: 'border-box' };
 const labelStyle = { display: 'block', fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.25rem' };
@@ -16,23 +18,29 @@ export default function HistoryTab({
   const [sheetOpen, setSheetOpen] = useState(false);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   useEffect(() => { setVisibleCount(PAGE_SIZE); }, [orders]);
+
   const {
     search, setSearch,
     paymentFilter, setPaymentFilter,
-    dateFilterPeriod, setDateFilterPeriod,
-    customStartDate, setCustomStartDate,
-    customEndDate, setCustomEndDate,
+    orderDateFilter = getDefaultDateFilter(),
+    setOrderDateFilter,
     sortOrder, setSortOrder
   } = filterState;
 
-  const hasActiveFilters = search || paymentFilter !== 'ALL' || dateFilterPeriod !== 'ALL' || sortOrder !== 'NEWEST';
+  // Tính COD động theo khoảng thời gian và đơn hàng đã lọc
+  const periodCodCollected = useMemo(() => {
+    return (orders || [])
+      .filter(o => o.status === 'DELIVERED')
+      .reduce((sum, o) => sum + (o.paymentMethod === 'COD' || !o.paymentMethod ? (parseFloat(o.totalAmount || o.total || 0)) : 0), 0);
+  }, [orders]);
+
+  const isDefaultDate = orderDateFilter?.period === 'TODAY';
+  const hasActiveFilters = search || paymentFilter !== 'ALL' || !isDefaultDate || sortOrder !== 'NEWEST';
 
   const resetFilters = () => {
     setSearch('');
     setPaymentFilter('ALL');
-    setDateFilterPeriod('ALL');
-    setCustomStartDate('');
-    setCustomEndDate('');
+    if (setOrderDateFilter) setOrderDateFilter(getDefaultDateFilter());
     setSortOrder('NEWEST');
   };
 
@@ -40,7 +48,7 @@ export default function HistoryTab({
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', gap: '0.5rem' }}>
         <strong style={{ fontSize: '0.9rem', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-          <HistoryIcon size={16} /> Lịch Sử ({orders.length})
+          <HistoryIcon size={16} /> Lịch Sử Giao Hàng ({orders.length})
         </strong>
         <button type="button" onClick={() => setSheetOpen(true)} className="delivery-icon-btn" style={{ position: 'relative' }} title="Bộ lọc">
           <Filter size={16} />
@@ -50,9 +58,40 @@ export default function HistoryTab({
         </button>
       </div>
 
+      {/* Date Filter Indicator Bar with Quick Reset Buttons */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.4rem 0.6rem', backgroundColor: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)', marginBottom: '0.65rem', border: '1px solid var(--border-glass)', fontSize: '0.74rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: 'var(--text-secondary)' }}>
+          <Calendar size={13} style={{ color: 'var(--primary)' }} />
+          <span>Thời gian: <strong style={{ color: 'var(--text-primary)' }}>{getDateFilterLabel(orderDateFilter)}</strong></span>
+        </div>
+        <div style={{ display: 'flex', gap: '0.4rem' }}>
+          {orderDateFilter?.period !== 'ALL' && (
+            <button
+              type="button"
+              onClick={() => setOrderDateFilter && setOrderDateFilter(prev => ({ ...prev, period: 'ALL' }))}
+              style={{ background: 'none', border: 'none', color: 'var(--primary)', fontWeight: 700, fontSize: '0.72rem', cursor: 'pointer', textDecoration: 'underline' }}
+            >
+              Xem tất cả
+            </button>
+          )}
+          {orderDateFilter?.period !== 'TODAY' && (
+            <button
+              type="button"
+              onClick={() => setOrderDateFilter && setOrderDateFilter(getDefaultDateFilter())}
+              style={{ background: 'none', border: 'none', color: 'var(--success)', fontWeight: 700, fontSize: '0.72rem', cursor: 'pointer', textDecoration: 'underline' }}
+            >
+              Hôm nay
+            </button>
+          )}
+        </div>
+      </div>
+
       <div className="delivery-card" style={{ marginBottom: '0.85rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span style={{ fontSize: '0.76rem', color: 'var(--text-secondary)' }}>Tổng COD cần nộp Kế toán</span>
-        <strong style={{ fontSize: '0.95rem', color: 'var(--success)' }}>{fmt(totalCodCollected)}</strong>
+        <div>
+          <div style={{ fontSize: '0.76rem', color: 'var(--text-secondary)' }}>Tổng COD thu hộ ({getDateFilterLabel(orderDateFilter)})</div>
+          <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>Cần nộp Kế toán • {orders.filter(o => o.status === 'DELIVERED').length} đơn hoàn tất</div>
+        </div>
+        <strong style={{ fontSize: '1rem', color: 'var(--success)' }}>{fmt(periodCodCollected)}</strong>
       </div>
 
       <div {...pullHandlers} style={{ overflowY: 'auto' }}>
@@ -64,7 +103,7 @@ export default function HistoryTab({
 
         {orders.length === 0 ? (
           <div style={{ padding: '2.5rem 1rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
-            Chưa có lịch sử giao hàng phù hợp bộ lọc.
+            Chưa có lịch sử giao hàng phù hợp bộ lọc ({getDateFilterLabel(orderDateFilter)}).
           </div>
         ) : (
           <>
@@ -104,30 +143,12 @@ export default function HistoryTab({
           />
         </div>
 
-        <div>
-          <label style={labelStyle}>Khoảng thời gian</label>
-          <select value={dateFilterPeriod} onChange={e => setDateFilterPeriod(e.target.value)} style={selectStyle}>
-            <option value="ALL">Tất Cả Thời Gian</option>
-            <option value="TODAY">Hôm Nay</option>
-            <option value="YESTERDAY">Hôm Qua</option>
-            <option value="LAST_7_DAYS">7 Ngày Qua</option>
-            <option value="LAST_30_DAYS">30 Ngày Qua</option>
-            <option value="CUSTOM">Tùy Chọn Ngày...</option>
-          </select>
-        </div>
-
-        {dateFilterPeriod === 'CUSTOM' && (
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
-            <div style={{ flex: 1 }}>
-              <label style={labelStyle}><Calendar size={11} /> Từ ngày</label>
-              <input type="date" value={customStartDate} onChange={e => setCustomStartDate(e.target.value)} style={selectStyle} />
-            </div>
-            <div style={{ flex: 1 }}>
-              <label style={labelStyle}>Đến ngày</label>
-              <input type="date" value={customEndDate} onChange={e => setCustomEndDate(e.target.value)} style={selectStyle} />
-            </div>
-          </div>
-        )}
+        {/* Unified DateFilterControl */}
+        <DateFilterControl
+          dateFilter={orderDateFilter}
+          onChange={setOrderDateFilter}
+          variant="sheet"
+        />
 
         <div>
           <label style={labelStyle}>Hình thức thanh toán</label>

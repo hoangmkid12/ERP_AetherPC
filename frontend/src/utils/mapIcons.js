@@ -57,6 +57,14 @@ export function createWarehouseElement() {
   return createPinElement('#1a73e8');
 }
 
+export function createOriginHubElement() {
+  return createPinElement('#10b981');
+}
+
+export function createGpsOriginElement() {
+  return createPinElement('#8b5cf6');
+}
+
 export function createDestinationElement() {
   return createPinElement('#ea4335');
 }

@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Truck, Filter, RefreshCw, Calendar } from 'lucide-react';
-
-const PAGE_SIZE = 25;
 import OrderCard from './components/OrderCard';
 import FilterSheet from './components/FilterSheet';
+import DateFilterControl from './components/DateFilterControl';
+import RouteOptimizerPanel from './components/RouteOptimizerPanel';
+
+const PAGE_SIZE = 25;
 
 const selectStyle = { width: '100%', padding: '0.55rem 0.65rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-glass)', fontSize: '0.8rem', backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)', fontWeight: 600, boxSizing: 'border-box' };
 const labelStyle = { display: 'block', fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.25rem' };
@@ -13,7 +15,8 @@ export default function ActiveTab({
   filterState, activeOrdersList, todayCount, newCount, backlogCount,
   countShipping, doneCount, countAwaiting, countRescheduled, countRejected, countReturning,
   onGoToPending, pullHandlers, isRefreshing, pullDistance,
-  gpsOrderId, simulatingOrderId
+  gpsOrderId, simulatingOrderId,
+  onStartOptimized
 }) {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
@@ -23,23 +26,42 @@ export default function ActiveTab({
     regionFilter, setRegionFilter,
     paymentFilter, setPaymentFilter,
     incidentFilter, setIncidentFilter,
-    dateFilterPeriod, setDateFilterPeriod,
-    customStartDate, setCustomStartDate,
-    customEndDate, setCustomEndDate,
+    orderDateFilter, setOrderDateFilter,
     sortOrder, setSortOrder
   } = filterState;
 
-  const hasActiveFilters = search || regionFilter !== 'ALL' || paymentFilter !== 'ALL' || incidentFilter !== 'ALL' || dateFilterPeriod !== 'ALL' || sortOrder !== 'NEWEST';
+  const hasActiveFilters = search || regionFilter !== 'ALL' || paymentFilter !== 'ALL' || incidentFilter !== 'ALL' || (orderDateFilter && orderDateFilter.period !== 'TODAY') || sortOrder !== 'NEWEST';
 
   const resetFilters = () => {
     setSearch('');
     setRegionFilter('ALL');
     setPaymentFilter('ALL');
     setIncidentFilter('ALL');
-    setDateFilterPeriod('ALL');
-    setCustomStartDate('');
-    setCustomEndDate('');
+    if (setOrderDateFilter) {
+      setOrderDateFilter({
+        period: 'TODAY',
+        selectedDate: new Date().toISOString().split('T')[0],
+        selectedMonth: new Date().toISOString().slice(0, 7),
+        selectedYear: String(new Date().getFullYear()),
+        customStartDate: '',
+        customEndDate: ''
+      });
+    }
     setSortOrder('NEWEST');
+  };
+
+  const handlePillClick = (tabId) => {
+    if (tabId === 'TODAY') {
+      if (setOrderDateFilter) setOrderDateFilter(prev => ({ ...prev, period: 'TODAY' }));
+      setIncidentFilter('ALL');
+    } else if (tabId === 'BACKLOG') {
+      setIncidentFilter('BACKLOG');
+    } else if (tabId === 'ALL') {
+      if (setOrderDateFilter) setOrderDateFilter(prev => ({ ...prev, period: 'ALL' }));
+      setIncidentFilter('ALL');
+    } else {
+      setIncidentFilter(tabId);
+    }
   };
 
   const pillTabs = [
@@ -75,15 +97,80 @@ export default function ActiveTab({
         </button>
       </div>
 
+      {/* Interactive Quick Time Filter Bar */}
       <div style={{
-        display: 'flex', gap: '0.6rem', fontSize: '0.72rem', color: 'var(--text-secondary)',
-        padding: '0.5rem 0.7rem', backgroundColor: 'var(--bg-primary)', border: '1px solid var(--border-glass)',
-        borderRadius: 'var(--radius-md)', marginBottom: '0.85rem'
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.72rem', color: 'var(--text-secondary)',
+        padding: '0.45rem 0.7rem', backgroundColor: 'var(--bg-primary)', border: '1px solid var(--border-glass)',
+        borderRadius: 'var(--radius-md)', marginBottom: '0.85rem', flexWrap: 'wrap', gap: '0.4rem'
       }}>
-        <span>Hôm nay: <strong style={{ color: 'var(--primary)' }}>{todayCount}</strong> (mới: <strong style={{ color: '#ea580c' }}>{newCount}</strong>)</span>
-        <span style={{ color: 'var(--border-glass)' }}>|</span>
-        <span>Tồn: <strong style={{ color: 'var(--warning)' }}>{backlogCount}</strong></span>
+        <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            onClick={() => {
+              if (setOrderDateFilter) setOrderDateFilter(prev => ({ ...prev, period: 'TODAY' }));
+              setIncidentFilter('ALL');
+            }}
+            style={{
+              background: orderDateFilter?.period === 'TODAY' && incidentFilter !== 'BACKLOG' ? 'rgba(37,99,235,0.12)' : 'none',
+              border: orderDateFilter?.period === 'TODAY' && incidentFilter !== 'BACKLOG' ? '1px solid var(--primary)' : '1px solid transparent',
+              borderRadius: '12px', padding: '2px 8px', cursor: 'pointer',
+              color: orderDateFilter?.period === 'TODAY' && incidentFilter !== 'BACKLOG' ? 'var(--primary)' : 'var(--text-secondary)',
+              fontWeight: orderDateFilter?.period === 'TODAY' && incidentFilter !== 'BACKLOG' ? 700 : 500, fontSize: '0.72rem'
+            }}
+          >
+            Hôm nay: <strong style={{ color: 'var(--primary)' }}>{todayCount}</strong> {newCount > 0 && <span style={{ color: '#ea580c' }}>(mới: {newCount})</span>}
+          </button>
+
+          <span style={{ color: 'var(--border-glass)' }}>|</span>
+
+          <button
+            type="button"
+            onClick={() => {
+              setIncidentFilter('BACKLOG');
+            }}
+            style={{
+              background: incidentFilter === 'BACKLOG' ? 'rgba(217,119,6,0.12)' : 'none',
+              border: incidentFilter === 'BACKLOG' ? '1px solid var(--warning)' : '1px solid transparent',
+              borderRadius: '12px', padding: '2px 8px', cursor: 'pointer',
+              color: incidentFilter === 'BACKLOG' ? 'var(--warning)' : 'var(--text-secondary)',
+              fontWeight: incidentFilter === 'BACKLOG' ? 700 : 500, fontSize: '0.72rem'
+            }}
+          >
+            Tồn: <strong style={{ color: 'var(--warning)' }}>{backlogCount}</strong>
+          </button>
+
+          <span style={{ color: 'var(--border-glass)' }}>|</span>
+
+          <button
+            type="button"
+            onClick={() => {
+              if (setOrderDateFilter) setOrderDateFilter(prev => ({ ...prev, period: 'ALL' }));
+              setIncidentFilter('ALL');
+            }}
+            style={{
+              background: orderDateFilter?.period === 'ALL' && incidentFilter === 'ALL' ? 'rgba(100,116,139,0.12)' : 'none',
+              border: orderDateFilter?.period === 'ALL' && incidentFilter === 'ALL' ? '1px solid var(--text-muted)' : '1px solid transparent',
+              borderRadius: '12px', padding: '2px 8px', cursor: 'pointer',
+              color: 'var(--text-secondary)',
+              fontWeight: orderDateFilter?.period === 'ALL' && incidentFilter === 'ALL' ? 700 : 500, fontSize: '0.72rem'
+            }}
+          >
+            Tất cả: <strong>{activeOrdersList.length}</strong>
+          </button>
+        </div>
+
+        <span style={{ fontSize: '0.68rem', color: 'var(--primary)', fontWeight: 600 }}>
+          {orderDateFilter?.period === 'TODAY' ? 'Thời gian: Hôm nay' : (orderDateFilter?.period === 'ALL' ? 'Thời gian: Tất cả' : `Lọc: ${orderDateFilter?.period}`)}
+        </span>
       </div>
+
+      {/* Route Optimizer Panel — hiện khi có ≥ 2 đơn đang giao */}
+      {orders.length >= 2 && (
+        <RouteOptimizerPanel
+          orders={orders}
+          onStartOptimized={onStartOptimized}
+        />
+      )}
 
       <div {...pullHandlers} style={{ overflowY: 'auto' }}>
         {(isRefreshing || pullDistance > 0) && (
@@ -101,13 +188,27 @@ export default function ActiveTab({
             <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '0.3rem 0 0.85rem' }}>
               Hãy đổi bộ lọc hoặc sang tab "Chờ Nhận" để nhận thêm đơn.
             </p>
-            <button
-              type="button"
-              onClick={onGoToPending}
-              style={{ padding: '0.5rem 1rem', fontSize: '0.78rem', fontWeight: 700, backgroundColor: 'var(--primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-md)', cursor: 'pointer' }}
-            >
-              Sang Tab Chờ Nhận
-            </button>
+            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+              {orderDateFilter?.period !== 'ALL' && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (setOrderDateFilter) setOrderDateFilter(prev => ({ ...prev, period: 'ALL' }));
+                    setIncidentFilter('ALL');
+                  }}
+                  style={{ padding: '0.45rem 0.9rem', fontSize: '0.76rem', fontWeight: 700, backgroundColor: 'var(--bg-tertiary)', color: 'var(--primary)', border: '1px solid var(--border-glass)', borderRadius: 'var(--radius-md)', cursor: 'pointer' }}
+                >
+                  Xem Tất Cả ({activeOrdersList.length} đơn)
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={onGoToPending}
+                style={{ padding: '0.45rem 0.9rem', fontSize: '0.76rem', fontWeight: 700, backgroundColor: 'var(--primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-md)', cursor: 'pointer' }}
+              >
+                Sang Tab Chờ Nhận
+              </button>
+            </div>
           </div>
         ) : (
           <>
@@ -153,18 +254,24 @@ export default function ActiveTab({
         </div>
 
         <div>
-          <label style={labelStyle}>Tiến độ & thời gian</label>
+          <label style={labelStyle}>Tiến độ giao hàng</label>
           <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
             {pillTabs.map(tab => (
               <button
                 key={tab.id}
                 type="button"
-                onClick={() => setIncidentFilter(tab.id)}
+                onClick={() => handlePillClick(tab.id)}
                 style={{
                   padding: '0.3rem 0.65rem', borderRadius: '999px', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer',
-                  border: incidentFilter === tab.id ? '1.5px solid var(--primary)' : '1px solid var(--border-glass)',
-                  backgroundColor: incidentFilter === tab.id ? 'rgba(37,99,235,0.1)' : 'var(--bg-primary)',
-                  color: incidentFilter === tab.id ? 'var(--primary)' : 'var(--text-secondary)'
+                  border: (incidentFilter === tab.id || (tab.id === 'TODAY' && orderDateFilter?.period === 'TODAY' && incidentFilter === 'ALL') || (tab.id === 'ALL' && orderDateFilter?.period === 'ALL' && incidentFilter === 'ALL'))
+                    ? '1.5px solid var(--primary)'
+                    : '1px solid var(--border-glass)',
+                  backgroundColor: (incidentFilter === tab.id || (tab.id === 'TODAY' && orderDateFilter?.period === 'TODAY' && incidentFilter === 'ALL') || (tab.id === 'ALL' && orderDateFilter?.period === 'ALL' && incidentFilter === 'ALL'))
+                    ? 'rgba(37,99,235,0.1)'
+                    : 'var(--bg-primary)',
+                  color: (incidentFilter === tab.id || (tab.id === 'TODAY' && orderDateFilter?.period === 'TODAY' && incidentFilter === 'ALL') || (tab.id === 'ALL' && orderDateFilter?.period === 'ALL' && incidentFilter === 'ALL'))
+                    ? 'var(--primary)'
+                    : 'var(--text-secondary)'
                 }}
               >
                 {tab.label} ({tab.count})
@@ -173,29 +280,13 @@ export default function ActiveTab({
           </div>
         </div>
 
-        <div>
-          <label style={labelStyle}>Khoảng thời gian</label>
-          <select value={dateFilterPeriod} onChange={e => setDateFilterPeriod(e.target.value)} style={selectStyle}>
-            <option value="ALL">Tất Cả Thời Gian</option>
-            <option value="TODAY">Hôm Nay</option>
-            <option value="YESTERDAY">Hôm Qua</option>
-            <option value="LAST_7_DAYS">7 Ngày Qua</option>
-            <option value="LAST_30_DAYS">30 Ngày Qua</option>
-            <option value="CUSTOM">Tùy Chọn Ngày...</option>
-          </select>
-        </div>
-
-        {dateFilterPeriod === 'CUSTOM' && (
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
-            <div style={{ flex: 1 }}>
-              <label style={labelStyle}><Calendar size={11} /> Từ ngày</label>
-              <input type="date" value={customStartDate} onChange={e => setCustomStartDate(e.target.value)} style={selectStyle} />
-            </div>
-            <div style={{ flex: 1 }}>
-              <label style={labelStyle}>Đến ngày</label>
-              <input type="date" value={customEndDate} onChange={e => setCustomEndDate(e.target.value)} style={selectStyle} />
-            </div>
-          </div>
+        {/* Date Filter Control with support for Month, Year, Day */}
+        {orderDateFilter && setOrderDateFilter && (
+          <DateFilterControl
+            dateFilter={orderDateFilter}
+            onChange={setOrderDateFilter}
+            variant="sheet"
+          />
         )}
 
         <div>

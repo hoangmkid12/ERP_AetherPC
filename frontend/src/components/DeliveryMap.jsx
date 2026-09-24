@@ -1,7 +1,15 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import '@goongmaps/goong-js/dist/goong-js.css';
 import { fetchRoadRoute, reverseGeocode, forwardGeocode } from '../utils/routingService';
-import { goongjs, GOONG_STYLE_URL, createWarehouseElement, createDestinationElement, createShipperElement } from '../utils/mapIcons';
+import {
+  goongjs,
+  GOONG_STYLE_URL,
+  createWarehouseElement,
+  createOriginHubElement,
+  createGpsOriginElement,
+  createDestinationElement,
+  createShipperElement
+} from '../utils/mapIcons';
 
 // Tần suất gọi lại OSRM/Nominatim khi Shipper di chuyển — GPS gửi mỗi 8s
 // (xem GPS_SEND_INTERVAL_MS ở trang Delivery), nhưng không cần tính lại
@@ -58,6 +66,8 @@ export default function DeliveryMap({
   shipperPosition,
   shipperName,
   shipperPhone,
+  originType = 'warehouse',
+  originCoord = null,
   height = '370px'
 }) {
   const containerRef = useRef(null);
@@ -166,10 +176,31 @@ export default function DeliveryMap({
     };
   }, []);
 
-  // Tải và vẽ lộ trình đường bộ thực tế (OSRM Road Routing) giữa Kho và Nhà khách
+  // Xác định điểm xuất phát hiệu dụng theo 1 trong 3 option
+  const effectiveOrigin = (() => {
+    if (originType === 'manual' && originCoord?.lat && originCoord?.lng) {
+      return {
+        lat: originCoord.lat,
+        lng: originCoord.lng,
+        name: originCoord.name || 'Trạm xuất phát / Điểm giao hàng',
+        address: originCoord.address || ''
+      };
+    }
+    if (originType === 'gps' && shipperPosition?.lat && shipperPosition?.lng) {
+      return {
+        lat: shipperPosition.lat,
+        lng: shipperPosition.lng,
+        name: 'Vị trí bắt đầu của Shipper',
+        address: currentAddress || 'Tọa độ GPS hiện tại'
+      };
+    }
+    return warehouse;
+  })();
+
+  // Tải và vẽ lộ trình đường bộ thực tế (OSRM Road Routing) giữa Điểm xuất phát và Nhà khách
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !styleReadyRef.current || !warehouse || !exactDestination) return;
+    if (!map || !styleReadyRef.current || !effectiveOrigin || !exactDestination) return;
 
     // Xóa marker cũ
     if (markersRef.current.warehouse) markersRef.current.warehouse.remove();
@@ -179,10 +210,30 @@ export default function DeliveryMap({
     setCurrentAddress('');
     lastLiveRecalcRef.current = 0;
 
-    // Marker Kho
-    markersRef.current.warehouse = new goongjs.Marker({ element: createWarehouseElement(), anchor: 'bottom' })
-      .setLngLat([warehouse.lng, warehouse.lat])
-      .setPopup(new goongjs.Popup({ offset: 28 }).setHTML(`<div style="padding:2px 4px;font-size:0.82rem;"><strong>Kho xuất phát</strong><br/>${warehouse.name || 'Kho AetherPC'}<br/><span style="font-size:0.75rem;color:#5f6368;">${warehouse.address || ''}</span></div>`))
+    // Xác định icon & nội dung popup Điểm xuất phát A
+    let originEl = createWarehouseElement();
+    let popupTitle = 'Kho xuất phát';
+    let popupName = effectiveOrigin.name || 'Kho AetherPC';
+    let popupSub = effectiveOrigin.address || '';
+
+    if (originType === 'manual') {
+      originEl = createOriginHubElement();
+      popupTitle = 'Trạm xuất phát giao hàng';
+      popupName = effectiveOrigin.name || 'Điểm tập kết / Bưu cục';
+      popupSub = effectiveOrigin.address || 'Shipper xuất phát từ trạm này';
+    } else if (originType === 'gps') {
+      originEl = createGpsOriginElement();
+      popupTitle = 'Vị trí xuất phát của Shipper';
+      popupName = shipperName ? `Shipper: ${shipperName}` : 'Định vị GPS thực tế';
+      popupSub = 'Xuất phát từ vị trí hiện tại';
+    }
+
+    // Marker Điểm xuất phát A
+    markersRef.current.warehouse = new goongjs.Marker({ element: originEl, anchor: 'bottom' })
+      .setLngLat([effectiveOrigin.lng, effectiveOrigin.lat])
+      .setPopup(new goongjs.Popup({ offset: 28 }).setHTML(
+        `<div style="padding:2px 4px;font-size:0.82rem;"><strong>${popupTitle}</strong><br/>${popupName}${popupSub ? `<br/><span style="font-size:0.75rem;color:#5f6368;">${popupSub}</span>` : ''}</div>`
+      ))
       .addTo(map);
 
     // Marker Nhà khách
@@ -194,7 +245,7 @@ export default function DeliveryMap({
     let isMounted = true;
 
     // Gọi dịch vụ OSRM để lấy toàn bộ các góc phố, khúc cua của con đường thực tế
-    fetchRoadRoute(warehouse, exactDestination).then(route => {
+    fetchRoadRoute(effectiveOrigin, exactDestination).then(route => {
       if (!isMounted || !mapRef.current) return;
 
       if (route && route.coordinates && route.coordinates.length > 0) {
@@ -215,7 +266,7 @@ export default function DeliveryMap({
     return () => {
       isMounted = false;
     };
-  }, [warehouse?.lat, warehouse?.lng, exactDestination?.lat, exactDestination?.lng, styleReadyTick]);
+  }, [effectiveOrigin?.lat, effectiveOrigin?.lng, exactDestination?.lat, exactDestination?.lng, styleReadyTick, originType]);
 
   // Marker Shipper — trượt mượt giữa 2 điểm GPS liên tiếp thay vì nhảy tức thời
   useEffect(() => {
@@ -296,12 +347,12 @@ export default function DeliveryMap({
       const coords = routeCoordsRef.current.map(([lat, lng]) => [lng, lat]);
       const bounds = coords.reduce((b, c) => b.extend(c), new goongjs.LngLatBounds(coords[0], coords[0]));
       map.fitBounds(bounds, { padding: 45, animate: true });
-    } else if (warehouse && exactDestination) {
-      const bounds = new goongjs.LngLatBounds([warehouse.lng, warehouse.lat], [warehouse.lng, warehouse.lat])
+    } else if (effectiveOrigin && exactDestination) {
+      const bounds = new goongjs.LngLatBounds([effectiveOrigin.lng, effectiveOrigin.lat], [effectiveOrigin.lng, effectiveOrigin.lat])
         .extend([exactDestination.lng, exactDestination.lat]);
       map.fitBounds(bounds, { padding: 45, animate: true });
     }
-  }, [warehouse, exactDestination]);
+  }, [effectiveOrigin, exactDestination]);
 
   // Khoảng cách đường chim bay từ Shipper đến bạn — chỉ có ý nghĩa khi đã có
   // tín hiệu GPS sống; không dùng lại cho trường hợp chưa có vị trí (đã có
@@ -374,6 +425,24 @@ export default function DeliveryMap({
           <div style={{ fontSize: '0.8rem', color: '#5f6368' }}>
             {(remainingInfo || routeInfo) ? `${(remainingInfo || routeInfo).distanceKm} km` : 'Tìm tuyến đường tối ưu'}
             {distanceDisplay ? ` · Cách bạn ${distanceDisplay}` : ''}
+          </div>
+          <div style={{ marginTop: '0.3rem', display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
+            <span style={{
+              fontSize: '0.72rem',
+              fontWeight: 700,
+              color: originType === 'manual' ? '#047857' : originType === 'gps' ? '#6d28d9' : '#1d4ed8',
+              backgroundColor: originType === 'manual' ? '#d1fae5' : originType === 'gps' ? '#ede9fe' : '#eff6ff',
+              border: `1px solid ${originType === 'manual' ? '#a7f3d0' : originType === 'gps' ? '#ddd6fe' : '#bfdbfe'}`,
+              padding: '0.15rem 0.5rem',
+              borderRadius: '999px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.25rem'
+            }}>
+              {originType === 'manual' && '📍 Xuất phát: Điểm hẹn / Trạm trung chuyển'}
+              {originType === 'gps' && '📡 Xuất phát: Vị trí GPS của Shipper'}
+              {originType === 'warehouse' && '🏢 Xuất phát: Kho Tổng AetherPC'}
+            </span>
           </div>
         </div>
 

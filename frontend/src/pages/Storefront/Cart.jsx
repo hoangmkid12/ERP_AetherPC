@@ -195,21 +195,34 @@ export default function Cart() {
     return () => { active = false; };
   }, [user]);
 
-  // Fetch live communes for a given province name/code, proxied through our backend
-  const fetchCommunesForProvince = (provName) => {
-    const foundProv = apiProvinces.find(p => p.name === provName || p.code === provName);
-    if (foundProv?.code) {
-      setLoadingCommunes(true);
-      api.get(`/address/provinces/${foundProv.code}/communes`)
-        .then(res => {
-          const communes = res?.data?.communes;
-          if (Array.isArray(communes)) {
-            setApiCommunes(communes);
-          }
-        })
-        .catch(err => console.warn('AddressKit Communes fetch error:', err))
-        .finally(() => setLoadingCommunes(false));
+  // Fetch live wards for selected province & district
+  const fetchWardsForDistrict = (provName, districtName) => {
+    if (!provName) {
+      setApiCommunes([]);
+      return;
     }
+    setLoadingCommunes(true);
+    const params = new URLSearchParams();
+    params.set('province', provName);
+    if (districtName) params.set('district', districtName);
+
+    api.get(`/address/wards?${params.toString()}`)
+      .then(res => {
+        const wards = res?.data?.wards;
+        if (Array.isArray(wards) && wards.length > 0) {
+          setApiCommunes(wards);
+        } else {
+          // Fallback to communes
+          const foundProv = apiProvinces.find(p => p.name === provName || p.code === provName);
+          if (foundProv?.code) {
+            return api.get(`/address/provinces/${foundProv.code}/communes`).then(cRes => {
+              setApiCommunes(cRes?.data?.communes || []);
+            });
+          }
+        }
+      })
+      .catch(err => console.warn('Wards fetch error:', err))
+      .finally(() => setLoadingCommunes(false));
   };
 
   const useSavedAddress = (address) => {
@@ -221,8 +234,9 @@ export default function Cart() {
     setWard(address.ward || '');
     setSelectedDistrict(address.district || '');
     setApiCommunes([]);
-    fetchCommunesForProvince(address.city || '');
+    fetchWardsForDistrict(address.city || '', address.district || '');
   };
+
   // Update district, ward & fetch live communes when province changes
   const handleProvinceChange = (val) => {
     const provName = typeof val === 'string' ? val : val?.target?.value;
@@ -230,7 +244,15 @@ export default function Cart() {
     setSelectedDistrict('');
     setWard('');
     setApiCommunes([]);
-    fetchCommunesForProvince(provName);
+  };
+
+  const handleDistrictChange = (distVal) => {
+    setSelectedDistrict(distVal);
+    setWard('');
+    setApiCommunes([]);
+    if (distVal && selectedProvince) {
+      fetchWardsForDistrict(selectedProvince, distVal);
+    }
   };
 
   // Find matching province in VIETNAM_PROVINCES to retrieve standard districts
@@ -974,9 +996,9 @@ export default function Cart() {
                         </label>
                         <SearchableSelect
                           value={selectedDistrict}
-                          onChange={val => setSelectedDistrict(val)}
+                          onChange={handleDistrictChange}
                           options={currentProvinceObj.districts || []}
-                          placeholder="-- Chọn Quận / Huyện --"
+                          placeholder={!selectedProvince ? "-- Chọn Tỉnh/TP trước --" : "-- Chọn Quận / Huyện --"}
                           disabled={!selectedProvince}
                         />
                       </div>
@@ -988,8 +1010,14 @@ export default function Cart() {
                           value={ward}
                           onChange={val => setWard(val)}
                           options={apiCommunes}
-                          placeholder={loadingCommunes ? "-- Đang tải... --" : "-- Chọn Phường / Xã --"}
-                          disabled={loadingCommunes || !selectedProvince}
+                          placeholder={
+                            !selectedProvince
+                              ? "-- Chọn Tỉnh/TP trước --"
+                              : !selectedDistrict
+                              ? "-- Chọn Quận / Huyện trước --"
+                              : (loadingCommunes ? "-- Đang tải Phường/Xã... --" : "-- Chọn Phường / Xã --")
+                          }
+                          disabled={loadingCommunes || !selectedProvince || !selectedDistrict}
                           loading={loadingCommunes}
                         />
                       </div>
