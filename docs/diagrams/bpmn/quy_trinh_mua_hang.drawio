@@ -76,9 +76,6 @@
         <mxCell id="t_issue" value="Lập Phiếu Mua Hàng&lt;br/&gt;Trình Duyệt" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;strokeWidth=1.3;fontSize=10.5;fontColor=#1C2833;" vertex="1" parent="1">
           <mxGeometry x="830" y="84.5" width="150" height="60" as="geometry" />
         </mxCell>
-        <mxCell id="ann_compare" value="Báo giá của các NCC&lt;br/&gt;còn lại tự động huỷ;&lt;br/&gt;đơn báo giá gốc được đóng" style="shape=partialRectangle;whiteSpace=wrap;html=1;top=0;bottom=0;right=0;fillColor=none;strokeColor=#666666;align=left;spacingLeft=6;fontSize=9.5;fontColor=#444444;" vertex="1" parent="1">
-          <mxGeometry x="1010" y="84.5" width="150" height="50" as="geometry" />
-        </mxCell>
 
         <!-- ===== Ban Giám Đốc: duyệt PO ===== -->
         <mxCell id="gw_ceo" value="" style="rhombus;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;strokeWidth=1.4;fontSize=20;fontStyle=1;fontColor=#222222;" vertex="1" parent="1">
@@ -97,9 +94,6 @@
         <!-- ===== Nhà Cung Cấp: xác nhận PO ===== -->
         <mxCell id="t_confirm" value="Xác Nhận Đơn Mua &amp;&lt;br/&gt;Hẹn Ngày Giao Hàng" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;strokeWidth=1.3;fontSize=10.5;fontColor=#1C2833;" vertex="1" parent="1">
           <mxGeometry x="1010" y="209.5" width="150" height="60" as="geometry" />
-        </mxCell>
-        <mxCell id="ann_confirm" value="Hệ thống tự động tạo&lt;br/&gt;Phiếu Nhập Kho" style="shape=partialRectangle;whiteSpace=wrap;html=1;top=0;bottom=0;right=0;fillColor=none;strokeColor=#666666;align=left;spacingLeft=6;fontSize=9.5;fontColor=#444444;" vertex="1" parent="1">
-          <mxGeometry x="1300" y="195" width="160" height="36" as="geometry" />
         </mxCell>
 
         <!-- ===== Nhân Viên QC ===== -->
@@ -122,9 +116,6 @@
         <!-- ===== Bộ Phận Kho: nghiệm thu nhập kho ===== -->
         <mxCell id="t_grn" value="Nghiệm Thu Nhập Kho&lt;br/&gt;+ Quét Số Serial" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;strokeWidth=1.3;fontSize=10.5;fontColor=#1C2833;" vertex="1" parent="1">
           <mxGeometry x="1315" y="584.5" width="150" height="60" as="geometry" />
-        </mxCell>
-        <mxCell id="ann_grn" value="Chỉ nhập số lượng đạt kiểm định;&lt;br/&gt;cập nhật tồn kho &amp; giá vốn&lt;br/&gt;bình quân gia quyền" style="shape=partialRectangle;whiteSpace=wrap;html=1;top=0;bottom=0;right=0;fillColor=none;strokeColor=#666666;align=left;spacingLeft=6;fontSize=9.5;fontColor=#444444;" vertex="1" parent="1">
-          <mxGeometry x="1500" y="589.5" width="200" height="50" as="geometry" />
         </mxCell>
 
         <!-- ===== Kế Toán: hoá đơn NCC & thanh toán ===== -->
@@ -276,26 +267,6 @@
               <mxPoint x="1695" y="790" />
               <mxPoint x="1570" y="790" />
             </Array>
-          </mxGeometry>
-        </mxCell>
-
-        <!-- ===== Associations (annotations) ===== -->
-        <mxCell id="assoc_compare" value="" style="endArrow=none;dashed=1;html=1;strokeColor=#666666;strokeWidth=1;" edge="1" parent="1">
-          <mxGeometry relative="1" as="geometry">
-            <mxPoint x="1010" y="109.5" as="sourcePoint" />
-            <mxPoint x="980" y="100" as="targetPoint" />
-          </mxGeometry>
-        </mxCell>
-        <mxCell id="assoc_confirm" value="" style="endArrow=none;dashed=1;html=1;strokeColor=#666666;strokeWidth=1;" edge="1" parent="1">
-          <mxGeometry relative="1" as="geometry">
-            <mxPoint x="1300" y="213" as="sourcePoint" />
-            <mxPoint x="1160" y="220" as="targetPoint" />
-          </mxGeometry>
-        </mxCell>
-        <mxCell id="assoc_grn" value="" style="endArrow=none;dashed=1;html=1;strokeColor=#666666;strokeWidth=1;" edge="1" parent="1">
-          <mxGeometry relative="1" as="geometry">
-            <mxPoint x="1500" y="614.5" as="sourcePoint" />
-            <mxPoint x="1465" y="614.5" as="targetPoint" />
           </mxGeometry>
         </mxCell>
       </root>

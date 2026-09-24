@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<mxfile host="app.diagrams.net" modified="2026-09-24T05:58:12.836Z" agent="AetherPC-ERP-BPMN" version="21.0.0" type="device">
+<mxfile host="app.diagrams.net" modified="2026-09-24T06:14:19.367Z" agent="AetherPC-ERP-BPMN" version="21.0.0" type="device">
   <diagram id="bpmn_diagram" name="AetherPC - Bán Hàng &amp;amp; Lắp Ráp">
     <mxGraphModel dx="1400" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1930" pageHeight="945" math="0" shadow="0">
       <root>
@@ -62,9 +62,6 @@
         <mxCell id="t_xndon" value="Xác Nhận&lt;br/&gt;Đơn Hàng" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;strokeWidth=1.3;fontSize=10.5;fontColor=#1C2833;" vertex="1" parent="1">
           <mxGeometry x="485" y="209.5" width="150" height="60" as="geometry" />
         </mxCell>
-        <mxCell id="ann_auto" value="Quá 5 giờ chưa xác nhận → hệ thống tự duyệt" style="shape=partialRectangle;whiteSpace=wrap;html=1;top=0;bottom=0;right=0;fillColor=none;strokeColor=#666666;align=left;spacingLeft=6;fontSize=9.5;fontColor=#444444;" vertex="1" parent="1">
-          <mxGeometry x="490" y="180" width="215" height="24" as="geometry" />
-        </mxCell>
         <mxCell id="t_choh" value="Tạm Giữ Đơn Chờ Hàng&lt;br/&gt;&amp;amp; Lập Đề Xuất Mua" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;strokeWidth=1.3;fontSize=10.5;fontColor=#1C2833;" vertex="1" parent="1">
           <mxGeometry x="385" y="584.5" width="150" height="60" as="geometry" />
         </mxCell>
@@ -88,9 +85,6 @@
         </mxCell>
         <mxCell id="gw_build_lbl" value="Đơn Build PC?" style="text;html=1;align=center;verticalAlign=bottom;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=10.5;fontStyle=1;fontColor=#222222;" vertex="1" parent="1">
           <mxGeometry x="875" y="316.5" width="140" height="26" as="geometry" />
-        </mxCell>
-        <mxCell id="ann_email" value="Mỗi lần đơn hàng đổi trạng thái,&lt;br/&gt;hệ thống tự gửi email báo khách" style="shape=partialRectangle;whiteSpace=wrap;html=1;top=0;bottom=0;right=0;fillColor=none;strokeColor=#666666;align=left;spacingLeft=6;fontSize=9.5;fontColor=#444444;" vertex="1" parent="1">
-          <mxGeometry x="1110" y="340" width="220" height="40" as="geometry" />
         </mxCell>
         <mxCell id="t_lenh" value="Tạo Lệnh Lắp Ráp&lt;br/&gt;Theo Đơn Hàng" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;strokeWidth=1.3;fontSize=10.5;fontColor=#1C2833;" vertex="1" parent="1">
           <mxGeometry x="985" y="459.5" width="150" height="60" as="geometry" />
