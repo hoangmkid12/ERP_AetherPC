@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<mxfile host="app.diagrams.net" modified="2026-09-24T06:14:19.448Z" agent="AetherPC-ERP-BPMN" version="21.0.0" type="device">
+<mxfile host="app.diagrams.net" modified="2026-09-24T06:27:17.010Z" agent="AetherPC-ERP-BPMN" version="21.0.0" type="device">
   <diagram id="bpmn_diagram" name="AetherPC - Bán Hàng – Thu Tiền">
     <mxGraphModel dx="1400" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1960" pageHeight="970" math="0" shadow="0">
       <root>
@@ -74,7 +74,7 @@
         <mxCell id="l1" value="Lập Lệnh&lt;br/&gt;Lắp Ráp" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;strokeWidth=1.3;fontSize=10.5;fontColor=#1C2833;" vertex="1" parent="1">
           <mxGeometry x="895" y="397" width="150" height="60" as="geometry" />
         </mxCell>
-        <mxCell id="l2" value="Lắp Ráp &amp;amp; Kiểm Tra&lt;br/&gt;Checklist 5 Bước" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;strokeWidth=1.3;fontSize=10.5;fontColor=#1C2833;" vertex="1" parent="1">
+        <mxCell id="l2" value="Lắp Ráp &amp;amp; Kiểm Tra&lt;br/&gt;Checklist 4 Mục" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;strokeWidth=1.3;fontSize=10.5;fontColor=#1C2833;" vertex="1" parent="1">
           <mxGeometry x="1065" y="397" width="150" height="60" as="geometry" />
         </mxCell>
         <mxCell id="g1" value="Giao Hàng &amp;amp; Chụp&lt;br/&gt;Ảnh Xác Nhận" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;strokeWidth=1.3;fontSize=10.5;fontColor=#1C2833;" vertex="1" parent="1">
