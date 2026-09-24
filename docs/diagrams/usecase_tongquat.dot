@@ -28,9 +28,9 @@ digraph UseCaseAetherPC {
     // "pc-builder" không có allowedRoles, addToCart gắn tag pc_build_bundle.
     // Chỉ nối với Khách Vãng Lai — Khách Hàng kế thừa qua generalization a2->a1,
     // không vẽ thêm association trùng, đúng nguyên tắc đã áp dụng cho uc_xemsp).
-    uc_xemsp    [label="Xem / Tìm\nSản Phẩm"];
+    uc_xemsp    [label="Xem Và Tìm\nSản Phẩm"];
     uc_dangky   [label="Đăng Ký\nTài Khoản"];
-    uc_buildpc  [label="Tự Cấu Hình\n& Build PC"];
+    uc_buildpc  [label="Tự Cấu Hình\nMáy Tính"];
     // Khách Hàng (8 — thêm "Chọn PT & Xác Nhận Thanh Toán": order.controller.js
     // dòng ~136 rẽ nhánh initialStatus=WAITING_PAYMENT khi paymentMethod là
     // BANK_TRANSFER/ONLINE_GATEWAY — có thật trong code, nhưng KHÔNG có cổng
@@ -43,12 +43,12 @@ digraph UseCaseAetherPC {
     // hàng không tự hủy đơn được. Route CUSTOMER duy nhất là PATCH /:id/details
     // (updateOrderDetails, order.controller.js dòng ~1319-1363) chỉ cho sửa
     // địa chỉ/ghi chú, và chỉ khi đơn đang PENDING — không có thao tác hủy.
-    uc_suahuy   [label="Sửa Thông Tin\nĐơn Hàng (Khi Chờ XN)"];
-    uc_thanhtoan[label="Chọn PT & Xác\nNhận Thanh Toán"];
+    uc_suahuy   [label="Sửa Thông Tin Đơn\nHàng Chờ Xác Nhận"];
+    uc_thanhtoan[label="Chọn Phương Thức\nThanh Toán"];
     uc_theodoi  [label="Theo Dõi\nĐơn Hàng"];
-    uc_hoso     [label="Quản Lý Hồ Sơ\n& Sổ Địa Chỉ"];
+    uc_hoso     [label="Quản Lý Hồ Sơ\nVà Sổ Địa Chỉ"];
     uc_danhgia  [label="Đánh Giá\nSản Phẩm"];
-    uc_khieunai [label="Gửi Khiếu Nại /\nĐổi Trả"];
+    uc_khieunai [label="Gửi Khiếu Nại Và\nYêu Cầu Đổi Trả"];
     uc_chatkh   [label="Chat Hỗ Trợ\nTrực Tuyến"];
     // Nhân Viên CSKH (2)
     uc_chat      [label="Trả Lời Chat\nTrực Tuyến"];
@@ -56,11 +56,11 @@ digraph UseCaseAetherPC {
     // Nhà Cung Cấp (2 — đã gộp "Xem Đơn Mua Hàng Của Mình" vào 2 UC
     // dưới vì đó chỉ là thao tác xem trước khi phản hồi/xác nhận,
     // không phải mục tiêu nghiệp vụ riêng — sửa theo góp ý mục 4)
-    uc_phanhoi  [label="Phản Hồi\nBáo Giá (RFQ)"];
-    uc_xacnhanpo[label="Xác Nhận Đơn\nMua Hàng (PO)"];
+    uc_phanhoi  [label="Phản Hồi Yêu\nCầu Báo Giá"];
+    uc_xacnhanpo[label="Xác Nhận\nĐơn Mua Hàng"];
     // Nhân Viên Bán Hàng (2)
-    uc_pos       [label="Bán Hàng Tại\nQuầy (POS)"];
-    uc_xldonhang [label="Xử Lý & Cập Nhật\nĐơn Hàng"];
+    uc_pos       [label="Bán Hàng\nTại Quầy"];
+    uc_xldonhang [label="Xử Lý Và Cập\nNhật Đơn Hàng"];
     // Quản Lý Bán Hàng (1)
     uc_duyethuy  [label="Duyệt Hủy\nĐơn Hàng"];
     // Nhân Viên Mua Hàng (3) — uc_taopo đổi tên từ "Tạo Đơn Mua Hàng (PO)":
@@ -68,11 +68,12 @@ digraph UseCaseAetherPC {
     // QUOTED -> PO (phát hành PO chính thức) CHỈ CEO/ADMIN được làm ("Chỉ CEO
     // (Ban Giám Đốc) mới có quyền duyệt báo giá thành PO chính thức") — Mua
     // Hàng không tự tạo PO, chỉ chốt bảng so sánh báo giá rồi trình CEO duyệt.
-    uc_qlncc     [label="Quản Lý & Đánh\nGiá Nhà Cung Cấp"];
-    uc_rfq       [label="Lập RFQ & So\nSánh Báo Giá"];
-    uc_taopo     [label="Trình Duyệt PO\n(Chốt Báo Giá)"];
+    uc_qlncc     [label="Quản Lý Và Đánh\nGiá Nhà Cung Cấp"];
+    uc_rfq       [label="Lập Yêu Cầu\nBáo Giá"];
+    uc_sosanh    [label="So Sánh\nBáo Giá"];
+    uc_taopo     [label="Trình Duyệt\nĐơn Mua Hàng"];
     // Nhân Viên QC (2)
-    uc_qa        [label="Kiểm Tra Chất\nLượng Hàng Nhập (QA)"];
+    uc_qa        [label="Kiểm Tra Chất\nLượng Hàng Nhập"];
     uc_qctra     [label="Thẩm Định\nHàng Hoàn Trả"];
 
     { rank=same;
@@ -82,7 +83,7 @@ digraph UseCaseAetherPC {
       uc_phanhoi; uc_xacnhanpo;
       uc_pos; uc_xldonhang;
       uc_duyethuy;
-      uc_qlncc; uc_rfq; uc_taopo;
+      uc_qlncc; uc_rfq; uc_sosanh; uc_taopo;
       uc_qa; uc_qctra;
     }
     uc_xemsp -> uc_dangky -> uc_buildpc
@@ -91,7 +92,7 @@ digraph UseCaseAetherPC {
       -> uc_phanhoi -> uc_xacnhanpo
       -> uc_pos -> uc_xldonhang
       -> uc_duyethuy
-      -> uc_qlncc -> uc_rfq -> uc_taopo
+      -> uc_qlncc -> uc_rfq -> uc_sosanh -> uc_taopo
       -> uc_qa -> uc_qctra [style=invis];
 
     // ---------- CỘT 3 — USE CASE DÙNG CHUNG ----------
@@ -101,7 +102,7 @@ digraph UseCaseAetherPC {
     // Precondition của bảng đặc tả use case, không vẽ <<include>>.
     // Chỉ còn 1 use case dùng chung thật sự là sub-flow bắt buộc của
     // nhiều actor khác nhau: kiểm tra/trừ tồn kho.
-    uc_tonkho   [label="Kiểm Tra & Cập\nNhật Tồn Kho"];
+    uc_tonkho   [label="Kiểm Tra Và Cập\nNhật Tồn Kho"];
 
     // 3 use case của actor tổng quát «Nhân Viên» (a18, xem GENERALIZATION
     // bên dưới) — KHÁC với uc_tonkho ở trên: đây không phải sub-flow
@@ -149,7 +150,7 @@ digraph UseCaseAetherPC {
     // Nhân Viên Kho (1 — đã gộp "Xem Lịch Sử Điều Chuyển Kho" vào GRN:
     // gộp theo tiêu chí mục 4, vì xem lịch sử chỉ là 1 màn hình tra cứu
     // đi kèm nghiệp vụ nghiệm thu, không phải mục tiêu riêng của actor)
-    uc_grn       [label="Nghiệm Thu Hàng Nhập\n& Theo Dõi Kho (GRN)"];
+    uc_grn       [label="Nghiệm Thu\nHàng Nhập Kho"];
     // Quản Lý Kho (2 — uc_kiemke đã chuyển association sang Nhân Viên Kho ở
     // dưới, vì warehouse.routes.js dòng 31 (route /inventory/adjust) cho
     // phép CẢ WAREHOUSE lẫn WAREHOUSE_MANAGER, không phải quyền riêng của
@@ -160,19 +161,19 @@ digraph UseCaseAetherPC {
     // order.routes.js dòng 32 xác nhận đây là 1 hành động — bấm "Xác Nhận
     // Xuất Kho" mở ngay modal phân công shipper trong cùng 1 lượt thao tác,
     // dùng chung 1 API PATCH /:id/status — tách đôi sẽ sai với hệ thống thật.
-    uc_xuatkho   [label="Xác Nhận Xuất Kho\n& Phân Công Shipper"];
+    uc_xuatkho   [label="Xác Nhận Xuất Kho Và\nPhân Công Giao Hàng"];
     uc_danhmucsp [label="Quản Lý Danh\nMục Sản Phẩm"];
     // Nhân Viên Kho (2 — thêm "Kiểm Kê & Cân Bằng Tồn Kho", chuyển từ Quản
     // Lý Kho sang đây, xem giải thích ở trên).
-    uc_kiemke    [label="Kiểm Kê & Cân\nBằng Tồn Kho"];
+    uc_kiemke    [label="Kiểm Kê Và Điều\nChỉnh Tồn Kho"];
     // Nhân Viên Lắp Ráp (2)
-    uc_nhanlenh  [label="Nhận Lệnh\nLắp Ráp PC"];
+    uc_nhanlenh  [label="Nhận Lệnh Lắp\nRáp Máy Tính"];
     uc_tiendo    [label="Cập Nhật Tiến\nĐộ Lắp Ráp"];
     // Nhân Viên Giao Hàng (2)
-    uc_giaohang  [label="Giao Hàng &\nThu Tiền COD"];
-    uc_thuhoi    [label="Thu Hồi Hàng Bảo\nHành / Hoàn Trả"];
+    uc_giaohang  [label="Giao Hàng Và\nThu Tiền Mặt"];
+    uc_thuhoi    [label="Thu Hồi Hàng Bảo\nHành Và Hoàn Trả"];
     // Nhân Viên Kế Toán (4)
-    uc_socai     [label="Quản Lý Sổ\nCái Thu Chi"];
+    uc_socai     [label="Ghi Nhận\nPhiếu Thu Chi"];
     uc_ttncc     [label="Thanh Toán\nNhà Cung Cấp"];
     uc_hoantien  [label="Giải Ngân Hoàn\nTiền Khách Hàng"];
     uc_luong     [label="Giải Ngân\nLương Nhân Viên"];
@@ -180,15 +181,16 @@ digraph UseCaseAetherPC {
     uc_hosonv    [label="Quản Lý Hồ Sơ\nNhân Viên"];
     uc_chamcong  [label="Chấm Công\nHàng Ngày"];
     uc_lapluong  [label="Lập Bảng\nLương"];
-    uc_nghiphep  [label="Duyệt / Quản Lý\nNghỉ Phép"];
+    uc_nghiphep  [label="Duyệt Đơn\nNghỉ Phép"];
     // Quản Trị Viên (2 — đã gộp "Xem Nhật Ký Kiểm Toán" vào use case
     // quản lý tài khoản, cùng tiêu chí gộp UC "Xem..." ở mục 4)
-    uc_qltk      [label="Quản Trị Tài Khoản,\nPhân Quyền & Nhật Ký"];
-    uc_backup    [label="Sao Lưu & Phục\nHồi Dữ Liệu"];
+    uc_qltk      [label="Quản Trị Tài Khoản\nVà Phân Quyền"];
+    uc_nhatky    [label="Xem Nhật Ký\nHệ Thống"];
+    uc_backup    [label="Sao Lưu Và Phục\nHồi Dữ Liệu"];
     // Ban Giám Đốc (3)
-    uc_duyetpo    [label="Duyệt Đơn Mua\nHàng (PO)"];
+    uc_duyetpo    [label="Duyệt Đơn\nMua Hàng"];
     uc_duyetluong [label="Duyệt Bảng Lương\nToàn Công Ty"];
-    uc_dashboard  [label="Xem Báo Cáo &\nDashboard Tổng Thể"];
+    uc_dashboard  [label="Xem Báo Cáo\nTổng Thể"];
 
     { rank=same;
       uc_tonkho;
@@ -199,7 +201,7 @@ digraph UseCaseAetherPC {
       uc_giaohang; uc_thuhoi;
       uc_socai; uc_ttncc; uc_hoantien; uc_luong;
       uc_hosonv; uc_chamcong; uc_lapluong; uc_nghiphep;
-      uc_qltk; uc_backup;
+      uc_qltk; uc_nhatky; uc_backup;
       uc_duyetpo; uc_duyetluong; uc_dashboard;
     }
     uc_grn
@@ -208,7 +210,7 @@ digraph UseCaseAetherPC {
       -> uc_giaohang -> uc_thuhoi
       -> uc_socai -> uc_ttncc -> uc_hoantien -> uc_luong
       -> uc_hosonv -> uc_chamcong -> uc_lapluong -> uc_nghiphep
-      -> uc_qltk -> uc_backup
+      -> uc_qltk -> uc_nhatky -> uc_backup
       -> uc_duyetpo -> uc_duyetluong -> uc_dashboard [style=invis];
   }
 
@@ -285,6 +287,7 @@ digraph UseCaseAetherPC {
   a5 -> uc_duyethuy;
   a7 -> uc_qlncc;
   a7 -> uc_rfq;
+  a7 -> uc_sosanh;
   a7 -> uc_taopo;
   a8 -> uc_qa;
   a8 -> uc_qctra;
@@ -300,7 +303,7 @@ digraph UseCaseAetherPC {
   uc_giaohang -> a12; uc_thuhoi -> a12;
   uc_socai -> a13; uc_ttncc -> a13; uc_hoantien -> a13; uc_luong -> a13;
   uc_hosonv -> a14; uc_chamcong -> a14; uc_lapluong -> a14; uc_nghiphep -> a14;
-  uc_qltk -> a15; uc_backup -> a15;
+  uc_qltk -> a15; uc_nhatky -> a15; uc_backup -> a15;
   uc_duyetpo -> a16; uc_duyetluong -> a16; uc_dashboard -> a16;
   // Nhân Viên (a18): CHIỀU EDGE uc -> actor giống các actor cột 5 khác ở
   // trên (không phải actor -> uc như thử ban đầu) — bắt buộc để a18 nằm
@@ -356,29 +359,21 @@ digraph UseCaseAetherPC {
   // làm (POS, xử lý đơn) cộng thêm quyền duyệt hủy đơn riêng.
   a5  -> a4 [arrowhead=empty, style=solid, constraint=false, weight=0];
 
-  // Ban đầu thử vẽ đủ 11 mũi tên generalization riêng lẻ từ mỗi actor gốc
-  // (Bán Hàng, CSKH, Mua Hàng, QC, Kho, Lắp Ráp, Giao Hàng, Kế Toán, Nhân
-  // Sự, Quản Trị Viên, Ban Giám Đốc) hội tụ về a18 — nhưng 11 đường cắt
-  // ngang gần hết bề rộng sơ đồ (nhiều actor ở cột 1, nhiều actor ở cột 5,
-  // 1 actor cha ở giữa) làm rối hơn là làm rõ, phản tác dụng với mục đích
-  // của UML use case diagram (dễ đọc tổng quan). Thay bằng 1 NOTE (chuẩn
-  // UML: hình chữ nhật gấp góc, nối actor bằng đường nối không mũi tên) —
-  // đây là cách xử lý được chấp nhận trong thực hành UML khi 1 actor cha
-  // có quá nhiều actor con để vẽ generalization tường minh mà vẫn giữ sơ
-  // đồ dễ đọc, miễn ghi rõ đầy đủ danh sách quan hệ bằng văn bản (không
-  // che giấu thông tin, chỉ đổi cách trình bày). Danh sách 11 actor vẫn
-  // đúng logic bắc cầu như bản trước: không liệt kê Quản Lý Bán Hàng/Quản
-  // Lý Kho vì đã kế thừa qua Nhân Viên Bán Hàng/Nhân Viên Kho.
-  // Nội dung note rút ngắn tối đa theo yêu cầu — chỉ giữ Ý CHÍNH (ai kế
-  // thừa, kế thừa gì), bỏ trích dẫn route/code (đã có đủ ở comment phía
-  // trên khi khai báo uc_xinnghi/uc_luongtoi/uc_xemtongquan) và bỏ chú
-  // thích "bắc cầu" (đã giải thích ở 2 generalization vẽ tường minh phía
-  // trên) để note dễ đọc lướt qua trong vài giây, không cần đọc hết.
-  // Dùng "Kế Thừa" (tiếng Việt) thay "generalization" — nhất quán yêu cầu
-  // toàn bộ chữ hiển thị trên sơ đồ phải là tiếng Việt thuần.
+  // ---- KE THUA VE Nhan Vien (a18) ----
+  // Da thu ve du 11 mui ten tam giac rong tu 11 vai tro noi bo ve a18
+  // (a4, a6, a7, a8 o cot actor TRAI + a9, a11..a16 o cot actor PHAI).
+  // Ket qua: dot phai keo 11 duong xuyen ngang toan bo so do, thuat toan
+  // giam giao cat bi pha vo, 2 cot use case bi dun vao lam 1 va khung
+  // ranh gioi he thong khong con bao dung cot 4 (da render kiem chung).
+  // Giai phap: giu so do tong quat sach, va tach rieng QUAN HE KE THUA
+  // ACTOR thanh mot hinh phu doc lap — file usecase_actor_hierarchy.dot —
+  // noi ca 14 quan he generalization duoc ve TUONG MINH bang tam giac
+  // rong dung chuan UML. Note ben duoi tro nguoi doc sang hinh phu do.
+
+  // ---- NOTE 1: giai thich quan he ke thua actor ----
   note_nhanvien [shape=note, style=filled, fillcolor="#fffde7", color="#999999",
     fontsize=9, fontname="Arial", margin=0.15,
-    label="«Kế Thừa»: Nhân Viên là actor cha của toàn bộ\nnhân viên nội bộ (Bán Hàng, CSKH, Mua Hàng, QC,\nKho, Lắp Ráp, Giao Hàng, Kế Toán, Nhân Sự,\nQuản Trị Viên, Ban Giám Đốc) — mỗi vai trò có thêm\nquyền riêng ngoài 3 chức năng chung ở trên."];
+    label="KẾ THỪA ACTOR\l\lNhân Viên là actor cha của 11 vai trò nội bộ, nên vai trò\lnào cũng dùng được 3 chức năng chung ở trên.\lQuản Lý Bán Hàng kế thừa Nhân Viên Bán Hàng.\lQuản Lý Kho kế thừa Nhân Viên Kho.\lKhách Hàng Thành Viên kế thừa Khách Vãng Lai.\l"];
   a18 -> note_nhanvien [style=dashed, arrowhead=none, constraint=false, weight=0];
 
   // NOTE thứ 2 — giải thích trực quan NGAY TRÊN sơ đồ vì sao không có use
@@ -393,7 +388,7 @@ digraph UseCaseAetherPC {
   // comment .dot phía trên khai báo use case cột 3, không cần lặp lại trên note).
   note_login [shape=note, style=filled, fillcolor="#fffde7", color="#999999",
     fontsize=9, fontname="Arial", margin=0.15,
-    label="Phải đăng nhập thành công mới dùng được các\nchức năng trong hệ thống (trừ 3 chức năng công\nkhai của Khách Vãng Lai) — vì vậy không vẽ riêng\n\"Đăng Nhập\" thành 1 use case."];
+    label="ĐIỀU KIỆN TIÊN QUYẾT\l\lMọi chức năng đều yêu cầu đã đăng nhập, trừ 3 chức\lnăng công khai của Khách Vãng Lai.\l"];
   note_login -> uc_xemsp [style=dashed, arrowhead=none, constraint=false, weight=0, lhead=cluster_system];
 
   // ============================================================
@@ -408,6 +403,9 @@ digraph UseCaseAetherPC {
   uc_dathang -> uc_tonkho [xlabel="«include»"];
   uc_pos     -> uc_tonkho [xlabel="«include»"];
   uc_xuatkho -> uc_tonkho [xlabel="«include»", constraint=false];
+  // Nghiem thu hang nhap: buoc cong tang ton kho nam trong CUNG 1 luot thao tac
+  // cua Nhan Vien Kho (cung API tao phieu nhap) nen du dieu kien «include».
+  uc_grn     -> uc_tonkho [xlabel="«include»", constraint=false];
 
   // KHÔNG vẽ include/extend nối chuỗi PO (Trình Duyệt PO -> Duyệt PO ->
   // Xác Nhận PO), chuỗi RMA (Khiếu Nại -> Thu Hồi -> Thẩm Định -> Hoàn
