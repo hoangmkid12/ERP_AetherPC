@@ -1826,16 +1826,17 @@ html, body {
     font-size: 0.8rem !important;
   }
 
-  /* Cột thao tác cuối cùng của bảng luôn rộng rãi, thẳng hàng, không bị co nhỏ mất nút */
-  .admin-main-content table th:last-child,
-  .admin-main-content table td:last-child,
-  table th:last-child,
-  table td:last-child {
+  /* Cột thao tác cuối cùng của bảng danh mục luôn rộng rãi, thẳng hàng, không bị co nhỏ mất nút */
+  .erp-table th:last-child,
+  .erp-table td:last-child,
+  .table-responsive table th:last-child,
+  .table-responsive table td:last-child {
     min-width: 130px !important;
     white-space: nowrap !important;
     text-align: center !important;
   }
-  table td:last-child > div {
+  .erp-table td:last-child > div,
+  .table-responsive table td:last-child > div {
     display: inline-flex !important;
     flex-wrap: nowrap !important;
     gap: 0.4rem !important;
