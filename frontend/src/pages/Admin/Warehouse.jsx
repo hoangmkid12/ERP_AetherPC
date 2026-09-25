@@ -4937,20 +4937,35 @@ export default function Warehouse() {
                   </div>
 
                   {/* Signature blocks — bản in để lưu hồ sơ / trình ký giấy */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', textAlign: 'center', marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px dashed #cbd5e1' }}>
-                    <div>
-                      <strong style={{ fontSize: '0.8rem', color: '#0f172a' }}>NGƯỜI ĐỀ XUẤT</strong>
-                      <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: '0.2rem' }}>(Ký, ghi rõ họ tên)</div>
-                      <div style={{ height: '56px' }} />
-                      <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#0f172a' }}>{viewingPR.requestedBy || ''}</div>
-                    </div>
-                    <div>
-                      <strong style={{ fontSize: '0.8rem', color: '#0f172a' }}>QUẢN LÝ KHO DUYỆT</strong>
-                      <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: '0.2rem' }}>(Ký, ghi rõ họ tên)</div>
-                      <div style={{ height: '56px' }} />
-                      <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#0f172a' }}>{viewingPR.approvedBy || ''}</div>
-                    </div>
-                  </div>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px dashed #cbd5e1', tableLayout: 'fixed' }}>
+                    <tbody>
+                      <tr>
+                        <td style={{ width: '50%', textAlign: 'center', padding: '0.5rem 0.5rem 0' }}>
+                          <strong style={{ fontSize: '0.8rem', color: '#0f172a' }}>NGƯỜI ĐỀ XUẤT</strong>
+                        </td>
+                        <td style={{ width: '50%', textAlign: 'center', padding: '0.5rem 0.5rem 0' }}>
+                          <strong style={{ fontSize: '0.8rem', color: '#0f172a' }}>QUẢN LÝ KHO DUYỆT</strong>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style={{ textAlign: 'center', padding: '0.15rem 0.5rem 0' }}>
+                          <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>(Ký, ghi rõ họ tên)</div>
+                        </td>
+                        <td style={{ textAlign: 'center', padding: '0.15rem 0.5rem 0' }}>
+                          <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>(Ký, ghi rõ họ tên)</div>
+                        </td>
+                      </tr>
+                      <tr style={{ height: '60px' }}><td /><td /></tr>
+                      <tr>
+                        <td style={{ textAlign: 'center', padding: '0 0.5rem 0.5rem' }}>
+                          <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#0f172a' }}>{viewingPR.requestedBy || ''}</div>
+                        </td>
+                        <td style={{ textAlign: 'center', padding: '0 0.5rem 0.5rem' }}>
+                          <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#0f172a' }}>{viewingPR.approvedBy || ''}</div>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
                 </div>
 
                 <div className="aetherpc-no-print" style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem', padding: '1.25rem 1.75rem', borderTop: '1px solid #f1f5f9' }}>

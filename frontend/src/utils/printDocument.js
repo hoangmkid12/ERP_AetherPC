@@ -27,6 +27,10 @@ const PRINT_CSS = `
     width: 100% !important; max-width: none !important; margin: 0 !important;
     border: none !important; border-radius: 0 !important; box-shadow: none !important;
   }
+  /* Bảo vệ grid/flex/table bên trong: không override width con cháu, chỉ reset wrapper ngoài cùng */
+  .aetherpc-print-root > * > * { width: auto !important; max-width: none !important; }
+  .aetherpc-print-root table, .aetherpc-print-root table * { width: revert; max-width: none !important; }
+  .aetherpc-print-root table { width: 100% !important; border-collapse: collapse; }
   .aetherpc-print-root, .aetherpc-print-root * { max-height: none !important; overflow: visible !important; }
   .aetherpc-print-root [style*="position: fixed"], .aetherpc-print-root [style*="position: sticky"] { position: static !important; }
   .aetherpc-print-root table { page-break-inside: auto; }
