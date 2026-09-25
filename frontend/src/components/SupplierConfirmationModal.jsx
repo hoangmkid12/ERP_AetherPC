@@ -225,12 +225,12 @@ export default function SupplierConfirmationModal({ order, onClose }) {
           </div>
           <table style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse', marginBottom: '0.45rem', fontSize: '0.78rem' }}>
             <colgroup>
-              <col style={{ width: '40px' }} />
+              <col style={{ width: '38px' }} />
               <col style={{ width: 'auto' }} />
-              <col style={{ width: '55px' }} />
-              <col style={{ width: '115px' }} />
-              <col style={{ width: '125px' }} />
-              <col style={{ width: '110px' }} />
+              <col style={{ width: '50px' }} />
+              <col style={{ width: '145px' }} />
+              <col style={{ width: '130px' }} />
+              <col style={{ width: '105px' }} />
             </colgroup>
             <thead>
               <tr style={{ borderBottom: '2px solid #0f172a', backgroundColor: '#f8fafc' }}>
@@ -250,12 +250,12 @@ export default function SupplierConfirmationModal({ order, onClose }) {
                 const itTotal = Number(it.totalCost || it.totalAmount || (itQty * itUnit) || 0);
                 return (
                   <tr key={it.id || idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                    <td style={{ padding: '0.5rem 0.35rem', textAlign: 'center', color: '#64748b' }}>{idx + 1}</td>
-                    <td style={{ padding: '0.5rem 0.5rem', color: '#0f172a', fontWeight: 600, wordBreak: 'break-word', lineHeight: 1.35 }}>{itName}</td>
-                    <td style={{ padding: '0.5rem 0.35rem', textAlign: 'center', color: '#0f172a', fontWeight: 700 }}>{itQty}</td>
-                    <td style={{ padding: '0.5rem 0.5rem', textAlign: 'right', color: '#475569', whiteSpace: 'nowrap' }}>{formatPrice(itUnit)}</td>
-                    <td style={{ padding: '0.5rem 0.5rem', textAlign: 'right', color: '#0f172a', fontWeight: 700, whiteSpace: 'nowrap' }}>{formatPrice(itTotal)}</td>
-                    <td style={{ padding: '0.5rem 0.5rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                    <td style={{ padding: '0.45rem 0.35rem', textAlign: 'center', color: '#64748b' }}>{idx + 1}</td>
+                    <td style={{ padding: '0.45rem 0.5rem', color: '#0f172a', fontWeight: 600, wordBreak: 'break-word', lineHeight: 1.35 }}>{itName}</td>
+                    <td style={{ padding: '0.45rem 0.35rem', textAlign: 'center', color: '#0f172a', fontWeight: 700 }}>{itQty}</td>
+                    <td style={{ padding: '0.45rem 0.5rem', textAlign: 'right', color: '#475569', whiteSpace: 'nowrap' }}>{formatPrice(itUnit)}</td>
+                    <td style={{ padding: '0.45rem 0.5rem', textAlign: 'right', color: '#0f172a', fontWeight: 700, whiteSpace: 'nowrap' }}>{formatPrice(itTotal)}</td>
+                    <td style={{ padding: '0.45rem 0.5rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
                       <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#15803d', backgroundColor: '#dcfce7', padding: '2px 8px', borderRadius: '4px' }}>
                         ✓ Sẵn sàng giao
                       </span>
@@ -266,10 +266,10 @@ export default function SupplierConfirmationModal({ order, onClose }) {
             </tbody>
             <tfoot>
               <tr style={{ borderTop: '2px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
-                <td colSpan={2} style={{ padding: '0.5rem 0.5rem', textAlign: 'right', fontWeight: 700, color: '#334155' }}>Tổng số lượng:</td>
-                <td style={{ padding: '0.5rem 0.35rem', textAlign: 'center', fontWeight: 800, color: '#0f172a' }}>{totalQty} SP</td>
-                <td style={{ padding: '0.5rem 0.5rem', textAlign: 'right', fontWeight: 700, color: '#334155' }}>Tổng giá trị xác nhận:</td>
-                <td colSpan={2} style={{ padding: '0.5rem 0.5rem', textAlign: 'right', fontWeight: 800, fontSize: '0.95rem', color: '#16a34a', whiteSpace: 'nowrap' }}>
+                <td colSpan={2} style={{ padding: '0.45rem 0.5rem', textAlign: 'right', fontWeight: 700, color: '#334155', whiteSpace: 'nowrap' }}>Tổng số lượng:</td>
+                <td style={{ padding: '0.45rem 0.35rem', textAlign: 'center', fontWeight: 800, color: '#0f172a', whiteSpace: 'nowrap' }}>{totalQty} SP</td>
+                <td style={{ padding: '0.45rem 0.5rem', textAlign: 'right', fontWeight: 700, color: '#334155', whiteSpace: 'nowrap' }}>Tổng giá trị xác nhận:</td>
+                <td colSpan={2} style={{ padding: '0.45rem 0.5rem', textAlign: 'right', fontWeight: 800, fontSize: '0.92rem', color: '#16a34a', whiteSpace: 'nowrap' }}>
                   {formatPrice(totalAmount)}
                 </td>
               </tr>
