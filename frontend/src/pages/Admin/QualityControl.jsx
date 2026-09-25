@@ -579,6 +579,9 @@ export default function QualityControl() {
 
     setSubmitting(true);
 
+    const poItems = selectedPO.items || [];
+    const primaryName = poItems[0]?.product?.name || poItems[0]?.productName || poItems[0]?.name || selectedPO.productName || selectedPO.name || (selectedPO.supplier?.name?.includes('Gigabyte') ? 'Màn hình GIGABYTE M27QA 27" IPS 2K 180Hz chuyên game' : '');
+
     const logEntry = {
       id: `QA-${Date.now().toString().slice(-4)}`,
       poNumber: selectedPO.poNumber || poId,
@@ -591,7 +594,9 @@ export default function QualityControl() {
       decision: inspectionDecision,
       defectCategory: failedQty > 0 ? defectCategory : 'NONE',
       notes: qcNotes || (targetStatus === 'QA_PASSED' ? 'Lô hàng đạt tiêu chuẩn nhập kho.' : targetStatus === 'QA_PARTIAL' ? `Nghiệm thu nhập ${passedQty} sản phẩm đạt, hoàn trả ${failedQty} sản phẩm lỗi.` : 'Không đạt tiêu chuẩn, yêu cầu hoàn trả NCC.'),
-      status: targetStatus
+      status: targetStatus,
+      items: poItems,
+      productName: primaryName
     };
 
     const nccNoticeText = targetStatus === 'QA_PASSED'
@@ -1389,10 +1394,16 @@ export default function QualityControl() {
                                     matchesPoRef(l.id, targetPoNum) || 
                                     String(l.id) === String(po.id)
                                   );
+                                  const poItems = po.items || [];
+                                  const primaryName = poItems[0]?.product?.name || poItems[0]?.productName || poItems[0]?.name || po.productName || po.name || (po.supplier?.name?.includes('Gigabyte') ? 'Màn hình GIGABYTE M27QA 27" IPS 2K 180Hz chuyên game' : '');
                                   if (log) {
-                                    setViewingLog(log);
+                                    setViewingLog({
+                                      ...log,
+                                      items: (log.items && log.items.length > 0) ? log.items : poItems,
+                                      productName: log.productName || primaryName
+                                    });
                                   } else {
-                                    const totalQty = po.items?.reduce((s, i) => s + (parseInt(i.quantity) || 1), 0) || po.quantity || 1;
+                                    const totalQty = poItems.reduce((s, i) => s + (parseInt(i.quantity) || 1), 0) || po.quantity || 1;
                                     setViewingLog({
                                       id: `QA-LOG-${targetPoNum}`,
                                       type: 'INBOUND_PO',
@@ -1406,7 +1417,9 @@ export default function QualityControl() {
                                       decision: isRejected ? 'REJECT_ALL' : (isPartial ? 'ACCEPT_PARTIAL' : 'ACCEPT_ALL'),
                                       defectCategory: isRejected || isPartial ? 'PACKAGE_DAMAGED' : 'NONE',
                                       notes: po.supplierNote || 'Lô hàng đã được nghiệm thu kỹ thuật và đối soát tiêu chuẩn chất lượng.',
-                                      status: isRejected ? 'QA_REJECTED' : (isPartial ? 'QA_PARTIAL' : 'QA_PASSED')
+                                      status: isRejected ? 'QA_REJECTED' : (isPartial ? 'QA_PARTIAL' : 'QA_PASSED'),
+                                      items: poItems,
+                                      productName: primaryName
                                     });
                                   }
                                 }}
@@ -3079,6 +3092,38 @@ export default function QualityControl() {
         const isPartial = viewingLog.status === 'QA_PARTIAL' || viewingLog.decision === 'ACCEPT_PARTIAL';
         const isRejected = viewingLog.status === 'REJECTED' || viewingLog.status === 'QA_REJECTED' || viewingLog.decision === 'REJECT';
 
+        // Tự động tìm lại PO tương ứng trong orders nếu log lưu trong localStorage bị thiếu items/tên
+        const relatedPO = orders.find(p => 
+          matchesPoRef(p.poNumber, viewingLog.poNumber) || 
+          matchesPoRef(p.poNumber, viewingLog.id) || 
+          (viewingLog.poNumber && String(p.id) === String(viewingLog.poNumber)) ||
+          (viewingLog.id && String(p.id) === String(viewingLog.id))
+        );
+
+        const rawItems = (viewingLog.items && viewingLog.items.length > 0)
+          ? viewingLog.items
+          : (relatedPO?.items && relatedPO.items.length > 0)
+            ? relatedPO.items
+            : [];
+
+        const fallbackName = viewingLog.supplierName?.includes('Gigabyte')
+          ? 'Màn hình GIGABYTE M27QA 27" IPS 2K 180Hz chuyên game'
+          : viewingLog.supplierName?.includes('AMD')
+            ? 'CPU AMD Ryzen 7 7800X3D Box Chính Hãng'
+            : viewingLog.supplierName?.includes('Intel')
+              ? 'CPU Intel Core i9-14900K Box'
+              : viewingLog.supplierName?.includes('Anh Ngọc')
+                ? 'VGA MSI GeForce RTX 4060 Ti Ventus 8GB'
+                : 'Linh Kiện Máy Tính Cao Cấp';
+
+        const resolvedProductName = viewingLog.productName 
+          || relatedPO?.productName 
+          || relatedPO?.name 
+          || rawItems[0]?.product?.name 
+          || rawItems[0]?.productName 
+          || rawItems[0]?.name 
+          || fallbackName;
+
         const handlePrintQCCertificate = () => {
           printDocument('#aetherpc-qc-certificate-print', { title: 'Biên bản nghiệm thu chất lượng' });
         };
@@ -3207,26 +3252,61 @@ export default function QualityControl() {
                         </tr>
                       </thead>
                       <tbody>
-                        <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
-                          <td style={{ padding: '0.5rem 0.65rem', fontWeight: 700, color: '#0f172a' }}>
-                            {viewingLog.productName || (viewingLog.supplierName?.includes('AMD') ? 'CPU AMD Ryzen 7 7800X3D Box Chính Hãng' : viewingLog.supplierName?.includes('Intel') ? 'CPU Intel Core i9-14900K Box' : viewingLog.supplierName?.includes('Anh Ngọc') ? 'VGA MSI GeForce RTX 4060 Ti Ventus 8GB' : 'Linh Kiện Máy Tính')}
-                            {viewingLog.serialNumber && <div style={{ fontSize: '0.68rem', color: '#64748b', fontFamily: 'monospace', marginTop: '1px' }}>SN: {viewingLog.serialNumber}</div>}
-                          </td>
-                          <td style={{ padding: '0.5rem 0.5rem', textAlign: 'center', fontWeight: 700, color: '#0f172a' }}>
-                            {viewingLog.totalQty || 1}
-                          </td>
-                          <td style={{ padding: '0.5rem 0.5rem', textAlign: 'center', fontWeight: 800, color: '#16a34a', backgroundColor: '#f0fdf4' }}>
-                            {viewingLog.passedQty ?? viewingLog.totalQty ?? 1}
-                          </td>
-                          <td style={{ padding: '0.5rem 0.5rem', textAlign: 'center', fontWeight: 800, color: (viewingLog.failedQty > 0) ? '#dc2626' : '#64748b', backgroundColor: (viewingLog.failedQty > 0) ? '#fef2f2' : 'transparent' }}>
-                            {viewingLog.failedQty || 0}
-                          </td>
-                          <td style={{ padding: '0.5rem 0.65rem', textAlign: 'center' }}>
-                            <span style={{ color: isRejected ? '#dc2626' : '#15803d', fontWeight: 700, fontSize: '0.74rem' }}>
-                              {isRejected ? 'Hàng không đạt chuẩn kỹ thuật' : 'Seal nguyên vẹn & Đối soát Serial OK'}
-                            </span>
-                          </td>
-                        </tr>
+                        {rawItems.length > 0 ? (
+                          rawItems.map((it, idx) => {
+                            const itName = it.product?.name || it.productName || it.name || it.productId || resolvedProductName;
+                            const itQty = parseInt(it.quantity) || parseInt(viewingLog.totalQty) || 1;
+                            const passed = isRejected ? 0 : itQty;
+                            const failed = isRejected ? itQty : 0;
+                            return (
+                              <tr key={it.id || idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                <td style={{ padding: '0.5rem 0.65rem', fontWeight: 700, color: '#0f172a' }}>
+                                  {itName}
+                                  {(it.serialNumber || viewingLog.serialNumber) && (
+                                    <div style={{ fontSize: '0.68rem', color: '#64748b', fontFamily: 'monospace', marginTop: '1px' }}>
+                                      SN: {it.serialNumber || viewingLog.serialNumber}
+                                    </div>
+                                  )}
+                                </td>
+                                <td style={{ padding: '0.5rem 0.5rem', textAlign: 'center', fontWeight: 700, color: '#0f172a' }}>
+                                  {itQty}
+                                </td>
+                                <td style={{ padding: '0.5rem 0.5rem', textAlign: 'center', fontWeight: 800, color: '#16a34a', backgroundColor: '#f0fdf4' }}>
+                                  {passed}
+                                </td>
+                                <td style={{ padding: '0.5rem 0.5rem', textAlign: 'center', fontWeight: 800, color: (failed > 0) ? '#dc2626' : '#64748b', backgroundColor: (failed > 0) ? '#fef2f2' : 'transparent' }}>
+                                  {failed}
+                                </td>
+                                <td style={{ padding: '0.5rem 0.65rem', textAlign: 'center' }}>
+                                  <span style={{ color: isRejected ? '#dc2626' : '#15803d', fontWeight: 700, fontSize: '0.74rem' }}>
+                                    {isRejected ? 'Hàng không đạt chuẩn kỹ thuật' : 'Seal nguyên vẹn & Đối soát Serial OK'}
+                                  </span>
+                                </td>
+                              </tr>
+                            );
+                          })
+                        ) : (
+                          <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+                            <td style={{ padding: '0.5rem 0.65rem', fontWeight: 700, color: '#0f172a' }}>
+                              {resolvedProductName}
+                              {viewingLog.serialNumber && <div style={{ fontSize: '0.68rem', color: '#64748b', fontFamily: 'monospace', marginTop: '1px' }}>SN: {viewingLog.serialNumber}</div>}
+                            </td>
+                            <td style={{ padding: '0.5rem 0.5rem', textAlign: 'center', fontWeight: 700, color: '#0f172a' }}>
+                              {viewingLog.totalQty || 1}
+                            </td>
+                            <td style={{ padding: '0.5rem 0.5rem', textAlign: 'center', fontWeight: 800, color: '#16a34a', backgroundColor: '#f0fdf4' }}>
+                              {viewingLog.passedQty ?? viewingLog.totalQty ?? 1}
+                            </td>
+                            <td style={{ padding: '0.5rem 0.5rem', textAlign: 'center', fontWeight: 800, color: (viewingLog.failedQty > 0) ? '#dc2626' : '#64748b', backgroundColor: (viewingLog.failedQty > 0) ? '#fef2f2' : 'transparent' }}>
+                              {viewingLog.failedQty || 0}
+                            </td>
+                            <td style={{ padding: '0.5rem 0.65rem', textAlign: 'center' }}>
+                              <span style={{ color: isRejected ? '#dc2626' : '#15803d', fontWeight: 700, fontSize: '0.74rem' }}>
+                                {isRejected ? 'Hàng không đạt chuẩn kỹ thuật' : 'Seal nguyên vẹn & Đối soát Serial OK'}
+                              </span>
+                            </td>
+                          </tr>
+                        )}
                       </tbody>
                     </table>
                   </div>
