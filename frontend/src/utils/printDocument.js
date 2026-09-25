@@ -12,16 +12,27 @@
 
 const PAGE_MARGIN_MM = 12;
 const MM_TO_PX = 96 / 25.4;
+// @page margin = 0 nên vùng in = toàn bộ tờ A4; lề thực nằm trong body padding
 const PRINTABLE_WIDTH_PX = (210 - PAGE_MARGIN_MM * 2) * MM_TO_PX;
 const PRINTABLE_HEIGHT_PX = (297 - PAGE_MARGIN_MM * 2) * MM_TO_PX;
 // Phiếu cần thu nhỏ quá mức này thì để tràn nhiều trang thay vì in chữ quá bé không đọc được.
 const MIN_FIT_SCALE = 0.55;
 
 const PRINT_CSS = `
-  @page { size: A4 portrait; margin: ${PAGE_MARGIN_MM}mm; }
-  html, body { margin: 0 !important; padding: 0 !important; background: #ffffff !important; height: auto !important; overflow: visible !important; }
+  /* margin: 0 => browser không có vùng margin để vẽ header/footer (ngày, URL, tiêu đề) */
+  @page { size: A4 portrait; margin: 0; }
+  html { margin: 0 !important; padding: 0 !important; background: #ffffff !important; }
+  body {
+    margin: 0 !important;
+    /* Lề thực thay thế cho @page margin — nằm trong nội dung, không phải vùng header/footer */
+    padding: ${PAGE_MARGIN_MM}mm !important;
+    background: #ffffff !important;
+    height: auto !important;
+    overflow: visible !important;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: #0f172a;
+  }
   * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; box-sizing: border-box; }
-  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #0f172a; }
   .aetherpc-print-root { width: ${PRINTABLE_WIDTH_PX}px; margin: 0 auto; transform-origin: top center; }
   .aetherpc-print-root > * {
     width: 100% !important; max-width: none !important; margin: 0 !important;
