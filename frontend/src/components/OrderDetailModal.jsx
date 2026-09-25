@@ -52,12 +52,12 @@ export default function OrderDetailModal({ order, onClose }) {
         {/* Header */}
         <div style={{
           padding: '1.25rem 1.75rem',
-          background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 55%, #1d4ed8 100%)',
-          color: '#ffffff',
+          backgroundColor: '#ffffff',
+          color: '#0f172a',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          borderBottom: '3px solid #2563eb',
+          borderBottom: '1px solid #e2e8f0',
           width: '100%',
           boxSizing: 'border-box'
         }}>
@@ -67,26 +67,25 @@ export default function OrderDetailModal({ order, onClose }) {
               width: '44px',
               height: '44px',
               borderRadius: '12px',
-              background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.3) 0%, rgba(29, 78, 216, 0.45) 100%)',
-              border: '1px solid rgba(96, 165, 250, 0.5)',
+              backgroundColor: '#eff6ff',
+              border: '1px solid #bfdbfe',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: '#93c5fd',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+              color: '#2563eb',
               flexShrink: 0
             }}>
               <Package size={22} />
             </div>
             <div style={{ minWidth: 0 }}>
-              <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: '#ffffff', letterSpacing: '-0.3px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.3px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 Chi Tiết Đơn Hàng #{order.orderId}
               </h3>
-              <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.8rem', color: '#cbd5e1', display: 'flex', alignItems: 'center', gap: '0.4rem', whiteSpace: 'nowrap' }}>
-                <Calendar size={13} style={{ color: '#60a5fa', flexShrink: 0 }} /> 
-                Ngày đặt: <strong style={{ color: '#f8fafc' }}>{order.date || new Date(order.createdAt).toLocaleDateString('vi-VN')}</strong>
-                <span style={{ margin: '0 0.3rem', color: '#64748b' }}>•</span>
-                <span style={{ color: '#93c5fd', fontSize: '0.78rem', fontWeight: 600 }}>Kênh: {order.type || 'ONLINE'}</span>
+              <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.8rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '0.4rem', whiteSpace: 'nowrap' }}>
+                <Calendar size={13} style={{ color: '#2563eb', flexShrink: 0 }} />
+                Ngày đặt: <strong style={{ color: '#0f172a' }}>{order.date || new Date(order.createdAt).toLocaleDateString('vi-VN')}</strong>
+                <span style={{ margin: '0 0.3rem', color: '#cbd5e1' }}>•</span>
+                <span style={{ color: '#2563eb', fontSize: '0.78rem', fontWeight: 600 }}>Kênh: {order.type || 'ONLINE'}</span>
               </p>
             </div>
           </div>
@@ -101,19 +100,18 @@ export default function OrderDetailModal({ order, onClose }) {
               color: statusInfo.color,
               backgroundColor: statusInfo.bg,
               border: `1.5px solid ${statusInfo.border}`,
-              boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
               whiteSpace: 'nowrap'
             }}>
               {statusInfo.label}
             </span>
 
-            <button 
+            <button
               onClick={onClose}
               title="Đóng chi tiết"
               style={{
-                background: 'rgba(255, 255, 255, 0.12)',
-                border: '1px solid rgba(255, 255, 255, 0.2)',
-                color: '#ffffff',
+                backgroundColor: '#ffffff',
+                border: '1px solid #cbd5e1',
+                color: '#475569',
                 cursor: 'pointer',
                 width: '34px',
                 height: '34px',
@@ -124,8 +122,8 @@ export default function OrderDetailModal({ order, onClose }) {
                 transition: 'all 0.2s',
                 flexShrink: 0
               }}
-              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.8)'; e.currentTarget.style.borderColor = '#ef4444'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.12)'; e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)'; }}
+              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#fef2f2'; e.currentTarget.style.borderColor = '#fecaca'; e.currentTarget.style.color = '#dc2626'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#ffffff'; e.currentTarget.style.borderColor = '#cbd5e1'; e.currentTarget.style.color = '#475569'; }}
             >
               <X size={18} />
             </button>

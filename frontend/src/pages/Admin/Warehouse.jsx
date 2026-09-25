@@ -15,6 +15,44 @@ import OrderDetailModal from '../../components/OrderDetailModal';
 import { printDocument } from '../../utils/printDocument';
 import { numberToVietnameseWords } from '../../utils/numberToWords';
 
+// Nút hành động dùng chung cho bảng "Hoạt Động / Lệnh Giao Hàng" — style cố định
+// để các nút cùng loại (vd "Xem Gói Hàng") luôn thẳng hàng nhau giữa các dòng.
+const ACTION_BTN_BASE = {
+  width: '100%',
+  border: 'none',
+  borderRadius: '5px',
+  padding: '0.32rem 0.5rem',
+  fontSize: '0.72rem',
+  cursor: 'pointer',
+  whiteSpace: 'nowrap',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  height: '28px',
+  boxSizing: 'border-box'
+};
+const ACTION_BTN_PRIMARY = { ...ACTION_BTN_BASE, backgroundColor: '#2563eb', color: '#ffffff', fontWeight: 700 };
+const ACTION_BTN_SECONDARY = { ...ACTION_BTN_BASE, backgroundColor: '#ffffff', color: '#475569', border: '1px solid #cbd5e1', fontWeight: 600 };
+const ACTION_BTN_WARNING = { ...ACTION_BTN_BASE, backgroundColor: '#fff7ed', color: '#c2410c', border: '1px solid #fdba74', fontWeight: 700 };
+const ACTION_BADGE_BASE = {
+  width: '100%',
+  boxSizing: 'border-box',
+  fontSize: '0.71rem',
+  fontWeight: 600,
+  padding: '0.3rem 0.5rem',
+  borderRadius: '4px',
+  whiteSpace: 'nowrap',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center'
+};
+const ACTION_BADGE_ORANGE = { ...ACTION_BADGE_BASE, color: '#c2410c', backgroundColor: '#fff7ed', border: '1px solid #fed7aa' };
+const ACTION_BADGE_BLUE = { ...ACTION_BADGE_BASE, color: '#1d4ed8', backgroundColor: '#eff6ff', border: '1px solid #bfdbfe' };
+
 const STANDARD_SUPPLIERS = [
   'Intel Vietnam',
   'Mai Hoàng Distribution',
@@ -818,6 +856,14 @@ function RegionalShipperModal({
     return { count: activeCount, isOnline, isOverload, rankScore, statusText, badgeBg, badgeColor, isFree: isOnline && activeCount === 0 };
   };
 
+  // Nhãn ngắn cho <option> — dropdown chọn shipper là <select> gốc trình
+  // duyệt nên không thể giới hạn chiều rộng khi xổ xuống bằng CSS; statusText
+  // đầy đủ ("Đã Tắt Nhận Đơn (Tạm nghỉ)") làm danh sách quá dài và tràn khỏi
+  // modal, nên rút gọn riêng cho phần hiển thị trong dropdown này.
+  const shortShipperStatus = (wl) => (
+    !wl.isOnline ? 'Tạm nghỉ' : wl.isOverload ? `Quá tải (${wl.count})` : wl.count > 0 ? `Đang giao (${wl.count})` : 'Sẵn sàng'
+  );
+
   // Sắp xếp Shipper theo độ ưu tiên: Người Online & Rảnh nhất lên đầu
   const sortedRegionalShippers = [...regionalShippers].sort((a, b) => {
     const wlA = getShipperWorkload(a);
@@ -1245,7 +1291,7 @@ function RegionalShipperModal({
                           value={`Shipper Nội Bộ - ${s.fullname} (${s.phone || '0912.xxx.xxx'})`}
                           style={{ color: wl.isOnline && !wl.isOverload ? '#0f172a' : '#64748b' }}
                         >
-                          ★ {s.fullname} ({s.phone || '09xx.xxx.xxx'}) — [{wl.statusText}]
+                          ★ {s.fullname} · {s.phone || '09xx.xxx.xxx'} · {shortShipperStatus(wl)}
                         </option>
                       );
                     })
@@ -1261,7 +1307,7 @@ function RegionalShipperModal({
                       const wl = getShipperWorkload(s);
                       return (
                         <option key={s.id || s.username} value={`Shipper Nội Bộ - ${s.fullname} (${s.phone || '0912.xxx.xxx'})`}>
-                          {s.fullname} ({s.phone || '09xx.xxx.xxx'}) — [Gốc: {sReg?.shortName || s.deliveryRegion}] — [{wl.statusText}]
+                          {s.fullname} · {s.phone || '09xx.xxx.xxx'} · {sReg?.shortName || s.deliveryRegion} · {shortShipperStatus(wl)}
                         </option>
                       );
                     })}
@@ -5035,16 +5081,16 @@ export default function Warehouse() {
 
           {/* Delivery Orders Table */}
           <div className="table-responsive" style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', overflowX: 'auto', WebkitOverflowScrolling: 'touch', maxWidth: '100%' }}>
-            <table style={{ width: '100%', minWidth: '1100px', borderCollapse: 'collapse', fontSize: '0.83rem' }}>
+            <table style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
               <thead>
                 <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569' }}>
-                  <th style={{ padding: '0.75rem 1rem', whiteSpace: 'nowrap', width: '120px' }}>Mã Đơn Hàng</th>
-                  <th style={{ padding: '0.75rem 1rem', minWidth: '140px' }}>Khách Hàng</th>
-                  <th style={{ padding: '0.75rem 1rem', minWidth: '180px' }}>Địa Chỉ Giao</th>
-                  <th style={{ padding: '0.75rem 1rem', textAlign: 'right', whiteSpace: 'nowrap', width: '130px' }}>Giá Trị Đơn</th>
-                  <th style={{ padding: '0.75rem 1rem', textAlign: 'center', whiteSpace: 'nowrap', width: '140px' }}>Shipper Đảm Nhận</th>
-                  <th style={{ padding: '0.75rem 1rem', textAlign: 'center', whiteSpace: 'nowrap', width: '160px' }}>Tiến Trình & Trạng Thái</th>
-                  <th style={{ padding: '0.75rem 1rem', textAlign: 'center', whiteSpace: 'nowrap', width: '280px' }}>Hành Động Nghiệp Vụ</th>
+                  <th style={{ padding: '0.65rem 0.6rem', whiteSpace: 'nowrap', width: '7%' }}>Mã Đơn</th>
+                  <th style={{ padding: '0.65rem 0.6rem', width: '13%' }}>Khách Hàng</th>
+                  <th style={{ padding: '0.65rem 0.6rem', width: '20%' }}>Địa Chỉ Giao</th>
+                  <th style={{ padding: '0.65rem 0.6rem', textAlign: 'right', whiteSpace: 'nowrap', width: '10%' }}>Giá Trị</th>
+                  <th style={{ padding: '0.65rem 0.6rem', textAlign: 'center', whiteSpace: 'nowrap', width: '11%' }}>Shipper</th>
+                  <th style={{ padding: '0.65rem 0.6rem', textAlign: 'center', whiteSpace: 'nowrap', width: '13%' }}>Trạng Thái</th>
+                  <th style={{ padding: '0.65rem 0.6rem', textAlign: 'center', whiteSpace: 'nowrap', width: '26%' }}>Hành Động</th>
                 </tr>
               </thead>
               <tbody>
@@ -5074,22 +5120,22 @@ export default function Warehouse() {
 
                     return (
                       <tr key={o.id || o.orderId} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ padding: '0.75rem 1rem', fontWeight: 700, color: '#2563eb', whiteSpace: 'nowrap' }}>
+                        <td style={{ padding: '0.65rem 0.6rem', fontWeight: 700, color: '#2563eb', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                           #{o.orderId || o.id}
                         </td>
-                        <td style={{ padding: '0.75rem 1rem', color: '#0f172a' }}>
-                          <div style={{ fontWeight: 700 }}>{o.customerName || 'Khách hàng'}</div>
-                          <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{o.phone || o.customerPhone || '090xxxxxxx'}</div>
+                        <td style={{ padding: '0.65rem 0.6rem', color: '#0f172a', overflow: 'hidden' }}>
+                          <div style={{ fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{o.customerName || 'Khách hàng'}</div>
+                          <div style={{ fontSize: '0.73rem', color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{o.phone || o.customerPhone || '090xxxxxxx'}</div>
                         </td>
-                        <td style={{ padding: '0.75rem 1rem', color: '#475569', maxWidth: '240px' }}>
+                        <td style={{ padding: '0.65rem 0.6rem', color: '#475569', overflow: 'hidden' }}>
                           <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                             {o.shippingAddress || o.address || 'TP. Hồ Chí Minh'}
                           </div>
                         </td>
-                        <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 700, color: '#16a34a', whiteSpace: 'nowrap' }}>
+                        <td style={{ padding: '0.65rem 0.6rem', textAlign: 'right', fontWeight: 700, color: '#16a34a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                           {safeFormatPrice(o.totalAmount || o.total || 0)}
                         </td>
-                        <td style={{ padding: '0.75rem 1rem', textAlign: 'center', color: '#334155', whiteSpace: 'nowrap' }}>
+                        <td style={{ padding: '0.65rem 0.6rem', textAlign: 'center', color: '#334155', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                           {isShipping || isDelivered || isAwaitingShipperAccept ? (
                             <span style={{ fontWeight: 700, color: '#0f172a' }}>
                               {o.assignedShipper || 'Shipper Nội Bộ'}
@@ -5100,7 +5146,7 @@ export default function Warehouse() {
                             </span>
                           )}
                         </td>
-                        <td style={{ padding: '0.75rem 1rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                        <td style={{ padding: '0.65rem 0.6rem', textAlign: 'center', whiteSpace: 'nowrap', overflow: 'hidden' }}>
                           {isAssemblingNow && (
                             <span title={o.assemblyJobCode ? `Lệnh lắp ráp ${o.assemblyJobCode}` : undefined} style={{
                               padding: '0.28rem 0.65rem', borderRadius: '6px', fontSize: '0.73rem', fontWeight: 700, whiteSpace: 'nowrap',
@@ -5235,196 +5281,67 @@ export default function Warehouse() {
                             </span>
                           )}
                         </td>
-                        <td style={{ padding: '0.75rem 1rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
-                          <div style={{ display: 'inline-flex', gap: '0.45rem', justifyContent: 'center', alignItems: 'center', flexWrap: 'nowrap', whiteSpace: 'nowrap' }}>
-                            {isAssemblingNow && (
-                              <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 600, whiteSpace: 'nowrap' }}>
-                                Chờ Lắp Ráp hoàn tất{o.assemblyJobCode ? ` (${o.assemblyJobCode})` : ''}
-                              </span>
-                            )}
-                            {isPendingPack && (
-                              canPackScan ? (
-                                <button
-                                  onClick={() => setPackScanOrder(o)}
-                                  style={{
-                                    backgroundColor: '#2563eb',
-                                    color: '#ffffff',
-                                    border: 'none',
-                                    borderRadius: '5px',
-                                    padding: '0.38rem 0.75rem',
-                                    fontSize: '0.75rem',
-                                    fontWeight: 700,
-                                    cursor: 'pointer',
-                                    whiteSpace: 'nowrap',
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    height: '31px',
-                                    flexShrink: 0,
-                                    boxSizing: 'border-box'
-                                  }}
-                                >
-                                  Đóng Gói & Quét Mã
-                                </button>
-                              ) : (
-                                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', whiteSpace: 'nowrap' }}>
-                                  <span style={{ fontSize: '0.74rem', color: '#c2410c', fontWeight: 600, backgroundColor: '#fff7ed', padding: '0.35rem 0.65rem', borderRadius: '4px', border: '1px solid #fed7aa', whiteSpace: 'nowrap' }}>
+                        <td style={{ padding: '0.65rem 0.6rem' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}>
+                            {/* Slot 1: trạng thái chính / nút hành động chính — cột cố định để thẳng hàng giữa các dòng */}
+                            <div style={{ width: '150px', flexShrink: 0, display: 'flex' }}>
+                              {isAssemblingNow && (
+                                <span style={{ width: '100%', boxSizing: 'border-box', fontSize: '0.72rem', color: '#64748b', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  Chờ Lắp Ráp hoàn tất{o.assemblyJobCode ? ` (${o.assemblyJobCode})` : ''}
+                                </span>
+                              )}
+                              {isPendingPack && (
+                                canPackScan ? (
+                                  <button
+                                    onClick={() => setPackScanOrder(o)}
+                                    style={ACTION_BTN_PRIMARY}
+                                  >
+                                    Đóng Gói & Quét Mã
+                                  </button>
+                                ) : (
+                                  <span style={ACTION_BADGE_ORANGE}>
                                     Chờ Thủ kho đóng gói
                                   </span>
-                                  <button
-                                    onClick={() => setSelectedOrderForDetail(o)}
-                                    style={{
-                                      backgroundColor: '#ffffff',
-                                      color: '#475569',
-                                      border: '1px solid #cbd5e1',
-                                      borderRadius: '5px',
-                                      padding: '0.38rem 0.75rem',
-                                      fontSize: '0.75rem',
-                                      fontWeight: 600,
-                                      cursor: 'pointer',
-                                      whiteSpace: 'nowrap',
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      height: '31px',
-                                      flexShrink: 0,
-                                      boxSizing: 'border-box'
-                                    }}
-                                  >
-                                    Xem Đơn
-                                  </button>
-                                </div>
-                              )
-                            )}
-
-                            {isPackedWaitingShipper && (
-                              canDispatch ? (
-                                <>
+                                )
+                              )}
+                              {isPackedWaitingShipper && (
+                                canDispatch ? (
                                   <button
                                     onClick={() => setOrderToAssign(o)}
-                                    style={{
-                                      backgroundColor: isAwaitingShipperAccept ? '#0284c7' : '#2563eb',
-                                      color: '#ffffff',
-                                      border: 'none',
-                                      borderRadius: '5px',
-                                      padding: '0.38rem 0.75rem',
-                                      fontSize: '0.75rem',
-                                      fontWeight: 700,
-                                      cursor: 'pointer',
-                                      whiteSpace: 'nowrap',
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      height: '31px',
-                                      flexShrink: 0,
-                                      boxSizing: 'border-box'
-                                    }}
+                                    style={{ ...ACTION_BTN_PRIMARY, backgroundColor: isAwaitingShipperAccept ? '#0284c7' : '#2563eb' }}
                                   >
                                     {isAwaitingShipperAccept ? 'Đổi Shipper' : 'Phân Công Shipper'}
                                   </button>
-                                  <button
-                                    onClick={() => setSelectedOrderForDetail(o)}
-                                    style={{
-                                      backgroundColor: '#ffffff',
-                                      color: '#475569',
-                                      border: '1px solid #cbd5e1',
-                                      borderRadius: '5px',
-                                      padding: '0.38rem 0.75rem',
-                                      fontSize: '0.75rem',
-                                      fontWeight: 600,
-                                      cursor: 'pointer',
-                                      whiteSpace: 'nowrap',
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      height: '31px',
-                                      flexShrink: 0,
-                                      boxSizing: 'border-box'
-                                    }}
-                                  >
-                                    Xem Gói Hàng
-                                  </button>
-                                </>
-                              ) : (
-                                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', whiteSpace: 'nowrap' }}>
-                                  <span style={{ fontSize: '0.74rem', color: '#1d4ed8', fontWeight: 600, backgroundColor: '#eff6ff', padding: '0.35rem 0.65rem', borderRadius: '4px', border: '1px solid #bfdbfe', whiteSpace: 'nowrap' }}>
+                                ) : (
+                                  <span style={ACTION_BADGE_BLUE}>
                                     Chờ Quản lý phân công
                                   </span>
-                                  <button
-                                    onClick={() => setSelectedOrderForDetail(o)}
-                                    style={{
-                                      backgroundColor: '#ffffff',
-                                      color: '#475569',
-                                      border: '1px solid #cbd5e1',
-                                      borderRadius: '5px',
-                                      padding: '0.38rem 0.75rem',
-                                      fontSize: '0.75rem',
-                                      fontWeight: 600,
-                                      cursor: 'pointer',
-                                      whiteSpace: 'nowrap',
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      height: '31px',
-                                      flexShrink: 0,
-                                      boxSizing: 'border-box'
-                                    }}
-                                  >
-                                    Xem Gói Hàng
-                                  </button>
-                                </div>
-                              )
-                            )}
-
-                            {isAwaitingStock && (
-                              <button
-                                onClick={() => setActiveTab('backorders')}
-                                style={{
-                                  backgroundColor: '#fff7ed',
-                                  color: '#c2410c',
-                                  border: '1px solid #fdba74',
-                                  borderRadius: '5px',
-                                  padding: '0.38rem 0.75rem',
-                                  fontSize: '0.75rem',
-                                  fontWeight: 700,
-                                  whiteSpace: 'nowrap',
-                                  cursor: 'pointer',
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  height: '31px',
-                                  flexShrink: 0,
-                                  boxSizing: 'border-box'
-                                }}
-                              >
-                                Xem Chờ Hàng
-                              </button>
-                            )}
-
-                            {(isShipping || isDelivered || isCancelled || isFailedDelivery) && (
-                              <button
-                                onClick={() => setSelectedOrderForDetail(o)}
-                                style={{
-                                  backgroundColor: '#ffffff',
-                                  color: '#475569',
-                                  border: '1px solid #cbd5e1',
-                                  borderRadius: '5px',
-                                  padding: '0.38rem 0.75rem',
-                                  fontSize: '0.75rem',
-                                  fontWeight: 600,
-                                  cursor: 'pointer',
-                                  whiteSpace: 'nowrap',
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  height: '31px',
-                                  flexShrink: 0,
-                                  boxSizing: 'border-box'
-                                }}
-                              >
-                                Xem Chi Tiết
-                              </button>
-                            )}
+                                )
+                              )}
+                            </div>
+                            {/* Slot 2: nút "Xem ..." — luôn cùng vị trí ngang qua mọi dòng */}
+                            <div style={{ width: '110px', flexShrink: 0, display: 'flex' }}>
+                              {isPendingPack && !canPackScan && (
+                                <button onClick={() => setSelectedOrderForDetail(o)} style={ACTION_BTN_SECONDARY}>
+                                  Xem Đơn
+                                </button>
+                              )}
+                              {isPackedWaitingShipper && (
+                                <button onClick={() => setSelectedOrderForDetail(o)} style={ACTION_BTN_SECONDARY}>
+                                  Xem Gói Hàng
+                                </button>
+                              )}
+                              {isAwaitingStock && (
+                                <button onClick={() => setActiveTab('backorders')} style={ACTION_BTN_WARNING}>
+                                  Xem Chờ Hàng
+                                </button>
+                              )}
+                              {(isShipping || isDelivered || isCancelled || isFailedDelivery) && (
+                                <button onClick={() => setSelectedOrderForDetail(o)} style={ACTION_BTN_SECONDARY}>
+                                  Xem Chi Tiết
+                                </button>
+                              )}
+                            </div>
                           </div>
                         </td>
                       </tr>
