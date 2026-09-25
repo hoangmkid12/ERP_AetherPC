@@ -1706,7 +1706,7 @@ export default function SupplierPortal() {
               </div>
             )}
 
-            {selectedPO.cancelReason && (
+            {selectedPO.cancelReason && !['CONFIRMED_BY_SUPPLIER', 'PENDING_QA', 'QA_PASSED', 'QA_PARTIAL', 'QA_REJECTED', 'RECEIVED', 'DONE', 'COMPLETED'].includes(selectedPO.status) && (
               (() => {
                 const r = selectedPO.cancelReason;
                 const isCompleted = ['DONE', 'COMPLETED', 'RECEIVED'].includes(selectedPO.status);
