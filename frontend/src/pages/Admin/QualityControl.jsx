@@ -27,6 +27,7 @@ import {
   AlertCircle, ArrowRight, Printer, CheckSquare, Layers, Clock, ThumbsUp, ThumbsDown,
   MoreHorizontal, ChevronDown, ChevronUp, ExternalLink
 } from 'lucide-react';
+import { printDocument } from '../../utils/printDocument';
 
 // Register ChartJS modules
 ChartJS.register(
@@ -2953,77 +2954,7 @@ export default function QualityControl() {
         const isRejected = viewingLog.status === 'REJECTED' || viewingLog.status === 'QA_REJECTED' || viewingLog.decision === 'REJECT';
 
         const handlePrintQCCertificate = () => {
-          const printableArea = document.getElementById('aetherpc-qc-certificate-print');
-          if (!printableArea) {
-            window.print();
-            return;
-          }
-
-          const oldIframe = document.getElementById('aetherpc-qc-print-frame');
-          if (oldIframe) oldIframe.remove();
-
-          const iframe = document.createElement('iframe');
-          iframe.id = 'aetherpc-qc-print-frame';
-          iframe.style.position = 'fixed';
-          iframe.style.top = '-9999px';
-          iframe.style.left = '-9999px';
-          iframe.style.width = '210mm';
-          iframe.style.height = '297mm';
-          iframe.style.border = 'none';
-          document.body.appendChild(iframe);
-
-          const pri = iframe.contentWindow || iframe.contentDocument;
-          pri.document.open();
-          pri.document.write(`
-            <!DOCTYPE html>
-            <html>
-            <head>
-              <meta charset="utf-8">
-              <title>Bien_Ban_Nghiem_Thu_${viewingLog.id || 'QC'}</title>
-              <style>
-                @page {
-                  size: A4 portrait;
-                  margin: 10mm 14mm;
-                }
-                * {
-                  box-sizing: border-box;
-                  margin: 0;
-                  padding: 0;
-                  -webkit-print-color-adjust: exact !important;
-                  print-color-adjust: exact !important;
-                }
-                body {
-                  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-                  color: #0f172a;
-                  background: #ffffff;
-                  width: 100%;
-                  line-height: 1.35;
-                  padding: 0;
-                  margin: 0;
-                }
-                table {
-                  width: 100%;
-                  border-collapse: collapse;
-                }
-                .aetherpc-no-print {
-                  display: none !important;
-                }
-              </style>
-            </head>
-            <body>
-              ${printableArea.innerHTML}
-            </body>
-            </html>
-          `);
-          pri.document.close();
-
-          setTimeout(() => {
-            pri.focus();
-            pri.print();
-            setTimeout(() => {
-              iframe.remove();
-            }, 2000);
-          }, 250);
+          printDocument('#aetherpc-qc-certificate-print', { title: 'Biên bản nghiệm thu chất lượng' });
         };
 
         return (
@@ -3317,7 +3248,7 @@ export default function QualityControl() {
       {/* ========================================================================= */}
       {detailRMA && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(6px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '1.5rem' }}>
-          <div style={{ width: '100%', maxWidth: '650px', maxHeight: '90vh', overflowY: 'auto', padding: '1.75rem', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
+          <div data-print-doc style={{ width: '100%', maxWidth: '650px', maxHeight: '90vh', overflowY: 'auto', padding: '1.75rem', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
             
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid #f1f5f9', paddingBottom: '0.75rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -3423,7 +3354,7 @@ export default function QualityControl() {
             {/* Action Footer */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.6rem', borderTop: '1px solid #f1f5f9', paddingTop: '1.25rem', marginTop: '1.25rem' }}>
               <button
-                onClick={() => window.print()}
+                onClick={(e) => printDocument(e.currentTarget.closest('[data-print-doc]'), { title: 'Phiếu kiểm định chất lượng' })}
                 style={{ backgroundColor: '#ffffff', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.5rem 0.85rem', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
               >
                 <Printer size={15} /> In Phiếu

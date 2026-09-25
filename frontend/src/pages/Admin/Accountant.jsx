@@ -26,6 +26,7 @@ import {
   Tooltip, 
   Legend 
 } from 'chart.js';
+import { printDocument } from '../../utils/printDocument';
 
 ChartJS.register(
   CategoryScale, 
@@ -702,7 +703,7 @@ export default function Accountant() {
 
         {activeTab === 'reports' && (
           <button
-            onClick={() => window.print()}
+            onClick={() => printDocument('[data-print-doc="reports"]', { title: 'Báo cáo tài chính P&L' })}
             style={{
               backgroundColor: '#ffffff',
               color: '#0f172a',
@@ -1597,7 +1598,7 @@ export default function Accountant() {
       {/* TAB 5: REPORTS (BÁO CÁO P&L & VAT) */}
       {/* ========================================================================= */}
       {activeTab === 'reports' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+        <div data-print-doc="reports" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
           
           {/* P&L Statement Card */}
           <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem' }}>
@@ -1751,7 +1752,7 @@ export default function Accountant() {
       {/* ================= MODAL: XEM CHỨNG TỪ SỔ CÁI ================= */}
       {viewingTxDetail && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(6px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', width: '100%', maxWidth: '560px', padding: '1.75rem', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)' }}>
+          <div data-print-doc style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', width: '100%', maxWidth: '560px', padding: '1.75rem', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)' }}>
             
             {/* Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #e2e8f0', paddingBottom: '0.85rem', marginBottom: '1.25rem' }}>
@@ -1865,7 +1866,7 @@ export default function Accountant() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.5rem', borderTop: '1px solid #e2e8f0', paddingTop: '0.85rem' }}>
                 <button
                   type="button"
-                  onClick={() => window.print()}
+                  onClick={(e) => printDocument(e.currentTarget.closest('[data-print-doc]'), { title: 'Chứng từ kế toán' })}
                   style={{
                     backgroundColor: '#ffffff',
                     color: '#0f172a',
@@ -1910,7 +1911,7 @@ export default function Accountant() {
       {/* ================= MODAL: XEM & IN PHIẾU ĐỀ NGHỊ CHI HOÀN TIỀN ================= */}
       {viewingRefundVoucher && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(6px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', width: '100%', maxWidth: '600px', padding: '1.75rem', maxHeight: '90vh', overflowY: 'auto' }}>
+          <div data-print-doc style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', width: '100%', maxWidth: '600px', padding: '1.75rem', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #e2e8f0', paddingBottom: '0.85rem', marginBottom: '1.25rem' }}>
               <div>
                 <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>
@@ -1968,7 +1969,7 @@ export default function Accountant() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.5rem', borderTop: '1px solid #e2e8f0', paddingTop: '0.85rem', flexWrap: 'wrap', gap: '0.5rem' }}>
                 <button
                   type="button"
-                  onClick={() => window.print()}
+                  onClick={(e) => printDocument(e.currentTarget.closest('[data-print-doc]'), { title: 'Chứng từ kế toán' })}
                   style={{ backgroundColor: '#ffffff', color: '#0f172a', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.45rem 0.85rem', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
                 >
                   <Printer size={15} /> In Phiếu Chi

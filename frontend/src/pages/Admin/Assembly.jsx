@@ -9,6 +9,7 @@ import {
   Truck, XCircle, Search, Cpu, HardDrive, Zap, Layers, Check, X, Printer,
   Eye, Calendar, User, Package, Award, TrendingUp, BarChart2, ShieldAlert, Sparkles
 } from 'lucide-react';
+import { printDocument } from '../../utils/printDocument';
 
 const CATEGORY_MAP_VI = {
   CPU: 'Bộ Vi Xử Lý (CPU)',
@@ -1188,7 +1189,7 @@ export default function Assembly() {
       {/* ================= MODAL XEM CHI TIẾT BIÊN BẢN NGHIỆM THU QA ================= */}
       {selectedQADetailJob && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(6px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '1.5rem' }}>
-          <div style={{ width: '100%', maxWidth: '850px', maxHeight: '90vh', overflowY: 'auto', padding: '2rem', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
+          <div data-print-doc style={{ width: '100%', maxWidth: '850px', maxHeight: '90vh', overflowY: 'auto', padding: '2rem', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
             
             {/* Modal Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid #e2e8f0', paddingBottom: '1.25rem', marginBottom: '1.25rem' }}>
@@ -1309,7 +1310,7 @@ export default function Assembly() {
             {/* Footer Buttons */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #f1f5f9', paddingTop: '1rem' }}>
               <button
-                onClick={() => window.print()}
+                onClick={(e) => printDocument(e.currentTarget.closest('[data-print-doc]'), { title: 'Phiếu lệnh lắp ráp' })}
                 style={{ backgroundColor: '#ffffff', color: '#2563eb', border: '1px solid #bfdbfe', borderRadius: '6px', padding: '0.5rem 1rem', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
               >
                 <Printer size={15} />

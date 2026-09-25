@@ -16,6 +16,7 @@ import {
   ChevronLeft, ChevronRight, Printer
 } from 'lucide-react';
 import { formatCurrencyInWords } from '../../utils/numberToWords';
+import { printDocument } from '../../utils/printDocument';
 
 const CAT_ALIASES = {
   CPU: ['CPU', 'VI XỬ LÝ', 'CHIP', 'BỘ VI XỬ LÝ'],
@@ -3305,7 +3306,7 @@ export default function Purchasing() {
                 Đóng
               </button>
               <button
-                onClick={() => window.print()}
+                onClick={() => printDocument('.aetherpc-pr-print', { title: `Phiếu đề xuất mua hàng ${selectedViewPR.prCode}` })}
                 style={{ backgroundColor: '#ffffff', color: '#2563eb', border: '1px solid #bfdbfe', borderRadius: '6px', padding: '0.5rem 1.1rem', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
               >
                 <Printer size={15} /> In Phiếu
@@ -5014,7 +5015,7 @@ export default function Purchasing() {
                   Đóng
                 </button>
                 <button
-                  onClick={() => window.print()}
+                  onClick={() => printDocument('.aetherpc-quote-print', { title: `Phiếu báo giá ${formatPurchaseReference(printQuoteTarget)}` })}
                   style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.5rem 1.25rem', fontSize: '0.82rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
                 >
                   <Printer size={15} /> In Phiếu
@@ -5039,77 +5040,7 @@ export default function Purchasing() {
         const purchasingManagerDate = formatDate(printPOTarget.createdAt || new Date());
 
         const handlePrintPODocument = () => {
-          const printableArea = document.getElementById('aetherpc-po-printable-area');
-          if (!printableArea) {
-            window.print();
-            return;
-          }
-
-          const oldIframe = document.getElementById('aetherpc-print-frame');
-          if (oldIframe) oldIframe.remove();
-
-          const iframe = document.createElement('iframe');
-          iframe.id = 'aetherpc-print-frame';
-          iframe.style.position = 'fixed';
-          iframe.style.top = '-9999px';
-          iframe.style.left = '-9999px';
-          iframe.style.width = '210mm';
-          iframe.style.height = '297mm';
-          iframe.style.border = 'none';
-          document.body.appendChild(iframe);
-
-          const pri = iframe.contentWindow || iframe.contentDocument;
-          pri.document.open();
-          pri.document.write(`
-            <!DOCTYPE html>
-            <html>
-            <head>
-              <meta charset="utf-8">
-              <title>Đơn Đặt Hàng - ${printPOTarget.poNumber || formatPurchaseReference(printPOTarget)}</title>
-              <style>
-                @page {
-                  size: A4 portrait;
-                  margin: 8mm 12mm;
-                }
-                * {
-                  box-sizing: border-box;
-                  margin: 0;
-                  padding: 0;
-                  -webkit-print-color-adjust: exact !important;
-                  print-color-adjust: exact !important;
-                }
-                body {
-                  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-                  color: #0f172a;
-                  background: #ffffff;
-                  width: 100%;
-                  line-height: 1.35;
-                  padding: 0;
-                  margin: 0;
-                }
-                table {
-                  width: 100%;
-                  border-collapse: collapse;
-                }
-                .aetherpc-no-print {
-                  display: none !important;
-                }
-              </style>
-            </head>
-            <body>
-              ${printableArea.innerHTML}
-            </body>
-            </html>
-          `);
-          pri.document.close();
-
-          setTimeout(() => {
-            pri.focus();
-            pri.print();
-            setTimeout(() => {
-              iframe.remove();
-            }, 2000);
-          }, 250);
+          printDocument('#aetherpc-po-printable-area', { title: `Đơn đặt hàng ${printPOTarget.poNumber || formatPurchaseReference(printPOTarget)}` });
         };
 
         return (

@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { formatCurrencyInWords } from '../../utils/numberToWords';
+import { printDocument } from '../../utils/printDocument';
 
 export default function SupplierPortal() {
   const { user, logout } = useAuth();
@@ -1896,77 +1897,7 @@ export default function SupplierPortal() {
         const purchasingManagerDate = formatDate(printPOTarget.createdAt || new Date());
 
         const handlePrintPODocument = () => {
-          const printableArea = document.getElementById('aetherpc-supplier-po-print');
-          if (!printableArea) {
-            window.print();
-            return;
-          }
-
-          const oldIframe = document.getElementById('aetherpc-supplier-print-frame');
-          if (oldIframe) oldIframe.remove();
-
-          const iframe = document.createElement('iframe');
-          iframe.id = 'aetherpc-supplier-print-frame';
-          iframe.style.position = 'fixed';
-          iframe.style.top = '-9999px';
-          iframe.style.left = '-9999px';
-          iframe.style.width = '210mm';
-          iframe.style.height = '297mm';
-          iframe.style.border = 'none';
-          document.body.appendChild(iframe);
-
-          const pri = iframe.contentWindow || iframe.contentDocument;
-          pri.document.open();
-          pri.document.write(`
-            <!DOCTYPE html>
-            <html>
-            <head>
-              <meta charset="utf-8">
-              <title>PO_${printPOTarget.poNumber || formatPurchaseReference(printPOTarget)}</title>
-              <style>
-                @page {
-                  size: A4 portrait;
-                  margin: 8mm 12mm;
-                }
-                * {
-                  box-sizing: border-box;
-                  margin: 0;
-                  padding: 0;
-                  -webkit-print-color-adjust: exact !important;
-                  print-color-adjust: exact !important;
-                }
-                body {
-                  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-                  color: #0f172a;
-                  background: #ffffff;
-                  width: 100%;
-                  line-height: 1.35;
-                  padding: 0;
-                  margin: 0;
-                }
-                table {
-                  width: 100%;
-                  border-collapse: collapse;
-                }
-                .aetherpc-no-print {
-                  display: none !important;
-                }
-              </style>
-            </head>
-            <body>
-              ${printableArea.innerHTML}
-            </body>
-            </html>
-          `);
-          pri.document.close();
-
-          setTimeout(() => {
-            pri.focus();
-            pri.print();
-            setTimeout(() => {
-              iframe.remove();
-            }, 2000);
-          }, 250);
+          printDocument('#aetherpc-supplier-po-print', { title: `Đơn đặt hàng ${printPOTarget.poNumber || ''}` });
         };
 
         return (

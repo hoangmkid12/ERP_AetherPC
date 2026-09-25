@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import { useInventoryStore, useSalesStore } from '../../stores';
+import { printDocument } from '../../utils/printDocument';
 import { useAuth } from '../../context/AuthContext';
 import { usePermission } from '../../hooks/usePermission';
 import { useNotification, notify } from '../../context/NotificationContext';
@@ -2258,7 +2259,7 @@ export default function SalesPOS() {
       {/* ================= MODAL IN HÓA ĐƠN POS ================= */}
       {showReceiptModal && printedReceipt && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(6px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '1.5rem' }}>
-          <div style={{ width: '100%', maxWidth: '480px', maxHeight: '90vh', overflowY: 'auto', padding: '2rem', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
+          <div data-print-doc style={{ width: '100%', maxWidth: '480px', maxHeight: '90vh', overflowY: 'auto', padding: '2rem', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
             <div style={{ textAlign: 'center', borderBottom: '2px dashed #e2e8f0', paddingBottom: '1rem', marginBottom: '1rem' }}>
               <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#0f172a' }}>HỆ THỐNG AETHERPC ERP</h3>
               <p style={{ margin: '0.2rem 0', fontSize: '0.78rem', color: '#64748b' }}>Cửa Hàng Linh Kiện Máy Tính Cao Cấp</p>
@@ -2310,7 +2311,7 @@ export default function SalesPOS() {
 
             <div style={{ display: 'flex', gap: '0.5rem' }}>
               <button
-                onClick={() => { window.print(); setShowReceiptModal(false); }}
+                onClick={(e) => { printDocument(e.currentTarget.closest('[data-print-doc]'), { title: 'Hoá đơn bán hàng' }); setShowReceiptModal(false); }}
                 style={{ flex: 1, backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.6rem', fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
               >
                 <Printer size={16} />

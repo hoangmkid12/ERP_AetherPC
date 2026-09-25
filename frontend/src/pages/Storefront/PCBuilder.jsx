@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useCart } from '../../context/CartContext';
 import { notify } from '../../context/NotificationContext';
 import { api } from '../../services/api';
+import { printDocument } from '../../utils/printDocument';
 import {
   Cpu, Trash2, ShieldCheck, ShieldAlert, ShoppingCart, HelpCircle, Sparkles,
   AlertTriangle, XCircle, Layers, Database, Gamepad2, Zap, HardDrive, Box, Wind,
@@ -455,7 +456,7 @@ export default function PCBuilder() {
   };
 
   const handlePrintBuild = () => {
-    window.print();
+    printDocument('.print-only-layout', { title: 'Cấu hình PC - AetherPC' });
   };
 
   const addWholeBuildToCart = () => {
@@ -1526,7 +1527,7 @@ export default function PCBuilder() {
       </div> {/* Close pc-builder-screen-layout */}
 
       {/* PRINT-ONLY TEMPLATE */}
-      <div className="print-only-layout">
+      <div className="print-only-layout aetherpc-print-only">
         <div style={{ padding: '2rem', fontFamily: 'Arial, sans-serif', color: '#000', backgroundColor: '#fff' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #000', paddingBottom: '1rem', marginBottom: '2rem' }}>
             <div>

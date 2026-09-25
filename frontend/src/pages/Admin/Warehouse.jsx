@@ -12,6 +12,7 @@ import { Package, CheckCircle, X, AlertCircle, Truck, RotateCcw, Sparkles, Refre
 import ActorNotificationBar from '../../components/ActorNotificationBar';
 import PackAndScanModal from '../../components/PackAndScanModal';
 import OrderDetailModal from '../../components/OrderDetailModal';
+import { printDocument } from '../../utils/printDocument';
 
 const STANDARD_SUPPLIERS = [
   'Intel Vietnam',
@@ -4960,7 +4961,7 @@ export default function Warehouse() {
                     Đóng
                   </button>
                   <button
-                    onClick={() => window.print()}
+                    onClick={() => printDocument('.aetherpc-pr-print', { title: `Phiếu đề xuất mua hàng ${viewingPR.prCode}` })}
                     style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.5rem 1.25rem', fontSize: '0.82rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
                   >
                     <Printer size={15} /> In Phiếu
