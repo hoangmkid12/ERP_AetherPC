@@ -1345,9 +1345,9 @@ export default function QualityControl() {
                           </span>
                         </td>
                         <td style={{ padding: '0.65rem 0.85rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
-                          {isPending ? (
-                            isQCOfficer ? (
-                              <div style={{ display: 'inline-flex', gap: '0.35rem', alignItems: 'center', justifyContent: 'center', flexWrap: 'nowrap', whiteSpace: 'nowrap' }}>
+                          <div style={{ display: 'inline-flex', gap: '0.4rem', alignItems: 'center', justifyContent: 'center', flexWrap: 'nowrap', whiteSpace: 'nowrap' }}>
+                            {isPending ? (
+                              isQCOfficer ? (
                                 <button
                                   onClick={() => handleOpenInspectionModal(po)}
                                   style={{
@@ -1355,52 +1355,31 @@ export default function QualityControl() {
                                     color: '#ffffff',
                                     border: 'none',
                                     borderRadius: '4px',
-                                    padding: '0.32rem 0.65rem',
+                                    padding: '0 0.5rem',
                                     fontSize: '0.74rem',
                                     fontWeight: 700,
                                     cursor: 'pointer',
                                     display: 'inline-flex',
                                     alignItems: 'center',
+                                    justifyContent: 'center',
                                     gap: '0.25rem',
                                     whiteSpace: 'nowrap',
+                                    width: '115px',
+                                    minWidth: '115px',
                                     height: '28px',
                                     boxSizing: 'border-box'
                                   }}
                                 >
                                   <ShieldCheck size={14} /> Kiểm Định Ngay
                                 </button>
-                                {['CONFIRMED_BY_SUPPLIER', 'PENDING_QA', 'QA_PASSED', 'QA_PARTIAL', 'QA_REJECTED', 'RECEIVED', 'DONE', 'COMPLETED'].includes(po.status) && (
-                                  <button
-                                    onClick={() => setPrintConfirmTarget(po)}
-                                    title="Xem phiếu xác nhận đơn hàng NCC"
-                                    style={{
-                                      backgroundColor: '#f0fdf4',
-                                      color: '#15803d',
-                                      border: '1px solid #86efac',
-                                      borderRadius: '4px',
-                                      padding: '0.32rem 0.55rem',
-                                      fontSize: '0.74rem',
-                                      fontWeight: 700,
-                                      cursor: 'pointer',
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      gap: '0.25rem',
-                                      whiteSpace: 'nowrap',
-                                      height: '28px',
-                                      boxSizing: 'border-box'
-                                    }}
-                                  >
-                                    <FileText size={13} /> Phiếu XN
-                                  </button>
-                                )}
-                              </div>
+                              ) : (
+                                <div style={{ width: '115px', minWidth: '115px', display: 'inline-flex', justifyContent: 'center' }}>
+                                  <span style={{ fontSize: '0.7rem', color: '#b45309', fontWeight: 600, backgroundColor: '#fef3c7', padding: '0.2rem 0.4rem', borderRadius: '4px', border: '1px solid #fde68a', whiteSpace: 'nowrap' }}>
+                                    Chờ QA/QC
+                                  </span>
+                                </div>
+                              )
                             ) : (
-                              <span style={{ fontSize: '0.74rem', color: '#b45309', fontWeight: 600, backgroundColor: '#fef3c7', padding: '0.3rem 0.6rem', borderRadius: '4px', border: '1px solid #fde68a' }}>
-                                Chờ QA/QC kiểm định
-                              </span>
-                            )
-                          ) : (
-                            <div style={{ display: 'inline-flex', gap: '0.35rem', alignItems: 'center', justifyContent: 'center', flexWrap: 'nowrap', whiteSpace: 'nowrap' }}>
                               <button
                                 onClick={() => {
                                   const targetPoNum = po.poNumber || po.id;
@@ -1436,43 +1415,51 @@ export default function QualityControl() {
                                   color: '#2563eb',
                                   border: '1px solid #bfdbfe',
                                   borderRadius: '4px',
-                                  padding: '0.32rem 0.65rem',
+                                  padding: '0 0.5rem',
                                   fontSize: '0.74rem',
                                   fontWeight: 700,
                                   cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
                                   whiteSpace: 'nowrap',
+                                  width: '115px',
+                                  minWidth: '115px',
                                   height: '28px',
                                   boxSizing: 'border-box'
                                 }}
                               >
                                 Xem Biên Bản
                               </button>
-                              {['CONFIRMED_BY_SUPPLIER', 'PENDING_QA', 'QA_PASSED', 'QA_PARTIAL', 'QA_REJECTED', 'RECEIVED', 'DONE', 'COMPLETED'].includes(po.status) && (
-                                <button
-                                  onClick={() => setPrintConfirmTarget(po)}
-                                  title="Xem phiếu xác nhận đơn hàng NCC"
-                                  style={{
-                                    backgroundColor: '#f0fdf4',
-                                    color: '#15803d',
-                                    border: '1px solid #86efac',
-                                    borderRadius: '4px',
-                                    padding: '0.32rem 0.55rem',
-                                    fontSize: '0.74rem',
-                                    fontWeight: 700,
-                                    cursor: 'pointer',
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    gap: '0.25rem',
-                                    whiteSpace: 'nowrap',
-                                    height: '28px',
-                                    boxSizing: 'border-box'
-                                  }}
-                                >
-                                  <FileText size={13} /> Phiếu XN
-                                </button>
-                              )}
-                            </div>
-                          )}
+                            )}
+
+                            {/* SLOT 2: NÚT PHIẾU XÁC NHẬN NCC — ĐỒNG BỘ 82PX CHO TẤT CẢ CÁC ĐƠN */}
+                            <button
+                              onClick={() => setPrintConfirmTarget(po)}
+                              title="Xem phiếu xác nhận đơn hàng NCC"
+                              style={{
+                                backgroundColor: '#f0fdf4',
+                                color: '#15803d',
+                                border: '1px solid #86efac',
+                                borderRadius: '4px',
+                                padding: '0 0.4rem',
+                                fontSize: '0.74rem',
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '0.25rem',
+                                whiteSpace: 'nowrap',
+                                width: '82px',
+                                minWidth: '82px',
+                                height: '28px',
+                                boxSizing: 'border-box'
+                              }}
+                            >
+                              <FileText size={13} /> Phiếu XN
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
