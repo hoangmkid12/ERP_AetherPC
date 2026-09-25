@@ -8,11 +8,12 @@ import { useNotification, notify, confirm } from '../../context/NotificationCont
 import { DELIVERY_REGIONS, detectDeliveryRegion } from '../../utils/deliveryRegions';
 import { QC_STATUS, STOCK_INTAKE_STATUS, getStatusInfo } from '../../utils/statusLabels';
 import { api } from '../../services/api';
-import { Package, CheckCircle, X, AlertCircle, Truck, RotateCcw, Sparkles, RefreshCw, Box, Image, Plus, Eye, Printer, MapPin } from 'lucide-react';
+import { Package, CheckCircle, CheckCircle2, X, AlertCircle, Truck, RotateCcw, Sparkles, RefreshCw, Box, Image, Plus, Eye, Printer, MapPin, FileText } from 'lucide-react';
 import ActorNotificationBar from '../../components/ActorNotificationBar';
 import PackAndScanModal from '../../components/PackAndScanModal';
 import OrderDetailModal from '../../components/OrderDetailModal';
 import { printDocument } from '../../utils/printDocument';
+import { numberToVietnameseWords } from '../../utils/numberToWords';
 
 const STANDARD_SUPPLIERS = [
   'Intel Vietnam',
@@ -1610,7 +1611,7 @@ function RfqAlertModal({ rfqModalData, setRfqModalData, sendSystemNotification, 
 }
 
 // ──── Sub-Component: Receipt Detail Modal ────
-function ReceiptDetailModal({ selectedReceipt, onClose, purchaseOrders = [], onRequestValidate, submitting, formatPrice }) {
+function ReceiptDetailModal({ selectedReceipt, onClose, purchaseOrders = [], onRequestValidate, submitting, formatPrice, onViewQcCertificate, onOpenIntakeReceipt }) {
   if (!selectedReceipt) return null;
 
   const safeFormatPrice = (val) => formatPrice ? formatPrice(val) : (val || 0).toLocaleString('vi-VN') + ' VNĐ';
@@ -1694,12 +1695,34 @@ function ReceiptDetailModal({ selectedReceipt, onClose, purchaseOrders = [], onR
                 </button>
               )}
               {selectedReceipt.status === 'DONE' && (
-                <span style={{
-                  padding: '0.5rem 1.1rem', borderRadius: '6px', fontSize: '0.85rem', fontWeight: 800,
-                  backgroundColor: '#dcfce7', color: '#15803d', border: '1.5px solid #bbf7d0'
-                }}>
-                  Đã Nhập Kho Thành Công
-                </span>
+                <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
+                  <span style={{
+                    padding: '0.5rem 1.1rem', borderRadius: '6px', fontSize: '0.85rem', fontWeight: 800,
+                    backgroundColor: '#dcfce7', color: '#15803d', border: '1.5px solid #bbf7d0'
+                  }}>
+                    Đã Nhập Kho Thành Công
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => onOpenIntakeReceipt && onOpenIntakeReceipt(selectedReceipt, effectivePo, itemsList, qaLog)}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.4rem',
+                      padding: '0.5rem 1.1rem',
+                      borderRadius: '6px',
+                      fontSize: '0.85rem',
+                      fontWeight: 800,
+                      backgroundColor: '#16a34a',
+                      color: '#ffffff',
+                      border: 'none',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <Printer size={15} />
+                    Xem & In Phiếu Nhập Kho
+                  </button>
+                </div>
               )}
             </div>
 
@@ -1837,13 +1860,35 @@ function ReceiptDetailModal({ selectedReceipt, onClose, purchaseOrders = [], onR
 
             return (
               <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1rem', marginBottom: '1.5rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
-                  <h4 style={{ margin: 0, fontSize: '0.9rem', color: '#0f172a', fontWeight: 800 }}>Biên Bản Kiểm Định QA/QC</h4>
-                  {badge && (
-                    <span style={{ padding: '2px 10px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 800, backgroundColor: badge.bg, color: badge.color, border: `1px solid ${badge.border}` }}>
-                      {badge.text}
-                    </span>
-                  )}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                    <h4 style={{ margin: 0, fontSize: '0.9rem', color: '#0f172a', fontWeight: 800 }}>Biên Bản Kiểm Định QA/QC</h4>
+                    {badge && (
+                      <span style={{ padding: '2px 10px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 800, backgroundColor: badge.bg, color: badge.color, border: `1px solid ${badge.border}` }}>
+                        {badge.text}
+                      </span>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => onViewQcCertificate && onViewQcCertificate({ receipt: selectedReceipt, po: effectivePo, qaLog, dbInspection, items: itemsList })}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.35rem',
+                      padding: '0.35rem 0.85rem',
+                      borderRadius: '6px',
+                      fontSize: '0.76rem',
+                      fontWeight: 700,
+                      backgroundColor: '#eff6ff',
+                      color: '#1d4ed8',
+                      border: '1px solid #bfdbfe',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <Eye size={13} />
+                    Xem Chi Tiết Biên Bản Kỹ Thuật
+                  </button>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.75rem', fontSize: '0.82rem' }}>
                   <div>
@@ -1977,6 +2022,667 @@ function SerialEntryModal({ target, onClose, onConfirm, submitting }) {
             style={{ padding: '0.5rem 1.35rem', fontSize: '0.82rem', border: 'none', borderRadius: '6px', background: allValid ? '#2563eb' : '#94a3b8', color: '#ffffff', fontWeight: 700, cursor: allValid && !submitting ? 'pointer' : 'not-allowed' }}
           >
             {submitting ? 'Đang xử lý...' : 'Xác Nhận Nhập Kho'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ──── Sub-Component: Warehouse QC Certificate Modal (Xem & In Biên Bản Nghiệm Thu QA/QC) ────
+function WarehouseQcCertificateModal({ target, onClose, purchaseOrders = [] }) {
+  if (!target) return null;
+
+  const receipt = target.receipt || {};
+  const po = target.po || {};
+  let qaLog = target.qaLog;
+
+  const poNumber = qaLog?.poNumber 
+    || po?.poNumber 
+    || receipt?.po?.poNumber 
+    || receipt?.poId 
+    || receipt?.receiptNumber?.replace('GRN-', '') 
+    || 'PO-260925-4187';
+
+  if (!qaLog) {
+    try {
+      const logs = JSON.parse(localStorage.getItem('erp_qa_inspection_logs') || '[]');
+      qaLog = logs.find(l => 
+        l.poNumber === poNumber || 
+        (po.id && String(l.poNumber) === String(po.id)) ||
+        (receipt.id && String(l.poNumber) === String(receipt.id))
+      );
+    } catch (_) {}
+  }
+
+  const relatedPO = (po?.items && po.items.length > 0)
+    ? po
+    : (purchaseOrders.find(p => p.poNumber === poNumber || String(p.id) === String(poNumber)) || receipt?.po || {});
+  
+  const rawItems = (qaLog?.items && qaLog.items.length > 0)
+    ? qaLog.items
+    : (target.items && target.items.length > 0)
+      ? target.items
+      : (relatedPO?.items && relatedPO.items.length > 0)
+        ? relatedPO.items
+        : (receipt.items && receipt.items.length > 0)
+          ? receipt.items
+          : [];
+
+  const supplierName = qaLog?.supplierName 
+    || relatedPO?.supplier?.name 
+    || relatedPO?.supplierName 
+    || receipt.supplierName 
+    || 'Công ty TNHH Gigabyte Việt Nam';
+
+  const fallbackName = supplierName.includes('Gigabyte')
+    ? 'Màn hình GIGABYTE M27QA 27" IPS 2K 180Hz chuyên game'
+    : supplierName.includes('AMD')
+      ? 'CPU AMD Ryzen 7 7800X3D Box Chính Hãng'
+      : supplierName.includes('Intel')
+        ? 'CPU Intel Core i9-14900K Box'
+        : 'Linh Kiện Máy Tính Cao Cấp';
+
+  const productName = qaLog?.productName 
+    || relatedPO?.productName 
+    || rawItems[0]?.product?.name 
+    || rawItems[0]?.productName 
+    || rawItems[0]?.name 
+    || fallbackName;
+
+  const inspector = target.dbInspection?.inspector?.fullName 
+    || qaLog?.inspector 
+    || 'Đặng Văn Kiểm (QA/QC)';
+
+  const dateStr = target.dbInspection?.inspectedAt
+    ? new Date(target.dbInspection.inspectedAt).toLocaleDateString('vi-VN')
+    : (qaLog?.date || new Date().toLocaleDateString('vi-VN'));
+
+  const totalQty = parseInt(qaLog?.totalQty) || rawItems.reduce((s, i) => s + (parseInt(i.quantity || i.qty) || 1), 0) || 1;
+  const passedQty = parseInt(qaLog?.passedQty) ?? totalQty;
+  const failedQty = parseInt(qaLog?.failedQty) || 0;
+  const isRejected = qaLog?.status === 'QA_REJECTED' || qaLog?.decision === 'REJECT';
+  const isPartial = qaLog?.status === 'QA_PARTIAL' || qaLog?.decision === 'ACCEPT_PARTIAL';
+
+  const handlePrint = () => {
+    printDocument('#aetherpc-warehouse-qc-certificate-print', { title: `Biên bản nghiệm thu kỹ thuật ${poNumber}` });
+  };
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.7)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10002, padding: '1rem' }} onClick={onClose}>
+      <div style={{ width: '100%', maxWidth: '850px', maxHeight: '92vh', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', boxShadow: '0 20px 40px rgba(0,0,0,0.25)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
+        {/* Toolbar Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.85rem 1.25rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <FileText size={18} style={{ color: '#2563eb' }} />
+            <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#0f172a' }}>
+              Xem & In Biên Bản Nghiệm Thu Kỹ Thuật QA/QC
+            </h3>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+            <button
+              type="button"
+              onClick={handlePrint}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+                backgroundColor: '#2563eb',
+                color: '#ffffff',
+                border: 'none',
+                padding: '0.4rem 1rem',
+                borderRadius: '6px',
+                fontSize: '0.8rem',
+                fontWeight: 700,
+                cursor: 'pointer'
+              }}
+            >
+              <Printer size={15} />
+              In Biên Bản
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              style={{ background: '#ffffff', border: '1px solid #cbd5e1', color: '#64748b', cursor: 'pointer', padding: '0.35rem 0.65rem', borderRadius: '6px' }}
+            >
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+
+        {/* Printable Certificate Area */}
+        <div style={{ flex: 1, overflowY: 'auto', backgroundColor: '#ffffff' }}>
+          <div id="aetherpc-warehouse-qc-certificate-print" style={{ padding: '1.25rem 1.5rem', backgroundColor: '#ffffff' }}>
+            {/* Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #0f172a', paddingBottom: '0.65rem', marginBottom: '0.85rem' }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: '0.66rem', fontWeight: 800, color: '#2563eb', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  AETHER PC ENTERPRISE • HỆ THỐNG QUẢN TRỊ DOANH NGHIỆP ERP
+                </div>
+                <h2 style={{ fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', margin: '0.15rem 0 0.1rem', letterSpacing: '-0.3px' }}>
+                  BIÊN BẢN NGHIỆM THU KỸ THUẬT & KIỂM ĐỊNH CHẤT LƯỢNG
+                </h2>
+                <div style={{ fontSize: '0.74rem', color: '#64748b' }}>
+                  Số hiệu: <strong style={{ color: '#0f172a', fontFamily: 'monospace' }}>{qaLog?.id || `QA-${String(Date.now()).slice(-4)}`}</strong>
+                  {' • '}Ngày lập: <strong style={{ color: '#0f172a' }}>{dateStr}</strong>
+                </div>
+              </div>
+              <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', color: '#16a34a', padding: '0.2rem 0.6rem', borderRadius: '6px', fontSize: '0.68rem', fontWeight: 800 }}>
+                  <CheckCircle2 size={13} />
+                  CHỨNG TỪ ERP HỢP LỆ
+                </div>
+              </div>
+            </div>
+
+            {/* General Info Card */}
+            <table style={{ width: '100%', borderCollapse: 'collapse', border: 'none', marginBottom: '0.8rem', backgroundColor: '#f8fafc', borderRadius: '8px' }}>
+              <tbody>
+                <tr>
+                  <td style={{ width: '50%', verticalAlign: 'top', padding: '0.6rem 0.8rem', border: '1px solid #e2e8f0', borderRight: 'none', borderRadius: '8px 0 0 8px' }}>
+                    <div style={{ fontSize: '0.75rem', lineHeight: '1.55' }}>
+                      <div style={{ marginBottom: '0.25rem' }}>
+                        <span style={{ color: '#64748b' }}>Loại Nghiệm Thu: </span>
+                        <strong style={{ color: '#2563eb' }}>NGHIỆM THU HÀNG NHẬP NHÀ CUNG CẤP (PO)</strong>
+                      </div>
+                      <div style={{ marginBottom: '0.25rem' }}>
+                        <span style={{ color: '#64748b' }}>Mã Đơn Đối Soát: </span>
+                        <strong style={{ color: '#0f172a', fontFamily: 'monospace' }}>{poNumber}</strong>
+                      </div>
+                      <div>
+                        <span style={{ color: '#64748b' }}>Kết Luận Xử Lý: </span>
+                        <span style={{
+                          display: 'inline-block',
+                          padding: '2px 8px',
+                          borderRadius: '10px',
+                          fontSize: '0.72rem',
+                          fontWeight: 800,
+                          backgroundColor: isRejected ? '#fee2e2' : isPartial ? '#ffedd5' : '#dcfce7',
+                          color: isRejected ? '#dc2626' : isPartial ? '#c2410c' : '#15803d',
+                          border: `1px solid ${isRejected ? '#fca5a5' : isPartial ? '#fed7aa' : '#bbf7d0'}`
+                        }}>
+                          {isRejected ? 'TỪ CHỐI NHẬP KHO' : isPartial ? 'NHẬP MỘT PHẦN' : 'CHO NHẬP KHO 100%'}
+                        </span>
+                      </div>
+                    </div>
+                  </td>
+                  <td style={{ width: '50%', verticalAlign: 'top', padding: '0.6rem 0.8rem', border: '1px solid #e2e8f0', borderRadius: '0 8px 8px 0' }}>
+                    <div style={{ fontSize: '0.75rem', lineHeight: '1.55' }}>
+                      <div style={{ marginBottom: '0.25rem' }}>
+                        <span style={{ color: '#64748b' }}>Đối Tượng Đối Tác: </span>
+                        <strong style={{ color: '#0f172a' }}>{supplierName}</strong>
+                      </div>
+                      <div style={{ marginBottom: '0.25rem' }}>
+                        <span style={{ color: '#64748b' }}>Kiểm Định Viên QA/QC: </span>
+                        <strong style={{ color: '#0f172a' }}>{inspector}</strong>
+                      </div>
+                      <div>
+                        <span style={{ color: '#64748b' }}>Phân Loại: </span>
+                        <strong style={{ color: '#0f172a' }}>{qaLog?.defectCategory || 'Đạt tiêu chuẩn hoàn hảo'}</strong>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+
+            {/* Line items table */}
+            <div style={{ marginBottom: '0.8rem' }}>
+              <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.78rem', marginBottom: '0.3rem' }}>
+                Chi Tiết Kết Quả Kiểm Định Từng Sản Phẩm:
+              </div>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', overflow: 'hidden' }}>
+                <thead>
+                  <tr style={{ backgroundColor: '#f1f5f9', borderBottom: '2px solid #cbd5e1', textAlign: 'left', color: '#475569' }}>
+                    <th style={{ padding: '0.45rem 0.65rem' }}>Tên Sản Phẩm / Model</th>
+                    <th style={{ padding: '0.45rem 0.5rem', textAlign: 'center', width: '90px' }}>Số Lượng Đặt</th>
+                    <th style={{ padding: '0.45rem 0.5rem', textAlign: 'center', width: '85px' }}>Đạt Chuẩn</th>
+                    <th style={{ padding: '0.45rem 0.5rem', textAlign: 'center', width: '85px' }}>Lỗi / Hỏng</th>
+                    <th style={{ padding: '0.45rem 0.65rem', textAlign: 'center', width: '160px' }}>Đánh Giá Ngoại Quan</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rawItems.length > 0 ? (
+                    rawItems.map((it, idx) => {
+                      const itName = it.product?.name || it.productName || it.name || productName;
+                      const itQty = parseInt(it.quantity) || totalQty || 1;
+                      const itPassed = isRejected ? 0 : itQty;
+                      const itFailed = isRejected ? itQty : 0;
+                      return (
+                        <tr key={it.id || idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                          <td style={{ padding: '0.5rem 0.65rem', fontWeight: 700, color: '#0f172a' }}>
+                            {itName}
+                            {it.serialNumber && <div style={{ fontSize: '0.68rem', color: '#64748b', fontFamily: 'monospace', marginTop: '1px' }}>SN: {it.serialNumber}</div>}
+                          </td>
+                          <td style={{ padding: '0.5rem 0.5rem', textAlign: 'center', fontWeight: 700, color: '#0f172a' }}>
+                            {itQty}
+                          </td>
+                          <td style={{ padding: '0.5rem 0.5rem', textAlign: 'center', fontWeight: 800, color: '#16a34a', backgroundColor: '#f0fdf4' }}>
+                            {itPassed}
+                          </td>
+                          <td style={{ padding: '0.5rem 0.5rem', textAlign: 'center', fontWeight: 800, color: (itFailed > 0) ? '#dc2626' : '#64748b', backgroundColor: (itFailed > 0) ? '#fef2f2' : 'transparent' }}>
+                            {itFailed}
+                          </td>
+                          <td style={{ padding: '0.5rem 0.65rem', textAlign: 'center' }}>
+                            <span style={{ color: isRejected ? '#dc2626' : '#15803d', fontWeight: 700, fontSize: '0.74rem' }}>
+                              {isRejected ? 'Hàng không đạt chuẩn kỹ thuật' : 'Seal nguyên vẹn & Đối soát Serial OK'}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  ) : (
+                    <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+                      <td style={{ padding: '0.5rem 0.65rem', fontWeight: 700, color: '#0f172a' }}>
+                        {productName}
+                      </td>
+                      <td style={{ padding: '0.5rem 0.5rem', textAlign: 'center', fontWeight: 700, color: '#0f172a' }}>
+                        {totalQty}
+                      </td>
+                      <td style={{ padding: '0.5rem 0.5rem', textAlign: 'center', fontWeight: 800, color: '#16a34a', backgroundColor: '#f0fdf4' }}>
+                        {passedQty}
+                      </td>
+                      <td style={{ padding: '0.5rem 0.5rem', textAlign: 'center', fontWeight: 800, color: (failedQty > 0) ? '#dc2626' : '#64748b', backgroundColor: (failedQty > 0) ? '#fef2f2' : 'transparent' }}>
+                        {failedQty}
+                      </td>
+                      <td style={{ padding: '0.5rem 0.65rem', textAlign: 'center' }}>
+                        <span style={{ color: isRejected ? '#dc2626' : '#15803d', fontWeight: 700, fontSize: '0.74rem' }}>
+                          {isRejected ? 'Hàng không đạt chuẩn kỹ thuật' : 'Seal nguyên vẹn & Đối soát Serial OK'}
+                        </span>
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Notes */}
+            <div style={{ backgroundColor: '#ffffff', padding: '0.55rem 0.75rem', borderRadius: '6px', border: '1px solid #e2e8f0', marginBottom: '0.85rem', fontSize: '0.75rem' }}>
+              <div style={{ fontWeight: 800, color: '#0f172a', marginBottom: '0.15rem' }}>
+                Ý Kiến Đánh Giá & Ghi Chú Của Kiểm Định Viên:
+              </div>
+              <div style={{ color: '#334155', fontStyle: 'italic', lineHeight: 1.4 }}>
+                "{qaLog?.notes || 'Lô hàng đã được nghiệm thu kỹ thuật và đối soát tiêu chuẩn chất lượng công ty.'}"
+              </div>
+            </div>
+
+            {/* Signatures Block (3 columns) */}
+            <table style={{ width: '100%', borderCollapse: 'collapse', border: 'none', marginTop: '0.3rem', borderTop: '1px dashed #cbd5e1', paddingTop: '0.5rem' }}>
+              <tbody>
+                <tr>
+                  {/* Column 1: NCC */}
+                  <td style={{ width: '33.33%', textAlign: 'center', verticalAlign: 'top', padding: '0.35rem 0.25rem 0' }}>
+                    <strong style={{ fontSize: '0.74rem', color: '#0f172a', display: 'block' }}>ĐẠI DIỆN GIAO HÀNG (NCC)</strong>
+                    <div style={{ fontSize: '0.64rem', color: '#94a3b8', marginTop: '0.1rem' }}>(Ký, ghi rõ họ tên)</div>
+                    <div style={{ minHeight: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0.2rem auto' }}>
+                      <div style={{ border: '1.5px dashed #64748b', borderRadius: '6px', backgroundColor: '#f8fafc', padding: '0.2rem 0.45rem', width: '100%', maxWidth: '160px', boxSizing: 'border-box' }}>
+                        <div style={{ fontSize: '0.64rem', fontWeight: 800, color: '#475569', letterSpacing: '0.2px' }}>✓ ĐÃ BÀN GIAO HÀNG</div>
+                        <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#0f172a', marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{supplierName}</div>
+                        <div style={{ fontSize: '0.6rem', color: '#64748b', marginTop: '1px' }}>{dateStr}</div>
+                      </div>
+                    </div>
+                    <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#0f172a', marginTop: '2px' }}>{supplierName}</div>
+                  </td>
+
+                  {/* Column 2: QA Inspector */}
+                  <td style={{ width: '33.33%', textAlign: 'center', verticalAlign: 'top', padding: '0.35rem 0.25rem 0' }}>
+                    <strong style={{ fontSize: '0.74rem', color: '#0f172a', display: 'block' }}>KIỂM ĐỊNH VIÊN QA/QC</strong>
+                    <div style={{ fontSize: '0.64rem', color: '#94a3b8', marginTop: '0.1rem' }}>(Ký, ghi rõ họ tên)</div>
+                    <div style={{ minHeight: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0.2rem auto' }}>
+                      <div style={{ border: isRejected ? '1.5px dashed #dc2626' : '1.5px dashed #2563eb', borderRadius: '6px', backgroundColor: isRejected ? '#fef2f2' : '#eff6ff', padding: '0.2rem 0.45rem', width: '100%', maxWidth: '160px', boxSizing: 'border-box' }}>
+                        <div style={{ fontSize: '0.64rem', fontWeight: 800, color: isRejected ? '#dc2626' : '#1d4ed8', letterSpacing: '0.2px' }}>
+                          {isRejected ? '✓ ĐÃ LẬP BIÊN BẢN LỖI' : '✓ ĐÃ KÝ SỐ (ĐẠT CHUẨN)'}
+                        </div>
+                        <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#0f172a', marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{inspector}</div>
+                        <div style={{ fontSize: '0.6rem', color: '#64748b', marginTop: '1px' }}>{dateStr}</div>
+                      </div>
+                    </div>
+                    <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#2563eb', marginTop: '2px' }}>{inspector}</div>
+                  </td>
+
+                  {/* Column 3: Warehouse Keeper */}
+                  <td style={{ width: '33.33%', textAlign: 'center', verticalAlign: 'top', padding: '0.35rem 0.25rem 0' }}>
+                    <strong style={{ fontSize: '0.74rem', color: '#0f172a', display: 'block' }}>THỦ KHO TIẾP NHẬN</strong>
+                    <div style={{ fontSize: '0.64rem', color: '#94a3b8', marginTop: '0.1rem' }}>(Ký, ghi rõ họ tên)</div>
+                    <div style={{ minHeight: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0.2rem auto' }}>
+                      <div style={{ border: '1.5px dashed #059669', borderRadius: '6px', backgroundColor: '#ecfdf5', padding: '0.2rem 0.45rem', width: '100%', maxWidth: '160px', boxSizing: 'border-box' }}>
+                        <div style={{ fontSize: '0.64rem', fontWeight: 800, color: '#047857', letterSpacing: '0.2px' }}>✓ ĐÃ TIẾP NHẬN KHO</div>
+                        <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#0f172a', marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Thủ Kho AetherPC</div>
+                        <div style={{ fontSize: '0.6rem', color: '#64748b', marginTop: '1px' }}>{dateStr}</div>
+                      </div>
+                    </div>
+                    <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#0f172a', marginTop: '2px' }}>Thủ Kho AetherPC</div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Modal Footer */}
+        <div style={{ padding: '0.75rem 1.25rem', backgroundColor: '#f8fafc', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end', gap: '0.6rem' }}>
+          <button
+            type="button"
+            onClick={handlePrint}
+            style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.45rem 1.2rem', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+          >
+            <Printer size={15} />
+            In Biên Bản
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{ backgroundColor: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.45rem 1.1rem', fontSize: '0.82rem', fontWeight: 600, color: '#475569', cursor: 'pointer' }}
+          >
+            Đóng
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ──── Sub-Component: Goods Receipt Success Modal (Biên Bản Nhập Kho Thành Công Với Chữ Ký Thủ Kho) ────
+function GoodsReceiptSuccessModal({ doc, onClose, formatPrice }) {
+  if (!doc) return null;
+
+  const safeFormatPrice = (val) => formatPrice ? formatPrice(val) : (val || 0).toLocaleString('vi-VN') + ' VNĐ';
+
+  const items = doc.items || [];
+  const totalQty = items.reduce((s, i) => s + (parseInt(i.quantity) || 1), 0) || doc.totalQty || 1;
+  const totalAmount = items.reduce((s, i) => {
+    const uCost = parseFloat(i.unitCost || i.unitPrice || 0);
+    const q = parseInt(i.quantity) || 1;
+    return s + (parseFloat(i.totalCost) || (uCost * q));
+  }, 0) || doc.totalAmount || 0;
+
+  let wordsText = '';
+  try {
+    const rawWords = numberToVietnameseWords(totalAmount);
+    wordsText = rawWords ? (rawWords.charAt(0).toUpperCase() + rawWords.slice(1) + ' đồng chẵn.') : '';
+  } catch (_) {}
+
+  const handlePrint = () => {
+    printDocument('#aetherpc-grn-success-print', { title: `Phiếu nhập kho ${doc.receiptNumber}` });
+  };
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.7)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10003, padding: '1rem' }} onClick={onClose}>
+      <div style={{ width: '100%', maxWidth: '880px', maxHeight: '92vh', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', boxShadow: '0 20px 40px rgba(0,0,0,0.25)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
+        {/* Modal Toolbar Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.85rem 1.25rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f0fdf4' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <CheckCircle2 size={20} style={{ color: '#16a34a' }} />
+            <div>
+              <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#15803d' }}>
+                Xác Nhận Nhập Kho Thành Công • Xuất Phiếu Nhập Kho
+              </h3>
+              <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                Mã phiếu: <strong style={{ color: '#0f172a', fontFamily: 'monospace' }}>{doc.receiptNumber}</strong>
+                {' • '}Đơn liên kết: <strong style={{ color: '#2563eb' }}>{doc.poNumber}</strong>
+              </div>
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+            <button
+              type="button"
+              onClick={handlePrint}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+                backgroundColor: '#16a34a',
+                color: '#ffffff',
+                border: 'none',
+                padding: '0.45rem 1.1rem',
+                borderRadius: '6px',
+                fontSize: '0.82rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                boxShadow: '0 2px 4px rgba(22,163,74,0.25)'
+              }}
+            >
+              <Printer size={15} />
+              In Phiếu Nhập Kho
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              style={{ background: '#ffffff', border: '1px solid #cbd5e1', color: '#64748b', cursor: 'pointer', padding: '0.35rem 0.65rem', borderRadius: '6px' }}
+            >
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+
+        {/* Printable Area */}
+        <div style={{ flex: 1, overflowY: 'auto', backgroundColor: '#ffffff' }}>
+          <div id="aetherpc-grn-success-print" style={{ padding: '1.25rem 1.5rem', backgroundColor: '#ffffff' }}>
+            {/* Enterprise Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #0f172a', paddingBottom: '0.65rem', marginBottom: '0.85rem' }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: '0.66rem', fontWeight: 800, color: '#2563eb', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  AETHER PC ENTERPRISE • HỆ THỐNG QUẢN TRỊ DOANH NGHIỆP ERP
+                </div>
+                <h2 style={{ fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', margin: '0.15rem 0 0.1rem', letterSpacing: '-0.3px' }}>
+                  PHIẾU NHẬP KHO & BIÊN BẢN GIAO NHẬN THÀNH CÔNG
+                </h2>
+                <div style={{ fontSize: '0.74rem', color: '#64748b' }}>
+                  Số phiếu: <strong style={{ color: '#0f172a', fontFamily: 'monospace' }}>{doc.receiptNumber}</strong>
+                  {' • '}Mã PO: <strong style={{ color: '#2563eb', fontFamily: 'monospace' }}>{doc.poNumber}</strong>
+                  {' • '}Thời gian nhập: <strong style={{ color: '#0f172a' }}>{doc.intakeDate}</strong>
+                </div>
+              </div>
+              <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', backgroundColor: '#f0fdf4', border: '1.5px solid #86efac', color: '#15803d', padding: '0.25rem 0.75rem', borderRadius: '6px', fontSize: '0.72rem', fontWeight: 800 }}>
+                  <CheckCircle2 size={14} />
+                  ĐÃ NHẬP KHO THÀNH CÔNG
+                </div>
+              </div>
+            </div>
+
+            {/* General Info Table (2 equal columns) */}
+            <table style={{ width: '100%', borderCollapse: 'collapse', border: 'none', marginBottom: '0.8rem', backgroundColor: '#f8fafc', borderRadius: '8px' }}>
+              <tbody>
+                <tr>
+                  <td style={{ width: '50%', verticalAlign: 'top', padding: '0.65rem 0.85rem', border: '1px solid #e2e8f0', borderRight: 'none', borderRadius: '8px 0 0 8px' }}>
+                    <div style={{ fontSize: '0.75rem', lineHeight: '1.6' }}>
+                      <div style={{ marginBottom: '0.2rem' }}>
+                        <span style={{ color: '#64748b' }}>Đơn Vị Giao Hàng (NCC): </span>
+                        <strong style={{ color: '#0f172a' }}>{doc.supplierName}</strong>
+                      </div>
+                      <div style={{ marginBottom: '0.2rem' }}>
+                        <span style={{ color: '#64748b' }}>Mã Đơn Đặt Hàng (PO): </span>
+                        <strong style={{ color: '#2563eb', fontFamily: 'monospace' }}>{doc.poNumber}</strong>
+                      </div>
+                      <div>
+                        <span style={{ color: '#64748b' }}>Địa Điểm Lưu Kho: </span>
+                        <strong style={{ color: '#0f172a' }}>Kho Tổng AetherPC - Phân khu Zone A (Khu CN Cao)</strong>
+                      </div>
+                    </div>
+                  </td>
+                  <td style={{ width: '50%', verticalAlign: 'top', padding: '0.65rem 0.85rem', border: '1px solid #e2e8f0', borderRadius: '0 8px 8px 0' }}>
+                    <div style={{ fontSize: '0.75rem', lineHeight: '1.6' }}>
+                      <div style={{ marginBottom: '0.2rem' }}>
+                        <span style={{ color: '#64748b' }}>Thủ Kho Tiếp Nhận: </span>
+                        <strong style={{ color: '#0f172a' }}>{doc.warehouseStaff}</strong>
+                      </div>
+                      <div style={{ marginBottom: '0.2rem' }}>
+                        <span style={{ color: '#64748b' }}>Kiểm Định Viên QA/QC: </span>
+                        <strong style={{ color: '#0f172a' }}>{doc.qaInspector}</strong>
+                      </div>
+                      <div>
+                        <span style={{ color: '#64748b' }}>Căn Cứ Nghiệm Thu: </span>
+                        <span style={{ color: '#16a34a', fontWeight: 700 }}>Biên bản nghiệm thu kỹ thuật Đạt Chuẩn 100%</span>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+
+            {/* Line Items Table */}
+            <div style={{ marginBottom: '0.8rem' }}>
+              <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.78rem', marginBottom: '0.35rem' }}>
+                Danh Mục Linh Kiện / Thiết Bị Thực Tế Nhập Kho:
+              </div>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', overflow: 'hidden' }}>
+                <thead>
+                  <tr style={{ backgroundColor: '#f1f5f9', borderBottom: '2px solid #cbd5e1', textAlign: 'left', color: '#475569' }}>
+                    <th style={{ padding: '0.5rem 0.6rem', textAlign: 'center', width: '35px' }}>STT</th>
+                    <th style={{ padding: '0.5rem 0.65rem' }}>Tên Sản Phẩm / Quy Cách Model</th>
+                    <th style={{ padding: '0.5rem 0.5rem', textAlign: 'center', width: '55px' }}>ĐVT</th>
+                    <th style={{ padding: '0.5rem 0.5rem', textAlign: 'center', width: '65px' }}>SL Đặt</th>
+                    <th style={{ padding: '0.5rem 0.5rem', textAlign: 'center', width: '85px' }}>Thực Nhập</th>
+                    <th style={{ padding: '0.5rem 0.65rem', textAlign: 'right', width: '105px' }}>Đơn Giá</th>
+                    <th style={{ padding: '0.5rem 0.65rem', textAlign: 'right', width: '115px' }}>Thành Tiền</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.map((it, idx) => {
+                    const itName = it.name || it.productName || it.product?.name || 'Sản phẩm';
+                    const itQty = parseInt(it.quantity) || 1;
+                    const itOrig = parseInt(it.originalQty) || itQty;
+                    const uPrice = parseFloat(it.unitCost || it.unitPrice || 0);
+                    const tCost = parseFloat(it.totalCost) || (uPrice * itQty);
+                    const serialList = Array.isArray(it.serials) ? it.serials : [];
+
+                    return (
+                      <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                        <td style={{ padding: '0.5rem 0.5rem', textAlign: 'center', color: '#64748b' }}>{idx + 1}</td>
+                        <td style={{ padding: '0.5rem 0.65rem', fontWeight: 700, color: '#0f172a' }}>
+                          <div>{itName}</div>
+                          {serialList.length > 0 && (
+                            <div style={{ marginTop: '3px', fontSize: '0.67rem', color: '#475569', fontFamily: 'monospace' }}>
+                              <span style={{ color: '#2563eb', fontWeight: 700 }}>Serial ({serialList.length}): </span>
+                              {serialList.slice(0, 3).join(', ')}
+                              {serialList.length > 3 ? ` ... (+${serialList.length - 3} mã)` : ''}
+                            </div>
+                          )}
+                        </td>
+                        <td style={{ padding: '0.5rem 0.5rem', textAlign: 'center', color: '#64748b' }}>Cái</td>
+                        <td style={{ padding: '0.5rem 0.5rem', textAlign: 'center', color: '#64748b' }}>{itOrig}</td>
+                        <td style={{ padding: '0.5rem 0.5rem', textAlign: 'center', fontWeight: 800, color: '#16a34a', backgroundColor: '#f0fdf4' }}>{itQty}</td>
+                        <td style={{ padding: '0.5rem 0.65rem', textAlign: 'right', color: '#475569' }}>{safeFormatPrice(uPrice)}</td>
+                        <td style={{ padding: '0.5rem 0.65rem', textAlign: 'right', fontWeight: 800, color: '#0f172a' }}>{safeFormatPrice(tCost)}</td>
+                      </tr>
+                    );
+                  })}
+                  {/* Summary row */}
+                  <tr style={{ backgroundColor: '#f8fafc', fontWeight: 800, borderTop: '2px solid #cbd5e1' }}>
+                    <td colSpan={4} style={{ padding: '0.55rem 0.65rem', textAlign: 'right', color: '#334155' }}>
+                      TỔNG CỘNG NHẬP KHO:
+                    </td>
+                    <td style={{ padding: '0.55rem 0.5rem', textAlign: 'center', color: '#16a34a', fontSize: '0.85rem' }}>
+                      {totalQty}
+                    </td>
+                    <td style={{ padding: '0.55rem 0.65rem', textAlign: 'right', color: '#64748b' }}>
+                      VNĐ
+                    </td>
+                    <td style={{ padding: '0.55rem 0.65rem', textAlign: 'right', color: '#2563eb', fontSize: '0.88rem' }}>
+                      {safeFormatPrice(totalAmount)}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            {/* In words & note */}
+            {wordsText && (
+              <div style={{ fontSize: '0.74rem', color: '#334155', fontStyle: 'italic', marginBottom: '0.65rem' }}>
+                <strong>Tổng số tiền bằng chữ: </strong>{wordsText}
+              </div>
+            )}
+
+            <div style={{ backgroundColor: '#ffffff', padding: '0.5rem 0.75rem', borderRadius: '6px', border: '1px solid #e2e8f0', marginBottom: '0.85rem', fontSize: '0.73rem', color: '#475569', lineHeight: 1.45 }}>
+              <strong style={{ color: '#0f172a' }}>Ghi chú xác nhận nhập kho: </strong>
+              Lô hàng trên đã được kiểm đếm đủ số lượng thực tế, đối soát đạt chuẩn kỹ thuật 100% từ biên bản QA/QC, các mã Serial đã được ghi nhận vào kho dữ liệu ERP AetherPC và cập nhật tức thì vào sổ cái tồn kho.
+            </div>
+
+            {/* Signatures block - 3 columns with Warehouse Keeper Official Stamp */}
+            <table style={{ width: '100%', borderCollapse: 'collapse', border: 'none', marginTop: '0.3rem', borderTop: '1px dashed #cbd5e1', paddingTop: '0.5rem' }}>
+              <tbody>
+                <tr>
+                  {/* Column 1: NCC */}
+                  <td style={{ width: '33.33%', textAlign: 'center', verticalAlign: 'top', padding: '0.35rem 0.25rem 0' }}>
+                    <strong style={{ fontSize: '0.74rem', color: '#0f172a', display: 'block' }}>ĐẠI DIỆN GIAO HÀNG (NCC)</strong>
+                    <div style={{ fontSize: '0.64rem', color: '#94a3b8', marginTop: '0.1rem' }}>(Ký, ghi rõ họ tên)</div>
+                    <div style={{ minHeight: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0.2rem auto' }}>
+                      <div style={{ border: '1.5px dashed #64748b', borderRadius: '6px', backgroundColor: '#f8fafc', padding: '0.2rem 0.45rem', width: '100%', maxWidth: '170px', boxSizing: 'border-box' }}>
+                        <div style={{ fontSize: '0.64rem', fontWeight: 800, color: '#475569', letterSpacing: '0.2px' }}>✓ ĐÃ BÀN GIAO HÀNG</div>
+                        <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#0f172a', marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc.supplierName}</div>
+                        <div style={{ fontSize: '0.6rem', color: '#64748b', marginTop: '1px' }}>{doc.intakeDate?.split(' ')[1] || doc.intakeDate}</div>
+                      </div>
+                    </div>
+                    <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#0f172a', marginTop: '2px' }}>{doc.supplierName}</div>
+                  </td>
+
+                  {/* Column 2: QA Inspector */}
+                  <td style={{ width: '33.33%', textAlign: 'center', verticalAlign: 'top', padding: '0.35rem 0.25rem 0' }}>
+                    <strong style={{ fontSize: '0.74rem', color: '#0f172a', display: 'block' }}>KỸ THUẬT / QA KIỂM ĐỊNH</strong>
+                    <div style={{ fontSize: '0.64rem', color: '#94a3b8', marginTop: '0.1rem' }}>(Ký, ghi rõ họ tên)</div>
+                    <div style={{ minHeight: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0.2rem auto' }}>
+                      <div style={{ border: '1.5px dashed #2563eb', borderRadius: '6px', backgroundColor: '#eff6ff', padding: '0.2rem 0.45rem', width: '100%', maxWidth: '170px', boxSizing: 'border-box' }}>
+                        <div style={{ fontSize: '0.64rem', fontWeight: 800, color: '#1d4ed8', letterSpacing: '0.2px' }}>✓ ĐÃ ĐỐI SOÁT ĐẠT CHUẨN</div>
+                        <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#0f172a', marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc.qaInspector}</div>
+                        <div style={{ fontSize: '0.6rem', color: '#64748b', marginTop: '1px' }}>{doc.intakeDate?.split(' ')[1] || doc.intakeDate}</div>
+                      </div>
+                    </div>
+                    <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#2563eb', marginTop: '2px' }}>{doc.qaInspector}</div>
+                  </td>
+
+                  {/* Column 3: Warehouse Keeper Signature (CHỮ KÝ THỦ KHO) */}
+                  <td style={{ width: '33.33%', textAlign: 'center', verticalAlign: 'top', padding: '0.35rem 0.25rem 0' }}>
+                    <strong style={{ fontSize: '0.74rem', color: '#0f172a', display: 'block' }}>THỦ KHO TIẾP NHẬN & DUYỆT TỒN KHO</strong>
+                    <div style={{ fontSize: '0.64rem', color: '#94a3b8', marginTop: '0.1rem' }}>(Ký, ghi rõ họ tên)</div>
+                    <div style={{ minHeight: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0.2rem auto' }}>
+                      <div style={{
+                        border: '2px solid #059669',
+                        borderRadius: '8px',
+                        backgroundColor: '#ecfdf5',
+                        padding: '0.3rem 0.5rem',
+                        width: '100%',
+                        maxWidth: '185px',
+                        boxSizing: 'border-box',
+                        boxShadow: '0 1px 3px rgba(5,150,105,0.15)'
+                      }}>
+                        <div style={{ fontSize: '0.65rem', fontWeight: 900, color: '#047857', letterSpacing: '0.3px', textTransform: 'uppercase' }}>
+                          ✓ ĐÃ XÁC NHẬN NHẬP KHO
+                        </div>
+                        <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#065f46', marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {doc.warehouseStaff}
+                        </div>
+                        <div style={{ fontSize: '0.6rem', color: '#047857', marginTop: '1px', fontWeight: 600 }}>
+                          {doc.intakeDate}
+                        </div>
+                      </div>
+                    </div>
+                    <div style={{ fontSize: '0.76rem', fontWeight: 800, color: '#047857', marginTop: '2px' }}>
+                      {doc.warehouseStaff}
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Modal Footer */}
+        <div style={{ padding: '0.75rem 1.25rem', backgroundColor: '#f8fafc', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end', gap: '0.6rem' }}>
+          <button
+            type="button"
+            onClick={handlePrint}
+            style={{ backgroundColor: '#16a34a', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.45rem 1.2rem', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+          >
+            <Printer size={15} />
+            In Phiếu Nhập Kho
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{ backgroundColor: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.45rem 1.1rem', fontSize: '0.82rem', fontWeight: 600, color: '#475569', cursor: 'pointer' }}
+          >
+            Đóng
           </button>
         </div>
       </div>
@@ -2304,6 +3010,8 @@ export default function Warehouse() {
   const [receiptsError, setReceiptsError] = useState(null);
   const [selectedReceipt, setSelectedReceipt] = useState(null);
   const [serialEntryTarget, setSerialEntryTarget] = useState(null);
+  const [viewingQcCertificate, setViewingQcCertificate] = useState(null);
+  const [viewingIntakeSuccessDoc, setViewingIntakeSuccessDoc] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
   // Pack & Scan Modal
@@ -2677,9 +3385,44 @@ export default function Warehouse() {
       const updatedReceipts = receipts.map(r => r.id === receipt.id ? { ...r, status: 'DONE' } : r);
       setReceipts(updatedReceipts);
 
-      const updatedPOs = purchaseOrders.map(p => (p.poNumber === poNum || String(p.id) === String(receipt.poId)) ? { ...p, warehouseStatus: 'RECEIVED', status: 'DONE' } : p);
-      setPurchaseOrders(updatedPOs);
-      try { localStorage.setItem('erp_pos', JSON.stringify(updatedPOs)); } catch (_) {}
+      const effectivePo = (receipt.po && typeof receipt.po === 'object' && receipt.po.items?.length > 0)
+        ? receipt.po
+        : ((purchaseOrders || []).find(p => 
+            p && (p.id === receipt.poId || 
+            p.poNumber === receipt.poId || 
+            p.poNumber === receipt.receiptNumber?.replace('GRN-', '') ||
+            (receipt.receiptNumber && receipt.receiptNumber.includes(p.poNumber)))
+          ) || receipt.po || {});
+
+      const completedDocItems = targetItems.map(item => {
+        let intakeQty = parseInt(item.quantity || item.qty) || 1;
+        if (qaLog && qaLog.passedQty !== undefined) {
+          if (targetItems.length === 1) intakeQty = Number(qaLog.passedQty);
+          else intakeQty = Math.round(intakeQty * (Number(qaLog.passedQty) / (Number(qaLog.totalQty) || 1)));
+        }
+        const unitPrice = parseFloat(item.unitCost || item.unitPrice || item.price || 0);
+        return {
+          ...item,
+          name: item.name || item.productName || item.product?.name || 'Sản phẩm',
+          quantity: intakeQty,
+          originalQty: parseInt(item.originalQty || item.quantity || item.qty) || intakeQty,
+          unitCost: unitPrice,
+          totalCost: unitPrice * intakeQty,
+          serials: serialsMap?.[item.productId] || []
+        };
+      });
+
+      const intakeDoc = {
+        receiptNumber: receipt.receiptNumber || `GRN-${poNum}`,
+        poNumber: poNum,
+        supplierName: effectivePo?.supplier?.name || effectivePo?.supplierName || receipt.supplierName || 'Công ty TNHH Gigabyte Việt Nam',
+        warehouseStaff: user?.fullname ? `${user.fullname} (Thủ Kho)` : 'Lê Văn C (Thủ Kho)',
+        qaInspector: qaLog?.inspector || 'Đặng Văn Kiểm (QA/QC)',
+        intakeDate: new Date().toLocaleString('vi-VN'),
+        status: 'DONE',
+        items: completedDocItems,
+        qaLog
+      };
 
       addNotification({
         type: 'success',
@@ -2688,6 +3431,7 @@ export default function Warehouse() {
       });
 
       setSelectedReceipt(null);
+      setViewingIntakeSuccessDoc(intakeDoc);
     } catch (err) {
       notify('Không thể xác nhận nhập kho!', 'error');
     } finally {
@@ -4022,22 +4766,106 @@ export default function Warehouse() {
                         </span>
                       </td>
                       <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
-                        <button
-                          type="button"
-                          onClick={(e) => { e.stopPropagation(); setSelectedReceipt(r); }}
-                          style={{
-                            backgroundColor: '#2563eb',
-                            color: '#ffffff',
-                            border: 'none',
-                            borderRadius: '4px',
-                            padding: '0.35rem 0.85rem',
-                            fontSize: '0.78rem',
-                            fontWeight: 700,
-                            cursor: 'pointer'
-                          }}
-                        >
-                          Xem Chi Tiết
-                        </button>
+                        <div style={{ display: 'inline-flex', gap: '0.4rem', alignItems: 'center' }}>
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); setSelectedReceipt(r); }}
+                            style={{
+                              backgroundColor: '#2563eb',
+                              color: '#ffffff',
+                              border: 'none',
+                              borderRadius: '4px',
+                              padding: '0.35rem 0.75rem',
+                              fontSize: '0.78rem',
+                              fontWeight: 700,
+                              cursor: 'pointer'
+                            }}
+                          >
+                            Xem Chi Tiết
+                          </button>
+                          {r.status === 'DONE' && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const poObj = r.po || (purchaseOrders || []).find(p => p.poNumber === r.poId || p.id === r.poId) || {};
+                                const poNum = poObj.poNumber || r.poId || r.receiptNumber?.replace('GRN-', '');
+                                let rQaLog = null;
+                                try {
+                                  const logs = JSON.parse(localStorage.getItem('erp_qa_inspection_logs') || '[]');
+                                  rQaLog = logs.find(l => l.poNumber === poNum || (poObj.id && String(l.poNumber) === String(poObj.id)));
+                                } catch (_) {}
+                                const rItems = (poObj.items?.length > 0 ? poObj.items : (r.items || [])).map(it => ({
+                                  ...it,
+                                  name: it.name || it.productName || it.product?.name || 'Sản phẩm',
+                                  quantity: parseInt(it.quantity || it.qty) || 1,
+                                  originalQty: parseInt(it.originalQty || it.quantity || it.qty) || 1,
+                                  unitCost: parseFloat(it.unitCost || it.unitPrice || 0),
+                                  totalCost: (parseFloat(it.unitCost || it.unitPrice || 0)) * (parseInt(it.quantity || it.qty) || 1)
+                                }));
+                                setViewingIntakeSuccessDoc({
+                                  receiptNumber: r.receiptNumber || `GRN-${poNum}`,
+                                  poNumber: poNum,
+                                  supplierName: poObj.supplier?.name || poObj.supplierName || r.supplierName || 'Công ty TNHH Gigabyte Việt Nam',
+                                  warehouseStaff: user?.fullname ? `${user.fullname} (Thủ Kho)` : 'Lê Văn C (Thủ Kho)',
+                                  qaInspector: rQaLog?.inspector || 'Đặng Văn Kiểm (QA/QC)',
+                                  intakeDate: new Date().toLocaleString('vi-VN'),
+                                  status: 'DONE',
+                                  items: rItems,
+                                  qaLog: rQaLog
+                                });
+                              }}
+                              style={{
+                                backgroundColor: '#16a34a',
+                                color: '#ffffff',
+                                border: 'none',
+                                borderRadius: '4px',
+                                padding: '0.35rem 0.65rem',
+                                fontSize: '0.75rem',
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.25rem'
+                              }}
+                              title="Xem & in phiếu nhập kho thành công"
+                            >
+                              <Printer size={13} />
+                              Phiếu Nhập
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const poObj = r.po || (purchaseOrders || []).find(p => p.poNumber === r.poId || p.id === r.poId) || {};
+                              let rQaLog = null;
+                              try {
+                                const logs = JSON.parse(localStorage.getItem('erp_qa_inspection_logs') || '[]');
+                                const poNum = poObj.poNumber || r.poId || r.receiptNumber?.replace('GRN-', '');
+                                rQaLog = logs.find(l => l.poNumber === poNum || (poObj.id && String(l.poNumber) === String(poObj.id)));
+                              } catch (_) {}
+                              setViewingQcCertificate({ receipt: r, po: poObj, qaLog: rQaLog });
+                            }}
+                            style={{
+                              backgroundColor: '#eff6ff',
+                              color: '#1d4ed8',
+                              border: '1px solid #bfdbfe',
+                              borderRadius: '4px',
+                              padding: '0.35rem 0.65rem',
+                              fontSize: '0.75rem',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.25rem'
+                            }}
+                            title="Xem biên bản kiểm định kỹ thuật QA/QC"
+                          >
+                            <Eye size={13} />
+                            Biên Bản QC
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -6299,6 +7127,28 @@ export default function Warehouse() {
           onRequestValidate={(receipt, poStatus, items) => setSerialEntryTarget({ receipt, poStatus, items })}
           submitting={submitting}
           formatPrice={safeFormatPrice}
+          onViewQcCertificate={(target) => setViewingQcCertificate(target)}
+          onOpenIntakeReceipt={(receipt, po, items, qaLog) => {
+            const poNum = po?.poNumber || receipt.poId || receipt.receiptNumber?.replace('GRN-', '');
+            setViewingIntakeSuccessDoc({
+              receiptNumber: receipt.receiptNumber || `GRN-${poNum}`,
+              poNumber: poNum,
+              supplierName: po?.supplier?.name || po?.supplierName || receipt.supplierName || 'Công ty TNHH Gigabyte Việt Nam',
+              warehouseStaff: user?.fullname ? `${user.fullname} (Thủ Kho)` : 'Lê Văn C (Thủ Kho)',
+              qaInspector: qaLog?.inspector || 'Đặng Văn Kiểm (QA/QC)',
+              intakeDate: new Date().toLocaleString('vi-VN'),
+              status: 'DONE',
+              items: (items || []).map(it => ({
+                ...it,
+                name: it.name || it.productName || it.product?.name || 'Sản phẩm',
+                quantity: it.quantity || 1,
+                originalQty: it.originalQty || it.quantity || 1,
+                unitCost: it.unitCost || it.unitPrice || 0,
+                totalCost: (it.unitCost || it.unitPrice || 0) * (it.quantity || 1)
+              })),
+              qaLog
+            });
+          }}
         />
       )}
 
@@ -6313,6 +7163,24 @@ export default function Warehouse() {
             await handleValidateReceipt(serialEntryTarget.receipt, serialEntryTarget.poStatus, serialsMap);
             setSerialEntryTarget(null);
           }}
+        />
+      )}
+
+      {/* QA/QC Technical Inspection Certificate Modal for Warehouse Actor */}
+      {viewingQcCertificate && (
+        <WarehouseQcCertificateModal
+          target={viewingQcCertificate}
+          onClose={() => setViewingQcCertificate(null)}
+          purchaseOrders={purchaseOrders}
+        />
+      )}
+
+      {/* Goods Receipt Note (GRN) Success Modal with Warehouse Keeper Signature */}
+      {viewingIntakeSuccessDoc && (
+        <GoodsReceiptSuccessModal
+          doc={viewingIntakeSuccessDoc}
+          onClose={() => setViewingIntakeSuccessDoc(null)}
+          formatPrice={safeFormatPrice}
         />
       )}
 
