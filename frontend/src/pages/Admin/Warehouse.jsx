@@ -2527,6 +2527,13 @@ function GoodsReceiptSuccessModal({ doc, onClose, formatPrice }) {
     return s + (parseFloat(i.totalCost) || (uCost * q));
   }, 0) || doc.totalAmount || 0;
 
+  // Phiếu này trước đây LUÔN in cứng "Đạt Chuẩn 100%" bất kể kết quả QC thật —
+  // với lô Nhập Một Phần, số SP nhập kho (quantity) ít hơn số đặt (originalQty)
+  // và/hoặc qaLog.failedQty > 0. Dùng 2 tín hiệu đó để phản ánh đúng thực tế.
+  const isPartialIntake = Number(doc.qaLog?.failedQty) > 0 ||
+    items.some(i => (parseInt(i.originalQty) || 0) > (parseInt(i.quantity) || 0));
+  const qcResultLabel = isPartialIntake ? 'Nhập Một Phần (có SP lỗi bị loại)' : 'Đạt Chuẩn 100%';
+
   let wordsText = '';
   try {
     const rawWords = numberToVietnameseWords(totalAmount);
@@ -2644,7 +2651,7 @@ function GoodsReceiptSuccessModal({ doc, onClose, formatPrice }) {
                       </div>
                       <div>
                         <span style={{ color: '#64748b' }}>Căn Cứ Nghiệm Thu: </span>
-                        <span style={{ color: '#16a34a', fontWeight: 700 }}>Biên bản nghiệm thu kỹ thuật Đạt Chuẩn 100%</span>
+                        <span style={{ color: isPartialIntake ? '#c2410c' : '#16a34a', fontWeight: 700 }}>Biên bản nghiệm thu kỹ thuật {qcResultLabel}</span>
                       </div>
                     </div>
                   </td>
@@ -2727,7 +2734,9 @@ function GoodsReceiptSuccessModal({ doc, onClose, formatPrice }) {
 
             <div style={{ backgroundColor: '#ffffff', padding: '0.5rem 0.75rem', borderRadius: '6px', border: '1px solid #e2e8f0', marginBottom: '0.85rem', fontSize: '0.73rem', color: '#475569', lineHeight: 1.45 }}>
               <strong style={{ color: '#0f172a' }}>Ghi chú xác nhận nhập kho: </strong>
-              Lô hàng trên đã được kiểm đếm đủ số lượng thực tế, đối soát đạt chuẩn kỹ thuật 100% từ biên bản QA/QC, các mã Serial đã được ghi nhận vào kho dữ liệu ERP AetherPC và cập nhật tức thì vào sổ cái tồn kho.
+              {isPartialIntake
+                ? `Lô hàng đã được kiểm đếm theo đúng kết quả nghiệm thu MỘT PHẦN từ biên bản QA/QC (${doc.qaLog?.failedQty || 0} SP lỗi không đưa vào kho, chờ hoàn trả NCC) — chỉ ${totalQty} SP đạt chuẩn được ghi nhận vào kho dữ liệu ERP AetherPC, các mã Serial đã cập nhật tức thì vào sổ cái tồn kho.`
+                : 'Lô hàng trên đã được kiểm đếm đủ số lượng thực tế, đối soát đạt chuẩn kỹ thuật 100% từ biên bản QA/QC, các mã Serial đã được ghi nhận vào kho dữ liệu ERP AetherPC và cập nhật tức thì vào sổ cái tồn kho.'}
             </div>
 
             {/* Signatures block - 3 columns with Warehouse Keeper Official Stamp */}
@@ -3448,6 +3457,19 @@ export default function Warehouse() {
       const qaLogs = JSON.parse(localStorage.getItem('erp_qa_inspection_logs') || '[]');
       qaLog = qaLogs.find(l => l.poNumber === poNum || String(l.poNumber) === String(receipt.poId));
     } catch (e) {}
+    // Cùng lỗi đã sửa ở ReceiptDetailModal/WarehouseQcCertificateModal: qaLog
+    // cục bộ chỉ có trên máy vừa thao tác QC. Không có nó, số lượng nhập kho
+    // thực tế bên dưới sẽ mặc định = số lượng đặt ĐẦY ĐỦ, khiến "Phiếu Nhập
+    // Kho" báo nhập 100% dù QC thật đã báo lô hàng bị Nhập Một Phần.
+    if (!qaLog && receipt.qcInspections?.length > 0) {
+      const dbInsp = receipt.qcInspections[0];
+      qaLog = {
+        passedQty: dbInsp.passedQuantity,
+        totalQty: dbInsp.passedQuantity + dbInsp.defectiveQuantity,
+        failedQty: dbInsp.defectiveQuantity,
+        inspector: dbInsp.inspector?.fullName
+      };
+    }
 
     const effectiveStatus = qaLog?.status || currentPoStatus || receipt.po?.status;
 
@@ -4955,14 +4977,33 @@ export default function Warehouse() {
                                   const logs = JSON.parse(localStorage.getItem('erp_qa_inspection_logs') || '[]');
                                   rQaLog = logs.find(l => l.poNumber === poNum || (poObj.id && String(l.poNumber) === String(poObj.id)));
                                 } catch (_) {}
-                                const rItems = (poObj.items?.length > 0 ? poObj.items : (r.items || [])).map(it => ({
-                                  ...it,
-                                  name: it.name || it.productName || it.product?.name || 'Sản phẩm',
-                                  quantity: parseInt(it.quantity || it.qty) || 1,
-                                  originalQty: parseInt(it.originalQty || it.quantity || it.qty) || 1,
-                                  unitCost: parseFloat(it.unitCost || it.unitPrice || 0),
-                                  totalCost: (parseFloat(it.unitCost || it.unitPrice || 0)) * (parseInt(it.quantity || it.qty) || 1)
-                                }));
+                                if (!rQaLog && r.qcInspections?.length > 0) {
+                                  const dbInsp = r.qcInspections[0];
+                                  rQaLog = {
+                                    passedQty: dbInsp.passedQuantity,
+                                    totalQty: dbInsp.passedQuantity + dbInsp.defectiveQuantity,
+                                    failedQty: dbInsp.defectiveQuantity,
+                                    inspector: dbInsp.inspector?.fullName
+                                  };
+                                }
+                                const rRawItems = poObj.items?.length > 0 ? poObj.items : (r.items || []);
+                                const rItems = rRawItems.map(it => {
+                                  const origQty = parseInt(it.originalQty || it.quantity || it.qty) || 1;
+                                  let adjQty = origQty;
+                                  if (rQaLog && rQaLog.passedQty !== undefined) {
+                                    adjQty = rRawItems.length === 1
+                                      ? Number(rQaLog.passedQty)
+                                      : Math.round(origQty * (Number(rQaLog.passedQty) / (Number(rQaLog.totalQty) || 1)));
+                                  }
+                                  return {
+                                    ...it,
+                                    name: it.name || it.productName || it.product?.name || 'Sản phẩm',
+                                    quantity: adjQty,
+                                    originalQty: origQty,
+                                    unitCost: parseFloat(it.unitCost || it.unitPrice || 0),
+                                    totalCost: (parseFloat(it.unitCost || it.unitPrice || 0)) * adjQty
+                                  };
+                                });
                                 setViewingIntakeSuccessDoc({
                                   receiptNumber: r.receiptNumber || `GRN-${poNum}`,
                                   poNumber: poNum,
