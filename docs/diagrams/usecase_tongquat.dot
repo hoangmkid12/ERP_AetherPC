@@ -356,10 +356,11 @@ digraph UseCaseAetherPC {
   // thích ở khai báo note_nhanvien bên dưới.
   // ============================================================
   a2  -> a1 [arrowhead=empty, style=solid, constraint=false, weight=0];
-  // Quản Lý Kho làm được mọi việc Nhân Viên Kho làm (toàn bộ route
-  // warehouse.routes.js cho phép cả 2 role WAREHOUSE/WAREHOUSE_MANAGER)
-  // cộng thêm quyền riêng (duyệt xuất kho, quản lý danh mục SP) — đủ
-  // điều kiện generalization thật, không chỉ là 2 actor cùng phòng ban.
+  // Quản Lý Kho làm được mọi việc Nhân Viên Kho làm (các route
+  // warehouse.routes.js cho phép cả 2 role WAREHOUSE/WAREHOUSE_MANAGER, trừ
+  // POST /stock-intakes — Thủ Kho lập phiếu nhập kho trực tiếp, Quản Lý Kho
+  // chỉ duyệt, nên ở uc_kiemke Quản Lý Kho tham gia với vai trò người duyệt)
+  // cộng thêm quyền riêng (duyệt xuất kho, quản lý danh mục SP).
   a10 -> a9 [arrowhead=empty, style=solid, constraint=false, weight=0];
   // Tương tự: Quản Lý Bán Hàng làm được mọi việc Nhân Viên Bán Hàng
   // làm (POS, xử lý đơn) cộng thêm quyền duyệt hủy đơn riêng.
