@@ -1875,26 +1875,28 @@ function ReceiptDetailModal({ selectedReceipt, onClose, purchaseOrders = [], onR
                       </span>
                     )}
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => onViewQcCertificate && onViewQcCertificate({ receipt: selectedReceipt, po: effectivePo, qaLog, dbInspection, items: itemsList })}
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '0.35rem',
-                      padding: '0.35rem 0.85rem',
-                      borderRadius: '6px',
-                      fontSize: '0.76rem',
-                      fontWeight: 700,
-                      backgroundColor: '#eff6ff',
-                      color: '#1d4ed8',
-                      border: '1px solid #bfdbfe',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    <Eye size={13} />
-                    Xem Chi Tiết Biên Bản Kỹ Thuật
-                  </button>
+                  {(isQaPassed || isQaPartial || dbInspection?.status === 'PASSED' || qaLog?.status === 'QA_PASSED') && (
+                    <button
+                      type="button"
+                      onClick={() => onViewQcCertificate && onViewQcCertificate({ receipt: selectedReceipt, po: effectivePo, qaLog, dbInspection, items: itemsList })}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.35rem',
+                        padding: '0.35rem 0.85rem',
+                        borderRadius: '6px',
+                        fontSize: '0.76rem',
+                        fontWeight: 700,
+                        backgroundColor: '#eff6ff',
+                        color: '#1d4ed8',
+                        border: '1px solid #bfdbfe',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <Eye size={13} />
+                      Xem Chi Tiết Biên Bản Kỹ Thuật
+                    </button>
+                  )}
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.75rem', fontSize: '0.82rem' }}>
                   <div>
@@ -2064,6 +2066,39 @@ function WarehouseQcCertificateModal({ target, onClose, purchaseOrders = [] }) {
   const relatedPO = (po?.items && po.items.length > 0)
     ? po
     : (purchaseOrders.find(p => p.poNumber === poNumber || String(p.id) === String(poNumber)) || receipt?.po || {});
+
+  const hasInspectionRecord = !!(
+    qaLog ||
+    target.dbInspection ||
+    ['QA_PASSED', 'QA_PARTIAL', 'QA_REJECTED'].includes(relatedPO?.status) ||
+    ['QA_PASSED', 'QA_PARTIAL', 'QA_REJECTED'].includes(receipt?.poStatus) ||
+    receipt?.qcInspections?.length > 0
+  );
+
+  if (!hasInspectionRecord) {
+    return (
+      <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.7)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10002, padding: '1rem' }} onClick={onClose}>
+        <div style={{ width: '100%', maxWidth: '480px', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', padding: '1.75rem', textAlign: 'center', boxShadow: '0 20px 40px rgba(0,0,0,0.2)' }} onClick={e => e.stopPropagation()}>
+          <div style={{ width: '52px', height: '52px', borderRadius: '50%', backgroundColor: '#fef3c7', color: '#d97706', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem auto' }}>
+            <AlertCircle size={30} />
+          </div>
+          <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '1.15rem', fontWeight: 800, color: '#0f172a' }}>
+            Đơn Hàng Chưa Được Kiểm Định QA/QC
+          </h3>
+          <p style={{ margin: '0 0 1.5rem 0', fontSize: '0.85rem', color: '#64748b', lineHeight: 1.5 }}>
+            Lô hàng thuộc mã đơn <strong>{poNumber}</strong> hiện đang ở trạng thái <strong>Chưa Kiểm Định</strong>. Chưa có kết quả nghiệm thu kỹ thuật và biên bản kiểm định chất lượng từ bộ phận QA/QC.
+          </p>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.55rem 1.6rem', fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer' }}
+          >
+            Đóng
+          </button>
+        </div>
+      </div>
+    );
+  }
   
   const rawItems = (qaLog?.items && qaLog.items.length > 0)
     ? qaLog.items
@@ -4840,37 +4875,45 @@ export default function Warehouse() {
                               Phiếu Nhập
                             </button>
                           )}
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              const poObj = r.po || (purchaseOrders || []).find(p => p.poNumber === r.poId || p.id === r.poId) || {};
-                              let rQaLog = null;
-                              try {
-                                const logs = JSON.parse(localStorage.getItem('erp_qa_inspection_logs') || '[]');
-                                const poNum = poObj.poNumber || r.poId || r.receiptNumber?.replace('GRN-', '');
-                                rQaLog = logs.find(l => l.poNumber === poNum || (poObj.id && String(l.poNumber) === String(poObj.id)));
-                              } catch (_) {}
-                              setViewingQcCertificate({ receipt: r, po: poObj, qaLog: rQaLog });
-                            }}
-                            style={{
-                              backgroundColor: '#eff6ff',
-                              color: '#1d4ed8',
-                              border: '1px solid #bfdbfe',
-                              borderRadius: '4px',
-                              padding: '0.35rem 0.65rem',
-                              fontSize: '0.75rem',
-                              fontWeight: 700,
-                              cursor: 'pointer',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '0.25rem'
-                            }}
-                            title="Xem biên bản kiểm định kỹ thuật QA/QC"
-                          >
-                            <Eye size={13} />
-                            Biên Bản QC
-                          </button>
+                          {(() => {
+                            const qcBadge = getReceiptQcBadge(r);
+                            const hasInspected = qcBadge && qcBadge.text !== 'Chưa Kiểm Định' && qcBadge.text !== 'Chưa rõ';
+                            if (!hasInspected) return null;
+
+                            return (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const poObj = r.po || (purchaseOrders || []).find(p => p.poNumber === r.poId || p.id === r.poId) || {};
+                                  let rQaLog = null;
+                                  try {
+                                    const logs = JSON.parse(localStorage.getItem('erp_qa_inspection_logs') || '[]');
+                                    const poNum = poObj.poNumber || r.poId || r.receiptNumber?.replace('GRN-', '');
+                                    rQaLog = logs.find(l => l.poNumber === poNum || (poObj.id && String(l.poNumber) === String(poObj.id)));
+                                  } catch (_) {}
+                                  setViewingQcCertificate({ receipt: r, po: poObj, qaLog: rQaLog, dbInspection: r.qcInspections?.[0] });
+                                }}
+                                style={{
+                                  backgroundColor: '#eff6ff',
+                                  color: '#1d4ed8',
+                                  border: '1px solid #bfdbfe',
+                                  borderRadius: '4px',
+                                  padding: '0.35rem 0.65rem',
+                                  fontSize: '0.75rem',
+                                  fontWeight: 700,
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '0.25rem'
+                                }}
+                                title="Xem biên bản kiểm định kỹ thuật QA/QC"
+                              >
+                                <Eye size={13} />
+                                Biên Bản QC
+                              </button>
+                            );
+                          })()}
                         </div>
                       </td>
                     </tr>
