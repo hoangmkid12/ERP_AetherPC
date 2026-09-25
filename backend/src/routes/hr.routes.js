@@ -334,13 +334,15 @@ router.post('/payrolls', authMiddleware(['HR', 'CEO', 'ADMIN']), async (req, res
     // - Lương ngày công = lương cơ bản / 26 × số ngày công thực nhận trong kỳ.
     //   Chỉ trừ những ngày CÓ chấm công ghi nhận Vắng/Trễ — ngày chưa chấm
     //   công (HR không ghi nhận) mặc định coi như đi làm đủ, để tránh phạt oan
-    //   nhân viên chỉ vì HR chưa/không chấm công ngày đó.
+    //   nhân viên chỉ vì HR chưa/không chấm công ngày đó. Ngày Vắng nằm trong
+    //   đơn nghỉ phép đã duyệt (trừ loại "Không Lương") cũng không bị trừ.
     // - Tăng ca: (lương cơ bản / 26 / 8 giờ) × tổng giờ OT trong kỳ × 150%
     //   (hệ số tăng ca ngày thường theo Bộ luật Lao động).
     // - Khấu trừ bảo hiểm bắt buộc 10.5% lương cơ bản (8% BHXH + 1.5% BHYT + 1% BHTN).
     // - Hoa hồng Sales = % doanh số thật (đơn POS có soldById = nhân viên này,
     //   trong tháng, chưa hủy/giao thất bại) — không còn là số tiền cố định.
-    // - Thưởng lắp ráp = đơn giá/bộ × số WorkOrder đã COMPLETED thật trong kỳ.
+    // - Thưởng lắp ráp = đơn giá/bộ × số bộ đã nghiệm thu COMPLETED trong kỳ
+    //   (AssemblyJob của module Lắp Ráp + WorkOrder cũ từ seed).
     const STANDARD_WORKDAYS = 26;
     const INSURANCE_RATE = 0.105; // 8% BHXH + 1.5% BHYT + 1% BHTN
     const OVERTIME_MULTIPLIER = 1.5;
@@ -363,6 +365,32 @@ router.post('/payrolls', authMiddleware(['HR', 'CEO', 'ADMIN']), async (req, res
       (attendanceByEmp[a.employeeId] ||= []).push(a);
     }
 
+    // Nghỉ có phép (đơn đã APPROVED) được hưởng lương — ngày HR chấm ABSENT mà
+    // nằm trong khoảng nghỉ đã duyệt thì KHÔNG trừ công. Riêng loại "Không Lương"
+    // (tùy chọn trong form nghỉ phép) là nghỉ có phép nhưng không hưởng lương
+    // nên vẫn trừ như bình thường. startDate/endDate/date đều là cột @db.Date
+    // (nửa đêm UTC) nên so sánh timestamp trực tiếp là chính xác theo ngày.
+    const UNPAID_LEAVE_TYPES = ['Không Lương'];
+    const paidLeaves = await prisma.leaveRequest.findMany({
+      where: {
+        employeeId: { in: empIds },
+        status: 'APPROVED',
+        type: { notIn: UNPAID_LEAVE_TYPES },
+        startDate: { lt: periodEnd },
+        endDate: { gte: periodStart }
+      }
+    });
+    const paidLeavesByEmp = {};
+    for (const l of paidLeaves) {
+      (paidLeavesByEmp[l.employeeId] ||= []).push(l);
+    }
+    const isOnPaidLeave = (empId, date) => {
+      const t = new Date(date).getTime();
+      return (paidLeavesByEmp[empId] || []).some(l =>
+        t >= new Date(l.startDate).getTime() && t <= new Date(l.endDate).getTime()
+      );
+    };
+
     const salesEmpIds = toCreate.filter(e => e.role === 'SALES').map(e => e.id);
     const revenueByEmp = {};
     if (salesEmpIds.length > 0) {
@@ -378,7 +406,8 @@ router.post('/payrolls', authMiddleware(['HR', 'CEO', 'ADMIN']), async (req, res
       for (const g of revenueGroups) revenueByEmp[g.soldById] = parseFloat(g._sum.totalAmount) || 0;
     }
 
-    const assemblyEmpIds = toCreate.filter(e => e.role === 'ASSEMBLY').map(e => e.id);
+    const assemblyEmps = toCreate.filter(e => e.role === 'ASSEMBLY');
+    const assemblyEmpIds = assemblyEmps.map(e => e.id);
     const assembledByEmp = {};
     if (assemblyEmpIds.length > 0) {
       const assemblyGroups = await prisma.workOrder.groupBy({
@@ -391,6 +420,30 @@ router.post('/payrolls', authMiddleware(['HR', 'CEO', 'ADMIN']), async (req, res
         _count: { id: true }
       });
       for (const g of assemblyGroups) assembledByEmp[g.employeeId] = g._count.id;
+
+      // Module Lắp Ráp thật (assembly.controller.js) ghi vào AssemblyJob, KHÔNG
+      // tạo WorkOrder — WorkOrder chỉ có trong seed.js. Trước đây chỉ đếm
+      // WorkOrder nên thưởng lắp ráp luôn = 0 với dữ liệu thật. AssemblyJob
+      // không có FK nhân viên; completedBy lưu email (hoặc mã NV) của người
+      // nghiệm thu (req.user.email || req.user.code) nên khớp ngược theo 2 trường đó.
+      const empIdByKey = {};
+      for (const e of assemblyEmps) {
+        if (e.email) empIdByKey[e.email.toLowerCase()] = e.id;
+        if (e.employeeCode) empIdByKey[e.employeeCode.toLowerCase()] = e.id;
+      }
+      const jobGroups = await prisma.assemblyJob.groupBy({
+        by: ['completedBy'],
+        where: {
+          status: 'COMPLETED',
+          completedBy: { not: null },
+          completedAt: { gte: periodStart, lt: periodEnd }
+        },
+        _count: { jobCode: true }
+      });
+      for (const g of jobGroups) {
+        const empId = empIdByKey[String(g.completedBy).toLowerCase()];
+        if (empId) assembledByEmp[empId] = (assembledByEmp[empId] || 0) + g._count.jobCode;
+      }
     }
 
     await prisma.payroll.createMany({
@@ -398,7 +451,7 @@ router.post('/payrolls', authMiddleware(['HR', 'CEO', 'ADMIN']), async (req, res
         const base = parseFloat(e.baseSalary) || 0;
         const dailyRate = base / STANDARD_WORKDAYS;
         const logs = attendanceByEmp[e.id] || [];
-        const absentDays = logs.filter(l => l.status === 'ABSENT').length;
+        const absentDays = logs.filter(l => l.status === 'ABSENT' && !isOnPaidLeave(e.id, l.date)).length;
         const lateDays = logs.filter(l => l.status === 'LATE').length;
         const workedDays = Math.max(0, STANDARD_WORKDAYS - absentDays - lateDays * 0.5);
         const proratedBase = Math.round(dailyRate * workedDays);

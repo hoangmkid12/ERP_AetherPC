@@ -1293,8 +1293,9 @@ export default function HRManager() {
                 >
                   <option value="Phép Năm">Nghỉ Phép Năm</option>
                   <option value="Nghỉ Ốm">Nghỉ Ốm / Điều Trị Y Tế</option>
-                  <option value="Việc Riêng">Việc Riêng (Có lương / Không lương)</option>
+                  <option value="Việc Riêng">Việc Riêng (Có Lương)</option>
                   <option value="Nghỉ Thai Sản">Chế Độ Thai Sản</option>
+                  <option value="Không Lương">Nghỉ Không Lương (Trừ Công)</option>
                 </select>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
