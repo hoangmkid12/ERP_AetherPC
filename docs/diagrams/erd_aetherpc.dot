@@ -1,4 +1,4 @@
-// Sơ đồ quan hệ thực thể (ERD) rút gọn - CSDL AetherPC: 27 bảng chính, chỉ hiển thị khoá chính/khoá ngoại. Đối chiếu backend/prisma/schema.prisma.
+// Sơ đồ quan hệ thực thể (ERD) rút gọn - CSDL AetherPC: 28 bảng chính, chỉ hiển thị khoá chính/khoá ngoại. Đối chiếu backend/prisma/schema.prisma.
 digraph ERD_AetherPC {
   charset="UTF-8";
   newrank=true;
@@ -25,6 +25,7 @@ digraph ERD_AetherPC {
     inventory [label=<<TABLE BORDER="1" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="white"><TR><TD COLSPAN="2" BGCOLOR="#EFEFEF"><B>inventory</B></TD></TR><TR><TD ALIGN="LEFT"><U>id</U></TD><TD ALIGN="CENTER"><FONT POINT-SIZE="9">PK</FONT></TD></TR><TR><TD ALIGN="LEFT">product_id</TD><TD ALIGN="CENTER"><FONT POINT-SIZE="9">FK</FONT></TD></TR><TR><TD ALIGN="LEFT">warehouse_id</TD><TD ALIGN="CENTER"><FONT POINT-SIZE="9">FK</FONT></TD></TR></TABLE>>];
     stock_movements [label=<<TABLE BORDER="1" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="white"><TR><TD COLSPAN="2" BGCOLOR="#EFEFEF"><B>stock_movements</B></TD></TR><TR><TD ALIGN="LEFT"><U>id</U></TD><TD ALIGN="CENTER"><FONT POINT-SIZE="9">PK</FONT></TD></TR><TR><TD ALIGN="LEFT">product_id</TD><TD ALIGN="CENTER"><FONT POINT-SIZE="9">FK</FONT></TD></TR><TR><TD ALIGN="LEFT">from_warehouse_id</TD><TD ALIGN="CENTER"><FONT POINT-SIZE="9">FK</FONT></TD></TR><TR><TD ALIGN="LEFT">to_warehouse_id</TD><TD ALIGN="CENTER"><FONT POINT-SIZE="9">FK</FONT></TD></TR></TABLE>>];
     purchase_requests [label=<<TABLE BORDER="1" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="white"><TR><TD COLSPAN="2" BGCOLOR="#EFEFEF"><B>purchase_requests</B></TD></TR><TR><TD ALIGN="LEFT"><U>id</U></TD><TD ALIGN="CENTER"><FONT POINT-SIZE="9">PK</FONT></TD></TR><TR><TD ALIGN="LEFT">product_id</TD><TD ALIGN="CENTER"><FONT POINT-SIZE="9">FK</FONT></TD></TR></TABLE>>];
+    stock_intake_requests [label=<<TABLE BORDER="1" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="white"><TR><TD COLSPAN="2" BGCOLOR="#EFEFEF"><B>stock_intake_requests</B></TD></TR><TR><TD ALIGN="LEFT"><U>id</U></TD><TD ALIGN="CENTER"><FONT POINT-SIZE="9">PK</FONT></TD></TR><TR><TD ALIGN="LEFT">product_id</TD><TD ALIGN="CENTER"><FONT POINT-SIZE="9">FK</FONT></TD></TR></TABLE>>];
     assembly_jobs [label=<<TABLE BORDER="1" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4" BGCOLOR="white"><TR><TD COLSPAN="2" BGCOLOR="#EFEFEF"><B>assembly_jobs</B></TD></TR><TR><TD ALIGN="LEFT"><U>job_code</U></TD><TD ALIGN="CENTER"><FONT POINT-SIZE="9">PK</FONT></TD></TR></TABLE>>];
   }
   subgraph cluster_3 {
@@ -66,6 +67,7 @@ digraph ERD_AetherPC {
   products -> stock_movements [arrowtail=teetee, arrowhead=crowodot];
   warehouses -> stock_movements [arrowtail=teeodot, arrowhead=crowodot];
   products -> purchase_requests [arrowtail=teetee, arrowhead=crowodot];
+  products -> stock_intake_requests [arrowtail=teetee, arrowhead=crowodot];
   suppliers -> purchase_orders [arrowtail=teetee, arrowhead=crowodot];
   purchase_orders -> purchase_order_items [arrowtail=teetee, arrowhead=crowodot];
   products -> purchase_order_items [arrowtail=teetee, arrowhead=crowodot];
