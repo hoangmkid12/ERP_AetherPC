@@ -5035,16 +5035,16 @@ export default function Warehouse() {
 
           {/* Delivery Orders Table */}
           <div className="table-responsive" style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', overflowX: 'auto', WebkitOverflowScrolling: 'touch', maxWidth: '100%' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.83rem' }}>
+            <table style={{ width: '100%', minWidth: '1100px', borderCollapse: 'collapse', fontSize: '0.83rem' }}>
               <thead>
                 <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569' }}>
-                  <th style={{ padding: '0.75rem 1rem' }}>Mã Đơn Hàng</th>
-                  <th style={{ padding: '0.75rem 1rem' }}>Khách Hàng</th>
-                  <th style={{ padding: '0.75rem 1rem' }}>Địa Chỉ Giao</th>
-                  <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Giá Trị Đơn</th>
-                  <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Shipper Đảm Nhận</th>
-                  <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Tiến Trình & Trạng Thái</th>
-                  <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Hành Động Nghiệp Vụ</th>
+                  <th style={{ padding: '0.75rem 1rem', whiteSpace: 'nowrap', width: '120px' }}>Mã Đơn Hàng</th>
+                  <th style={{ padding: '0.75rem 1rem', minWidth: '140px' }}>Khách Hàng</th>
+                  <th style={{ padding: '0.75rem 1rem', minWidth: '180px' }}>Địa Chỉ Giao</th>
+                  <th style={{ padding: '0.75rem 1rem', textAlign: 'right', whiteSpace: 'nowrap', width: '130px' }}>Giá Trị Đơn</th>
+                  <th style={{ padding: '0.75rem 1rem', textAlign: 'center', whiteSpace: 'nowrap', width: '140px' }}>Shipper Đảm Nhận</th>
+                  <th style={{ padding: '0.75rem 1rem', textAlign: 'center', whiteSpace: 'nowrap', width: '160px' }}>Tiến Trình & Trạng Thái</th>
+                  <th style={{ padding: '0.75rem 1rem', textAlign: 'center', whiteSpace: 'nowrap', width: '280px' }}>Hành Động Nghiệp Vụ</th>
                 </tr>
               </thead>
               <tbody>
@@ -5074,7 +5074,7 @@ export default function Warehouse() {
 
                     return (
                       <tr key={o.id || o.orderId} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ padding: '0.75rem 1rem', fontWeight: 700, color: '#2563eb' }}>
+                        <td style={{ padding: '0.75rem 1rem', fontWeight: 700, color: '#2563eb', whiteSpace: 'nowrap' }}>
                           #{o.orderId || o.id}
                         </td>
                         <td style={{ padding: '0.75rem 1rem', color: '#0f172a' }}>
@@ -5086,10 +5086,10 @@ export default function Warehouse() {
                             {o.shippingAddress || o.address || 'TP. Hồ Chí Minh'}
                           </div>
                         </td>
-                        <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 700, color: '#16a34a' }}>
+                        <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 700, color: '#16a34a', whiteSpace: 'nowrap' }}>
                           {safeFormatPrice(o.totalAmount || o.total || 0)}
                         </td>
-                        <td style={{ padding: '0.75rem 1rem', textAlign: 'center', color: '#334155' }}>
+                        <td style={{ padding: '0.75rem 1rem', textAlign: 'center', color: '#334155', whiteSpace: 'nowrap' }}>
                           {isShipping || isDelivered || isAwaitingShipperAccept ? (
                             <span style={{ fontWeight: 700, color: '#0f172a' }}>
                               {o.assignedShipper || 'Shipper Nội Bộ'}
@@ -5100,25 +5100,28 @@ export default function Warehouse() {
                             </span>
                           )}
                         </td>
-                        <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
+                        <td style={{ padding: '0.75rem 1rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
                           {isAssemblingNow && (
                             <span title={o.assemblyJobCode ? `Lệnh lắp ráp ${o.assemblyJobCode}` : undefined} style={{
-                              padding: '3px 10px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 700, whiteSpace: 'nowrap',
-                              backgroundColor: '#eef2ff', color: '#4338ca', border: '1px solid #c7d2fe'
+                              padding: '0.28rem 0.65rem', borderRadius: '6px', fontSize: '0.73rem', fontWeight: 700, whiteSpace: 'nowrap',
+                              backgroundColor: '#eef2ff', color: '#4338ca', border: '1px solid #c7d2fe', display: 'inline-flex', alignItems: 'center', justifyContent: 'center'
                             }}>
                               {o.assemblyJobStatus === 'ASSEMBLING' ? 'Đang Lắp Ráp' : 'Chờ Lắp Ráp'}
                             </span>
                           )}
                           {isPendingPack && (
                             <span style={{
-                              padding: '3px 10px',
-                              borderRadius: '4px',
-                              fontSize: '0.75rem',
+                              padding: '0.28rem 0.65rem',
+                              borderRadius: '6px',
+                              fontSize: '0.73rem',
                               fontWeight: 700,
                               whiteSpace: 'nowrap',
                               backgroundColor: '#fff7ed',
                               color: '#c2410c',
-                              border: '1px solid #fdba74'
+                              border: '1px solid #fdba74',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center'
                             }}>
                               Chờ Đóng Gói
                             </span>
@@ -5126,14 +5129,17 @@ export default function Warehouse() {
 
                           {isPackedWaitingShipper && (
                             <span style={{
-                              padding: '3px 10px',
-                              borderRadius: '4px',
-                              fontSize: '0.75rem',
+                              padding: '0.28rem 0.65rem',
+                              borderRadius: '6px',
+                              fontSize: '0.73rem',
                               fontWeight: 700,
                               whiteSpace: 'nowrap',
-                              backgroundColor: '#f5f3ff',
-                              color: '#6d28d9',
-                              border: '1px solid #ddd6fe'
+                              backgroundColor: isAwaitingShipperAccept ? '#eff6ff' : '#f0fdf4',
+                              color: isAwaitingShipperAccept ? '#1d4ed8' : '#15803d',
+                              border: isAwaitingShipperAccept ? '1px solid #bfdbfe' : '1px solid #bbf7d0',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center'
                             }}>
                               {isAwaitingShipperAccept ? 'Chờ Shipper Nhận' : 'Đã Đóng Gói'}
                             </span>
@@ -5141,14 +5147,17 @@ export default function Warehouse() {
 
                           {isShipping && (
                             <span style={{
-                              padding: '3px 10px',
-                              borderRadius: '4px',
-                              fontSize: '0.75rem',
+                              padding: '0.28rem 0.65rem',
+                              borderRadius: '6px',
+                              fontSize: '0.73rem',
                               fontWeight: 700,
                               whiteSpace: 'nowrap',
                               backgroundColor: '#eff6ff',
                               color: '#1d4ed8',
-                              border: '1px solid #bfdbfe'
+                              border: '1px solid #bfdbfe',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center'
                             }}>
                               Đang Giao Hàng
                             </span>
@@ -5156,14 +5165,17 @@ export default function Warehouse() {
 
                           {isDelivered && (
                             <span style={{
-                              padding: '3px 10px',
-                              borderRadius: '4px',
-                              fontSize: '0.75rem',
+                              padding: '0.28rem 0.65rem',
+                              borderRadius: '6px',
+                              fontSize: '0.73rem',
                               fontWeight: 700,
                               whiteSpace: 'nowrap',
                               backgroundColor: '#f0fdf4',
                               color: '#15803d',
-                              border: '1px solid #bbf7d0'
+                              border: '1px solid #bbf7d0',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center'
                             }}>
                               Đã Giao Hàng
                             </span>
@@ -5171,14 +5183,17 @@ export default function Warehouse() {
 
                           {isCancelled && (
                             <span style={{
-                              padding: '3px 10px',
-                              borderRadius: '4px',
-                              fontSize: '0.75rem',
+                              padding: '0.28rem 0.65rem',
+                              borderRadius: '6px',
+                              fontSize: '0.73rem',
                               fontWeight: 700,
                               whiteSpace: 'nowrap',
                               backgroundColor: '#f1f5f9',
                               color: '#64748b',
-                              border: '1px solid #cbd5e1'
+                              border: '1px solid #cbd5e1',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center'
                             }}>
                               Đã Hủy
                             </span>
@@ -5186,14 +5201,17 @@ export default function Warehouse() {
 
                           {isFailedDelivery && (
                             <span style={{
-                              padding: '3px 10px',
-                              borderRadius: '4px',
-                              fontSize: '0.75rem',
+                              padding: '0.28rem 0.65rem',
+                              borderRadius: '6px',
+                              fontSize: '0.73rem',
                               fontWeight: 700,
                               whiteSpace: 'nowrap',
                               backgroundColor: '#fef2f2',
                               color: '#b91c1c',
-                              border: '1px solid #fecaca'
+                              border: '1px solid #fecaca',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center'
                             }}>
                               Giao Thất Bại
                             </span>
@@ -5201,23 +5219,26 @@ export default function Warehouse() {
 
                           {isAwaitingStock && (
                             <span style={{
-                              padding: '3px 10px',
-                              borderRadius: '4px',
-                              fontSize: '0.75rem',
+                              padding: '0.28rem 0.65rem',
+                              borderRadius: '6px',
+                              fontSize: '0.73rem',
                               fontWeight: 700,
                               whiteSpace: 'nowrap',
                               backgroundColor: '#fff7ed',
                               color: '#c2410c',
-                              border: '1px solid #fdba74'
+                              border: '1px solid #fdba74',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center'
                             }}>
                               Chờ Hàng
                             </span>
                           )}
                         </td>
-                        <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
-                          <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center', alignItems: 'center' }}>
+                        <td style={{ padding: '0.75rem 1rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                          <div style={{ display: 'inline-flex', gap: '0.45rem', justifyContent: 'center', alignItems: 'center', flexWrap: 'nowrap', whiteSpace: 'nowrap' }}>
                             {isAssemblingNow && (
-                              <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 600 }}>
+                              <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 600, whiteSpace: 'nowrap' }}>
                                 Chờ Lắp Ráp hoàn tất{o.assemblyJobCode ? ` (${o.assemblyJobCode})` : ''}
                               </span>
                             )}
@@ -5226,21 +5247,28 @@ export default function Warehouse() {
                                 <button
                                   onClick={() => setPackScanOrder(o)}
                                   style={{
-                                    backgroundColor: '#1d4ed8',
+                                    backgroundColor: '#2563eb',
                                     color: '#ffffff',
                                     border: 'none',
                                     borderRadius: '5px',
-                                    padding: '0.45rem 0.85rem',
-                                    fontSize: '0.78rem',
+                                    padding: '0.38rem 0.75rem',
+                                    fontSize: '0.75rem',
                                     fontWeight: 700,
-                                    cursor: 'pointer'
+                                    cursor: 'pointer',
+                                    whiteSpace: 'nowrap',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    height: '31px',
+                                    flexShrink: 0,
+                                    boxSizing: 'border-box'
                                   }}
                                 >
                                   Đóng Gói & Quét Mã
                                 </button>
                               ) : (
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                                  <span style={{ fontSize: '0.74rem', color: '#c2410c', fontWeight: 600, backgroundColor: '#fff7ed', padding: '0.35rem 0.65rem', borderRadius: '4px', border: '1px solid #fed7aa' }}>
+                                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', whiteSpace: 'nowrap' }}>
+                                  <span style={{ fontSize: '0.74rem', color: '#c2410c', fontWeight: 600, backgroundColor: '#fff7ed', padding: '0.35rem 0.65rem', borderRadius: '4px', border: '1px solid #fed7aa', whiteSpace: 'nowrap' }}>
                                     Chờ Thủ kho đóng gói
                                   </span>
                                   <button
@@ -5250,10 +5278,17 @@ export default function Warehouse() {
                                       color: '#475569',
                                       border: '1px solid #cbd5e1',
                                       borderRadius: '5px',
-                                      padding: '0.45rem 0.65rem',
+                                      padding: '0.38rem 0.75rem',
                                       fontSize: '0.75rem',
                                       fontWeight: 600,
-                                      cursor: 'pointer'
+                                      cursor: 'pointer',
+                                      whiteSpace: 'nowrap',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      height: '31px',
+                                      flexShrink: 0,
+                                      boxSizing: 'border-box'
                                     }}
                                   >
                                     Xem Đơn
@@ -5268,14 +5303,21 @@ export default function Warehouse() {
                                   <button
                                     onClick={() => setOrderToAssign(o)}
                                     style={{
-                                      backgroundColor: '#6d28d9',
+                                      backgroundColor: isAwaitingShipperAccept ? '#0284c7' : '#2563eb',
                                       color: '#ffffff',
                                       border: 'none',
                                       borderRadius: '5px',
-                                      padding: '0.45rem 0.85rem',
-                                      fontSize: '0.78rem',
+                                      padding: '0.38rem 0.75rem',
+                                      fontSize: '0.75rem',
                                       fontWeight: 700,
-                                      cursor: 'pointer'
+                                      cursor: 'pointer',
+                                      whiteSpace: 'nowrap',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      height: '31px',
+                                      flexShrink: 0,
+                                      boxSizing: 'border-box'
                                     }}
                                   >
                                     {isAwaitingShipperAccept ? 'Đổi Shipper' : 'Phân Công Shipper'}
@@ -5287,18 +5329,25 @@ export default function Warehouse() {
                                       color: '#475569',
                                       border: '1px solid #cbd5e1',
                                       borderRadius: '5px',
-                                      padding: '0.45rem 0.65rem',
+                                      padding: '0.38rem 0.75rem',
                                       fontSize: '0.75rem',
                                       fontWeight: 600,
-                                      cursor: 'pointer'
+                                      cursor: 'pointer',
+                                      whiteSpace: 'nowrap',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      height: '31px',
+                                      flexShrink: 0,
+                                      boxSizing: 'border-box'
                                     }}
                                   >
                                     Xem Gói Hàng
                                   </button>
                                 </>
                               ) : (
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                                  <span style={{ fontSize: '0.74rem', color: '#6d28d9', fontWeight: 600, backgroundColor: '#f5f3ff', padding: '0.35rem 0.65rem', borderRadius: '4px', border: '1px solid #ddd6fe' }}>
+                                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', whiteSpace: 'nowrap' }}>
+                                  <span style={{ fontSize: '0.74rem', color: '#1d4ed8', fontWeight: 600, backgroundColor: '#eff6ff', padding: '0.35rem 0.65rem', borderRadius: '4px', border: '1px solid #bfdbfe', whiteSpace: 'nowrap' }}>
                                     Chờ Quản lý phân công
                                   </span>
                                   <button
@@ -5308,10 +5357,17 @@ export default function Warehouse() {
                                       color: '#475569',
                                       border: '1px solid #cbd5e1',
                                       borderRadius: '5px',
-                                      padding: '0.45rem 0.65rem',
+                                      padding: '0.38rem 0.75rem',
                                       fontSize: '0.75rem',
                                       fontWeight: 600,
-                                      cursor: 'pointer'
+                                      cursor: 'pointer',
+                                      whiteSpace: 'nowrap',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      height: '31px',
+                                      flexShrink: 0,
+                                      boxSizing: 'border-box'
                                     }}
                                   >
                                     Xem Gói Hàng
@@ -5328,11 +5384,17 @@ export default function Warehouse() {
                                   color: '#c2410c',
                                   border: '1px solid #fdba74',
                                   borderRadius: '5px',
-                                  padding: '0.45rem 0.65rem',
+                                  padding: '0.38rem 0.75rem',
                                   fontSize: '0.75rem',
                                   fontWeight: 700,
                                   whiteSpace: 'nowrap',
-                                  cursor: 'pointer'
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  height: '31px',
+                                  flexShrink: 0,
+                                  boxSizing: 'border-box'
                                 }}
                               >
                                 Xem Chờ Hàng
@@ -5347,10 +5409,17 @@ export default function Warehouse() {
                                   color: '#475569',
                                   border: '1px solid #cbd5e1',
                                   borderRadius: '5px',
-                                  padding: '0.45rem 0.65rem',
+                                  padding: '0.38rem 0.75rem',
                                   fontSize: '0.75rem',
                                   fontWeight: 600,
-                                  cursor: 'pointer'
+                                  cursor: 'pointer',
+                                  whiteSpace: 'nowrap',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  height: '31px',
+                                  flexShrink: 0,
+                                  boxSizing: 'border-box'
                                 }}
                               >
                                 Xem Chi Tiết

@@ -52,12 +52,12 @@ export default function OrderDetailModal({ order, onClose }) {
         {/* Header */}
         <div style={{
           padding: '1.25rem 1.75rem',
-          background: 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 60%, #312e81 100%)',
+          background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 55%, #1d4ed8 100%)',
           color: '#ffffff',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          borderBottom: '3px solid #6366f1',
+          borderBottom: '3px solid #2563eb',
           width: '100%',
           boxSizing: 'border-box'
         }}>
@@ -67,12 +67,12 @@ export default function OrderDetailModal({ order, onClose }) {
               width: '44px',
               height: '44px',
               borderRadius: '12px',
-              background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.3) 0%, rgba(79, 70, 229, 0.4) 100%)',
-              border: '1px solid rgba(129, 140, 248, 0.5)',
+              background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.3) 0%, rgba(29, 78, 216, 0.45) 100%)',
+              border: '1px solid rgba(96, 165, 250, 0.5)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: '#a5b4fc',
+              color: '#93c5fd',
               boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
               flexShrink: 0
             }}>
@@ -83,10 +83,10 @@ export default function OrderDetailModal({ order, onClose }) {
                 Chi Tiết Đơn Hàng #{order.orderId}
               </h3>
               <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.8rem', color: '#cbd5e1', display: 'flex', alignItems: 'center', gap: '0.4rem', whiteSpace: 'nowrap' }}>
-                <Calendar size={13} style={{ color: '#818cf8', flexShrink: 0 }} /> 
+                <Calendar size={13} style={{ color: '#60a5fa', flexShrink: 0 }} /> 
                 Ngày đặt: <strong style={{ color: '#f8fafc' }}>{order.date || new Date(order.createdAt).toLocaleDateString('vi-VN')}</strong>
                 <span style={{ margin: '0 0.3rem', color: '#64748b' }}>•</span>
-                <span style={{ color: '#a5b4fc', fontSize: '0.78rem', fontWeight: 600 }}>Kênh: {order.type || 'ONLINE'}</span>
+                <span style={{ color: '#93c5fd', fontSize: '0.78rem', fontWeight: 600 }}>Kênh: {order.type || 'ONLINE'}</span>
               </p>
             </div>
           </div>
@@ -434,25 +434,25 @@ export default function OrderDetailModal({ order, onClose }) {
           backgroundColor: '#ffffff',
           borderTop: '1px solid #e2e8f0',
           display: 'flex',
-          justify: 'flex-end',
+          justifyContent: 'flex-end',
           alignItems: 'center'
         }}>
           <button
             onClick={onClose}
             style={{
               padding: '0.6rem 1.75rem',
-              borderRadius: '10px',
-              backgroundColor: '#4f46e5',
+              borderRadius: '8px',
+              backgroundColor: '#2563eb',
               color: '#ffffff',
               border: 'none',
               fontWeight: 800,
               fontSize: '0.85rem',
               cursor: 'pointer',
-              boxShadow: '0 4px 12px rgba(79, 70, 229, 0.25)',
+              boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)',
               transition: 'all 0.2s ease'
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#4338ca'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#4f46e5'; e.currentTarget.style.transform = 'none'; }}
+            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#1d4ed8'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#2563eb'; e.currentTarget.style.transform = 'none'; }}
           >
             Đóng Chi Tiết
           </button>
