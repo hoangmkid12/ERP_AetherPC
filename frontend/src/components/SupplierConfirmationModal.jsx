@@ -160,38 +160,52 @@ export default function SupplierConfirmationModal({ order, onClose }) {
               <strong>Kính gửi:</strong> Phòng Mua Hàng & Bộ Phận Kiểm Định Chất Lượng (QC) — <strong>CÔNG TY TNHH CÔNG NGHỆ AETHERPC</strong>
             </div>
 
-            {/* Khối Thông tin Giao Nhận */}
-            <div style={{ backgroundColor: '#f0fdf4', border: '1.5px solid #86efac', borderRadius: '8px', padding: '0.55rem 0.85rem', marginBottom: '0.45rem' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', border: 'none', fontSize: '0.74rem' }}>
+            {/* Khối Thông tin Giao Nhận — CÂN ĐỐI 50% / 50% TUYỆT ĐỐI */}
+            <div style={{ backgroundColor: '#f0fdf4', border: '1.5px solid #86efac', borderRadius: '8px', padding: '0.65rem 0.85rem', marginBottom: '0.55rem', boxSizing: 'border-box' }}>
+              <table style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse', border: 'none', fontSize: '0.74rem' }}>
+                <colgroup>
+                  <col style={{ width: '50%' }} />
+                  <col style={{ width: '50%' }} />
+                </colgroup>
                 <tbody>
                   <tr>
-                    <td style={{ width: '50%', verticalAlign: 'top', paddingRight: '0.5rem' }}>
-                      <div style={{ color: '#166534', fontWeight: 700, marginBottom: '0.15rem' }}>ĐỊA ĐIỂM GIAO HÀNG (BÊN NHẬN):</div>
-                      <div style={{ color: '#0f172a', fontWeight: 700 }}>Công Ty TNHH Công Nghệ AetherPC</div>
-                      <div style={{ color: '#475569', fontSize: '0.7rem' }}>Kho Tổng: Lô E2a-7, Đường D1, Khu Công nghệ cao, TP. Thủ Đức, TP.HCM</div>
-                      <div style={{ color: '#475569', fontSize: '0.7rem', marginTop: '0.15rem' }}>Bộ phận tiếp nhận kiểm định: <strong>Phòng QC & Thủ Kho</strong></div>
+                    <td style={{ width: '50%', verticalAlign: 'top', paddingRight: '0.75rem', boxSizing: 'border-box' }}>
+                      <div style={{ color: '#166534', fontWeight: 800, fontSize: '0.72rem', marginBottom: '0.25rem', textTransform: 'uppercase' }}>
+                        ĐỊA ĐIỂM GIAO HÀNG (BÊN NHẬN):
+                      </div>
+                      <div style={{ color: '#0f172a', fontWeight: 700, fontSize: '0.78rem' }}>
+                        Công Ty TNHH Công Nghệ AetherPC
+                      </div>
+                      <div style={{ color: '#475569', fontSize: '0.7rem', marginTop: '0.15rem', lineHeight: 1.35 }}>
+                        Kho Tổng: Lô E2a-7, Đường D1, Khu Công nghệ cao, TP. Thủ Đức, TP.HCM
+                      </div>
+                      <div style={{ color: '#475569', fontSize: '0.7rem', marginTop: '0.15rem' }}>
+                        Bộ phận tiếp nhận kiểm định: <strong style={{ color: '#0f172a' }}>Phòng QC & Thủ Kho</strong>
+                      </div>
                     </td>
-                    <td style={{ width: '50%', verticalAlign: 'top', paddingLeft: '0.5rem', borderLeft: '1px dashed #86efac' }}>
-                      <div style={{ color: '#166534', fontWeight: 700, marginBottom: '0.15rem' }}>TIẾN ĐỘ CAM KẾT GIAO HÀNG:</div>
-                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.35rem' }}>
-                        <span style={{ color: '#475569' }}>Ngày hẹn giao:</span>
-                        <strong style={{ color: '#15803d', fontSize: '0.92rem' }}>
+                    <td style={{ width: '50%', verticalAlign: 'top', paddingLeft: '0.75rem', borderLeft: '1px dashed #86efac', boxSizing: 'border-box' }}>
+                      <div style={{ color: '#166534', fontWeight: 800, fontSize: '0.72rem', marginBottom: '0.25rem', textTransform: 'uppercase' }}>
+                        TIẾN ĐỘ CAM KẾT GIAO HÀNG:
+                      </div>
+                      <div style={{ marginBottom: '0.18rem' }}>
+                        <span style={{ color: '#475569' }}>Ngày hẹn giao: </span>
+                        <strong style={{ color: '#15803d', fontSize: '0.88rem' }}>
                           {order.expectedDeliveryDate ? formatDate(order.expectedDeliveryDate) : 'Theo thỏa thuận đơn PO'}
                         </strong>
                       </div>
-                      <div style={{ color: '#475569', fontSize: '0.7rem', marginTop: '0.15rem' }}>
-                        Thời gian xác nhận: <strong>{formatDateTime(order.updatedAt || new Date())}</strong>
+                      <div style={{ color: '#475569', fontSize: '0.7rem', marginBottom: '0.18rem' }}>
+                        Thời gian xác nhận: <strong style={{ color: '#0f172a' }}>{formatDateTime(order.updatedAt || new Date())}</strong>
                       </div>
-                      <div style={{ color: '#475569', fontSize: '0.7rem', marginTop: '0.15rem' }}>
-                        Hình thức giao: <strong>Giao hàng tận kho (kèm CO/CQ, Hóa đơn VAT)</strong>
+                      <div style={{ color: '#475569', fontSize: '0.7rem' }}>
+                        Hình thức giao: <strong style={{ color: '#0f172a' }}>Giao hàng tận kho (kèm CO/CQ, Hóa đơn VAT)</strong>
                       </div>
                     </td>
                   </tr>
                   {(order.supplierNote || order.note) && (
                     <tr>
-                      <td colSpan={2} style={{ paddingTop: '0.35rem', borderTop: '1px dashed #bbf7d0', marginTop: '0.35rem' }}>
-                        <div style={{ color: '#166534', fontWeight: 700, fontSize: '0.7rem' }}>GHI CHÚ / CAM KẾT CỦA NHÀ CUNG CẤP:</div>
-                        <div style={{ color: '#1e293b', fontStyle: 'italic', fontSize: '0.72rem', marginTop: '0.08rem' }}>
+                      <td colSpan={2} style={{ paddingTop: '0.45rem', borderTop: '1px dashed #bbf7d0', marginTop: '0.45rem' }}>
+                        <div style={{ color: '#166534', fontWeight: 800, fontSize: '0.7rem' }}>GHI CHÚ / CAM KẾT CỦA NHÀ CUNG CẤP:</div>
+                        <div style={{ color: '#1e293b', fontStyle: 'italic', fontSize: '0.72rem', marginTop: '0.08rem', lineHeight: 1.35 }}>
                           "{order.supplierNote || order.note}"
                         </div>
                       </td>
@@ -205,15 +219,23 @@ export default function SupplierConfirmationModal({ order, onClose }) {
             <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#0f172a', marginBottom: '0.25rem', textTransform: 'uppercase' }}>
               Danh mục linh kiện / hàng hóa xác nhận cung ứng:
             </div>
-            <table style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse', marginBottom: '0.3rem', fontSize: '0.74rem' }}>
+            <table style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse', marginBottom: '0.35rem', fontSize: '0.74rem' }}>
+              <colgroup>
+                <col style={{ width: '36px' }} />
+                <col style={{ width: 'auto' }} />
+                <col style={{ width: '46px' }} />
+                <col style={{ width: '105px' }} />
+                <col style={{ width: '115px' }} />
+                <col style={{ width: '100px' }} />
+              </colgroup>
               <thead>
                 <tr style={{ borderBottom: '2px solid #0f172a', backgroundColor: '#f8fafc' }}>
-                  <th style={{ textAlign: 'center', padding: '0.32rem 0.25rem', color: '#475569', width: '34px' }}>STT</th>
+                  <th style={{ textAlign: 'center', padding: '0.32rem 0.25rem', color: '#475569' }}>STT</th>
                   <th style={{ textAlign: 'left', padding: '0.32rem 0.35rem', color: '#475569' }}>Tên Sản Phẩm / Linh Kiện</th>
-                  <th style={{ textAlign: 'center', padding: '0.32rem 0.25rem', color: '#475569', width: '46px' }}>SL</th>
-                  <th style={{ textAlign: 'right', padding: '0.32rem 0.35rem', color: '#475569', width: '100px' }}>Đơn Giá</th>
-                  <th style={{ textAlign: 'right', padding: '0.32rem 0.35rem', color: '#475569', width: '110px' }}>Thành Tiền</th>
-                  <th style={{ textAlign: 'center', padding: '0.32rem 0.35rem', color: '#475569', width: '90px' }}>Tình Trạng</th>
+                  <th style={{ textAlign: 'center', padding: '0.32rem 0.25rem', color: '#475569' }}>SL</th>
+                  <th style={{ textAlign: 'right', padding: '0.32rem 0.35rem', color: '#475569' }}>Đơn Giá</th>
+                  <th style={{ textAlign: 'right', padding: '0.32rem 0.35rem', color: '#475569' }}>Thành Tiền</th>
+                  <th style={{ textAlign: 'center', padding: '0.32rem 0.35rem', color: '#475569' }}>Tình Trạng</th>
                 </tr>
               </thead>
               <tbody>
@@ -261,22 +283,27 @@ export default function SupplierConfirmationModal({ order, onClose }) {
               <strong>Cam kết của Bên B (Nhà Cung Cấp):</strong> Hàng hóa được giao bảo đảm mới 100%, đúng quy cách kỹ thuật, đầy đủ chứng từ xuất xưởng (CO/CQ), phiếu đóng gói và hóa đơn VAT hợp pháp khi bàn giao cho bộ phận QC và Kho của AetherPC nghiệm thu.
             </div>
 
-            {/* Khối Chữ Ký 3 Bên — Cân đối 3 cột */}
-            <table style={{ width: '100%', borderCollapse: 'collapse', border: 'none', marginTop: '0.45rem', borderTop: '1px dashed #cbd5e1', paddingTop: '0.45rem' }}>
+            {/* Khối Chữ Ký 3 Bên — CÂN ĐỐI 3 CỘT (33.33% MỖI BÊN) */}
+            <table style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse', border: 'none', marginTop: '0.55rem', borderTop: '1px dashed #cbd5e1', paddingTop: '0.5rem' }}>
+              <colgroup>
+                <col style={{ width: '33.33%' }} />
+                <col style={{ width: '33.33%' }} />
+                <col style={{ width: '33.33%' }} />
+              </colgroup>
               <tbody>
                 <tr>
                   {/* CỘT 1: BÊN MUA HÀNG TIẾP NHẬN */}
-                  <td style={{ width: '33.33%', textAlign: 'center', verticalAlign: 'top', padding: '0.35rem 0.2rem 0' }}>
-                    <strong style={{ fontSize: '0.72rem', color: '#0f172a', display: 'block' }}>PHÒNG MUA HÀNG TIẾP NHẬN</strong>
+                  <td style={{ width: '33.33%', textAlign: 'center', verticalAlign: 'top', padding: '0.35rem 0.25rem 0', boxSizing: 'border-box' }}>
+                    <strong style={{ fontSize: '0.72rem', color: '#0f172a', display: 'block', whiteSpace: 'nowrap' }}>PHÒNG MUA HÀNG TIẾP NHẬN</strong>
                     <div style={{ fontSize: '0.62rem', color: '#94a3b8', marginTop: '0.1rem' }}>(Ký, ghi rõ họ tên)</div>
-                    <div style={{ minHeight: '46px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0.2rem auto' }}>
+                    <div style={{ minHeight: '48px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0.25rem auto' }}>
                       <div style={{
                         border: '1.5px dashed #2563eb',
                         borderRadius: '6px',
                         backgroundColor: '#eff6ff',
                         padding: '0.2rem 0.4rem',
                         width: '100%',
-                        maxWidth: '155px',
+                        maxWidth: '150px',
                         boxSizing: 'border-box'
                       }}>
                         <div style={{ fontSize: '0.62rem', fontWeight: 800, color: '#1d4ed8', letterSpacing: '0.2px' }}>
@@ -296,21 +323,21 @@ export default function SupplierConfirmationModal({ order, onClose }) {
                   </td>
 
                   {/* CỘT 2: BỘ PHẬN KIỂM ĐỊNH QC */}
-                  <td style={{ width: '33.33%', textAlign: 'center', verticalAlign: 'top', padding: '0.35rem 0.2rem 0' }}>
-                    <strong style={{ fontSize: '0.72rem', color: '#0f172a', display: 'block' }}>BỘ PHẬN KIỂM ĐỊNH QC</strong>
-                    <div style={{ fontSize: '0.62rem', color: '#94a3b8', marginTop: '0.1rem' }}>(Tiếp nhận kế hoạch kiểm thử)</div>
-                    <div style={{ minHeight: '46px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0.2rem auto' }}>
+                  <td style={{ width: '33.33%', textAlign: 'center', verticalAlign: 'top', padding: '0.35rem 0.25rem 0', boxSizing: 'border-box' }}>
+                    <strong style={{ fontSize: '0.72rem', color: '#0f172a', display: 'block', whiteSpace: 'nowrap' }}>BỘ PHẬN KIỂM ĐỊNH QC</strong>
+                    <div style={{ fontSize: '0.62rem', color: '#94a3b8', marginTop: '0.1rem' }}>(Ký nhận kiểm định)</div>
+                    <div style={{ minHeight: '48px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0.25rem auto' }}>
                       <div style={{
                         border: '1px dashed #cbd5e1',
                         borderRadius: '6px',
                         backgroundColor: '#f8fafc',
                         padding: '0.25rem 0.4rem',
                         width: '100%',
-                        maxWidth: '155px',
+                        maxWidth: '150px',
                         boxSizing: 'border-box'
                       }}>
                         <div style={{ fontSize: '0.62rem', color: '#0f172a', fontWeight: 700 }}>
-                          KIỂM ĐỊNH LÔ HÀNG
+                          TIẾP NHẬN KIỂM ĐỊNH
                         </div>
                         <div style={{ fontSize: '0.58rem', color: '#64748b', marginTop: '1px' }}>
                           (Ký nghiệm thu khi giao)
@@ -323,17 +350,17 @@ export default function SupplierConfirmationModal({ order, onClose }) {
                   </td>
 
                   {/* CỘT 3: ĐẠI DIỆN NHÀ CUNG CẤP */}
-                  <td style={{ width: '33.33%', textAlign: 'center', verticalAlign: 'top', padding: '0.35rem 0.2rem 0' }}>
-                    <strong style={{ fontSize: '0.72rem', color: '#0f172a', display: 'block' }}>ĐẠI DIỆN NHÀ CUNG CẤP</strong>
+                  <td style={{ width: '33.33%', textAlign: 'center', verticalAlign: 'top', padding: '0.35rem 0.25rem 0', boxSizing: 'border-box' }}>
+                    <strong style={{ fontSize: '0.72rem', color: '#0f172a', display: 'block', whiteSpace: 'nowrap' }}>ĐẠI DIỆN NHÀ CUNG CẤP</strong>
                     <div style={{ fontSize: '0.62rem', color: '#94a3b8', marginTop: '0.1rem' }}>(Ký số xác nhận & cam kết)</div>
-                    <div style={{ minHeight: '46px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0.2rem auto' }}>
+                    <div style={{ minHeight: '48px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0.25rem auto' }}>
                       <div style={{
                         border: '1.5px dashed #059669',
                         borderRadius: '6px',
                         backgroundColor: '#ecfdf5',
                         padding: '0.2rem 0.4rem',
                         width: '100%',
-                        maxWidth: '155px',
+                        maxWidth: '150px',
                         boxSizing: 'border-box'
                       }}>
                         <div style={{ fontSize: '0.62rem', fontWeight: 800, color: '#047857', letterSpacing: '0.2px' }}>

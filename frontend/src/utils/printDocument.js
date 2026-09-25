@@ -40,8 +40,9 @@ const PRINT_CSS = `
   }
   /* Bảo vệ grid/flex/table bên trong: không override width con cháu, chỉ reset wrapper ngoài cùng */
   .aetherpc-print-root > * > * { width: auto !important; max-width: none !important; }
-  .aetherpc-print-root table, .aetherpc-print-root table * { width: revert; max-width: none !important; }
   .aetherpc-print-root table { width: 100% !important; border-collapse: collapse; }
+  .aetherpc-print-root table, .aetherpc-print-root table * { max-width: none !important; }
+  .aetherpc-print-root td, .aetherpc-print-root th { box-sizing: border-box; }
   .aetherpc-print-root, .aetherpc-print-root * { max-height: none !important; overflow: visible !important; }
   .aetherpc-print-root [style*="position: fixed"], .aetherpc-print-root [style*="position: sticky"] { position: static !important; }
   .aetherpc-print-root table { page-break-inside: auto; }
