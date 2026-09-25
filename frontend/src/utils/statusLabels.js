@@ -140,6 +140,13 @@ export const PURCHASE_REQUEST_STATUS = {
   RFQ_CREATED: { label: 'Đã Lập RFQ', color: '#1d4ed8', bg: '#eff6ff', border: '#bfdbfe' }
 };
 
+// ─── StockIntakeRequest.status (phiếu nhập kho trực tiếp, không qua PO) ───
+export const STOCK_INTAKE_STATUS = {
+  PENDING: { label: 'Chờ Quản Lý Kho Duyệt', color: '#b45309', bg: '#fffbeb', border: '#fde68a' },
+  APPROVED: { label: 'Đã Duyệt — Đã Nhập Kho', color: '#15803d', bg: '#f0fdf4', border: '#bbf7d0' },
+  REJECTED: { label: 'Từ Chối', color: '#dc2626', bg: '#fef2f2', border: '#fecaca' }
+};
+
 // ─── GoodsReceipt.status (phiếu nhập kho) ───
 export const GOODS_RECEIPT_STATUS = {
   READY: { label: 'Chờ Nhận Hàng', color: '#b45309', bg: '#fffbeb', border: '#fde68a' },

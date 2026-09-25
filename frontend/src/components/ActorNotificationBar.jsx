@@ -17,7 +17,7 @@ const listOf = (res) => (Array.isArray(res) ? res : (Array.isArray(res?.data) ? 
 // Nguồn dữ liệu mỗi vai trò cần — chỉ gọi các API vai trò đó có quyền đọc.
 const SOURCES_BY_ROLE = {
   WAREHOUSE: ['orders', 'receipts', 'returns', 'purchaseRequests'],
-  WAREHOUSE_MANAGER: ['orders', 'receipts', 'returns', 'purchaseRequests'],
+  WAREHOUSE_MANAGER: ['orders', 'receipts', 'returns', 'purchaseRequests', 'stockIntakes'],
   PURCHASING: ['purchaseRequests', 'purchaseOrders'],
   QC: ['purchaseOrders', 'returns'],
   ACCOUNTANT: ['purchaseOrders', 'payrolls', 'returns'],
@@ -37,7 +37,8 @@ const FETCHERS = {
   purchaseOrders: () => api.get('/purchasing/orders'),
   payrolls: () => api.get('/hr/payrolls'),
   leaves: () => api.get('/hr/leaves/all'),
-  complaints: () => api.get('/complaints')
+  complaints: () => api.get('/complaints'),
+  stockIntakes: () => api.get('/warehouse/stock-intakes?status=PENDING')
 };
 
 const normalizeRole = (role) => (QC_ROLES.includes(role) ? 'QC' : role);
@@ -56,6 +57,11 @@ function buildWarehouseTasks(d, inventory, isManager) {
       key: 'pr-approve', count: prs.filter(p => p.status === 'PENDING').length,
       label: 'phiếu đề xuất mua hàng chờ Quản Lý Kho duyệt',
       path: '/admin/warehouse?tab=rfq', action: 'Duyệt Phiếu', urgent: true
+    });
+    tasks.push({
+      key: 'intake-approve', count: (d.stockIntakes || []).filter(s => s.status === 'PENDING').length,
+      label: 'phiếu nhập kho trực tiếp của Thủ Kho chờ duyệt',
+      path: '/admin/warehouse?tab=intake', action: 'Duyệt Nhập', urgent: true
     });
   }
   tasks.push({

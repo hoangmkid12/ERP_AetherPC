@@ -408,95 +408,198 @@ const getInventory = async (req, res, next) => {
   }
 };
 
-// POST /api/v1/warehouse/inventory/adjust
-// Nhập kho trực tiếp / kiểm kê bổ sung — không qua đơn mua PO. Trước đây tab
-// này ở frontend chỉ ghi localStorage, không có route nào chạm tới CSDL thật.
-const adjustInventory = async (req, res, next) => {
-  try {
-    const { productId, quantity, warehouseId, location, reason, note, refCode, serials } = req.body;
-    const qty = parseInt(quantity, 10);
-    const whId = parseInt(warehouseId, 10) || 1;
-    const actor = req.user?.name || req.user?.email || req.user?.code || 'Thủ Kho';
+// ─── Phiếu Nhập Kho Trực Tiếp (StockIntakeRequest) ─────────────────────────
+// Nhập kho không qua đơn mua PO (hàng tặng, kiểm kê thừa, nhập bổ sung...). Vòng đời:
+// PENDING (Thủ Kho lập) → APPROVED (Quản Lý Kho duyệt — lúc này mới cộng tồn kho và ghi
+// serial) / REJECTED. Trước đây POST /inventory/adjust cộng tồn ngay, không qua ai duyệt.
+const INTAKE_CREATOR_ROLES = ['WAREHOUSE', 'ADMIN'];
+const INTAKE_APPROVER_ROLES = ['WAREHOUSE_MANAGER', 'ADMIN'];
 
+const parseIntakeSerials = (serials) => (Array.isArray(serials)
+  ? serials
+  : String(serials || '').split(/[\n,]/)).map(s => String(s).trim()).filter(Boolean);
+
+// Cộng tồn kho + ghi serial + nhật ký nhập — dùng khi Quản Lý Kho duyệt phiếu.
+const applyStockIntake = async (tx, { productId, qty, whId, location, reason, note, refCode, serials, actor }) => {
+  const product = await tx.product.findUnique({ where: { productId: String(productId) } });
+  if (!product) {
+    throw Object.assign(new Error(`Không tìm thấy sản phẩm với mã: ${productId}`), { statusCode: 404 });
+  }
+
+  try {
+    await tx.serialNumber.createMany({
+      data: serials.map(serial => ({ serial, productId: product.productId, status: 'AVAILABLE' }))
+    });
+  } catch (e) {
+    throw Object.assign(new Error('Một trong các Serial Number đã tồn tại trong hệ thống.'), { statusCode: 409 });
+  }
+
+  const updatedProduct = await tx.product.update({
+    where: { productId: product.productId },
+    data: { stockQuantity: { increment: qty } }
+  });
+
+  const existingInventory = await tx.inventory.findFirst({
+    where: { productId: product.productId, warehouseId: whId }
+  });
+  const inventoryRow = existingInventory
+    ? await tx.inventory.update({ where: { id: existingInventory.id }, data: { quantityOnHand: { increment: qty } } })
+    : await tx.inventory.create({ data: { productId: product.productId, warehouseId: whId, quantityOnHand: qty } });
+
+  const movement = await tx.stockMovement.create({
+    data: {
+      productId: product.productId,
+      toWarehouseId: whId,
+      type: 'IN',
+      quantity: qty,
+      referenceId: refCode,
+      note: `Nhập trực tiếp / Kiểm kê (${reason || 'DIRECT_PURCHASE'})${location ? ` — Vị trí: ${location}` : ''}. ${note || ''}`.trim(),
+      createdBy: actor
+    }
+  });
+
+  return { product: updatedProduct, inventory: inventoryRow, movement };
+};
+
+// GET /api/v1/warehouse/stock-intakes
+const listStockIntakes = async (req, res, next) => {
+  try {
+    const { status } = req.query;
+    const requests = await prisma.stockIntakeRequest.findMany({
+      where: status && status !== 'ALL' ? { status } : {},
+      include: { product: { select: { name: true, sku: true } } },
+      orderBy: { createdAt: 'desc' },
+      take: 200
+    });
+    res.json({ success: true, data: requests });
+  } catch (err) { next(err); }
+};
+
+// POST /api/v1/warehouse/stock-intakes — Thủ Kho lập phiếu nhập kho trực tiếp
+const createStockIntake = async (req, res, next) => {
+  try {
+    if (!INTAKE_CREATOR_ROLES.includes(req.user?.role)) {
+      return res.status(403).json({ success: false, message: 'Phiếu nhập kho trực tiếp do Thủ Kho lập.' });
+    }
+    const { productId, quantity, warehouseId, location, reason, note, refCode } = req.body;
+    const qty = parseInt(quantity, 10);
     if (!productId || !Number.isInteger(qty) || qty <= 0) {
       return res.status(400).json({ success: false, message: 'Cần chọn sản phẩm và số lượng nhập là số nguyên dương.' });
     }
-
-    // Serial Number bắt buộc cho mọi lượt nhập kho, kể cả nhập trực tiếp/kiểm kê
-    // ngoài PO — nếu không, số serial khả dụng sẽ lệch dần khỏi stockQuantity thật.
-    const itemSerials = Array.isArray(serials) ? serials.map(s => String(s).trim()).filter(Boolean) : [];
-    if (itemSerials.length !== qty) {
-      return res.status(400).json({ success: false, message: `Cần quét đủ ${qty} Serial Number, hiện có ${itemSerials.length}.` });
+    // Serial Number bắt buộc cho mọi lượt nhập, kể cả ngoài PO — nếu không, số serial khả
+    // dụng sẽ lệch dần khỏi tồn kho thật.
+    const serials = parseIntakeSerials(req.body.serials);
+    if (serials.length !== qty) {
+      return res.status(400).json({ success: false, message: `Cần quét đủ ${qty} Serial Number, hiện có ${serials.length}.` });
     }
-    if (new Set(itemSerials).size !== itemSerials.length) {
+    if (new Set(serials).size !== serials.length) {
       return res.status(400).json({ success: false, message: 'Danh sách Serial Number có mã bị trùng lặp.' });
     }
+    const product = await prisma.product.findUnique({ where: { productId: String(productId) } });
+    if (!product) {
+      return res.status(404).json({ success: false, message: `Không tìm thấy sản phẩm với mã: ${productId}` });
+    }
+    const existingSerial = await prisma.serialNumber.findFirst({ where: { serial: { in: serials } }, select: { serial: true } });
+    if (existingSerial) {
+      return res.status(409).json({ success: false, message: `Serial Number ${existingSerial.serial} đã tồn tại trong hệ thống.` });
+    }
 
-    const result = await prisma.$transaction(async (tx) => {
-      const product = await tx.product.findUnique({ where: { productId: String(productId) } });
-      if (!product) {
-        const err = new Error(`Không tìm thấy sản phẩm với mã: ${productId}`);
-        err.statusCode = 404;
-        throw err;
-      }
-
-      try {
-        await tx.serialNumber.createMany({
-          data: itemSerials.map(serial => ({ serial, productId: product.productId, status: 'AVAILABLE' }))
-        });
-      } catch (e) {
-        const err = new Error('Một trong các Serial Number đã tồn tại trong hệ thống.');
-        err.statusCode = 409;
-        throw err;
-      }
-
-      const updatedProduct = await tx.product.update({
-        where: { productId: product.productId },
-        data: { stockQuantity: { increment: qty } }
-      });
-
-      const existingInventory = await tx.inventory.findFirst({
-        where: { productId: product.productId, warehouseId: whId }
-      });
-
-      const inventoryRow = existingInventory
-        ? await tx.inventory.update({
-            where: { id: existingInventory.id },
-            data: { quantityOnHand: { increment: qty } }
-          })
-        : await tx.inventory.create({
-            data: { productId: product.productId, warehouseId: whId, quantityOnHand: qty }
-          });
-
-      const movement = await tx.stockMovement.create({
-        data: {
-          productId: product.productId,
-          toWarehouseId: whId,
-          type: 'IN',
-          quantity: qty,
-          referenceId: refCode || `DIR-${Date.now().toString().slice(-8)}`,
-          note: `Nhập trực tiếp / Kiểm kê (${reason || 'DIRECT_PURCHASE'})${location ? ` — Vị trí: ${location}` : ''}. ${note || ''}`.trim(),
-          createdBy: actor
-        }
-      });
-
-      return { product: updatedProduct, inventory: inventoryRow, movement };
+    const stamp = Date.now().toString().slice(-8);
+    const request = await prisma.stockIntakeRequest.create({
+      data: {
+        code: `NK-${stamp}`,
+        productId: product.productId,
+        quantity: qty,
+        warehouseId: parseInt(warehouseId, 10) || 1,
+        location: location || null,
+        refCode: (refCode && String(refCode).trim()) || `DIR-${stamp}`,
+        reason: reason || null,
+        note: note || null,
+        serials,
+        status: 'PENDING',
+        requestedBy: req.user?.name || req.user?.email || req.user?.code || 'Thủ Kho'
+      },
+      include: { product: { select: { name: true, sku: true } } }
     });
 
-    res.json({ success: true, message: 'Đã ghi nhận nhập kho trực tiếp thành công.', data: result });
-  } catch (err) {
-    if (err.statusCode) {
-      return res.status(err.statusCode).json({ success: false, message: err.message });
+    logAudit({ req, action: 'CREATE_STOCK_INTAKE', module: 'Kho Hàng', targetId: request.id, note: `${request.code} — ${product.name} x${qty}` });
+    res.status(201).json({ success: true, message: 'Đã lập phiếu nhập kho, chờ Quản Lý Kho duyệt.', data: request });
+  } catch (err) { next(err); }
+};
+
+// PATCH /api/v1/warehouse/stock-intakes/:id/approve — Quản Lý Kho duyệt → cộng tồn kho
+const approveStockIntake = async (req, res, next) => {
+  try {
+    if (!INTAKE_APPROVER_ROLES.includes(req.user?.role)) {
+      return res.status(403).json({ success: false, message: 'Chỉ Quản Lý Kho được duyệt phiếu nhập kho.' });
     }
+    const id = parseInt(req.params.id, 10);
+    const actor = req.user?.name || req.user?.email || req.user?.code || 'Quản Lý Kho';
+
+    const result = await prisma.$transaction(async (tx) => {
+      // Giành quyền xử lý nguyên tử: 2 lần bấm duyệt song song chỉ 1 lần được cộng tồn.
+      const claim = await tx.stockIntakeRequest.updateMany({
+        where: { id, status: 'PENDING' },
+        data: { status: 'APPROVED', approvedBy: actor, approvedAt: new Date() }
+      });
+      if (claim.count === 0) {
+        const existing = await tx.stockIntakeRequest.findUnique({ where: { id } });
+        throw Object.assign(new Error(existing ? 'Phiếu nhập kho này đã được xử lý.' : `Không tìm thấy phiếu nhập kho: ${req.params.id}`), { statusCode: existing ? 409 : 404 });
+      }
+      const intake = await tx.stockIntakeRequest.findUnique({ where: { id } });
+      const applied = await applyStockIntake(tx, {
+        productId: intake.productId,
+        qty: intake.quantity,
+        whId: intake.warehouseId,
+        location: intake.location,
+        reason: intake.reason,
+        note: `${intake.note || ''} [Phiếu ${intake.code} — lập bởi ${intake.requestedBy || 'Thủ Kho'}, duyệt bởi ${actor}]`.trim(),
+        refCode: intake.refCode || intake.code,
+        serials: intake.serials,
+        actor
+      });
+      const request = await tx.stockIntakeRequest.findUnique({ where: { id }, include: { product: { select: { name: true, sku: true } } } });
+      return { request, ...applied };
+    });
+
+    logAudit({ req, action: 'APPROVE_STOCK_INTAKE', module: 'Kho Hàng', targetId: id, note: `${result.request.code} +${result.request.quantity}` });
+    res.json({ success: true, message: 'Đã duyệt phiếu và cộng tồn kho.', data: result });
+  } catch (err) {
+    if (err.statusCode) return res.status(err.statusCode).json({ success: false, message: err.message });
     next(err);
   }
 };
 
+// PATCH /api/v1/warehouse/stock-intakes/:id/reject
+const rejectStockIntake = async (req, res, next) => {
+  try {
+    if (!INTAKE_APPROVER_ROLES.includes(req.user?.role)) {
+      return res.status(403).json({ success: false, message: 'Chỉ Quản Lý Kho được từ chối phiếu nhập kho.' });
+    }
+    const id = parseInt(req.params.id, 10);
+    const claim = await prisma.stockIntakeRequest.updateMany({
+      where: { id, status: 'PENDING' },
+      data: {
+        status: 'REJECTED',
+        approvedBy: req.user?.name || req.user?.email || req.user?.code || 'Quản Lý Kho',
+        approvedAt: new Date(),
+        rejectReason: req.body?.reason || null
+      }
+    });
+    if (claim.count === 0) {
+      const existing = await prisma.stockIntakeRequest.findUnique({ where: { id } });
+      return res.status(existing ? 409 : 404).json({ success: false, message: existing ? 'Phiếu nhập kho này đã được xử lý.' : `Không tìm thấy phiếu nhập kho: ${req.params.id}` });
+    }
+    const request = await prisma.stockIntakeRequest.findUnique({ where: { id }, include: { product: { select: { name: true, sku: true } } } });
+    logAudit({ req, action: 'REJECT_STOCK_INTAKE', module: 'Kho Hàng', targetId: id, note: request.code });
+    res.json({ success: true, message: 'Đã từ chối phiếu nhập kho.', data: request });
+  } catch (err) { next(err); }
+};
+
 // POST /api/v1/warehouse/inventory/audit-adjust
 // Kiểm kê phát hiện thiếu hụt/hư hỏng thực tế so với hệ thống — GIẢM tồn kho,
-// ngược chiều với adjustInventory (chỉ tăng). Chỉ Quản Lý Kho được duyệt việc
-// này (warehouse_audit_adjust) — khác adjustInventory dùng chung cho cả 2 vai
-// trò vì đó là thao tác nhập hàng hàng ngày.
+// ngược chiều với phiếu nhập kho trực tiếp (chỉ tăng). Chỉ Quản Lý Kho được
+// thực hiện việc này (warehouse_audit_adjust).
 const auditDecreaseInventory = async (req, res, next) => {
   try {
     const { productId, quantity, warehouseId, reason, note, serials } = req.body;
@@ -871,7 +974,10 @@ module.exports = {
   validateReceipt,
   getStockMovements,
   getInventory,
-  adjustInventory,
+  listStockIntakes,
+  createStockIntake,
+  approveStockIntake,
+  rejectStockIntake,
   auditDecreaseInventory,
   listPurchaseRequests,
   createPurchaseRequest,

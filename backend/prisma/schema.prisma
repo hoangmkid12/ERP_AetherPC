@@ -90,6 +90,7 @@ model Product {
   bomItems        BomItem[]
   serialNumbers   SerialNumber[]
   purchaseRequests PurchaseRequest[]
+  stockIntakeRequests StockIntakeRequest[]
 
   // Search & Filtering Indexes
   @@index([name]) // For LIKE/contains searches
@@ -419,6 +420,32 @@ model PurchaseRequest {
 
   @@index([status])
   @@map("purchase_requests")
+}
+
+// Phiếu nhập kho trực tiếp (không qua PO): Thủ Kho lập → Quản Lý Kho duyệt thì tồn kho
+// mới tăng. Serial được giữ ở phiếu tới lúc duyệt mới ghi vào serial_numbers.
+model StockIntakeRequest {
+  id           Int       @id @default(autoincrement())
+  code         String    @unique @db.VarChar(50)
+  productId    String    @map("product_id") @db.VarChar(50)
+  quantity     Int
+  warehouseId  Int       @default(1) @map("warehouse_id")
+  location     String?   @db.VarChar(100)
+  refCode      String?   @map("ref_code") @db.VarChar(50)
+  reason       String?   @db.VarChar(50)
+  note         String?
+  serials      String[]
+  status       String    @default("PENDING") @db.VarChar(20) // PENDING, APPROVED, REJECTED
+  requestedBy  String?   @map("requested_by") @db.VarChar(100)
+  approvedBy   String?   @map("approved_by") @db.VarChar(100)
+  approvedAt   DateTime? @map("approved_at") @db.Timestamptz()
+  rejectReason String?   @map("reject_reason")
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+
+  product      Product   @relation(fields: [productId], references: [productId])
+
+  @@index([status])
+  @@map("stock_intake_requests")
 }
 
 model Inventory {

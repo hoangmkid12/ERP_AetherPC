@@ -6,7 +6,7 @@ import { usePermission } from '../../hooks/usePermission';
 import { useAutoRefresh } from '../../hooks/useAutoRefresh';
 import { useNotification, notify, confirm } from '../../context/NotificationContext';
 import { DELIVERY_REGIONS, detectDeliveryRegion } from '../../utils/deliveryRegions';
-import { QC_STATUS, getStatusInfo } from '../../utils/statusLabels';
+import { QC_STATUS, STOCK_INTAKE_STATUS, getStatusInfo } from '../../utils/statusLabels';
 import { api } from '../../services/api';
 import { Package, CheckCircle, X, AlertCircle, Truck, RotateCcw, Sparkles, RefreshCw, Box, Image, Plus, Eye, Printer, MapPin } from 'lucide-react';
 import ActorNotificationBar from '../../components/ActorNotificationBar';
@@ -1998,7 +1998,12 @@ export default function Warehouse() {
   const isManager = canDo('warehouse_dispatch_shipper') || canApprove('warehouse') || isCEO || isAdmin;
   const canPackScan = canDo('warehouse_pack_scan') || isWarehouse || isAdmin;
   const canDispatch = canDo('warehouse_dispatch_shipper') || isCEO || isAdmin;
-  const canStockIntake = canDo('warehouse_stock_intake') || isWarehouse || isAdmin;
+  // Phiếu nhập kho trực tiếp: Thủ Kho lập, Quản Lý Kho duyệt (khớp kiểm tra ở backend —
+  // CEO không nằm trong luồng này).
+  const canStockIntake = isWarehouse || isAdmin;
+  const canApproveIntake = isWarehouseManager || isAdmin;
+  const [stockIntakes, setStockIntakes] = useState([]);
+  const [intakeBusyId, setIntakeBusyId] = useState(null);
   const canApprovePr = canDo('warehouse_approve_pr') || isCEO || isAdmin;
   const canAuditAdjust = canDo('warehouse_audit_adjust') || isCEO || isAdmin;
   const canCreatePr = canDo('warehouse_create_pr') || isWarehouse || isWarehouseManager || isCEO || isAdmin;
@@ -2566,6 +2571,7 @@ export default function Warehouse() {
 
   useEffect(() => {
     if (activeTab === 'rfq') loadPurchaseRequests();
+    if (activeTab === 'intake') loadStockIntakes();
     if (activeTab === 'locations') loadWarehouseLocations();
     if (activeTab === 'categories') loadCategories();
   }, [activeTab]);
@@ -2575,6 +2581,7 @@ export default function Warehouse() {
   // luôn khớp với thao tác của người khác mà không cần F5.
   useAutoRefresh((silent) => fetchReceipts(silent));
   useAutoRefresh((silent) => loadPurchaseRequests(silent), { enabled: activeTab === 'rfq' });
+  useAutoRefresh((silent) => loadStockIntakes(silent), { enabled: activeTab === 'intake' });
 
   // Real Supplier directory (Purchasing's Danh Bạ NCC) — the product edit form used
   // to offer a hardcoded list of supplier NAMES (STANDARD_SUPPLIERS) with no relation
@@ -2971,58 +2978,68 @@ export default function Warehouse() {
 
     const selectedInv = inventory.find(i => String(i.id) === String(directProduct) || i.name === directProduct);
     const prodName = selectedInv ? selectedInv.name : directProduct;
-    const refCode = directRef.trim() || ('DIR-' + Date.now().toString().slice(-6));
 
     setSubmitting(true);
     try {
-      // Ghi vào CSDL thật trước — trước đây hàm này chỉ sửa state cục bộ và
-      // localStorage, không hề gọi API nào, nên "nhập kho" ở tab này chưa
-      // từng thật sự cộng vào tồn kho chung của hệ thống.
-      await api.post('/warehouse/inventory/adjust', {
+      // Thủ Kho chỉ LẬP phiếu — tồn kho chưa thay đổi cho tới khi Quản Lý Kho duyệt.
+      const res = await api.post('/warehouse/stock-intakes', {
         productId: directProduct,
         quantity: qtyNum,
         warehouseId: 1,
         location: directLocation,
         reason: directReason,
         note: directNote,
-        refCode,
+        refCode: directRef.trim() || undefined,
         serials: parsedSerials
       });
-
-      const updatedInventory = inventory.map(item => {
-        if (String(item.id) === String(directProduct) || item.name === directProduct) {
-          return {
-            ...item,
-            stock: item.stock + qtyNum,
-            location: directLocation || item.location,
-            supplier: directSupplier || item.supplier
-          };
-        }
-        return item;
-      });
-      setInventory(updatedInventory);
-
-      const newMov = {
-        id: 'MOV-' + Date.now(),
-        type: 'IN',
-        reference: refCode,
-        productName: prodName,
-        quantity: qtyNum,
-        timestamp: new Date().toISOString(),
-        actor: user?.fullname || 'Thủ Kho',
-        note: `Nhập trực tiếp / Kiểm kê (${directReason}). Ghi chú: ${directNote || 'N/A'}`
-      };
-      setStockMovements(prev => [newMov, ...prev]);
+      const code = res?.data?.code || '';
+      if (typeof sendSystemNotification === 'function') {
+        sendSystemNotification({
+          targetRoles: ['WAREHOUSE_MANAGER'],
+          title: `Phiếu nhập kho chờ duyệt: ${prodName}`,
+          message: `Thủ kho lập phiếu ${code} nhập trực tiếp ${qtyNum} cái "${prodName}". Cần Quản Lý Kho duyệt để cộng tồn kho.`,
+          link: '/admin/warehouse?tab=intake',
+          type: 'STOCK_INTAKE_PENDING'
+        });
+      }
 
       setDirectQty('');
       setDirectNote('');
       setDirectRef('');
       setDirectSerials('');
-      notify(`Đã hoàn tất nhập kho trực tiếp ${qtyNum} SP ${prodName} (Mã chứng từ: ${refCode}).`, 'success');
+      notify(`Đã lập phiếu nhập kho ${code} (${qtyNum} SP ${prodName}), chờ Quản Lý Kho duyệt.`, 'success');
+      loadStockIntakes(true);
     } catch (err) {
-      notify(err.message || 'Không thể ghi nhận nhập kho trực tiếp lên máy chủ. Vui lòng thử lại.', 'error');
+      notify(err.message || 'Không thể lập phiếu nhập kho. Vui lòng thử lại.', 'error');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const loadStockIntakes = async (silent = false) => {
+    try {
+      const res = await api.get('/warehouse/stock-intakes');
+      setStockIntakes(res?.data || []);
+    } catch (err) {
+      if (!silent) notify(err?.message || 'Không thể tải danh sách phiếu nhập kho.', 'error');
+    }
+  };
+
+  const handleDecideIntake = async (intake, decision) => {
+    const label = decision === 'approve' ? 'duyệt' : 'từ chối';
+    if (!(await confirm(`Xác nhận ${label} phiếu ${intake.code} (${intake.product?.name}, SL ${intake.quantity})?${decision === 'approve' ? ' Tồn kho sẽ được cộng ngay.' : ''}`, { danger: decision === 'reject' }))) return;
+    setIntakeBusyId(intake.id);
+    try {
+      await api.patch(`/warehouse/stock-intakes/${intake.id}/${decision}`);
+      notify(`Đã ${label} phiếu ${intake.code}.`, 'success');
+      if (decision === 'approve' && typeof refreshInventoryFromServer === 'function') {
+        refreshInventoryFromServer().catch(() => {});
+      }
+      loadStockIntakes(true);
+    } catch (err) {
+      notify(err?.message || `Không thể ${label} phiếu nhập kho.`, 'error');
+    } finally {
+      setIntakeBusyId(null);
     }
   };
 
@@ -4402,17 +4419,20 @@ export default function Warehouse() {
               Hoạt Động / Nhập Kho Trực Tiếp
             </h2>
             <p style={{ fontSize: '0.82rem', color: '#64748b', margin: '0.2rem 0 0 0' }}>
-              Tạo phiếu nhập trực tiếp bổ sung số lượng tồn kho không qua đơn mua PO
+              Nhập bổ sung tồn kho không qua đơn mua PO — Thủ Kho lập phiếu, Quản Lý Kho duyệt thì tồn kho mới được cộng
             </p>
           </div>
 
           {!canStockIntake && (
-            <div style={{ backgroundColor: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px', padding: '0.75rem 1rem', marginBottom: '1.25rem', fontSize: '0.82rem', color: '#92400e', fontWeight: 600 }}>
-              Bạn không có quyền nhập kho trực tiếp — chỉ Quản Lý Kho / CEO / Quản Trị mới thực hiện được thao tác này.
+            <div style={{ backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '8px', padding: '0.75rem 1rem', marginBottom: '1.25rem', fontSize: '0.82rem', color: '#1e40af', fontWeight: 600 }}>
+              {canApproveIntake
+                ? 'Phiếu nhập kho trực tiếp do Thủ Kho lập — Quản Lý Kho duyệt hoặc từ chối các phiếu ở danh sách bên dưới.'
+                : 'Chỉ Thủ Kho được lập phiếu nhập kho trực tiếp, và chỉ Quản Lý Kho được duyệt.'}
             </div>
           )}
 
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.5rem', opacity: canStockIntake ? 1 : 0.6 }}>
+          {canStockIntake && (
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.5rem' }}>
             <fieldset disabled={!canStockIntake} style={{ border: 'none', padding: 0, margin: 0 }}>
             <form onSubmit={handleDirectIntakeSubmit}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.25rem', marginBottom: '1.25rem' }}>
@@ -4516,10 +4536,71 @@ export default function Warehouse() {
                   cursor: 'pointer'
                 }}
               >
-                Xác Nhận Nhập Kho Trực Tiếp
+                {submitting ? 'Đang gửi...' : 'Lập Phiếu Nhập Kho (Trình Quản Lý Kho Duyệt)'}
               </button>
             </form>
             </fieldset>
+          </div>
+          )}
+
+          {/* Danh sách phiếu nhập kho trực tiếp — Quản Lý Kho duyệt / từ chối */}
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem', marginTop: '1.5rem' }}>
+            <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a', margin: '0 0 0.75rem 0' }}>
+              Phiếu Nhập Kho Trực Tiếp ({stockIntakes.filter(s => s.status === 'PENDING').length} chờ duyệt)
+            </h3>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
+                <thead>
+                  <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569' }}>
+                    <th style={{ padding: '0.55rem 0.75rem' }}>Mã Phiếu</th>
+                    <th style={{ padding: '0.55rem 0.75rem' }}>Sản Phẩm</th>
+                    <th style={{ padding: '0.55rem 0.75rem', textAlign: 'center' }}>SL</th>
+                    <th style={{ padding: '0.55rem 0.75rem' }}>Vị Trí / Chứng Từ</th>
+                    <th style={{ padding: '0.55rem 0.75rem' }}>Người Lập</th>
+                    <th style={{ padding: '0.55rem 0.75rem' }}>Trạng Thái</th>
+                    <th style={{ padding: '0.55rem 0.75rem', textAlign: 'center' }}>Thao Tác</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {stockIntakes.length === 0 ? (
+                    <tr><td colSpan="7" style={{ textAlign: 'center', padding: '1.25rem', color: '#94a3b8' }}>Chưa có phiếu nhập kho trực tiếp nào.</td></tr>
+                  ) : stockIntakes.map(s => {
+                    const st = getStatusInfo(STOCK_INTAKE_STATUS, s.status);
+                    return (
+                      <tr key={s.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                        <td style={{ padding: '0.55rem 0.75rem', fontWeight: 700, color: '#2563eb' }}>{s.code}</td>
+                        <td style={{ padding: '0.55rem 0.75rem', color: '#0f172a' }} title={`Serial: ${(s.serials || []).join(', ')}`}>
+                          <div style={{ fontWeight: 600 }}>{s.product?.name || s.productId}</div>
+                          {s.note && <div style={{ fontSize: '0.72rem', color: '#64748b' }}>{s.note}</div>}
+                        </td>
+                        <td style={{ padding: '0.55rem 0.75rem', textAlign: 'center', fontWeight: 800 }}>{s.quantity}</td>
+                        <td style={{ padding: '0.55rem 0.75rem', color: '#475569' }}>{s.location || '—'}<div style={{ fontSize: '0.72rem', color: '#94a3b8' }}>{s.refCode}</div></td>
+                        <td style={{ padding: '0.55rem 0.75rem', color: '#475569' }}>
+                          {s.requestedBy || 'Thủ Kho'}
+                          <div style={{ fontSize: '0.72rem', color: '#94a3b8' }}>{s.createdAt ? new Date(s.createdAt).toLocaleString('vi-VN') : ''}</div>
+                        </td>
+                        <td style={{ padding: '0.55rem 0.75rem' }}>
+                          <span style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 800, backgroundColor: st.bg, color: st.color, border: `1px solid ${st.border}`, whiteSpace: 'nowrap' }}>{st.label}</span>
+                          {s.status !== 'PENDING' && s.approvedBy && (
+                            <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: '0.2rem' }}>bởi {s.approvedBy}{s.rejectReason ? ` — ${s.rejectReason}` : ''}</div>
+                          )}
+                        </td>
+                        <td style={{ padding: '0.55rem 0.75rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                          {s.status === 'PENDING' && canApproveIntake ? (
+                            <>
+                              <button disabled={intakeBusyId === s.id} onClick={() => handleDecideIntake(s, 'approve')} style={{ backgroundColor: '#16a34a', color: '#ffffff', border: 'none', borderRadius: '5px', padding: '0.3rem 0.7rem', fontSize: '0.74rem', fontWeight: 700, cursor: 'pointer', marginRight: '0.35rem' }}>Duyệt</button>
+                              <button disabled={intakeBusyId === s.id} onClick={() => handleDecideIntake(s, 'reject')} style={{ backgroundColor: '#ffffff', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '5px', padding: '0.3rem 0.7rem', fontSize: '0.74rem', fontWeight: 700, cursor: 'pointer' }}>Từ Chối</button>
+                            </>
+                          ) : s.status === 'PENDING' ? (
+                            <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>Chờ Quản Lý Kho</span>
+                          ) : '—'}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
 
           {/* Kiểm Kê Điều Chỉnh GIẢM Tồn Kho — warehouse_audit_adjust, chỉ Quản Lý Kho */}

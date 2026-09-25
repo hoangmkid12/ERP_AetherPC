@@ -8,7 +8,10 @@ const {
   validateReceipt,
   getStockMovements,
   getInventory,
-  adjustInventory,
+  listStockIntakes,
+  createStockIntake,
+  approveStockIntake,
+  rejectStockIntake,
   auditDecreaseInventory,
   listPurchaseRequests,
   createPurchaseRequest,
@@ -43,9 +46,14 @@ router.get('/stock-movements', authMiddleware(['WAREHOUSE', 'WAREHOUSE_MANAGER',
 // @route   GET /api/v1/warehouse/inventory
 router.get('/inventory', authMiddleware(['WAREHOUSE', 'WAREHOUSE_MANAGER', ...QC_ROLES, 'SALES', 'SALES_MANAGER', 'PURCHASING', 'ACCOUNTANT', 'CEO', 'ADMIN']), getInventory);
 
-// @route   POST /api/v1/warehouse/inventory/adjust
-// @desc    Nhập kho trực tiếp / kiểm kê bổ sung (không qua đơn mua PO)
-router.post('/inventory/adjust', authMiddleware(WAREHOUSE_ROLES), adjustInventory);
+// ─── Phiếu Nhập Kho Trực Tiếp (không qua PO) ────────────────────────────────
+// Thủ Kho lập phiếu → Quản Lý Kho duyệt thì mới cộng tồn kho. Vai trò lập/duyệt được
+// kiểm tra thêm trong controller vì authMiddleware luôn cho CEO đi qua, mà CEO không
+// nằm trong luồng này. (POST /inventory/adjust cũ — cộng tồn ngay không qua duyệt — đã bỏ.)
+router.get('/stock-intakes', authMiddleware(WAREHOUSE_ROLES), listStockIntakes);
+router.post('/stock-intakes', authMiddleware(['WAREHOUSE', 'ADMIN']), createStockIntake);
+router.patch('/stock-intakes/:id/approve', authMiddleware(['WAREHOUSE_MANAGER', 'ADMIN']), approveStockIntake);
+router.patch('/stock-intakes/:id/reject', authMiddleware(['WAREHOUSE_MANAGER', 'ADMIN']), rejectStockIntake);
 
 // @route   POST /api/v1/warehouse/inventory/audit-adjust
 // @desc    Kiểm kê điều chỉnh GIẢM tồn kho (warehouse_audit_adjust) — chỉ Quản Lý Kho
