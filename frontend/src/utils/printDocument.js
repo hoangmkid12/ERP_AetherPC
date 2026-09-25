@@ -10,11 +10,13 @@
 // Quy ước trong phiếu: phần tử có class `aetherpc-no-print` (nút Đóng/In...) bị ẩn khi in; phần tử
 // `aetherpc-print-only` (ẩn trên màn hình) được hiện khi in.
 
-const PAGE_MARGIN_MM = 12;
+const PAGE_MARGIN_MM = 10;
 const MM_TO_PX = 96 / 25.4;
 // @page margin = 0 nên vùng in = toàn bộ tờ A4; lề thực nằm trong body padding
 const PRINTABLE_WIDTH_PX = (210 - PAGE_MARGIN_MM * 2) * MM_TO_PX;
 const PRINTABLE_HEIGHT_PX = (297 - PAGE_MARGIN_MM * 2) * MM_TO_PX;
+// Ngưỡng an toàn tối đa cho 1 trang A4 để bù trừ lề bổ sung của trình duyệt / driver máy in
+const SAFE_ONE_PAGE_HEIGHT_PX = 960;
 // Phiếu cần thu nhỏ quá mức này thì để tràn nhiều trang thay vì in chữ quá bé không đọc được.
 const MIN_FIT_SCALE = 0.55;
 
@@ -37,6 +39,11 @@ const PRINT_CSS = `
   .aetherpc-print-root > * {
     width: 100% !important; max-width: none !important; margin: 0 !important;
     border: none !important; border-radius: 0 !important; box-shadow: none !important;
+  }
+  /* Bỏ padding thừa của wrapper chứng từ khi in vì body iframe đã có lề */
+  .aetherpc-print-root #aetherpc-supplier-confirm-document,
+  .aetherpc-print-root [id*="-document"] {
+    padding: 0 !important;
   }
   /* Bảo vệ grid/flex/table bên trong: không override width con cháu, chỉ reset wrapper ngoài cùng */
   .aetherpc-print-root > * > * { width: auto !important; max-width: none !important; }
@@ -107,8 +114,9 @@ export function printDocument(target, { title = 'AetherPC', fitOnePage = true } 
     const root = doc.querySelector('.aetherpc-print-root');
     if (fitOnePage && root) {
       const height = root.scrollHeight;
-      if (height > PRINTABLE_HEIGHT_PX) {
-        const scale = PRINTABLE_HEIGHT_PX / height;
+      const targetHeight = Math.min(PRINTABLE_HEIGHT_PX, SAFE_ONE_PAGE_HEIGHT_PX);
+      if (height > targetHeight) {
+        const scale = targetHeight / height;
         if (scale >= MIN_FIT_SCALE) {
           // zoom thu nhỏ cả bố cục (không chỉ hình ảnh như transform) nên trình duyệt phân
           // trang đúng theo chiều cao sau khi thu — phiếu nằm gọn 1 trang.
