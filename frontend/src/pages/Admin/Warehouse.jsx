@@ -1683,6 +1683,20 @@ function ReceiptDetailModal({ selectedReceipt, onClose, purchaseOrders = [], onR
     const poNum = effectivePo?.poNumber || selectedReceipt.poId || selectedReceipt.receiptNumber?.replace('GRN-', '');
     qaLog = qaLogs.find(l => l.poNumber === poNum || (effectivePo && String(l.poNumber) === String(effectivePo.id)));
   } catch (e) {}
+  // Cache localStorage chỉ có trên máy/phiên vừa thao tác QC — với lô hàng đã
+  // QC thật trong DB (selectedReceipt.qcInspections) nhưng chưa từng nghiệm
+  // thu ở TRÌNH DUYỆT NÀY, qaLog ở trên luôn null nên "Số Lượng Nhập Thực Tế"
+  // phía dưới rơi về mặc định = số lượng đặt đầy đủ, bỏ qua kết quả nghiệm thu
+  // một phần thật — Thủ Kho tưởng nhập đủ 100% dù QC đã báo có SP lỗi. Dùng
+  // bản ghi QcInspection thật của DB làm nguồn dự phòng khi không có cache.
+  if (!qaLog && selectedReceipt.qcInspections?.length > 0) {
+    const dbInsp = selectedReceipt.qcInspections[0];
+    qaLog = {
+      passedQty: dbInsp.passedQuantity,
+      totalQty: dbInsp.passedQuantity + dbInsp.defectiveQuantity,
+      failedQty: dbInsp.defectiveQuantity
+    };
+  }
 
   // NOTE: selectedReceipt.status === 'READY' is the default state of EVERY receipt
   // awaiting warehouse action — it says nothing about whether QC has inspected the
