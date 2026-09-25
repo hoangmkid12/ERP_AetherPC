@@ -287,12 +287,19 @@ export default function QualityControl() {
         ? { ...po, ...localMatch, status: list.length > 0 ? po.status : (localMatch.status || po.status) }
         : po;
       
-      const log = storedQaLogs.find(l => 
-        matchesPoRef(l.poNumber, targetPoNum) || 
-        matchesPoRef(l.poNumber, po.id) || 
-        matchesPoRef(l.poNumber, po.poNumber) || 
+      const log = storedQaLogs.find(l =>
+        matchesPoRef(l.poNumber, targetPoNum) ||
+        matchesPoRef(l.poNumber, po.id) ||
+        matchesPoRef(l.poNumber, po.poNumber) ||
         String(l.id) === String(po.id)
       );
+      // Bản ghi QcInspection thật trong DB (GET /purchasing/orders đã kèm
+      // receipts[].qcInspections[]) — luôn đáng tin hơn `log` (cache cục bộ của
+      // riêng trình duyệt này, có thể là kết quả một lần submit trước đó bị
+      // backend từ chối nhưng vẫn lỡ lưu local). Số lượng đạt/lỗi phải lấy từ
+      // đây khi có, để mọi máy/vai trò đều thấy cùng một kết quả nghiệm thu.
+      const dbInsp = (po.receipts || []).flatMap(r => r.qcInspections || [])[0];
+      const hasDbInsp = dbInsp && Number.isFinite(dbInsp.passedQuantity);
       if (log && (log.status || log.decision)) {
         const isLogPassed = log.status === 'QA_PASSED' || log.decision === 'ACCEPT_ALL' || (Number(log.totalQty) > 0 && Number(log.passedQty) === Number(log.totalQty));
         const isLogRejected = log.status === 'QA_REJECTED' || log.decision === 'REJECT_ALL';
@@ -302,8 +309,14 @@ export default function QualityControl() {
           status: effectiveStatus,
           decision: log.decision || (isLogPassed ? 'ACCEPT_ALL' : isLogRejected ? 'REJECT_ALL' : 'ACCEPT_PARTIAL'),
           supplierNote: log.notes || merged.supplierNote,
-          passedQty: log.passedQty,
-          failedQty: log.failedQty
+          passedQty: hasDbInsp ? dbInsp.passedQuantity : log.passedQty,
+          failedQty: hasDbInsp ? dbInsp.defectiveQuantity : log.failedQty
+        };
+      } else if (hasDbInsp) {
+        merged = {
+          ...merged,
+          passedQty: dbInsp.passedQuantity,
+          failedQty: dbInsp.defectiveQuantity
         };
       }
       merged.poNumber = formatPurchaseReference(merged);
@@ -1404,19 +1417,28 @@ export default function QualityControl() {
                                     });
                                   } else {
                                     const totalQty = poItems.reduce((s, i) => s + (parseInt(i.quantity) || 1), 0) || po.quantity || 1;
+                                    // Không có qaLog cục bộ (PO này chưa từng được QC ở TRÌNH DUYỆT
+                                    // NÀY) — trước đây rơi vào bịa số cứng "failedQty: 2" cho MỌI đơn
+                                    // Nhập Một Phần, sai lệch với kết quả nghiệm thu thật. Ưu tiên bản
+                                    // ghi QcInspection thật trong DB (GET /purchasing/orders đã kèm
+                                    // receipts[].qcInspections[]) trước khi phải đoán.
+                                    const dbInsp = (po.receipts || []).flatMap(r => r.qcInspections || [])[0];
+                                    const hasDbInsp = dbInsp && Number.isFinite(dbInsp.passedQuantity);
+                                    const guessedPassed = isRejected ? 0 : (isPartial ? Math.max(1, totalQty - 2) : totalQty);
+                                    const guessedFailed = isRejected ? totalQty : (isPartial ? 2 : 0);
                                     setViewingLog({
                                       id: `QA-LOG-${targetPoNum}`,
                                       type: 'INBOUND_PO',
                                       poNumber: targetPoNum,
                                       supplierName: po.supplier?.name || po.supplierCode || po.supplierName || 'Nhà Cung Cấp',
-                                      inspector: user?.fullname || 'Chuyên viên QA/QC',
-                                      date: po.createdAt ? new Date(po.createdAt).toLocaleDateString('vi-VN') : new Date().toLocaleDateString('vi-VN'),
+                                      inspector: dbInsp?.inspector?.fullName || user?.fullname || 'Chuyên viên QA/QC',
+                                      date: dbInsp?.inspectedAt ? new Date(dbInsp.inspectedAt).toLocaleDateString('vi-VN') : (po.createdAt ? new Date(po.createdAt).toLocaleDateString('vi-VN') : new Date().toLocaleDateString('vi-VN')),
                                       totalQty: totalQty,
-                                      passedQty: isRejected ? 0 : (isPartial ? Math.max(1, totalQty - 2) : totalQty),
-                                      failedQty: isRejected ? totalQty : (isPartial ? 2 : 0),
+                                      passedQty: hasDbInsp ? dbInsp.passedQuantity : guessedPassed,
+                                      failedQty: hasDbInsp ? dbInsp.defectiveQuantity : guessedFailed,
                                       decision: isRejected ? 'REJECT_ALL' : (isPartial ? 'ACCEPT_PARTIAL' : 'ACCEPT_ALL'),
                                       defectCategory: isRejected || isPartial ? 'PACKAGE_DAMAGED' : 'NONE',
-                                      notes: po.supplierNote || 'Lô hàng đã được nghiệm thu kỹ thuật và đối soát tiêu chuẩn chất lượng.',
+                                      notes: dbInsp?.notes || po.supplierNote || 'Lô hàng đã được nghiệm thu kỹ thuật và đối soát tiêu chuẩn chất lượng.',
                                       status: isRejected ? 'QA_REJECTED' : (isPartial ? 'QA_PARTIAL' : 'QA_PASSED'),
                                       items: poItems,
                                       productName: primaryName
