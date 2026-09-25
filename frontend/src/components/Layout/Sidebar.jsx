@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { usePermission } from '../../hooks/usePermission';
 import { useInventoryStore, useSalesStore, useFinanceStore, useHRStore, useUtilityStore } from '../../stores';
 import { notify } from '../../context/NotificationContext';
+import { api } from '../../services/api';
 import { LEAVE_STATUS, getStatusInfo, getStatusLabel } from '../../utils/statusLabels';
 import { 
   BarChart2, 
@@ -44,7 +45,19 @@ export default function Sidebar({ isOpen = false, onClose }) {
   const leaveRequests = useHRStore(state => state.leaveRequests) || [];
   const assemblyJobs = useUtilityStore(state => state.assemblyJobs) || [];
   const customNotifs = useUtilityStore(state => state.customNotifs) || [];
-  const receipts = [];
+  // Không có store dùng chung nào giữ danh sách phiếu nhập kho (Warehouse.jsx tự
+  // fetch cục bộ cho tab GRN) — badge "Phiếu Nhập Kho" trước đây đọc từ mảng
+  // rỗng cố định `[]` nên luôn rơi vào nhánh fallback (từng là số giả "2").
+  // Tự lấy dữ liệu thật ở đây, chỉ cho vai trò thực sự thấy mục này.
+  const [receipts, setReceipts] = useState([]);
+  useEffect(() => {
+    if (!isWarehouse && !isWarehouseManager && !isAdmin && !isCEO) return;
+    let cancelled = false;
+    api.get('/warehouse/receipts')
+      .then(res => { if (!cancelled && res?.success) setReceipts(res.data || []); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [isWarehouse, isWarehouseManager, isAdmin, isCEO]);
   const isCskh = user?.role === 'CSKH';
   const isDelivery = user?.role === 'DELIVERY';
   const navigate = useNavigate();
@@ -175,13 +188,18 @@ export default function Sidebar({ isOpen = false, onClose }) {
   const activeInventory = (inventory || []).filter(item => !isItemDiscontinued(item));
   const lowStockCount = activeInventory.filter(item => Number(item.stock || 0) <= Number(item.threshold || 0)).length;
   const backordersCount = (orders || []).filter(o => o && o.status === 'AWAITING_STOCK').length;
-  const pendingReceipts = (receipts && receipts.length > 0)
-    ? receipts.filter(r => r && r.status === 'READY').length
-    : 2;
+  // Không dùng fallback số giả (trước là "2" khi receipts rỗng/chưa tải xong)
+  // — badge phải phản ánh đúng dữ liệu thật, kể cả khi đó là 0.
+  const pendingReceipts = (receipts || []).filter(r => r && r.status === 'READY').length;
   const pendingExportCount = (orders || []).filter(o => o && o.status === 'CONFIRMED').length;
-  const pendingReturnsCount = (returnRequests && returnRequests.length > 0)
-    ? returnRequests.filter(r => r && !['QC_PASSED', 'RESTOCKED', 'APPROVED', 'VENDOR_WARRANTY', 'INSPECTED_SCRAP', 'EXCHANGE_NEW', 'EXCHANGED', 'REJECTED', 'REJECT_RMA'].includes(r.status)).length
-    : 0;
+  // Danh sách trạng thái RETURN_STATUS đã hoàn tất (xem utils/statusLabels.js) —
+  // trước đây thiếu REFUNDED/COMPLETED/RETURNED_TO_CUSTOMER (3 trạng thái kết
+  // thúc thật) và chứa 3 giá trị không tồn tại trong enum (APPROVED/EXCHANGE_NEW/
+  // REJECT_RMA), khiến yêu cầu đã hoàn tiền/hoàn tất vẫn bị đếm là "đang chờ".
+  const pendingReturnsCount = (returnRequests || []).filter(r => r && ![
+    'QC_PASSED', 'RESTOCKED', 'EXCHANGED', 'VENDOR_WARRANTY', 'INSPECTED_SCRAP',
+    'REFUNDED', 'COMPLETED', 'REJECTED', 'RETURNED_TO_CUSTOMER'
+  ].includes(r.status)).length;
   const pendingQuotedPOs = (purchaseOrders || []).filter(p => p && p.status === 'QUOTED_PENDING_CEO').length;
   const pendingPayrollApproval = (payrolls && payrolls.length > 0 && payrolls[0]?.status === 'SUBMITTED_TO_CEO') ? 1 : 0;
   const pendingLeaveApproval = (leaveRequests || []).filter(l => l && (l.status === 'PENDING_CEO' || l.status === 'PENDING')).length;
