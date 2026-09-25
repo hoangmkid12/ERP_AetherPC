@@ -1406,7 +1406,7 @@ export default function SupplierPortal() {
                     {isQuotedMissingPrices(selectedPO) ? 'Đơn báo giá chưa ghi nhận được giá — Vui lòng nhập lại' : 'Phòng Mua Hàng yêu cầu báo giá'}
                   </div>
                   <div style={{ color: '#475569', fontSize: '0.85rem' }}>
-                    Vui lòng nhập <strong>đơn giá</strong> cho từng sản phẩm bên dưới, rồi bấm <strong>"Gửi Báo Giá Cho CEO Duyệt"</strong> để tiến hành báo giá.
+                    Vui lòng nhập <strong>đơn giá</strong> cho từng sản phẩm bên dưới, rồi bấm <strong>"Gửi Báo Giá"</strong> để tiến hành báo giá.
                   </div>
                 </div>
               </div>
@@ -1778,7 +1778,7 @@ export default function SupplierPortal() {
                       style={{ padding: '0.6rem 1.2rem', fontSize: '0.85rem', backgroundColor: 'var(--success)', border: 'none', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 700 }}
                       disabled={submitting || getQuotedTotal(selectedPO) <= 0}
                     >
-                      <Check size={15} /> Gửi Báo Giá Cho CEO Duyệt
+                      <Check size={15} /> Gửi Báo Giá
                     </button>
                   </>
                 )}
