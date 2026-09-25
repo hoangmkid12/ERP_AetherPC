@@ -806,22 +806,45 @@ const updateOrderStatus = async (req, res, next) => {
       }
 
       // Cập nhật trạng thái đơn hàng & thông tin POD giao vận
-      const actualPayMethod = req.body.actualPaymentMethod || (existingOrder.paymentMethod === 'COD' ? 'CASH' : 'PREPAID');
+      // ---------------------------------------------------------------
+      // Split payment: UI có thể gửi cashAmount + bankAmount cùng lúc.
+      // Nếu chỉ gửi actualPaymentMethod thì dùng như cũ (1 phương thức).
+      // ---------------------------------------------------------------
+      const cashAmount  = parseFloat(req.body.cashAmount  ?? 0) || 0;
+      const bankAmount  = parseFloat(req.body.bankAmount   ?? 0) || 0;
+      const totalOrderAmount = parseFloat(existingOrder.totalAmount);
+
+      // Xác định actualPaymentMethod đồng nhất để ghi lên Order.actualPaymentMethod
+      let actualPayMethod;
+      if (cashAmount > 0 && bankAmount > 0) {
+        actualPayMethod = 'SPLIT'; // vừa tiền mặt vừa chuyển khoản
+      } else if (cashAmount > 0) {
+        actualPayMethod = 'CASH';
+      } else if (bankAmount > 0) {
+        actualPayMethod = 'BANK_TRANSFER';
+      } else {
+        // fallback: nếu UI không gửi cashAmount/bankAmount, dùng trường cũ
+        actualPayMethod = req.body.actualPaymentMethod || (existingOrder.paymentMethod === 'COD' ? 'CASH' : 'PREPAID');
+      }
+
       const receivedType = req.body.receivedByType || 'DIRECT_CUSTOMER';
       const receiverName = req.body.receiverNameActual || (receivedType === 'DIRECT_CUSTOMER' ? (existingOrder.customer?.name || 'Khách hàng') : 'Người nhận thay');
 
-      // Chặn xác nhận "khách đã chuyển khoản" mà không kèm mã giao dịch ngân
-      // hàng nào — trước đây route này chấp nhận actualPaymentMethod=
-      // BANK_TRANSFER với bankRefCode rỗng, vẫn ghi paymentStatus=PAID và tạo
-      // OrderPayment SUCCESS ngay lập tức, tức là chấp nhận lời khai của
-      // Shipper mà không có bằng chứng nào (khác tiền mặt — Shipper đang cầm
-      // tiền thật trong tay, đối soát COD với Kế Toán sau). Validate lại ở
-      // đây vì giao diện chỉ chặn được thao tác qua UI, không chặn được ai
-      // gọi thẳng API này.
-      if (status === 'DELIVERED' && actualPayMethod === 'BANK_TRANSFER' && !req.body.bankRefCode) {
+      // Validate: chuyển khoản phải có mã giao dịch
+      if (status === 'DELIVERED' && (actualPayMethod === 'BANK_TRANSFER' || actualPayMethod === 'SPLIT') && bankAmount > 0 && !req.body.bankRefCode) {
         const error = new Error('Cần nhập Mã Giao Dịch Ngân Hàng trước khi xác nhận đã nhận chuyển khoản.');
         error.statusCode = 400;
         throw error;
+      }
+
+      // Validate: tổng split phải khớp với totalAmount
+      if (status === 'DELIVERED' && actualPayMethod === 'SPLIT') {
+        const splitTotal = cashAmount + bankAmount;
+        if (Math.abs(splitTotal - totalOrderAmount) > 1) { // dung sai 1đ làm tròn
+          const error = new Error(`Tổng thanh toán (${splitTotal.toLocaleString('vi-VN')}đ) không khớp với giá trị đơn hàng (${totalOrderAmount.toLocaleString('vi-VN')}đ).`);
+          error.statusCode = 400;
+          throw error;
+        }
       }
 
       // Kho "Xác Nhận Xuất Kho" gửi kèm assignedShipperId/deliveryRegion khi
@@ -940,30 +963,90 @@ const updateOrderStatus = async (req, res, next) => {
         }
       });
 
-      // Nếu đơn giao thành công và là đơn COD, ghi nhận giao dịch thanh toán OrderPayment
+      // Nếu đơn giao thành công, ghi nhận giao dịch thanh toán OrderPayment
+      // Hỗ trợ split payment: tạo 2 rows riêng nếu có cả tiền mặt + chuyển khoản
       if (status === 'DELIVERED' && existingOrder.paymentStatus !== 'PAID') {
-        await tx.orderPayment.create({
-          data: {
-            orderId: id,
-            method: actualPayMethod,
-            amount: existingOrder.totalAmount,
-            // Trước đây luôn fallback về tiền tố "CASH-" kể cả khi phương thức
-            // thực tế là PREPAID (đơn đã trả online từ trước, Shipper không
-            // nhập mã GD lúc giao) — sai nhãn trên sổ giao dịch dùng để đối
-            // soát/audit sau này.
-            transactionId: req.body.bankRefCode || `${actualPayMethod}-${id}-${Date.now().toString().slice(-4)}`,
-            status: 'SUCCESS'
+        const paymentRows = [];
+
+        if (actualPayMethod === 'SPLIT') {
+          // Split: Tiền mặt shipper thu (cần đối soát) + Chuyển khoản đã xác nhận
+          if (cashAmount > 0) {
+            paymentRows.push({
+              orderId: id,
+              method: 'CASH',
+              amount: cashAmount,
+              transactionId: `CASH-${id}-${Date.now().toString().slice(-4)}`,
+              status: 'SUCCESS'
+              // settledAt null → Kế Toán cần đối soát COD với Shipper
+            });
           }
-        }).catch(e => console.warn('[OrderPayment] Ghi nhận thanh toán:', e.message));
+          if (bankAmount > 0) {
+            paymentRows.push({
+              orderId: id,
+              method: 'BANK_TRANSFER',
+              amount: bankAmount,
+              transactionId: req.body.bankRefCode || `BANK-${id}-${Date.now().toString().slice(-4)}`,
+              status: 'SUCCESS',
+              settledAt: new Date(), // chuyển khoản ghi nhận ngay, không cần đối soát
+              settledBy: changedBy
+            });
+          }
+        } else if (actualPayMethod === 'CASH') {
+          // COD tiền mặt: Shipper đang giữ, Kế Toán đối soát sau
+          paymentRows.push({
+            orderId: id,
+            method: 'CASH',
+            amount: existingOrder.totalAmount,
+            transactionId: `CASH-${id}-${Date.now().toString().slice(-4)}`,
+            status: 'SUCCESS'
+            // settledAt null → chờ Kế Toán đối soát
+          });
+        } else if (actualPayMethod === 'BANK_TRANSFER') {
+          paymentRows.push({
+            orderId: id,
+            method: 'BANK_TRANSFER',
+            amount: existingOrder.totalAmount,
+            transactionId: req.body.bankRefCode || `BANK-${id}-${Date.now().toString().slice(-4)}`,
+            status: 'SUCCESS',
+            settledAt: new Date(),
+            settledBy: changedBy
+          });
+        } else {
+          // PREPAID: đã thu tiền trước (online/chuyển khoản khi đặt hàng)
+          paymentRows.push({
+            orderId: id,
+            method: 'PREPAID',
+            amount: existingOrder.totalAmount,
+            transactionId: `PREPAID-${id}`,
+            status: 'SUCCESS',
+            settledAt: new Date(),
+            settledBy: changedBy
+          });
+        }
+
+        for (const row of paymentRows) {
+          await tx.orderPayment.create({ data: row })
+            .catch(e => console.warn('[OrderPayment] Ghi nhận thanh toán:', e.message));
+        }
       }
 
       // Ghi nhật ký lịch sử trạng thái
       let historyLogNote = note;
       if (!historyLogNote) {
         if (status === 'DELIVERED') {
-          const payLabel = actualPayMethod === 'BANK_TRANSFER' ? `Chuyển khoản VietQR (Mã GD: ${req.body.bankRefCode || 'Napas247'})` : (actualPayMethod === 'CASH' ? 'Tiền mặt' : 'Đã thanh toán trước');
+          let payLabel;
+          if (actualPayMethod === 'SPLIT') {
+            payLabel = `Tiền mặt ${cashAmount.toLocaleString('vi-VN')}đ + Chuyển khoản ${bankAmount.toLocaleString('vi-VN')}đ (Mã GD: ${req.body.bankRefCode || 'N/A'})`;
+          } else if (actualPayMethod === 'BANK_TRANSFER') {
+            payLabel = `Chuyển khoản VietQR (Mã GD: ${req.body.bankRefCode || 'Napas247'})`;
+          } else if (actualPayMethod === 'CASH') {
+            payLabel = 'Tiền mặt (COD - Shipper thu)';
+          } else {
+            payLabel = 'Đã thanh toán trước';
+          }
           historyLogNote = `Giao hàng thành công (Người nhận: ${receiverName} - ${receivedType === 'DIRECT_CUSTOMER' ? 'Chính chủ' : 'Nhận thay'}, Thanh toán: ${payLabel}) bởi Shipper ${changedBy}`;
         } else if (status === 'SHIPPING_FAILED') {
+
           historyLogNote = `Giao thất bại: ${req.body.failReason || 'Không liên lạc được'} (${req.body.isAwaitingCallback ? 'Chờ gọi lại 24h' : 'Hẹn lại'}) bởi ${changedBy}`;
         } else if (status === 'RETURNING_TO_WAREHOUSE') {
           const returnPhotoNote = req.body.returnProofPhoto ? ', đã chụp ảnh minh chứng kiện hàng' : '';
