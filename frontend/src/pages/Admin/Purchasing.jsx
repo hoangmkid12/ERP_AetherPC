@@ -3288,7 +3288,7 @@ export default function Purchasing() {
                   <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#0f172a' }}>{selectedViewPR.requestedBy || ''}</div>
                 </div>
                 <div>
-                  <strong style={{ fontSize: '0.8rem', color: '#0f172a' }}>QUẢN LÝ KHO / PHÒNG MUA HÀNG DUYỆT</strong>
+                  <strong style={{ fontSize: '0.8rem', color: '#0f172a' }}>QUẢN LÝ KHO DUYỆT</strong>
                   <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: '0.2rem' }}>(Ký, ghi rõ họ tên)</div>
                   <div style={{ height: '56px' }} />
                   <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#0f172a' }}>{selectedViewPR.approvedBy || ''}</div>
