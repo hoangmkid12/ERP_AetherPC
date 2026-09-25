@@ -166,6 +166,12 @@ digraph UseCaseAetherPC {
     // Nhân Viên Kho (2 — thêm "Kiểm Kê & Cân Bằng Tồn Kho", chuyển từ Quản
     // Lý Kho sang đây, xem giải thích ở trên).
     uc_kiemke    [label="Kiểm Kê Và Điều\nChỉnh Tồn Kho"];
+    // Phiếu Yêu Cầu Mua Hàng (PurchaseRequest): Thủ Kho lập (POST
+    // /warehouse/purchase-requests, WAREHOUSE_ROLES) — Quản Lý Kho duyệt/từ chối
+    // (PATCH .../approve|reject, CHỈ WAREHOUSE_MANAGER/CEO/ADMIN; Phòng Mua Hàng
+    // không còn quyền này). Mua Hàng chỉ thấy và lập RFQ từ phiếu đã duyệt.
+    uc_lappr     [label="Lập Phiếu Đề Xuất\nMua Hàng"];
+    uc_duyetpr   [label="Duyệt Phiếu Đề\nXuất Mua Hàng"];
     // Nhân Viên Lắp Ráp (2)
     uc_nhanlenh  [label="Nhận Lệnh Lắp\nRáp Máy Tính"];
     uc_tiendo    [label="Cập Nhật Tiến\nĐộ Lắp Ráp"];
@@ -196,7 +202,7 @@ digraph UseCaseAetherPC {
       uc_tonkho;
       uc_xinnghi; uc_luongtoi; uc_xemtongquan;
       uc_grn;
-      uc_xuatkho; uc_kiemke; uc_danhmucsp;
+      uc_xuatkho; uc_kiemke; uc_danhmucsp; uc_lappr; uc_duyetpr;
       uc_nhanlenh; uc_tiendo;
       uc_giaohang; uc_thuhoi;
       uc_socai; uc_ttncc; uc_hoantien; uc_luong;
@@ -205,7 +211,7 @@ digraph UseCaseAetherPC {
       uc_duyetpo; uc_duyetluong; uc_dashboard;
     }
     uc_grn
-      -> uc_xuatkho -> uc_kiemke -> uc_danhmucsp
+      -> uc_xuatkho -> uc_kiemke -> uc_lappr -> uc_danhmucsp -> uc_duyetpr
       -> uc_nhanlenh -> uc_tiendo
       -> uc_giaohang -> uc_thuhoi
       -> uc_socai -> uc_ttncc -> uc_hoantien -> uc_luong
@@ -297,8 +303,8 @@ digraph UseCaseAetherPC {
   // đúng thứ tự rank trái→phải; arrowhead=none nên không hiện mũi tên,
   // đúng ý nghĩa Association 2 chiều dù chiều edge kỹ thuật là 1 chiều.
   // ============================================================
-  uc_grn -> a9; uc_kiemke -> a9;
-  uc_xuatkho -> a10; uc_danhmucsp -> a10;
+  uc_grn -> a9; uc_kiemke -> a9; uc_lappr -> a9;
+  uc_xuatkho -> a10; uc_danhmucsp -> a10; uc_duyetpr -> a10;
   uc_nhanlenh -> a11; uc_tiendo -> a11;
   uc_giaohang -> a12; uc_thuhoi -> a12;
   uc_socai -> a13; uc_ttncc -> a13; uc_hoantien -> a13; uc_luong -> a13;
@@ -400,12 +406,15 @@ digraph UseCaseAetherPC {
   // nhóm — không phải suy đoán chủ quan.
   // ============================================================
   edge [style=dashed, dir=forward, arrowhead=vee, fontname="Arial", fontsize=9];
-  uc_dathang -> uc_tonkho [xlabel="«include»"];
-  uc_pos     -> uc_tonkho [xlabel="«include»"];
-  uc_xuatkho -> uc_tonkho [xlabel="«include»", constraint=false];
+  // Nhãn «include» đặt bằng taillabel (sát use case gốc) thay vì xlabel: với
+  // splines=ortho, dot đặt xlabel ở vị trí tuỳ ý, có khi trôi sang cạnh use case
+  // không liên quan (đã gặp: nhãn nằm cạnh "Quản Lý Hồ Sơ Nhân Viên", "Sao Lưu").
+  uc_dathang -> uc_tonkho [taillabel="«include»", labeldistance=4.5, labelangle=-25];
+  uc_pos     -> uc_tonkho [taillabel="«include»", labeldistance=4.5, labelangle=-25];
+  uc_xuatkho -> uc_tonkho [taillabel="«include»", labeldistance=4.5, labelangle=25, constraint=false];
   // Nghiem thu hang nhap: buoc cong tang ton kho nam trong CUNG 1 luot thao tac
   // cua Nhan Vien Kho (cung API tao phieu nhap) nen du dieu kien «include».
-  uc_grn     -> uc_tonkho [xlabel="«include»", constraint=false];
+  uc_grn     -> uc_tonkho [taillabel="«include»", labeldistance=4.5, labelangle=25, constraint=false];
 
   // KHÔNG vẽ include/extend nối chuỗi PO (Trình Duyệt PO -> Duyệt PO ->
   // Xác Nhận PO), chuỗi RMA (Khiếu Nại -> Thu Hồi -> Thẩm Định -> Hoàn
