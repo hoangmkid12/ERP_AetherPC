@@ -1291,7 +1291,7 @@ export default function QualityControl() {
                   <th style={{ padding: '0.65rem 0.85rem', textAlign: 'center' }}>Số Lượng</th>
                   <th style={{ padding: '0.65rem 0.85rem', textAlign: 'right' }}>Giá Trị Lô Hàng</th>
                   <th style={{ padding: '0.65rem 0.85rem', textAlign: 'center' }}>Trạng Thái QA</th>
-                  <th style={{ padding: '0.65rem 0.85rem', textAlign: 'center' }}>Thao Tác</th>
+                  <th style={{ padding: '0.65rem 0.85rem', textAlign: 'center', minWidth: '225px', width: '225px', whiteSpace: 'nowrap' }}>Thao Tác</th>
                 </tr>
               </thead>
               <tbody>
@@ -1344,13 +1344,28 @@ export default function QualityControl() {
                             {isPending ? 'CHỜ NGHIỆM THU' : isPassed ? 'CHO NHẬP KHO 100%' : isRejected ? 'TỪ CHỐI QC' : 'NHẬP 1 PHẦN'}
                           </span>
                         </td>
-                        <td style={{ padding: '0.65rem 0.85rem', textAlign: 'center' }}>
+                        <td style={{ padding: '0.65rem 0.85rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
                           {isPending ? (
                             isQCOfficer ? (
-                              <div style={{ display: 'inline-flex', gap: '0.35rem', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap' }}>
+                              <div style={{ display: 'inline-flex', gap: '0.35rem', alignItems: 'center', justifyContent: 'center', flexWrap: 'nowrap', whiteSpace: 'nowrap' }}>
                                 <button
                                   onClick={() => handleOpenInspectionModal(po)}
-                                  style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '4px', padding: '0.35rem 0.85rem', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
+                                  style={{
+                                    backgroundColor: '#2563eb',
+                                    color: '#ffffff',
+                                    border: 'none',
+                                    borderRadius: '4px',
+                                    padding: '0.32rem 0.65rem',
+                                    fontSize: '0.74rem',
+                                    fontWeight: 700,
+                                    cursor: 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '0.25rem',
+                                    whiteSpace: 'nowrap',
+                                    height: '28px',
+                                    boxSizing: 'border-box'
+                                  }}
                                 >
                                   <ShieldCheck size={14} /> Kiểm Định Ngay
                                 </button>
@@ -1358,7 +1373,22 @@ export default function QualityControl() {
                                   <button
                                     onClick={() => setPrintConfirmTarget(po)}
                                     title="Xem phiếu xác nhận đơn hàng NCC"
-                                    style={{ backgroundColor: '#f0fdf4', color: '#15803d', border: '1px solid #86efac', borderRadius: '4px', padding: '0.35rem 0.65rem', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
+                                    style={{
+                                      backgroundColor: '#f0fdf4',
+                                      color: '#15803d',
+                                      border: '1px solid #86efac',
+                                      borderRadius: '4px',
+                                      padding: '0.32rem 0.55rem',
+                                      fontSize: '0.74rem',
+                                      fontWeight: 700,
+                                      cursor: 'pointer',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '0.25rem',
+                                      whiteSpace: 'nowrap',
+                                      height: '28px',
+                                      boxSizing: 'border-box'
+                                    }}
                                   >
                                     <FileText size={13} /> Phiếu XN
                                   </button>
@@ -1370,40 +1400,78 @@ export default function QualityControl() {
                               </span>
                             )
                           ) : (
-                            <button
-                              onClick={() => {
-                                const targetPoNum = po.poNumber || po.id;
-                                const log = qaLogs.find(l => 
-                                  matchesPoRef(l.poNumber, targetPoNum) || 
-                                  matchesPoRef(l.poNumber, po.id) || 
-                                  matchesPoRef(l.id, targetPoNum) || 
-                                  String(l.id) === String(po.id)
-                                );
-                                if (log) {
-                                  setViewingLog(log);
-                                } else {
-                                  const totalQty = po.items?.reduce((s, i) => s + (parseInt(i.quantity) || 1), 0) || po.quantity || 1;
-                                  setViewingLog({
-                                    id: `QA-LOG-${targetPoNum}`,
-                                    type: 'INBOUND_PO',
-                                    poNumber: targetPoNum,
-                                    supplierName: po.supplier?.name || po.supplierCode || po.supplierName || 'Nhà Cung Cấp',
-                                    inspector: user?.fullname || 'Chuyên viên QA/QC',
-                                    date: po.createdAt ? new Date(po.createdAt).toLocaleDateString('vi-VN') : new Date().toLocaleDateString('vi-VN'),
-                                    totalQty: totalQty,
-                                    passedQty: isRejected ? 0 : (isPartial ? Math.max(1, totalQty - 2) : totalQty),
-                                    failedQty: isRejected ? totalQty : (isPartial ? 2 : 0),
-                                    decision: isRejected ? 'REJECT_ALL' : (isPartial ? 'ACCEPT_PARTIAL' : 'ACCEPT_ALL'),
-                                    defectCategory: isRejected || isPartial ? 'PACKAGE_DAMAGED' : 'NONE',
-                                    notes: po.supplierNote || 'Lô hàng đã được nghiệm thu kỹ thuật và đối soát tiêu chuẩn chất lượng.',
-                                    status: isRejected ? 'QA_REJECTED' : (isPartial ? 'QA_PARTIAL' : 'QA_PASSED')
-                                  });
-                                }
-                              }}
-                              style={{ backgroundColor: '#ffffff', color: '#2563eb', border: '1px solid #bfdbfe', borderRadius: '4px', padding: '0.35rem 0.75rem', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer' }}
-                            >
-                              Xem Biên Bản
-                            </button>
+                            <div style={{ display: 'inline-flex', gap: '0.35rem', alignItems: 'center', justifyContent: 'center', flexWrap: 'nowrap', whiteSpace: 'nowrap' }}>
+                              <button
+                                onClick={() => {
+                                  const targetPoNum = po.poNumber || po.id;
+                                  const log = qaLogs.find(l => 
+                                    matchesPoRef(l.poNumber, targetPoNum) || 
+                                    matchesPoRef(l.poNumber, po.id) || 
+                                    matchesPoRef(l.id, targetPoNum) || 
+                                    String(l.id) === String(po.id)
+                                  );
+                                  if (log) {
+                                    setViewingLog(log);
+                                  } else {
+                                    const totalQty = po.items?.reduce((s, i) => s + (parseInt(i.quantity) || 1), 0) || po.quantity || 1;
+                                    setViewingLog({
+                                      id: `QA-LOG-${targetPoNum}`,
+                                      type: 'INBOUND_PO',
+                                      poNumber: targetPoNum,
+                                      supplierName: po.supplier?.name || po.supplierCode || po.supplierName || 'Nhà Cung Cấp',
+                                      inspector: user?.fullname || 'Chuyên viên QA/QC',
+                                      date: po.createdAt ? new Date(po.createdAt).toLocaleDateString('vi-VN') : new Date().toLocaleDateString('vi-VN'),
+                                      totalQty: totalQty,
+                                      passedQty: isRejected ? 0 : (isPartial ? Math.max(1, totalQty - 2) : totalQty),
+                                      failedQty: isRejected ? totalQty : (isPartial ? 2 : 0),
+                                      decision: isRejected ? 'REJECT_ALL' : (isPartial ? 'ACCEPT_PARTIAL' : 'ACCEPT_ALL'),
+                                      defectCategory: isRejected || isPartial ? 'PACKAGE_DAMAGED' : 'NONE',
+                                      notes: po.supplierNote || 'Lô hàng đã được nghiệm thu kỹ thuật và đối soát tiêu chuẩn chất lượng.',
+                                      status: isRejected ? 'QA_REJECTED' : (isPartial ? 'QA_PARTIAL' : 'QA_PASSED')
+                                    });
+                                  }
+                                }}
+                                style={{
+                                  backgroundColor: '#ffffff',
+                                  color: '#2563eb',
+                                  border: '1px solid #bfdbfe',
+                                  borderRadius: '4px',
+                                  padding: '0.32rem 0.65rem',
+                                  fontSize: '0.74rem',
+                                  fontWeight: 700,
+                                  cursor: 'pointer',
+                                  whiteSpace: 'nowrap',
+                                  height: '28px',
+                                  boxSizing: 'border-box'
+                                }}
+                              >
+                                Xem Biên Bản
+                              </button>
+                              {['CONFIRMED_BY_SUPPLIER', 'PENDING_QA', 'QA_PASSED', 'QA_PARTIAL', 'QA_REJECTED', 'RECEIVED', 'DONE', 'COMPLETED'].includes(po.status) && (
+                                <button
+                                  onClick={() => setPrintConfirmTarget(po)}
+                                  title="Xem phiếu xác nhận đơn hàng NCC"
+                                  style={{
+                                    backgroundColor: '#f0fdf4',
+                                    color: '#15803d',
+                                    border: '1px solid #86efac',
+                                    borderRadius: '4px',
+                                    padding: '0.32rem 0.55rem',
+                                    fontSize: '0.74rem',
+                                    fontWeight: 700,
+                                    cursor: 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '0.25rem',
+                                    whiteSpace: 'nowrap',
+                                    height: '28px',
+                                    boxSizing: 'border-box'
+                                  }}
+                                >
+                                  <FileText size={13} /> Phiếu XN
+                                </button>
+                              )}
+                            </div>
                           )}
                         </td>
                       </tr>
