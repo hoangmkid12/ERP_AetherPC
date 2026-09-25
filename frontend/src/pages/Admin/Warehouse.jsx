@@ -44,6 +44,12 @@ const safeFormatPrice = (amount) => {
   return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(n);
 };
 
+const cleanStaffName = (name) => {
+  if (!name) return 'Lê Văn C (Thủ Kho)';
+  let cleaned = String(name).replace(/\s*\(Thủ Kho\)/gi, '').trim();
+  return `${cleaned} (Thủ Kho)`;
+};
+
 const MAX_GALLERY_IMAGES = 8;
 
 // Shared cover-photo + gallery editor for the Add/Edit Product forms — matches how the
@@ -2505,10 +2511,10 @@ function GoodsReceiptSuccessModal({ doc, onClose, formatPrice }) {
                     <div style={{ fontSize: '0.75rem', lineHeight: '1.6' }}>
                       <div style={{ marginBottom: '0.2rem' }}>
                         <span style={{ color: '#64748b' }}>Thủ Kho Tiếp Nhận: </span>
-                        <strong style={{ color: '#0f172a' }}>{doc.warehouseStaff}</strong>
+                        <strong style={{ color: '#0f172a' }}>{cleanStaffName(doc.warehouseStaff)}</strong>
                       </div>
                       <div style={{ marginBottom: '0.2rem' }}>
-                        <span style={{ color: '#64748b' }}>Kiểm Định Viên QA/QC: </span>
+                        <span style={{ color: '#64748b' }}>QA Kiểm Định: </span>
                         <strong style={{ color: '#0f172a' }}>{doc.qaInspector}</strong>
                       </div>
                       <div>
@@ -2619,7 +2625,7 @@ function GoodsReceiptSuccessModal({ doc, onClose, formatPrice }) {
 
                   {/* Column 2: QA Inspector */}
                   <td style={{ width: '33.33%', textAlign: 'center', verticalAlign: 'top', padding: '0.35rem 0.25rem 0' }}>
-                    <strong style={{ fontSize: '0.74rem', color: '#0f172a', display: 'block' }}>KỸ THUẬT / QA KIỂM ĐỊNH</strong>
+                    <strong style={{ fontSize: '0.74rem', color: '#0f172a', display: 'block' }}>QA KIỂM ĐỊNH</strong>
                     <div style={{ fontSize: '0.64rem', color: '#94a3b8', marginTop: '0.1rem' }}>(Ký, ghi rõ họ tên)</div>
                     <div style={{ minHeight: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0.2rem auto' }}>
                       <div style={{ border: '1.5px dashed #2563eb', borderRadius: '6px', backgroundColor: '#eff6ff', padding: '0.2rem 0.45rem', width: '100%', maxWidth: '170px', boxSizing: 'border-box' }}>
@@ -2633,7 +2639,7 @@ function GoodsReceiptSuccessModal({ doc, onClose, formatPrice }) {
 
                   {/* Column 3: Warehouse Keeper Signature (CHỮ KÝ THỦ KHO) */}
                   <td style={{ width: '33.33%', textAlign: 'center', verticalAlign: 'top', padding: '0.35rem 0.25rem 0' }}>
-                    <strong style={{ fontSize: '0.74rem', color: '#0f172a', display: 'block' }}>THỦ KHO TIẾP NHẬN & DUYỆT TỒN KHO</strong>
+                    <strong style={{ fontSize: '0.74rem', color: '#0f172a', display: 'block' }}>THỦ KHO</strong>
                     <div style={{ fontSize: '0.64rem', color: '#94a3b8', marginTop: '0.1rem' }}>(Ký, ghi rõ họ tên)</div>
                     <div style={{ minHeight: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0.2rem auto' }}>
                       <div style={{
@@ -2650,7 +2656,7 @@ function GoodsReceiptSuccessModal({ doc, onClose, formatPrice }) {
                           ✓ ĐÃ XÁC NHẬN NHẬP KHO
                         </div>
                         <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#065f46', marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {doc.warehouseStaff}
+                          {cleanStaffName(doc.warehouseStaff)}
                         </div>
                         <div style={{ fontSize: '0.6rem', color: '#047857', marginTop: '1px', fontWeight: 600 }}>
                           {doc.intakeDate}
@@ -2658,7 +2664,7 @@ function GoodsReceiptSuccessModal({ doc, onClose, formatPrice }) {
                       </div>
                     </div>
                     <div style={{ fontSize: '0.76rem', fontWeight: 800, color: '#047857', marginTop: '2px' }}>
-                      {doc.warehouseStaff}
+                      {cleanStaffName(doc.warehouseStaff)}
                     </div>
                   </td>
                 </tr>
@@ -3416,7 +3422,7 @@ export default function Warehouse() {
         receiptNumber: receipt.receiptNumber || `GRN-${poNum}`,
         poNumber: poNum,
         supplierName: effectivePo?.supplier?.name || effectivePo?.supplierName || receipt.supplierName || 'Công ty TNHH Gigabyte Việt Nam',
-        warehouseStaff: user?.fullname ? `${user.fullname} (Thủ Kho)` : 'Lê Văn C (Thủ Kho)',
+        warehouseStaff: cleanStaffName(user?.fullname),
         qaInspector: qaLog?.inspector || 'Đặng Văn Kiểm (QA/QC)',
         intakeDate: new Date().toLocaleString('vi-VN'),
         status: 'DONE',
@@ -4807,7 +4813,7 @@ export default function Warehouse() {
                                   receiptNumber: r.receiptNumber || `GRN-${poNum}`,
                                   poNumber: poNum,
                                   supplierName: poObj.supplier?.name || poObj.supplierName || r.supplierName || 'Công ty TNHH Gigabyte Việt Nam',
-                                  warehouseStaff: user?.fullname ? `${user.fullname} (Thủ Kho)` : 'Lê Văn C (Thủ Kho)',
+                                  warehouseStaff: cleanStaffName(user?.fullname),
                                   qaInspector: rQaLog?.inspector || 'Đặng Văn Kiểm (QA/QC)',
                                   intakeDate: new Date().toLocaleString('vi-VN'),
                                   status: 'DONE',
@@ -7134,7 +7140,7 @@ export default function Warehouse() {
               receiptNumber: receipt.receiptNumber || `GRN-${poNum}`,
               poNumber: poNum,
               supplierName: po?.supplier?.name || po?.supplierName || receipt.supplierName || 'Công ty TNHH Gigabyte Việt Nam',
-              warehouseStaff: user?.fullname ? `${user.fullname} (Thủ Kho)` : 'Lê Văn C (Thủ Kho)',
+              warehouseStaff: cleanStaffName(user?.fullname),
               qaInspector: qaLog?.inspector || 'Đặng Văn Kiểm (QA/QC)',
               intakeDate: new Date().toLocaleString('vi-VN'),
               status: 'DONE',
