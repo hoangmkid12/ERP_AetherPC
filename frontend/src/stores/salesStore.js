@@ -107,6 +107,9 @@ export const useSalesStore = create((set, get) => ({
           return oid && !apiIds.has(oid) && isNew;
         });
 
+        // Dòng này từng bị xoá nhầm (commit 5e7c08a) — `merged` không tồn tại làm getOrders
+        // ném ReferenceError mỗi lần gọi, trang Kho/Bán Hàng kẹt ở danh sách đơn cũ trong localStorage.
+        const merged = [...localOnlyOrders, ...apiOrders];
         const now = Date.now();
         const fortyEightHoursMs = 48 * 60 * 60 * 1000;
         const processed = merged.map(o => {

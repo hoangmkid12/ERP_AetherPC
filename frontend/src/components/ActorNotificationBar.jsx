@@ -77,10 +77,12 @@ function buildWarehouseTasks(d, inventory, isManager) {
     const inv = inventory.find(i => String(i.id) === String(productId));
     return inv ? Number(inv.stock || 0) : 0;
   };
+  // Cùng điều kiện với bộ lọc "Đủ hàng" (isOrderFulfillable) của tab Đơn Chờ Hàng.
+  const backorders = orders.filter(o => o.status === 'AWAITING_STOCK');
   tasks.push({
-    key: 'backorder', count: orders.filter(o => o.status === 'AWAITING_STOCK' && (o.items || []).length > 0
+    key: 'backorder', count: backorders.filter(o => (o.items || []).length > 0
       && (o.items || []).every(it => stockOf(it.productId || it.id) >= (Number(it.quantity) || 1))).length,
-    label: 'đơn chờ hàng nay đã đủ tồn kho, cần giải phóng',
+    label: `đơn chờ hàng nay đã đủ tồn kho, cần giải phóng (trong tổng ${backorders.length} đơn chờ hàng)`,
     path: '/admin/warehouse?tab=backorders', action: 'Giải Phóng'
   });
   tasks.push({
@@ -90,11 +92,13 @@ function buildWarehouseTasks(d, inventory, isManager) {
   });
   // Linh kiện dưới ngưỡng mà CHƯA có phiếu đề xuất đang mở — Thủ Kho lập phiếu, Quản Lý
   // Kho duyệt, rồi mới tới Mua Hàng (không gửi thẳng cho Mua Hàng).
+  // Cùng điều kiện với thẻ "Bổ sung hàng — N Cần mua" trên trang Kho (restockNeededItems).
   const coveredProducts = new Set(prs.filter(p => OPEN_PR_STATUSES.includes(p.status)).map(p => String(p.productId)));
+  const restockNeeded = inventory.filter(i => i.status !== 'DISCONTINUED' && Number(i.stock || 0) <= Number(i.threshold || 5));
+  const uncovered = restockNeeded.filter(i => !coveredProducts.has(String(i.id))).length;
   tasks.push({
-    key: 'low-stock', count: inventory.filter(i => i.status !== 'DISCONTINUED'
-      && Number(i.stock || 0) <= Number(i.threshold || 5) && !coveredProducts.has(String(i.id))).length,
-    label: 'linh kiện dưới ngưỡng tồn chưa lập phiếu đề xuất mua hàng',
+    key: 'low-stock', count: uncovered,
+    label: `linh kiện dưới ngưỡng tồn chưa lập phiếu đề xuất (tổng ${restockNeeded.length} cần mua, ${restockNeeded.length - uncovered} đã có phiếu)`,
     path: '/admin/warehouse?tab=rfq', action: 'Lập Phiếu'
   });
   return tasks;
