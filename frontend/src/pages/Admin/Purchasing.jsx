@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { formatCurrencyInWords } from '../../utils/numberToWords';
 import { printDocument } from '../../utils/printDocument';
+import SupplierConfirmationModal from '../../components/SupplierConfirmationModal';
 
 const CAT_ALIASES = {
   CPU: ['CPU', 'VI XỬ LÝ', 'CHIP', 'BỘ VI XỬ LÝ'],
@@ -1050,6 +1051,8 @@ export default function Purchasing() {
   const [printQuoteTarget, setPrintQuoteTarget] = useState(null);
   // Phiếu Mua Hàng (PO) — chứng từ chuẩn xem & in cho đơn mua hàng
   const [printPOTarget, setPrintPOTarget] = useState(null);
+  // Phiếu Xác Nhận Giao Hàng NCC — chứng từ xác nhận riêng biệt do NCC gửi
+  const [printConfirmTarget, setPrintConfirmTarget] = useState(null);
 
   const openIssuePOForm = (rfq) => {
     setIssuePOTarget(rfq);
@@ -2386,30 +2389,58 @@ export default function Purchasing() {
                               </button>
                             )}
                             {activeTab === 'orders' ? (
-                              <button
-                                onClick={() => setPrintPOTarget(po)}
-                                title="Xem / In Phiếu Mua Hàng (PO)"
-                                style={{
-                                  backgroundColor: '#eff6ff',
-                                  color: '#2563eb',
-                                  border: '1px solid #bfdbfe',
-                                  borderRadius: '4px',
-                                  padding: '0.3rem 0.5rem',
-                                  fontSize: '0.74rem',
-                                  fontWeight: 700,
-                                  cursor: 'pointer',
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  gap: '3px',
-                                  minWidth: '74px',
-                                  height: '28px',
-                                  boxSizing: 'border-box',
-                                  whiteSpace: 'nowrap'
-                                }}
-                              >
-                                <Printer size={12} /> In Phiếu
-                              </button>
+                              <>
+                                <button
+                                  onClick={() => setPrintPOTarget(po)}
+                                  title="Xem / In Phiếu Mua Hàng (PO)"
+                                  style={{
+                                    backgroundColor: '#eff6ff',
+                                    color: '#2563eb',
+                                    border: '1px solid #bfdbfe',
+                                    borderRadius: '4px',
+                                    padding: '0.3rem 0.5rem',
+                                    fontSize: '0.74rem',
+                                    fontWeight: 700,
+                                    cursor: 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '3px',
+                                    minWidth: '74px',
+                                    height: '28px',
+                                    boxSizing: 'border-box',
+                                    whiteSpace: 'nowrap'
+                                  }}
+                                >
+                                  <Printer size={12} /> In Phiếu
+                                </button>
+                                {['CONFIRMED_BY_SUPPLIER', 'PENDING_QA', 'QA_PASSED', 'QA_PARTIAL', 'QA_REJECTED', 'RECEIVED', 'DONE', 'COMPLETED'].includes(po.status) && (
+                                  <button
+                                    onClick={() => setPrintConfirmTarget(po)}
+                                    title="Xem / In Phiếu Xác Nhận Giao Hàng của NCC"
+                                    style={{
+                                      backgroundColor: '#f0fdf4',
+                                      color: '#15803d',
+                                      border: '1px solid #86efac',
+                                      borderRadius: '4px',
+                                      padding: '0.3rem 0.5rem',
+                                      fontSize: '0.74rem',
+                                      fontWeight: 700,
+                                      cursor: 'pointer',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      gap: '3px',
+                                      minWidth: '74px',
+                                      height: '28px',
+                                      boxSizing: 'border-box',
+                                      whiteSpace: 'nowrap'
+                                    }}
+                                  >
+                                    <FileText size={12} /> Phiếu XN
+                                  </button>
+                                )}
+                              </>
                             ) : (
                               ['QUOTED', 'PENDING_PO_DRAFT', 'CONVERTED'].includes(po.status) && (
                                 <button
@@ -3897,8 +3928,27 @@ export default function Purchasing() {
             {/* ── PHIẾU XÁC NHẬN CỦA NCC — Mua Hàng xem ── */}
             {['CONFIRMED_BY_SUPPLIER', 'PENDING_QA', 'QA_PASSED', 'QA_PARTIAL', 'QA_REJECTED', 'RECEIVED', 'DONE', 'COMPLETED'].includes(selectedPO.status) && (
               <div style={{ backgroundColor: '#f0fdf4', border: '2px solid #86efac', borderRadius: '8px', padding: '0.75rem 1rem', marginBottom: '1.25rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', marginBottom: '0.5rem', flexWrap: 'wrap' }}>
                   <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#15803d', textTransform: 'uppercase' }}>✅ NCC Đã Xác Nhận Giao Hàng</span>
+                  <button
+                    onClick={() => setPrintConfirmTarget(selectedPO)}
+                    title="Xem và in phiếu xác nhận giao hàng riêng của NCC"
+                    style={{
+                      backgroundColor: '#ffffff',
+                      color: '#15803d',
+                      border: '1.5px solid #86efac',
+                      borderRadius: '6px',
+                      padding: '0.35rem 0.75rem',
+                      fontSize: '0.78rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px'
+                    }}
+                  >
+                    <FileText size={13} /> Xem Phiếu Xác Nhận Riêng Của NCC
+                  </button>
                 </div>
                 <div style={{ display: 'flex', gap: '2rem', flexWrap: 'wrap', fontSize: '0.82rem' }}>
                   <div>
@@ -4194,6 +4244,30 @@ export default function Purchasing() {
                   }}
                 >
                   <Printer size={14} /> In Phiếu PO
+                </button>
+              )}
+
+              {['CONFIRMED_BY_SUPPLIER', 'PENDING_QA', 'QA_PASSED', 'QA_PARTIAL', 'QA_REJECTED', 'RECEIVED', 'DONE', 'COMPLETED'].includes(selectedPO.status) && (
+                <button
+                  onClick={() => setPrintConfirmTarget(selectedPO)}
+                  title="Xem & In Phiếu Xác Nhận Giao Hàng NCC"
+                  style={{
+                    backgroundColor: '#f0fdf4',
+                    color: '#15803d',
+                    border: '1px solid #86efac',
+                    borderRadius: '6px',
+                    padding: '0.5rem 1rem',
+                    fontSize: '0.82rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    whiteSpace: 'nowrap',
+                    flexShrink: 0
+                  }}
+                >
+                  <Printer size={14} /> Phiếu Xác Nhận NCC
                 </button>
               )}
 
@@ -5345,6 +5419,12 @@ export default function Purchasing() {
           </div>
         );
       })()}
+
+      {/* MODAL XEM & IN PHIẾU XÁC NHẬN GIAO HÀNG NCC (RIÊNG BIỆT) */}
+      <SupplierConfirmationModal
+        order={printConfirmTarget}
+        onClose={() => setPrintConfirmTarget(null)}
+      />
 
     </div>
   );

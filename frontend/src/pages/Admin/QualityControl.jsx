@@ -28,6 +28,7 @@ import {
   MoreHorizontal, ChevronDown, ChevronUp, ExternalLink
 } from 'lucide-react';
 import { printDocument } from '../../utils/printDocument';
+import SupplierConfirmationModal from '../../components/SupplierConfirmationModal';
 
 // Register ChartJS modules
 ChartJS.register(
@@ -88,6 +89,7 @@ export default function QualityControl() {
 
   // Modal State for QA Inbound Inspection (PO)
   const [selectedPO, setSelectedPO] = useState(null);
+  const [printConfirmTarget, setPrintConfirmTarget] = useState(null);
   const [inspectionDecision, setInspectionDecision] = useState('ACCEPT_ALL');
   const [passedQty, setPassedQty] = useState(0);
   const [failedQty, setFailedQty] = useState(0);
@@ -1345,12 +1347,23 @@ export default function QualityControl() {
                         <td style={{ padding: '0.65rem 0.85rem', textAlign: 'center' }}>
                           {isPending ? (
                             isQCOfficer ? (
-                              <button
-                                onClick={() => handleOpenInspectionModal(po)}
-                                style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '4px', padding: '0.35rem 0.85rem', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
-                              >
-                                <ShieldCheck size={14} /> Kiểm Định Ngay
-                              </button>
+                              <div style={{ display: 'inline-flex', gap: '0.35rem', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap' }}>
+                                <button
+                                  onClick={() => handleOpenInspectionModal(po)}
+                                  style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '4px', padding: '0.35rem 0.85rem', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
+                                >
+                                  <ShieldCheck size={14} /> Kiểm Định Ngay
+                                </button>
+                                {['CONFIRMED_BY_SUPPLIER', 'PENDING_QA', 'QA_PASSED', 'QA_PARTIAL', 'QA_REJECTED', 'RECEIVED', 'DONE', 'COMPLETED'].includes(po.status) && (
+                                  <button
+                                    onClick={() => setPrintConfirmTarget(po)}
+                                    title="Xem phiếu xác nhận đơn hàng NCC"
+                                    style={{ backgroundColor: '#f0fdf4', color: '#15803d', border: '1px solid #86efac', borderRadius: '4px', padding: '0.35rem 0.65rem', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
+                                  >
+                                    <FileText size={13} /> Phiếu XN
+                                  </button>
+                                )}
+                              </div>
                             ) : (
                               <span style={{ fontSize: '0.74rem', color: '#b45309', fontWeight: 600, backgroundColor: '#fef3c7', padding: '0.3rem 0.6rem', borderRadius: '4px', border: '1px solid #fde68a' }}>
                                 Chờ QA/QC kiểm định
@@ -2176,8 +2189,28 @@ export default function QualityControl() {
               {/* ── THÔNG TIN XÁC NHẬN CỦA NCC — hiện cho QC biết NCC đã hẹn ngày giao ── */}
               {['CONFIRMED_BY_SUPPLIER', 'PENDING_QA', 'QA_PASSED', 'QA_PARTIAL', 'QA_REJECTED', 'RECEIVED', 'DONE', 'COMPLETED'].includes(selectedPO.status) && (
                 <div style={{ backgroundColor: '#f0fdf4', border: '2px solid #86efac', borderRadius: '8px', padding: '0.75rem 1rem', marginBottom: '1.25rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', marginBottom: '0.5rem', flexWrap: 'wrap' }}>
                     <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#15803d', textTransform: 'uppercase' }}>✅ NCC Đã Xác Nhận Giao Hàng</span>
+                    <button
+                      type="button"
+                      onClick={() => setPrintConfirmTarget(selectedPO)}
+                      title="Xem và in phiếu xác nhận giao hàng riêng của NCC"
+                      style={{
+                        backgroundColor: '#ffffff',
+                        color: '#15803d',
+                        border: '1.5px solid #86efac',
+                        borderRadius: '6px',
+                        padding: '0.35rem 0.75rem',
+                        fontSize: '0.78rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '5px'
+                      }}
+                    >
+                      <FileText size={13} /> Xem Phiếu Xác Nhận Riêng Của NCC
+                    </button>
                   </div>
                   <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap', fontSize: '0.82rem' }}>
                     <div>
@@ -2376,7 +2409,16 @@ export default function QualityControl() {
               </div>
 
               {/* Action Footer */}
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem', borderTop: '1px solid #f1f5f9', paddingTop: '1rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '0.6rem', borderTop: '1px solid #f1f5f9', paddingTop: '1rem', flexWrap: 'wrap' }}>
+                {['CONFIRMED_BY_SUPPLIER', 'PENDING_QA', 'QA_PASSED', 'QA_PARTIAL', 'QA_REJECTED', 'RECEIVED', 'DONE', 'COMPLETED'].includes(selectedPO.status) && (
+                  <button
+                    type="button"
+                    onClick={() => setPrintConfirmTarget(selectedPO)}
+                    style={{ backgroundColor: '#f0fdf4', color: '#15803d', border: '1px solid #86efac', borderRadius: '6px', padding: '0.55rem 1.15rem', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '5px', marginRight: 'auto' }}
+                  >
+                    <FileText size={15} /> Xem Phiếu Xác Nhận NCC
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => setSelectedPO(null)}
@@ -3913,6 +3955,12 @@ export default function QualityControl() {
           </button>
         </div>
       )}
+
+      {/* MODAL XEM & IN PHIẾU XÁC NHẬN GIAO HÀNG NCC (RIÊNG BIỆT) */}
+      <SupplierConfirmationModal
+        order={printConfirmTarget}
+        onClose={() => setPrintConfirmTarget(null)}
+      />
 
     </div>
   );

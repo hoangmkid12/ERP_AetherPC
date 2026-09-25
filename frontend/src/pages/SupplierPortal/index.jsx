@@ -11,6 +11,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { formatCurrencyInWords } from '../../utils/numberToWords';
 import { printDocument } from '../../utils/printDocument';
+import SupplierConfirmationModal from '../../components/SupplierConfirmationModal';
 
 export default function SupplierPortal() {
   const { user, logout } = useAuth();
@@ -22,6 +23,7 @@ export default function SupplierPortal() {
   const [loading, setLoading] = useState(true);
   const [selectedPO, setSelectedPO] = useState(null);
   const [printPOTarget, setPrintPOTarget] = useState(null);
+  const [printConfirmTarget, setPrintConfirmTarget] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   
   // State for price input when confirming RFQ
@@ -1274,6 +1276,27 @@ export default function SupplierPortal() {
                             >
                               <Printer size={12} /> Xem Phiếu
                             </button>
+                            {['CONFIRMED_BY_SUPPLIER', 'PENDING_QA', 'QA_PASSED', 'QA_PARTIAL', 'QA_REJECTED', 'RECEIVED', 'DONE', 'COMPLETED'].includes(po.status) && (
+                              <button
+                                onClick={() => setPrintConfirmTarget(po)}
+                                title="Xem và in phiếu xác nhận giao hàng của NCC"
+                                style={{
+                                  background: '#f0fdf4',
+                                  border: '1px solid #86efac',
+                                  color: '#15803d',
+                                  borderRadius: '6px',
+                                  padding: '0.3rem 0.65rem',
+                                  fontSize: '0.75rem',
+                                  fontWeight: 700,
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px'
+                                }}
+                              >
+                                <Printer size={12} /> Phiếu Xác Nhận
+                              </button>
+                            )}
                             <button
                               onClick={() => handleSelectPO(po)}
                               style={{
@@ -1732,7 +1755,7 @@ export default function SupplierPortal() {
 
             {/* Modal Actions */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', borderTop: '1px solid #e2e8f0', paddingTop: '1.25rem', flexWrap: 'wrap' }}>
-              <div>
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                 <button
                   onClick={() => setPrintPOTarget(selectedPO)}
                   style={{
@@ -1749,8 +1772,28 @@ export default function SupplierPortal() {
                     gap: '6px'
                   }}
                 >
-                  <Printer size={16} /> Xem & In Phiếu
+                  <Printer size={16} /> In Phiếu PO
                 </button>
+                {['CONFIRMED_BY_SUPPLIER', 'PENDING_QA', 'QA_PASSED', 'QA_PARTIAL', 'QA_REJECTED', 'RECEIVED', 'DONE', 'COMPLETED'].includes(selectedPO.status) && (
+                  <button
+                    onClick={() => setPrintConfirmTarget(selectedPO)}
+                    style={{
+                      padding: '0.6rem 1.15rem',
+                      fontSize: '0.85rem',
+                      backgroundColor: '#f0fdf4',
+                      border: '1px solid #86efac',
+                      color: '#15803d',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      fontWeight: 700,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px'
+                    }}
+                  >
+                    <Printer size={16} /> In Phiếu Xác Nhận
+                  </button>
+                )}
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                 {(selectedPO.status === 'PO' || selectedPO.status === 'APPROVED') && (
@@ -2001,69 +2044,6 @@ export default function SupplierPortal() {
                     </p>
                   )}
 
-                  {/* ── PHIẾU XÁC NHẬN GIAO HÀNG — chỉ hiện khi NCC đã xác nhận ── */}
-                  {['CONFIRMED_BY_SUPPLIER', 'PENDING_QA', 'QA_PASSED', 'QA_PARTIAL', 'QA_REJECTED', 'RECEIVED', 'DONE', 'COMPLETED'].includes(printPOTarget.status) && (
-                    <div style={{ border: '2px solid #16a34a', borderRadius: '8px', padding: '0.6rem 0.85rem', marginBottom: '0.45rem', backgroundColor: '#f0fdf4' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', borderBottom: '1px solid #bbf7d0', paddingBottom: '0.35rem', marginBottom: '0.4rem' }}>
-                        <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#15803d', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
-                          ✅ Phiếu Xác Nhận Giao Hàng — Nhà Cung Cấp
-                        </span>
-                      </div>
-                      <table style={{ width: '100%', borderCollapse: 'collapse', border: 'none', fontSize: '0.75rem' }}>
-                        <tbody>
-                          <tr>
-                            <td style={{ width: '50%', verticalAlign: 'top', paddingRight: '0.5rem' }}>
-                              <div style={{ color: '#64748b', fontWeight: 600, marginBottom: '0.1rem' }}>Nhà Cung Cấp xác nhận:</div>
-                              <div style={{ color: '#0f172a', fontWeight: 700, fontSize: '0.82rem' }}>{getSupplierName(printPOTarget)}</div>
-                              <div style={{ color: '#64748b', marginTop: '0.2rem' }}>Mã NCC: {printPOTarget.supplierCode || user?.code || '—'}</div>
-                            </td>
-                            <td style={{ width: '50%', verticalAlign: 'top', paddingLeft: '0.5rem' }}>
-                              <div style={{ color: '#64748b', fontWeight: 600, marginBottom: '0.1rem' }}>Ngày hẹn giao hàng:</div>
-                              <div style={{ color: '#15803d', fontWeight: 800, fontSize: '0.9rem' }}>
-                                {printPOTarget.expectedDeliveryDate ? formatDate(printPOTarget.expectedDeliveryDate) : '—'}
-                              </div>
-                              <div style={{ color: '#64748b', marginTop: '0.2rem' }}>
-                                Ngày xác nhận: {formatDate(printPOTarget.updatedAt || new Date())}
-                              </div>
-                            </td>
-                          </tr>
-                          {(printPOTarget.supplierNote || printPOTarget.note) && (
-                            <tr>
-                              <td colSpan={2} style={{ paddingTop: '0.35rem' }}>
-                                <div style={{ color: '#64748b', fontWeight: 600, marginBottom: '0.1rem' }}>Ghi chú của NCC:</div>
-                                <div style={{ color: '#334155', fontStyle: 'italic' }}>{printPOTarget.supplierNote || printPOTarget.note}</div>
-                              </td>
-                            </tr>
-                          )}
-                          <tr>
-                            <td colSpan={2} style={{ paddingTop: '0.45rem' }}>
-                              <table style={{ width: '100%', borderCollapse: 'collapse', border: 'none' }}>
-                                <tbody>
-                                  <tr>
-                                    <td style={{ width: '50%', textAlign: 'center', paddingTop: '0.3rem' }}>
-                                      <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#15803d' }}>ĐẠI DIỆN NHÀ CUNG CẤP</div>
-                                      <div style={{ fontSize: '0.6rem', color: '#94a3b8' }}>(Ký, ghi rõ họ tên)</div>
-                                      <div style={{ height: '40px', border: '1px dashed #86efac', borderRadius: '4px', margin: '0.3rem auto', maxWidth: '140px', backgroundColor: '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                        <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#15803d' }}>✓ Đã Xác Nhận Điện Tử</span>
-                                      </div>
-                                      <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#0f172a' }}>{getSupplierName(printPOTarget)}</div>
-                                    </td>
-                                    <td style={{ width: '50%', textAlign: 'center', paddingTop: '0.3rem' }}>
-                                      <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#1d4ed8' }}>PHÒNG MUA HÀNG TIẾP NHẬN</div>
-                                      <div style={{ fontSize: '0.6rem', color: '#94a3b8' }}>(Ký, ghi rõ họ tên)</div>
-                                      <div style={{ height: '40px', border: '1px dashed #cbd5e1', borderRadius: '4px', margin: '0.3rem auto', maxWidth: '140px' }} />
-                                      <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#94a3b8' }}>Nhân Viên Mua Hàng</div>
-                                    </td>
-                                  </tr>
-                                </tbody>
-                              </table>
-                            </td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-
                   {/* Thông tin điều khoản & giao nhận */}
                   <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '0.35rem 0.65rem', marginBottom: '0.45rem', fontSize: '0.72rem', display: 'flex', flexDirection: 'column', gap: '0.15rem', lineHeight: 1.35 }}>
                     <div>
@@ -2223,11 +2203,16 @@ export default function SupplierPortal() {
                   Đóng
                 </button>
               </div>
-
             </div>
           </div>
         );
       })()}
+
+      {/* MODAL XEM & IN PHIẾU XÁC NHẬN GIAO HÀNG NCC (RIÊNG BIỆT) */}
+      <SupplierConfirmationModal
+        order={printConfirmTarget}
+        onClose={() => setPrintConfirmTarget(null)}
+      />
     </div>
   );
 }
