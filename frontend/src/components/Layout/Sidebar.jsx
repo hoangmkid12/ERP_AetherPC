@@ -40,6 +40,7 @@ export default function Sidebar({ isOpen = false, onClose }) {
   const inventory = useInventoryStore(state => state.inventory) || [];
   const orders = useSalesStore(state => state.orders) || [];
   const returnRequests = useSalesStore(state => state.returnRequests) || [];
+  const complaints = useSalesStore(state => state.complaints) || [];
   const purchaseOrders = useFinanceStore(state => state.purchaseOrders) || [];
   const payrolls = useHRStore(state => state.payrolls) || [];
   const leaveRequests = useHRStore(state => state.leaveRequests) || [];
@@ -205,6 +206,7 @@ export default function Sidebar({ isOpen = false, onClose }) {
   const pendingLeaveApproval = (leaveRequests || []).filter(l => l && (l.status === 'PENDING_CEO' || l.status === 'PENDING')).length;
   const pendingCeoApprovals = pendingQuotedPOs + pendingPayrollApproval + pendingLeaveApproval;
   const pendingQaCount = (purchaseOrders || []).filter(p => p && ['CONFIRMED_BY_SUPPLIER', 'PO', 'APPROVED', 'PENDING_QA', 'SHIPPED', 'DELIVERED'].includes(p.status)).length;
+  const openComplaintsCount = (complaints || []).filter(c => c && ['OPEN', 'IN_PROGRESS'].includes(c.status)).length;
 
   const handleLogout = () => {
     logout();
@@ -1164,6 +1166,9 @@ export default function Sidebar({ isOpen = false, onClose }) {
                       const currentTab = new URLSearchParams(location.search).get('tab') || 'overview';
                       const isSubActive = currentTab === sub.tab;
 
+                      let badgeVal = 0;
+                      if (sub.badgeKey === 'pendingLeaveApproval') badgeVal = pendingLeaveApproval;
+
                       return (
                         <NavLink
                           key={sub.tab}
@@ -1184,6 +1189,15 @@ export default function Sidebar({ isOpen = false, onClose }) {
                           }}
                         >
                           <span style={{ flex: 1 }}>{sub.label}</span>
+                          {badgeVal > 0 && (
+                            <span style={{
+                              backgroundColor: '#ef4444', color: '#ffffff', fontSize: '0.68rem', fontWeight: 800,
+                              padding: '2px 8px', borderRadius: '10px', lineHeight: '1', marginLeft: 'auto',
+                              flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center'
+                            }}>
+                              {badgeVal}
+                            </span>
+                          )}
                         </NavLink>
                       );
                     })}
@@ -1196,6 +1210,10 @@ export default function Sidebar({ isOpen = false, onClose }) {
                     {accountingSubItems.map(sub => {
                       const currentTab = new URLSearchParams(location.search).get('tab') || 'overview';
                       const isSubActive = currentTab === sub.tab;
+
+                      let badgeVal = 0;
+                      if (sub.badgeKey === 'pendingQuotedPOs') badgeVal = pendingQuotedPOs;
+                      if (sub.badgeKey === 'pendingPayrollApproval') badgeVal = pendingPayrollApproval;
 
                       return (
                         <NavLink
@@ -1217,6 +1235,15 @@ export default function Sidebar({ isOpen = false, onClose }) {
                           }}
                         >
                           <span style={{ flex: 1 }}>{sub.label}</span>
+                          {badgeVal > 0 && (
+                            <span style={{
+                              backgroundColor: '#ef4444', color: '#ffffff', fontSize: '0.68rem', fontWeight: 800,
+                              padding: '2px 8px', borderRadius: '10px', lineHeight: '1', marginLeft: 'auto',
+                              flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center'
+                            }}>
+                              {badgeVal}
+                            </span>
+                          )}
                         </NavLink>
                       );
                     })}
@@ -1229,6 +1256,13 @@ export default function Sidebar({ isOpen = false, onClose }) {
                     {cskhSubItems.map(sub => {
                       const currentTab = new URLSearchParams(location.search).get('tab') || 'overview';
                       const isSubActive = currentTab === sub.tab;
+
+                      // 'onlineChatCount' vẫn bỏ trống — không có nguồn dữ liệu nào
+                      // (store/API) đang giữ số phiên chat online để tính, khác với
+                      // openComplaintsCount/pendingReturnsCount đã có sẵn dữ liệu thật.
+                      let badgeVal = 0;
+                      if (sub.badgeKey === 'openComplaintsCount') badgeVal = openComplaintsCount;
+                      if (sub.badgeKey === 'pendingReturnsCount') badgeVal = pendingReturnsCount;
 
                       return (
                         <NavLink
@@ -1250,6 +1284,15 @@ export default function Sidebar({ isOpen = false, onClose }) {
                           }}
                         >
                           <span style={{ flex: 1 }}>{sub.label}</span>
+                          {badgeVal > 0 && (
+                            <span style={{
+                              backgroundColor: '#ef4444', color: '#ffffff', fontSize: '0.68rem', fontWeight: 800,
+                              padding: '2px 8px', borderRadius: '10px', lineHeight: '1', marginLeft: 'auto',
+                              flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center'
+                            }}>
+                              {badgeVal}
+                            </span>
+                          )}
                         </NavLink>
                       );
                     })}
