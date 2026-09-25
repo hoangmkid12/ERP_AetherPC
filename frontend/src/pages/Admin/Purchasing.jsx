@@ -143,8 +143,9 @@ export default function Purchasing() {
   const [selectedViewPR, setSelectedViewPR] = useState(null);
   const [selectedProcessPR, setSelectedProcessPR] = useState(null);
   const [processQty, setProcessQty] = useState(1);
-  const [rejectReason, setRejectReason] = useState('');
-  const [isRejecting, setIsRejecting] = useState(false);
+  // id của Phiếu Yêu Cầu Mua Hàng (đã được Quản Lý Kho duyệt) mà RFQ đang lập dựa trên
+  // — gửi kèm khi tạo RFQ để backend kiểm tra đề xuất đã duyệt và đánh dấu RFQ_CREATED.
+  const [rfqSourcePrId, setRfqSourcePrId] = useState(null);
 
   // Modal State
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -259,6 +260,7 @@ export default function Purchasing() {
     setPoBlanketCap('');
     setPoBlanketValidUntil('');
     setPoBlanketRefId(null);
+    setRfqSourcePrId(null);
 
     const estCost = product?.price ? Math.round(Number(product.price) * 0.8) : 1500000;
     setPoItems([{
@@ -281,6 +283,7 @@ export default function Purchasing() {
     setPoBlanketCap('');
     setPoBlanketValidUntil('');
     setPoBlanketRefId(null);
+    setRfqSourcePrId(null);
     try { window.history.replaceState({}, document.title); } catch (_) {}
     setShowCreateModal(true);
   };
@@ -370,6 +373,7 @@ export default function Purchasing() {
     setPoBlanketCap('');
     setPoBlanketValidUntil('');
     setPoBlanketRefId(po.isBlanket ? po.id : null);
+    setRfqSourcePrId(null);
     setSelectedPO(null);
     setShowCreateModal(true);
   };
@@ -662,22 +666,12 @@ export default function Purchasing() {
       }
     }
 
-    let alertLogs = [];
-    try {
-      alertLogs = JSON.parse(localStorage.getItem('erp_rfq_alert_logs') || '[]');
-    } catch (_) {}
-
-    let localPRs = [];
-    try {
-      localPRs = JSON.parse(localStorage.getItem('erp_purchase_requests') || '[]');
-    } catch (_) {}
-
-    const map = new Map();
-
-    // 1. Put DB records
-    dbReqs.forEach(r => {
-      const key = r.prCode || String(r.id);
-      map.set(key, {
+    // Chỉ lấy Phiếu Yêu Cầu Mua Hàng THẬT trong CSDL (backend đã lọc cho Phòng Mua
+    // Hàng chỉ thấy phiếu Quản Lý Kho đã duyệt). Trước đây còn trộn thêm cảnh báo/phiếu
+    // lưu localStorage — những bản ghi đó chưa từng qua bước ký duyệt của Quản Lý Kho
+    // nên Mua Hàng có thể lập RFQ thẳng từ đó, sai quy trình.
+    const list = dbReqs
+      .map(r => ({
         id: r.id,
         prCode: r.prCode || `PR-${r.id}`,
         productId: r.productId,
@@ -692,151 +686,21 @@ export default function Purchasing() {
         approvedAt: r.approvedAt || null,
         createdAt: r.createdAt || new Date().toISOString(),
         source: 'PR_INTERNAL'
-      });
-    });
-
-    // 2. Put local PR records
-    localPRs.forEach(r => {
-      const key = r.prCode || String(r.id);
-      if (!map.has(key)) {
-        map.set(key, {
-          id: r.id || key,
-          prCode: r.prCode || key,
-          productId: r.productId,
-          productName: r.productName || r.product?.name || 'Linh kiện',
-          sku: r.sku || '',
-          stock: r.stock !== undefined ? r.stock : null,
-          quantity: r.quantity || 10,
-          reason: r.reason || 'Đề xuất bổ sung hàng',
-          status: r.status || 'PENDING',
-          requestedBy: r.requestedBy || 'Thủ Kho',
-          approvedBy: r.approvedBy || null,
-          approvedAt: r.approvedAt || null,
-          createdAt: r.createdAt || new Date().toISOString(),
-          source: 'PR_INTERNAL'
-        });
-      }
-    });
-
-    // 3. Put Alert logs
-    alertLogs.forEach((log, idx) => {
-      const code = log.prCode || `PR-ALERT-${String(log.timestamp || (Date.now() - idx * 86400000)).slice(-6)}`;
-      const key = log.id || code;
-      if (!map.has(key)) {
-        map.set(key, {
-          id: key,
-          prCode: code,
-          productId: log.productId || log.id,
-          productName: log.productName || log.name || 'Linh kiện cảnh báo',
-          sku: log.sku || '',
-          stock: log.currentStock !== undefined ? log.currentStock : log.stock,
-          threshold: log.threshold || 5,
-          quantity: log.requestedQty || log.quantity || 14,
-          reason: log.reason || log.alertReason || 'Tồn kho chạm ngưỡng tối thiểu',
-          status: log.status === 'HANDLED' || log.handled ? 'APPROVED' : 'PENDING',
-          requestedBy: log.requestedBy || 'Thủ Kho',
-          approvedBy: log.handledBy || null,
-          approvedAt: null,
-          createdAt: log.createdAt || log.timestamp || new Date().toISOString(),
-          source: 'STOCK_ALERT'
-        });
-      }
-    });
-
-    const list = Array.from(map.values()).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      }))
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
     setPurchaseRequests(list);
     if (!silent) setLoadingPRs(false);
   };
 
-  const handleApprovePR = async (pr, showNotification = true) => {
-    try {
-      if (typeof pr.id === 'number') {
-        try {
-          await api.patch(`/purchasing/requests/${pr.id}/approve`);
-        } catch (_) {
-          await api.patch(`/warehouse/purchase-requests/${pr.id}/approve`);
-        }
-      }
-    } catch (e) {
-      console.warn('API approve failed, local fallback:', e);
-    }
-
-    const approverName = user?.name || user?.fullname || user?.email || 'Phòng Mua Hàng';
-    const nowISO = new Date().toISOString();
-
-    // Local PR storage
-    try {
-      const local = JSON.parse(localStorage.getItem('erp_purchase_requests') || '[]');
-      const updated = local.map(item => (item.id === pr.id || item.prCode === pr.prCode) ? { ...item, status: 'APPROVED', approvedBy: approverName, approvedAt: nowISO } : item);
-      localStorage.setItem('erp_purchase_requests', JSON.stringify(updated));
-    } catch (_) {}
-
-    // Alert logs
-    try {
-      const alerts = JSON.parse(localStorage.getItem('erp_rfq_alert_logs') || '[]');
-      const updatedAlerts = alerts.map(item => (item.id === pr.id || item.prCode === pr.prCode) ? { ...item, status: 'HANDLED', handled: true, handledBy: approverName } : item);
-      localStorage.setItem('erp_rfq_alert_logs', JSON.stringify(updatedAlerts));
-    } catch (_) {}
-
-    // State
-    setPurchaseRequests(prev => prev.map(item => (item.id === pr.id || item.prCode === pr.prCode) ? {
-      ...item,
-      status: 'APPROVED',
-      approvedBy: approverName,
-      approvedAt: nowISO
-    } : item));
-
-    setSelectedProcessPR(null);
-    if (showNotification) {
-      notify ? notify(`Đã phê duyệt Yêu Cầu Mua Hàng ${pr.prCode} thành công!`, 'success') : alert(`Đã phê duyệt Yêu Cầu Mua Hàng ${pr.prCode} thành công!`);
-    }
-  };
-
-  const handleRejectPR = async (pr, customReason) => {
-    const finalReason = (customReason || rejectReason || 'Không duyệt ngân sách / Đã đủ tồn kho').trim();
-    try {
-      if (typeof pr.id === 'number') {
-        try {
-          await api.patch(`/purchasing/requests/${pr.id}/reject`, { reason: finalReason });
-        } catch (_) {
-          await api.patch(`/warehouse/purchase-requests/${pr.id}/reject`, { reason: finalReason });
-        }
-      }
-    } catch (e) {
-      console.warn('API reject failed, local fallback:', e);
-    }
-
-    const approverName = user?.name || user?.fullname || user?.email || 'Phòng Mua Hàng';
-
-    // Local PR storage
-    try {
-      const local = JSON.parse(localStorage.getItem('erp_purchase_requests') || '[]');
-      const updated = local.map(item => (item.id === pr.id || item.prCode === pr.prCode) ? { ...item, status: 'REJECTED', rejectReason: finalReason, approvedBy: approverName } : item);
-      localStorage.setItem('erp_purchase_requests', JSON.stringify(updated));
-    } catch (_) {}
-
-    // Alert logs
-    try {
-      const alerts = JSON.parse(localStorage.getItem('erp_rfq_alert_logs') || '[]');
-      const updatedAlerts = alerts.map(item => (item.id === pr.id || item.prCode === pr.prCode) ? { ...item, status: 'REJECTED', handled: true, rejectReason: finalReason, handledBy: approverName } : item);
-      localStorage.setItem('erp_rfq_alert_logs', JSON.stringify(updatedAlerts));
-    } catch (_) {}
-
-    // State
-    setPurchaseRequests(prev => prev.map(item => (item.id === pr.id || item.prCode === pr.prCode) ? {
-      ...item,
-      status: 'REJECTED',
-      rejectReason: finalReason,
-      approvedBy: approverName
-    } : item));
-
-    setSelectedProcessPR(null);
-    setIsRejecting(false);
-    setRejectReason('');
-    notify ? notify(`Đã từ chối Yêu Cầu Mua Hàng ${pr.prCode}.`, 'info') : alert(`Đã từ chối Yêu Cầu Mua Hàng ${pr.prCode}.`);
-  };
-
+  // Lập RFQ từ một Phiếu Yêu Cầu Mua Hàng. Theo quy trình Mua Hàng – Thanh Toán,
+  // Phòng Mua Hàng chỉ nhận đề xuất ĐÃ được Quản Lý Kho ký duyệt — không tự duyệt
+  // hay từ chối đề xuất của kho (trước đây hàm này ngầm gọi API duyệt đề xuất).
+  // id đề xuất được gửi kèm khi tạo RFQ để backend kiểm tra lại và đánh dấu RFQ_CREATED.
   const handleCreateRfqFromPR = (pr, overrideQty) => {
+    if (!pr || !['APPROVED', 'RFQ_CREATED'].includes(pr.status)) {
+      notify('Phiếu yêu cầu này chưa được Quản Lý Kho ký duyệt — chưa thể lập RFQ.', 'error');
+      return;
+    }
     const qtyToUse = overrideQty || pr.quantity || 1;
     const matchedProd = effectiveCatalog.find(p => 
       String(p.productId || p.id) === String(pr.productId) || 
@@ -849,9 +713,9 @@ export default function Purchasing() {
       stockQuantity: pr.stock,
       sku: pr.sku
     };
-    // Mark PR as approved/processed silently
-    handleApprovePR(pr, false);
+    setSelectedProcessPR(null);
     handleOpenRFQForProduct(matchedProd, qtyToUse);
+    setRfqSourcePrId(pr.id);
   };
 
   useEffect(() => {
@@ -895,6 +759,7 @@ export default function Purchasing() {
     setPoBlanketCap('');
     setPoBlanketValidUntil('');
     setPoBlanketRefId(null);
+    setRfqSourcePrId(null);
     if (prod) {
       const prodId = String(prod.productId || prod.id || '');
       setProductSearchQuery(prod.name || '');
@@ -1037,7 +902,8 @@ export default function Purchasing() {
               quantity: parseInt(item.quantity, 10),
               unitCost: parseFloat(item.unitCost || 0)
             })),
-            isMultiRfqGroup: true
+            isMultiRfqGroup: true,
+            ...(rfqSourcePrId ? { purchaseRequestId: rfqSourcePrId } : {})
           };
 
           try {
@@ -1057,6 +923,7 @@ export default function Purchasing() {
         if (createdPOs.length > 0) {
           await fetchData();
           setShowCreateModal(false);
+          if (rfqSourcePrId) { setRfqSourcePrId(null); loadPurchaseRequests(true); }
         }
         if (failedCount === 0 && createdPOs.length > 0) {
           notify(`Đã khởi tạo thành công ${createdPOs.length} Yêu Cầu Báo Giá (RFQ) gửi tới các Nhà Cung Cấp.`, 'success');
@@ -1082,7 +949,8 @@ export default function Purchasing() {
             blanketCapAmount: poBlanketCap ? parseFloat(poBlanketCap) : null,
             blanketValidUntil: poBlanketValidUntil || null
           } : {}),
-          ...(poBlanketRefId ? { blanketRefId: poBlanketRefId } : {})
+          ...(poBlanketRefId ? { blanketRefId: poBlanketRefId } : {}),
+          ...(rfqSourcePrId ? { purchaseRequestId: rfqSourcePrId } : {})
         };
 
         try {
@@ -1090,6 +958,7 @@ export default function Purchasing() {
           if (res?.success) {
             await fetchData();
             setShowCreateModal(false);
+            if (rfqSourcePrId) { setRfqSourcePrId(null); loadPurchaseRequests(true); }
             notify(
               poIsBlanket
                 ? 'Tạo Hợp Đồng Khung thành công.'
@@ -1762,7 +1631,7 @@ export default function Purchasing() {
                 </button>
               </div>
               <p style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '1rem' }}>
-                Đề xuất bổ sung hàng từ kho: có <strong style={{ color: '#d97706' }}>{purchaseRequests.filter(r => r.status === 'PENDING').length} yêu cầu mới</strong> cần khảo sát giá và lên đơn.
+                Đề xuất bổ sung hàng từ kho: có <strong style={{ color: '#d97706' }}>{purchaseRequests.filter(r => r.status === 'APPROVED').length} yêu cầu đã được Quản Lý Kho duyệt</strong> cần khảo sát giá và lên đơn.
               </p>
               <div style={{ display: 'flex', gap: '0.5rem' }}>
                 <button
@@ -1781,20 +1650,21 @@ export default function Purchasing() {
       {/* TAB: REQUESTS (DANH SÁCH YÊU CẦU MUA HÀNG - PR) */}
       {/* ========================================================================= */}
       {activeTab === 'requests' && (() => {
-        const pendingCount = purchaseRequests.filter(r => r.status === 'PENDING').length;
-        const approvedCount = purchaseRequests.filter(r => r.status === 'APPROVED').length;
+        // Phòng Mua Hàng chỉ nhận phiếu đã được Quản Lý Kho duyệt (APPROVED = chờ lập RFQ,
+        // RFQ_CREATED = đã lập RFQ). PENDING/REJECTED chỉ hiện với CEO/ADMIN (backend lọc).
+        const toRfqCount = purchaseRequests.filter(r => r.status === 'APPROVED').length;
+        const rfqCreatedCount = purchaseRequests.filter(r => r.status === 'RFQ_CREATED').length;
+        const awaitingManagerCount = purchaseRequests.filter(r => r.status === 'PENDING').length;
         const rejectedCount = purchaseRequests.filter(r => r.status === 'REJECTED').length;
 
         const filteredRequests = purchaseRequests.filter(r => {
-          const matchSearch = !prSearchTerm || 
+          const matchSearch = !prSearchTerm ||
             (r.prCode || '').toLowerCase().includes(prSearchTerm.toLowerCase()) ||
             (r.productName || '').toLowerCase().includes(prSearchTerm.toLowerCase()) ||
             (r.reason || '').toLowerCase().includes(prSearchTerm.toLowerCase()) ||
             (r.requestedBy || '').toLowerCase().includes(prSearchTerm.toLowerCase());
-          
-          if (prStatusFilter === 'PENDING') return matchSearch && r.status === 'PENDING';
-          if (prStatusFilter === 'APPROVED') return matchSearch && r.status === 'APPROVED';
-          if (prStatusFilter === 'REJECTED') return matchSearch && r.status === 'REJECTED';
+
+          if (prStatusFilter !== 'ALL') return matchSearch && r.status === prStatusFilter;
           return matchSearch;
         });
 
@@ -1874,8 +1744,8 @@ export default function Purchasing() {
               <div style={{ backgroundColor: '#fffbeb', padding: '1rem 1.25rem', borderRadius: '8px', border: '1px solid #fde68a' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
-                    <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#b45309' }}>Chờ Duyệt</div>
-                    <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#b45309', marginTop: '0.2rem' }}>{pendingCount}</div>
+                    <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#b45309' }}>Chờ Lập RFQ</div>
+                    <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#b45309', marginTop: '0.2rem' }}>{toRfqCount}</div>
                   </div>
                   <div style={{ width: '38px', height: '38px', borderRadius: '8px', backgroundColor: '#fef3c7', color: '#d97706', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <Clock size={20} />
@@ -1886,8 +1756,8 @@ export default function Purchasing() {
               <div style={{ backgroundColor: '#f0fdf4', padding: '1rem 1.25rem', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
-                    <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#15803d' }}>Đã Duyệt</div>
-                    <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#15803d', marginTop: '0.2rem' }}>{approvedCount}</div>
+                    <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#15803d' }}>Đã Lập RFQ</div>
+                    <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#15803d', marginTop: '0.2rem' }}>{rfqCreatedCount}</div>
                   </div>
                   <div style={{ width: '38px', height: '38px', borderRadius: '8px', backgroundColor: '#dcfce7', color: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <CheckCircle2 size={20} />
@@ -1924,9 +1794,10 @@ export default function Purchasing() {
               <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
                 {[
                   { key: 'ALL', label: `Tất cả (${purchaseRequests.length})` },
-                  { key: 'PENDING', label: `Chờ duyệt (${pendingCount})` },
-                  { key: 'APPROVED', label: `Đã duyệt (${approvedCount})` },
-                  { key: 'REJECTED', label: `Từ chối (${rejectedCount})` }
+                  { key: 'APPROVED', label: `Chờ lập RFQ (${toRfqCount})` },
+                  { key: 'RFQ_CREATED', label: `Đã lập RFQ (${rfqCreatedCount})` },
+                  ...(awaitingManagerCount > 0 ? [{ key: 'PENDING', label: `Chờ QL Kho duyệt (${awaitingManagerCount})` }] : []),
+                  ...(rejectedCount > 0 ? [{ key: 'REJECTED', label: `Từ chối (${rejectedCount})` }] : [])
                 ].map(f => (
                   <button
                     key={f.key}
@@ -1995,12 +1866,13 @@ export default function Purchasing() {
                     ) : (
                       filteredRequests.map(pr => {
                         const isApproved = pr.status === 'APPROVED';
+                        const isRfqCreated = pr.status === 'RFQ_CREATED';
                         const isRejected = pr.status === 'REJECTED';
 
-                        const badgeBg = isApproved ? '#f0fdf4' : isRejected ? '#fef2f2' : '#fffbeb';
-                        const badgeColor = isApproved ? '#15803d' : isRejected ? '#dc2626' : '#b45309';
-                        const badgeBorder = isApproved ? '#bbf7d0' : isRejected ? '#fecaca' : '#fde68a';
-                        const badgeText = isApproved ? 'Đã Duyệt' : isRejected ? 'Từ Chối' : 'Chờ Duyệt';
+                        const badgeBg = isRfqCreated ? '#eff6ff' : isApproved ? '#f0fdf4' : isRejected ? '#fef2f2' : '#fffbeb';
+                        const badgeColor = isRfqCreated ? '#1d4ed8' : isApproved ? '#15803d' : isRejected ? '#dc2626' : '#b45309';
+                        const badgeBorder = isRfqCreated ? '#bfdbfe' : isApproved ? '#bbf7d0' : isRejected ? '#fecaca' : '#fde68a';
+                        const badgeText = isRfqCreated ? 'Đã Lập RFQ' : isApproved ? 'QL Kho Đã Duyệt' : isRejected ? 'Từ Chối' : 'Chờ QL Kho Duyệt';
 
                         return (
                           <tr key={pr.id || pr.prCode} style={{ borderBottom: '1px solid #f1f5f9' }}>
@@ -2113,33 +1985,14 @@ export default function Purchasing() {
                               <div style={{ display: 'flex', gap: '0.35rem', justifyContent: 'center', alignItems: 'center' }}>
                                 {pr.status === 'PENDING' ? (
                                   <>
-                                    <button
-                                      onClick={() => {
-                                        setSelectedProcessPR(pr);
-                                        setProcessQty(pr.quantity || 1);
-                                        setIsRejecting(false);
-                                        setRejectReason('');
-                                      }}
-                                      title="Xử lý yêu cầu mua hàng (Tạo RFQ / Ký Duyệt / Từ Chối)"
-                                      style={{
-                                        backgroundColor: '#2563eb',
-                                        color: '#ffffff',
-                                        border: 'none',
-                                        borderRadius: '6px',
-                                        padding: '0.42rem 0.75rem',
-                                        fontSize: '0.76rem',
-                                        fontWeight: 700,
-                                        cursor: 'pointer',
-                                        display: 'inline-flex',
-                                        alignItems: 'center',
-                                        gap: '0.3rem',
-                                        boxShadow: '0 1px 3px rgba(37,99,235,0.25)',
-                                        whiteSpace: 'nowrap'
-                                      }}
+                                    {/* Chưa được Quản Lý Kho ký duyệt — Phòng Mua Hàng chưa được lập RFQ */}
+                                    <span
+                                      title="Phiếu đang chờ Quản Lý Kho ký duyệt"
+                                      style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.74rem', fontWeight: 600, color: '#b45309', whiteSpace: 'nowrap' }}
                                     >
-                                      <CheckCircle2 size={13} />
-                                      <span>Xử Lý</span>
-                                    </button>
+                                      <Clock size={13} />
+                                      <span>Chờ QL Kho</span>
+                                    </span>
                                     <button
                                       onClick={() => setSelectedViewPR(pr)}
                                       title="Xem chi tiết phiếu"
@@ -2161,8 +2014,11 @@ export default function Purchasing() {
                                 ) : pr.status === 'APPROVED' ? (
                                   <>
                                     <button
-                                      onClick={() => handleCreateRfqFromPR(pr)}
-                                      title="Tạo Yêu Cầu Báo Giá (RFQ)"
+                                      onClick={() => {
+                                        setSelectedProcessPR(pr);
+                                        setProcessQty(pr.quantity || 1);
+                                      }}
+                                      title="Tạo Yêu Cầu Báo Giá (RFQ) từ phiếu đã được Quản Lý Kho duyệt"
                                       style={{
                                         backgroundColor: '#059669',
                                         color: '#ffffff',
@@ -2203,7 +2059,7 @@ export default function Purchasing() {
                                 ) : (
                                   <button
                                     onClick={() => setSelectedViewPR(pr)}
-                                    title="Xem lý do từ chối"
+                                    title={isRejected ? 'Xem lý do từ chối' : 'Xem chi tiết phiếu'}
                                     style={{
                                       backgroundColor: '#f8fafc',
                                       color: '#64748b',
@@ -2749,6 +2605,7 @@ export default function Purchasing() {
                             setPoBlanketCap('');
                             setPoBlanketValidUntil('');
                             setPoBlanketRefId(null);
+                            setRfqSourcePrId(null);
                             setShowCreateModal(true);
                           }}
                           style={{
@@ -3411,8 +3268,8 @@ export default function Purchasing() {
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.5rem', fontSize: '0.85rem' }}>
                 <span style={{ color: '#64748b' }}>Trạng thái:</span>
                 {(() => {
-                  const statusLabel = selectedViewPR.status === 'APPROVED' ? 'Đã Duyệt' : selectedViewPR.status === 'REJECTED' ? 'Từ Chối' : 'Chờ Duyệt';
-                  const statusColor = selectedViewPR.status === 'APPROVED' ? '#15803d' : selectedViewPR.status === 'REJECTED' ? '#dc2626' : '#b45309';
+                  const statusLabel = selectedViewPR.status === 'RFQ_CREATED' ? 'Đã Lập RFQ' : selectedViewPR.status === 'APPROVED' ? 'QL Kho Đã Duyệt' : selectedViewPR.status === 'REJECTED' ? 'Từ Chối' : 'Chờ QL Kho Duyệt';
+                  const statusColor = selectedViewPR.status === 'RFQ_CREATED' ? '#1d4ed8' : selectedViewPR.status === 'APPROVED' ? '#15803d' : selectedViewPR.status === 'REJECTED' ? '#dc2626' : '#b45309';
                   return <strong style={{ color: statusColor }}>{statusLabel}</strong>;
                 })()}
                 {selectedViewPR.approvedBy && (
@@ -3453,17 +3310,19 @@ export default function Purchasing() {
               >
                 <Printer size={15} /> In Phiếu
               </button>
-              <button
-                onClick={() => {
-                  const pr = selectedViewPR;
-                  setSelectedViewPR(null);
-                  handleCreateRfqFromPR(pr);
-                }}
-                style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.5rem 1.25rem', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
-              >
-                <ShoppingCart size={15} />
-                <span>Chuyển Thành RFQ Ngay</span>
-              </button>
+              {['APPROVED', 'RFQ_CREATED'].includes(selectedViewPR.status) && (
+                <button
+                  onClick={() => {
+                    const pr = selectedViewPR;
+                    setSelectedViewPR(null);
+                    handleCreateRfqFromPR(pr);
+                  }}
+                  style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.5rem 1.25rem', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+                >
+                  <ShoppingCart size={15} />
+                  <span>Chuyển Thành RFQ Ngay</span>
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -3478,18 +3337,18 @@ export default function Purchasing() {
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
-                    Xử Lý Yêu Cầu Mua Hàng
+                    Lập RFQ Từ Yêu Cầu Mua Hàng
                   </h3>
                   <span style={{ backgroundColor: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', padding: '1px 8px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 700, fontFamily: 'monospace' }}>
                     {selectedProcessPR.prCode}
                   </span>
                 </div>
                 <p style={{ margin: '0.25rem 0 0', fontSize: '0.78rem', color: '#64748b' }}>
-                  Lựa chọn phương án xử lý đề xuất bổ sung hàng hóa từ bộ phận Kho
+                  Đề xuất bổ sung hàng hóa từ bộ phận Kho, đã được Quản Lý Kho ký duyệt
                 </p>
               </div>
               <button 
-                onClick={() => { setSelectedProcessPR(null); setIsRejecting(false); }} 
+                onClick={() => setSelectedProcessPR(null)} 
                 style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', padding: '4px' }}
               >
                 <X size={20} />
@@ -3549,14 +3408,13 @@ export default function Purchasing() {
                 </div>
               </div>
 
-              {/* Action Selection Box */}
-              {!isRejecting ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                  <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#334155' }}>
-                    Chọn phương án xử lý:
-                  </div>
+              {/* Action Selection Box — Phòng Mua Hàng chỉ lập RFQ; ký duyệt/từ chối là việc của Quản Lý Kho */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#334155' }}>
+                  Phiếu đã được Quản Lý Kho ký duyệt{selectedProcessPR.approvedBy ? ` (${selectedProcessPR.approvedBy})` : ''} — lập RFQ khảo sát giá:
+                </div>
 
-                  {/* Option 1: Create RFQ */}
+                {/* Option 1: Create RFQ */}
                   <div 
                     onClick={() => {
                       const pr = selectedProcessPR;
@@ -3581,7 +3439,7 @@ export default function Purchasing() {
                       </div>
                       <div>
                         <div style={{ fontWeight: 800, color: '#1d4ed8', fontSize: '0.88rem' }}>
-                          Chuyển Thành RFQ Khảo Sát Giá (Khuyến nghị)
+                          Chuyển Thành RFQ Khảo Sát Giá
                         </div>
                         <div style={{ fontSize: '0.75rem', color: '#3b82f6', marginTop: '1px' }}>
                           Tự động tạo phiếu RFQ gửi đến các nhà cung cấp phân phối linh kiện này
@@ -3590,108 +3448,14 @@ export default function Purchasing() {
                     </div>
                     <ArrowRight size={18} style={{ color: '#2563eb' }} />
                   </div>
-
-                  {/* Option 2: Approve directly */}
-                  <div 
-                    onClick={() => handleApprovePR(selectedProcessPR)}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      padding: '0.85rem 1rem',
-                      borderRadius: '8px',
-                      border: '1px solid #cbd5e1',
-                      backgroundColor: '#ffffff',
-                      cursor: 'pointer',
-                      transition: 'all 0.15s'
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                      <div style={{ width: '36px', height: '36px', borderRadius: '8px', backgroundColor: '#f0fdf4', color: '#16a34a', border: '1px solid #bbf7d0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <Check size={18} />
-                      </div>
-                      <div>
-                        <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.85rem' }}>
-                          Ký Duyệt Yêu Cầu (Approve)
-                        </div>
-                        <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '1px' }}>
-                          Phê duyệt đề xuất mua hàng và lưu trạng thái sẵn sàng đặt hàng
-                        </div>
-                      </div>
-                    </div>
-                    <CheckCircle2 size={18} style={{ color: '#16a34a' }} />
-                  </div>
-
-                  {/* Option 3: Reject */}
-                  <div 
-                    onClick={() => setIsRejecting(true)}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      padding: '0.75rem 1rem',
-                      borderRadius: '8px',
-                      border: '1px dashed #fca5a5',
-                      backgroundColor: '#fffaf0',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                      <div style={{ width: '36px', height: '36px', borderRadius: '8px', backgroundColor: '#fef2f2', color: '#dc2626', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <X size={18} />
-                      </div>
-                      <div>
-                        <div style={{ fontWeight: 700, color: '#b91c1c', fontSize: '0.85rem' }}>
-                          Từ Chối Yêu Cầu Này
-                        </div>
-                        <div style={{ fontSize: '0.73rem', color: '#991b1b', marginTop: '1px' }}>
-                          Không mua thêm hoặc đã có nguồn cung khác
-                        </div>
-                      </div>
-                    </div>
-                    <span style={{ fontSize: '0.75rem', color: '#b91c1c', fontWeight: 600 }}>Nhập lý do &rarr;</span>
-                  </div>
-                </div>
-              ) : (
-                /* Rejection Sub-form */
-                <div style={{ backgroundColor: '#fef2f2', padding: '1rem', borderRadius: '8px', border: '1px solid #fecaca' }}>
-                  <div style={{ fontWeight: 700, color: '#991b1b', fontSize: '0.85rem', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                    <AlertCircle size={16} />
-                    <span>Xác nhận từ chối yêu cầu mua hàng</span>
-                  </div>
-                  <label style={{ fontSize: '0.75rem', color: '#7f1d1d', display: 'block', marginBottom: '0.25rem' }}>
-                    Lý do từ chối:
-                  </label>
-                  <input 
-                    type="text" 
-                    placeholder="VD: Đã có đơn PO đang giao / Chưa phê duyệt ngân sách đợt này"
-                    value={rejectReason}
-                    onChange={e => setRejectReason(e.target.value)}
-                    style={{ width: '100%', padding: '0.5rem 0.75rem', borderRadius: '6px', border: '1px solid #f87171', fontSize: '0.82rem', marginBottom: '0.75rem' }}
-                  />
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
-                    <button
-                      onClick={() => setIsRejecting(false)}
-                      style={{ padding: '0.4rem 0.85rem', borderRadius: '5px', border: '1px solid #cbd5e1', backgroundColor: '#ffffff', color: '#475569', fontSize: '0.78rem', cursor: 'pointer' }}
-                    >
-                      Quay Lại
-                    </button>
-                    <button
-                      onClick={() => handleRejectPR(selectedProcessPR, rejectReason)}
-                      style={{ padding: '0.4rem 1rem', borderRadius: '5px', border: 'none', backgroundColor: '#dc2626', color: '#ffffff', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer' }}
-                    >
-                      Xác Nhận Từ Chối
-                    </button>
-                  </div>
-                </div>
-              )}
+              </div>
 
             </div>
 
             {/* Modal Footer */}
             <div style={{ padding: '1rem 1.5rem', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end', backgroundColor: '#f8fafc' }}>
               <button
-                onClick={() => { setSelectedProcessPR(null); setIsRejecting(false); }}
+                onClick={() => setSelectedProcessPR(null)}
                 style={{ backgroundColor: '#ffffff', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.5rem 1.25rem', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}
               >
                 Đóng

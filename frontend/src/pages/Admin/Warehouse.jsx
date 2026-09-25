@@ -1376,22 +1376,25 @@ function RfqAlertModal({ rfqModalData, setRfqModalData, sendSystemNotification, 
   if (!rfqModalData || !rfqModalData.item) return null;
   const { item, qty, reason } = rfqModalData;
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     const finalQty = Number(qty);
     if (!finalQty || finalQty <= 0) {
       notify('Vui lòng nhập số lượng đề xuất hợp lệ (lớn hơn 0).', 'error');
       return;
     }
 
-    // Ghi thành 1 Phiếu Yêu Cầu Mua Hàng (PurchaseRequest) THẬT trong CSDL để
-    // Quản Lý Kho có gì để ký duyệt (tab "Bổ Sung Hàng" > Phiếu Yêu Cầu) —
-    // trước đây bước này chỉ ghi localStorage + gửi thông báo, không để lại
-    // hồ sơ nào thật sự chờ duyệt.
+    // Ghi thành 1 Phiếu Yêu Cầu Mua Hàng (PurchaseRequest) THẬT trong CSDL ở trạng
+    // thái chờ Quản Lý Kho ký duyệt. Theo quy trình Mua Hàng – Thanh Toán, phiếu
+    // chỉ tới Phòng Mua Hàng SAU khi Quản Lý Kho duyệt — nên nếu không lưu được
+    // phiếu thì dừng lại, không báo "đã gửi" như trước.
     const realProductId = item.productId || item.id;
-    if (realProductId) {
-      api.post('/warehouse/purchase-requests', { productId: realProductId, quantity: finalQty, reason }).catch(err => {
-        console.warn('[RFQ Alert] Không thể tạo Phiếu Yêu Cầu Mua Hàng thật:', err.message);
-      });
+    let prCode = null;
+    try {
+      const res = await api.post('/warehouse/purchase-requests', { productId: realProductId, quantity: finalQty, reason });
+      prCode = res?.data?.prCode || null;
+    } catch (err) {
+      notify(`Không thể tạo Phiếu Yêu Cầu Mua Hàng: ${err?.message || 'lỗi kết nối'}.`, 'error');
+      return;
     }
 
     const newLog = {
@@ -1417,12 +1420,12 @@ function RfqAlertModal({ rfqModalData, setRfqModalData, sendSystemNotification, 
 
     if (sendSystemNotification) {
       sendSystemNotification({
-        targetRoles: ['PURCHASING', 'CEO', 'ADMIN'],
-        title: `Cảnh Báo Kho: ${item.name}`,
-        message: `Kho báo linh kiện ${item.name} hiện còn ${item.stock} cái (Ngưỡng: ${item.threshold || 5}). Đề xuất mua ${finalQty} cái. Lý do: ${reason}`,
-        link: '/admin/purchasing',
-        navState: { createRFQ: true, product: item, quantity: finalQty, reason: reason },
-        type: 'RFQ_ALERT',
+        targetRoles: ['WAREHOUSE_MANAGER', 'CEO', 'ADMIN'],
+        title: `Phiếu yêu cầu mua hàng chờ duyệt: ${item.name}`,
+        message: `Thủ kho lập phiếu ${prCode || ''} đề xuất mua ${finalQty} cái "${item.name}" (tồn ${item.stock}, ngưỡng ${item.threshold || 5}). Lý do: ${reason}. Cần Quản Lý Kho ký duyệt trước khi chuyển Phòng Mua Hàng.`,
+        link: '/admin/warehouse?tab=rfq',
+        navState: { openPurchaseRequests: true },
+        type: 'PR_PENDING_APPROVAL',
         itemData: { ...item, requestedQty: finalQty, alertReason: reason }
       });
     }
@@ -1430,12 +1433,11 @@ function RfqAlertModal({ rfqModalData, setRfqModalData, sendSystemNotification, 
     setRfqModalData(null);
 
     notify(
-      `GỬI CẢNH BÁO RFQ THÀNH CÔNG!\n\n` +
+      `ĐÃ LẬP PHIẾU YÊU CẦU MUA HÀNG${prCode ? ` ${prCode}` : ''}\n\n` +
       `• Linh kiện: ${item.name}\n` +
       `• Số lượng đề xuất mua: ${finalQty} sản phẩm\n` +
       `• Ghi chú / Lý do: ${reason}\n` +
-      `• Đơn vị tiếp nhận: Bộ phận Mua Hàng & Ban Giám Đốc\n\n` +
-      `Cảnh báo Yêu cầu Báo giá đã được ghi nhận trực tiếp vào Lịch sử và Quả chuông Thông báo Hệ thống!`,
+      `• Bước tiếp theo: chờ Quản Lý Kho ký duyệt, sau đó phiếu mới được chuyển tới Phòng Mua Hàng.`,
       'success'
     );
   };
@@ -2141,6 +2143,17 @@ export default function Warehouse() {
     try {
       await api.patch(`/warehouse/purchase-requests/${pr.id}/${decision}`);
       notify(`Đã ${label} phiếu ${pr.prCode}.`, 'success');
+      // Chỉ sau khi Quản Lý Kho ký duyệt, phiếu mới được chuyển tới Phòng Mua Hàng.
+      if (decision === 'approve' && typeof sendSystemNotification === 'function') {
+        sendSystemNotification({
+          targetRoles: ['PURCHASING', 'CEO', 'ADMIN'],
+          title: `Yêu cầu mua hàng đã duyệt: ${pr.product?.name || pr.prCode}`,
+          message: `Quản Lý Kho đã ký duyệt phiếu ${pr.prCode} (${pr.product?.name || ''}, SL ${pr.quantity}). Phòng Mua Hàng lập RFQ khảo sát giá.`,
+          link: '/admin/purchasing?tab=requests',
+          navState: { openPurchaseRequests: true },
+          type: 'PR_APPROVED'
+        });
+      }
       loadPurchaseRequests();
     } catch (err) {
       notify(err?.message || `Không thể ${label} phiếu.`, 'error');
@@ -2701,123 +2714,40 @@ export default function Warehouse() {
     });
   };
 
-  // Handle Confirm and Send RFQ to Purchasing
+  // Đề xuất mua bổ sung cho đơn đang nợ khách (thiếu hàng). Trước đây Thủ Kho gọi
+  // thẳng API tạo RFQ (và lưu RFQ giả vào localStorage khi bị từ chối), bỏ qua bước
+  // Quản Lý Kho ký duyệt. Nay lập Phiếu Yêu Cầu Mua Hàng như luồng thường; Phòng Mua
+  // Hàng chỉ lập RFQ sau khi phiếu được Quản Lý Kho duyệt.
   const handleConfirmSendBackorderRfq = async (e) => {
     if (e && e.preventDefault) e.preventDefault();
     if (!backorderRfqData) return;
 
-    const { order, orderId, productId, productName, suggestedQty, supplier, unitPrice, reason, neededQty } = backorderRfqData;
+    const { orderId, productId, productName, suggestedQty, reason } = backorderRfqData;
     const finalQty = Number(suggestedQty) || 5;
-    const totalAmount = finalQty * Number(unitPrice || 1500000);
-    // Map the guessed brand/supplier name to a real Supplier.code — the old
-    // 's1'..'s5' placeholders never matched any actual row, so this RFQ was
-    // structurally unable to reach the real backend regardless of anything
-    // else. This mapping is still a best-effort guess for pre-filling the
-    // form; Purchasing can change the supplier before actually sending it.
-    const brandCodeMap = [
-      [/asus/i, 'SUP-ASUS-VN'], [/msi/i, 'SUP-MSI-VN'], [/samsung/i, 'SUP-SAMSUNG-VN'],
-      [/intel/i, 'SUP-INTEL-VN'], [/amd/i, 'SUP-AMD-VN'], [/kingston/i, 'SUP-KINGSTON-VN'],
-      [/corsair/i, 'SUP-CORSAIR-VN'], [/gigabyte/i, 'SUP-GIGABYTE-VN'], [/lg\b/i, 'SUP-LG-VN']
-    ];
-    const suppCode = (brandCodeMap.find(([re]) => re.test(supplier || '')) || [null, 'SUP-MAIHOANG'])[1];
 
-    let poNumber = `RFQ-BO-${Date.now().toString().slice(-6)}`;
-    let apiSucceeded = false;
+    let prCode = null;
     try {
-      const res = await api.post('/purchasing/orders', {
-        supplierCode: suppCode,
-        expectedDeliveryDate: new Date(Date.now() + 86400000 * 3).toISOString().split('T')[0],
-        items: [{ productId: String(productId), quantity: finalQty, unitCost: unitPrice }]
-      });
-      if (res?.success && res?.data?.poNumber) {
-        poNumber = res.data.poNumber;
-        apiSucceeded = true;
-      }
-    } catch (apiErr) {
-      console.warn('Backorder RFQ API error, saving locally only:', apiErr);
+      const res = await api.post('/warehouse/purchase-requests', { productId: String(productId), quantity: finalQty, reason });
+      prCode = res?.data?.prCode || null;
+    } catch (err) {
+      notify(`Không thể lập Phiếu Yêu Cầu Mua Hàng cho đơn nợ #${orderId}: ${err?.message || 'lỗi kết nối'}.`, 'error');
+      return;
     }
 
-    const newPO = {
-      id: poNumber,
-      poNumber: poNumber,
-      supplierCode: suppCode,
-      supplier: { code: suppCode, name: supplier },
-      supplierName: supplier,
-      createdBy: user?.fullname || user?.email || 'Thủ Kho',
-      orderDate: new Date().toISOString().split('T')[0],
-      createdAt: new Date().toISOString(),
-      expectedDeliveryDate: new Date(Date.now() + 86400000 * 3).toISOString().split('T')[0],
-      totalAmount: totalAmount,
-      status: 'RFQ_SENT',
-      type: 'BACKORDER_RFQ',
-      relatedOrderId: orderId,
-      items: [
-        {
-          productId,
-          productName,
-          name: productName,
-          quantity: finalQty,
-          unitCost: unitPrice,
-          totalCost: totalAmount
-        }
-      ],
-      supplierNote: `[ĐỀ XUẤT TỪ KHO - NỢ KHÁCH #${orderId}]: Khách hàng ${order.customerName || 'đặt mua'} đang chờ linh kiện "${productName}". Yêu cầu phòng Mua Hàng gửi RFQ mua gấp tối thiểu ${neededQty || 1} SP (Đề xuất đặt ${finalQty} SP để bổ sung tồn kho).`
-    };
-
-    // 1. Save to state & localStorage for POs
-    const updatedPOs = [newPO, ...(purchaseOrders || [])];
-    setPurchaseOrders(updatedPOs);
-    try {
-      const curLocalPos = JSON.parse(localStorage.getItem('erp_pos') || '[]');
-      localStorage.setItem('erp_pos', JSON.stringify([newPO, ...curLocalPos.filter(p => p.id !== poNumber)]));
-    } catch (_) {}
-
-    // 2. Save RFQ Alert Log
-    const newLog = {
-      id: 'RFQ-ALT-' + Date.now(),
-      sentAt: new Date().toISOString(),
-      sender: 'Thủ kho',
-      productId,
-      productName,
-      category: 'COMP',
-      supplier,
-      currentStock: backorderRfqData.currentStock,
-      threshold: 5,
-      requestedQty: finalQty,
-      reason
-    };
-    try {
-      const existingLogs = JSON.parse(localStorage.getItem('erp_rfq_alert_logs') || '[]');
-      localStorage.setItem('erp_rfq_alert_logs', JSON.stringify([newLog, ...existingLogs]));
-      if (setRfqAlertLogs) setRfqAlertLogs([newLog, ...existingLogs]);
-    } catch (_) {}
-
-    // 3. Send system notification to Purchasing & Admin
     if (typeof sendSystemNotification === 'function') {
       sendSystemNotification({
-        targetRoles: ['PURCHASING', 'CEO', 'ADMIN'],
-        title: `[ĐỀ XUẤT MUA HÀNG KHẨN] ${productName}`,
-        message: `Thủ kho vừa tạo đề xuất mua hàng ${poNumber} cho linh kiện "${productName}" (${finalQty} cái). Đơn nợ khách #${orderId}.`,
-        link: '/admin/purchasing',
-        type: 'RFQ_ALERT',
-        itemData: newPO
+        targetRoles: ['WAREHOUSE_MANAGER', 'CEO', 'ADMIN'],
+        title: `[KHẨN] Phiếu yêu cầu mua hàng chờ duyệt: ${productName}`,
+        message: `Thủ kho lập phiếu ${prCode || ''} đề xuất mua ${finalQty} cái "${productName}" cho đơn nợ khách #${orderId}. Cần Quản Lý Kho ký duyệt trước khi chuyển Phòng Mua Hàng.`,
+        link: '/admin/warehouse?tab=rfq',
+        navState: { openPurchaseRequests: true },
+        type: 'PR_PENDING_APPROVAL'
       });
     }
 
-    if (typeof addNotification === 'function') {
-      addNotification(apiSucceeded ? {
-        type: 'success',
-        title: 'Đã gửi Đề Xuất Mua Hàng (RFQ)',
-        message: `Mã phiếu: ${poNumber}. Đã chuyển yêu cầu mua ${finalQty} cái "${productName}" sang bộ phận Mua Hàng.`
-      } : {
-        type: 'warning',
-        title: 'Chưa gửi được lên máy chủ',
-        message: `Đề xuất mua "${productName}" chỉ mới lưu tạm trên trình duyệt này — Phòng Mua Hàng CHƯA thấy được. Vui lòng thử lại hoặc báo Phòng Mua Hàng tạo RFQ thủ công.`
-      });
-    }
-
+    notify(`Đã lập Phiếu Yêu Cầu Mua Hàng${prCode ? ` ${prCode}` : ''} cho đơn nợ #${orderId}, chờ Quản Lý Kho ký duyệt.`, 'success');
     setBackorderRfqData(null);
-    navigate('/admin/purchasing?tab=orders');
+    loadPurchaseRequests(true);
   };
 
   // Handle Fulfill Backorder
@@ -4801,10 +4731,11 @@ export default function Warehouse() {
                   <tbody>
                     {(showAllPRs ? purchaseRequests : purchaseRequests.slice(0, 3)).map(pr => {
                       const isBusy = prBusyId === pr.id;
-                      const statusColor = pr.status === 'APPROVED' ? '#15803d' : pr.status === 'REJECTED' ? '#dc2626' : '#b45309';
-                      const statusBg = pr.status === 'APPROVED' ? '#f0fdf4' : pr.status === 'REJECTED' ? '#fef2f2' : '#fffbeb';
-                      const statusBorder = pr.status === 'APPROVED' ? '#bbf7d0' : pr.status === 'REJECTED' ? '#fecaca' : '#fde68a';
-                      const statusLabel = pr.status === 'APPROVED' ? 'Đã Duyệt' : pr.status === 'REJECTED' ? 'Từ Chối' : 'Chờ Duyệt';
+                      const isRfqCreated = pr.status === 'RFQ_CREATED';
+                      const statusColor = isRfqCreated ? '#1d4ed8' : pr.status === 'APPROVED' ? '#15803d' : pr.status === 'REJECTED' ? '#dc2626' : '#b45309';
+                      const statusBg = isRfqCreated ? '#eff6ff' : pr.status === 'APPROVED' ? '#f0fdf4' : pr.status === 'REJECTED' ? '#fef2f2' : '#fffbeb';
+                      const statusBorder = isRfqCreated ? '#bfdbfe' : pr.status === 'APPROVED' ? '#bbf7d0' : pr.status === 'REJECTED' ? '#fecaca' : '#fde68a';
+                      const statusLabel = isRfqCreated ? 'Đã Lập RFQ' : pr.status === 'APPROVED' ? 'Đã Duyệt' : pr.status === 'REJECTED' ? 'Từ Chối' : 'Chờ Duyệt';
                       return (
                         <tr key={pr.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
                           <td style={{ padding: '0.75rem 1rem', fontWeight: 700, color: '#2563eb', whiteSpace: 'nowrap' }}>{pr.prCode}</td>
@@ -4893,8 +4824,8 @@ export default function Warehouse() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.5rem', fontSize: '0.85rem' }}>
                     <span style={{ color: '#64748b' }}>Trạng thái:</span>
                     {(() => {
-                      const statusLabel = viewingPR.status === 'APPROVED' ? 'Đã Duyệt' : viewingPR.status === 'REJECTED' ? 'Từ Chối' : 'Chờ Duyệt';
-                      const statusColor = viewingPR.status === 'APPROVED' ? '#15803d' : viewingPR.status === 'REJECTED' ? '#dc2626' : '#b45309';
+                      const statusLabel = viewingPR.status === 'RFQ_CREATED' ? 'Đã Lập RFQ' : viewingPR.status === 'APPROVED' ? 'Đã Duyệt' : viewingPR.status === 'REJECTED' ? 'Từ Chối' : 'Chờ Duyệt';
+                      const statusColor = viewingPR.status === 'RFQ_CREATED' ? '#1d4ed8' : viewingPR.status === 'APPROVED' ? '#15803d' : viewingPR.status === 'REJECTED' ? '#dc2626' : '#b45309';
                       return <strong style={{ color: statusColor }}>{statusLabel}</strong>;
                     })()}
                     {viewingPR.approvedBy && (

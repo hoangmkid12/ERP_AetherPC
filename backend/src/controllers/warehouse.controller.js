@@ -591,12 +591,22 @@ const auditDecreaseInventory = async (req, res, next) => {
 };
 
 // ─── Phiếu Yêu Cầu Mua Hàng nội bộ (PurchaseRequest) ───────────────────────
+// Vòng đời: PENDING (Thủ Kho lập) → APPROVED / REJECTED (Quản Lý Kho) →
+// RFQ_CREATED (Phòng Mua Hàng đã lập đơn báo giá từ đề xuất, xem createPurchaseOrder).
+const PURCHASING_VISIBLE_PR_STATUSES = ['APPROVED', 'RFQ_CREATED'];
 
 // GET /api/v1/warehouse/purchase-requests
 const listPurchaseRequests = async (req, res, next) => {
   try {
     const { status } = req.query;
     const where = status && status !== 'ALL' ? { status } : {};
+    // Phòng Mua Hàng chỉ thấy đề xuất đã được Quản Lý Kho ký duyệt (APPROVED) hoặc đã
+    // được lập RFQ (RFQ_CREATED) — đề xuất còn PENDING/REJECTED là việc nội bộ của Kho.
+    if (req.user?.role === 'PURCHASING') {
+      where.status = status && status !== 'ALL' && PURCHASING_VISIBLE_PR_STATUSES.includes(status)
+        ? status
+        : { in: PURCHASING_VISIBLE_PR_STATUSES };
+    }
     const requests = await prisma.purchaseRequest.findMany({
       where,
       include: { product: { select: { name: true, sku: true, stockQuantity: true } } },

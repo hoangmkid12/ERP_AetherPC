@@ -66,10 +66,12 @@ router.post('/purchase-requests', authMiddleware(WAREHOUSE_ROLES), createPurchas
 
 // @route   PATCH /api/v1/warehouse/purchase-requests/:id/approve
 // @desc    Quản Lý Kho ký duyệt (warehouse_approve_pr)
-router.patch('/purchase-requests/:id/approve', authMiddleware(['PURCHASING', ...WAREHOUSE_MANAGER_ROLES]), approvePurchaseRequest);
+// Chỉ Quản Lý Kho (CEO/ADMIN) ký duyệt — Phòng Mua Hàng chỉ nhận đề xuất đã duyệt
+// (quy trình Mua Hàng – Thanh Toán: Thủ Kho lập → Quản Lý Kho duyệt → Mua Hàng lập RFQ).
+router.patch('/purchase-requests/:id/approve', authMiddleware(WAREHOUSE_MANAGER_ROLES), approvePurchaseRequest);
 
 // @route   PATCH /api/v1/warehouse/purchase-requests/:id/reject
-router.patch('/purchase-requests/:id/reject', authMiddleware(['PURCHASING', ...WAREHOUSE_MANAGER_ROLES]), rejectPurchaseRequest);
+router.patch('/purchase-requests/:id/reject', authMiddleware(WAREHOUSE_MANAGER_ROLES), rejectPurchaseRequest);
 
 // ─── Vị Trí Kệ Kho ───────────────────────────────────────────────────────────
 

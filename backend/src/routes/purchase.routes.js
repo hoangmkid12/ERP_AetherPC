@@ -23,8 +23,9 @@ const { listPurchaseRequests, approvePurchaseRequest, rejectPurchaseRequest } = 
 // @route   GET /api/v1/purchasing/requests
 // @desc    Lấy danh sách phiếu yêu cầu mua hàng nội bộ (PR)
 router.get('/requests', authMiddleware(['PURCHASING', 'WAREHOUSE_MANAGER', 'CEO', 'ADMIN']), listPurchaseRequests);
-router.patch('/requests/:id/approve', authMiddleware(['PURCHASING', 'WAREHOUSE_MANAGER', 'CEO', 'ADMIN']), approvePurchaseRequest);
-router.patch('/requests/:id/reject', authMiddleware(['PURCHASING', 'WAREHOUSE_MANAGER', 'CEO', 'ADMIN']), rejectPurchaseRequest);
+// Phòng Mua Hàng KHÔNG tự duyệt/từ chối đề xuất của kho — chỉ Quản Lý Kho (CEO/ADMIN).
+router.patch('/requests/:id/approve', authMiddleware(['WAREHOUSE_MANAGER', 'CEO', 'ADMIN']), approvePurchaseRequest);
+router.patch('/requests/:id/reject', authMiddleware(['WAREHOUSE_MANAGER', 'CEO', 'ADMIN']), rejectPurchaseRequest);
 
 // @route   GET /api/v1/purchasing/suppliers
 router.get('/suppliers', authMiddleware(['PURCHASING', 'WAREHOUSE_MANAGER', 'CEO', 'ADMIN', 'SUPPLIER']), getSuppliers);

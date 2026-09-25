@@ -300,7 +300,7 @@ const getPurchaseOrders = async (req, res, next) => {
 // POST /api/v1/purchasing/orders
 const createPurchaseOrder = async (req, res, next) => {
   try {
-    const { supplierCode, expectedDeliveryDate, items, isBlanket, blanketCapAmount, blanketValidUntil, blanketRefId } = req.body;
+    const { supplierCode, expectedDeliveryDate, items, isBlanket, blanketCapAmount, blanketValidUntil, blanketRefId, purchaseRequestId } = req.body;
     const createdBy = req.user ? req.user.name || req.user.email || req.user.code || 'Staff' : 'Staff';
 
     if (!supplierCode || !items || items.length === 0) {
@@ -337,6 +337,24 @@ const createPurchaseOrder = async (req, res, next) => {
         }
         if (blanket.blanketValidUntil && new Date(blanket.blanketValidUntil) < new Date()) {
           const error = new Error(`Hợp đồng khung đã hết hiệu lực từ ${new Date(blanket.blanketValidUntil).toLocaleDateString('vi-VN')}.`);
+          error.statusCode = 409;
+          throw error;
+        }
+      }
+
+      // 1c. RFQ lập từ một Phiếu Yêu Cầu Mua Hàng của kho: đề xuất phải đã được
+      // Quản Lý Kho ký duyệt. Cho phép cả RFQ_CREATED vì một đợt so sánh gửi RFQ
+      // tới nhiều nhà cung cấp cùng lúc (mỗi NCC một request) từ cùng một đề xuất.
+      if (purchaseRequestId !== undefined && purchaseRequestId !== null) {
+        const prId = parseInt(purchaseRequestId, 10);
+        const claimed = Number.isInteger(prId)
+          ? await tx.purchaseRequest.updateMany({
+              where: { id: prId, status: { in: ['APPROVED', 'RFQ_CREATED'] } },
+              data: { status: 'RFQ_CREATED' }
+            })
+          : { count: 0 };
+        if (claimed.count !== 1) {
+          const error = new Error('Phiếu yêu cầu mua hàng chưa được Quản Lý Kho ký duyệt (hoặc không tồn tại) — không thể lập RFQ.');
           error.statusCode = 409;
           throw error;
         }
