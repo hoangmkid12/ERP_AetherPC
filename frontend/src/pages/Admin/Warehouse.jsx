@@ -2186,10 +2186,19 @@ function WarehouseQcCertificateModal({ target, onClose, purchaseOrders = [] }) {
     : (qaLog?.date || new Date().toLocaleDateString('vi-VN'));
 
   const totalQty = parseInt(qaLog?.totalQty) || rawItems.reduce((s, i) => s + (parseInt(i.quantity || i.qty) || 1), 0) || 1;
-  const passedQty = parseInt(qaLog?.passedQty) ?? totalQty;
-  const failedQty = parseInt(qaLog?.failedQty) || 0;
-  const isRejected = qaLog?.status === 'QA_REJECTED' || qaLog?.decision === 'REJECT';
-  const isPartial = qaLog?.status === 'QA_PARTIAL' || qaLog?.decision === 'ACCEPT_PARTIAL';
+  // Ưu tiên bản ghi QcInspection thật trong DB (target.dbInspection) — đây mới
+  // là kết quả nghiệm thu thật; qaLog chỉ là cache cục bộ trong trình duyệt của
+  // người vừa thao tác nên rỗng với PO đã được QC từ máy/phiên khác. Trước đây
+  // code bỏ qua dbInspection và dùng thẳng `parseInt(qaLog?.passedQty) ?? totalQty`
+  // — parseInt(undefined) ra NaN, và NaN ?? totalQty vẫn là NaN (?? chỉ thay
+  // null/undefined) nên biên bản in ra "NaN" thay vì số liệu thật hoặc totalQty.
+  const dbPassedQty = parseInt(target.dbInspection?.passedQuantity);
+  const parsedPassedQty = Number.isFinite(dbPassedQty) ? dbPassedQty : parseInt(qaLog?.passedQty);
+  const passedQty = Number.isFinite(parsedPassedQty) ? parsedPassedQty : totalQty;
+  const dbFailedQty = parseInt(target.dbInspection?.defectiveQuantity);
+  const failedQty = Number.isFinite(dbFailedQty) ? dbFailedQty : (parseInt(qaLog?.failedQty) || 0);
+  const isRejected = qaLog?.status === 'QA_REJECTED' || qaLog?.decision === 'REJECT' || relatedPO?.status === 'QA_REJECTED' || (failedQty > 0 && passedQty === 0);
+  const isPartial = qaLog?.status === 'QA_PARTIAL' || qaLog?.decision === 'ACCEPT_PARTIAL' || relatedPO?.status === 'QA_PARTIAL' || (failedQty > 0 && passedQty > 0);
 
   const handlePrint = () => {
     printDocument('#aetherpc-warehouse-qc-certificate-print', { title: `Biên bản nghiệm thu kỹ thuật ${poNumber}` });
