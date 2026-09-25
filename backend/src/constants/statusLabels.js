@@ -70,6 +70,10 @@ const TIER_VI = {
 
 // Không bao giờ trả về mã tiếng Anh thô cho người dùng: mã lạ (chưa có nhãn) hiện là
 // "Chưa xác định" — thêm nhãn vào đúng bảng ở trên khi phát sinh trạng thái mới.
-const labelOf = (map, code) => (code && map[code]) || (code ? 'Chưa xác định' : 'Không có');
+const labelOf = (map, code) => {
+  if (!code) return 'Không có';
+  if (map[code]) return map[code];
+  return /^[A-Z][A-Z0-9_]*$/.test(String(code)) ? 'Chưa xác định' : String(code);
+};
 
 module.exports = { ORDER_STATUS_VI, PO_STATUS_VI, TIER_VI, labelOf };

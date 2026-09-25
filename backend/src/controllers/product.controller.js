@@ -119,7 +119,7 @@ const getProductById = async (req, res, next) => {
     });
 
     if (!product) {
-      return res.status(404).json({ success: false, message: 'Product not found' });
+      return res.status(404).json({ success: false, message: 'Không tìm thấy sản phẩm.' });
     }
 
     res.json({
@@ -276,7 +276,7 @@ const getAIRecommendations = async (req, res, next) => {
 
     const product = await prisma.product.findUnique({ where: { productId: id } });
     if (!product) {
-      return res.status(404).json({ success: false, message: 'Product not found' });
+      return res.status(404).json({ success: false, message: 'Không tìm thấy sản phẩm.' });
     }
 
     const coOrders = await prisma.orderItem.findMany({

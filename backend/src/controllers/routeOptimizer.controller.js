@@ -35,7 +35,7 @@ async function fetchOsrmDurationMatrix(coords) {
   const url = `${OSRM_BASE_URL}/table/v1/driving/${coordStr}?annotations=duration`;
   try {
     const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
-    if (!res.ok) throw new Error(`OSRM HTTP ${res.status}`);
+    if (!res.ok) throw new Error(`Dịch vụ tìm đường OSRM lỗi ${res.status}`);
     const data = await res.json();
     if (data.code === 'Ok' && data.durations) return data.durations;
   } catch (err) {

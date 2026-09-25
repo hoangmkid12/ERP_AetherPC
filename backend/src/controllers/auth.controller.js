@@ -28,7 +28,7 @@ const loginCustomer = async (req, res, next) => {
     const loginIdentifier = (email || username || '').trim();
 
     if (!loginIdentifier || !password) {
-      return res.status(400).json({ success: false, message: 'Email and password are required' });
+      return res.status(400).json({ success: false, message: 'Vui lòng nhập tài khoản và mật khẩu.' });
     }
 
     const customer = await prisma.customer.findFirst({
@@ -41,12 +41,12 @@ const loginCustomer = async (req, res, next) => {
     });
 
     if (!customer) {
-      return res.status(401).json({ success: false, message: 'Invalid credentials' });
+      return res.status(401).json({ success: false, message: 'Tài khoản hoặc mật khẩu không chính xác.' });
     }
 
     const isMatch = await bcrypt.compare(password, customer.passwordHash);
     if (!isMatch) {
-      return res.status(401).json({ success: false, message: 'Invalid credentials' });
+      return res.status(401).json({ success: false, message: 'Tài khoản hoặc mật khẩu không chính xác.' });
     }
 
     if (customer.status && customer.status !== 'ACTIVE') {
@@ -190,7 +190,7 @@ const loginEmployee = async (req, res, next) => {
     const loginIdentifier = (email || username || '').trim();
 
     if (!loginIdentifier || !password) {
-      return res.status(400).json({ success: false, message: 'Email and password are required' });
+      return res.status(400).json({ success: false, message: 'Vui lòng nhập tài khoản và mật khẩu.' });
     }
 
     const lowerId = loginIdentifier.toLowerCase();
@@ -229,13 +229,13 @@ const loginEmployee = async (req, res, next) => {
 
     if (!user) {
       logAudit({ req, action: 'LOGIN', module: 'Bảo Mật', status: 'FAILED', note: `Không tìm thấy tài khoản: ${loginIdentifier}`, actorOverride: { id: null, name: loginIdentifier, role: null } });
-      return res.status(401).json({ success: false, message: 'Invalid credentials' });
+      return res.status(401).json({ success: false, message: 'Tài khoản hoặc mật khẩu không chính xác.' });
     }
 
     const isMatch = await bcrypt.compare(password, user.passwordHash);
     if (!isMatch) {
       logAudit({ req, action: 'LOGIN', module: 'Bảo Mật', status: 'FAILED', note: 'Sai mật khẩu', actorOverride: { id: isSupplier ? user.code : user.id, name: loginIdentifier, role } });
-      return res.status(401).json({ success: false, message: 'Invalid credentials' });
+      return res.status(401).json({ success: false, message: 'Tài khoản hoặc mật khẩu không chính xác.' });
     }
 
     if (isSupplier) {
@@ -332,7 +332,7 @@ const getMe = async (req, res, next) => {
 
     const employeeId = parseInt(id);
     if (!Number.isInteger(employeeId)) {
-      return res.status(400).json({ success: false, message: 'Invalid account' });
+      return res.status(400).json({ success: false, message: 'Tài khoản không hợp lệ.' });
     }
     const employee = await prisma.employee.findUnique({ where: { id: employeeId } });
     if (!employee) {
@@ -415,7 +415,7 @@ const updateProfile = async (req, res, next) => {
     } else {
       const employeeId = parseInt(req.user.id);
       if (!Number.isInteger(employeeId)) {
-        return res.status(400).json({ success: false, message: 'Invalid employee account' });
+        return res.status(400).json({ success: false, message: 'Tài khoản nhân viên không hợp lệ.' });
       }
       const updatedEmployee = await prisma.employee.update({
         where: { id: employeeId },
@@ -491,7 +491,7 @@ const changePassword = async (req, res, next) => {
     } else {
       const employeeId = parseInt(req.user.id);
       if (!Number.isInteger(employeeId)) {
-        return res.status(400).json({ success: false, message: 'Invalid employee account' });
+        return res.status(400).json({ success: false, message: 'Tài khoản nhân viên không hợp lệ.' });
       }
       const employee = await prisma.employee.findUnique({
         where: { id: employeeId }

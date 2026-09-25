@@ -243,7 +243,7 @@ const handleChat = async (req, res, next) => {
     const { message, history } = req.body;
 
     if (!message) {
-      return res.status(400).json({ success: false, message: 'Message is required' });
+      return res.status(400).json({ success: false, message: 'Vui lòng nhập nội dung tin nhắn.' });
     }
 
     // Load DB Caches
@@ -621,7 +621,7 @@ const handleChat = async (req, res, next) => {
 
   } catch (err) {
     console.error('[Chatbot] Handle chat error:', err);
-    res.status(500).json({ success: false, message: 'Internal Server Error' });
+    res.status(500).json({ success: false, message: 'Lỗi hệ thống, vui lòng thử lại sau.' });
   }
 };
 
@@ -633,33 +633,33 @@ const getCskhSessions = async (req, res) => {
     res.json({ success: true, sessions });
   } catch (err) {
     console.error('[Chat] Error getting sessions:', err);
-    res.status(500).json({ success: false, message: 'Failed to get sessions' });
+    res.status(500).json({ success: false, message: 'Không tải được danh sách phiên chat.' });
   }
 };
 
 const sendCskhCustomerMessage = async (req, res) => {
   try {
     const { sessionId = 'session_default', text, customerName, time } = req.body;
-    if (!text) return res.status(400).json({ success: false, message: 'Text is required' });
+    if (!text) return res.status(400).json({ success: false, message: 'Vui lòng nhập nội dung tin nhắn.' });
 
     const session = await addCustomerMessage({ sessionId, text, customerName, time });
     res.json({ success: true, session });
   } catch (err) {
     console.error('[Chat] Error sending customer message:', err);
-    res.status(500).json({ success: false, message: 'Failed to send message' });
+    res.status(500).json({ success: false, message: 'Không gửi được tin nhắn, vui lòng thử lại.' });
   }
 };
 
 const sendCskhStaffMessage = async (req, res) => {
   try {
     const { sessionId = 'session_default', text, time } = req.body;
-    if (!text) return res.status(400).json({ success: false, message: 'Text is required' });
+    if (!text) return res.status(400).json({ success: false, message: 'Vui lòng nhập nội dung tin nhắn.' });
 
     const session = await addStaffMessage({ sessionId, text, time });
     res.json({ success: true, session });
   } catch (err) {
     console.error('[Chat] Error sending staff message:', err);
-    res.status(500).json({ success: false, message: 'Failed to send message' });
+    res.status(500).json({ success: false, message: 'Không gửi được tin nhắn, vui lòng thử lại.' });
   }
 };
 

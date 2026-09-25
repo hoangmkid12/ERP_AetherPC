@@ -88,7 +88,7 @@ const getReceiptById = async (req, res, next) => {
     });
 
     if (!receipt) {
-      return res.status(404).json({ success: false, message: `Receipt not found: ${id}` });
+      return res.status(404).json({ success: false, message: `Không tìm thấy phiếu nhập kho: ${id}` });
     }
 
     res.json({ success: true, data: receipt });
@@ -131,7 +131,7 @@ const validateReceipt = async (req, res, next) => {
         where: { id: parseInt(id) },
         include: { po: { include: { items: true, supplier: true } } }
       });
-      if (!receipt) throw new Error(`Receipt not found: ${id}`);
+      if (!receipt) throw Object.assign(new Error(`Không tìm thấy phiếu nhập kho: ${id}`), { statusCode: 404 });
 
       const po = receipt.po;
       if (!['QA_PASSED', 'QA_PARTIAL'].includes(po.status)) {

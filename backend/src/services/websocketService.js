@@ -298,7 +298,7 @@ const handleWSMessage = async (ws, data) => {
     else if (type === 'STAFF_SEND_MSG') {
       const { sessionId, text } = payload || {};
       if (!text || !sessionId) return;
-      if (!ws._isStaff) return ws.send(JSON.stringify({ type: 'ERROR', message: 'Staff authorization required' }));
+      if (!ws._isStaff) return ws.send(JSON.stringify({ type: 'ERROR', message: 'Chỉ nhân viên CSKH đã đăng nhập mới được thực hiện thao tác này.' }));
 
       const session = await addMessage(sessionId, 'staff', text, 'Staff');
 
@@ -337,7 +337,7 @@ const handleWSMessage = async (ws, data) => {
     else if (type === 'DELETE_SESSION') {
       const { sessionId } = payload || {};
       if (!sessionId) return;
-      if (!ws._isStaff) return ws.send(JSON.stringify({ type: 'ERROR', message: 'Staff authorization required' }));
+      if (!ws._isStaff) return ws.send(JSON.stringify({ type: 'ERROR', message: 'Chỉ nhân viên CSKH đã đăng nhập mới được thực hiện thao tác này.' }));
 
       await deleteSession(sessionId);
 
@@ -349,7 +349,7 @@ const handleWSMessage = async (ws, data) => {
     else if (type === 'CLOSE_SESSION') {
       const { sessionId, notes } = payload || {};
       if (!sessionId) return;
-      if (!ws._isStaff) return ws.send(JSON.stringify({ type: 'ERROR', message: 'Staff authorization required' }));
+      if (!ws._isStaff) return ws.send(JSON.stringify({ type: 'ERROR', message: 'Chỉ nhân viên CSKH đã đăng nhập mới được thực hiện thao tác này.' }));
 
       const session = await closeSession(sessionId, notes);
 
@@ -363,7 +363,7 @@ const handleWSMessage = async (ws, data) => {
     console.error('[WebSocket] Error handling message:', err);
     ws.send(JSON.stringify({
       type: 'ERROR',
-      message: 'Failed to process message',
+      message: 'Không xử lý được tin nhắn, vui lòng thử lại.',
       error: err.message
     }));
   }
@@ -463,7 +463,7 @@ const handleTrackingMessage = async (ws, data) => {
     console.error('[WebSocket] Error handling tracking message:', err);
     ws.send(JSON.stringify({
       type: 'ERROR',
-      message: 'Failed to process message',
+      message: 'Không xử lý được tin nhắn, vui lòng thử lại.',
       error: err.message
     }));
   }

@@ -201,7 +201,7 @@ const markSessionOnlineIfExists = async (sessionId) => {
 const addMessage = async (sessionId, sender, text, senderName = null) => {
   try {
     if (!sessionId || !text) {
-      throw new Error('Session ID and text are required');
+      throw new Error('Thiếu mã phiên chat hoặc nội dung tin nhắn.');
     }
 
     // Ensure session exists

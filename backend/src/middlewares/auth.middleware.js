@@ -15,14 +15,14 @@ const authMiddleware = (roles = []) => {
       }
 
       if (!token) {
-        return res.status(401).json({ success: false, message: 'No token provided, authorization denied' });
+        return res.status(401).json({ success: false, message: 'Bạn chưa đăng nhập hoặc phiên đăng nhập đã hết hạn.' });
       }
 
       // Verify real JWT token
       const secret = process.env.JWT_SECRET;
       if (!secret) {
         console.error('CRITICAL: JWT_SECRET is not set in environment variables');
-        return res.status(500).json({ success: false, message: 'Server configuration error' });
+        return res.status(500).json({ success: false, message: 'Lỗi cấu hình máy chủ (thiếu khoá xác thực).' });
       }
 
       const decoded = jwt.verify(token, secret);
@@ -30,12 +30,12 @@ const authMiddleware = (roles = []) => {
 
       // Role check (ADMIN and CEO have broad access)
       if (roles.length > 0 && !roles.includes(decoded.role) && decoded.role !== 'ADMIN' && decoded.role !== 'CEO') {
-        return res.status(403).json({ success: false, message: 'Forbidden: Insufficient permissions' });
+        return res.status(403).json({ success: false, message: 'Tài khoản của bạn không có quyền thực hiện thao tác này.' });
       }
 
       next();
     } catch (err) {
-      return res.status(401).json({ success: false, message: 'Invalid or expired token' });
+      return res.status(401).json({ success: false, message: 'Phiên đăng nhập không hợp lệ hoặc đã hết hạn, vui lòng đăng nhập lại.' });
     }
   };
 };

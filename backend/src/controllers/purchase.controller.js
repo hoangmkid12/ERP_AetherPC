@@ -305,7 +305,7 @@ const createPurchaseOrder = async (req, res, next) => {
     const createdBy = req.user ? req.user.name || req.user.email || req.user.code || 'Staff' : 'Staff';
 
     if (!supplierCode || !items || items.length === 0) {
-      return res.status(400).json({ success: false, message: 'Supplier and items are required' });
+      return res.status(400).json({ success: false, message: 'Vui lòng chọn nhà cung cấp và thêm ít nhất một sản phẩm.' });
     }
 
     const newPO = await prisma.$transaction(async (tx) => {
@@ -314,7 +314,7 @@ const createPurchaseOrder = async (req, res, next) => {
         where: { code: supplierCode }
       });
       if (!supplier) {
-        throw new Error(`Supplier not found: ${supplierCode}`);
+        throw Object.assign(new Error(`Không tìm thấy nhà cung cấp: ${supplierCode}`), { statusCode: 404 });
       }
 
       // 1b. If this order is being released against an existing blanket (hợp đồng
@@ -388,7 +388,7 @@ const createPurchaseOrder = async (req, res, next) => {
           });
         }
         if (!prod) {
-          throw new Error(`Không tìm thấy sản phẩm trong CSDL với mã: ${item.productId}`);
+          throw Object.assign(new Error(`Không tìm thấy sản phẩm trong CSDL với mã: ${item.productId}`), { statusCode: 404 });
         }
 
         const quantity = parseInt(item.quantity);
@@ -467,7 +467,7 @@ const createPurchaseOrder = async (req, res, next) => {
 
     res.status(201).json({
       success: true,
-      message: 'Purchase Order created successfully (RFQ)',
+      message: 'Đã tạo Yêu Cầu Báo Giá (RFQ).',
       data: newPO
     });
   } catch (err) {
@@ -611,7 +611,7 @@ const updatePurchaseOrderStatus = async (req, res, next) => {
       });
 
       if (!po) {
-        throw new Error(`Purchase Order not found: ${id}`);
+        throw Object.assign(new Error(`Không tìm thấy đơn mua hàng: ${id}`), { statusCode: 404 });
       }
 
       const userRole = req.user?.role;
@@ -908,7 +908,7 @@ const createVendorBill = async (req, res, next) => {
         where: { id: parseInt(id) },
         include: { supplier: true }
       });
-      if (!po) throw new Error(`Purchase Order not found: ${id}`);
+      if (!po) throw Object.assign(new Error(`Không tìm thấy đơn mua hàng: ${id}`), { statusCode: 404 });
       if (!['RECEIVED', 'DONE', 'COMPLETED'].includes(po.status)) {
         const error = new Error('Chỉ có thể ghi nhận hóa đơn NCC sau khi kho đã hoàn tất nhập hàng.');
         error.statusCode = 409;
@@ -982,7 +982,7 @@ const createVendorBill = async (req, res, next) => {
     const { bill: newBill, originalAmount, acceptRatio } = result;
     res.status(201).json({
       success: true,
-      message: 'Vendor Bill created successfully',
+      message: 'Đã lập hoá đơn nhà cung cấp.',
       data: newBill,
       qcAdjustment: acceptRatio !== null && acceptRatio < 1
         ? { acceptRatio, originalAmount, adjustedAmount: parseFloat(newBill.amountTotal) }
@@ -1022,8 +1022,8 @@ const registerPayment = async (req, res, next) => {
         where: { id: parseInt(billId) },
         include: { supplier: true, po: true }
       });
-      if (!bill) throw new Error(`Vendor Bill not found: ${billId}`);
-      if (bill.status === 'PAID') throw new Error('Bill is already fully paid.');
+      if (!bill) throw Object.assign(new Error(`Không tìm thấy hoá đơn nhà cung cấp: ${billId}`), { statusCode: 404 });
+      if (bill.status === 'PAID') throw new Error('Hoá đơn này đã được thanh toán đủ.');
 
       const payAmount = amount ? parseFloat(amount) : parseFloat(bill.amountDue);
       if (!(payAmount > 0)) {
@@ -1075,7 +1075,7 @@ const registerPayment = async (req, res, next) => {
       return newPayment;
     });
 
-    res.status(201).json({ success: true, message: 'Payment registered successfully', data: payment });
+    res.status(201).json({ success: true, message: 'Đã ghi nhận thanh toán.', data: payment });
   } catch (err) {
     next(err);
   }
@@ -1122,7 +1122,7 @@ const validateReceipt = async (req, res, next) => {
         where: { id: parseInt(receiptId) },
         include: { po: { include: { items: true } } }
       });
-      if (!receipt) throw new Error(`Receipt not found: ${receiptId}`);
+      if (!receipt) throw Object.assign(new Error(`Không tìm thấy phiếu nhập kho: ${receiptId}`), { statusCode: 404 });
 
       const po = receipt.po;
       if (!['QA_PASSED', 'QA_PARTIAL'].includes(po.status)) {
@@ -1241,7 +1241,7 @@ const validateReceipt = async (req, res, next) => {
       return tx.goodsReceipt.findUnique({ where: { id: receipt.id } });
     }, { timeout: 20000 });
 
-    res.json({ success: true, message: 'Goods receipt validated successfully', data: updatedReceipt });
+    res.json({ success: true, message: 'Đã xác nhận nhập kho.', data: updatedReceipt });
   } catch (err) {
     next(err);
   }

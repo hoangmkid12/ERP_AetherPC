@@ -14,10 +14,15 @@
 // biến bị dùng nhầm bảng) → "Chưa xác định". Không bao giờ hiện mã tiếng Anh thô.
 const UNKNOWN_STYLE = { color: '#64748b', bg: '#f8fafc', border: '#e2e8f0' };
 
+const STATUS_CODE_RE = /^[A-Z][A-Z0-9_]*$/;
+
 export const getStatusInfo = (dictionary, status) => {
   if (dictionary && dictionary[status]) return dictionary[status];
   if (status && GENERIC_STATUS[status]) return GENERIC_STATUS[status];
-  return { label: status ? 'Chưa xác định' : 'Không có', ...UNKNOWN_STYLE };
+  if (!status) return { label: 'Không có', ...UNKNOWN_STYLE };
+  // Chuỗi không phải mã (vd dữ liệu cũ đã lưu sẵn nhãn tiếng Việt) → giữ nguyên để hiển thị;
+  // chỉ mã UPPER_SNAKE lạ mới bị che thành "Chưa xác định".
+  return { label: STATUS_CODE_RE.test(String(status)) ? 'Chưa xác định' : String(status), ...UNKNOWN_STYLE };
 };
 
 export const getStatusLabel = (dictionary, status) => getStatusInfo(dictionary, status).label;

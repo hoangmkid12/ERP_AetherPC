@@ -41,7 +41,7 @@ const getProvinces = async (req, res, next) => {
   try {
     if (!provincesCache) {
       const upstream = await fetch(`${ADDRESSKIT_BASE}/provinces`);
-      if (!upstream.ok) throw new Error(`AddressKit provinces error: ${upstream.status}`);
+      if (!upstream.ok) throw new Error(`Không tải được danh sách tỉnh/thành (dịch vụ địa chỉ lỗi ${upstream.status}).`);
       const data = await upstream.json();
       provincesCache = Array.isArray(data?.provinces) ? data.provinces : [];
     }
@@ -57,7 +57,7 @@ const getCommunes = async (req, res, next) => {
     const { code } = req.params;
     if (!communesCache.has(code)) {
       const upstream = await fetch(`${ADDRESSKIT_BASE}/provinces/${encodeURIComponent(code)}/communes`);
-      if (!upstream.ok) throw new Error(`AddressKit communes error: ${upstream.status}`);
+      if (!upstream.ok) throw new Error(`Không tải được danh sách phường/xã (dịch vụ địa chỉ lỗi ${upstream.status}).`);
       const data = await upstream.json();
       communesCache.set(code, Array.isArray(data?.communes) ? data.communes : []);
     }

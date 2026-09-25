@@ -12,7 +12,21 @@ const errorMiddleware = (err, req, res, next) => {
   console.error('API Error:', err);
 
   let statusCode = err.statusCode || 500;
-  let message = err.message || 'Internal Server Error';
+  let message = err.message || 'Lỗi hệ thống, vui lòng thử lại sau.';
+
+  // Lỗi kỹ thuật của Prisma (truy vấn sai, bản ghi không tồn tại, mất kết nối CSDL...)
+  // có message tiếng Anh nhiều dòng, không phù hợp hiển thị cho người dùng — chi tiết
+  // đã được ghi log ở trên. Các lỗi nghiệp vụ controller tự đặt message thì giữ nguyên.
+  const isPrismaError = (typeof err.code === 'string' && /^P\d{4}$/.test(err.code)) || /^Prisma/.test(err.name || '');
+  if (isPrismaError && err.code !== 'P2002') {
+    if (err.code === 'P2025') {
+      statusCode = 404;
+      message = 'Không tìm thấy bản ghi cần thao tác (có thể đã bị xoá hoặc thay đổi).';
+    } else {
+      statusCode = err.statusCode || 500;
+      message = 'Lỗi truy vấn dữ liệu, vui lòng thử lại sau.';
+    }
+  }
 
   // Prisma unique-constraint violation (P2002) otherwise leaks its raw,
   // multi-line "Invalid `prisma.x.create()` invocation..." message straight

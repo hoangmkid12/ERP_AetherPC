@@ -30,7 +30,7 @@ module.exports = (authLimiter) => {
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict'
     });
-    res.json({ success: true, message: 'Logged out successfully' });
+    res.json({ success: true, message: 'Đã đăng xuất.' });
   });
 
   // @route   GET /api/v1/auth/me
