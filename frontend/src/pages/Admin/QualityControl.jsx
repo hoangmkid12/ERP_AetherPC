@@ -3256,8 +3256,25 @@ export default function QualityControl() {
                           rawItems.map((it, idx) => {
                             const itName = it.product?.name || it.productName || it.name || it.productId || resolvedProductName;
                             const itQty = parseInt(it.quantity) || parseInt(viewingLog.totalQty) || 1;
-                            const passed = isRejected ? 0 : itQty;
-                            const failed = isRejected ? itQty : 0;
+                            
+                            let passed = itQty;
+                            let failed = 0;
+                            if (isRejected) {
+                              passed = 0;
+                              failed = itQty;
+                            } else if (it.passedQty !== undefined) {
+                              passed = Number(it.passedQty);
+                              failed = Number(it.failedQty ?? (itQty - passed));
+                            } else if (rawItems.length === 1) {
+                              passed = Number(viewingLog.passedQty ?? itQty);
+                              failed = Number(viewingLog.failedQty ?? 0);
+                            } else {
+                              const totalInspectionQty = Number(viewingLog.totalQty) || rawItems.reduce((s, i) => s + (parseInt(i.quantity) || 1), 0) || 1;
+                              const ratio = totalInspectionQty > 0 ? (Number(viewingLog.passedQty ?? totalInspectionQty) / totalInspectionQty) : 1;
+                              passed = Math.round(itQty * ratio);
+                              failed = itQty - passed;
+                            }
+
                             return (
                               <tr key={it.id || idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
                                 <td style={{ padding: '0.5rem 0.65rem', fontWeight: 700, color: '#0f172a' }}>
@@ -3278,8 +3295,10 @@ export default function QualityControl() {
                                   {failed}
                                 </td>
                                 <td style={{ padding: '0.5rem 0.65rem', textAlign: 'center' }}>
-                                  <span style={{ color: isRejected ? '#dc2626' : '#15803d', fontWeight: 700, fontSize: '0.74rem' }}>
-                                    {isRejected ? 'Hàng không đạt chuẩn kỹ thuật' : 'Seal nguyên vẹn & Đối soát Serial OK'}
+                                  <span style={{ color: (failed > 0 || isRejected) ? '#dc2626' : '#15803d', fontWeight: 700, fontSize: '0.74rem' }}>
+                                    {failed > 0
+                                      ? `Phát hiện ${failed} SP lỗi / Không đạt`
+                                      : (isRejected ? 'Hàng không đạt chuẩn kỹ thuật' : 'Seal nguyên vẹn & Đối soát Serial OK')}
                                   </span>
                                 </td>
                               </tr>
@@ -3301,8 +3320,10 @@ export default function QualityControl() {
                               {viewingLog.failedQty || 0}
                             </td>
                             <td style={{ padding: '0.5rem 0.65rem', textAlign: 'center' }}>
-                              <span style={{ color: isRejected ? '#dc2626' : '#15803d', fontWeight: 700, fontSize: '0.74rem' }}>
-                                {isRejected ? 'Hàng không đạt chuẩn kỹ thuật' : 'Seal nguyên vẹn & Đối soát Serial OK'}
+                              <span style={{ color: (viewingLog.failedQty > 0 || isRejected) ? '#dc2626' : '#15803d', fontWeight: 700, fontSize: '0.74rem' }}>
+                                {viewingLog.failedQty > 0
+                                  ? `Phát hiện ${viewingLog.failedQty} SP lỗi / Không đạt`
+                                  : (isRejected ? 'Hàng không đạt chuẩn kỹ thuật' : 'Seal nguyên vẹn & Đối soát Serial OK')}
                               </span>
                             </td>
                           </tr>

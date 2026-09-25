@@ -2287,8 +2287,25 @@ function WarehouseQcCertificateModal({ target, onClose, purchaseOrders = [] }) {
                     rawItems.map((it, idx) => {
                       const itName = it.product?.name || it.productName || it.name || productName;
                       const itQty = parseInt(it.quantity) || totalQty || 1;
-                      const itPassed = isRejected ? 0 : itQty;
-                      const itFailed = isRejected ? itQty : 0;
+                      
+                      let passed = itQty;
+                      let failed = 0;
+                      if (isRejected) {
+                        passed = 0;
+                        failed = itQty;
+                      } else if (it.passedQty !== undefined) {
+                        passed = Number(it.passedQty);
+                        failed = Number(it.failedQty ?? (itQty - passed));
+                      } else if (rawItems.length === 1) {
+                        passed = Number(passedQty ?? itQty);
+                        failed = Number(failedQty ?? 0);
+                      } else {
+                        const totalInspectionQty = Number(totalQty) || rawItems.reduce((s, i) => s + (parseInt(i.quantity) || 1), 0) || 1;
+                        const ratio = totalInspectionQty > 0 ? (Number(passedQty ?? totalInspectionQty) / totalInspectionQty) : 1;
+                        passed = Math.round(itQty * ratio);
+                        failed = itQty - passed;
+                      }
+
                       return (
                         <tr key={it.id || idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
                           <td style={{ padding: '0.5rem 0.65rem', fontWeight: 700, color: '#0f172a' }}>
@@ -2299,14 +2316,16 @@ function WarehouseQcCertificateModal({ target, onClose, purchaseOrders = [] }) {
                             {itQty}
                           </td>
                           <td style={{ padding: '0.5rem 0.5rem', textAlign: 'center', fontWeight: 800, color: '#16a34a', backgroundColor: '#f0fdf4' }}>
-                            {itPassed}
+                            {passed}
                           </td>
-                          <td style={{ padding: '0.5rem 0.5rem', textAlign: 'center', fontWeight: 800, color: (itFailed > 0) ? '#dc2626' : '#64748b', backgroundColor: (itFailed > 0) ? '#fef2f2' : 'transparent' }}>
-                            {itFailed}
+                          <td style={{ padding: '0.5rem 0.5rem', textAlign: 'center', fontWeight: 800, color: (failed > 0) ? '#dc2626' : '#64748b', backgroundColor: (failed > 0) ? '#fef2f2' : 'transparent' }}>
+                            {failed}
                           </td>
                           <td style={{ padding: '0.5rem 0.65rem', textAlign: 'center' }}>
-                            <span style={{ color: isRejected ? '#dc2626' : '#15803d', fontWeight: 700, fontSize: '0.74rem' }}>
-                              {isRejected ? 'Hàng không đạt chuẩn kỹ thuật' : 'Seal nguyên vẹn & Đối soát Serial OK'}
+                            <span style={{ color: (failed > 0 || isRejected) ? '#dc2626' : '#15803d', fontWeight: 700, fontSize: '0.74rem' }}>
+                              {failed > 0
+                                ? `Phát hiện ${failed} SP lỗi / Không đạt`
+                                : (isRejected ? 'Hàng không đạt chuẩn kỹ thuật' : 'Seal nguyên vẹn & Đối soát Serial OK')}
                             </span>
                           </td>
                         </tr>
@@ -2327,8 +2346,10 @@ function WarehouseQcCertificateModal({ target, onClose, purchaseOrders = [] }) {
                         {failedQty}
                       </td>
                       <td style={{ padding: '0.5rem 0.65rem', textAlign: 'center' }}>
-                        <span style={{ color: isRejected ? '#dc2626' : '#15803d', fontWeight: 700, fontSize: '0.74rem' }}>
-                          {isRejected ? 'Hàng không đạt chuẩn kỹ thuật' : 'Seal nguyên vẹn & Đối soát Serial OK'}
+                        <span style={{ color: (failedQty > 0 || isRejected) ? '#dc2626' : '#15803d', fontWeight: 700, fontSize: '0.74rem' }}>
+                          {failedQty > 0
+                            ? `Phát hiện ${failedQty} SP lỗi / Không đạt`
+                            : (isRejected ? 'Hàng không đạt chuẩn kỹ thuật' : 'Seal nguyên vẹn & Đối soát Serial OK')}
                         </span>
                       </td>
                     </tr>
