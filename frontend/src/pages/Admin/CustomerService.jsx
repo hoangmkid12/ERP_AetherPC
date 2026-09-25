@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
+import ActorNotificationBar from '../../components/ActorNotificationBar';
 import { useSearchParams } from 'react-router-dom';
 import { useSalesStore } from '../../stores';
 import { useAuth } from '../../context/AuthContext';
@@ -464,6 +465,7 @@ export default function CustomerService() {
       {/* ========================================================================= */}
       {activeTab === 'overview' && (
         <div>
+          <ActorNotificationBar />
           {/* 6 Balanced KPI Cards (2 Rows x 3 Columns) */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem', marginBottom: '1.25rem' }}>
             {stats.map((st, sIdx) => (

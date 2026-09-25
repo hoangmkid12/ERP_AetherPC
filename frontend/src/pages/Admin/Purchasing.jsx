@@ -1305,7 +1305,7 @@ export default function Purchasing() {
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
-                    Trung Tâm Nhiệm Vụ Mua Hàng
+                    Tiến Độ Chuỗi Cung Ứng
                   </h3>
                   {rfqQuotedCount > 0 && (
                     <span style={{
@@ -1396,7 +1396,7 @@ export default function Purchasing() {
             </div>
           </div>
 
-          {/* 2. Actor Notification Bar placed below task center */}
+          {/* 2. Trung Tâm Nhiệm Vụ theo vai trò (việc cần làm ở bước hiện tại) */}
           <div style={{ marginBottom: '1.25rem' }}>
             <ActorNotificationBar />
           </div>

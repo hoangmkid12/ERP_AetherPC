@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import ActorNotificationBar from '../../components/ActorNotificationBar';
 import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import { useFinanceStore, useUtilityStore, useSalesStore, useInventoryStore } from '../../stores';
 import { useAuth } from '../../context/AuthContext';
@@ -1090,6 +1091,7 @@ export default function QualityControl() {
       {/* ========================================================================= */}
       {activeTab === 'overview' && (
         <div>
+          <ActorNotificationBar />
           {/* 6 Balanced KPI Cards (2 Rows x 3 Columns) */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem', marginBottom: '1.25rem' }}>
             {stats.map((st, sIdx) => (

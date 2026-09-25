@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import ActorNotificationBar from '../../components/ActorNotificationBar';
 import { useSearchParams } from 'react-router-dom';
 import { useHRStore, useUtilityStore } from '../../stores';
 import { useAuth } from '../../context/AuthContext';
@@ -436,6 +437,7 @@ export default function HRManager() {
       {/* ========================================================================= */}
       {activeTab === 'overview' && (
         <div>
+          <ActorNotificationBar />
           {/* 6 Balanced KPI Cards (2 Rows x 3 Columns) */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem', marginBottom: '1.25rem' }}>
             {stats.map((st, sIdx) => (

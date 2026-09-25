@@ -663,7 +663,11 @@ export default function Dashboard() {
 
   // Pending Approvals Count for CEO
   const pendingQuotedPOsCount = filteredQuotedOrders.length;
-  const pendingPayrollApprovalCount = (payrolls && payrolls.length > 0 && payrolls[0]?.status === 'SUBMITTED_TO_CEO') ? 1 : 0;
+  // HR lập bảng lương ở trạng thái SUBMITTED_TO_ACCOUNTING (= "Chờ Ban Giám Đốc duyệt", xem
+  // hr.routes.js) — mã SUBMITTED_TO_CEO cũ không bao giờ được backend ghi nên trước đây luôn đếm 0.
+  const payrollAwaitingCeo = (payrolls || []).some(p => p && ['SUBMITTED_TO_ACCOUNTING', 'SUBMITTED_TO_CEO'].includes(p.status));
+  const payrollApprovedByCeo = !payrollAwaitingCeo && (payrolls || []).some(p => p && p.status === 'APPROVED_BY_CEO');
+  const pendingPayrollApprovalCount = payrollAwaitingCeo ? 1 : 0;
   const pendingLeaveList = (leaveRequests || []).filter(l => l && (l.status === 'PENDING_CEO' || l.status === 'PENDING'));
   const pendingLeaveApprovalCount = pendingLeaveList.length;
   const totalPendingCeoApprovals = pendingQuotedPOsCount + pendingPayrollApprovalCount + pendingLeaveApprovalCount;
@@ -1210,9 +1214,9 @@ export default function Dashboard() {
               </div>
 
               <div style={{ display: 'flex', gap: '0.5rem' }}>
-                {payrolls.length > 0 && payrolls[0]?.status === 'APPROVED_BY_CEO' ? (
-                  <span style={{ backgroundColor: '#ffffff', color: '#16a34a', border: '1px solid #bbf7d0', padding: '0.4rem 0.85rem', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 800 }}>
-                    ✓ Đã Phê Duyệt (Kế Toán Đang Chi Trả)
+                {!payrollAwaitingCeo ? (
+                  <span style={{ backgroundColor: '#ffffff', color: payrollApprovedByCeo ? '#16a34a' : '#64748b', border: `1px solid ${payrollApprovedByCeo ? '#bbf7d0' : '#e2e8f0'}`, padding: '0.4rem 0.85rem', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 800 }}>
+                    {payrollApprovedByCeo ? '✓ Đã Phê Duyệt (Kế Toán Đang Chi Trả)' : 'Không có bảng lương chờ duyệt'}
                   </span>
                 ) : (
                   <button
