@@ -7,13 +7,18 @@
 //   getStatusLabel(ORDER_STATUS, order.status)   // chỉ lấy text
 //   getStatusInfo(ORDER_STATUS, order.status)    // lấy { label, color, bg, border }
 
-export const getStatusInfo = (dictionary, status) =>
-  (dictionary && dictionary[status]) || {
-    label: status || 'Không xác định',
-    color: '#64748b',
-    bg: '#f8fafc',
-    border: '#e2e8f0'
-  };
+// Mã trạng thái trong CSDL vẫn giữ dạng UPPER_SNAKE tiếng Anh vì mọi logic chuyển trạng
+// thái/phân quyền so sánh trên các mã này — CHỈ phần hiển thị được dịch qua file này.
+//
+// Tra cứu: bảng được truyền vào → bảng dự phòng dùng chung (GENERIC_STATUS, cho mã phổ
+// biến bị dùng nhầm bảng) → "Chưa xác định". Không bao giờ hiện mã tiếng Anh thô.
+const UNKNOWN_STYLE = { color: '#64748b', bg: '#f8fafc', border: '#e2e8f0' };
+
+export const getStatusInfo = (dictionary, status) => {
+  if (dictionary && dictionary[status]) return dictionary[status];
+  if (status && GENERIC_STATUS[status]) return GENERIC_STATUS[status];
+  return { label: status ? 'Chưa xác định' : 'Không có', ...UNKNOWN_STYLE };
+};
 
 export const getStatusLabel = (dictionary, status) => getStatusInfo(dictionary, status).label;
 
@@ -37,7 +42,26 @@ export const ORDER_STATUS = {
   RETURN_APPROVED: { label: 'Đã Duyệt Trả Hàng', color: '#6366f1', bg: '#eef2ff', border: '#c7d2fe' },
   RETURNING: { label: 'Đang Trả Hàng', color: '#6366f1', bg: '#eef2ff', border: '#c7d2fe' },
   RETURNED: { label: 'Đã Trả Hàng', color: '#64748b', bg: '#f1f5f9', border: '#cbd5e1' },
-  REFUNDED: { label: 'Đã Hoàn Tiền', color: '#047857', bg: '#ecfdf5', border: '#a7f3d0' }
+  REFUNDED: { label: 'Đã Hoàn Tiền', color: '#047857', bg: '#ecfdf5', border: '#a7f3d0' },
+  // Trạng thái do luồng đổi trả ghi lên đơn hàng gốc (confirmReturnWarehouse, qcInspectReturn...)
+  DELIVERED_TO_WAREHOUSE: { label: 'Đã Về Kho - Chờ QC', color: '#6366f1', bg: '#eef2ff', border: '#c7d2fe' },
+  QC_PASSED: { label: 'QC Thẩm Định Đạt', color: '#047857', bg: '#ecfdf5', border: '#a7f3d0' },
+  RESTOCKED: { label: 'Đã Nhập Lại Kho', color: '#047857', bg: '#ecfdf5', border: '#a7f3d0' },
+  EXCHANGED: { label: 'Đã Đổi Mới 1-1', color: '#6d28d9', bg: '#f5f3ff', border: '#ddd6fe' },
+  VENDOR_WARRANTY: { label: 'Đã Chuyển Gửi Hãng Bảo Hành', color: '#c2410c', bg: '#fff7ed', border: '#fed7aa' },
+  INSPECTED_SCRAP: { label: 'Phế Phẩm / Kho Lỗi', color: '#be123c', bg: '#fff1f2', border: '#fecdd3' },
+  RETURNING_TO_CUSTOMER: { label: 'Đang Giao Trả Khách', color: '#6366f1', bg: '#eef2ff', border: '#c7d2fe' },
+  RETURNED_TO_CUSTOMER: { label: 'Đã Trả Lại Khách', color: '#64748b', bg: '#f1f5f9', border: '#cbd5e1' },
+  REJECTED: { label: 'Từ Chối Đổi Trả', color: '#be123c', bg: '#fff1f2', border: '#fecdd3' }
+};
+
+// ─── Order.paymentMethod / OrderPayment.method ───
+export const PAYMENT_METHOD = {
+  COD: { label: 'Thanh Toán Khi Nhận Hàng (COD)', color: '#b45309', bg: '#fffbeb', border: '#fde68a' },
+  CASH: { label: 'Tiền Mặt', color: '#047857', bg: '#ecfdf5', border: '#a7f3d0' },
+  BANK_TRANSFER: { label: 'Chuyển Khoản', color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe' },
+  ONLINE_GATEWAY: { label: 'Cổng Thanh Toán Online', color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe' },
+  EXCHANGE_1TO1: { label: 'Đổi Mới 1-1 (0đ)', color: '#6d28d9', bg: '#f5f3ff', border: '#ddd6fe' }
 };
 
 // ─── Order.paymentStatus ───
@@ -88,7 +112,34 @@ export const RETURN_STATUS = {
   INSPECTED_SCRAP: { label: 'Phế Phẩm / Kho Lỗi', color: '#be123c', bg: '#fff1f2', border: '#fecdd3' },
   REFUNDED: { label: 'Đã Hoàn Tiền', color: '#047857', bg: '#ecfdf5', border: '#a7f3d0' },
   COMPLETED: { label: 'Hoàn Tất', color: '#047857', bg: '#ecfdf5', border: '#a7f3d0' },
-  REJECTED: { label: 'Đã Từ Chối', color: '#be123c', bg: '#fff1f2', border: '#fecdd3' }
+  REJECTED: { label: 'Đã Từ Chối', color: '#be123c', bg: '#fff1f2', border: '#fecdd3' },
+  RETURNING_TO_CUSTOMER: { label: 'Đang Giao Trả Khách', color: '#6366f1', bg: '#eef2ff', border: '#c7d2fe' },
+  RETURNED_TO_CUSTOMER: { label: 'Đã Trả Lại Khách', color: '#64748b', bg: '#f1f5f9', border: '#cbd5e1' }
+};
+
+// ─── ReturnRequest.type / qcDecision ───
+export const RETURN_TYPE = {
+  EXCHANGE: { label: 'Đổi Mới 1-1', color: '#6d28d9', bg: '#f5f3ff', border: '#ddd6fe' },
+  REFUND: { label: 'Hoàn Tiền', color: '#047857', bg: '#ecfdf5', border: '#a7f3d0' },
+  EXCHANGE_NEW: { label: 'Đổi Mới 1-1', color: '#6d28d9', bg: '#f5f3ff', border: '#ddd6fe' },
+  RESTOCK_WAREHOUSE: { label: 'Nhập Lại Kho', color: '#047857', bg: '#ecfdf5', border: '#a7f3d0' },
+  APPROVE_REFUND: { label: 'Duyệt Hoàn Tiền', color: '#047857', bg: '#ecfdf5', border: '#a7f3d0' },
+  APPROVE_EXCHANGE: { label: 'Duyệt Đổi Mới', color: '#6d28d9', bg: '#f5f3ff', border: '#ddd6fe' }
+};
+
+// ─── PurchaseRequest.status (phiếu yêu cầu mua hàng của kho) ───
+export const PURCHASE_REQUEST_STATUS = {
+  PENDING: { label: 'Chờ Quản Lý Kho Duyệt', color: '#b45309', bg: '#fffbeb', border: '#fde68a' },
+  APPROVED: { label: 'Quản Lý Kho Đã Duyệt', color: '#15803d', bg: '#f0fdf4', border: '#bbf7d0' },
+  REJECTED: { label: 'Từ Chối', color: '#dc2626', bg: '#fef2f2', border: '#fecaca' },
+  RFQ_CREATED: { label: 'Đã Lập RFQ', color: '#1d4ed8', bg: '#eff6ff', border: '#bfdbfe' }
+};
+
+// ─── GoodsReceipt.status (phiếu nhập kho) ───
+export const GOODS_RECEIPT_STATUS = {
+  READY: { label: 'Chờ Nhận Hàng', color: '#b45309', bg: '#fffbeb', border: '#fde68a' },
+  DONE: { label: 'Đã Nhập Kho', color: '#047857', bg: '#ecfdf5', border: '#a7f3d0' },
+  CANCELLED: { label: 'Đã Hủy', color: '#be123c', bg: '#fff1f2', border: '#fecdd3' }
 };
 
 // ─── Complaint.status (khiếu nại CSKH, 4 giá trị) ───
@@ -97,6 +148,14 @@ export const COMPLAINT_STATUS = {
   IN_PROGRESS: { label: 'Đang Xử Lý', color: '#f59e0b', bg: '#fffbeb', border: '#fde68a' },
   RESOLVED: { label: 'Đã Giải Quyết', color: '#047857', bg: '#ecfdf5', border: '#a7f3d0' },
   CLOSED: { label: 'Đã Đóng', color: '#64748b', bg: '#f1f5f9', border: '#cbd5e1' }
+};
+
+// ─── Complaint.priority ───
+export const COMPLAINT_PRIORITY = {
+  LOW: { label: 'Thấp', color: '#64748b', bg: '#f1f5f9', border: '#cbd5e1' },
+  MEDIUM: { label: 'Trung Bình', color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe' },
+  HIGH: { label: 'Cao', color: '#c2410c', bg: '#fff7ed', border: '#fed7aa' },
+  URGENT: { label: 'Khẩn Cấp', color: '#be123c', bg: '#fff1f2', border: '#fecdd3' }
 };
 
 // ─── QcInspection.status (biên bản kiểm định) ───
@@ -126,7 +185,9 @@ export const PAYROLL_STATUS = {
   UNPAID: { label: 'Chưa Chi Trả', color: '#64748b', bg: '#f1f5f9', border: '#cbd5e1' },
   SUBMITTED_TO_CEO: { label: 'Đã Trình CEO Duyệt', color: '#b45309', bg: '#fffbeb', border: '#fde68a' },
   APPROVED_BY_CEO: { label: 'CEO Đã Duyệt - Chờ Giải Ngân', color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe' },
-  SUBMITTED_TO_ACCOUNTING: { label: 'Chờ Kế Toán Duyệt Chi', color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe' },
+  // Bảng lương HR vừa lập — bước kế tiếp là Ban Giám Đốc duyệt (hr.routes.js approve-ceo),
+  // KHÔNG phải kế toán duyệt chi như nhãn cũ.
+  SUBMITTED_TO_ACCOUNTING: { label: 'Chờ Ban Giám Đốc Duyệt', color: '#b45309', bg: '#fffbeb', border: '#fde68a' },
   DISBURSED: { label: 'Đã Chi Trả Lương', color: '#047857', bg: '#ecfdf5', border: '#a7f3d0' },
   COMPLETED: { label: 'Đã Chi Trả Lương', color: '#047857', bg: '#ecfdf5', border: '#a7f3d0' },
   PAID: { label: 'Đã Chi Trả Lương', color: '#047857', bg: '#ecfdf5', border: '#a7f3d0' }
@@ -180,6 +241,59 @@ export const CHAT_SESSION_STATUS = {
   OFFLINE: { label: 'Ngoại Tuyến', color: '#64748b', bg: '#f1f5f9', border: '#cbd5e1' },
   CLOSED: { label: 'Đã Đóng', color: '#64748b', bg: '#f1f5f9', border: '#cbd5e1' }
 };
+
+// ─── Supplier.status / Customer.status ───
+export const SUPPLIER_STATUS = {
+  ACTIVE: { label: 'Đang Hợp Tác', color: '#047857', bg: '#ecfdf5', border: '#a7f3d0' },
+  INACTIVE: { label: 'Ngừng Hợp Tác', color: '#64748b', bg: '#f1f5f9', border: '#cbd5e1' }
+};
+export const CUSTOMER_STATUS = {
+  ACTIVE: { label: 'Đang Hoạt Động', color: '#047857', bg: '#ecfdf5', border: '#a7f3d0' },
+  INACTIVE: { label: 'Đã Khóa', color: '#be123c', bg: '#fff1f2', border: '#fecdd3' }
+};
+
+// ─── Customer.tier (hạng thành viên) — khớp TIER_VI ở backend/src/constants/statusLabels.js ───
+export const CUSTOMER_TIER = {
+  REGULAR: { label: 'Khách Thường', color: '#64748b', bg: '#f1f5f9', border: '#cbd5e1' },
+  BRONZE: { label: 'Hạng Đồng', color: '#9a3412', bg: '#fff7ed', border: '#fed7aa' },
+  SILVER: { label: 'Hạng Bạc', color: '#475569', bg: '#f1f5f9', border: '#cbd5e1' },
+  GOLD: { label: 'Hạng Vàng', color: '#b45309', bg: '#fffbeb', border: '#fde68a' },
+  PLATINUM: { label: 'Hạng Bạch Kim', color: '#1d4ed8', bg: '#eff6ff', border: '#bfdbfe' },
+  DIAMOND: { label: 'Hạng Kim Cương', color: '#6d28d9', bg: '#f5f3ff', border: '#ddd6fe' },
+  B2B: { label: 'Doanh Nghiệp (B2B)', color: '#0f766e', bg: '#f0fdfa', border: '#99f6e4' }
+};
+
+// ─── LedgerEntry.type / StockMovement.type ───
+export const LEDGER_ENTRY_TYPE = {
+  INCOME: { label: 'Thu', color: '#047857', bg: '#ecfdf5', border: '#a7f3d0' },
+  EXPENSE: { label: 'Chi', color: '#be123c', bg: '#fff1f2', border: '#fecdd3' },
+  REFUND: { label: 'Hoàn Tiền', color: '#c2410c', bg: '#fff7ed', border: '#fed7aa' }
+};
+export const STOCK_MOVEMENT_TYPE = {
+  IN: { label: 'Nhập Kho', color: '#047857', bg: '#ecfdf5', border: '#a7f3d0' },
+  OUT: { label: 'Xuất Kho', color: '#be123c', bg: '#fff1f2', border: '#fecdd3' }
+};
+
+// ─── Dự phòng dùng chung: mã phổ biến khi trang tra nhầm bảng hoặc bảng thiếu mã ───
+// Gộp từ các bảng trên (bảng đứng trước ưu tiên hơn), rồi phủ nhãn trung tính cho các mã
+// mang nghĩa khác nhau tuỳ ngữ cảnh (PENDING, APPROVED...).
+const GENERIC_STATUS = Object.assign(
+  {},
+  STOCK_MOVEMENT_TYPE, LEDGER_ENTRY_TYPE, CUSTOMER_TIER, COMPLAINT_PRIORITY, RETURN_TYPE, PURCHASE_REQUEST_STATUS,
+  ATTENDANCE_STATUS, CHAT_SESSION_STATUS, SERIAL_STATUS, PRODUCT_STATUS, EMPLOYEE_STATUS,
+  AUDIT_LOG_STATUS, ASSEMBLY_STATUS, PAYROLL_STATUS, LEAVE_STATUS, VENDOR_BILL_STATUS, QC_STATUS,
+  COMPLAINT_STATUS, GOODS_RECEIPT_STATUS, RETURN_STATUS, PO_STATUS, PAYMENT_METHOD, PAYMENT_STATUS,
+  ORDER_STATUS,
+  {
+    PENDING: { label: 'Đang Chờ Xử Lý', color: '#b45309', bg: '#fffbeb', border: '#fde68a' },
+    APPROVED: { label: 'Đã Duyệt', color: '#047857', bg: '#ecfdf5', border: '#a7f3d0' },
+    REJECTED: { label: 'Từ Chối', color: '#be123c', bg: '#fff1f2', border: '#fecdd3' },
+    PAID: { label: 'Đã Thanh Toán', color: '#047857', bg: '#ecfdf5', border: '#a7f3d0' },
+    UNPAID: { label: 'Chưa Thanh Toán', color: '#b45309', bg: '#fffbeb', border: '#fde68a' },
+    ACTIVE: { label: 'Đang Hoạt Động', color: '#047857', bg: '#ecfdf5', border: '#a7f3d0' },
+    INACTIVE: { label: 'Ngừng Hoạt Động', color: '#64748b', bg: '#f1f5f9', border: '#cbd5e1' }
+  }
+);
 
 /**
  * Định dạng mã RMA chuẩn nghiệp vụ ngắn gọn, chuyên nghiệp (ví dụ #RMA-260917-4821 hoặc #RMA-A9B168)

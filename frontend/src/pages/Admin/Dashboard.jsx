@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { formatCurrencyInWords } from '../../utils/numberToWords';
 import OrderDetailModal from '../../components/OrderDetailModal';
+import { getRoleName } from '../../utils/rbacEngine';
 
 // Register ChartJS modules
 ChartJS.register(
@@ -1416,7 +1417,7 @@ export default function Dashboard() {
                         {idx + 1}
                       </span>
                       <strong style={{ fontSize: '0.85rem', color: '#0f172a' }}>{s.name}</strong>
-                      <span style={{ fontSize: '0.72rem', color: '#64748b' }}>({s.role})</span>
+                      <span style={{ fontSize: '0.72rem', color: '#64748b' }}>({getRoleName(s.role)})</span>
                     </div>
                     <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#16a34a' }}>
                       Hoa hồng: {formatPrice(s.commission)}
@@ -1450,7 +1451,7 @@ export default function Dashboard() {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
                     <div>
                       <strong style={{ fontSize: '0.85rem', color: '#0f172a' }}>{tech.name}</strong>
-                      <span style={{ fontSize: '0.72rem', color: '#64748b', marginLeft: '0.4rem' }}>({tech.role})</span>
+                      <span style={{ fontSize: '0.72rem', color: '#64748b', marginLeft: '0.4rem' }}>({getRoleName(tech.role)})</span>
                     </div>
                     <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#16a34a' }}>
                       Thưởng ráp máy: {formatPrice(tech.bonus)}
@@ -1991,7 +1992,7 @@ export default function Dashboard() {
                     <tr key={pIdx} style={{ borderBottom: '1px solid #f1f5f9' }}>
                       <td style={{ padding: '0.5rem', fontWeight: 700, color: '#2563eb' }}>NV-{p.empId || pIdx + 1}</td>
                       <td style={{ padding: '0.5rem', fontWeight: 600, color: '#0f172a' }}>{p.employeeName || p.name}</td>
-                      <td style={{ padding: '0.5rem', color: '#64748b' }}>{p.role || 'Nhân viên'}</td>
+                      <td style={{ padding: '0.5rem', color: '#64748b' }}>{getRoleName(p.role) || 'Nhân viên'}</td>
                       <td style={{ padding: '0.5rem', textAlign: 'right' }}>{formatPrice(p.baseSalary || p.base || 8500000)}</td>
                       <td style={{ padding: '0.5rem', textAlign: 'right', color: '#16a34a', fontWeight: 700 }}>+{formatPrice(p.bonus || p.commission || 1000000)}</td>
                       <td style={{ padding: '0.5rem', textAlign: 'right', fontWeight: 800, color: '#0f172a' }}>{formatPrice(p.netSalary || 9500000)}</td>

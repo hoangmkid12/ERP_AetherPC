@@ -5,7 +5,7 @@ import { useAuth } from '../../context/AuthContext';
 import { usePermission } from '../../hooks/usePermission';
 import { useNotification, notify } from '../../context/NotificationContext';
 import { api } from '../../services/api';
-import { ORDER_STATUS, getStatusInfo } from '../../utils/statusLabels';
+import { ORDER_STATUS, getStatusInfo, CUSTOMER_TIER, getStatusLabel } from '../../utils/statusLabels';
 import ActorNotificationBar from '../../components/ActorNotificationBar';
 import { 
   Search, ShoppingCart, Plus, Minus, Trash2, Printer, FileText,
@@ -1488,7 +1488,6 @@ export default function SalesPOS() {
               ) : filteredCustomerAccounts.map((cust) => {
                 const isInactive = cust.status !== 'ACTIVE';
                 const isBusy = customerActionBusyId === cust.customerId;
-                const tierLabels = { BRONZE: 'Hạng Đồng', SILVER: 'Hạng Bạc', GOLD: 'Hạng Vàng', PLATINUM: 'Hạng Kim Cương' };
 
                 return (
                   <div key={cust.customerId} style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: `1px solid ${isInactive ? '#fecaca' : '#cbd5e1'}`, padding: '1.25rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', opacity: isInactive ? 0.75 : 1 }}>
@@ -1505,7 +1504,7 @@ export default function SalesPOS() {
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', alignItems: 'flex-end' }}>
                           <span style={{ fontSize: '0.68rem', fontWeight: 800, padding: '2px 8px', borderRadius: '10px', backgroundColor: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe' }}>
-                            {tierLabels[cust.tier] || cust.tier || 'Khách Thường'}
+                            {cust.tier ? getStatusLabel(CUSTOMER_TIER, cust.tier) : 'Khách Thường'}
                           </span>
                           <span style={{ fontSize: '0.68rem', fontWeight: 800, padding: '2px 8px', borderRadius: '10px', backgroundColor: isInactive ? '#fef2f2' : '#f0fdf4', color: isInactive ? '#dc2626' : '#16a34a', border: `1px solid ${isInactive ? '#fecaca' : '#bbf7d0'}` }}>
                             {isInactive ? 'Đã vô hiệu hóa' : 'Đang hoạt động'}

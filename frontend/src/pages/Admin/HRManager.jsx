@@ -12,6 +12,7 @@ import {
   Edit3, User, Printer, Phone, Mail, MapPin, CreditCard, Building, TrendingUp, AlertTriangle
 } from 'lucide-react';
 import { Bar, Doughnut } from 'react-chartjs-2';
+import { getRoleName } from '../../utils/rbacEngine';
 import { 
   Chart as ChartJS, 
   CategoryScale, 
@@ -958,7 +959,7 @@ export default function HRManager() {
                     <td style={{ padding: '0.65rem 0.85rem', fontWeight: 700, color: '#0f172a' }}>{p.empName || `NV #${p.empId}`}</td>
                     <td style={{ padding: '0.65rem 0.85rem' }}>
                       <span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 800, backgroundColor: `${ROLE_COLORS[p.employee?.role] || '#6366f1'}15`, color: ROLE_COLORS[p.employee?.role] || '#6366f1' }}>
-                        {p.employee?.role || '---'}
+                        {getRoleName(p.employee?.role) || '---'}
                       </span>
                     </td>
                     <td style={{ padding: '0.65rem 0.85rem', textAlign: 'right', color: '#475569' }}>{fmt(p.salary)}</td>
@@ -1238,7 +1239,7 @@ export default function HRManager() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', fontSize: '0.82rem' }}>
               <div><strong>Họ và tên:</strong> {viewingEmpDetail.fullname}</div>
               <div><strong>Tài khoản đăng nhập:</strong> <code style={{ color: '#2563eb' }}>{viewingEmpDetail.username}</code></div>
-              <div><strong>Chức danh:</strong> <span style={{ fontWeight: 800, color: ROLE_COLORS[viewingEmpDetail.role] }}>{viewingEmpDetail.role}</span></div>
+              <div><strong>Chức danh:</strong> <span style={{ fontWeight: 800, color: ROLE_COLORS[viewingEmpDetail.role] }}>{getRoleName(viewingEmpDetail.role)}</span></div>
               <div><strong>Phòng ban:</strong> {viewingEmpDetail.department || 'Kinh Doanh'}</div>
               <div><strong>Lương cơ bản:</strong> <strong style={{ color: '#16a34a' }}>{fmt(viewingEmpDetail.salary || viewingEmpDetail.baseSalary)}</strong></div>
               <div><strong>Hợp đồng:</strong> Chính thức (Không thời hạn)</div>

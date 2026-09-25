@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useCart } from '../../context/CartContext';
 import { useNotification, notify } from '../../context/NotificationContext';
 import { api } from '../../services/api';
+import { getRoleName } from '../../utils/rbacEngine';
 import {
   ShoppingBag, Cpu, LogIn, LogOut, LayoutDashboard,
   ChevronDown, Tag, Newspaper, Building2, Users,
@@ -652,7 +653,7 @@ export default function Header() {
                           fontSize: '0.78rem',
                           color: '#475569'
                         }}>
-                          Vai trò: <strong style={{ color: '#2563eb', fontWeight: 800 }}>{user.role}</strong>
+                          Vai trò: <strong style={{ color: '#2563eb', fontWeight: 800 }}>{getRoleName(user.role)}</strong>
                         </div>
                       )}
 

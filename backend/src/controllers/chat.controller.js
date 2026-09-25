@@ -6,39 +6,9 @@ const { findBestKnowledgeMatch } = require('../utils/chatKnowledgeBase');
 
 const formatVnd = (val) => new Intl.NumberFormat('vi-VN').format(parseFloat(val) || 0) + '₫';
 
-// Nhãn tiếng Việt cho Order.status — bản rút gọn của ORDER_STATUS ở
-// frontend/src/utils/statusLabels.js, chỉ giữ phần label vì chatbot chỉ cần
-// hiển thị chữ, không cần màu badge.
-const ORDER_STATUS_VI = {
-  PENDING: 'Chờ Xác Nhận',
-  WAITING_PAYMENT: 'Chờ Thanh Toán',
-  CONFIRMED: 'Đã Xác Nhận',
-  PACKED: 'Đã Đóng Gói',
-  PROCESSING: 'Đang Chuẩn Bị Hàng',
-  AWAITING_STOCK: 'Chờ Nhập Hàng',
-  READY_TO_SHIP: 'Sẵn Sàng Giao',
-  SHIPPED: 'Đang Giao Hàng',
-  DELIVERED: 'Đã Giao Hàng',
-  COMPLETED: 'Hoàn Tất',
-  CANCELLED: 'Đã Hủy',
-  FAILED_DELIVERY: 'Giao Thất Bại',
-  SHIPPING_FAILED: 'Giao Thất Bại - Hẹn Lại',
-  RETURNING_TO_WAREHOUSE: 'Đang Hoàn Về Kho',
-  RETURN_REQUESTED: 'Yêu Cầu Trả Hàng',
-  RETURN_APPROVED: 'Đã Duyệt Trả Hàng',
-  RETURNING: 'Đang Trả Hàng',
-  RETURNED: 'Đã Trả Hàng',
-  REFUNDED: 'Đã Hoàn Tiền'
-};
-
-const TIER_LABEL_VI = {
-  REGULAR: 'Thường',
-  BRONZE: 'Đồng',
-  SILVER: 'Bạc',
-  GOLD: 'Vàng',
-  PLATINUM: 'Bạch Kim',
-  DIAMOND: 'Kim Cương'
-};
+// Nhãn tiếng Việt lấy từ bảng chung (constants/statusLabels.js) — không tự định nghĩa lại
+// để khỏi thiếu mã (đơn đổi trả, hạng B2B...) như trước.
+const { ORDER_STATUS_VI, TIER_VI, labelOf } = require('../constants/statusLabels');
 
 // Chọn ngẫu nhiên 1 trong nhiều cách diễn đạt cho cùng 1 ý — tránh bot trả
 // lời y hệt từng từ mỗi lần, cảm giác tự nhiên/"thông minh" hơn hẳn so với
@@ -550,7 +520,7 @@ const handleChat = async (req, res, next) => {
           // CUSTOMER — tránh 1 khách gõ đại mã đơn để dò thông tin đơn người khác.
           const ownedByRequester = order && (req.user?.role !== 'CUSTOMER' || order.customerId === req.user.id);
           if (order && ownedByRequester) {
-            reply = `📦 **Đơn hàng ${order.orderId}**\n- Trạng thái: **${ORDER_STATUS_VI[order.status] || order.status}**\n- Tổng tiền: **${formatVnd(order.totalAmount)}**\n- Ngày đặt: ${new Date(order.createdAt).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}\n\nXem chi tiết đầy đủ (lịch sử xử lý, vị trí giao hàng) tại mục **"Đơn Mua Của Tôi"** nhé!`;
+            reply = `📦 **Đơn hàng ${order.orderId}**\n- Trạng thái: **${labelOf(ORDER_STATUS_VI, order.status)}**\n- Tổng tiền: **${formatVnd(order.totalAmount)}**\n- Ngày đặt: ${new Date(order.createdAt).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}\n\nXem chi tiết đầy đủ (lịch sử xử lý, vị trí giao hàng) tại mục **"Đơn Mua Của Tôi"** nhé!`;
           } else {
             reply = `Xin lỗi, tôi không tìm thấy đơn hàng **${orderId}** khớp với tài khoản của bạn. Bạn kiểm tra lại mã đơn hoặc bấm **"Gặp NV CSKH"** để được hỗ trợ tra cứu trực tiếp nhé.`;
           }
@@ -562,7 +532,7 @@ const handleChat = async (req, res, next) => {
           });
           if (recentOrders.length > 0) {
             reply = `**Các đơn hàng gần đây của bạn:**\n\n` +
-              recentOrders.map(o => `- Đơn **${o.orderId}**: ${ORDER_STATUS_VI[o.status] || o.status} — ${formatVnd(o.totalAmount)}`).join('\n') +
+              recentOrders.map(o => `- Đơn **${o.orderId}**: ${labelOf(ORDER_STATUS_VI, o.status)} — ${formatVnd(o.totalAmount)}`).join('\n') +
               `\n\nXem đầy đủ chi tiết & theo dõi vị trí giao hàng tại mục **"Đơn Mua Của Tôi"** nhé!`;
           } else {
             reply = 'Bạn chưa có đơn hàng nào tại AetherPC. Khám phá ngay các sản phẩm hot tại cửa hàng nhé!';
@@ -610,7 +580,7 @@ const handleChat = async (req, res, next) => {
             select: { loyaltyPoints: true, tier: true }
           });
           if (customer) {
-            reply = `Bạn hiện đang ở hạng **${TIER_LABEL_VI[customer.tier] || customer.tier}** với **${customer.loyaltyPoints.toLocaleString('vi-VN')} điểm** tích lũy.\n\n📊 Mốc thăng hạng: Bạc (1.000 điểm), Vàng (5.000 điểm), Bạch Kim (15.000 điểm). Cứ mỗi **10.000đ thanh toán = 1 điểm** cơ bản, nhân thêm theo % hạng hiện tại. Xem chi tiết đầy đủ tại trang **Hạng Thành Viên**.`;
+            reply = `Bạn hiện đang ở hạng **${labelOf(TIER_VI, customer.tier)}** với **${customer.loyaltyPoints.toLocaleString('vi-VN')} điểm** tích lũy.\n\n📊 Mốc thăng hạng: Bạc (1.000 điểm), Vàng (5.000 điểm), Bạch Kim (15.000 điểm). Cứ mỗi **10.000đ thanh toán = 1 điểm** cơ bản, nhân thêm theo % hạng hiện tại. Xem chi tiết đầy đủ tại trang **Hạng Thành Viên**.`;
           }
         } catch (err) {
           console.error('[Chatbot] Member tier lookup error:', err);

@@ -4,7 +4,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
 import { NotificationProvider } from './context/NotificationContext';
 import { initializeAllStores } from './stores';
-import { getRolesForModule } from './utils/rbacEngine';
+import { getRolesForModule, getRoleName } from './utils/rbacEngine';
 
 // Layout chrome loads eagerly (needed on first paint of every page).
 // Every actual page is lazy-loaded instead — the JS for e.g. SystemAdmin's
@@ -150,7 +150,7 @@ const AdminLayout = () => {
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
             <span style={{ fontWeight: 800, fontSize: '1rem', color: '#0f172a' }}>AetherPC</span>
             <span style={{ fontSize: '0.7rem', fontWeight: 800, background: '#eff6ff', color: '#2563eb', padding: '2px 6px', borderRadius: '4px', border: '1px solid #bfdbfe' }}>
-              {user?.role || 'ERP'}
+              {getRoleName(user?.role) || 'ERP'}
             </span>
           </div>
         </div>

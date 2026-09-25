@@ -24,7 +24,7 @@ import {
 import { useHRStore, useSalesStore, useInventoryStore, useFinanceStore } from '../../stores';
 import { DELIVERY_REGIONS } from '../../utils/deliveryRegions';
 import { notify, confirm } from '../../context/NotificationContext';
-import { AUDIT_LOG_STATUS, getStatusLabel } from '../../utils/statusLabels';
+import { AUDIT_LOG_STATUS, getStatusLabel, ORDER_STATUS } from '../../utils/statusLabels';
 import {
   ERP_SYSTEM_MODULES,
   ERP_ROLES,
@@ -2673,7 +2673,7 @@ export default function SystemAdmin() {
                                 <td style={{ padding: '0.4rem 0.5rem', color: '#64748b' }}>{new Date(o.createdAt).toLocaleDateString('vi-VN')}</td>
                                 <td style={{ padding: '0.4rem 0.5rem', textAlign: 'center' }}>
                                   <span style={{ padding: '2px 6px', borderRadius: '4px', fontSize: '0.68rem', fontWeight: 700, backgroundColor: '#f1f5f9', color: '#475569' }}>
-                                    {o.status}
+                                    {getStatusLabel(ORDER_STATUS, o.status)}
                                   </span>
                                 </td>
                                 <td style={{ padding: '0.4rem 0.5rem', textAlign: 'right', fontWeight: 700, color: '#0f172a' }}>{fmt(o.totalAmount)} ₫</td>

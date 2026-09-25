@@ -31,6 +31,18 @@ export const ERP_ROLES = [
   { code: 'HR', name: 'Quản Trị Nhân Sự', color: '#ec4899', desc: 'Quản lý hồ sơ nhân viên, chấm công và chế độ đãi ngộ' }
 ];
 
+// Tên tiếng Việt của một mã vai trò (UPPER_SNAKE) để HIỂN THỊ — mã trong JWT/CSDL giữ
+// nguyên. QA / QUALITY_CONTROL là biến thể của QC. Chuỗi không phải mã vai trò (vd chức
+// danh tự do) được trả nguyên; mã lạ hiện "Chưa xác định" thay vì tiếng Anh thô.
+const EXTRA_ROLE_NAMES = { QA: 'Kiểm Định Chất Lượng', QUALITY_CONTROL: 'Kiểm Định Chất Lượng', CUSTOMER: 'Khách Hàng', SUPPLIER: 'Nhà Cung Cấp' };
+export const getRoleName = (code) => {
+  if (!code) return '';
+  const found = ERP_ROLES.find(r => r.code === code);
+  if (found) return found.name;
+  if (EXTRA_ROLE_NAMES[code]) return EXTRA_ROLE_NAMES[code];
+  return /^[A-Z][A-Z0-9_]*$/.test(String(code)) ? 'Chưa xác định' : code;
+};
+
 // Danh mục toàn bộ các nghiệp vụ thực tế trong ERP (Granular Operations Catalog)
 export const OPERATIONAL_PERMISSIONS = [
   // 1. Phân Hệ Bán Hàng & Đơn Hàng

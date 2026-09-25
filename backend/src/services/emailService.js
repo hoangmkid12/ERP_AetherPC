@@ -34,8 +34,11 @@ const getEmailLogs = () => {
   return [];
 };
 
-// Map status to Vietnamese friendly label
+// Map status to Vietnamese friendly label — cách diễn đạt riêng cho email khách hàng,
+// phủ lên bảng nhãn chung (constants/statusLabels.js) để mọi mã còn lại vẫn có tiếng Việt.
+const { ORDER_STATUS_VI, labelOf } = require('../constants/statusLabels');
 const STATUS_LABELS = {
+  ...ORDER_STATUS_VI,
   'PENDING': 'Chờ Xử Lý',
   'WAITING_PAYMENT': 'Chờ Thanh Toán',
   'CONFIRMED': 'Đã Xác Nhận & Đủ Hàng',
@@ -359,7 +362,7 @@ const renderTracker = (status) => {
 // returns, refund, failed delivery, ...).
 const renderExceptionBanner = (status, note) => {
   const v = getStatusVisual(status);
-  const label = STATUS_LABELS[status] || status;
+  const label = labelOf(STATUS_LABELS, status);
   return `
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: ${v.bg}; border: 1px solid ${v.border}; border-radius: 10px; margin-bottom: 20px;">
       <tr><td style="padding: 18px; text-align: center;">
@@ -527,7 +530,7 @@ const sendOrderConfirmationEmail = async ({ toEmail, customerName, orderId, item
  * Gửi email thông báo cập nhật trạng thái đơn hàng (CONFIRMED, SHIPPED, DELIVERED, CANCELLED,...)
  */
 const sendOrderStatusUpdateEmail = async ({ toEmail, customerName, orderId, status, note, items, subtotal, discount, totalAmount, shippingFee, proofPhoto, proofUrl, receiverNote, deliveredTime }) => {
-  const statusVN = STATUS_LABELS[status] || status;
+  const statusVN = labelOf(STATUS_LABELS, status);
   const isDelivered = ['DELIVERED', 'COMPLETED'].includes(status);
   const isException = getStepIndex(status) === -1;
 

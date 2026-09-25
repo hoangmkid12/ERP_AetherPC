@@ -3,6 +3,7 @@ const { normalizeQcRole } = require('../constants/roles');
 const { computeBlendedAverageCost } = require('../utils/inventoryCosting');
 const { logAudit } = require('../utils/auditLog');
 const { hasOperationalPermission } = require('../middlewares/rbac.middleware');
+const { PO_STATUS_VI, labelOf } = require('../constants/statusLabels');
 
 // Neither the supplier-quote submission nor the CEO PO-approval action on the frontend
 // ever sends a reason/note (there's no free-text field for either step), so every such
@@ -600,7 +601,7 @@ const updatePurchaseOrderStatus = async (req, res, next) => {
     // 'CONFIRMED_BY_SUPPLIER' until QC files QA_PASSED/QA_PARTIAL/QA_REJECTED.
     const validStatuses = ['RFQ', 'RFQ_SENT', 'SENT', 'QUOTED', 'PENDING_PO_DRAFT', 'QUOTED_PENDING_CEO', 'PO', 'CONFIRMED_BY_SUPPLIER', 'QA_PASSED', 'QA_PARTIAL', 'QA_REJECTED', 'RECEIVED', 'DONE', 'COMPLETED', 'CANCELLED'];
     if (!validStatuses.includes(status)) {
-      return res.status(400).json({ success: false, message: `Invalid status: ${status}. Must be one of: ${validStatuses.join(', ')}` });
+      return res.status(400).json({ success: false, message: `Trạng thái đơn mua hàng không hợp lệ: ${status}.` });
     }
 
     const updatedPO = await prisma.$transaction(async (tx) => {
@@ -889,7 +890,7 @@ const updatePurchaseOrderStatus = async (req, res, next) => {
 
     res.json({
       success: true,
-      message: `Status updated to ${status} successfully`,
+      message: `Đã cập nhật trạng thái thành "${labelOf(PO_STATUS_VI, status)}".`,
       data: updatedPOClean
     });
   } catch (err) {

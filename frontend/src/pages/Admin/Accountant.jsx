@@ -5,13 +5,14 @@ import { useAuth } from '../../context/AuthContext';
 import { useAutoRefresh } from '../../hooks/useAutoRefresh';
 import { api } from '../../services/api';
 import { notify, confirm } from '../../context/NotificationContext';
-import { PO_STATUS, VENDOR_BILL_STATUS, getStatusInfo, formatRmaCode } from '../../utils/statusLabels';
+import { PO_STATUS, VENDOR_BILL_STATUS, getStatusInfo, formatRmaCode, PAYROLL_STATUS, getStatusLabel } from '../../utils/statusLabels';
 import { 
   DollarSign, ArrowUpRight, ArrowDownLeft, FileText, CheckCircle, ShoppingBag,
   Search, PlusCircle, Download, X, Eye, Printer, Calendar, CreditCard, Users,
   Building2, ArrowRightLeft, ShieldCheck, Check, RefreshCw, FileCheck, PieChart, TrendingUp, Filter, AlertTriangle, Send, Truck
 } from 'lucide-react';
 import { Bar, Doughnut, Line } from 'react-chartjs-2';
+import { getRoleName } from '../../utils/rbacEngine';
 import { 
   Chart as ChartJS, 
   CategoryScale, 
@@ -1544,12 +1545,12 @@ export default function Accountant() {
                   return (
                     <tr key={p.id || pIdx} style={{ borderBottom: '1px solid #f1f5f9' }}>
                       <td style={{ padding: '0.65rem 0.85rem', fontWeight: 700, color: '#0f172a' }}>{p.empName}</td>
-                      <td style={{ padding: '0.65rem 0.85rem', color: '#64748b' }}>{p.employee?.role}</td>
+                      <td style={{ padding: '0.65rem 0.85rem', color: '#64748b' }}>{getRoleName(p.employee?.role)}</td>
                       <td style={{ padding: '0.65rem 0.85rem', textAlign: 'right', color: '#475569' }}>{fmt(p.salary)}</td>
                       <td style={{ padding: '0.65rem 0.85rem', textAlign: 'right', color: netAdjust >= 0 ? '#16a34a' : '#dc2626' }}>{netAdjust >= 0 ? '+' : ''}{fmt(netAdjust)}</td>
                       <td style={{ padding: '0.65rem 0.85rem', textAlign: 'right', fontWeight: 800, color: '#0f172a' }}>{fmt(p.netAmount)}</td>
                       <td style={{ padding: '0.65rem 0.85rem', fontSize: '0.72rem', color: isPaid ? '#16a34a' : isReady ? '#2563eb' : '#b45309' }}>
-                        {isPaid ? 'Đã Chi Trả' : isReady ? 'Sẵn Sàng Chi Trả' : p.status}
+                        {isPaid ? 'Đã Chi Trả' : isReady ? 'Sẵn Sàng Chi Trả' : getStatusLabel(PAYROLL_STATUS, p.status)}
                       </td>
                       <td style={{ padding: '0.65rem 0.85rem', textAlign: 'center' }}>
                         {isPaid ? (

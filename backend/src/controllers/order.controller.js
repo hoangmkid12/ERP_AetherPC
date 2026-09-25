@@ -2,6 +2,7 @@ const prisma = require('../config/database');
 const { sendOrderConfirmationEmail, sendOrderStatusUpdateEmail } = require('../services/emailService');
 const { claimAvailableSerials } = require('../utils/serialAllocation');
 const { hasOperationalPermission } = require('../middlewares/rbac.middleware');
+const { ORDER_STATUS_VI, labelOf } = require('../constants/statusLabels');
 
 const LOYALTY_VND_PER_POINT = 10000; // 10.000 VNĐ = 1 điểm
 
@@ -996,7 +997,7 @@ const updateOrderStatus = async (req, res, next) => {
 
     res.json({
       success: true,
-      message: `Cập nhật trạng thái đơn hàng thành ${status} thành công`,
+      message: `Cập nhật trạng thái đơn hàng thành "${labelOf(ORDER_STATUS_VI, status)}" thành công`,
       data: order
     });
   } catch (err) {
