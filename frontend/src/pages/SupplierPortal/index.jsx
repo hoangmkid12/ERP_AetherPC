@@ -1760,7 +1760,7 @@ export default function SupplierPortal() {
                     style={{ padding: '0.65rem 1.4rem', fontSize: '0.88rem', backgroundColor: '#2563eb', border: 'none', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 800, borderRadius: '8px' }}
                     disabled={submitting || !deliveryDateInput}
                   >
-                    <Truck size={17} /> Xác Nhận Đơn & Hẹn Ngày Giao Gửi Bên Mua Hàng
+                    <Truck size={17} /> Xác Nhận Đơn & Hẹn Ngày Giao
                   </button>
                 )}
                 {needsPriceInput(selectedPO) && (
