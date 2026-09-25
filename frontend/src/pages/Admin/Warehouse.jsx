@@ -3069,7 +3069,10 @@ export default function Warehouse() {
   // Shared with the Delivery tab's default "PENDING" filter (below) so the
   // Overview KPI card always matches the count the linked tab actually shows.
   const PENDING_DELIVERY_STATUSES = ['CONFIRMED', 'READY_TO_SHIP', 'PACKED', 'PENDING', 'PROCESSING', 'AWAITING_SHIP'];
-  const pendingDeliveriesCount = orders.filter(o => PENDING_DELIVERY_STATUSES.includes(o.status)).length;
+  // Đơn còn lệnh lắp ráp chưa xong (assemblyPending — backend gắn từ assembly_jobs) là việc của
+  // Lắp Ráp: khi lắp xong hệ thống tự chuyển đơn sang READY_TO_SHIP, lúc đó Kho mới xuất.
+  const isAwaitingKhoExport = (o) => PENDING_DELIVERY_STATUSES.includes(o.status) && !o.assemblyPending;
+  const pendingDeliveriesCount = orders.filter(isAwaitingKhoExport).length;
 
   const CAT_ALIASES = {
     'CPU': ['CPU', 'PROCESSOR', 'BỘ XỬ LÝ', 'BỘ VI XỬ LÝ'],
@@ -3252,7 +3255,8 @@ export default function Warehouse() {
   const filteredDeliveriesList = orders.filter(o => {
     const matchSearch = !deliverySearch.trim() || String(o.orderId || o.id).toLowerCase().includes(deliverySearch.toLowerCase()) || (o.customerName && o.customerName.toLowerCase().includes(deliverySearch.toLowerCase()));
     const matchStatus = deliveryFilter === 'ALL' ||
-      (deliveryFilter === 'PENDING' && PENDING_DELIVERY_STATUSES.includes(o.status)) ||
+      (deliveryFilter === 'PENDING' && isAwaitingKhoExport(o)) ||
+      (deliveryFilter === 'ASSEMBLING' && PENDING_DELIVERY_STATUSES.includes(o.status) && o.assemblyPending) ||
       (deliveryFilter === 'SHIPPED' && ['SHIPPED', 'OUT_FOR_DELIVERY', 'ASSIGNED'].includes(o.status)) ||
       (deliveryFilter === 'DELIVERED' && ['DELIVERED', 'COMPLETED'].includes(o.status)) ||
       (deliveryFilter === 'AWAITING_STOCK' && o.status === 'AWAITING_STOCK') ||
@@ -4070,6 +4074,7 @@ export default function Warehouse() {
               style={{ padding: '0.55rem 0.85rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px' }}
             >
               <option value="PENDING">Chờ xuất kho & bàn giao</option>
+              <option value="ASSEMBLING">Đang lắp ráp (chưa tới lượt Kho)</option>
               <option value="SHIPPED">Đang giao hàng</option>
               <option value="DELIVERED">Đã giao hàng thành công</option>
               <option value="AWAITING_STOCK">Đang chờ hàng</option>
@@ -4113,7 +4118,8 @@ export default function Warehouse() {
                   </tr>
                 ) : (
                   filteredDeliveriesList.map(o => {
-                    const isPendingPack = ['CONFIRMED', 'PROCESSING', 'PENDING', 'AWAITING_SHIP'].includes(o.status);
+                    const isAssemblingNow = Boolean(o.assemblyPending) && PENDING_DELIVERY_STATUSES.includes(o.status);
+                    const isPendingPack = !isAssemblingNow && ['CONFIRMED', 'PROCESSING', 'PENDING', 'AWAITING_SHIP'].includes(o.status);
                     const isPackedWaitingShipper = ['PACKED', 'READY_TO_SHIP'].includes(o.status);
                     // Phân công giờ giữ đơn ở READY_TO_SHIP cho tới khi shipper tự bấm
                     // "Nhận Chuyến" — tách riêng sub-state này để bảng không hiển thị
@@ -4157,6 +4163,14 @@ export default function Warehouse() {
                           )}
                         </td>
                         <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
+                          {isAssemblingNow && (
+                            <span title={o.assemblyJobCode ? `Lệnh lắp ráp ${o.assemblyJobCode}` : undefined} style={{
+                              padding: '3px 10px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 700, whiteSpace: 'nowrap',
+                              backgroundColor: '#eef2ff', color: '#4338ca', border: '1px solid #c7d2fe'
+                            }}>
+                              {o.assemblyJobStatus === 'ASSEMBLING' ? 'Đang Lắp Ráp' : 'Chờ Lắp Ráp'}
+                            </span>
+                          )}
                           {isPendingPack && (
                             <span style={{
                               padding: '3px 10px',
@@ -4264,6 +4278,11 @@ export default function Warehouse() {
                         </td>
                         <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
                           <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center', alignItems: 'center' }}>
+                            {isAssemblingNow && (
+                              <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 600 }}>
+                                Chờ Lắp Ráp hoàn tất{o.assemblyJobCode ? ` (${o.assemblyJobCode})` : ''}
+                              </span>
+                            )}
                             {isPendingPack && (
                               canPackScan ? (
                                 <button

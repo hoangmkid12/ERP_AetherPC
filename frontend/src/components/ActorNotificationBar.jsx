@@ -70,12 +70,13 @@ function buildWarehouseTasks(d, inventory, isManager) {
     path: '/admin/warehouse?tab=grn', action: 'Nhập Kho', urgent: true
   });
   tasks.push({
-    key: 'pack', count: orders.filter(o => ['CONFIRMED', 'PROCESSING', 'AWAITING_SHIP'].includes(o.status)).length,
+    // Loại đơn còn lệnh lắp ráp chưa xong (assemblyPending) — đó là việc của Lắp Ráp.
+    key: 'pack', count: orders.filter(o => ['CONFIRMED', 'PROCESSING', 'PENDING', 'AWAITING_SHIP'].includes(o.status) && !o.assemblyPending).length,
     label: 'đơn bán chờ soát serial, đóng gói & xác nhận xuất kho',
     path: '/admin/warehouse?tab=delivery', action: 'Xuất Kho'
   });
   tasks.push({
-    key: 'dispatch', count: orders.filter(o => ['PACKED', 'READY_TO_SHIP'].includes(o.status) && !o.assignedShipperId && !o.assignedShipper).length,
+    key: 'dispatch', count: orders.filter(o => ['PACKED', 'READY_TO_SHIP'].includes(o.status) && !o.assemblyPending && !o.assignedShipperId && !o.assignedShipper).length,
     label: 'đơn đã đóng gói, chưa phân công shipper',
     path: '/admin/warehouse?tab=delivery', action: 'Phân Công'
   });

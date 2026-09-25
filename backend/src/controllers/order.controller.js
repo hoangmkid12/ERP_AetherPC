@@ -511,6 +511,14 @@ const getCustomerOrders = async (req, res, next) => {
       orderBy: { createdAt: 'desc' }
     });
 
+    // Đơn đang có lệnh lắp ráp CHƯA xong (PENDING/ASSEMBLING) là việc của Lắp Ráp — Kho chưa
+    // được đóng gói/xuất. Kho không đọc được /assembly-jobs nên gắn sẵn trạng thái lên từng đơn.
+    const openJobs = isCustomer ? [] : await prisma.assemblyJob.findMany({
+      where: { orderId: { in: orders.map(o => o.orderId) }, status: { in: ['PENDING', 'ASSEMBLING'] } },
+      select: { orderId: true, jobCode: true, status: true }
+    });
+    const openJobByOrder = new Map(openJobs.map(j => [j.orderId, j]));
+
     // Format dữ liệu đồng bộ với frontend
     const formattedOrders = orders.map(ord => ({
       ...ord,
@@ -519,7 +527,12 @@ const getCustomerOrders = async (req, res, next) => {
       phone: ord.customer?.phone || '',
       email: ord.customer?.email || '',
       address: ord.shippingAddress,
-      total: parseFloat(ord.totalAmount)
+      total: parseFloat(ord.totalAmount),
+      ...(openJobByOrder.has(ord.orderId) ? {
+        assemblyPending: true,
+        assemblyJobCode: openJobByOrder.get(ord.orderId).jobCode,
+        assemblyJobStatus: openJobByOrder.get(ord.orderId).status
+      } : {})
     }));
 
     res.json({
