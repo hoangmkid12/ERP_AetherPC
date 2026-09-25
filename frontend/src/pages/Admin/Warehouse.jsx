@@ -4778,15 +4778,15 @@ export default function Warehouse() {
 
           {/* Receipts Table */}
           <div className="table-responsive" style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', overflowX: 'auto', WebkitOverflowScrolling: 'touch', maxWidth: '100%' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.83rem' }}>
+            <table style={{ width: '100%', minWidth: '1080px', borderCollapse: 'collapse', fontSize: '0.83rem' }}>
               <thead>
                 <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569' }}>
-                  <th style={{ padding: '0.75rem 1rem' }}>Mã Phiếu GRN</th>
-                  <th style={{ padding: '0.75rem 1rem' }}>Mã Đơn PO</th>
-                  <th style={{ padding: '0.75rem 1rem' }}>Nhà Cung Cấp</th>
-                  <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Trạng Thái QA/QC</th>
-                  <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Trạng Thái Kho</th>
-                  <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Hành Động</th>
+                  <th style={{ padding: '0.75rem 1rem', whiteSpace: 'nowrap', width: '130px' }}>Mã Phiếu GRN</th>
+                  <th style={{ padding: '0.75rem 1rem', whiteSpace: 'nowrap', width: '130px' }}>Mã Đơn PO</th>
+                  <th style={{ padding: '0.75rem 1rem', minWidth: '180px' }}>Nhà Cung Cấp</th>
+                  <th style={{ padding: '0.75rem 1rem', textAlign: 'center', whiteSpace: 'nowrap', width: '150px' }}>Trạng Thái QA/QC</th>
+                  <th style={{ padding: '0.75rem 1rem', textAlign: 'center', whiteSpace: 'nowrap', width: '140px' }}>Trạng Thái Kho</th>
+                  <th style={{ padding: '0.75rem 1rem', textAlign: 'center', whiteSpace: 'nowrap', width: '330px' }}>Hành Động</th>
                 </tr>
               </thead>
               <tbody>
@@ -4805,30 +4805,52 @@ export default function Warehouse() {
                       onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
                       onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                     >
-                      <td style={{ padding: '0.75rem 1rem', fontWeight: 700, color: '#2563eb' }}>{r.receiptNumber}</td>
-                      <td style={{ padding: '0.75rem 1rem', color: '#0f172a' }}>{r.po?.poNumber || r.poId || '---'}</td>
+                      <td style={{ padding: '0.75rem 1rem', fontWeight: 700, color: '#2563eb', whiteSpace: 'nowrap' }}>{r.receiptNumber}</td>
+                      <td style={{ padding: '0.75rem 1rem', color: '#0f172a', whiteSpace: 'nowrap' }}>{r.po?.poNumber || r.poId || '---'}</td>
                       <td style={{ padding: '0.75rem 1rem', color: '#475569' }}>{r.po?.supplier?.name || r.supplierName || 'Intel Vietnam'}</td>
-                      <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
+                      <td style={{ padding: '0.75rem 1rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
                         {(() => {
                           const qcBadge = getReceiptQcBadge(r);
                           return (
-                            <span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 700, backgroundColor: qcBadge.bg, color: qcBadge.color }}>
+                            <span style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              whiteSpace: 'nowrap',
+                              padding: '0.28rem 0.65rem',
+                              borderRadius: '6px',
+                              fontSize: '0.73rem',
+                              fontWeight: 700,
+                              backgroundColor: qcBadge.bg,
+                              color: qcBadge.color,
+                              border: qcBadge.border ? `1px solid ${qcBadge.border}` : 'none',
+                              lineHeight: '1.2'
+                            }}>
                               {qcBadge.text}
                             </span>
                           );
                         })()}
                       </td>
-                      <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
+                      <td style={{ padding: '0.75rem 1rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
                         <span style={{
-                          padding: '2px 8px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 700,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          whiteSpace: 'nowrap',
+                          padding: '0.28rem 0.65rem',
+                          borderRadius: '6px',
+                          fontSize: '0.73rem',
+                          fontWeight: 700,
                           backgroundColor: r.status === 'DONE' ? '#dcfce7' : '#fef3c7',
-                          color: r.status === 'DONE' ? '#15803d' : '#d97706'
+                          color: r.status === 'DONE' ? '#15803d' : '#d97706',
+                          border: r.status === 'DONE' ? '1px solid #bbf7d0' : '1px solid #fed7aa',
+                          lineHeight: '1.2'
                         }}>
                           {r.status === 'DONE' ? 'Đã Nhập Kho' : 'Chờ Nhập Kho'}
                         </span>
                       </td>
-                      <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
-                        <div style={{ display: 'inline-flex', gap: '0.4rem', alignItems: 'center' }}>
+                      <td style={{ padding: '0.75rem 1rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                        <div style={{ display: 'inline-flex', gap: '0.45rem', alignItems: 'center', justifyContent: 'center', flexWrap: 'nowrap' }}>
                           <button
                             type="button"
                             onClick={(e) => { e.stopPropagation(); setSelectedReceipt(r); }}
@@ -4836,11 +4858,18 @@ export default function Warehouse() {
                               backgroundColor: '#2563eb',
                               color: '#ffffff',
                               border: 'none',
-                              borderRadius: '4px',
-                              padding: '0.35rem 0.75rem',
-                              fontSize: '0.78rem',
+                              borderRadius: '5px',
+                              padding: '0.38rem 0.75rem',
+                              fontSize: '0.75rem',
                               fontWeight: 700,
-                              cursor: 'pointer'
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              whiteSpace: 'nowrap',
+                              flexShrink: 0,
+                              height: '31px',
+                              boxSizing: 'border-box'
                             }}
                           >
                             Xem Chi Tiết
@@ -4881,14 +4910,19 @@ export default function Warehouse() {
                                 backgroundColor: '#16a34a',
                                 color: '#ffffff',
                                 border: 'none',
-                                borderRadius: '4px',
-                                padding: '0.35rem 0.65rem',
+                                borderRadius: '5px',
+                                padding: '0.38rem 0.75rem',
                                 fontSize: '0.75rem',
                                 fontWeight: 700,
                                 cursor: 'pointer',
                                 display: 'inline-flex',
                                 alignItems: 'center',
-                                gap: '0.25rem'
+                                justifyContent: 'center',
+                                gap: '0.3rem',
+                                whiteSpace: 'nowrap',
+                                flexShrink: 0,
+                                height: '31px',
+                                boxSizing: 'border-box'
                               }}
                               title="Xem & in phiếu nhập kho thành công"
                             >
@@ -4919,14 +4953,19 @@ export default function Warehouse() {
                                   backgroundColor: '#eff6ff',
                                   color: '#1d4ed8',
                                   border: '1px solid #bfdbfe',
-                                  borderRadius: '4px',
-                                  padding: '0.35rem 0.65rem',
+                                  borderRadius: '5px',
+                                  padding: '0.38rem 0.75rem',
                                   fontSize: '0.75rem',
                                   fontWeight: 700,
                                   cursor: 'pointer',
                                   display: 'inline-flex',
                                   alignItems: 'center',
-                                  gap: '0.25rem'
+                                  justifyContent: 'center',
+                                  gap: '0.3rem',
+                                  whiteSpace: 'nowrap',
+                                  flexShrink: 0,
+                                  height: '31px',
+                                  boxSizing: 'border-box'
                                 }}
                                 title="Xem biên bản kiểm định kỹ thuật QA/QC"
                               >
