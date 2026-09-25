@@ -2173,6 +2173,35 @@ export default function QualityControl() {
                 );
               })()}
 
+              {/* ── THÔNG TIN XÁC NHẬN CỦA NCC — hiện cho QC biết NCC đã hẹn ngày giao ── */}
+              {['CONFIRMED_BY_SUPPLIER', 'PENDING_QA', 'QA_PASSED', 'QA_PARTIAL', 'QA_REJECTED', 'RECEIVED', 'DONE', 'COMPLETED'].includes(selectedPO.status) && (
+                <div style={{ backgroundColor: '#f0fdf4', border: '2px solid #86efac', borderRadius: '8px', padding: '0.75rem 1rem', marginBottom: '1.25rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                    <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#15803d', textTransform: 'uppercase' }}>✅ NCC Đã Xác Nhận Giao Hàng</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap', fontSize: '0.82rem' }}>
+                    <div>
+                      <span style={{ color: '#64748b' }}>Nhà Cung Cấp: </span>
+                      <strong style={{ color: '#0f172a' }}>{selectedPO.supplier?.name || selectedPO.supplierCode || selectedPO.supplierName || '—'}</strong>
+                    </div>
+                    <div>
+                      <span style={{ color: '#64748b' }}>Ngày hẹn giao: </span>
+                      <strong style={{ color: '#15803d' }}>
+                        {selectedPO.expectedDeliveryDate
+                          ? new Date(selectedPO.expectedDeliveryDate).toLocaleDateString('vi-VN')
+                          : '—'}
+                      </strong>
+                    </div>
+                    {(selectedPO.supplierNote || selectedPO.note) && (
+                      <div>
+                        <span style={{ color: '#64748b' }}>Ghi chú NCC: </span>
+                        <em style={{ color: '#334155' }}>{selectedPO.supplierNote || selectedPO.note}</em>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {/* 2. Step 1: Technical Inspection Criteria Checklist */}
               <div style={{ marginBottom: '1.25rem', padding: '1rem', borderRadius: '8px', border: '1px solid #e2e8f0', backgroundColor: '#ffffff' }}>
                 <div style={{ fontSize: '0.84rem', fontWeight: 800, color: '#0f172a', marginBottom: '0.65rem' }}>

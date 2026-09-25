@@ -3894,6 +3894,36 @@ export default function Purchasing() {
                 })()}
               </div>
             </div>
+            {/* ── PHIẾU XÁC NHẬN CỦA NCC — Mua Hàng xem ── */}
+            {['CONFIRMED_BY_SUPPLIER', 'PENDING_QA', 'QA_PASSED', 'QA_PARTIAL', 'QA_REJECTED', 'RECEIVED', 'DONE', 'COMPLETED'].includes(selectedPO.status) && (
+              <div style={{ backgroundColor: '#f0fdf4', border: '2px solid #86efac', borderRadius: '8px', padding: '0.75rem 1rem', marginBottom: '1.25rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
+                  <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#15803d', textTransform: 'uppercase' }}>✅ NCC Đã Xác Nhận Giao Hàng</span>
+                </div>
+                <div style={{ display: 'flex', gap: '2rem', flexWrap: 'wrap', fontSize: '0.82rem' }}>
+                  <div>
+                    <span style={{ color: '#64748b' }}>Nhà Cung Cấp: </span>
+                    <strong style={{ color: '#0f172a' }}>{getSupplierName(selectedPO)}</strong>
+                  </div>
+                  <div>
+                    <span style={{ color: '#64748b' }}>Ngày hẹn giao: </span>
+                    <strong style={{ color: '#15803d' }}>
+                      {selectedPO.expectedDeliveryDate ? formatDate(selectedPO.expectedDeliveryDate) : '—'}
+                    </strong>
+                  </div>
+                  <div>
+                    <span style={{ color: '#64748b' }}>Ngày xác nhận: </span>
+                    <strong style={{ color: '#0f172a' }}>{formatDate(selectedPO.updatedAt || selectedPO.createdAt)}</strong>
+                  </div>
+                  {(selectedPO.supplierNote || selectedPO.note) && (
+                    <div style={{ width: '100%' }}>
+                      <span style={{ color: '#64748b' }}>Ghi chú NCC: </span>
+                      <em style={{ color: '#334155' }}>{selectedPO.supplierNote || selectedPO.note}</em>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Items Table */}
             <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', overflow: 'hidden', marginBottom: '1.25rem' }}>
