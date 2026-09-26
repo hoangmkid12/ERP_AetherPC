@@ -1,22 +1,45 @@
 import React, { useState } from 'react';
-import { X, AlertTriangle } from 'lucide-react';
+import { X, AlertTriangle, Calendar, Clock } from 'lucide-react';
 import { buildFailPayload } from '../deliveryHelpers';
 
-// Delivery-failure report flow. Keeps the reason dropdown + attempt
-// counter + free-text note from the old Delivery.jsx (these ARE read by
-// the update handler). Drops the old 3-radio "Hướng Xử Lý" group — it was
-// purely cosmetic (never read by handleFailDelivery, no matching backend
-// field) so it's intentionally not carried over, per the in-scope bug fix.
 export default function FailModal({ order: failModal, onClose, onConfirm }) {
   const [failReason, setFailReason] = useState('');
   const [failNote, setFailNote] = useState('');
 
+  const now = new Date();
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const tomorrow = new Date(now);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowStr = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`;
+
+  const [appointDateType, setAppointDateType] = useState('TODAY'); // 'TODAY' | 'TOMORROW' | 'CUSTOM'
+  const [customDate, setCustomDate] = useState(tomorrowStr);
+  const [appointTimeSlot, setAppointTimeSlot] = useState('13:30 - 15:30');
+  const [exactTime, setExactTime] = useState('14:30');
+
   const attemptCount = (failModal.deliveryAttempts || 0) + 1;
   const isMaxAttempt = attemptCount >= 3;
 
+  const isRescheduleReason = failReason.toLowerCase().includes('hẹn') || failReason.toLowerCase().includes('ngày khác');
+
   const handleSubmit = () => {
     if (!failReason) return;
-    onConfirm(buildFailPayload(failModal, failReason, failNote));
+
+    let finalNote = failNote;
+    let extraData = {};
+
+    if (isRescheduleReason) {
+      const selectedDate = appointDateType === 'TODAY' ? todayStr : (appointDateType === 'TOMORROW' ? tomorrowStr : customDate);
+      const selectedTime = appointTimeSlot === 'EXACT' ? exactTime : appointTimeSlot;
+      const tag = `[HEN:${selectedDate}_${selectedTime}]`;
+      finalNote = `${tag} ${failNote}`.trim();
+      extraData = {
+        appointmentDate: selectedDate,
+        appointmentTimeWindow: selectedTime
+      };
+    }
+
+    onConfirm(buildFailPayload(failModal, failReason, finalNote, extraData));
   };
 
   return (
@@ -24,6 +47,7 @@ export default function FailModal({ order: failModal, onClose, onConfirm }) {
       <div
         className="delivery-filter-sheet"
         onClick={e => e.stopPropagation()}
+        style={{ maxHeight: '90vh', overflowY: 'auto' }}
       >
         <div className="delivery-sheet-handle" />
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.9rem' }}>
@@ -69,13 +93,112 @@ export default function FailModal({ order: failModal, onClose, onConfirm }) {
             </select>
           </div>
 
+          {/* Form Hẹn Lại Giờ Cụ Thể (Hiện khi khách hẹn) */}
+          {isRescheduleReason && (
+            <div style={{
+              backgroundColor: 'rgba(124, 58, 237, 0.06)',
+              border: '1.5px solid rgba(124, 58, 237, 0.25)',
+              borderRadius: 'var(--radius-md)',
+              padding: '0.75rem',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.65rem'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: '#7c3aed', fontWeight: 800, fontSize: '0.8rem' }}>
+                <Clock size={15} />
+                Lịch Hẹn Giao Cụ Thể Của Khách
+              </div>
+
+              {/* Chọn Ngày */}
+              <div>
+                <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>
+                  <Calendar size={12} style={{ display: 'inline', marginRight: '3px' }} />
+                  Ngày hẹn giao lại
+                </label>
+                <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
+                  {[
+                    { id: 'TODAY', label: 'Hôm Nay' },
+                    { id: 'TOMORROW', label: 'Ngày Mai' },
+                    { id: 'CUSTOM', label: 'Ngày Khác...' }
+                  ].map(d => (
+                    <button
+                      key={d.id}
+                      type="button"
+                      onClick={() => setAppointDateType(d.id)}
+                      style={{
+                        padding: '0.3rem 0.65rem', borderRadius: '20px', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer',
+                        border: appointDateType === d.id ? '1.5px solid #7c3aed' : '1px solid var(--border-glass)',
+                        backgroundColor: appointDateType === d.id ? '#7c3aed' : 'var(--bg-primary)',
+                        color: appointDateType === d.id ? '#fff' : 'var(--text-secondary)'
+                      }}
+                    >
+                      {d.label}
+                    </button>
+                  ))}
+                </div>
+                {appointDateType === 'CUSTOM' && (
+                  <input
+                    type="date"
+                    value={customDate}
+                    onChange={e => setCustomDate(e.target.value)}
+                    min={todayStr}
+                    style={{ marginTop: '0.4rem', width: '100%', padding: '0.5rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-glass)', fontSize: '0.78rem', boxSizing: 'border-box' }}
+                  />
+                )}
+              </div>
+
+              {/* Chọn Khung Giờ */}
+              <div>
+                <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>
+                  <Clock size={12} style={{ display: 'inline', marginRight: '3px' }} />
+                  Khung giờ hẹn giao
+                </label>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.35rem' }}>
+                  {[
+                    { label: 'Sáng (08:30 - 11:30)', value: '08:30 - 11:30' },
+                    { label: 'Đầu chiều (13:30 - 15:30)', value: '13:30 - 15:30' },
+                    { label: 'Cuối chiều (15:30 - 18:00)', value: '15:30 - 18:00' },
+                    { label: 'Tối (18:00 - 20:30)', value: '18:00 - 20:30' },
+                    { label: 'Cả ngày (Giờ tự do)', value: 'Cả ngày' },
+                    { label: 'Giờ cụ thể...', value: 'EXACT' }
+                  ].map(slot => (
+                    <button
+                      key={slot.value}
+                      type="button"
+                      onClick={() => setAppointTimeSlot(slot.value)}
+                      style={{
+                        padding: '0.4rem 0.45rem', borderRadius: '6px', fontSize: '0.7rem', fontWeight: 700, cursor: 'pointer', textAlign: 'center',
+                        border: appointTimeSlot === slot.value ? '1.5px solid #7c3aed' : '1px solid var(--border-glass)',
+                        backgroundColor: appointTimeSlot === slot.value ? 'rgba(124,58,237,0.12)' : 'var(--bg-primary)',
+                        color: appointTimeSlot === slot.value ? '#7c3aed' : 'var(--text-secondary)'
+                      }}
+                    >
+                      {slot.label}
+                    </button>
+                  ))}
+                </div>
+                {appointTimeSlot === 'EXACT' && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.4rem' }}>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600 }}>Khách hẹn lúc:</span>
+                    <input
+                      type="time"
+                      value={exactTime}
+                      onChange={e => setExactTime(e.target.value)}
+                      style={{ padding: '0.4rem 0.6rem', borderRadius: 'var(--radius-sm)', border: '1.5px solid #7c3aed', fontSize: '0.82rem', fontWeight: 700 }}
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           <div>
             <label style={{ display: 'block', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '0.3rem' }}>
               Ghi Chú Chi Tiết:
             </label>
             <textarea
-              rows={3}
-              placeholder="Ví dụ: Khách bảo đi công tác, hẹn giao lại sáng thứ Bảy..."
+              rows={2}
+              placeholder="Ví dụ: Khách bảo đi công tác về sau 17h, gọi trước khi đến..."
               value={failNote}
               onChange={e => setFailNote(e.target.value)}
               style={{ width: '100%', padding: '0.6rem 0.7rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-glass)', boxSizing: 'border-box', fontSize: '0.82rem' }}
@@ -93,7 +216,7 @@ export default function FailModal({ order: failModal, onClose, onConfirm }) {
               fontWeight: 800, cursor: failReason ? 'pointer' : 'not-allowed'
             }}
           >
-            Xác Nhận Báo Lỗi & Lưu Lịch
+            Xác Nhận Báo Lỗi & Lưu Lịch Hẹn
           </button>
         </div>
       </div>

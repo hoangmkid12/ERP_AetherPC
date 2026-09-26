@@ -1,6 +1,6 @@
 import React from 'react';
 import { Truck, Clock, Eye, Navigation, Phone, MapPin, RotateCcw } from 'lucide-react';
-import { getDeliveryIncidentStatus, isOrderRedelivery } from '../deliveryHelpers';
+import { getDeliveryIncidentStatus, isOrderRedelivery, getAppointmentInfo } from '../deliveryHelpers';
 
 // Shared full-width mobile card used by PendingTab / ActiveTab / HistoryTab.
 // `variant` controls which action buttons render:
@@ -15,6 +15,7 @@ export default function OrderCard({ order: ord, variant, fmt, getOrderTimeClassi
   const isPlainShipping = !isDelivered && !isAwaiting && !isRescheduled && !isRejected && !isReturning;
 
   const timeInfo = getOrderTimeClassification(ord);
+  const appointment = getAppointmentInfo(ord);
   const codAmount = parseFloat(ord.totalAmount || ord.total || 0);
   const isPrepaid = ord.paymentStatus === 'PAID' || ord.paymentMethod === 'ONLINE_GATEWAY' || ord.paymentMethod === 'BANK_TRANSFER' || codAmount === 0;
   const addrStr = (ord.shippingAddress || '').toLowerCase();
@@ -70,6 +71,35 @@ export default function OrderCard({ order: ord, variant, fmt, getOrderTimeClassi
       {timeInfo.isNew && !isDelivered && (
         <div style={{ fontSize: '0.68rem', color: '#ea580c', fontWeight: 800, marginBottom: '0.35rem' }}>
           MỚI BÀN GIAO
+        </div>
+      )}
+
+      {/* Appointment badge if customer scheduled specific time */}
+      {appointment.hasAppointment && !isDelivered && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: '0.35rem',
+          padding: '0.28rem 0.55rem', borderRadius: 'var(--radius-sm)',
+          marginBottom: '0.45rem', fontSize: '0.72rem', fontWeight: 800,
+          backgroundColor: appointment.isLate
+            ? 'rgba(220, 38, 38, 0.12)'
+            : appointment.isUpcoming
+              ? 'rgba(217, 119, 6, 0.15)'
+              : 'rgba(124, 58, 237, 0.1)',
+          color: appointment.isLate
+            ? 'var(--danger)'
+            : appointment.isUpcoming
+              ? '#d97706'
+              : '#7c3aed',
+          border: `1px solid ${appointment.isLate ? 'rgba(220,38,38,0.3)' : appointment.isUpcoming ? 'rgba(217,119,6,0.35)' : 'rgba(124,58,237,0.25)'}`
+        }}>
+          <Clock size={12} style={{ flexShrink: 0 }} />
+          <span>
+            {appointment.isLate
+              ? `⚠️ Trễ giờ hẹn: ${appointment.label}`
+              : appointment.isUpcoming
+                ? `⏰ Sắp tới giờ hẹn: ${appointment.label}`
+                : `⏰ Hẹn giao: ${appointment.label}`}
+          </span>
         </div>
       )}
 

@@ -5,7 +5,7 @@ import { api } from '../../../../services/api';
 import { forwardGeocode, fetchMultiStopRoute } from '../../../../utils/routingService';
 import { goongjs, GOONG_STYLE_URL } from '../../../../utils/mapIcons';
 import OriginAddressPicker from './OriginAddressPicker';
-import { isOrderRedelivery } from '../deliveryHelpers';
+import { isOrderRedelivery, getAppointmentInfo } from '../deliveryHelpers';
 
 // Màu gradient cho từng số thứ tự
 const SEQ_COLORS = [
@@ -243,7 +243,39 @@ export default function RouteOptimizerPanel({
       }
       const res = await api.post('/routes/optimize', payload);
       if (res.data?.success && res.data?.data) {
-        setResult(res.data.data);
+        const backendData = res.data.data;
+        const enrichedRoute = (backendData.optimizedRoute || []).map(stop => {
+          const ord = eligibleOrders.find(o => String(o.orderId || o.id) === String(stop.orderId));
+          const apt = getAppointmentInfo(ord || stop);
+          let appointmentAdherence = null;
+          if (apt.hasAppointment && stop.estimatedArrival) {
+            const etaDate = new Date(stop.estimatedArrival);
+            const etaMinutes = etaDate.getHours() * 60 + etaDate.getMinutes();
+            if (apt.startMinutes !== null && apt.endMinutes !== null) {
+              if (etaMinutes >= apt.startMinutes - 20 && etaMinutes <= apt.endMinutes + 15) {
+                appointmentAdherence = { status: 'ON_TIME', label: `✅ Đúng hẹn (${apt.timeWindow})`, color: 'var(--success)' };
+              } else if (etaMinutes < apt.startMinutes - 20) {
+                const diff = Math.round(apt.startMinutes - etaMinutes);
+                appointmentAdherence = { status: 'EARLY', label: `⏳ Đến sớm ~${diff}p (${apt.timeWindow})`, color: '#0891b2' };
+              } else {
+                const diff = Math.round(etaMinutes - apt.endMinutes);
+                appointmentAdherence = { status: 'LATE', label: `⚠️ Trễ hẹn ~${diff}p (${apt.timeWindow})`, color: 'var(--danger)' };
+              }
+            } else {
+              appointmentAdherence = { status: 'SCHEDULED', label: `⏰ Hẹn: ${apt.label}`, color: '#7c3aed' };
+            }
+          }
+          return {
+            ...stop,
+            isRedelivery: stop.isRedelivery || isOrderRedelivery(ord || stop),
+            appointmentInfo: apt,
+            appointmentAdherence
+          };
+        });
+        setResult({
+          ...backendData,
+          optimizedRoute: enrichedRoute
+        });
         setStatus('done');
         setCollapsed(false);
       } else {
@@ -253,6 +285,46 @@ export default function RouteOptimizerPanel({
       console.warn('[RouteOptimizer] Backend lỗi, thử frontend fallback:', err.message);
       await runFrontendFallback(orderIds, shipperCoord);
     }
+  };
+
+  const handlePromoteToFirst = (orderId) => {
+    if (!result?.optimizedRoute) return;
+    const currentList = [...result.optimizedRoute];
+    const targetIdx = currentList.findIndex(s => String(s.orderId) === String(orderId));
+    if (targetIdx <= 0) return;
+
+    const [promoted] = currentList.splice(targetIdx, 1);
+    currentList.unshift(promoted);
+
+    const now = new Date();
+    let cumMinutes = 5;
+    const recomputed = currentList.map((stop, seq) => {
+      cumMinutes += (stop.durationFromPrevMinutes || 5);
+      const etaDate = new Date(now.getTime() + cumMinutes * 60 * 1000);
+      const apt = stop.appointmentInfo || getAppointmentInfo(stop);
+      let appointmentAdherence = stop.appointmentAdherence;
+      if (apt?.hasAppointment && apt.startMinutes !== null && apt.endMinutes !== null) {
+        const etaMinutes = etaDate.getHours() * 60 + etaDate.getMinutes();
+        if (etaMinutes >= apt.startMinutes - 20 && etaMinutes <= apt.endMinutes + 15) {
+          appointmentAdherence = { status: 'ON_TIME', label: `✅ Đúng hẹn (${apt.timeWindow})`, color: 'var(--success)' };
+        } else if (etaMinutes < apt.startMinutes - 20) {
+          appointmentAdherence = { status: 'EARLY', label: `⏳ Đến sớm ~${Math.round(apt.startMinutes - etaMinutes)}p (${apt.timeWindow})`, color: '#0891b2' };
+        } else {
+          appointmentAdherence = { status: 'LATE', label: `⚠️ Trễ hẹn ~${Math.round(etaMinutes - apt.endMinutes)}p (${apt.timeWindow})`, color: 'var(--danger)' };
+        }
+      }
+      return {
+        ...stop,
+        sequence: seq + 1,
+        estimatedArrival: etaDate.toISOString(),
+        appointmentAdherence
+      };
+    });
+
+    setResult(prev => ({
+      ...prev,
+      optimizedRoute: recomputed
+    }));
   };
 
   const runFrontendFallback = async (orderIds, shipperCoord = null) => {
@@ -289,6 +361,27 @@ export default function RouteOptimizerPanel({
       const routeResult = optimizedRoute.map((stop, seq) => {
         cumSeconds += stop.durationFromPrev;
         const ord = validOrders[stop.index - 1];
+        const apt = getAppointmentInfo(ord);
+        const etaDate = new Date(now.getTime() + cumSeconds * 1000);
+
+        let appointmentAdherence = null;
+        if (apt.hasAppointment) {
+          const etaMinutes = etaDate.getHours() * 60 + etaDate.getMinutes();
+          if (apt.startMinutes !== null && apt.endMinutes !== null) {
+            if (etaMinutes >= apt.startMinutes - 20 && etaMinutes <= apt.endMinutes + 15) {
+              appointmentAdherence = { status: 'ON_TIME', label: `✅ Đúng hẹn (${apt.timeWindow})`, color: 'var(--success)' };
+            } else if (etaMinutes < apt.startMinutes - 20) {
+              const diff = Math.round(apt.startMinutes - etaMinutes);
+              appointmentAdherence = { status: 'EARLY', label: `⏳ Đến sớm ~${diff}p (${apt.timeWindow})`, color: '#0891b2' };
+            } else {
+              const diff = Math.round(etaMinutes - apt.endMinutes);
+              appointmentAdherence = { status: 'LATE', label: `⚠️ Trễ hẹn ~${diff}p (${apt.timeWindow})`, color: 'var(--danger)' };
+            }
+          } else {
+            appointmentAdherence = { status: 'SCHEDULED', label: `⏰ Hẹn: ${apt.label}`, color: '#7c3aed' };
+          }
+        }
+
         return {
           sequence: seq + 1,
           orderId: ord.orderId || ord.id,
@@ -300,8 +393,10 @@ export default function RouteOptimizerPanel({
           lng: ord.lng,
           isRedelivery: isOrderRedelivery(ord),
           notes: ord.notes,
+          appointmentInfo: apt,
+          appointmentAdherence,
           durationFromPrevMinutes: Math.round(stop.durationFromPrev / 60),
-          estimatedArrival: new Date(now.getTime() + cumSeconds * 1000).toISOString(),
+          estimatedArrival: etaDate.toISOString(),
           distanceFromPrevKm: +((stop.durationFromPrev / 3600) * 20).toFixed(1)
         };
       });
@@ -744,6 +839,36 @@ export default function RouteOptimizerPanel({
                         }}>
                           <RotateCcw size={9} /> Giao lại
                         </span>
+                      )}
+                      {stop.appointmentAdherence && (
+                        <span style={{
+                          display: 'inline-flex', alignItems: 'center', gap: '3px',
+                          padding: '1px 5px', borderRadius: '3px', fontSize: '0.62rem', fontWeight: 800,
+                          backgroundColor: stop.appointmentAdherence.status === 'LATE' ? 'rgba(220,38,38,0.12)' : (stop.appointmentAdherence.status === 'ON_TIME' ? 'rgba(22,163,74,0.12)' : 'rgba(124,58,237,0.12)'),
+                          color: stop.appointmentAdherence.color,
+                          border: `1px solid ${stop.appointmentAdherence.color}40`
+                        }}>
+                          <Clock size={9} />
+                          {stop.appointmentAdherence.label}
+                        </span>
+                      )}
+                      {stop.appointmentInfo?.hasAppointment && stop.sequence > 1 && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handlePromoteToFirst(stop.orderId);
+                          }}
+                          style={{
+                            padding: '1px 6px', borderRadius: '3px',
+                            fontSize: '0.62rem', fontWeight: 800, cursor: 'pointer',
+                            backgroundColor: 'rgba(37,99,235,0.08)', color: 'var(--primary)',
+                            border: '1px solid rgba(37,99,235,0.25)', display: 'inline-flex', alignItems: 'center', gap: '2px'
+                          }}
+                          title="Đảo đơn này lên đầu danh sách để kịp giờ hẹn"
+                        >
+                          ⚡ Đi đơn này trước
+                        </button>
                       )}
                     </div>
                   </div>

@@ -1,7 +1,7 @@
 // Builds the payload for a "delivery failed" status update — shared by
 // FailModal (full reason picker) and QuickFailSheet (1-tap common reasons)
 // so the attempt-count / 24h-callback-deadline logic lives in one place.
-export const buildFailPayload = (order, failReason, failNote = '') => {
+export const buildFailPayload = (order, failReason, failNote = '', extraData = {}) => {
   const attemptCount = (order.deliveryAttempts || 0) + 1;
   const reasonLower = failReason.toLowerCase();
   const isNoContact = reasonLower.includes('không liên lạc') || reasonLower.includes('không nghe máy') || reasonLower.includes('thuê bao');
@@ -14,7 +14,103 @@ export const buildFailPayload = (order, failReason, failNote = '') => {
     failedAt: now.toISOString(),
     callbackDeadline: isNoContact ? deadline24h : null,
     isAwaitingCallback: isNoContact,
-    deliveryAttempts: attemptCount
+    deliveryAttempts: attemptCount,
+    ...extraData
+  };
+};
+
+/**
+ * Extract appointment date and time window from an Order
+ * Returns: { hasAppointment, date, timeWindow, startMinutes, endMinutes, label, isToday, isLate, isUpcoming }
+ */
+export const getAppointmentInfo = (ord) => {
+  if (!ord) return { hasAppointment: false };
+
+  let date = ord.appointmentDate || null;
+  let timeWindow = ord.appointmentTimeWindow || ord.appointmentTime || null;
+
+  const searchStr = `${ord.failNote || ''} ${ord.notes || ''} ${ord.failReason || ''} ${ord.receiverNote || ''}`;
+
+  if (!date || !timeWindow) {
+    const matchTag = searchStr.match(/\[HEN:([^\]]+)\]/i) || searchStr.match(/\[HEN_GIAO:([^\]]+)\]/i);
+    if (matchTag && matchTag[1]) {
+      const parts = matchTag[1].trim().split('_');
+      if (parts.length >= 2) {
+        if (!date) date = parts[0];
+        if (!timeWindow) timeWindow = parts[1];
+      } else {
+        if (!timeWindow) timeWindow = parts[0];
+      }
+    }
+  }
+
+  if (!timeWindow) {
+    const rangeMatch = searchStr.match(/(\d{1,2}[:h]\d{0,2})\s*[-–]\s*(\d{1,2}[:h]\d{0,2})/i);
+    if (rangeMatch) {
+      timeWindow = `${rangeMatch[1]} - ${rangeMatch[2]}`.replace(/h/g, ':00').replace(/:(\s|$)/g, ':00$1');
+    } else {
+      const exactMatch = searchStr.match(/(\d{1,2}[:h]\d{2})/i) || searchStr.match(/(?:hẹn|lúc)\s+(\d{1,2}h)/i);
+      if (exactMatch) {
+        timeWindow = exactMatch[1].replace('h', ':');
+      }
+    }
+  }
+
+  if (!timeWindow && !date) {
+    return { hasAppointment: false };
+  }
+
+  let startMinutes = null;
+  let endMinutes = null;
+
+  if (timeWindow && timeWindow !== 'Cả ngày') {
+    const timeParts = timeWindow.split(/[-–]/).map(s => s.trim());
+    const parseTimeToMinutes = (tStr) => {
+      if (!tStr) return null;
+      const clean = tStr.replace('h', ':');
+      const [h, m] = clean.split(':').map(Number);
+      if (isNaN(h)) return null;
+      return h * 60 + (isNaN(m) ? 0 : m);
+    };
+
+    if (timeParts.length === 2) {
+      startMinutes = parseTimeToMinutes(timeParts[0]);
+      endMinutes = parseTimeToMinutes(timeParts[1]);
+    } else if (timeParts.length === 1) {
+      const exact = parseTimeToMinutes(timeParts[0]);
+      if (exact !== null) {
+        startMinutes = Math.max(0, exact - 30);
+        endMinutes = Math.min(24 * 60, exact + 30);
+      }
+    }
+  }
+
+  const now = new Date();
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const isToday = !date || date === todayStr;
+
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+  let isLate = false;
+  let isUpcoming = false;
+
+  if (isToday && endMinutes !== null) {
+    if (currentMinutes > endMinutes) {
+      isLate = true;
+    } else if (startMinutes !== null && currentMinutes >= startMinutes - 45 && currentMinutes <= endMinutes) {
+      isUpcoming = true;
+    }
+  }
+
+  return {
+    hasAppointment: true,
+    date: date || todayStr,
+    timeWindow: timeWindow || 'Cả ngày',
+    startMinutes,
+    endMinutes,
+    isToday,
+    isLate,
+    isUpcoming,
+    label: timeWindow ? `${timeWindow}${date && date !== todayStr ? ` (${date})` : ''}` : date
   };
 };
 
