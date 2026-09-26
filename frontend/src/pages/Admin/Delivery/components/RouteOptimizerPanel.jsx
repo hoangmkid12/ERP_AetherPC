@@ -347,16 +347,20 @@ export default function RouteOptimizerPanel({
         return;
       }
 
-      const { fetchOsrmTable, nearestNeighborTSP } = await import('../../../../utils/routingService');
+      const { fetchOsrmTable, solveVRPTW } = await import('../../../../utils/routingService');
       const allCoords = [originCoord, ...validOrders.map(o => ({ lat: o.lat, lng: o.lng }))];
       const matrix = await fetchOsrmTable(allCoords);
 
       // Nếu OSRM cũng lỗi, dùng khoảng cách đường thẳng
       const effectiveMatrix = matrix || buildSimpleMatrix(allCoords);
-      const deliveryIndices = validOrders.map((_, i) => i + 1);
-      const optimizedRoute = nearestNeighborTSP(effectiveMatrix, 0, deliveryIndices);
-
+      const ordersWithMeta = validOrders.map(o => ({
+        ...o,
+        appointmentInfo: getAppointmentInfo(o)
+      }));
       const now = new Date();
+      const currentMinutesOfDay = now.getHours() * 60 + now.getMinutes();
+      const optimizedRoute = solveVRPTW(effectiveMatrix, 0, ordersWithMeta, currentMinutesOfDay);
+
       let cumSeconds = 5 * 60;
       const routeResult = optimizedRoute.map((stop, seq) => {
         cumSeconds += stop.durationFromPrev;

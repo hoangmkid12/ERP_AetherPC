@@ -367,6 +367,67 @@ export function nearestNeighborTSP(matrix, startIdx, deliveryIndices) {
 }
 
 /**
+ * Thuật toán VRPTW (Vehicle Routing Problem with Time Windows) Heuristic.
+ * Ưu tiên:
+ *  1. Đơn ĐÃ TRỄ HẸN hoặc SẮP TRỄ HẸN: Điểm phạt âm cực mạnh để kéo lên đầu tuyến.
+ *  2. Đơn ĐÚNG KHUNG GIỜ VÀNG: Giao đúng cam kết với khách.
+ *  3. Đơn HẸN TƯƠNG LAI (đến sớm quá): Phạt đến sớm (Early Penalty) để đẩy lùi về sau.
+ *  4. Đơn TỰ DO: Gom tiện đường giữa các điểm hẹn theo khoảng cách ngắn nhất.
+ */
+export function solveVRPTW(matrix, startIdx, ordersWithMeta, startMinutesOfDay) {
+  const unvisited = new Set(ordersWithMeta.map((_, i) => i + 1));
+  const route = [];
+  let current = startIdx;
+  const now = new Date();
+  let currentMinutes = (startMinutesOfDay ?? (now.getHours() * 60 + now.getMinutes())) + 5;
+
+  while (unvisited.size > 0) {
+    let bestIdx = -1;
+    let bestScore = Infinity;
+    let bestTravelSec = 0;
+
+    for (const idx of unvisited) {
+      const travelSec = matrix[current]?.[idx] || 300;
+      const travelMin = Math.round(travelSec / 60);
+      const arrivalMin = currentMinutes + travelMin;
+      const ord = ordersWithMeta[idx - 1];
+      const apt = ord?.appointmentInfo || ord?.appointment;
+
+      let penalty = 0;
+      if (apt && apt.startMinutes != null && apt.endMinutes != null) {
+        const { startMinutes: sMin, endMinutes: eMin } = apt;
+        if (arrivalMin > eMin) {
+          const minutesLate = arrivalMin - eMin;
+          penalty = -10000 - (minutesLate * 25);
+        } else if (arrivalMin < sMin - 15) {
+          const minutesEarly = (sMin - 15) - arrivalMin;
+          penalty = 5000 + (minutesEarly * 60);
+        } else {
+          penalty = -3000;
+        }
+      } else {
+        penalty = 0;
+      }
+
+      const score = travelMin + penalty;
+      if (score < bestScore) {
+        bestScore = score;
+        bestIdx = idx;
+        bestTravelSec = travelSec;
+      }
+    }
+
+    if (bestIdx === -1) break;
+    unvisited.delete(bestIdx);
+    const chosenTravelMin = Math.round(bestTravelSec / 60);
+    currentMinutes += chosenTravelMin + 4;
+    route.push({ index: bestIdx, durationFromPrev: bestTravelSec });
+    current = bestIdx;
+  }
+  return route;
+}
+
+/**
  * Lấy polyline đường bộ qua nhiều điểm dừng (multi-stop route).
  * Gọi OSRM Route API với tất cả waypoints.
  * @param {Array<{lat: number, lng: number}>} waypoints - Danh sách tọa độ theo thứ tự giao
