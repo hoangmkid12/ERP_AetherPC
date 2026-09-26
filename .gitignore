@@ -8,10 +8,10 @@ frontend/dist/
 dist/
 build/
 
-# Local environment variables and secrets (uncommented to push with project)
-# backend/.env
-# frontend/.env
-# .env
+# Local environment variables and secrets — NEVER commit these
+backend/.env
+frontend/.env
+.env
 .env.local
 .env.development.local
 .env.test.local
