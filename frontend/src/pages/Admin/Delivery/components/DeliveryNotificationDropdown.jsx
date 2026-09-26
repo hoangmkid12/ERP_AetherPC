@@ -74,302 +74,349 @@ export default function DeliveryNotificationDropdown({
             transform: translateY(0) scale(1);
           }
         }
+        .delivery-notif-card:hover {
+          transform: translateY(-1px);
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+        }
+        .delivery-notif-tabs::-webkit-scrollbar {
+          display: none;
+        }
       `}</style>
       <div
         style={{
           position: 'absolute',
-          top: 'calc(100% + 8px)',
-          right: '-6px',
-          width: 'min(380px, calc(100vw - 20px))',
-          maxHeight: 'min(520px, calc(100vh - 90px))',
+          top: 'calc(100% + 6px)',
+          right: '10px',
+          width: 'min(420px, calc(100% - 20px))',
+          maxHeight: 'min(540px, calc(100vh - 85px))',
           zIndex: 9999,
-          backgroundColor: 'var(--bg-primary, #ffffff)',
+          backgroundColor: '#ffffff',
           borderRadius: '16px',
-          boxShadow: '0 16px 40px rgba(0, 0, 0, 0.22), 0 4px 12px rgba(0, 0, 0, 0.08)',
-          border: '1px solid var(--border-glass, #cbd5e1)',
+          boxShadow: '0 18px 45px rgba(0, 0, 0, 0.22), 0 4px 14px rgba(0, 0, 0, 0.08)',
+          border: '1px solid #cbd5e1',
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
           transformOrigin: 'top right',
-          animation: 'dropdownDrop 0.22s cubic-bezier(0.16, 1, 0.3, 1)'
+          animation: 'dropdownDrop 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Caret pointing up at Bell icon */}
+        {/* Caret pointing directly up at Bell icon (82px from topbar right edge, dropdown is 10px from edge -> 72px center -> caret right: 66px) */}
         <div style={{
           position: 'absolute',
           top: '-6px',
-          right: '20px',
+          right: '66px',
           width: '12px',
           height: '12px',
-          backgroundColor: 'var(--bg-primary, #ffffff)',
-          borderLeft: '1px solid var(--border-glass, #cbd5e1)',
-          borderTop: '1px solid var(--border-glass, #cbd5e1)',
+          backgroundColor: '#ffffff',
+          borderLeft: '1px solid #cbd5e1',
+          borderTop: '1px solid #cbd5e1',
           transform: 'rotate(45deg)',
-          zIndex: 10
+          zIndex: 12
         }} />
 
-      {/* Header */}
-      <div style={{
-        padding: '0.75rem 0.95rem',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        borderBottom: '1px solid var(--border-glass, #e2e8f0)',
-        backgroundColor: 'var(--bg-primary, #ffffff)',
-        position: 'relative',
-        zIndex: 11
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <div style={{
-            width: '28px', height: '28px', borderRadius: '8px',
-            background: 'linear-gradient(135deg, #2563eb, #7c3aed)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 2px 6px rgba(37, 99, 235, 0.3)'
-          }}>
-            <Bell size={15} color="#fff" />
-          </div>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              <strong style={{ fontSize: '0.88rem', color: 'var(--text-primary, #0f172a)' }}>
-                Thông Báo Giao Hàng
-              </strong>
+        {/* Header */}
+        <div style={{
+          padding: '0.8rem 1rem',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          borderBottom: '1px solid #e2e8f0',
+          backgroundColor: '#ffffff',
+          position: 'relative',
+          zIndex: 11
+        }}>
+          {/* Left Title + Badge */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', minWidth: 0 }}>
+            <div style={{
+              width: '32px', height: '32px', borderRadius: '10px',
+              background: 'linear-gradient(135deg, #2563eb, #4f46e5)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: '0 2px 8px rgba(37, 99, 235, 0.3)',
+              flexShrink: 0
+            }}>
+              <Bell size={16} color="#fff" />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', minWidth: 0 }}>
+              <span style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', whiteSpace: 'nowrap' }}>
+                Thông Báo
+              </span>
               {unreadCount > 0 && (
                 <span style={{
-                  fontSize: '0.64rem', fontWeight: 800, color: '#fff',
-                  backgroundColor: 'var(--danger, #ef4444)',
-                  padding: '0.1rem 0.4rem', borderRadius: '999px'
+                  fontSize: '0.68rem', fontWeight: 800, color: '#ffffff',
+                  backgroundColor: '#ef4444',
+                  padding: '0.12rem 0.45rem', borderRadius: '999px',
+                  whiteSpace: 'nowrap',
+                  lineHeight: 1.2,
+                  flexShrink: 0
                 }}>
                   {unreadCount} mới
                 </span>
               )}
             </div>
           </div>
-        </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-          {unreadCount > 0 && (
+          {/* Right Actions */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexShrink: 0 }}>
+            {unreadCount > 0 && (
+              <button
+                type="button"
+                onClick={onMarkAllAsRead}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
+                  padding: '0.35rem 0.65rem', borderRadius: '8px',
+                  border: '1px solid #cbd5e1',
+                  backgroundColor: '#f8fafc',
+                  color: '#2563eb',
+                  fontSize: '0.74rem', fontWeight: 700, cursor: 'pointer',
+                  whiteSpace: 'nowrap', lineHeight: 1,
+                  transition: 'background-color 0.15s'
+                }}
+                title="Đánh dấu tất cả đã đọc"
+              >
+                <CheckCheck size={14} />
+                <span>Đã đọc hết</span>
+              </button>
+            )}
             <button
               type="button"
-              onClick={onMarkAllAsRead}
+              onClick={onClose}
               style={{
-                display: 'inline-flex', alignItems: 'center', gap: '0.25rem',
-                padding: '0.3rem 0.55rem', borderRadius: '6px',
-                border: '1px solid var(--border-glass, #cbd5e1)',
-                backgroundColor: 'var(--bg-secondary, #f8fafc)',
-                color: 'var(--primary, #2563eb)',
-                fontSize: '0.7rem', fontWeight: 700, cursor: 'pointer'
+                width: '28px', height: '28px', borderRadius: '50%',
+                border: 'none', backgroundColor: '#f1f5f9',
+                color: '#64748b', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                flexShrink: 0,
+                transition: 'background-color 0.15s'
               }}
-              title="Đánh dấu tất cả đã đọc"
+              title="Đóng"
             >
-              <CheckCheck size={13} />
-              <span>Đã đọc hết</span>
+              <X size={15} />
             </button>
+          </div>
+        </div>
+
+        {/* Filter Tabs */}
+        <div
+          className="delivery-notif-tabs"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.45rem',
+            padding: '0.55rem 0.85rem',
+            backgroundColor: '#f8fafc',
+            borderBottom: '1px solid #e2e8f0',
+            overflowX: 'auto',
+            WebkitOverflowScrolling: 'touch',
+            scrollbarWidth: 'none',
+            msOverflowStyle: 'none'
+          }}
+        >
+          {[
+            { id: 'ALL', label: 'Tất Cả', count: notifications.length },
+            { id: 'UNREAD', label: 'Chưa Đọc', count: unreadCount },
+            { id: 'URGENT', label: '⏰ Hẹn Giờ', count: urgentCount },
+            { id: 'NEW', label: '📦 Đơn Mới', count: newCount }
+          ].map(tab => {
+            const isSelected = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id)}
+                style={{
+                  height: '28px',
+                  padding: '0 0.7rem',
+                  borderRadius: '999px',
+                  border: isSelected ? '1px solid #2563eb' : '1px solid #cbd5e1',
+                  backgroundColor: isSelected ? '#2563eb' : '#ffffff',
+                  color: isSelected ? '#ffffff' : '#334155',
+                  fontSize: '0.74rem',
+                  fontWeight: isSelected ? 800 : 600,
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.35rem',
+                  flexShrink: 0,
+                  lineHeight: 1,
+                  boxSizing: 'border-box',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                <span>{tab.label}</span>
+                {tab.count > 0 && (
+                  <span style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    minWidth: '18px',
+                    height: '18px',
+                    padding: '0 4px',
+                    borderRadius: '999px',
+                    fontSize: '0.64rem',
+                    fontWeight: 800,
+                    lineHeight: 1,
+                    backgroundColor: isSelected ? 'rgba(255, 255, 255, 0.28)' : 'rgba(100, 116, 139, 0.15)',
+                    color: isSelected ? '#ffffff' : '#64748b'
+                  }}>
+                    {tab.count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Notification Scrollable List */}
+        <div style={{
+          flex: 1,
+          overflowY: 'auto',
+          padding: '0.75rem 0.85rem',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '0.6rem'
+        }}>
+          {filteredNotifications.length === 0 ? (
+            <div style={{
+              textAlign: 'center', padding: '2.5rem 1rem',
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.55rem'
+            }}>
+              <div style={{
+                width: '46px', height: '46px', borderRadius: '50%',
+                backgroundColor: 'rgba(100, 116, 139, 0.1)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center'
+              }}>
+                <BellOff size={22} color="#94a3b8" />
+              </div>
+              <strong style={{ fontSize: '0.9rem', color: '#0f172a' }}>
+                Không có thông báo nào
+              </strong>
+              <p style={{ margin: 0, fontSize: '0.76rem', color: '#64748b', maxWidth: '240px', lineHeight: 1.4 }}>
+                {activeTab === 'UNREAD'
+                  ? 'Bạn đã đọc hết tất cả thông báo rồi!'
+                  : 'Hệ thống sẽ tự động nhắc khi có đơn hẹn hoặc đơn mới.'}
+              </p>
+            </div>
+          ) : (
+            filteredNotifications.map((notif) => {
+              const badge = getBadgeStyle(notif.type);
+              const isUrgent = notif.category === 'urgent';
+              return (
+                <div
+                  key={notif.id}
+                  className="delivery-notif-card"
+                  onClick={() => onNotificationClick && onNotificationClick(notif)}
+                  style={{
+                    padding: '0.75rem 0.85rem',
+                    borderRadius: '12px',
+                    border: '1px solid',
+                    borderColor: !notif.isRead
+                      ? (isUrgent ? 'rgba(239, 68, 68, 0.4)' : 'rgba(37, 99, 235, 0.35)')
+                      : '#e2e8f0',
+                    backgroundColor: !notif.isRead
+                      ? (isUrgent ? 'rgba(254, 242, 242, 0.85)' : 'rgba(240, 249, 255, 0.85)')
+                      : '#ffffff',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    gap: '0.7rem',
+                    position: 'relative',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  {/* Dot unread */}
+                  {!notif.isRead && (
+                    <span style={{
+                      position: 'absolute', top: '9px', right: '9px',
+                      width: '8px', height: '8px', borderRadius: '50%',
+                      backgroundColor: isUrgent ? '#ef4444' : '#2563eb',
+                      boxShadow: isUrgent ? '0 0 6px rgba(239, 68, 68, 0.6)' : 'none'
+                    }} />
+                  )}
+
+                  {/* Left Icon */}
+                  <div style={{
+                    width: '34px', height: '34px', borderRadius: '9px',
+                    backgroundColor: badge.bg,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    flexShrink: 0
+                  }}>
+                    {getIconForType(notif.type)}
+                  </div>
+
+                  {/* Body Content */}
+                  <div style={{ flex: 1, minWidth: 0, paddingRight: notif.isRead ? 0 : '10px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.2rem' }}>
+                      <span style={{
+                        fontSize: '0.64rem', fontWeight: 800,
+                        padding: '0.1rem 0.4rem', borderRadius: '4px',
+                        backgroundColor: badge.bg, color: badge.text,
+                        lineHeight: 1.2
+                      }}>
+                        {badge.label}
+                      </span>
+                      <span style={{ fontSize: '0.68rem', color: '#64748b' }}>
+                        {notif.timeLabel || 'Hôm nay'}
+                      </span>
+                    </div>
+
+                    <strong style={{
+                      display: 'block', fontSize: '0.82rem',
+                      color: isUrgent && !notif.isRead ? '#b91c1c' : '#0f172a',
+                      marginBottom: '0.2rem', lineHeight: 1.3
+                    }}>
+                      {notif.title}
+                    </strong>
+
+                    <p style={{
+                      margin: 0, fontSize: '0.75rem',
+                      color: '#475569',
+                      lineHeight: 1.45
+                    }}>
+                      {notif.message}
+                    </p>
+
+                    <div style={{
+                      marginTop: '0.4rem',
+                      display: 'flex', alignItems: 'center', gap: '0.2rem',
+                      fontSize: '0.74rem', fontWeight: 700,
+                      color: isUrgent ? '#dc2626' : '#2563eb'
+                    }}>
+                      <span>{notif.actionText || 'Xem đơn hàng'}</span>
+                      <ChevronRight size={13} />
+                    </div>
+                  </div>
+                </div>
+              );
+            })
           )}
+        </div>
+
+        {/* Footer */}
+        <div style={{
+          padding: '0.65rem 0.95rem',
+          backgroundColor: '#f8fafc',
+          borderTop: '1px solid #e2e8f0',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          fontSize: '0.72rem', color: '#64748b'
+        }}>
+          <span>Nhắc giờ hẹn & phân công</span>
           <button
             type="button"
             onClick={onClose}
             style={{
-              width: '26px', height: '26px', borderRadius: '50%',
-              border: 'none', backgroundColor: 'var(--bg-secondary, #f1f5f9)',
-              color: 'var(--text-muted, #64748b)', cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center'
+              padding: '0.35rem 0.85rem', borderRadius: '7px',
+              border: 'none', backgroundColor: '#2563eb',
+              color: '#ffffff', fontSize: '0.74rem', fontWeight: 700, cursor: 'pointer',
+              lineHeight: 1,
+              transition: 'background-color 0.15s'
             }}
           >
-            <X size={15} />
+            Đóng
           </button>
         </div>
       </div>
-
-      {/* Filter Tabs */}
-      <div style={{
-        display: 'flex', gap: '0.35rem', padding: '0.5rem 0.85rem',
-        backgroundColor: 'var(--bg-secondary, #f8fafc)',
-        borderBottom: '1px solid var(--border-glass, #e2e8f0)',
-        overflowX: 'auto', WebkitOverflowScrolling: 'touch'
-      }}>
-        {[
-          { id: 'ALL', label: 'Tất Cả', count: notifications.length },
-          { id: 'UNREAD', label: 'Chưa Đọc', count: unreadCount },
-          { id: 'URGENT', label: '⏰ Hẹn Giờ', count: urgentCount },
-          { id: 'NEW', label: '📦 Đơn Mới', count: newCount }
-        ].map(tab => {
-          const isSelected = activeTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => setActiveTab(tab.id)}
-              style={{
-                padding: '0.25rem 0.6rem',
-                borderRadius: '999px',
-                border: isSelected ? '1px solid var(--primary, #2563eb)' : '1px solid var(--border-glass, #cbd5e1)',
-                backgroundColor: isSelected ? 'var(--primary, #2563eb)' : 'var(--bg-primary, #ffffff)',
-                color: isSelected ? '#ffffff' : 'var(--text-primary, #334155)',
-                fontSize: '0.7rem', fontWeight: 700, cursor: 'pointer',
-                whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: '0.25rem',
-                transition: 'all 0.15s ease'
-              }}
-            >
-              <span>{tab.label}</span>
-              {tab.count > 0 && (
-                <span style={{
-                  padding: '0.02rem 0.3rem', borderRadius: '999px',
-                  fontSize: '0.62rem',
-                  backgroundColor: isSelected ? 'rgba(255,255,255,0.25)' : 'rgba(100,116,139,0.15)',
-                  color: isSelected ? '#fff' : 'var(--text-muted, #64748b)'
-                }}>
-                  {tab.count}
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Notification Scrollable List */}
-      <div style={{
-        flex: 1,
-        overflowY: 'auto',
-        padding: '0.65rem 0.85rem',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '0.55rem'
-      }}>
-        {filteredNotifications.length === 0 ? (
-          <div style={{
-            textAlign: 'center', padding: '2.5rem 1rem',
-            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.55rem'
-          }}>
-            <div style={{
-              width: '46px', height: '46px', borderRadius: '50%',
-              backgroundColor: 'rgba(100, 116, 139, 0.1)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center'
-            }}>
-              <BellOff size={22} color="var(--text-muted, #94a3b8)" />
-            </div>
-            <strong style={{ fontSize: '0.88rem', color: 'var(--text-primary, #0f172a)' }}>
-              Không có thông báo nào
-            </strong>
-            <p style={{ margin: 0, fontSize: '0.74rem', color: 'var(--text-muted, #64748b)', maxWidth: '240px' }}>
-              {activeTab === 'UNREAD'
-                ? 'Bạn đã đọc hết tất cả thông báo rồi!'
-                : 'Hệ thống sẽ tự động nhắc khi có đơn hẹn hoặc đơn mới.'}
-            </p>
-          </div>
-        ) : (
-          filteredNotifications.map((notif) => {
-            const badge = getBadgeStyle(notif.type);
-            const isUrgent = notif.category === 'urgent';
-            return (
-              <div
-                key={notif.id}
-                onClick={() => onNotificationClick && onNotificationClick(notif)}
-                style={{
-                  padding: '0.7rem 0.8rem',
-                  borderRadius: '12px',
-                  border: '1px solid',
-                  borderColor: !notif.isRead
-                    ? (isUrgent ? 'rgba(239, 68, 68, 0.35)' : 'rgba(37, 99, 235, 0.3)')
-                    : 'var(--border-glass, #e2e8f0)',
-                  backgroundColor: !notif.isRead
-                    ? (isUrgent ? 'rgba(254, 242, 242, 0.75)' : 'rgba(240, 249, 255, 0.75)')
-                    : 'var(--bg-primary, #ffffff)',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  gap: '0.65rem',
-                  position: 'relative',
-                  transition: 'all 0.15s ease'
-                }}
-              >
-                {/* Dot unread */}
-                {!notif.isRead && (
-                  <span style={{
-                    position: 'absolute', top: '8px', right: '8px',
-                    width: '7px', height: '7px', borderRadius: '50%',
-                    backgroundColor: isUrgent ? '#ef4444' : '#2563eb'
-                  }} />
-                )}
-
-                {/* Left Icon */}
-                <div style={{
-                  width: '32px', height: '32px', borderRadius: '8px',
-                  backgroundColor: badge.bg,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  flexShrink: 0
-                }}>
-                  {getIconForType(notif.type)}
-                </div>
-
-                {/* Body Content */}
-                <div style={{ flex: 1, minWidth: 0, paddingRight: notif.isRead ? 0 : '8px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', marginBottom: '0.15rem' }}>
-                    <span style={{
-                      fontSize: '0.62rem', fontWeight: 800,
-                      padding: '0.1rem 0.35rem', borderRadius: '4px',
-                      backgroundColor: badge.bg, color: badge.text
-                    }}>
-                      {badge.label}
-                    </span>
-                    <span style={{ fontSize: '0.66rem', color: 'var(--text-muted, #94a3b8)' }}>
-                      {notif.timeLabel || 'Hôm nay'}
-                    </span>
-                  </div>
-
-                  <strong style={{
-                    display: 'block', fontSize: '0.8rem',
-                    color: isUrgent && !notif.isRead ? '#b91c1c' : 'var(--text-primary, #0f172a)',
-                    marginBottom: '0.15rem', lineHeight: 1.25
-                  }}>
-                    {notif.title}
-                  </strong>
-
-                  <p style={{
-                    margin: 0, fontSize: '0.74rem',
-                    color: 'var(--text-secondary, #475569)',
-                    lineHeight: 1.4
-                  }}>
-                    {notif.message}
-                  </p>
-
-                  <div style={{
-                    marginTop: '0.35rem',
-                    display: 'flex', alignItems: 'center', gap: '0.2rem',
-                    fontSize: '0.72rem', fontWeight: 700,
-                    color: isUrgent ? '#dc2626' : 'var(--primary, #2563eb)'
-                  }}>
-                    <span>{notif.actionText || 'Xem đơn hàng'}</span>
-                    <ChevronRight size={12} />
-                  </div>
-                </div>
-              </div>
-            );
-          })
-        )}
-      </div>
-
-      {/* Footer */}
-      <div style={{
-        padding: '0.5rem 0.85rem',
-        backgroundColor: 'var(--bg-secondary, #f8fafc)',
-        borderTop: '1px solid var(--border-glass, #e2e8f0)',
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        fontSize: '0.68rem', color: 'var(--text-muted, #64748b)'
-      }}>
-        <span>Nhắc giờ hẹn & phân công</span>
-        <button
-          type="button"
-          onClick={onClose}
-          style={{
-            padding: '0.25rem 0.7rem', borderRadius: '6px',
-            border: 'none', backgroundColor: 'var(--primary, #2563eb)',
-            color: '#fff', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer'
-          }}
-        >
-          Đóng
-        </button>
-      </div>
-    </div>
-  </>
-);
+    </>
+  );
 }

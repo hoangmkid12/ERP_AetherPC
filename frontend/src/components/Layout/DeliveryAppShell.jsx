@@ -335,58 +335,58 @@ export default function DeliveryAppShell({ children }) {
                 }} />
               )}
             </button>
-            <div style={{ position: 'relative' }}>
-              <button
-                type="button"
-                onClick={() => setShowNotifications(prev => !prev)}
-                className="delivery-icon-btn"
-                title="Thông báo giao hàng"
-                style={{ position: 'relative' }}
-              >
-                <Bell size={19} color={hasUrgentLate ? 'var(--danger)' : undefined} />
-                {unreadCount > 0 && (
-                  <span style={{
-                    position: 'absolute', top: '2px', right: '2px',
-                    minWidth: '15px', height: '15px', borderRadius: '999px',
-                    backgroundColor: hasUrgentLate ? 'var(--danger)' : 'var(--primary)',
-                    color: '#fff',
-                    fontSize: '0.6rem', fontWeight: 800,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    padding: '0 3px', lineHeight: 1,
-                    boxShadow: hasUrgentLate ? '0 0 8px rgba(239, 68, 68, 0.6)' : 'none'
-                  }}>
-                    {unreadCount > 99 ? '99+' : unreadCount}
-                  </span>
-                )}
-              </button>
-
-              {showNotifications && (
-                <>
-                  {/* Backdrop click outside to dismiss */}
-                  <div
-                    style={{
-                      position: 'fixed',
-                      inset: 0,
-                      zIndex: 9998,
-                      background: 'rgba(0, 0, 0, 0.12)'
-                    }}
-                    onClick={() => setShowNotifications(false)}
-                  />
-                  {/* Dropdown dropping down directly from Bell icon */}
-                  <DeliveryNotificationDropdown
-                    onClose={() => setShowNotifications(false)}
-                    notifications={notifications}
-                    unreadCount={unreadCount}
-                    onMarkAllAsRead={handleMarkAllAsRead}
-                    onNotificationClick={handleNotificationClick}
-                  />
-                </>
+            <button
+              type="button"
+              onClick={() => setShowNotifications(prev => !prev)}
+              className="delivery-icon-btn"
+              title="Thông báo giao hàng"
+              style={{ position: 'relative' }}
+            >
+              <Bell size={19} color={hasUrgentLate ? 'var(--danger)' : undefined} />
+              {unreadCount > 0 && (
+                <span style={{
+                  position: 'absolute', top: '2px', right: '2px',
+                  minWidth: '15px', height: '15px', borderRadius: '999px',
+                  backgroundColor: hasUrgentLate ? 'var(--danger)' : 'var(--primary)',
+                  color: '#fff',
+                  fontSize: '0.6rem', fontWeight: 800,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  padding: '0 3px', lineHeight: 1,
+                  boxShadow: hasUrgentLate ? '0 0 8px rgba(239, 68, 68, 0.6)' : 'none'
+                }}>
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </span>
               )}
-            </div>
+            </button>
             <button type="button" onClick={handleLogout} className="delivery-icon-btn" title="Đăng xuất">
               <LogOut size={18} />
             </button>
           </div>
+
+          {/* Notifications Dropdown anchored to Topbar */}
+          {showNotifications && (
+            <>
+              {/* Backdrop click outside to dismiss */}
+              <div
+                style={{
+                  position: 'fixed',
+                  inset: 0,
+                  zIndex: 9998,
+                  background: 'rgba(15, 23, 42, 0.25)',
+                  backdropFilter: 'blur(2px)'
+                }}
+                onClick={() => setShowNotifications(false)}
+              />
+              {/* Dropdown dropping down directly under topbar / bell icon */}
+              <DeliveryNotificationDropdown
+                onClose={() => setShowNotifications(false)}
+                notifications={notifications}
+                unreadCount={unreadCount}
+                onMarkAllAsRead={handleMarkAllAsRead}
+                onNotificationClick={handleNotificationClick}
+              />
+            </>
+          )}
         </div>
 
         {/* Content */}
