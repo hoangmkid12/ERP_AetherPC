@@ -1,6 +1,8 @@
 import React, { useState, useMemo } from 'react';
-import { Package, Truck, Clock, CheckCircle, AlertTriangle, Award, Calendar, BarChart3, PieChart } from 'lucide-react';
+import { Package, Truck, Clock, CheckCircle, AlertTriangle, Award, Calendar, BarChart3, PieChart, Wallet, FileText, Printer, X, CheckCheck, QrCode } from 'lucide-react';
 import { formatRmaCode } from '../../../utils/statusLabels';
+import { useAuth } from '../../../context/AuthContext';
+import { printDocument } from '../../../utils/printDocument';
 import { Bar, Doughnut } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -45,7 +47,9 @@ export default function OverviewTab({
   onGoToReturns
 }) {
   // Mặc định bộ lọc thời gian là ngày realtime (Hôm nay)
+  const { user } = useAuth();
   const [dateFilter, setDateFilter] = useState(getDefaultDateFilter);
+  const [showHandoverModal, setShowHandoverModal] = useState(false);
 
   // Pool of orders assigned to this shipper
   const shipperOrders = useMemo(() => {
@@ -85,12 +89,29 @@ export default function OverviewTab({
       return st.isRescheduled || st.isRejected || st.isReturning;
     }).length;
 
-    const totalCod = periodOrders
-      .filter(o => o.status === 'DELIVERED')
-      .reduce((sum, o) => {
-        const isCod = o.paymentMethod === 'COD' || !o.paymentMethod;
-        return sum + (isCod ? parseFloat(o.totalAmount || o.total || 0) : 0);
-      }, 0);
+    // Phân tích chi tiết tiền mặt COD: Đã thu, Đã nộp kế toán, Đang giữ
+    const codOrders = periodOrders.filter(o => {
+      if (o.status !== 'DELIVERED') return false;
+      return o.paymentMethod === 'COD' || o.actualPaymentMethod === 'COD' || o.actualPaymentMethod === 'CASH' || (!o.paymentMethod && !o.actualPaymentMethod);
+    });
+
+    const isOrderSettled = (o) => {
+      if (Array.isArray(o.payments) && o.payments.length > 0) {
+        const cashPayments = o.payments.filter(p => p.method === 'CASH');
+        if (cashPayments.length > 0) {
+          return cashPayments.every(p => p.settledAt !== null);
+        }
+      }
+      return Boolean(o.codSettled || o.settledAt);
+    };
+
+    const settledOrders = codOrders.filter(isOrderSettled);
+    const pendingOrders = codOrders.filter(o => !isOrderSettled(o));
+
+    const totalCollected = codOrders.reduce((sum, o) => sum + parseFloat(o.totalAmount || o.total || 0), 0);
+    const settledAmount = settledOrders.reduce((sum, o) => sum + parseFloat(o.totalAmount || o.total || 0), 0);
+    const pendingAmount = pendingOrders.reduce((sum, o) => sum + parseFloat(o.totalAmount || o.total || 0), 0);
+    const percentSettled = totalCollected > 0 ? Math.min(100, Math.round((settledAmount / totalCollected) * 100)) : 100;
 
     return [
       { label: 'Chờ Nhận Tại Kho', value: `${ready} đơn`, color: 'var(--warning)', bg: 'rgba(217,119,6,0.1)', sub: 'Đơn sẵn sàng lấy', icon: <Package size={18} /> },
@@ -98,9 +119,52 @@ export default function OverviewTab({
       { label: 'Chờ Khách Gọi Lại 24h', value: `${awaiting} đơn`, color: 'var(--warning)', bg: 'rgba(217,119,6,0.1)', sub: 'Tạm giữ liên lạc', icon: <Clock size={18} /> },
       { label: 'Giao Thành Công (POD)', value: `${done} đơn`, color: 'var(--success)', bg: 'rgba(22,163,74,0.1)', sub: 'Đã giao hoàn tất', icon: <CheckCircle size={18} /> },
       { label: 'Sự Cố / Chuyển Hoàn', value: `${failed} đơn`, color: 'var(--danger)', bg: 'rgba(220,38,38,0.1)', sub: 'Hẹn lại & hoàn kho', icon: <AlertTriangle size={18} /> },
-      { label: 'Tổng Tiền Thu Hộ COD', value: fmt(totalCod), color: 'var(--success)', bg: 'rgba(22,163,74,0.1)', sub: 'Cần nộp kế toán', icon: <Award size={18} /> }
+      {
+        label: 'Tiền COD Đang Giữ',
+        value: fmt(pendingAmount),
+        color: pendingAmount > 0 ? '#b45309' : 'var(--success)',
+        bg: pendingAmount > 0 ? 'rgba(217,119,6,0.1)' : 'rgba(22,163,74,0.1)',
+        sub: pendingAmount > 0 ? `Cần nộp (${pendingOrders.length} đơn)` : 'Đã tất toán 100%',
+        icon: <Award size={18} />
+      }
     ];
   }, [periodOrders, fmt]);
+
+  // Bộ tính toán COD phục vụ khối Đối soát ca & Phiếu bàn giao
+  const codAnalytics = useMemo(() => {
+    const codOrders = periodOrders.filter(o => {
+      if (o.status !== 'DELIVERED') return false;
+      return o.paymentMethod === 'COD' || o.actualPaymentMethod === 'COD' || o.actualPaymentMethod === 'CASH' || (!o.paymentMethod && !o.actualPaymentMethod);
+    });
+
+    const isOrderSettled = (o) => {
+      if (Array.isArray(o.payments) && o.payments.length > 0) {
+        const cashPayments = o.payments.filter(p => p.method === 'CASH');
+        if (cashPayments.length > 0) {
+          return cashPayments.every(p => p.settledAt !== null);
+        }
+      }
+      return Boolean(o.codSettled || o.settledAt);
+    };
+
+    const settledOrders = codOrders.filter(isOrderSettled);
+    const pendingOrders = codOrders.filter(o => !isOrderSettled(o));
+
+    const totalCollected = codOrders.reduce((sum, o) => sum + parseFloat(o.totalAmount || o.total || 0), 0);
+    const settledAmount = settledOrders.reduce((sum, o) => sum + parseFloat(o.totalAmount || o.total || 0), 0);
+    const pendingAmount = pendingOrders.reduce((sum, o) => sum + parseFloat(o.totalAmount || o.total || 0), 0);
+    const percentSettled = totalCollected > 0 ? Math.min(100, Math.round((settledAmount / totalCollected) * 100)) : 100;
+
+    return {
+      codOrders,
+      settledOrders,
+      pendingOrders,
+      totalCollected,
+      settledAmount,
+      pendingAmount,
+      percentSettled
+    };
+  }, [periodOrders]);
 
   // Doughnut chart: Ratio of order states in this time period
   const deliveryRatioData = useMemo(() => {
@@ -273,6 +337,109 @@ export default function OverviewTab({
         ))}
       </div>
 
+      {/* KHỐI BÀN GIAO & ĐỐI SOÁT TIỀN MẶT COD CA NÀY */}
+      <div className="delivery-card" style={{ marginBottom: '0.9rem', border: '1.5px solid #cbd5e1' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+            <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'linear-gradient(135deg, #10b981, #059669)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
+              <Wallet size={16} />
+            </div>
+            <div>
+              <h3 style={{ fontSize: '0.88rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
+                Bàn Giao & Đối Soát Tiền Mặt (COD)
+              </h3>
+              <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
+                Theo dõi tiền nộp ca & đối soát với Kế toán / Thủ quỹ
+              </span>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setShowHandoverModal(true)}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: '0.35rem',
+              padding: '0.4rem 0.75rem', borderRadius: '6px',
+              border: '1px solid #cbd5e1', backgroundColor: '#ffffff',
+              color: '#2563eb', fontSize: '0.74rem', fontWeight: 700, cursor: 'pointer',
+              boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+            }}
+          >
+            <FileText size={14} />
+            <span>Phiếu Bàn Giao Ca</span>
+          </button>
+        </div>
+
+        {/* 3 Metric Columns */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem', backgroundColor: '#f8fafc', padding: '0.75rem', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '0.75rem' }}>
+          <div>
+            <span style={{ fontSize: '0.65rem', color: '#64748b', display: 'block', fontWeight: 700 }}>Tổng COD Đã Thu</span>
+            <strong style={{ fontSize: '0.88rem', color: '#0f172a', display: 'block', marginTop: '2px' }}>
+              {fmt(codAnalytics.totalCollected)}
+            </strong>
+            <span style={{ fontSize: '0.62rem', color: '#94a3b8' }}>{codAnalytics.codOrders.length} đơn</span>
+          </div>
+
+          <div>
+            <span style={{ fontSize: '0.65rem', color: '#15803d', display: 'block', fontWeight: 700 }}>Đã Nộp Kế Toán</span>
+            <strong style={{ fontSize: '0.88rem', color: '#16a34a', display: 'block', marginTop: '2px' }}>
+              {fmt(codAnalytics.settledAmount)}
+            </strong>
+            <span style={{ fontSize: '0.62rem', color: '#16a34a' }}>{codAnalytics.settledOrders.length} đơn đã duyệt</span>
+          </div>
+
+          <div>
+            <span style={{ fontSize: '0.65rem', color: codAnalytics.pendingAmount > 0 ? '#b45309' : '#64748b', display: 'block', fontWeight: 700 }}>Còn Giữ (Cần Nộp)</span>
+            <strong style={{ fontSize: '0.88rem', color: codAnalytics.pendingAmount > 0 ? '#dc2626' : '#16a34a', display: 'block', marginTop: '2px' }}>
+              {fmt(codAnalytics.pendingAmount)}
+            </strong>
+            <span style={{ fontSize: '0.62rem', color: codAnalytics.pendingAmount > 0 ? '#dc2626' : '#64748b' }}>
+              {codAnalytics.pendingOrders.length} đơn chưa nộp
+            </span>
+          </div>
+        </div>
+
+        {/* Progress Bar */}
+        <div style={{ marginBottom: '0.65rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.68rem', marginBottom: '0.25rem', fontWeight: 700 }}>
+            <span style={{ color: '#475569' }}>Tiến độ nộp tiền về quầy:</span>
+            <span style={{ color: codAnalytics.percentSettled === 100 ? '#16a34a' : '#2563eb' }}>
+              {codAnalytics.percentSettled}% ({fmt(codAnalytics.settledAmount)} / {fmt(codAnalytics.totalCollected)})
+            </span>
+          </div>
+          <div style={{ height: '7px', borderRadius: '999px', backgroundColor: '#e2e8f0', overflow: 'hidden' }}>
+            <div style={{
+              width: `${codAnalytics.percentSettled}%`,
+              height: '100%',
+              borderRadius: '999px',
+              backgroundColor: codAnalytics.percentSettled === 100 ? '#16a34a' : '#2563eb',
+              transition: 'width 0.4s ease'
+            }} />
+          </div>
+        </div>
+
+        {/* Status Notification Banner */}
+        {codAnalytics.pendingAmount > 0 ? (
+          <div style={{ padding: '0.55rem 0.75rem', borderRadius: '6px', backgroundColor: '#fffbeb', border: '1px solid #fef3c7', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <AlertTriangle size={15} style={{ color: '#d97706', flexShrink: 0 }} />
+            <span style={{ fontSize: '0.72rem', color: '#92400e', lineHeight: 1.35 }}>
+              Bạn đang giữ <strong>{fmt(codAnalytics.pendingAmount)}</strong> tiền mặt. Vui lòng bàn giao cho Kế toán / Thủ quỹ khi kết thúc ca làm việc.
+            </span>
+          </div>
+        ) : codAnalytics.totalCollected > 0 ? (
+          <div style={{ padding: '0.55rem 0.75rem', borderRadius: '6px', backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <CheckCheck size={16} style={{ color: '#16a34a', flexShrink: 0 }} />
+            <span style={{ fontSize: '0.72rem', color: '#15803d', lineHeight: 1.35 }}>
+              <strong>ĐÃ HOÀN TẤT ĐỐI SOÁT 100% TIỀN COD — AN TOÀN KẾT CA!</strong> Kế toán đã xác nhận nhận đủ tiền ca của bạn.
+            </span>
+          </div>
+        ) : (
+          <div style={{ padding: '0.55rem 0.75rem', borderRadius: '6px', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', fontSize: '0.72rem', color: '#64748b' }}>
+            Chưa phát sinh đơn hàng thu tiền mặt COD trong khoảng thời gian được chọn.
+          </div>
+        )}
+      </div>
+
       {/* Charts stacked full-width */}
       <div className="delivery-card" style={{ height: '260px', display: 'flex', flexDirection: 'column' }}>
         <h3 style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-primary)', margin: '0 0 0.75rem 0', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
@@ -362,6 +529,164 @@ export default function OverviewTab({
           )}
         </div>
       </div>
+
+      {/* MODAL: PHIẾU BÀN GIAO TIỀN CA (HANDOVER VOUCHER) */}
+      {showHandoverModal && (
+        <div
+          style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(4px)', zIndex: 100001, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
+          onClick={() => setShowHandoverModal(false)}
+        >
+          <div
+            style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', width: '100%', maxWidth: '640px', maxHeight: '88vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' }}
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div style={{ padding: '0.85rem 1.1rem', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <FileText size={18} style={{ color: '#2563eb' }} />
+                <strong style={{ fontSize: '0.95rem', color: '#0f172a' }}>Phiếu Bàn Giao Tiền Mặt Thu Hộ (COD)</strong>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowHandoverModal(false)}
+                style={{ background: '#f1f5f9', border: 'none', padding: '0.35rem', borderRadius: '6px', cursor: 'pointer' }}
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Modal Scrollable Body */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '1.25rem' }}>
+              <div data-print-doc="cod-handover">
+                {/* Print Header */}
+                <div style={{ textAlign: 'center', borderBottom: '2px solid #0f172a', paddingBottom: '0.75rem', marginBottom: '1rem' }}>
+                  <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    CÔNG TY TNHH CÔNG NGHỆ AETHERPC • PHÒNG VẬN HÀNH & GIAO HÀNG
+                  </div>
+                  <h2 style={{ fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', margin: '0.25rem 0' }}>
+                    BIÊN BẢN BÀN GIAO TIỀN MẶT THU HỘ (COD)
+                  </h2>
+                  <div style={{ fontSize: '0.74rem', color: '#64748b' }}>
+                    Mã biên bản: <code style={{ color: '#2563eb', fontWeight: 800 }}>#BG-COD-{Date.now().toString().slice(-8)}</code> • Thời gian xuất: {new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} - {new Date().toLocaleDateString('vi-VN')}
+                  </div>
+                </div>
+
+                {/* Shipper & Summary Info */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', backgroundColor: '#f8fafc', padding: '0.85rem', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '1rem', fontSize: '0.8rem' }}>
+                  <div>
+                    <span style={{ color: '#64748b', display: 'block', fontSize: '0.72rem' }}>Nhân viên giao hàng:</span>
+                    <strong style={{ color: '#0f172a' }}>{user?.fullname || user?.name || 'Shipper'}</strong>
+                    <span style={{ color: '#64748b', display: 'block', fontSize: '0.72rem', marginTop: '2px' }}>Khu vực: {user?.deliveryRegion || 'HCM_KV1'}</span>
+                  </div>
+                  <div>
+                    <span style={{ color: '#64748b', display: 'block', fontSize: '0.72rem' }}>Tổng tiền mặt cần nộp ca này:</span>
+                    <strong style={{ color: '#b45309', fontSize: '1.05rem', display: 'block' }}>{fmt(codAnalytics.pendingAmount)}</strong>
+                    <span style={{ color: '#64748b', display: 'block', fontSize: '0.72rem' }}>
+                      (Đã nộp: {fmt(codAnalytics.settledAmount)} / Tổng thu: {fmt(codAnalytics.totalCollected)})
+                    </span>
+                  </div>
+                </div>
+
+                {/* Table of Orders */}
+                <div style={{ marginBottom: '1rem' }}>
+                  <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#0f172a', marginBottom: '0.4rem' }}>
+                    Danh Sách Đơn Hàng COD ({codAnalytics.codOrders.length} đơn)
+                  </div>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.76rem' }}>
+                    <thead>
+                      <tr style={{ backgroundColor: '#f1f5f9', borderBottom: '1px solid #cbd5e1', textAlign: 'left', color: '#475569' }}>
+                        <th style={{ padding: '0.45rem 0.6rem' }}>Mã Đơn</th>
+                        <th style={{ padding: '0.45rem 0.6rem' }}>Khách Hàng</th>
+                        <th style={{ padding: '0.45rem 0.6rem' }}>Địa Chỉ Giao</th>
+                        <th style={{ padding: '0.45rem 0.6rem', textAlign: 'right' }}>Tiền COD</th>
+                        <th style={{ padding: '0.45rem 0.6rem', textAlign: 'center' }}>Trạng Thái</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {codAnalytics.codOrders.map((o, idx) => {
+                        const isSettled = Array.isArray(o.payments) && o.payments.some(p => p.method === 'CASH' && p.settledAt !== null);
+                        return (
+                          <tr key={idx} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                            <td style={{ padding: '0.45rem 0.6rem', fontWeight: 700, color: '#2563eb' }}>#{o.orderId || o.id}</td>
+                            <td style={{ padding: '0.45rem 0.6rem', color: '#0f172a' }}>{o.customerName}</td>
+                            <td style={{ padding: '0.45rem 0.6rem', color: '#64748b' }}>{o.shippingAddress}</td>
+                            <td style={{ padding: '0.45rem 0.6rem', textAlign: 'right', fontWeight: 800, color: '#0f172a' }}>
+                              {fmt(parseFloat(o.totalAmount || o.total || 0))}
+                            </td>
+                            <td style={{ padding: '0.45rem 0.6rem', textAlign: 'center' }}>
+                              {isSettled ? (
+                                <span style={{ padding: '2px 6px', borderRadius: '4px', fontSize: '0.66rem', fontWeight: 800, backgroundColor: '#dcfce7', color: '#15803d' }}>
+                                  ĐÃ DUYỆT
+                                </span>
+                              ) : (
+                                <span style={{ padding: '2px 6px', borderRadius: '4px', fontSize: '0.66rem', fontWeight: 800, backgroundColor: '#fef3c7', color: '#b45309' }}>
+                                  CHỜ NỘP
+                                </span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      {codAnalytics.codOrders.length === 0 && (
+                        <tr>
+                          <td colSpan={5} style={{ padding: '1.5rem', textAlign: 'center', color: '#94a3b8' }}>
+                            Không có đơn COD nào trong khoảng thời gian này.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Signatures */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', marginTop: '1.5rem', textAlign: 'center', fontSize: '0.78rem' }}>
+                  <div>
+                    <strong style={{ display: 'block', color: '#0f172a' }}>NGƯỜI BÀN GIAO (SHIPPER)</strong>
+                    <span style={{ fontSize: '0.7rem', color: '#64748b' }}>(Ký và ghi rõ họ tên)</span>
+                    <div style={{ height: '50px' }} />
+                    <strong style={{ color: '#0f172a' }}>{user?.fullname || user?.name || 'Shipper'}</strong>
+                  </div>
+                  <div>
+                    <strong style={{ display: 'block', color: '#0f172a' }}>NGƯỜI NHẬN TIỀN (THỦ QUỸ / KẾ TOÁN)</strong>
+                    <span style={{ fontSize: '0.7rem', color: '#64748b' }}>(Ký và xác nhận nhận đủ tiền)</span>
+                    <div style={{ height: '50px' }} />
+                    <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>Chờ ký nhận tại quầy</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div style={{ padding: '0.75rem 1.1rem', backgroundColor: '#f8fafc', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <button
+                type="button"
+                onClick={() => printDocument('[data-print-doc="cod-handover"]', { title: 'Phiếu Bàn Giao Tiền COD' })}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
+                  padding: '0.45rem 0.9rem', borderRadius: '6px',
+                  border: '1px solid #cbd5e1', backgroundColor: '#ffffff',
+                  color: '#0f172a', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer'
+                }}
+              >
+                <Printer size={15} />
+                <span>In Biên Bản</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowHandoverModal(false)}
+                style={{
+                  padding: '0.45rem 1rem', borderRadius: '6px',
+                  border: 'none', backgroundColor: '#2563eb',
+                  color: '#ffffff', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer'
+                }}
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

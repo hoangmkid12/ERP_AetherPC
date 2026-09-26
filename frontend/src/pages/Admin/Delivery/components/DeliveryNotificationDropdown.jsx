@@ -35,6 +35,8 @@ export default function DeliveryNotificationDropdown({
         return <Package size={16} color="#10b981" />;
       case 'COD_THRESHOLD':
         return <Wallet size={16} color="#8b5cf6" />;
+      case 'COD_SETTLED':
+        return <CheckCheck size={16} color="#16a34a" />;
       case 'RETURNING_REMINDER':
         return <Building size={16} color="#f97316" />;
       default:
@@ -54,6 +56,8 @@ export default function DeliveryNotificationDropdown({
         return { bg: 'rgba(16, 185, 129, 0.12)', text: '#059669', label: 'ĐƠN MỚI' };
       case 'COD_THRESHOLD':
         return { bg: 'rgba(139, 92, 246, 0.12)', text: '#7c3aed', label: 'TIỀN COD' };
+      case 'COD_SETTLED':
+        return { bg: 'rgba(22, 163, 74, 0.12)', text: '#15803d', label: 'ĐÃ DUYỆT NỘP' };
       case 'RETURNING_REMINDER':
         return { bg: 'rgba(249, 115, 22, 0.12)', text: '#ea580c', label: 'HOÀN KHO' };
       default:

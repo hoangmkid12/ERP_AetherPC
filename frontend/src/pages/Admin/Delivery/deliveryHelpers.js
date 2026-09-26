@@ -672,26 +672,62 @@ export const generateShipperNotifications = (
     });
   }
 
-  // 5. Cảnh báo hạn mức tiền mặt COD đang giữ
+  // 5. Cảnh báo hạn mức tiền mặt COD đang giữ & đối soát nộp tiền
   const deliveredToday = orders.filter(o => {
     if (!o || o.status !== 'DELIVERED' || !isShipperMatched(o)) return false;
-    const isCod = o.paymentMethod === 'COD' || o.actualPaymentMethod === 'COD';
+    const isCod = o.paymentMethod === 'COD' || o.actualPaymentMethod === 'COD' || o.actualPaymentMethod === 'CASH' || (!o.paymentMethod && !o.actualPaymentMethod);
     if (!isCod) return false;
     const d = getOrderDateTime(o);
     return matchesDateFilter(d, { period: 'TODAY' });
   });
 
+  const isOrderSettled = (o) => {
+    if (Array.isArray(o.payments) && o.payments.length > 0) {
+      const cashPayments = o.payments.filter(p => p.method === 'CASH');
+      if (cashPayments.length > 0) {
+        return cashPayments.every(p => p.settledAt !== null);
+      }
+    }
+    return Boolean(o.codSettled || o.settledAt);
+  };
+
+  const settledToday = deliveredToday.filter(isOrderSettled);
+  const pendingToday = deliveredToday.filter(o => !isOrderSettled(o));
+
   const totalCodToday = deliveredToday.reduce((sum, o) => sum + parseFloat(o.totalAmount || o.total || 0), 0);
-  if (totalCodToday >= 3000000) {
-    const id = `notif-cod-limit-${Math.floor(totalCodToday / 1000000)}m-${now.toDateString()}`;
+  const settledCodToday = settledToday.reduce((sum, o) => sum + parseFloat(o.totalAmount || o.total || 0), 0);
+  const pendingCodToday = pendingToday.reduce((sum, o) => sum + parseFloat(o.totalAmount || o.total || 0), 0);
+
+  // 5a. Cảnh báo nếu tiền mặt COD đang giữ vượt ngưỡng an toàn
+  if (pendingCodToday >= 3000000) {
+    const id = `notif-cod-limit-${Math.floor(pendingCodToday / 1000000)}m-${now.toDateString()}`;
     notifs.push({
       id,
       type: 'COD_THRESHOLD',
       category: 'system',
       title: `💵 Nhắc Nhở Hạn Mức Tiền Mặt COD Đang Giữ`,
-      message: `Bạn đang giữ tổng cộng ${totalCodToday.toLocaleString('vi-VN')}đ tiền mặt COD trong ca hôm nay (${deliveredToday.length} đơn). Hãy chú ý an toàn và nộp về thu ngân / kế toán khi hết ca.`,
-      targetTab: 'history',
-      actionText: 'Xem danh sách đơn đã thu tiền',
+      message: `Bạn đang giữ tổng cộng ${pendingCodToday.toLocaleString('vi-VN')}đ tiền mặt COD trong ca hôm nay (${pendingToday.length} đơn). Hãy chú ý an toàn và nộp về thu ngân / kế toán khi hết ca.`,
+      targetTab: 'overview',
+      actionText: 'Xem bảng đối soát ca',
+      timeLabel: 'Hôm nay',
+      isRead: readNotificationIds.has(id),
+      createdAt: now
+    });
+  }
+
+  // 5b. Thông báo Kế toán đã duyệt nộp tiền COD
+  if (settledCodToday > 0) {
+    const lastSettledDate = settledToday[0]?.payments?.find(p => p.settledAt)?.settledAt || now;
+    const timeKey = new Date(lastSettledDate).getHours();
+    const id = `notif-cod-settled-${settledToday.length}-${timeKey}-${now.toDateString()}`;
+    notifs.push({
+      id,
+      type: 'COD_SETTLED',
+      category: 'system',
+      title: `✅ Kế Toán Đã Duyệt Nộp Tiền COD`,
+      message: `Kế toán đã xác nhận nhận đủ ${settledCodToday.toLocaleString('vi-VN')}đ tiền mặt COD (${settledToday.length} đơn). Quỹ ca của bạn đã được đối soát an toàn.`,
+      targetTab: 'overview',
+      actionText: 'Xem biên bản bàn giao ca',
       timeLabel: 'Hôm nay',
       isRead: readNotificationIds.has(id),
       createdAt: now

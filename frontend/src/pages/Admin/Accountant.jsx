@@ -74,6 +74,9 @@ export default function Accountant() {
   // Đối soát COD từ Shipper (accounting_settle_cod) — tiền mặt khách trả khi
   // nhận hàng, shipper đang giữ tới khi Kế Toán thu hồi thật.
   const [codGroups, setCodGroups] = useState([]);
+  const [codHistory, setCodHistory] = useState([]);
+  const [codSubTab, setCodSubTab] = useState('PENDING'); // PENDING | HISTORY
+  const [codSearch, setCodSearch] = useState('');
   const [loadingCod, setLoadingCod] = useState(false);
   const [settlingShipperId, setSettlingShipperId] = useState(null);
 
@@ -82,6 +85,7 @@ export default function Accountant() {
     try {
       const res = await api.get('/ledger/cod-settlement');
       setCodGroups(res.data || []);
+      setCodHistory(res.history || []);
     } catch (err) {
       if (!silent) notify(err?.message || 'Không thể tải danh sách đối soát COD.', 'error');
     } finally {
@@ -1418,85 +1422,318 @@ export default function Accountant() {
       {/* ========================================================================= */}
       {/* TAB: ĐỐI SOÁT COD TỪ SHIPPER (accounting_settle_cod) */}
       {/* ========================================================================= */}
-      {activeTab === 'cod_settlement' && (
-        <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
-            <p style={{ color: '#64748b', fontSize: '0.82rem', margin: 0 }}>
-              Tiền mặt khách trả trực tiếp cho Shipper khi nhận hàng (COD) — Kế Toán xác nhận đã thu hồi tiền mặt thật từ từng shipper.
-            </p>
-            <button
-              onClick={loadCodSettlement}
-              disabled={loadingCod}
-              style={{ backgroundColor: '#ffffff', color: '#334155', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.45rem 0.85rem', fontSize: '0.8rem', fontWeight: 600, cursor: loadingCod ? 'default' : 'pointer', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
-            >
-              <RefreshCw size={14} style={{ animation: loadingCod ? 'spin 1s linear infinite' : 'none' }} />
-              <span>{loadingCod ? 'Đang tải...' : 'Làm Mới'}</span>
-            </button>
-          </div>
+      {activeTab === 'cod_settlement' && (() => {
+        const totalPendingAmount = codGroups.reduce((sum, g) => sum + (Number(g.totalAmount) || 0), 0);
+        const totalPendingOrders = codGroups.reduce((sum, g) => sum + (g.orders?.length || 0), 0);
+        const totalSettledAmount = codHistory.reduce((sum, h) => sum + (Number(h.amount) || 0), 0);
 
-          {loadingCod ? (
-            <div style={{ textAlign: 'center', padding: '2.5rem', color: '#94a3b8' }}>Đang tải...</div>
-          ) : codGroups.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '2.5rem', color: '#94a3b8' }}>
-              Không có khoản COD nào đang chờ đối soát — mọi shipper đã bàn giao đủ tiền mặt.
+        const filteredPendingGroups = codGroups.filter(g => {
+          if (!codSearch.trim()) return true;
+          const q = codSearch.trim().toLowerCase();
+          return (
+            String(g.shipperName || '').toLowerCase().includes(q) ||
+            String(g.shipperCode || '').toLowerCase().includes(q) ||
+            g.orders?.some(o => String(o.orderId || '').toLowerCase().includes(q))
+          );
+        });
+
+        const filteredHistory = codHistory.filter(h => {
+          if (!codSearch.trim()) return true;
+          const q = codSearch.trim().toLowerCase();
+          return (
+            String(h.orderId || '').toLowerCase().includes(q) ||
+            String(h.shipperName || '').toLowerCase().includes(q) ||
+            String(h.customerName || '').toLowerCase().includes(q)
+          );
+        });
+
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+            {/* 3 Overview KPI Cards */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
+              <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1rem 1.25rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#b45309', textTransform: 'uppercase' }}>
+                    Tiền Mặt COD Đang Chờ Thu
+                  </span>
+                  <div style={{ width: '30px', height: '30px', borderRadius: '6px', backgroundColor: '#fef3c7', color: '#d97706', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Truck size={17} />
+                  </div>
+                </div>
+                <div style={{ fontSize: '1.45rem', fontWeight: 900, color: '#b45309', marginTop: '0.35rem' }}>
+                  {fmt(totalPendingAmount)}
+                </div>
+                <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '0.2rem' }}>
+                  {totalPendingOrders} đơn hàng đang giữ bởi {codGroups.length} shipper
+                </div>
+              </div>
+
+              <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1rem 1.25rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#15803d', textTransform: 'uppercase' }}>
+                    Đã Thu Hồi Nhập Quỹ (30 Ngày)
+                  </span>
+                  <div style={{ width: '30px', height: '30px', borderRadius: '6px', backgroundColor: '#dcfce7', color: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <CheckCircle size={17} />
+                  </div>
+                </div>
+                <div style={{ fontSize: '1.45rem', fontWeight: 900, color: '#16a34a', marginTop: '0.35rem' }}>
+                  {fmt(totalSettledAmount)}
+                </div>
+                <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '0.2rem' }}>
+                  Đã đối soát & hạch toán vào sổ cái công ty
+                </div>
+              </div>
+
+              <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1rem 1.25rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#2563eb', textTransform: 'uppercase' }}>
+                    Tỷ Lệ Hoàn Tất Đối Soát
+                  </span>
+                  <div style={{ width: '30px', height: '30px', borderRadius: '6px', backgroundColor: '#dbeafe', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <PieChart size={17} />
+                  </div>
+                </div>
+                <div style={{ fontSize: '1.45rem', fontWeight: 900, color: '#2563eb', marginTop: '0.35rem' }}>
+                  {totalPendingOrders + codHistory.length > 0
+                    ? `${Math.round((codHistory.length / (totalPendingOrders + codHistory.length)) * 100)}%`
+                    : '100%'}
+                </div>
+                <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '0.2rem' }}>
+                  {codHistory.length} / {totalPendingOrders + codHistory.length} đơn COD đã thanh toán
+                </div>
+              </div>
             </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              {codGroups.map(group => {
-                const isBusy = settlingShipperId === group.shipperId;
-                return (
-                  <div key={group.shipperId} style={{ border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.85rem 1rem', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', flexWrap: 'wrap', gap: '0.75rem' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                        <Truck size={17} style={{ color: '#0ea5e9' }} />
-                        <div>
-                          <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.9rem' }}>{group.shipperName}</div>
-                          <div style={{ fontSize: '0.72rem', color: '#64748b' }}>{group.orders.length} đơn COD chưa đối soát</div>
+
+            {/* Main Content Box */}
+            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+                {/* Sub-Tabs: PENDING vs HISTORY */}
+                <div style={{ display: 'inline-flex', backgroundColor: '#f1f5f9', padding: '3px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                  <button
+                    type="button"
+                    onClick={() => setCodSubTab('PENDING')}
+                    style={{
+                      padding: '0.4rem 0.85rem',
+                      borderRadius: '6px',
+                      border: 'none',
+                      fontSize: '0.78rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      backgroundColor: codSubTab === 'PENDING' ? '#ffffff' : 'transparent',
+                      color: codSubTab === 'PENDING' ? '#b45309' : '#64748b',
+                      boxShadow: codSubTab === 'PENDING' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    Chờ Thu Tiền ({codGroups.length} Shipper • {fmt(totalPendingAmount)})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCodSubTab('HISTORY')}
+                    style={{
+                      padding: '0.4rem 0.85rem',
+                      borderRadius: '6px',
+                      border: 'none',
+                      fontSize: '0.78rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      backgroundColor: codSubTab === 'HISTORY' ? '#ffffff' : 'transparent',
+                      color: codSubTab === 'HISTORY' ? '#16a34a' : '#64748b',
+                      boxShadow: codSubTab === 'HISTORY' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    Lịch Sử Đã Thu & Biên Bản ({codHistory.length} Đơn)
+                  </button>
+                </div>
+
+                {/* Search & Actions */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+                  <div style={{ position: 'relative', width: '220px' }}>
+                    <input
+                      type="text"
+                      value={codSearch}
+                      onChange={e => setCodSearch(e.target.value)}
+                      placeholder="Tìm shipper, mã đơn..."
+                      style={{
+                        width: '100%',
+                        padding: '0.38rem 0.75rem',
+                        borderRadius: '6px',
+                        border: '1px solid #cbd5e1',
+                        fontSize: '0.78rem',
+                        outline: 'none'
+                      }}
+                    />
+                    {codSearch && (
+                      <button
+                        type="button"
+                        onClick={() => setCodSearch('')}
+                        style={{
+                          position: 'absolute',
+                          right: '8px',
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          border: 'none',
+                          background: 'transparent',
+                          color: '#94a3b8',
+                          cursor: 'pointer',
+                          fontWeight: 700
+                        }}
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+
+                  {codSubTab === 'HISTORY' && (
+                    <button
+                      type="button"
+                      onClick={() => printDocument('[data-print-doc="cod-settlement"]', { title: 'Biên Bản Đối Soát Thu Hồi Tiền COD' })}
+                      style={{
+                        backgroundColor: '#ffffff',
+                        color: '#0f172a',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: '6px',
+                        padding: '0.38rem 0.75rem',
+                        fontSize: '0.78rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.35rem'
+                      }}
+                    >
+                      <Printer size={14} />
+                      <span>In Biên Bản</span>
+                    </button>
+                  )}
+
+                  <button
+                    onClick={loadCodSettlement}
+                    disabled={loadingCod}
+                    style={{ backgroundColor: '#ffffff', color: '#334155', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.38rem 0.75rem', fontSize: '0.78rem', fontWeight: 600, cursor: loadingCod ? 'default' : 'pointer', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+                  >
+                    <RefreshCw size={13} style={{ animation: loadingCod ? 'spin 1s linear infinite' : 'none' }} />
+                    <span>Làm Mới</span>
+                  </button>
+                </div>
+              </div>
+
+              {loadingCod ? (
+                <div style={{ textAlign: 'center', padding: '2.5rem', color: '#94a3b8' }}>Đang tải dữ liệu...</div>
+              ) : codSubTab === 'PENDING' ? (
+                /* TAB PENDING: Groups of Shippers needing cash handover */
+                filteredPendingGroups.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '2.5rem', color: '#94a3b8' }}>
+                    {codSearch ? 'Không tìm thấy shipper hoặc đơn COD nào phù hợp.' : 'Không có khoản COD nào đang chờ đối soát — mọi shipper đã nộp đủ tiền mặt.'}
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    {filteredPendingGroups.map(group => {
+                      const isBusy = settlingShipperId === group.shipperId;
+                      return (
+                        <div key={group.shipperId} style={{ border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.85rem 1rem', backgroundColor: '#fffbeb', borderBottom: '1px solid #fef3c7', flexWrap: 'wrap', gap: '0.75rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                              <Truck size={18} style={{ color: '#d97706' }} />
+                              <div>
+                                <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.92rem' }}>{group.shipperName}</div>
+                                <div style={{ fontSize: '0.74rem', color: '#b45309' }}>{group.orders.length} đơn COD tiền mặt chưa nộp</div>
+                              </div>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                              <div style={{ textAlign: 'right' }}>
+                                <div style={{ fontSize: '0.72rem', color: '#92400e' }}>Tổng tiền mặt đang giữ</div>
+                                <div style={{ fontWeight: 900, color: '#b45309', fontSize: '1.1rem' }}>{fmt(group.totalAmount)}</div>
+                              </div>
+                              <button
+                                disabled={isBusy}
+                                onClick={() => handleSettleCod(group)}
+                                style={{ backgroundColor: '#16a34a', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.5rem 1rem', fontSize: '0.8rem', fontWeight: 800, cursor: isBusy ? 'default' : 'pointer', opacity: isBusy ? 0.6 : 1, whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+                              >
+                                <CheckCircle size={15} />
+                                {isBusy ? 'Đang xác nhận...' : 'Xác Nhận Đã Thu Tiền'}
+                              </button>
+                            </div>
+                          </div>
+                          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
+                            <thead>
+                              <tr style={{ textAlign: 'left', color: '#64748b', fontSize: '0.72rem', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+                                <th style={{ padding: '0.5rem 1rem' }}>Mã Đơn</th>
+                                <th style={{ padding: '0.5rem 1rem' }}>Khách Hàng & SĐT</th>
+                                <th style={{ padding: '0.5rem 1rem' }}>Địa Chỉ Giao</th>
+                                <th style={{ padding: '0.5rem 1rem' }}>Ngày Giao</th>
+                                <th style={{ padding: '0.5rem 1rem', textAlign: 'right' }}>Số Tiền Thu</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {group.orders.map(o => (
+                                <tr key={o.paymentId} style={{ borderTop: '1px solid #f1f5f9' }}>
+                                  <td style={{ padding: '0.55rem 1rem', fontWeight: 700, color: '#2563eb' }}>#{o.orderId}</td>
+                                  <td style={{ padding: '0.55rem 1rem', color: '#0f172a' }}>
+                                    <div>{o.customerName || 'Khách hàng'}</div>
+                                    {o.customerPhone && <span style={{ fontSize: '0.7rem', color: '#64748b' }}>{o.customerPhone}</span>}
+                                  </td>
+                                  <td style={{ padding: '0.55rem 1rem', color: '#64748b', fontSize: '0.75rem' }}>{o.shippingAddress}</td>
+                                  <td style={{ padding: '0.55rem 1rem', color: '#64748b', fontSize: '0.75rem' }}>{o.deliveredAt ? new Date(o.deliveredAt).toLocaleDateString('vi-VN') : '-'}</td>
+                                  <td style={{ padding: '0.55rem 1rem', textAlign: 'right', fontWeight: 800, color: '#0f172a' }}>{fmt(o.amount)}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
                         </div>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                        <div style={{ textAlign: 'right' }}>
-                          <div style={{ fontSize: '0.72rem', color: '#64748b' }}>Tổng tiền mặt đang giữ</div>
-                          <div style={{ fontWeight: 800, color: '#b45309', fontSize: '1rem' }}>{fmt(group.totalAmount)}</div>
-                        </div>
-                        <button
-                          disabled={isBusy}
-                          onClick={() => handleSettleCod(group)}
-                          style={{ backgroundColor: '#16a34a', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.5rem 1rem', fontSize: '0.8rem', fontWeight: 800, cursor: isBusy ? 'default' : 'pointer', opacity: isBusy ? 0.6 : 1, whiteSpace: 'nowrap' }}
-                        >
-                          {isBusy ? 'Đang xử lý...' : 'Xác Nhận Đã Thu'}
-                        </button>
-                      </div>
+                      );
+                    })}
+                  </div>
+                )
+              ) : (
+                /* TAB HISTORY: Table of settled COD payments */
+                <div data-print-doc="cod-settlement">
+                  {filteredHistory.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '2.5rem', color: '#94a3b8' }}>
+                      Chưa có lịch sử thu tiền COD nào trong 30 ngày qua.
                     </div>
+                  ) : (
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
                       <thead>
-                        <tr style={{ textAlign: 'left', color: '#94a3b8', fontSize: '0.72rem' }}>
-                          <th style={{ padding: '0.5rem 1rem' }}>Mã Đơn</th>
-                          <th style={{ padding: '0.5rem 1rem' }}>Khách Hàng</th>
-                          <th style={{ padding: '0.5rem 1rem' }}>Địa Chỉ Giao</th>
-                          <th style={{ padding: '0.5rem 1rem' }}>Ngày Giao</th>
-                          <th style={{ padding: '0.5rem 1rem', textAlign: 'right' }}>Số Tiền</th>
+                        <tr style={{ textAlign: 'left', color: '#64748b', fontSize: '0.72rem', backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
+                          <th style={{ padding: '0.65rem 0.85rem' }}>Mã Đơn</th>
+                          <th style={{ padding: '0.65rem 0.85rem' }}>Shipper Bàn Giao</th>
+                          <th style={{ padding: '0.65rem 0.85rem' }}>Khách Hàng</th>
+                          <th style={{ padding: '0.65rem 0.85rem', textAlign: 'right' }}>Số Tiền Thu</th>
+                          <th style={{ padding: '0.65rem 0.85rem' }}>Thời Gian Bàn Giao</th>
+                          <th style={{ padding: '0.65rem 0.85rem' }}>Kế Toán Thu Hồi</th>
+                          <th style={{ padding: '0.65rem 0.85rem', textAlign: 'center' }}>Trạng Thái</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {group.orders.map(o => (
-                          <tr key={o.paymentId} style={{ borderTop: '1px solid #f1f5f9' }}>
-                            <td style={{ padding: '0.55rem 1rem', fontWeight: 700, color: '#0f172a' }}>#{o.orderId}</td>
-                            <td style={{ padding: '0.55rem 1rem', color: '#475569' }}>{o.customerName || 'Khách hàng'}</td>
-                            <td style={{ padding: '0.55rem 1rem', color: '#64748b', fontSize: '0.75rem' }}>{o.shippingAddress}</td>
-                            <td style={{ padding: '0.55rem 1rem', color: '#64748b', fontSize: '0.75rem' }}>{o.deliveredAt ? new Date(o.deliveredAt).toLocaleDateString('vi-VN') : '-'}</td>
-                            <td style={{ padding: '0.55rem 1rem', textAlign: 'right', fontWeight: 700, color: '#0f172a' }}>{fmt(o.amount)}</td>
+                        {filteredHistory.map(h => (
+                          <tr key={h.paymentId} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                            <td style={{ padding: '0.65rem 0.85rem', fontWeight: 700, color: '#2563eb' }}>#{h.orderId}</td>
+                            <td style={{ padding: '0.65rem 0.85rem', fontWeight: 700, color: '#0f172a' }}>{h.shipperName}</td>
+                            <td style={{ padding: '0.65rem 0.85rem', color: '#475569' }}>{h.customerName || 'Khách hàng'}</td>
+                            <td style={{ padding: '0.65rem 0.85rem', textAlign: 'right', fontWeight: 800, color: '#16a34a' }}>{fmt(h.amount)}</td>
+                            <td style={{ padding: '0.65rem 0.85rem', color: '#64748b', fontSize: '0.75rem' }}>
+                              {h.settledAt ? new Date(h.settledAt).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' }) : '-'}
+                            </td>
+                            <td style={{ padding: '0.65rem 0.85rem', color: '#0f172a', fontWeight: 600 }}>{h.settledBy || 'Kế toán viên'}</td>
+                            <td style={{ padding: '0.65rem 0.85rem', textAlign: 'center' }}>
+                              <span style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '0.68rem', fontWeight: 800, backgroundColor: '#dcfce7', color: '#15803d', border: '1px solid #86efac' }}>
+                                ĐÃ NHẬP QUỸ
+                              </span>
+                            </td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
-                  </div>
-                );
-              })}
+                  )}
+                </div>
+              )}
             </div>
-          )}
-        </div>
-      )}
+          </div>
+        );
+      })()}
 
       {/* ========================================================================= */}
       {/* TAB 4: PAYROLL DISBURSEMENT (CHI TRẢ BẢNG LƯƠNG) */}

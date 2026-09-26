@@ -506,6 +506,17 @@ const getCustomerOrders = async (req, res, next) => {
         statusHistory: {
           take: 1,
           orderBy: { timestamp: 'desc' }
+        },
+        payments: {
+          select: {
+            id: true,
+            method: true,
+            amount: true,
+            status: true,
+            settledAt: true,
+            settledBy: true,
+            createdAt: true
+          }
         }
       },
       orderBy: { createdAt: 'desc' }
