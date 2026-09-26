@@ -6,6 +6,8 @@ import { api } from '../../services/api';
 import useSafeViewportHeight from '../../hooks/useSafeViewportHeight';
 import { detectDeliveryRegion, DELIVERY_REGIONS } from '../../utils/deliveryRegions';
 import { Home, Package, Truck, Undo2, History, Bell, LogOut, MessageCircle, X, Send } from 'lucide-react';
+import DeliveryNotificationSheet from '../../pages/Admin/Delivery/components/DeliveryNotificationSheet';
+import { generateShipperNotifications } from '../../pages/Admin/Delivery/deliveryHelpers';
 
 const TABS = [
   { id: 'overview', label: 'Tổng Quan', icon: Home },
@@ -136,6 +138,46 @@ export default function DeliveryAppShell({ children }) {
   const [hasUnreadChat, setHasUnreadChat] = useState(false);
   const chatWsRef = useRef(null);
   const chatMessagesEndRef = useRef(null);
+
+  // ── Thông báo thông minh cho Shipper (Hẹn giờ, Trễ hẹn, Đơn mới, Tiền mặt COD)
+  const [showNotifications, setShowNotifications] = useState(false);
+  const READ_NOTIFS_KEY = `aether_shipper_read_notifs_${userIdStr || 'unknown'}`;
+  const [readNotifIds, setReadNotifIds] = useState(() => {
+    try {
+      return new Set(JSON.parse(localStorage.getItem(READ_NOTIFS_KEY) || '[]'));
+    } catch (_) { return new Set(); }
+  });
+
+  const notifications = React.useMemo(() => {
+    return generateShipperNotifications(orders, user, readNotifIds);
+  }, [orders, user, readNotifIds]);
+
+  const unreadCount = notifications.filter(n => !n.isRead).length;
+  const hasUrgentLate = notifications.some(n => n.type === 'LATE_WARNING' && !n.isRead);
+
+  const handleMarkAllAsRead = () => {
+    const allIds = notifications.map(n => n.id);
+    const newSet = new Set([...readNotifIds, ...allIds]);
+    setReadNotifIds(newSet);
+    try {
+      localStorage.setItem(READ_NOTIFS_KEY, JSON.stringify([...newSet]));
+    } catch (_) {}
+  };
+
+  const handleNotificationClick = (notif) => {
+    const newSet = new Set(readNotifIds);
+    newSet.add(notif.id);
+    setReadNotifIds(newSet);
+    try {
+      localStorage.setItem(READ_NOTIFS_KEY, JSON.stringify([...newSet]));
+    } catch (_) {}
+
+    setShowNotifications(false);
+
+    if (notif.targetTab) {
+      navigate(`/admin/delivery?tab=${notif.targetTab}${notif.orderId ? `&highlight=${notif.orderId}` : ''}`);
+    }
+  };
 
   useEffect(() => {
     let reconnectTimeout = null;
@@ -295,22 +337,24 @@ export default function DeliveryAppShell({ children }) {
             </button>
             <button
               type="button"
-              onClick={() => navigate('/admin/delivery?tab=pending')}
+              onClick={() => setShowNotifications(true)}
               className="delivery-icon-btn"
-              title="Thông báo"
+              title="Thông báo giao hàng"
               style={{ position: 'relative' }}
             >
-              <Bell size={19} />
-              {totalDeliveryTasks > 0 && (
+              <Bell size={19} color={hasUrgentLate ? 'var(--danger)' : undefined} />
+              {unreadCount > 0 && (
                 <span style={{
                   position: 'absolute', top: '2px', right: '2px',
                   minWidth: '15px', height: '15px', borderRadius: '999px',
-                  backgroundColor: 'var(--danger)', color: '#fff',
+                  backgroundColor: hasUrgentLate ? 'var(--danger)' : 'var(--primary)',
+                  color: '#fff',
                   fontSize: '0.6rem', fontWeight: 800,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  padding: '0 3px', lineHeight: 1
+                  padding: '0 3px', lineHeight: 1,
+                  boxShadow: hasUrgentLate ? '0 0 8px rgba(239, 68, 68, 0.6)' : 'none'
                 }}>
-                  {totalDeliveryTasks > 99 ? '99+' : totalDeliveryTasks}
+                  {unreadCount > 99 ? '99+' : unreadCount}
                 </span>
               )}
             </button>
@@ -435,6 +479,16 @@ export default function DeliveryAppShell({ children }) {
           </div>
         </div>
       )}
+
+      {/* Delivery Notifications Sheet */}
+      <DeliveryNotificationSheet
+        isOpen={showNotifications}
+        onClose={() => setShowNotifications(false)}
+        notifications={notifications}
+        unreadCount={unreadCount}
+        onMarkAllAsRead={handleMarkAllAsRead}
+        onNotificationClick={handleNotificationClick}
+      />
     </div>
   );
 }

@@ -522,3 +522,200 @@ export const getDateFilterLabel = (filterConfig) => {
       return 'Tất Cả';
   }
 };
+
+/**
+ * Generate intelligent, actionable notifications for the Shipper notification bell
+ * Scans orders for:
+ *  1. Late appointment warnings (High priority)
+ *  2. Upcoming appointment reminders
+ *  3. Rescheduled orders for today's shift
+ *  4. New ready orders at warehouse
+ *  5. Cash COD collection threshold alerts
+ *  6. Returning orders that need handover
+ */
+export const generateShipperNotifications = (
+  orders = [],
+  user = null,
+  readNotificationIds = new Set()
+) => {
+  const notifs = [];
+  const now = new Date();
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+  const uName = String(user?.fullname || user?.name || '').toLowerCase();
+  const uUser = String(user?.username || '').toLowerCase();
+  const uPhone = String(user?.phone || '').replace(/\D/g, '');
+  const userIdStr = String(user?.id || user?.username || '').toLowerCase();
+  const shipperRegion = user?.deliveryRegion || 'HCM_KV1';
+
+  const isShipperMatched = (o) => {
+    if (!o) return false;
+    const shipperStr = String(o.assignedShipper || o.assignedShipperName || '').toLowerCase();
+    const assignedIdStr = String(o.assignedShipperId || o.assignedShipperUsername || '').toLowerCase();
+
+    const isDirectlyAssigned = (assignedIdStr && (
+        assignedIdStr === userIdStr ||
+        assignedIdStr === uUser ||
+        (user?.id && assignedIdStr === String(user.id).toLowerCase())
+      )) ||
+      (uName && shipperStr && shipperStr.includes(uName)) ||
+      (uUser && shipperStr && shipperStr.includes(uUser)) ||
+      (uPhone && shipperStr && shipperStr.includes(uPhone));
+
+    if (isDirectlyAssigned) return true;
+    if (o.assignedShipperId || o.assignedShipper || o.assignedShipperUsername) return false;
+
+    if (shipperRegion === 'ALL') return true;
+    const orderRegion = o.deliveryRegion || detectDeliveryRegion(o.shippingAddress || o.address || '');
+    return orderRegion === shipperRegion;
+  };
+
+  const assignedActiveOrders = orders.filter(o =>
+    o && ['SHIPPED', 'SHIPPING_FAILED', 'RETURNING_TO_WAREHOUSE'].includes(o.status) && isShipperMatched(o)
+  );
+
+  const readyOrders = orders.filter(o =>
+    o && o.status === 'READY_TO_SHIP' && isShipperMatched(o)
+  );
+
+  // 1. Cảnh báo trễ hẹn (Late Warnings)
+  assignedActiveOrders.forEach(ord => {
+    if (ord.status === 'SHIPPED') {
+      const apt = getAppointmentInfo(ord);
+      if (apt.hasAppointment && apt.isToday && apt.isLate) {
+        const id = `notif-late-${ord.orderId || ord.id}`;
+        const minLate = apt.endMinutes ? Math.max(1, currentMinutes - apt.endMinutes) : 0;
+        notifs.push({
+          id,
+          type: 'LATE_WARNING',
+          category: 'urgent',
+          title: `⚠️ Cảnh Báo Trễ Giờ Hẹn (${apt.timeWindow})`,
+          message: `Đơn #${ord.orderId || ord.id} của khách ${ord.customer?.name || ord.customerName || 'khách'} đã quá hạn ~${minLate} phút. Hãy ưu tiên ghé giao ngay để tránh khách khiếu nại!`,
+          orderId: ord.orderId || ord.id,
+          targetTab: 'active',
+          actionText: 'Xem đơn & Đi giao ngay',
+          timeLabel: `Trễ ~${minLate}p`,
+          isRead: readNotificationIds.has(id),
+          createdAt: now
+        });
+      }
+    }
+  });
+
+  // 2. Nhắc sắp tới giờ hẹn (Upcoming Appointments)
+  assignedActiveOrders.forEach(ord => {
+    if (ord.status === 'SHIPPED') {
+      const apt = getAppointmentInfo(ord);
+      if (apt.hasAppointment && apt.isToday && !apt.isLate) {
+        const isApproaching = apt.startMinutes != null && (
+          (currentMinutes >= apt.startMinutes - 60 && currentMinutes <= apt.endMinutes) ||
+          apt.isUpcoming
+        );
+        if (isApproaching) {
+          const id = `notif-upcoming-${ord.orderId || ord.id}`;
+          const minLeft = apt.startMinutes > currentMinutes ? (apt.startMinutes - currentMinutes) : 0;
+          notifs.push({
+            id,
+            type: 'UPCOMING_APPOINTMENT',
+            category: 'urgent',
+            title: `⏰ Sắp Đến Khung Giờ Hẹn (${apt.timeWindow})`,
+            message: `Đơn #${ord.orderId || ord.id} (${ord.customer?.name || ord.customerName || 'khách'}) hẹn giao ${apt.timeWindow} chiều nay${minLeft > 0 ? ` (còn ~${minLeft}p)` : ''}. Hãy sắp xếp tuyến đường để tới đúng giờ!`,
+            orderId: ord.orderId || ord.id,
+            targetTab: 'active',
+            actionText: 'Kiểm tra tuyến đường & ETA',
+            timeLabel: `Khung ${apt.timeWindow}`,
+            isRead: readNotificationIds.has(id),
+            createdAt: now
+          });
+        }
+      }
+    }
+  });
+
+  // 3. Đơn giao lại có lịch hẹn hôm nay (Rescheduled for today)
+  assignedActiveOrders.forEach(ord => {
+    if (ord.status === 'SHIPPING_FAILED') {
+      const apt = getAppointmentInfo(ord);
+      if (apt.isToday || (ord.notes?.includes('GIAO_LAI') || ord.failNote?.includes('GIAO_LAI'))) {
+        const id = `notif-rescheduled-${ord.orderId || ord.id}`;
+        notifs.push({
+          id,
+          type: 'RESCHEDULED_TODAY',
+          category: 'urgent',
+          title: `🔄 Khách Hẹn Giao Lại Hôm Nay${apt.hasAppointment ? ` (${apt.timeWindow})` : ''}`,
+          message: `Đơn #${ord.orderId || ord.id} (${ord.customer?.name || ord.customerName || 'khách'}) có hẹn giao lại trong ca hôm nay. Bấm nút "Giao Tiếp Theo Hẹn" để bắt đầu chuyến!`,
+          orderId: ord.orderId || ord.id,
+          targetTab: 'active',
+          actionText: 'Bấm giao tiếp theo hẹn',
+          timeLabel: apt.hasAppointment ? apt.timeWindow : 'Ca hôm nay',
+          isRead: readNotificationIds.has(id),
+          createdAt: now
+        });
+      }
+    }
+  });
+
+  // 4. Đơn hàng mới sẵn sàng tại kho (New Warehouse Orders)
+  if (readyOrders.length > 0) {
+    const id = `notif-ready-warehouse-${readyOrders.length}-${now.toDateString()}`;
+    notifs.push({
+      id,
+      type: 'NEW_ORDER',
+      category: 'new',
+      title: `📦 ${readyOrders.length} Đơn Hàng Mới Sẵn Sàng Tại Kho`,
+      message: `Kho AetherPC vừa xuất ${readyOrders.length} kiện hàng mới cho khu vực của bạn. Hãy kiểm tra và bấm "Nhận Chuyến" để bắt đầu giao!`,
+      targetTab: 'pending',
+      actionText: 'Xem danh sách Chờ Nhận',
+      timeLabel: 'Mới xuất kho',
+      isRead: readNotificationIds.has(id),
+      createdAt: now
+    });
+  }
+
+  // 5. Cảnh báo hạn mức tiền mặt COD đang giữ
+  const deliveredToday = orders.filter(o => {
+    if (!o || o.status !== 'DELIVERED' || !isShipperMatched(o)) return false;
+    const isCod = o.paymentMethod === 'COD' || o.actualPaymentMethod === 'COD';
+    if (!isCod) return false;
+    const d = getOrderDateTime(o);
+    return matchesDateFilter(d, { period: 'TODAY' });
+  });
+
+  const totalCodToday = deliveredToday.reduce((sum, o) => sum + parseFloat(o.totalAmount || o.total || 0), 0);
+  if (totalCodToday >= 3000000) {
+    const id = `notif-cod-limit-${Math.floor(totalCodToday / 1000000)}m-${now.toDateString()}`;
+    notifs.push({
+      id,
+      type: 'COD_THRESHOLD',
+      category: 'system',
+      title: `💵 Nhắc Nhở Hạn Mức Tiền Mặt COD Đang Giữ`,
+      message: `Bạn đang giữ tổng cộng ${totalCodToday.toLocaleString('vi-VN')}đ tiền mặt COD trong ca hôm nay (${deliveredToday.length} đơn). Hãy chú ý an toàn và nộp về thu ngân / kế toán khi hết ca.`,
+      targetTab: 'history',
+      actionText: 'Xem danh sách đơn đã thu tiền',
+      timeLabel: 'Hôm nay',
+      isRead: readNotificationIds.has(id),
+      createdAt: now
+    });
+  }
+
+  // 6. Nhắc nhở hoàn kho (Returning Orders)
+  const returningOrders = assignedActiveOrders.filter(o => o.status === 'RETURNING_TO_WAREHOUSE');
+  if (returningOrders.length > 0) {
+    const id = `notif-returning-${returningOrders.length}-${now.toDateString()}`;
+    notifs.push({
+      id,
+      type: 'RETURNING_REMINDER',
+      category: 'system',
+      title: `🏢 ${returningOrders.length} Kiện Hàng Cần Bàn Giao Hoàn Kho`,
+      message: `Bạn có ${returningOrders.length} đơn hàng giao thất bại cần chuyển hoàn về kho và chụp ảnh minh chứng bàn giao cho thủ kho.`,
+      targetTab: 'active',
+      actionText: 'Xem danh sách hoàn kho',
+      timeLabel: 'Trong ca',
+      isRead: readNotificationIds.has(id),
+      createdAt: now
+    });
+  }
+
+  return notifs;
+};
+
