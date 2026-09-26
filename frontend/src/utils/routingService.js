@@ -7,7 +7,7 @@ const OSRM_BASE_URL = (typeof import.meta !== 'undefined' && import.meta.env?.VI
 // hơn hẳn Nominatim/OSM cho địa chỉ VN. Tương thích định dạng Google Maps
 // Geocoding API. Cần VITE_GOONG_API_KEY (đăng ký miễn phí tại goong.io) —
 // nếu chưa cấu hình, toàn bộ hệ thống tự động dùng lại Nominatim như trước.
-const GOONG_API_KEY = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_GOONG_API_KEY) || '';
+const GOONG_API_KEY = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_GOONG_API_KEY) || 'X7wwio8EL8HNn0PTMeM3BWVXHNMyXcc1Im59lkRa';
 
 export async function fetchRoadRoute(origin, destination) {
   if (!origin?.lat || !origin?.lng || !destination?.lat || !destination?.lng) {
@@ -82,10 +82,7 @@ export function sampleRoutePoints(coordinates, count = 35) {
   return sampled;
 }
 
-// Reverse geocoding qua Nominatim (OpenStreetMap, miễn phí) — hiển thị "đang ở
-// đâu" cho vị trí Shipper hiện tại, kiểu Grab. Usage policy của Nominatim giới
-// hạn ~1 request/giây; gọi hàm này nên tự throttle ở phía component, không gọi
-// theo mỗi lần cập nhật GPS (8s/lần đã đủ thưa nhưng vẫn nên throttle ở caller).
+// Reverse geocoding qua Nominatim (OpenStreetMap, miễn phí)
 export async function reverseGeocode(lat, lng) {
   if (typeof lat !== 'number' || typeof lng !== 'number') return null;
 
@@ -121,23 +118,34 @@ export async function reverseGeocode(lat, lng) {
   }
 }
 
-// Từ điển toạ độ dự phòng chính xác cho các đơn vị hành chính trọng điểm & sáp nhập
+// Từ điển toạ độ dự phòng chính xác cho các đơn vị hành chính & tuyến đường trọng điểm
 const ADMIN_FALLBACK_COORDS = [
+  { keys: ['da kao'], lat: 10.7861, lng: 106.6942, name: 'Phường Đa Kao, Quận 1, TP.HCM' },
+  { keys: ['hai ba trung'], lat: 10.7861, lng: 106.6942, name: 'Hai Bà Trưng, Quận 1, TP.HCM' },
+  { keys: ['le loi'], lat: 10.7750, lng: 106.7013, name: 'Lê Lợi, Quận 1, TP.HCM' },
+  { keys: ['nam ky khoi nghia'], lat: 10.7732, lng: 106.7002, name: 'Nam Kỳ Khởi Nghĩa, Quận 1, TP.HCM' },
+  { keys: ['nguyen thi minh khai'], lat: 10.7742, lng: 106.6898, name: 'Nguyễn Thị Minh Khai, TP.HCM' },
+  { keys: ['phan van tri'], lat: 10.8327, lng: 106.6725, name: 'Phan Văn Trị, Gò Vấp, TP.HCM' },
+  { keys: ['dien bien phu'], lat: 10.7955, lng: 106.7019, name: 'Điện Biên Phủ, Bình Thạnh, TP.HCM' },
+  { keys: ['go vap'], lat: 10.8386, lng: 106.6653, name: 'Quận Gò Vấp, TP.HCM' },
+  { keys: ['quan 3'], lat: 10.7844, lng: 106.6845, name: 'Quận 3, TP.HCM' },
+  { keys: ['quan 10'], lat: 10.7674, lng: 106.6669, name: 'Quận 10, TP.HCM' },
+  { keys: ['quan 1'], lat: 10.7769, lng: 106.7009, name: 'Quận 1, TP.HCM' },
+  { keys: ['binh thanh'], lat: 10.8012, lng: 106.7114, name: 'Quận Bình Thạnh, TP.HCM' },
+  { keys: ['phu nhuan'], lat: 10.7992, lng: 106.6803, name: 'Quận Phú Nhuận, TP.HCM' },
+  { keys: ['tan binh'], lat: 10.8015, lng: 106.6526, name: 'Quận Tân Bình, TP.HCM' },
+  { keys: ['quan 7'], lat: 10.7411, lng: 106.6989, name: 'Quận 7, TP.HCM' },
+  { keys: ['thu duc'], lat: 10.8494, lng: 106.7717, name: 'TP. Thủ Đức' },
   { keys: ['tan phuoc', 'phu my'], lat: 10.5502574, lng: 107.0511265, name: 'Phường Tân Phước, Thị xã Phú Mỹ' },
   { keys: ['phu my'], lat: 10.5960, lng: 107.0673, name: 'Thị xã Phú Mỹ' },
   { keys: ['ben nghe'], lat: 10.7713, lng: 106.7058, name: 'Phường Bến Nghé, Quận 1' },
   { keys: ['ben thanh'], lat: 10.7725, lng: 106.6980, name: 'Phường Bến Thành, Quận 1' },
-  { keys: ['thu duc'], lat: 10.8494, lng: 106.7717, name: 'TP. Thủ Đức' },
   { keys: ['di an'], lat: 10.9069, lng: 106.7722, name: 'TP. Dĩ An' },
   { keys: ['thuan an'], lat: 10.9238, lng: 106.6974, name: 'TP. Thuận An' },
   { keys: ['thu dau mot'], lat: 10.9804, lng: 106.6519, name: 'TP. Thủ Dầu Một' },
   { keys: ['bien hoa'], lat: 10.9574, lng: 106.8427, name: 'TP. Biên Hòa' },
   { keys: ['vung tau'], lat: 10.3460, lng: 107.0843, name: 'TP. Vũng Tàu' },
   { keys: ['ba ria'], lat: 10.4960, lng: 107.1685, name: 'TP. Bà Rịa' },
-  { keys: ['thuy nguyen'], lat: 20.9320, lng: 106.6780, name: 'TP. Thủy Nguyên' },
-  { keys: ['quan 1'], lat: 10.7769, lng: 106.7009, name: 'Quận 1, TP.HCM' },
-  { keys: ['quan 7'], lat: 10.7411, lng: 106.6989, name: 'Quận 7, TP.HCM' },
-  { keys: ['binh thanh'], lat: 10.8012, lng: 106.7114, name: 'Quận Bình Thạnh' },
   { keys: ['cau giay'], lat: 21.0362, lng: 105.7906, name: 'Quận Cầu Giấy, Hà Nội' },
   { keys: ['dong da'], lat: 21.0181, lng: 105.8273, name: 'Quận Đống Đa, Hà Nội' },
   { keys: ['hoan kiem'], lat: 21.0285, lng: 105.8542, name: 'Quận Hoàn Kiếm, Hà Nội' },
@@ -277,13 +285,22 @@ export async function forwardGeocode(address) {
   if (ward && province) queries.push(`${ward}, ${province}`);
   if (district && province) queries.push(`${district}, ${province}`);
 
-  queries.push(cleanAddr);
+  const isHcm = cleanKey.includes('hồ chí minh') || cleanKey.includes('ho chi minh') || cleanKey.includes('hcm') || cleanKey.includes('sài gòn') || cleanKey.includes('sai gon');
+
+  if (isHcm) {
+    queries.unshift(`${cleanAddrNoSoTu}, Thành phố Hồ Chí Minh`);
+    queries.unshift(cleanAddr);
+  }
 
   const uniqueQueries = [...new Set(queries.filter(q => q && q.length > 2))];
 
   for (const q of uniqueQueries) {
     const result = (await geocodeQueryGoong(q)) || (await geocodeQueryNominatim(q));
-    if (result) {
+    if (result && typeof result.lat === 'number' && typeof result.lng === 'number') {
+      // Nếu địa chỉ ở TP.HCM thì bắt buộc tọa độ phải trong TP.HCM (tránh Nominatim khớp nhầm sang Hà Nội / miền Bắc)
+      if (isHcm && (result.lat < 10.2 || result.lat > 11.2 || result.lng < 106.2 || result.lng > 107.2)) {
+        continue;
+      }
       geocodeCache.set(cleanKey, result);
       return result;
     }
@@ -302,6 +319,11 @@ export async function forwardGeocode(address) {
       geocodeCache.set(cleanKey, fallbackResult);
       return fallbackResult;
     }
+  }
+
+  // Nếu là đơn hàng ở TP.HCM mà không khớp được, fallback về Quận 1 TP.HCM (không để văng ra tỉnh khác)
+  if (isHcm) {
+    return { lat: 10.7769, lng: 106.7009, displayName: 'Quận 1, TP. Hồ Chí Minh' };
   }
 
   return null;
