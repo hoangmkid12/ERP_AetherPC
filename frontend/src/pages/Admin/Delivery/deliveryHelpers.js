@@ -333,12 +333,19 @@ export const matchesDateFilter = (dateVal, filterConfig) => {
     }
 
     case 'CUSTOM': {
-      if (customStartDate) {
-        const s = new Date(customStartDate + 'T00:00:00');
+      let startStr = customStartDate;
+      let endStr = customEndDate;
+      if (startStr && endStr && startStr > endStr) {
+        const tmp = startStr;
+        startStr = endStr;
+        endStr = tmp;
+      }
+      if (startStr) {
+        const s = new Date(startStr + 'T00:00:00');
         if (!isNaN(s.getTime()) && d < s) return false;
       }
-      if (customEndDate) {
-        const e = new Date(customEndDate + 'T23:59:59.999');
+      if (endStr) {
+        const e = new Date(endStr + 'T23:59:59.999');
         if (!isNaN(e.getTime()) && d > e) return false;
       }
       return true;
@@ -381,8 +388,23 @@ export const getDateFilterLabel = (filterConfig) => {
     }
     case 'SPECIFIC_YEAR':
       return `Năm ${filterConfig.selectedYear}`;
-    case 'CUSTOM':
-      return `${filterConfig.customStartDate || '...'} → ${filterConfig.customEndDate || '...'}`;
+    case 'CUSTOM': {
+      const formatDate = (isoStr) => {
+        if (!isoStr) return '';
+        const parts = isoStr.split('-');
+        if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
+        return isoStr;
+      };
+      if (filterConfig.customStartDate && filterConfig.customEndDate) {
+        if (filterConfig.customStartDate === filterConfig.customEndDate) {
+          return `Ngày ${formatDate(filterConfig.customStartDate)}`;
+        }
+        return `${formatDate(filterConfig.customStartDate)} → ${formatDate(filterConfig.customEndDate)}`;
+      }
+      if (filterConfig.customStartDate) return `Từ ${formatDate(filterConfig.customStartDate)}`;
+      if (filterConfig.customEndDate) return `Đến ${formatDate(filterConfig.customEndDate)}`;
+      return 'Tất Cả';
+    }
     default:
       return 'Tất Cả';
   }

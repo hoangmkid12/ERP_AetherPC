@@ -4,6 +4,7 @@ import OrderCard from './components/OrderCard';
 import FilterSheet from './components/FilterSheet';
 import DateFilterControl from './components/DateFilterControl';
 import RouteOptimizerPanel from './components/RouteOptimizerPanel';
+import { getDateFilterLabel } from './deliveryHelpers';
 
 const PAGE_SIZE = 25;
 
@@ -30,7 +31,8 @@ export default function ActiveTab({
     sortOrder, setSortOrder
   } = filterState;
 
-  const hasActiveFilters = search || regionFilter !== 'ALL' || paymentFilter !== 'ALL' || incidentFilter !== 'ALL' || (orderDateFilter && orderDateFilter.period !== 'TODAY') || sortOrder !== 'NEWEST';
+  const todayStr = new Date().toISOString().split('T')[0];
+  const hasActiveFilters = search || regionFilter !== 'ALL' || paymentFilter !== 'ALL' || incidentFilter !== 'ALL' || (orderDateFilter && orderDateFilter.period !== 'ALL') || sortOrder !== 'NEWEST';
 
   const resetFilters = () => {
     setSearch('');
@@ -39,10 +41,10 @@ export default function ActiveTab({
     setIncidentFilter('ALL');
     if (setOrderDateFilter) {
       setOrderDateFilter({
-        period: 'TODAY',
-        selectedDate: new Date().toISOString().split('T')[0],
-        selectedMonth: new Date().toISOString().slice(0, 7),
-        selectedYear: String(new Date().getFullYear()),
+        period: 'ALL',
+        selectedDate: '',
+        selectedMonth: '',
+        selectedYear: '',
         customStartDate: '',
         customEndDate: ''
       });
@@ -52,12 +54,22 @@ export default function ActiveTab({
 
   const handlePillClick = (tabId) => {
     if (tabId === 'TODAY') {
-      if (setOrderDateFilter) setOrderDateFilter(prev => ({ ...prev, period: 'TODAY' }));
+      if (setOrderDateFilter) setOrderDateFilter(prev => ({
+        ...prev,
+        period: 'TODAY',
+        customStartDate: todayStr,
+        customEndDate: todayStr
+      }));
       setIncidentFilter('ALL');
     } else if (tabId === 'BACKLOG') {
       setIncidentFilter('BACKLOG');
     } else if (tabId === 'ALL') {
-      if (setOrderDateFilter) setOrderDateFilter(prev => ({ ...prev, period: 'ALL' }));
+      if (setOrderDateFilter) setOrderDateFilter(prev => ({
+        ...prev,
+        period: 'ALL',
+        customStartDate: '',
+        customEndDate: ''
+      }));
       setIncidentFilter('ALL');
     } else {
       setIncidentFilter(tabId);
@@ -160,7 +172,7 @@ export default function ActiveTab({
         </div>
 
         <span style={{ fontSize: '0.68rem', color: 'var(--primary)', fontWeight: 600 }}>
-          {orderDateFilter?.period === 'TODAY' ? 'Thời gian: Hôm nay' : (orderDateFilter?.period === 'ALL' ? 'Thời gian: Tất cả' : `Lọc: ${orderDateFilter?.period}`)}
+          Thời gian: {getDateFilterLabel(orderDateFilter)}
         </span>
       </div>
 
@@ -263,13 +275,25 @@ export default function ActiveTab({
                 onClick={() => handlePillClick(tab.id)}
                 style={{
                   padding: '0.3rem 0.65rem', borderRadius: '999px', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer',
-                  border: (incidentFilter === tab.id || (tab.id === 'TODAY' && orderDateFilter?.period === 'TODAY' && incidentFilter === 'ALL') || (tab.id === 'ALL' && orderDateFilter?.period === 'ALL' && incidentFilter === 'ALL'))
+                  border: (
+                    incidentFilter === tab.id ||
+                    (tab.id === 'TODAY' && (orderDateFilter?.period === 'TODAY' || (orderDateFilter?.customStartDate === todayStr && orderDateFilter?.customEndDate === todayStr)) && incidentFilter === 'ALL') ||
+                    (tab.id === 'ALL' && (orderDateFilter?.period === 'ALL' || (!orderDateFilter?.customStartDate && !orderDateFilter?.customEndDate)) && incidentFilter === 'ALL')
+                  )
                     ? '1.5px solid var(--primary)'
                     : '1px solid var(--border-glass)',
-                  backgroundColor: (incidentFilter === tab.id || (tab.id === 'TODAY' && orderDateFilter?.period === 'TODAY' && incidentFilter === 'ALL') || (tab.id === 'ALL' && orderDateFilter?.period === 'ALL' && incidentFilter === 'ALL'))
+                  backgroundColor: (
+                    incidentFilter === tab.id ||
+                    (tab.id === 'TODAY' && (orderDateFilter?.period === 'TODAY' || (orderDateFilter?.customStartDate === todayStr && orderDateFilter?.customEndDate === todayStr)) && incidentFilter === 'ALL') ||
+                    (tab.id === 'ALL' && (orderDateFilter?.period === 'ALL' || (!orderDateFilter?.customStartDate && !orderDateFilter?.customEndDate)) && incidentFilter === 'ALL')
+                  )
                     ? 'rgba(37,99,235,0.1)'
                     : 'var(--bg-primary)',
-                  color: (incidentFilter === tab.id || (tab.id === 'TODAY' && orderDateFilter?.period === 'TODAY' && incidentFilter === 'ALL') || (tab.id === 'ALL' && orderDateFilter?.period === 'ALL' && incidentFilter === 'ALL'))
+                  color: (
+                    incidentFilter === tab.id ||
+                    (tab.id === 'TODAY' && (orderDateFilter?.period === 'TODAY' || (orderDateFilter?.customStartDate === todayStr && orderDateFilter?.customEndDate === todayStr)) && incidentFilter === 'ALL') ||
+                    (tab.id === 'ALL' && (orderDateFilter?.period === 'ALL' || (!orderDateFilter?.customStartDate && !orderDateFilter?.customEndDate)) && incidentFilter === 'ALL')
+                  )
                     ? 'var(--primary)'
                     : 'var(--text-secondary)'
                 }}

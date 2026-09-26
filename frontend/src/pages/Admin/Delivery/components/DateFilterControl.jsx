@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Calendar, ChevronDown, Check, Clock } from 'lucide-react';
+import { Calendar, ChevronDown, X } from 'lucide-react';
 import { getDateFilterLabel } from '../deliveryHelpers';
 
 const selectStyle = {
@@ -22,6 +22,74 @@ const labelStyle = {
   marginBottom: '0.25rem'
 };
 
+const toIsoDateString = (d) => {
+  if (!d) return '';
+  const dateObj = d instanceof Date ? d : new Date(d);
+  if (isNaN(dateObj.getTime())) return '';
+  const y = dateObj.getFullYear();
+  const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+  const day = String(dateObj.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+};
+
+const getEffectiveDateRange = (df, now) => {
+  if (!df) return { start: '', end: '' };
+  const todayStr = toIsoDateString(now);
+
+  if (df.period === 'TODAY') {
+    return {
+      start: df.customStartDate || todayStr,
+      end: df.customEndDate || todayStr
+    };
+  }
+  if (df.period === 'YESTERDAY') {
+    const y = new Date(now);
+    y.setDate(y.getDate() - 1);
+    const yStr = toIsoDateString(y);
+    return {
+      start: df.customStartDate || yStr,
+      end: df.customEndDate || yStr
+    };
+  }
+  if (df.period === 'THIS_WEEK') {
+    const day = now.getDay();
+    const diffToMonday = (day === 0 ? -6 : 1) - day;
+    const monday = new Date(now);
+    monday.setDate(monday.getDate() + diffToMonday);
+    return {
+      start: df.customStartDate || toIsoDateString(monday),
+      end: df.customEndDate || todayStr
+    };
+  }
+  if (df.period === 'THIS_MONTH') {
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    return {
+      start: df.customStartDate || toIsoDateString(startOfMonth),
+      end: df.customEndDate || toIsoDateString(endOfMonth)
+    };
+  }
+  if (df.period === 'SPECIFIC_DATE') {
+    return {
+      start: df.selectedDate || '',
+      end: df.selectedDate || ''
+    };
+  }
+  if (df.period === 'CUSTOM') {
+    return {
+      start: df.customStartDate || '',
+      end: df.customEndDate || ''
+    };
+  }
+  if (df.period === 'ALL') {
+    return { start: '', end: '' };
+  }
+  return {
+    start: df.customStartDate || '',
+    end: df.customEndDate || ''
+  };
+};
+
 export default function DateFilterControl({
   dateFilter,
   onChange,
@@ -31,51 +99,157 @@ export default function DateFilterControl({
   const [showCustomModal, setShowCustomModal] = useState(false);
 
   const now = new Date();
-  const currentYear = now.getFullYear();
-  const yearOptions = [currentYear + 1, currentYear, currentYear - 1, currentYear - 2, currentYear - 3];
+  const todayStr = toIsoDateString(now);
 
-  const handlePeriodChange = (newPeriod) => {
-    const updated = { ...dateFilter, period: newPeriod };
-    if (newPeriod === 'SPECIFIC_DATE' && !updated.selectedDate) {
-      const y = now.getFullYear();
-      const m = String(now.getMonth() + 1).padStart(2, '0');
-      const d = String(now.getDate()).padStart(2, '0');
-      updated.selectedDate = `${y}-${m}-${d}`;
-    }
-    if (newPeriod === 'SPECIFIC_MONTH' && !updated.selectedMonth) {
-      const y = now.getFullYear();
-      const m = String(now.getMonth() + 1).padStart(2, '0');
-      updated.selectedMonth = `${y}-${m}`;
-    }
-    if (newPeriod === 'SPECIFIC_YEAR' && !updated.selectedYear) {
-      updated.selectedYear = String(currentYear);
-    }
-    onChange(updated);
-    if (onQuickSelect) onQuickSelect(newPeriod);
+  const yDate = new Date(now);
+  yDate.setDate(yDate.getDate() - 1);
+  const yesterdayStr = toIsoDateString(yDate);
+
+  const past7 = new Date(now);
+  past7.setDate(past7.getDate() - 6);
+  const past7Str = toIsoDateString(past7);
+
+  const monthStartStr = toIsoDateString(new Date(now.getFullYear(), now.getMonth(), 1));
+  const monthEndStr = toIsoDateString(new Date(now.getFullYear(), now.getMonth() + 1, 0));
+
+  const currentRange = getEffectiveDateRange(dateFilter, now);
+
+  const handleStartDateChange = (val) => {
+    const nextStart = val;
+    const nextEnd = currentRange.end;
+    const isBothEmpty = !nextStart && !nextEnd;
+    onChange({
+      ...dateFilter,
+      period: isBothEmpty ? 'ALL' : 'CUSTOM',
+      customStartDate: nextStart,
+      customEndDate: nextEnd
+    });
   };
+
+  const handleEndDateChange = (val) => {
+    const nextStart = currentRange.start;
+    const nextEnd = val;
+    const isBothEmpty = !nextStart && !nextEnd;
+    onChange({
+      ...dateFilter,
+      period: isBothEmpty ? 'ALL' : 'CUSTOM',
+      customStartDate: nextStart,
+      customEndDate: nextEnd
+    });
+  };
+
+  const handleClearDate = () => {
+    onChange({
+      ...dateFilter,
+      period: 'ALL',
+      customStartDate: '',
+      customEndDate: '',
+      selectedDate: '',
+      selectedMonth: '',
+      selectedYear: ''
+    });
+    if (onQuickSelect) onQuickSelect('ALL');
+  };
+
+  const quickPresets = [
+    {
+      id: 'ALL',
+      label: 'Tất Cả',
+      action: handleClearDate,
+      isActive: dateFilter?.period === 'ALL' || (!currentRange.start && !currentRange.end)
+    },
+    {
+      id: 'TODAY',
+      label: 'Hôm Nay',
+      action: () => {
+        onChange({
+          ...dateFilter,
+          period: 'TODAY',
+          customStartDate: todayStr,
+          customEndDate: todayStr
+        });
+        if (onQuickSelect) onQuickSelect('TODAY');
+      },
+      isActive: dateFilter?.period === 'TODAY' || (currentRange.start === todayStr && currentRange.end === todayStr)
+    },
+    {
+      id: 'YESTERDAY',
+      label: 'Hôm Qua',
+      action: () => {
+        onChange({
+          ...dateFilter,
+          period: 'CUSTOM',
+          customStartDate: yesterdayStr,
+          customEndDate: yesterdayStr
+        });
+        if (onQuickSelect) onQuickSelect('YESTERDAY');
+      },
+      isActive: dateFilter?.period === 'YESTERDAY' || (currentRange.start === yesterdayStr && currentRange.end === yesterdayStr)
+    },
+    {
+      id: '7DAYS',
+      label: '7 Ngày Qua',
+      action: () => {
+        onChange({
+          ...dateFilter,
+          period: 'CUSTOM',
+          customStartDate: past7Str,
+          customEndDate: todayStr
+        });
+        if (onQuickSelect) onQuickSelect('7DAYS');
+      },
+      isActive: currentRange.start === past7Str && currentRange.end === todayStr
+    },
+    {
+      id: 'THIS_MONTH',
+      label: 'Tháng Này',
+      action: () => {
+        onChange({
+          ...dateFilter,
+          period: 'CUSTOM',
+          customStartDate: monthStartStr,
+          customEndDate: monthEndStr
+        });
+        if (onQuickSelect) onQuickSelect('THIS_MONTH');
+      },
+      isActive: dateFilter?.period === 'THIS_MONTH' || (currentRange.start === monthStartStr && currentRange.end === monthEndStr)
+    }
+  ];
 
   // --- Inline Bar (Used on Top of OverviewTab or Tabs) ---
   if (variant === 'inline') {
-    const quickItems = [
+    const inlineItems = [
       { id: 'TODAY', label: 'Hôm Nay' },
       { id: 'THIS_MONTH', label: 'Tháng Này' },
       { id: 'THIS_YEAR', label: 'Năm Nay' },
       { id: 'ALL', label: 'Tất Cả' }
     ];
 
-    const isCustomActive = !quickItems.some(item => item.id === dateFilter.period);
+    const isCustomActive = !inlineItems.some(item => item.id === dateFilter.period);
 
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.4rem', flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', flex: 1 }}>
-            {quickItems.map(item => {
+            {inlineItems.map(item => {
               const active = dateFilter.period === item.id;
               return (
                 <button
                   key={item.id}
                   type="button"
-                  onClick={() => handlePeriodChange(item.id)}
+                  onClick={() => {
+                    if (item.id === 'ALL') handleClearDate();
+                    else if (item.id === 'TODAY') {
+                      onChange({ ...dateFilter, period: 'TODAY', customStartDate: todayStr, customEndDate: todayStr });
+                      if (onQuickSelect) onQuickSelect('TODAY');
+                    } else if (item.id === 'THIS_MONTH') {
+                      onChange({ ...dateFilter, period: 'THIS_MONTH', customStartDate: monthStartStr, customEndDate: monthEndStr });
+                      if (onQuickSelect) onQuickSelect('THIS_MONTH');
+                    } else {
+                      onChange({ ...dateFilter, period: item.id });
+                      if (onQuickSelect) onQuickSelect(item.id);
+                    }
+                  }}
                   style={{
                     padding: '0.35rem 0.7rem',
                     borderRadius: '20px',
@@ -113,13 +287,13 @@ export default function DateFilterControl({
               }}
             >
               <Calendar size={12} />
-              <span>{isCustomActive ? getDateFilterLabel(dateFilter) : 'Tùy Chọn...'}</span>
+              <span>{isCustomActive ? getDateFilterLabel(dateFilter) : 'Chọn Ngày...'}</span>
               <ChevronDown size={11} />
             </button>
           </div>
         </div>
 
-        {/* Inline Extended Filter Drawer / Card */}
+        {/* Inline Extended Filter Drawer */}
         {showCustomModal && (
           <div style={{
             backgroundColor: 'var(--bg-primary)',
@@ -133,8 +307,9 @@ export default function DateFilterControl({
             boxShadow: '0 4px 12px rgba(0,0,0,0.06)'
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-primary)' }}>
-                Bộ Lọc Thời Gian Chi Tiết
+              <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                <Calendar size={13} style={{ color: 'var(--primary)' }} />
+                Chọn Khoảng Thời Gian
               </span>
               <button
                 type="button"
@@ -145,179 +320,138 @@ export default function DateFilterControl({
               </button>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.5rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
               <div>
-                <label style={labelStyle}>Lọc theo</label>
-                <select
-                  value={dateFilter.period}
-                  onChange={e => handlePeriodChange(e.target.value)}
-                  style={selectStyle}
-                >
-                  <option value="TODAY">Hôm Nay (Realtime)</option>
-                  <option value="YESTERDAY">Hôm Qua</option>
-                  <option value="THIS_WEEK">Tuần Này</option>
-                  <option value="SPECIFIC_DATE">Theo Ngày Cụ Thể</option>
-                  <option value="THIS_MONTH">Tháng Này</option>
-                  <option value="SPECIFIC_MONTH">Theo Tháng Cụ Thể</option>
-                  <option value="THIS_YEAR">Năm Nay</option>
-                  <option value="SPECIFIC_YEAR">Theo Năm Cụ Thể</option>
-                  <option value="CUSTOM">Khoảng Ngày Tùy Chọn</option>
-                  <option value="ALL">Tất Cả Thời Gian</option>
-                </select>
+                <span style={{ display: 'block', fontSize: '0.68rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.2rem' }}>Từ ngày</span>
+                <input
+                  type="date"
+                  value={currentRange.start}
+                  onChange={e => handleStartDateChange(e.target.value)}
+                  style={{ ...selectStyle, padding: '0.45rem 0.5rem' }}
+                />
               </div>
-
-              {dateFilter.period === 'SPECIFIC_DATE' && (
-                <div>
-                  <label style={labelStyle}>Chọn ngày</label>
-                  <input
-                    type="date"
-                    value={dateFilter.selectedDate || ''}
-                    onChange={e => onChange({ ...dateFilter, selectedDate: e.target.value })}
-                    style={selectStyle}
-                  />
-                </div>
-              )}
-
-              {dateFilter.period === 'SPECIFIC_MONTH' && (
-                <div>
-                  <label style={labelStyle}>Chọn tháng</label>
-                  <input
-                    type="month"
-                    value={dateFilter.selectedMonth || ''}
-                    onChange={e => onChange({ ...dateFilter, selectedMonth: e.target.value })}
-                    style={selectStyle}
-                  />
-                </div>
-              )}
-
-              {dateFilter.period === 'SPECIFIC_YEAR' && (
-                <div>
-                  <label style={labelStyle}>Chọn năm</label>
-                  <select
-                    value={dateFilter.selectedYear || String(currentYear)}
-                    onChange={e => onChange({ ...dateFilter, selectedYear: e.target.value })}
-                    style={selectStyle}
-                  >
-                    {yearOptions.map(y => (
-                      <option key={y} value={String(y)}>Năm {y}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
+              <div>
+                <span style={{ display: 'block', fontSize: '0.68rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.2rem' }}>Đến ngày</span>
+                <input
+                  type="date"
+                  value={currentRange.end}
+                  onChange={e => handleEndDateChange(e.target.value)}
+                  style={{ ...selectStyle, padding: '0.45rem 0.5rem' }}
+                />
+              </div>
             </div>
 
-            {dateFilter.period === 'CUSTOM' && (
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <div style={{ flex: 1 }}>
-                  <label style={labelStyle}>Từ ngày</label>
-                  <input
-                    type="date"
-                    value={dateFilter.customStartDate || ''}
-                    onChange={e => onChange({ ...dateFilter, customStartDate: e.target.value })}
-                    style={selectStyle}
-                  />
-                </div>
-                <div style={{ flex: 1 }}>
-                  <label style={labelStyle}>Đến ngày</label>
-                  <input
-                    type="date"
-                    value={dateFilter.customEndDate || ''}
-                    onChange={e => onChange({ ...dateFilter, customEndDate: e.target.value })}
-                    style={selectStyle}
-                  />
-                </div>
-              </div>
-            )}
+            <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap' }}>
+              {quickPresets.map(preset => (
+                <button
+                  key={preset.id}
+                  type="button"
+                  onClick={preset.action}
+                  style={{
+                    padding: '0.2rem 0.55rem',
+                    borderRadius: '999px',
+                    fontSize: '0.68rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    border: preset.isActive ? '1.5px solid var(--primary)' : '1px solid var(--border-glass)',
+                    backgroundColor: preset.isActive ? 'rgba(37,99,235,0.1)' : 'var(--bg-primary)',
+                    color: preset.isActive ? 'var(--primary)' : 'var(--text-secondary)'
+                  }}
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
           </div>
         )}
       </div>
     );
   }
 
-  // --- Form Sheet (Used inside FilterSheet) ---
+  // --- Form Sheet (Used inside FilterSheet for ActiveTab, HistoryTab, ReturnsTab) ---
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
-      <div>
-        <label style={labelStyle}>Khoảng thời gian</label>
-        <select
-          value={dateFilter.period}
-          onChange={e => handlePeriodChange(e.target.value)}
-          style={selectStyle}
-        >
-          <option value="TODAY">Hôm Nay (Realtime)</option>
-          <option value="YESTERDAY">Hôm Qua</option>
-          <option value="THIS_WEEK">Tuần Này</option>
-          <option value="SPECIFIC_DATE">Theo Ngày Cụ Thể...</option>
-          <option value="THIS_MONTH">Tháng Này</option>
-          <option value="SPECIFIC_MONTH">Theo Tháng Cụ Thể...</option>
-          <option value="THIS_YEAR">Năm Nay</option>
-          <option value="SPECIFIC_YEAR">Theo Năm Cụ Thể...</option>
-          <option value="CUSTOM">Khoảng Ngày Tùy Chọn...</option>
-          <option value="ALL">Tất Cả Thời Gian</option>
-        </select>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <label style={{ ...labelStyle, marginBottom: 0, display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+          <Calendar size={13} style={{ color: 'var(--primary)' }} />
+          Khoảng thời gian
+        </label>
+        {(currentRange.start || currentRange.end || dateFilter?.period !== 'ALL') && (
+          <button
+            type="button"
+            onClick={handleClearDate}
+            style={{
+              background: 'none',
+              border: 'none',
+              fontSize: '0.72rem',
+              color: 'var(--primary)',
+              fontWeight: 700,
+              cursor: 'pointer',
+              padding: '0 0.2rem'
+            }}
+          >
+            Xóa ngày
+          </button>
+        )}
       </div>
 
-      {dateFilter.period === 'SPECIFIC_DATE' && (
+      {/* Date Pickers: Từ ngày - Đến ngày */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
         <div>
-          <label style={labelStyle}><Calendar size={11} /> Chọn ngày cụ thể</label>
+          <span style={{ display: 'block', fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.2rem' }}>
+            Từ ngày
+          </span>
           <input
             type="date"
-            value={dateFilter.selectedDate || ''}
-            onChange={e => onChange({ ...dateFilter, selectedDate: e.target.value })}
-            style={selectStyle}
+            value={currentRange.start}
+            onChange={e => handleStartDateChange(e.target.value)}
+            style={{
+              ...selectStyle,
+              padding: '0.5rem 0.55rem',
+              cursor: 'pointer'
+            }}
           />
         </div>
-      )}
-
-      {dateFilter.period === 'SPECIFIC_MONTH' && (
         <div>
-          <label style={labelStyle}><Calendar size={11} /> Chọn tháng cụ thể</label>
+          <span style={{ display: 'block', fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.2rem' }}>
+            Đến ngày
+          </span>
           <input
-            type="month"
-            value={dateFilter.selectedMonth || ''}
-            onChange={e => onChange({ ...dateFilter, selectedMonth: e.target.value })}
-            style={selectStyle}
+            type="date"
+            value={currentRange.end}
+            onChange={e => handleEndDateChange(e.target.value)}
+            style={{
+              ...selectStyle,
+              padding: '0.5rem 0.55rem',
+              cursor: 'pointer'
+            }}
           />
         </div>
-      )}
+      </div>
 
-      {dateFilter.period === 'SPECIFIC_YEAR' && (
-        <div>
-          <label style={labelStyle}><Calendar size={11} /> Chọn năm</label>
-          <select
-            value={dateFilter.selectedYear || String(currentYear)}
-            onChange={e => onChange({ ...dateFilter, selectedYear: e.target.value })}
-            style={selectStyle}
+      {/* Quick preset buttons */}
+      <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', marginTop: '0.15rem' }}>
+        {quickPresets.map(preset => (
+          <button
+            key={preset.id}
+            type="button"
+            onClick={preset.action}
+            style={{
+              padding: '0.25rem 0.6rem',
+              borderRadius: '999px',
+              fontSize: '0.72rem',
+              fontWeight: 700,
+              cursor: 'pointer',
+              transition: 'all 0.15s ease',
+              border: preset.isActive ? '1.5px solid var(--primary)' : '1px solid var(--border-glass)',
+              backgroundColor: preset.isActive ? 'rgba(37,99,235,0.1)' : 'var(--bg-primary)',
+              color: preset.isActive ? 'var(--primary)' : 'var(--text-secondary)'
+            }}
           >
-            {yearOptions.map(y => (
-              <option key={y} value={String(y)}>Năm {y}</option>
-            ))}
-          </select>
-        </div>
-      )}
-
-      {dateFilter.period === 'CUSTOM' && (
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
-          <div style={{ flex: 1 }}>
-            <label style={labelStyle}><Calendar size={11} /> Từ ngày</label>
-            <input
-              type="date"
-              value={dateFilter.customStartDate || ''}
-              onChange={e => onChange({ ...dateFilter, customStartDate: e.target.value })}
-              style={selectStyle}
-            />
-          </div>
-          <div style={{ flex: 1 }}>
-            <label style={labelStyle}>Đến ngày</label>
-            <input
-              type="date"
-              value={dateFilter.customEndDate || ''}
-              onChange={e => onChange({ ...dateFilter, customEndDate: e.target.value })}
-              style={selectStyle}
-            />
-          </div>
-        </div>
-      )}
+            {preset.label}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
