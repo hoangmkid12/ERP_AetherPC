@@ -934,9 +934,10 @@ const updateOrderStatus = async (req, res, next) => {
             receiverNameActual: receiverName
           } : {}),
           ...(status === 'SHIPPED' ? {
-            shippedAt: existingOrder.shippedAt || new Date(),
+            shippedAt: req.body.shippedAt ? new Date(req.body.shippedAt) : (existingOrder.shippedAt || new Date()),
             failReason: null,
-            failNote: null,
+            failNote: req.body.failNote !== undefined ? req.body.failNote : null,
+            ...(req.body.notes !== undefined ? { notes: req.body.notes } : {}),
             ...(!isNaN(parseFloat(req.body.lat)) && !isNaN(parseFloat(req.body.lng)) ? {
               lastLat: parseFloat(req.body.lat),
               lastLng: parseFloat(req.body.lng),

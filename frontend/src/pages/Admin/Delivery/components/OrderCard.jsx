@@ -1,6 +1,6 @@
 import React from 'react';
-import { Truck, Clock, Eye, Navigation, Phone, MapPin } from 'lucide-react';
-import { getDeliveryIncidentStatus } from '../deliveryHelpers';
+import { Truck, Clock, Eye, Navigation, Phone, MapPin, RotateCcw } from 'lucide-react';
+import { getDeliveryIncidentStatus, isOrderRedelivery } from '../deliveryHelpers';
 
 // Shared full-width mobile card used by PendingTab / ActiveTab / HistoryTab.
 // `variant` controls which action buttons render:
@@ -44,9 +44,21 @@ export default function OrderCard({ order: ord, variant, fmt, getOrderTimeClassi
     >
       {/* Header row */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem', gap: '0.5rem' }}>
-        <span style={{ fontSize: '0.9rem', fontWeight: 800, color: isDelivered ? 'var(--success)' : 'var(--primary)' }}>
-          #{orderId}
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: '0.9rem', fontWeight: 800, color: isDelivered ? 'var(--success)' : 'var(--primary)' }}>
+            #{orderId}
+          </span>
+          {isOrderRedelivery(ord) && (
+            <span style={{
+              display: 'inline-flex', alignItems: 'center', gap: '3px',
+              padding: '2px 7px', borderRadius: '4px', fontSize: '0.66rem', fontWeight: 800,
+              backgroundColor: 'rgba(234, 88, 12, 0.12)', color: '#ea580c', border: '1px solid rgba(234, 88, 12, 0.3)'
+            }}>
+              <RotateCcw size={10} />
+              Giao Lại
+            </span>
+          )}
+        </div>
         <span style={{
           padding: '2px 8px', borderRadius: '4px', fontSize: '0.68rem', fontWeight: 800,
           backgroundColor: statusBadge.bg, color: statusBadge.color, whiteSpace: 'nowrap'
@@ -83,7 +95,15 @@ export default function OrderCard({ order: ord, variant, fmt, getOrderTimeClassi
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '0.55rem' }}>
         <Clock size={12} />
-        <span>{isDelivered ? `Đã giao: ${timeInfo.formatted}` : isAwaiting ? 'Chờ khách gọi lại (24h)' : timeInfo.formatted}</span>
+        <span>
+          {isDelivered 
+            ? `Đã giao: ${timeInfo.formatted}` 
+            : isAwaiting 
+              ? 'Chờ khách gọi lại (24h)' 
+              : isOrderRedelivery(ord) 
+                ? `Giao lại hôm nay: ${timeInfo.formatted}` 
+                : timeInfo.formatted}
+        </span>
       </div>
 
       {/* COD box */}

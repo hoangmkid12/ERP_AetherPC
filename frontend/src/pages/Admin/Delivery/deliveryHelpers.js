@@ -178,11 +178,28 @@ export const getDeliveryIncidentStatus = (ord) => {
 };
 
 /**
+ * Check if an order is in a re-delivery / resumed delivery cycle
+ */
+export const isOrderRedelivery = (ord) => {
+  if (!ord) return false;
+  if (ord.isRedelivery) return true;
+  if (ord.resumedAt) return true;
+  if (typeof ord.notes === 'string' && ord.notes.includes('GIAO_LAI')) return true;
+  if (typeof ord.failNote === 'string' && ord.failNote.includes('GIAO_LAI')) return true;
+  if (typeof ord.failReason === 'string' && ord.failReason.includes('GIAO_LAI')) return true;
+  return false;
+};
+
+/**
  * Extract the most relevant Date object from an Order
  */
 export const getOrderDateTime = (ord) => {
   if (!ord) return null;
-  const dateVal = ord.deliveredAt || ord.shippedAt || ord.confirmedAt || ord.updatedAt || ord.createdAt || ord.packedAt || ord.date;
+  const isRedeliv = isOrderRedelivery(ord);
+  // For redelivered orders, prioritize resumedAt or shippedAt to place it in today's active shift
+  const dateVal = (isRedeliv && ord.resumedAt)
+    ? ord.resumedAt
+    : (ord.deliveredAt || ord.shippedAt || ord.confirmedAt || ord.updatedAt || ord.createdAt || ord.packedAt || ord.date);
   if (!dateVal) return null;
   if (typeof dateVal === 'string' && dateVal.includes('/')) {
     const parts = dateVal.split(/[\/\s:]+/);

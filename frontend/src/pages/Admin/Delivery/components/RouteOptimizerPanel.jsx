@@ -5,6 +5,7 @@ import { api } from '../../../../services/api';
 import { forwardGeocode, fetchMultiStopRoute } from '../../../../utils/routingService';
 import { goongjs, GOONG_STYLE_URL } from '../../../../utils/mapIcons';
 import OriginAddressPicker from './OriginAddressPicker';
+import { isOrderRedelivery } from '../deliveryHelpers';
 
 // Màu gradient cho từng số thứ tự
 const SEQ_COLORS = [
@@ -297,6 +298,8 @@ export default function RouteOptimizerPanel({
           paymentMethod: ord.paymentMethod,
           lat: ord.lat,
           lng: ord.lng,
+          isRedelivery: isOrderRedelivery(ord),
+          notes: ord.notes,
           durationFromPrevMinutes: Math.round(stop.durationFromPrev / 60),
           estimatedArrival: new Date(now.getTime() + cumSeconds * 1000).toISOString(),
           distanceFromPrevKm: +((stop.durationFromPrev / 3600) * 20).toFixed(1)
@@ -728,11 +731,20 @@ export default function RouteOptimizerPanel({
                       <MapPin size={10} style={{ display: 'inline', marginRight: '0.2rem' }} />
                       {stop.shippingAddress}
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.25rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', marginTop: '0.25rem', flexWrap: 'wrap' }}>
                       <span style={{ fontSize: '0.7rem', fontWeight: 700, color: stop.paymentMethod === 'COD' ? '#ea580c' : 'var(--success)' }}>
                         {stop.paymentMethod === 'COD' ? `💵 COD ${formatCurrency(stop.totalAmount)}` : `✅ Đã TT`}
                       </span>
                       <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>#{stop.orderId}</span>
+                      {isOrderRedelivery(stop) && (
+                        <span style={{
+                          display: 'inline-flex', alignItems: 'center', gap: '2px',
+                          padding: '1px 5px', borderRadius: '3px', fontSize: '0.62rem', fontWeight: 800,
+                          backgroundColor: 'rgba(234, 88, 12, 0.12)', color: '#ea580c', border: '1px solid rgba(234, 88, 12, 0.25)'
+                        }}>
+                          <RotateCcw size={9} /> Giao lại
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>

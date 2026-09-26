@@ -20,7 +20,7 @@ import OrderDetailSheet from './components/OrderDetailSheet';
 import DeliveryNavigationModal from './components/DeliveryNavigationModal';
 import RejectAssignmentSheet from './components/RejectAssignmentSheet';
 import NextOrderPromptModal from './components/NextOrderPromptModal';
-import { getDeliveryIncidentStatus, getDefaultDateFilter, matchesDateFilter, getOrderDateTime, getDateFilterLabel } from './deliveryHelpers';
+import { getDeliveryIncidentStatus, getDefaultDateFilter, matchesDateFilter, getOrderDateTime, getDateFilterLabel, isOrderRedelivery } from './deliveryHelpers';
 
 // Refetch orders/returns while the tab is visible, paused otherwise.
 const POLL_INTERVAL_MS = 35000;
@@ -271,10 +271,13 @@ export default function Delivery() {
   };
 
   const getOrderTimeClassification = (ord) => {
-    const dateVal = ord.deliveredAt || ord.shippedAt || ord.updatedAt || ord.createdAt || ord.packedAt || ord.date;
-    if (!dateVal) return { isToday: false, isNew: false, isBacklog: true, label: 'Đơn Cũ' };
+    const isRedeliv = isOrderRedelivery(ord);
+    const dateVal = (isRedeliv && ord.resumedAt)
+      ? ord.resumedAt
+      : (ord.deliveredAt || ord.shippedAt || ord.updatedAt || ord.createdAt || ord.packedAt || ord.date);
+    if (!dateVal) return { isToday: false, isNew: false, isBacklog: true, isRedelivery: false, label: 'Đơn Cũ' };
     const d = new Date(dateVal);
-    if (isNaN(d.getTime())) return { isToday: false, isNew: false, isBacklog: true, label: 'Đơn Cũ' };
+    if (isNaN(d.getTime())) return { isToday: false, isNew: false, isBacklog: true, isRedelivery: false, label: 'Đơn Cũ' };
 
     const now = new Date();
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
@@ -282,13 +285,14 @@ export default function Delivery() {
     const diffHours = (now.getTime() - d.getTime()) / (1000 * 60 * 60);
 
     const isToday = d >= startOfToday && d <= endOfToday;
-    const isNew = isToday && diffHours <= 3;
-    const isBacklog = d < startOfToday;
+    const isNew = isToday && diffHours <= 3 && !isRedeliv;
+    const isBacklog = !isToday && d < startOfToday;
 
     return {
       isToday,
       isNew,
       isBacklog,
+      isRedelivery: isRedeliv,
       dateObj: d,
       formatted: d.toLocaleDateString('vi-VN') + ' ' + d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
     };
@@ -508,17 +512,25 @@ export default function Delivery() {
   };
 
   const handleResumeDelivery = async (orderId) => {
+    const matched = (orders || []).find(o => String(o.orderId || o.id) === String(orderId));
+    const nowIso = new Date().toISOString();
+    const existingNotes = matched?.notes || '';
+    const updatedNotes = existingNotes.includes('[GIAO_LAI]') ? existingNotes : `${existingNotes ? existingNotes + ' ' : ''}[GIAO_LAI]`;
+
     const extra = {
       isAwaitingCallback: false,
       failReason: '',
       failNote: '',
-      resumedAt: new Date().toISOString()
+      resumedAt: nowIso,
+      shippedAt: nowIso,
+      notes: updatedNotes,
+      isRedelivery: true
     };
     setApiOrders(prev => prev.map(o => (String(o.orderId || o.id) === String(orderId) ? { ...o, status: 'SHIPPED', ...extra } : o)));
     try {
       await updateOrderStatus(orderId, 'SHIPPED', extra);
       setIncidentFilter('ALL');
-      addNotification(`Đơn #${orderId} đã được kích hoạt lại! Bạn có thể tiếp tục đi giao và chụp ảnh POD.`, 'success', '/admin/delivery?tab=active');
+      addNotification(`Đơn #${orderId} đã được chuyển vào ca giao hôm nay! Đơn đã sẵn sàng để tối ưu lộ trình và đi giao.`, 'success', '/admin/delivery?tab=active');
     } catch (err) {
       addNotification(`Lỗi kích hoạt lại đơn #${orderId}: ${err.message}`, 'error');
     } finally {
@@ -606,10 +618,21 @@ export default function Delivery() {
   };
 
   const handleRedeliver = async (orderId) => {
-    setApiOrders(prev => prev.map(o => (String(o.orderId || o.id) === String(orderId) ? { ...o, status: 'SHIPPED' } : o)));
+    const matched = (orders || []).find(o => String(o.orderId || o.id) === String(orderId));
+    const nowIso = new Date().toISOString();
+    const existingNotes = matched?.notes || '';
+    const updatedNotes = existingNotes.includes('[GIAO_LAI]') ? existingNotes : `${existingNotes ? existingNotes + ' ' : ''}[GIAO_LAI]`;
+
+    const extra = {
+      resumedAt: nowIso,
+      shippedAt: nowIso,
+      notes: updatedNotes,
+      isRedelivery: true
+    };
+    setApiOrders(prev => prev.map(o => (String(o.orderId || o.id) === String(orderId) ? { ...o, status: 'SHIPPED', ...extra } : o)));
     try {
-      await updateOrderStatus(orderId, 'SHIPPED');
-      addNotification(`Đã chuyển đơn #${orderId} lại trạng thái đang giao`, 'info');
+      await updateOrderStatus(orderId, 'SHIPPED', extra);
+      addNotification(`Đã chuyển đơn #${orderId} vào ca giao hôm nay để tối ưu lộ trình`, 'info');
     } catch (err) {
       addNotification(`Lỗi chuyển đơn #${orderId}: ${err.message}`, 'error');
     } finally {

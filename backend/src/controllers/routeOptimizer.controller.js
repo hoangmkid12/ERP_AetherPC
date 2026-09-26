@@ -113,6 +113,8 @@ exports.optimizeRoute = async (req, res) => {
         customerName: true,
         totalAmount: true,
         paymentMethod: true,
+        notes: true,
+        failNote: true
       }
     });
 
@@ -158,6 +160,7 @@ exports.optimizeRoute = async (req, res) => {
       const eta = new Date(now.getTime() + cumulativeSeconds * 1000);
       const ord = orders[stop.index - 1];
       const coord = orderCoords[stop.index - 1];
+      const isRedeliv = Boolean(ord.notes?.includes('GIAO_LAI') || ord.failNote?.includes('GIAO_LAI'));
 
       return {
         sequence: seq + 1,
@@ -168,6 +171,8 @@ exports.optimizeRoute = async (req, res) => {
         paymentMethod: ord.paymentMethod,
         lat: coord.lat,
         lng: coord.lng,
+        isRedelivery: isRedeliv,
+        notes: ord.notes,
         durationFromPrevSeconds: stop.durationFromPrev,
         durationFromPrevMinutes: Math.round(stop.durationFromPrev / 60),
         estimatedArrival: eta.toISOString(),
