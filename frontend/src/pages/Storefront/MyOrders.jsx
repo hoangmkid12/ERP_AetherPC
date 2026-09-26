@@ -32,8 +32,8 @@ export default function MyOrders() {
   const [confirmingReceivedId, setConfirmingReceivedId] = useState(null);
 
   useEffect(() => {
-    if (typeof getOrders === 'function') getOrders().catch(() => {});
-    if (typeof getReturnRequests === 'function') getReturnRequests().catch(() => {});
+    if (typeof getOrders === 'function') getOrders().catch(() => { });
+    if (typeof getReturnRequests === 'function') getReturnRequests().catch(() => { });
   }, [getOrders, getReturnRequests]);
 
   // Tự động kiểm tra các đơn đã giao (DELIVERED) quá 48h -> tự động chuyển COMPLETED (nhận thành công)
@@ -46,7 +46,7 @@ export default function MyOrders() {
         const deliveredTime = o.deliveredAt ? new Date(o.deliveredAt).getTime() : (o.date ? new Date(o.date).getTime() : null);
         if (deliveredTime && (now - deliveredTime >= fortyEightHoursMs)) {
           if (typeof confirmReceivedOrder === 'function') {
-            confirmReceivedOrder(o.orderId, 'Hệ thống tự động chuyển Hoàn tất sau 48h').catch(() => {});
+            confirmReceivedOrder(o.orderId, 'Hệ thống tự động chuyển Hoàn tất sau 48h').catch(() => { });
           }
         }
       }
@@ -76,7 +76,7 @@ export default function MyOrders() {
       setConfirmingReceivedId(null);
     }
   };
-  
+
   // Edit Order Modal State
   const [showEditModal, setShowEditModal] = useState(false);
   const [editForm, setEditForm] = useState({ customerName: '', phone: '', shippingAddress: '', notes: '' });
@@ -139,7 +139,7 @@ export default function MyOrders() {
           return r;
         });
         localStorage.setItem('erp_return_requests', JSON.stringify(updatedList));
-      } catch (_) {}
+      } catch (_) { }
 
       notify('Cảm ơn bạn đã xác nhận đã nhận đủ tiền hoàn 100%.', 'success');
     }
@@ -315,7 +315,7 @@ export default function MyOrders() {
           if (res.data?.lastLocation) setLivePosition(res.data.lastLocation);
         }
       })
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => { if (!cancelled) setTrackingLoading(false); });
 
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -361,8 +361,8 @@ export default function MyOrders() {
     }
 
     // Check if order has an associated ReturnRequest
-    const allMatchingRmas = typeof order === 'object' ? (returnRequests || []).filter(r => 
-      String(r.orderId) === String(order?.orderId) || 
+    const allMatchingRmas = typeof order === 'object' ? (returnRequests || []).filter(r =>
+      String(r.orderId) === String(order?.orderId) ||
       String(r.id) === String(order?.orderId) ||
       (order?.originalOrderId && String(r.orderId) === String(order?.originalOrderId)) ||
       (isExcOrder && String(order?.orderId).replace('ORD-EXC-', 'ORD-') === String(r.orderId)) ||
@@ -661,8 +661,8 @@ export default function MyOrders() {
               <span style={{ color: '#991b1b', fontWeight: 600 }}>
                 Trạng thái: <strong>{
                   rmaStatus === 'RETURNED_TO_CUSTOMER' ? 'Đã hoàn trả sản phẩm cho bạn' :
-                  rmaStatus === 'RETURNING_TO_CUSTOMER' ? 'Shipper đang trên đường giao trả lại hàng cho bạn' :
-                  'Kiện hàng lưu kho - Chờ Shipper nhận đi giao trả lại'
+                    rmaStatus === 'RETURNING_TO_CUSTOMER' ? 'Shipper đang trên đường giao trả lại hàng cho bạn' :
+                      'Kiện hàng lưu kho - Chờ Shipper nhận đi giao trả lại'
                 }</strong>
               </span>
             </div>
@@ -817,7 +817,7 @@ export default function MyOrders() {
       'Đang giao hàng',
       'Đã giao'
     ];
-    
+
     let activeIdx = 1;
     if (status === 'PENDING' || status === 'WAITING_PAYMENT') {
       activeIdx = 1;
@@ -839,9 +839,9 @@ export default function MyOrders() {
             return (
               <React.Fragment key={idx}>
                 {idx > 0 && (
-                  <div style={{ 
-                    flex: 1, 
-                    height: '2.5px', 
+                  <div style={{
+                    flex: 1,
+                    height: '2.5px',
                     backgroundColor: isLineActive ? '#2563eb' : '#e2e8f0',
                     margin: '0 0.25rem',
                     marginBottom: '1.25rem',
@@ -849,14 +849,14 @@ export default function MyOrders() {
                   }} />
                 )}
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: '55px' }}>
-                  <div style={{ 
-                    width: '30px', 
-                    height: '30px', 
-                    borderRadius: '50%', 
+                  <div style={{
+                    width: '30px',
+                    height: '30px',
+                    borderRadius: '50%',
                     backgroundColor: isDone ? '#2563eb' : isActive ? '#eff6ff' : '#f8fafc',
                     border: isActive ? '2px solid #2563eb' : isDone ? '2px solid #2563eb' : '1px solid #cbd5e1',
-                    display: 'flex', 
-                    alignItems: 'center', 
+                    display: 'flex',
+                    alignItems: 'center',
                     justifyContent: 'center',
                     color: isDone ? '#ffffff' : isActive ? '#2563eb' : '#64748b',
                     fontSize: '0.75rem',
@@ -866,10 +866,10 @@ export default function MyOrders() {
                   }}>
                     {isDone ? '✓' : idx + 1}
                   </div>
-                  <span style={{ 
-                    fontSize: '0.7rem', 
-                    color: isDone || isActive ? '#0f172a' : '#64748b', 
-                    marginTop: '0.4rem', 
+                  <span style={{
+                    fontSize: '0.7rem',
+                    color: isDone || isActive ? '#0f172a' : '#64748b',
+                    marginTop: '0.4rem',
                     textAlign: 'center',
                     fontWeight: isActive || isDone ? 750 : 500,
                     whiteSpace: 'nowrap'
@@ -983,14 +983,14 @@ export default function MyOrders() {
 
       {matchedOrders.length > 0 && (
         <div className="my-orders-grid">
-          
+
           {/* Left Column: Orders List */}
           <div className="card-glass" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             <h3 style={{ fontSize: '1rem', borderBottom: '1px solid var(--border-glass)', paddingBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0, fontWeight: 800 }}>
               <Package size={18} color="#2563eb" />
               Đơn Hàng Của Bạn ({matchedOrders.length})
             </h3>
-            
+
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
               {matchedOrders.map(order => {
                 const isSelected = selectedOrderId === order.orderId;
@@ -1014,15 +1014,15 @@ export default function MyOrders() {
                       {(() => {
                         const badge = getOrderStatusLabel(order);
                         return (
-                          <span 
-                            style={{ 
-                              fontSize: '0.68rem', 
+                          <span
+                            style={{
+                              fontSize: '0.68rem',
                               fontWeight: 750,
-                              padding: '2.5px 8px', 
-                              borderRadius: '6px', 
-                              color: badge.color, 
-                              backgroundColor: badge.bg, 
-                              border: `1px solid ${badge.border}` 
+                              padding: '2.5px 8px',
+                              borderRadius: '6px',
+                              color: badge.color,
+                              backgroundColor: badge.bg,
+                              border: `1px solid ${badge.border}`
                             }}
                           >
                             {badge.text}
@@ -1030,57 +1030,57 @@ export default function MyOrders() {
                         );
                       })()}
                     </div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'flex', justifyContent: 'space-between' }}>
-                    <span>Ngày: {order.date}</span>
-                    <strong style={{ color: 'var(--success)' }}>{formatPrice(order.totalAmount)}</strong>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'flex', justifyContent: 'space-between' }}>
+                      <span>Ngày: {order.date}</span>
+                      <strong style={{ color: 'var(--success)' }}>{formatPrice(order.totalAmount)}</strong>
+                    </div>
+
+                    {order.status === 'SHIPPED' && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedOrderId(order.orderId);
+                          setTimeout(() => {
+                            const el = document.getElementById('live-gps-tracking-card');
+                            if (el) el.scrollIntoView({ behavior: 'smooth' });
+                          }, 120);
+                        }}
+                        style={{
+                          marginTop: '0.6rem',
+                          width: '100%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '0.4rem',
+                          padding: '0.45rem 0.65rem',
+                          borderRadius: '6px',
+                          fontSize: '0.75rem',
+                          fontWeight: 800,
+                          cursor: 'pointer',
+                          backgroundColor: '#eff6ff',
+                          color: '#2563eb',
+                          border: '1px solid #bfdbfe',
+                          boxShadow: '0 1px 3px rgba(37,99,235,0.1)',
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#ef4444', boxShadow: '0 0 6px #ef4444' }} />
+                        Theo Dõi Trực Tiếp
+                      </button>
+                    )}
                   </div>
-
-                  {order.status === 'SHIPPED' && (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedOrderId(order.orderId);
-                        setTimeout(() => {
-                          const el = document.getElementById('live-gps-tracking-card');
-                          if (el) el.scrollIntoView({ behavior: 'smooth' });
-                        }, 120);
-                      }}
-                      style={{
-                        marginTop: '0.6rem',
-                        width: '100%',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '0.4rem',
-                        padding: '0.45rem 0.65rem',
-                        borderRadius: '6px',
-                        fontSize: '0.75rem',
-                        fontWeight: 800,
-                        cursor: 'pointer',
-                        backgroundColor: '#eff6ff',
-                        color: '#2563eb',
-                        border: '1px solid #bfdbfe',
-                        boxShadow: '0 1px 3px rgba(37,99,235,0.1)',
-                        transition: 'all 0.2s'
-                      }}
-                    >
-                      <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#ef4444', boxShadow: '0 0 6px #ef4444' }} />
-                      Theo Dõi Trực Tiếp
-                    </button>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Return success banner */}
-          {returnSuccess && (
-            <div style={{ padding: '0.75rem 1rem', backgroundColor: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#10b981', fontSize: '0.875rem' }}>
-              <CheckCircle2 size={16}/> Yêu cầu đổi trả đã được gửi! CSKH sẽ liên hệ bạn trong 24h.
+                );
+              })}
             </div>
-          )}
-        </div>
+
+            {/* Return success banner */}
+            {returnSuccess && (
+              <div style={{ padding: '0.75rem 1rem', backgroundColor: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#10b981', fontSize: '0.875rem' }}>
+                <CheckCircle2 size={16} /> Yêu cầu đổi trả đã được gửi! CSKH sẽ liên hệ bạn trong 24h.
+              </div>
+            )}
+          </div>
 
           {/* Right Column: Detail Order Status */}
           {selectedOrder && (
@@ -1090,7 +1090,7 @@ export default function MyOrders() {
                 {(() => {
                   let orderItems = selectedOrder.items;
                   if (typeof orderItems === 'string') {
-                    try { orderItems = JSON.parse(orderItems); } catch(e) { orderItems = []; }
+                    try { orderItems = JSON.parse(orderItems); } catch (e) { orderItems = []; }
                   }
                   if (!Array.isArray(orderItems) || orderItems.length === 0) {
                     orderItems = selectedOrder.products || [
@@ -1115,7 +1115,7 @@ export default function MyOrders() {
                         <div style={{ flex: 1, minWidth: '250px' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
                             <h3 style={{ fontSize: '1.25rem', color: '#0f172a', margin: 0 }}>Chi Tiết Đơn Hàng: {selectedOrder.orderId}</h3>
-                            
+
                             {/* Exchange order badge */}
                             {(selectedOrder.type === 'EXCHANGE' || String(selectedOrder.orderId).startsWith('ORD-EXC-')) && (
                               <span style={{ fontSize: '0.72rem', fontWeight: 800, padding: '3px 8px', borderRadius: '6px', backgroundColor: '#f5f3ff', color: '#7c3aed', border: '1px solid #ddd6fe', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
@@ -1125,7 +1125,7 @@ export default function MyOrders() {
 
                             {/* Demo Helper Button */}
                             {['PENDING'].includes(selectedOrder.status) && (
-                              <button 
+                              <button
                                 onClick={() => {
                                   // Directly simulate 5h+ age and trigger auto-approval flow
                                   const stored = localStorage.getItem('erp_orders');
@@ -1142,21 +1142,21 @@ export default function MyOrders() {
                                     setTimeout(() => window.location.reload(), 100);
                                   }
                                 }}
-                                className="btn" 
-                                style={{ 
-                                  padding: '0.25rem 0.625rem', 
-                                  fontSize: '0.75rem', 
-                                  background: 'rgba(59,130,246,0.1)', 
-                                  color: '#3b82f6', 
-                                  border: '1px solid rgba(59,130,246,0.25)', 
+                                className="btn"
+                                style={{
+                                  padding: '0.25rem 0.625rem',
+                                  fontSize: '0.75rem',
+                                  background: 'rgba(59,130,246,0.1)',
+                                  color: '#3b82f6',
+                                  border: '1px solid rgba(59,130,246,0.25)',
                                   borderRadius: '4px',
                                   cursor: 'pointer',
                                   display: 'inline-flex',
-                                  alignItems: 'center', 
-                                  gap: '0.25rem' 
+                                  alignItems: 'center',
+                                  gap: '0.25rem'
                                 }}
                               >
-                                <Sparkles size={12}/> Tua nhanh 5h
+                                <Sparkles size={12} /> Tua nhanh 5h
                               </button>
                             )}
                           </div>
@@ -1208,37 +1208,37 @@ export default function MyOrders() {
                           {orderItems.map((item, idx) => {
                             const productInfo = products?.find(p => p.id === item.productId || p.productId === item.productId);
                             const displayImage = item.image || item.primaryImage || productInfo?.image || productInfo?.primaryImage || productInfo?.imageUrls?.[0];
-                            
+
                             return (
-                            <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.75rem 1rem', borderRadius: '10px', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', fontSize: '0.875rem', alignItems: 'center', gap: '1rem' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', minWidth: 0, flex: 1 }}>
-                                <div style={{ width: '48px', height: '48px', borderRadius: '8px', overflow: 'hidden', backgroundColor: '#e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                                  {displayImage ? (
-                                    <img src={displayImage} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                  ) : (
-                                    <Package size={24} color="#94a3b8" />
-                                  )}
+                              <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.75rem 1rem', borderRadius: '10px', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', fontSize: '0.875rem', alignItems: 'center', gap: '1rem' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', minWidth: 0, flex: 1 }}>
+                                  <div style={{ width: '48px', height: '48px', borderRadius: '8px', overflow: 'hidden', backgroundColor: '#e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                    {displayImage ? (
+                                      <img src={displayImage} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                    ) : (
+                                      <Package size={24} color="#94a3b8" />
+                                    )}
+                                  </div>
+                                  <div style={{ minWidth: 0 }}>
+                                    <span className="badge badge-info" style={{ fontSize: '0.65rem', marginBottom: '0.2rem', display: 'inline-block', fontWeight: 700 }}>{item.category || 'LINH KIỆN'}</span>
+                                    <Link to={`/product/${item.productId}`} style={{ textDecoration: 'none', color: '#0f172a', minWidth: 0 }}>
+                                      <strong style={{ cursor: 'pointer', transition: 'color 0.2s', display: 'block', wordBreak: 'break-word', color: '#1e293b' }}
+                                        onMouseEnter={e => e.currentTarget.style.color = '#2563eb'}
+                                        onMouseLeave={e => e.currentTarget.style.color = '#1e293b'}
+                                      >
+                                        {item.name}
+                                      </strong>
+                                    </Link>
+                                    <span style={{ fontSize: '0.75rem', color: '#64748b', display: 'block', marginTop: '0.2rem' }}>Bảo hành 36 tháng</span>
+                                  </div>
                                 </div>
-                                <div style={{ minWidth: 0 }}>
-                                  <span className="badge badge-info" style={{ fontSize: '0.65rem', marginBottom: '0.2rem', display: 'inline-block', fontWeight: 700 }}>{item.category || 'LINH KIỆN'}</span>
-                                  <Link to={`/product/${item.productId}`} style={{ textDecoration: 'none', color: '#0f172a', minWidth: 0 }}>
-                                    <strong style={{ cursor: 'pointer', transition: 'color 0.2s', display: 'block', wordBreak: 'break-word', color: '#1e293b' }}
-                                      onMouseEnter={e => e.currentTarget.style.color = '#2563eb'}
-                                      onMouseLeave={e => e.currentTarget.style.color = '#1e293b'}
-                                    >
-                                      {item.name}
-                                    </strong>
-                                  </Link>
-                                  <span style={{ fontSize: '0.75rem', color: '#64748b', display: 'block', marginTop: '0.2rem' }}>Bảo hành 36 tháng</span>
-                                </div>
+                                <span style={{ color: '#2563eb', whiteSpace: 'nowrap', flexShrink: 0, fontWeight: 800 }}>x{item.quantity || 1} - {formatPrice(item.price)}</span>
                               </div>
-                              <span style={{ color: '#2563eb', whiteSpace: 'nowrap', flexShrink: 0, fontWeight: 800 }}>x{item.quantity || 1} - {formatPrice(item.price)}</span>
-                            </div>
                             );
                           })}
                         </div>
                       )}
-                      
+
                       {/* Chi tiết thanh toán & Giao hàng */}
                       <div style={{ marginTop: '1.5rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1rem' }}>
                         {/* Thông tin giao hàng */}
@@ -1519,22 +1519,22 @@ export default function MyOrders() {
                       {/* Hành động sửa/hủy đơn - bottom right */}
                       {selectedOrder.status === 'PENDING' && (
                         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1.25rem', paddingTop: '1.25rem', borderTop: '1px solid #e2e8f0' }}>
-                          <button 
+                          <button
                             onClick={() => {
                               setCancelTargetOrder(selectedOrder);
                               setShowCancelModal(true);
                             }}
-                            className="btn" 
-                            style={{ 
-                              padding: '0.5rem 1rem', 
-                              fontSize: '0.85rem', 
-                              background: 'rgba(239,68,68,0.1)', 
-                              color: '#ef4444', 
-                              border: '1px solid rgba(239,68,68,0.25)', 
+                            className="btn"
+                            style={{
+                              padding: '0.5rem 1rem',
+                              fontSize: '0.85rem',
+                              background: 'rgba(239,68,68,0.1)',
+                              color: '#ef4444',
+                              border: '1px solid rgba(239,68,68,0.25)',
                               borderRadius: '8px',
                               cursor: 'pointer',
                               display: 'inline-flex',
-                              alignItems: 'center', 
+                              alignItems: 'center',
                               gap: '0.35rem',
                               fontWeight: 600,
                               transition: 'all 0.2s'
@@ -1542,10 +1542,10 @@ export default function MyOrders() {
                             onMouseEnter={e => e.currentTarget.style.background = 'rgba(239,68,68,0.2)'}
                             onMouseLeave={e => e.currentTarget.style.background = 'rgba(239,68,68,0.1)'}
                           >
-                            <X size={16}/> Hủy đơn
+                            <X size={16} /> Hủy đơn
                           </button>
-                          
-                          <button 
+
+                          <button
                             onClick={() => {
                               setEditTargetOrder(selectedOrder);
                               setEditForm({
@@ -1556,17 +1556,17 @@ export default function MyOrders() {
                               });
                               setShowEditModal(true);
                             }}
-                            className="btn" 
-                            style={{ 
-                              padding: '0.5rem 1rem', 
-                              fontSize: '0.85rem', 
-                              background: 'rgba(234,179,8,0.1)', 
-                              color: '#eab308', 
-                              border: '1px solid rgba(234,179,8,0.25)', 
+                            className="btn"
+                            style={{
+                              padding: '0.5rem 1rem',
+                              fontSize: '0.85rem',
+                              background: 'rgba(234,179,8,0.1)',
+                              color: '#eab308',
+                              border: '1px solid rgba(234,179,8,0.25)',
                               borderRadius: '8px',
                               cursor: 'pointer',
                               display: 'inline-flex',
-                              alignItems: 'center', 
+                              alignItems: 'center',
                               gap: '0.35rem',
                               fontWeight: 600,
                               transition: 'all 0.2s'
@@ -1587,8 +1587,8 @@ export default function MyOrders() {
               {(() => {
                 const isExcOrder = selectedOrder.type === 'EXCHANGE' || String(selectedOrder.orderId).startsWith('ORD-EXC-');
                 const isOrderRefunded = selectedOrder.paymentStatus === 'REFUNDED' || selectedOrder.status === 'REFUNDED';
-                const allMatchingReturns = (returnRequests || []).filter(r => 
-                  String(r.orderId) === String(selectedOrder.orderId) || 
+                const allMatchingReturns = (returnRequests || []).filter(r =>
+                  String(r.orderId) === String(selectedOrder.orderId) ||
                   String(r.id) === String(selectedOrder.orderId) ||
                   (selectedOrder.originalOrderId && String(r.orderId) === String(selectedOrder.originalOrderId)) ||
                   (isExcOrder && String(selectedOrder.orderId).replace('ORD-EXC-', 'ORD-') === String(r.orderId)) ||
@@ -1853,7 +1853,7 @@ export default function MyOrders() {
                     <div style={{ padding: '1rem 1.5rem', backgroundColor: 'rgba(239,68,68,0.05)', border: '1px solid rgba(239,68,68,0.15)', borderRadius: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
                       <div>
                         <div style={{ fontWeight: 600, fontSize: '0.9rem', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <AlertCircle size={15} style={{ color: '#ef4444' }}/> Yêu Cầu Đổi Trả / Hoàn Tiền
+                          <AlertCircle size={15} style={{ color: '#ef4444' }} /> Yêu Cầu Đổi Trả / Hoàn Tiền
                         </div>
                         <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: '0.25rem 0 0' }}>
                           Trong vòng 7 ngày kể từ ngày giao hàng. CSKH xử lý trong 1-3 ngày làm việc.
@@ -1861,7 +1861,7 @@ export default function MyOrders() {
                       </div>
                       <button onClick={() => { setReturnTargetOrder(selectedOrder); setShowReturnModal(true); }}
                         className="btn" style={{ padding: '0.5rem 1rem', fontSize: '0.8rem', background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.3)', display: 'flex', alignItems: 'center', gap: '0.375rem', cursor: 'pointer' }}>
-                        <RefreshCw size={14}/> Gửi Yêu Cầu Đổi Trả
+                        <RefreshCw size={14} /> Gửi Yêu Cầu Đổi Trả
                       </button>
                     </div>
                   );
@@ -1870,24 +1870,24 @@ export default function MyOrders() {
                 // Return request exists — show detailed status card
                 const isExchangeType = existingReturn.type === 'EXCHANGE';
                 const statusConfig = {
-                  PENDING:                  { label: 'Chờ CSKH duyệt', color: '#f59e0b', bg: '#fffbeb', border: '#fde68a' },
-                  RETURN_REQUESTED:         { label: 'Chờ Shipper đến thu hồi hàng', color: '#f59e0b', bg: '#fffbeb', border: '#fde68a' },
-                  RETURN_APPROVED:          { label: 'CSKH đã duyệt - Chờ Shipper đến lấy hàng', color: '#f59e0b', bg: '#fffbeb', border: '#fde68a' },
-                  RETURNING_TO_WAREHOUSE:   { label: 'Shipper đang vận chuyển về kho', color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe' },
-                  DELIVERED_TO_WAREHOUSE:   { label: 'Đã về kho - Kỹ thuật QC đang thẩm định', color: '#7c3aed', bg: '#f5f3ff', border: '#ddd6fe' },
-                  QC_PASSED:                { label: 'QC thẩm định Đạt chuẩn - Chờ kho nhập kệ', color: '#059669', bg: '#ecfdf5', border: '#a7f3d0' },
-                  QC_REJECTED:              { label: 'QC từ chối - Không đủ điều kiện đổi trả', color: '#ef4444', bg: '#fef2f2', border: '#fecaca' },
-                  COMPLETED:                { label: 'Đã hoàn tất', color: '#16a34a', bg: '#f0fdf4', border: '#86efac' },
-                  RESTOCKED:                {
-                    label: isExchangeType ? 'Kho đã nhập hàng cũ - Đang xuất kho đơn đổi mới' : 'Kho đã nhập hàng - Chờ Kế toán hoàn tiền', 
-                    color: '#0284c7', 
-                    bg: '#f0f9ff', 
-                    border: '#bae6fd' 
+                  PENDING: { label: 'Chờ CSKH duyệt', color: '#f59e0b', bg: '#fffbeb', border: '#fde68a' },
+                  RETURN_REQUESTED: { label: 'Chờ Shipper đến thu hồi hàng', color: '#f59e0b', bg: '#fffbeb', border: '#fde68a' },
+                  RETURN_APPROVED: { label: 'CSKH đã duyệt - Chờ Shipper đến lấy hàng', color: '#f59e0b', bg: '#fffbeb', border: '#fde68a' },
+                  RETURNING_TO_WAREHOUSE: { label: 'Shipper đang vận chuyển về kho', color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe' },
+                  DELIVERED_TO_WAREHOUSE: { label: 'Đã về kho - Kỹ thuật QC đang thẩm định', color: '#7c3aed', bg: '#f5f3ff', border: '#ddd6fe' },
+                  QC_PASSED: { label: 'QC thẩm định Đạt chuẩn - Chờ kho nhập kệ', color: '#059669', bg: '#ecfdf5', border: '#a7f3d0' },
+                  QC_REJECTED: { label: 'QC từ chối - Không đủ điều kiện đổi trả', color: '#ef4444', bg: '#fef2f2', border: '#fecaca' },
+                  COMPLETED: { label: 'Đã hoàn tất', color: '#16a34a', bg: '#f0fdf4', border: '#86efac' },
+                  RESTOCKED: {
+                    label: isExchangeType ? 'Kho đã nhập hàng cũ - Đang xuất kho đơn đổi mới' : 'Kho đã nhập hàng - Chờ Kế toán hoàn tiền',
+                    color: '#0284c7',
+                    bg: '#f0f9ff',
+                    border: '#bae6fd'
                   },
-                  EXCHANGED:                { label: 'Kho đã xuất kho đơn hàng đổi mới', color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe' },
-                  EXCHANGE_NEW:             { label: 'Kho đã xuất kho đơn hàng đổi mới', color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe' },
-                  REFUNDED:                 { label: 'Kế toán đã hoàn tất chuyển tiền hoàn 100%', color: '#16a34a', bg: '#f0fdf4', border: '#86efac' },
-                  REJECTED:                 { label: 'Từ chối đổi trả', color: '#ef4444', bg: '#fef2f2', border: '#fecaca' }
+                  EXCHANGED: { label: 'Kho đã xuất kho đơn hàng đổi mới', color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe' },
+                  EXCHANGE_NEW: { label: 'Kho đã xuất kho đơn hàng đổi mới', color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe' },
+                  REFUNDED: { label: 'Kế toán đã hoàn tất chuyển tiền hoàn 100%', color: '#16a34a', bg: '#f0fdf4', border: '#86efac' },
+                  REJECTED: { label: 'Từ chối đổi trả', color: '#ef4444', bg: '#fef2f2', border: '#fecaca' }
                 };
                 const sc = statusConfig[existingReturn?.status] || statusConfig.PENDING;
                 const typeLabel = isExchangeType ? 'Đổi sản phẩm mới (1-1)' : 'Hoàn tiền 100%';
@@ -2170,7 +2170,7 @@ export default function MyOrders() {
                   <div style={{ padding: '1.15rem 1.35rem', backgroundColor: sc.bg, border: '1px solid ' + sc.border, borderRadius: '12px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.4rem' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontWeight: 700, fontSize: '0.88rem', color: '#0f172a' }}>
-                        <RefreshCw size={15} style={{ color: sc.color }}/> {isExchangeType ? 'Tiến Độ Đổi Mới Sản Phẩm' : 'Tiến Độ Trả Hàng & Hoàn Tiền'}
+                        <RefreshCw size={15} style={{ color: sc.color }} /> {isExchangeType ? 'Tiến Độ Đổi Mới Sản Phẩm' : 'Tiến Độ Trả Hàng & Hoàn Tiền'}
                       </div>
                       <span style={{ fontSize: '0.75rem', fontWeight: 800, padding: '0.2rem 0.65rem', borderRadius: '20px', backgroundColor: '#ffffff', border: '1px solid ' + sc.border, color: sc.color }}>
                         {sc.label}
@@ -2256,8 +2256,8 @@ export default function MyOrders() {
                 </h3>
                 {(() => {
                   const isExcOrder = selectedOrder.type === 'EXCHANGE' || String(selectedOrder.orderId).startsWith('ORD-EXC-');
-                  const currentReturn = returnRequests.find(r => 
-                    String(r.orderId) === String(selectedOrder.orderId) || 
+                  const currentReturn = returnRequests.find(r =>
+                    String(r.orderId) === String(selectedOrder.orderId) ||
                     String(r.id) === String(selectedOrder.orderId) ||
                     (selectedOrder.originalOrderId && String(r.orderId) === String(selectedOrder.originalOrderId)) ||
                     (isExcOrder && String(selectedOrder.orderId).replace('ORD-EXC-', 'ORD-') === String(r.orderId)) ||
@@ -2456,16 +2456,16 @@ export default function MyOrders() {
       </div>
 
       {/* Modal: Yêu cầu đổi trả */}
-      <ReturnRequestModal 
-        show={showReturnModal} 
+      <ReturnRequestModal
+        show={showReturnModal}
         onClose={(success) => {
           setShowReturnModal(false);
           if (success === true) {
             setReturnSuccess(true);
             setTimeout(() => setReturnSuccess(false), 5000);
           }
-        }} 
-        order={returnTargetOrder} 
+        }}
+        order={returnTargetOrder}
       />
 
       {/* Modal: Gửi Ticket Khiếu Nại & Hỗ Trợ */}
@@ -2480,7 +2480,7 @@ export default function MyOrders() {
                 <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>Gửi Ticket Khiếu Nại & Hỗ Trợ</h3>
               </div>
               <button onClick={() => setShowComplaintModal(false)} style={{ background: '#f1f5f9', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <X size={18}/>
+                <X size={18} />
               </button>
             </div>
 
@@ -2594,7 +2594,7 @@ export default function MyOrders() {
               <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
                 <button type="button" onClick={() => setShowComplaintModal(false)} className="btn btn-secondary" style={{ borderRadius: '10px' }}>Hủy</button>
                 <button type="button" onClick={handleComplaintSubmit} disabled={submittingComplaint} className="btn btn-primary" style={{ borderRadius: '10px', backgroundColor: submittingComplaint ? '#9ca3af' : '#ef4444', border: 'none', color: '#fff', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.5rem 1.25rem' }}>
-                  <AlertCircle size={16}/> {submittingComplaint ? 'Đang gửi...' : 'Gửi Khiếu Nại'}
+                  <AlertCircle size={16} /> {submittingComplaint ? 'Đang gửi...' : 'Gửi Khiếu Nại'}
                 </button>
               </div>
             </div>
@@ -2615,7 +2615,7 @@ export default function MyOrders() {
                 </span>
               </div>
               <button onClick={() => setViewTicketDetail(null)} style={{ background: '#f1f5f9', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <X size={18}/>
+                <X size={18} />
               </button>
             </div>
 
@@ -2674,12 +2674,12 @@ export default function MyOrders() {
       {showEditModal && editTargetOrder && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem' }}>
           <div style={{ backgroundColor: '#fff', borderRadius: '16px', width: '100%', maxWidth: '520px', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', maxHeight: 'calc(100vh - 2rem)', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)' }}>
-            
+
             {/* Modal Header - Fixed */}
             <div style={{ padding: '1.5rem 1.5rem 1rem 1.5rem', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h3 style={{ margin: 0, fontSize: '1.25rem', color: '#0f172a' }}>Cập nhật thông tin nhận hàng</h3>
               <button onClick={() => setShowEditModal(false)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#64748b' }}>
-                <X size={20}/>
+                <X size={20} />
               </button>
             </div>
 
@@ -2687,15 +2687,15 @@ export default function MyOrders() {
             <div style={{ padding: '1.5rem', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div>
                 <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.85rem', fontWeight: 600, color: '#475569' }}>Tên người nhận</label>
-                <input type="text" value={editForm.customerName} onChange={e => setEditForm({...editForm, customerName: e.target.value})} className="form-control" style={{ width: '100%', padding: '0.625rem', borderRadius: '8px', border: '1px solid #cbd5e1' }} />
+                <input type="text" value={editForm.customerName} onChange={e => setEditForm({ ...editForm, customerName: e.target.value })} className="form-control" style={{ width: '100%', padding: '0.625rem', borderRadius: '8px', border: '1px solid #cbd5e1' }} />
               </div>
               <div>
                 <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.85rem', fontWeight: 600, color: '#475569' }}>Số điện thoại</label>
-                <input type="text" value={editForm.phone} onChange={e => setEditForm({...editForm, phone: e.target.value})} className="form-control" style={{ width: '100%', padding: '0.625rem', borderRadius: '8px', border: '1px solid #cbd5e1' }} />
+                <input type="text" value={editForm.phone} onChange={e => setEditForm({ ...editForm, phone: e.target.value })} className="form-control" style={{ width: '100%', padding: '0.625rem', borderRadius: '8px', border: '1px solid #cbd5e1' }} />
               </div>
               <div>
                 <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.85rem', fontWeight: 600, color: '#475569' }}>Địa chỉ giao hàng</label>
-                <textarea value={editForm.shippingAddress} onChange={e => setEditForm({...editForm, shippingAddress: e.target.value})} className="form-control" rows="2" style={{ width: '100%', padding: '0.625rem', borderRadius: '8px', border: '1px solid #cbd5e1' }} />
+                <textarea value={editForm.shippingAddress} onChange={e => setEditForm({ ...editForm, shippingAddress: e.target.value })} className="form-control" rows="2" style={{ width: '100%', padding: '0.625rem', borderRadius: '8px', border: '1px solid #cbd5e1' }} />
               </div>
               {savedAddresses.length > 0 && (
                 <div style={{ border: '1px solid #dbeafe', background: '#f8fbff', borderRadius: '10px', padding: '0.75rem' }}>
@@ -2707,7 +2707,7 @@ export default function MyOrders() {
               )}
               <div>
                 <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.85rem', fontWeight: 600, color: '#475569' }}>Ghi chú thêm (Tùy chọn)</label>
-                <textarea value={editForm.notes} onChange={e => setEditForm({...editForm, notes: e.target.value})} className="form-control" rows="2" style={{ width: '100%', padding: '0.625rem', borderRadius: '8px', border: '1px solid #cbd5e1' }} />
+                <textarea value={editForm.notes} onChange={e => setEditForm({ ...editForm, notes: e.target.value })} className="form-control" rows="2" style={{ width: '100%', padding: '0.625rem', borderRadius: '8px', border: '1px solid #cbd5e1' }} />
               </div>
             </div>
 
@@ -2731,12 +2731,12 @@ export default function MyOrders() {
       {showCancelModal && cancelTargetOrder && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem' }}>
           <div style={{ backgroundColor: '#fff', borderRadius: '16px', width: '100%', maxWidth: '520px', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', maxHeight: 'calc(100vh - 2rem)', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)' }}>
-            
+
             {/* Modal Header */}
             <div style={{ padding: '1.5rem 1.5rem 1rem 1.5rem', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h3 style={{ margin: 0, fontSize: '1.25rem', color: '#0f172a' }}>Xác nhận hủy đơn hàng</h3>
               <button onClick={() => setShowCancelModal(false)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#64748b' }}>
-                <X size={20}/>
+                <X size={20} />
               </button>
             </div>
 
@@ -2750,24 +2750,24 @@ export default function MyOrders() {
 
               <div>
                 <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.85rem', fontWeight: 600, color: '#475569' }}>Lý do hủy đơn <span style={{ color: '#ef4444' }}>*</span></label>
-                <textarea 
-                  value={cancelForm.reason} 
-                  onChange={e => setCancelForm({...cancelForm, reason: e.target.value})} 
+                <textarea
+                  value={cancelForm.reason}
+                  onChange={e => setCancelForm({ ...cancelForm, reason: e.target.value })}
                   placeholder="Vui lòng cho chúng tôi biết lý do bạn muốn hủy đơn hàng này..."
-                  className="form-control" 
-                  rows="3" 
-                  style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem' }} 
+                  className="form-control"
+                  rows="3"
+                  style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem' }}
                 />
               </div>
-              
+
               <div>
                 <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.85rem', fontWeight: 600, color: '#475569' }}>Minh chứng (Ảnh/Video dưới 100MB, Tùy chọn)</label>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                   <label style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 1rem', backgroundColor: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 600, color: '#475569', transition: 'background-color 0.2s' }}>
                     <Upload size={16} /> Chọn File
-                    <input 
-                      type="file" 
-                      accept="image/*,video/*" 
+                    <input
+                      type="file"
+                      accept="image/*,video/*"
                       style={{ display: 'none' }}
                       onChange={e => {
                         const file = e.target.files[0];
@@ -2779,9 +2779,9 @@ export default function MyOrders() {
                           }
                           // Use object URL for fast local preview without browser freeze
                           const objectUrl = URL.createObjectURL(file);
-                          setCancelForm({...cancelForm, evidenceUrl: objectUrl});
+                          setCancelForm({ ...cancelForm, evidenceUrl: objectUrl });
                         }
-                      }} 
+                      }}
                     />
                   </label>
                   {cancelForm.evidenceUrl && (
@@ -2791,14 +2791,14 @@ export default function MyOrders() {
                   )}
                 </div>
                 {cancelForm.evidenceUrl && (
-                   <div style={{ marginTop: '0.75rem', position: 'relative', display: 'inline-block' }}>
-                     {cancelForm.evidenceUrl.startsWith('blob:') ? (
-                       <img src={cancelForm.evidenceUrl} alt="Preview" style={{ height: '80px', borderRadius: '8px', border: '1px solid #e2e8f0', objectFit: 'cover' }} />
-                     ) : null}
-                     <button onClick={() => setCancelForm({...cancelForm, evidenceUrl: ''})} style={{ position: 'absolute', top: '-8px', right: '-8px', background: '#fff', borderRadius: '50%', padding: '2px', border: '1px solid #ef4444', color: '#ef4444', cursor: 'pointer', display: 'flex' }}>
-                       <X size={12} />
-                     </button>
-                   </div>
+                  <div style={{ marginTop: '0.75rem', position: 'relative', display: 'inline-block' }}>
+                    {cancelForm.evidenceUrl.startsWith('blob:') ? (
+                      <img src={cancelForm.evidenceUrl} alt="Preview" style={{ height: '80px', borderRadius: '8px', border: '1px solid #e2e8f0', objectFit: 'cover' }} />
+                    ) : null}
+                    <button onClick={() => setCancelForm({ ...cancelForm, evidenceUrl: '' })} style={{ position: 'absolute', top: '-8px', right: '-8px', background: '#fff', borderRadius: '50%', padding: '2px', border: '1px solid #ef4444', color: '#ef4444', cursor: 'pointer', display: 'flex' }}>
+                      <X size={12} />
+                    </button>
+                  </div>
                 )}
               </div>
             </div>
@@ -2806,7 +2806,7 @@ export default function MyOrders() {
             {/* Modal Footer */}
             <div style={{ padding: '1rem 1.5rem 1.5rem 1.5rem', borderTop: '1px solid #e2e8f0', display: 'flex', gap: '1rem' }}>
               <button onClick={() => setShowCancelModal(false)} className="btn btn-secondary" style={{ flex: 1, padding: '0.75rem', borderRadius: '8px', fontWeight: 600 }}>Quay lại</button>
-              <button 
+              <button
                 onClick={() => {
                   if (!cancelForm.reason.trim()) {
                     addNotification('Vui lòng nhập lý do hủy đơn hàng.', 'error');
@@ -2816,8 +2816,8 @@ export default function MyOrders() {
                   setShowCancelModal(false);
                   setCancelForm({ reason: '', evidenceUrl: '' });
                   addNotification(`Đơn hàng #${cancelTargetOrder.orderId} đã hủy thành công!`, 'success', '/my-orders');
-                }} 
-                className="btn btn-primary" 
+                }}
+                className="btn btn-primary"
                 style={{ flex: 1, padding: '0.75rem', borderRadius: '8px', fontWeight: 600, backgroundColor: '#ef4444', color: 'white', border: 'none' }}
               >
                 Xác nhận Hủy Đơn
@@ -2952,7 +2952,7 @@ export default function MyOrders() {
                 <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', marginBottom: '0.6rem' }}>
                   Kênh Liên Hệ Trực Tiếp Phòng Kế Toán
                 </div>
-                
+
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.5rem 0.75rem', backgroundColor: '#ffffff', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
                     <div>
