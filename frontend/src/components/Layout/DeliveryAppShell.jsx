@@ -6,7 +6,7 @@ import { api } from '../../services/api';
 import useSafeViewportHeight from '../../hooks/useSafeViewportHeight';
 import { detectDeliveryRegion, DELIVERY_REGIONS } from '../../utils/deliveryRegions';
 import { Home, Package, Truck, Undo2, History, Bell, LogOut, MessageCircle, X, Send } from 'lucide-react';
-import DeliveryNotificationSheet from '../../pages/Admin/Delivery/components/DeliveryNotificationSheet';
+import DeliveryNotificationDropdown from '../../pages/Admin/Delivery/components/DeliveryNotificationDropdown';
 import { generateShipperNotifications } from '../../pages/Admin/Delivery/deliveryHelpers';
 
 const TABS = [
@@ -274,7 +274,7 @@ export default function DeliveryAppShell({ children }) {
     <div className="delivery-app-shell">
       <div className="delivery-app-inner" style={{ height: `${safeVh}px` }}>
         {/* Top Bar */}
-        <div className="delivery-topbar">
+        <div className="delivery-topbar" style={{ position: 'relative', zIndex: 100 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', minWidth: 0 }}>
             <div style={{
               width: '38px', height: '38px', borderRadius: '50%', flexShrink: 0,
@@ -335,29 +335,54 @@ export default function DeliveryAppShell({ children }) {
                 }} />
               )}
             </button>
-            <button
-              type="button"
-              onClick={() => setShowNotifications(true)}
-              className="delivery-icon-btn"
-              title="Thông báo giao hàng"
-              style={{ position: 'relative' }}
-            >
-              <Bell size={19} color={hasUrgentLate ? 'var(--danger)' : undefined} />
-              {unreadCount > 0 && (
-                <span style={{
-                  position: 'absolute', top: '2px', right: '2px',
-                  minWidth: '15px', height: '15px', borderRadius: '999px',
-                  backgroundColor: hasUrgentLate ? 'var(--danger)' : 'var(--primary)',
-                  color: '#fff',
-                  fontSize: '0.6rem', fontWeight: 800,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  padding: '0 3px', lineHeight: 1,
-                  boxShadow: hasUrgentLate ? '0 0 8px rgba(239, 68, 68, 0.6)' : 'none'
-                }}>
-                  {unreadCount > 99 ? '99+' : unreadCount}
-                </span>
+            <div style={{ position: 'relative' }}>
+              <button
+                type="button"
+                onClick={() => setShowNotifications(prev => !prev)}
+                className="delivery-icon-btn"
+                title="Thông báo giao hàng"
+                style={{ position: 'relative' }}
+              >
+                <Bell size={19} color={hasUrgentLate ? 'var(--danger)' : undefined} />
+                {unreadCount > 0 && (
+                  <span style={{
+                    position: 'absolute', top: '2px', right: '2px',
+                    minWidth: '15px', height: '15px', borderRadius: '999px',
+                    backgroundColor: hasUrgentLate ? 'var(--danger)' : 'var(--primary)',
+                    color: '#fff',
+                    fontSize: '0.6rem', fontWeight: 800,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    padding: '0 3px', lineHeight: 1,
+                    boxShadow: hasUrgentLate ? '0 0 8px rgba(239, 68, 68, 0.6)' : 'none'
+                  }}>
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
+                )}
+              </button>
+
+              {showNotifications && (
+                <>
+                  {/* Backdrop click outside to dismiss */}
+                  <div
+                    style={{
+                      position: 'fixed',
+                      inset: 0,
+                      zIndex: 9998,
+                      background: 'rgba(0, 0, 0, 0.12)'
+                    }}
+                    onClick={() => setShowNotifications(false)}
+                  />
+                  {/* Dropdown dropping down directly from Bell icon */}
+                  <DeliveryNotificationDropdown
+                    onClose={() => setShowNotifications(false)}
+                    notifications={notifications}
+                    unreadCount={unreadCount}
+                    onMarkAllAsRead={handleMarkAllAsRead}
+                    onNotificationClick={handleNotificationClick}
+                  />
+                </>
               )}
-            </button>
+            </div>
             <button type="button" onClick={handleLogout} className="delivery-icon-btn" title="Đăng xuất">
               <LogOut size={18} />
             </button>
@@ -479,16 +504,6 @@ export default function DeliveryAppShell({ children }) {
           </div>
         </div>
       )}
-
-      {/* Delivery Notifications Sheet */}
-      <DeliveryNotificationSheet
-        isOpen={showNotifications}
-        onClose={() => setShowNotifications(false)}
-        notifications={notifications}
-        unreadCount={unreadCount}
-        onMarkAllAsRead={handleMarkAllAsRead}
-        onNotificationClick={handleNotificationClick}
-      />
     </div>
   );
 }
