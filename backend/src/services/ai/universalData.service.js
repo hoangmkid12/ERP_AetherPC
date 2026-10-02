@@ -375,12 +375,31 @@ SQL Query:`;
       const result = await aiClient.models.generateContent({
         model: 'gemini-2.5-flash',
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        config: { temperature: 0.05, maxOutputTokens: 300 }
+        config: { temperature: 0.05, maxOutputTokens: 500 }
       });
 
-      let sql = result.text?.trim() || '';
-      // Làm sạch nếu model bọc markdown
-      sql = sql.replace(/```sql/gi, '').replace(/```/g, '').trim();
+      let rawResponse = result.text?.trim() || '';
+      let sql = '';
+
+      // Trường hợp 1: Gemini trả về JSON theo chuẩn PHẦN 6
+      const jsonMatch = rawResponse.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        try {
+          const parsed = JSON.parse(jsonMatch[0]);
+          if (parsed.status === 'OK' && parsed.sql) {
+            sql = parsed.sql.trim();
+          } else if (parsed.status === 'FORBIDDEN' || parsed.status === 'UNSUPPORTED') {
+            console.log(`[UniversalData] Gemini từ chối truy vấn: status=${parsed.status}`);
+            return null;
+          }
+        } catch (e) {}
+      }
+
+      // Trường hợp 2: Gemini trả về chuỗi SQL thô hoặc bọc markdown
+      if (!sql) {
+        sql = rawResponse.replace(/```sql/gi, '').replace(/```/g, '').trim();
+      }
+
       if (sql && isSafeSqlQuery(sql)) {
         return sql;
       }

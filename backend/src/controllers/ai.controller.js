@@ -582,12 +582,40 @@ Hãy phân tích câu hỏi trên và đưa ra phản hồi lịch sự, thân t
       // Hỗ trợ ngữ cảnh: targetRole, timePeriod, subIntent
       // -----------------------------------------------------------------------
       case 'FINANCE_REPORT': {
+        // Nếu người dùng hỏi doanh thu cụ thể theo thời gian (năm nay, tháng này, quý này, từng tháng, top sản phẩm, kênh online...)
+        // hãy ưu tiên Universal Live Data Engine để query đúng 100% số liệu thực từ database
+        const isTimePeriodRevenue = /(năm nay|tháng này|tháng trước|hôm qua|tuần này|từng tháng|chi tiết|bao nhiêu|kênh|danh mục|quý)/i.test(promptText);
+        if (isTimePeriodRevenue) {
+          const universalResult = await executeUniversalDataQuery(promptText, user).catch(() => null);
+          if (universalResult && universalResult.success) {
+            finalAiResponse = universalResult.finalResponse;
+            toolCallsExecuted.push({
+              tool: 'universal_live_data_query',
+              params: { query: promptText, sql: universalResult.sqlUsed },
+              result: { rowCount: universalResult.rowCount }
+            });
+            break;
+          }
+        }
+
         const toolResult = await executeToolCall('get_finance_kpi', { period: entities.timePeriod || 'TODAY' }, user);
         toolCallsExecuted.push({ tool: 'get_finance_kpi', params: { period: entities.timePeriod || 'TODAY' }, result: toolResult });
 
         if (!toolResult.success && toolResult.error === 'PERMISSION_DENIED') {
           finalAiResponse = `⚠️ **Từ chối truy cập:** Vai trò của bạn (**${user.role}**) không có thẩm quyền tra cứu dữ liệu tài chính của doanh nghiệp. Vui lòng liên hệ Ban Giám Đốc (CEO) hoặc Kế Toán Trưởng.`;
         } else if (toolResult.data) {
+          // Thử tra cứu thêm qua Universal SQL để trả lời chính xác số liệu
+          const universalResult = await executeUniversalDataQuery(promptText, user).catch(() => null);
+          if (universalResult && universalResult.success) {
+            finalAiResponse = universalResult.finalResponse;
+            toolCallsExecuted.push({
+              tool: 'universal_live_data_query',
+              params: { query: promptText, sql: universalResult.sqlUsed },
+              result: { rowCount: universalResult.rowCount }
+            });
+            break;
+          }
+
           // Nếu câu hỏi có ngữ cảnh đặc biệt (targetRole, subIntent cụ thể), dùng Gemini tổng hợp phản hồi phù hợp ngữ cảnh
           const hasContext = entities.targetRole || (subIntent && subIntent !== 'Báo cáo tài chính');
           if (hasContext && aiClient) {
@@ -603,7 +631,7 @@ ${entities.targetRole ? `Vai trò/bộ phận được nhắc đến: ${entities
 ${subIntent ? `Ý định cụ thể: ${subIntent}` : ''}
 Vai trò người hỏi: ${user.role}
 
-Hãy trả lời chính xác dựa trên dữ liệu trên. Nếu dữ liệu chưa đủ chi tiết cho vai trò/bộ phận cụ thể được nhắc đến, hãy cung cấp dữ liệu tổng quan có sẵn kèm gợi ý nơi xem chi tiết hơn. Dùng Markdown đẹp, chuyên nghiệp.`;
+Hãy trả lời chính xác dựa trên dữ liệu trên. Dùng Markdown đẹp, chuyên nghiệp.`;
 
               const aiGen = await aiClient.models.generateContent({
                 model: 'gemini-2.5-flash',
