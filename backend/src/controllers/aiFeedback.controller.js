@@ -305,7 +305,7 @@ const executeTestSql = async (req, res, next) => {
   }
 };
 
-// Gợi ý câu lệnh SQL thông minh cho câu hỏi dựa trên Gemini NL2SQL
+// Gợi ý câu lệnh SQL thông minh cho câu hỏi dựa trên Gemini NL2SQL & Semantic Rules
 const generateSuggestedSql = async (req, res, next) => {
   try {
     const { question } = req.body || {};
@@ -313,11 +313,27 @@ const generateSuggestedSql = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'Thiếu câu hỏi cần gợi ý SQL.' });
     }
 
-    const { generateSqlFromQuestion } = require('../services/ai/universalData.service');
-    const sql = await generateSqlFromQuestion(question.trim(), req.user?.role || 'ADMIN');
+    const { generateSqlFromQuestion, generateSqlBySemanticPattern } = require('../services/ai/universalData.service');
+    let sql = await generateSqlFromQuestion(question.trim(), req.user?.role || 'ADMIN');
+    if (!sql) {
+      sql = generateSqlBySemanticPattern(question.trim(), req.user?.role || 'ADMIN');
+    }
+
+    // Fallback thông minh theo chủ đề câu hỏi thay vì hardcode generic query
+    if (!sql) {
+      const lower = question.toLowerCase();
+      if (/(doanh thu|doanh số|tiền thu|thu được)/.test(lower)) {
+        sql = `SELECT SUM(total_amount) AS doanh_thu_nam_nay FROM orders WHERE status IN ('DELIVERED', 'COMPLETED') AND created_at >= date_trunc('year', now() AT TIME ZONE 'Asia/Ho_Chi_Minh');`;
+      } else if (/(tồn kho|hết hàng|sản phẩm)/.test(lower)) {
+        sql = `SELECT product_id, name, sku, stock_quantity, retail_price FROM products WHERE stock_quantity > 0 ORDER BY stock_quantity DESC LIMIT 15;`;
+      } else {
+        sql = `SELECT order_id, total_amount, status, created_at FROM orders ORDER BY created_at DESC LIMIT 10;`;
+      }
+    }
+
     res.json({
       success: true,
-      sql: sql || 'SELECT order_id, total_amount, status, created_at FROM orders ORDER BY created_at DESC LIMIT 10;'
+      sql
     });
   } catch (err) {
     next(err);

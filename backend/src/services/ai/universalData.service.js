@@ -258,6 +258,33 @@ const isSafeSqlQuery = (sql) => {
 const generateSqlBySemanticPattern = (userPrompt, userRole) => {
   const lower = userPrompt.toLowerCase();
 
+  // 0. Doanh thu & Dòng tiền theo mốc thời gian (Năm nay, Tháng này, Quý này, Hôm nay, Hôm qua, Từng tháng...)
+  if (/(doanh thu|doanh số|tiền thu|thu được)/.test(lower)) {
+    if (/(năm nay|cả năm|năm 2026)/.test(lower)) {
+      return `SELECT SUM(total_amount) AS doanh_thu_nam_nay FROM orders WHERE status IN ('DELIVERED', 'COMPLETED') AND created_at >= date_trunc('year', now() AT TIME ZONE 'Asia/Ho_Chi_Minh');`;
+    }
+    if (/(tháng trước)/.test(lower)) {
+      return `SELECT SUM(total_amount) AS doanh_thu_thang_truoc FROM orders WHERE status IN ('DELIVERED', 'COMPLETED') AND created_at >= date_trunc('month', now() AT TIME ZONE 'Asia/Ho_Chi_Minh') - INTERVAL '1 month' AND created_at < date_trunc('month', now() AT TIME ZONE 'Asia/Ho_Chi_Minh');`;
+    }
+    if (/(tháng này|trong tháng)/.test(lower)) {
+      return `SELECT SUM(total_amount) AS doanh_thu_thang_nay FROM orders WHERE status IN ('DELIVERED', 'COMPLETED') AND created_at >= date_trunc('month', now() AT TIME ZONE 'Asia/Ho_Chi_Minh');`;
+    }
+    if (/(quý này|quý)/.test(lower)) {
+      return `SELECT SUM(total_amount) AS doanh_thu_quy_nay FROM orders WHERE status IN ('DELIVERED', 'COMPLETED') AND created_at >= date_trunc('quarter', now() AT TIME ZONE 'Asia/Ho_Chi_Minh');`;
+    }
+    if (/(hôm qua)/.test(lower)) {
+      return `SELECT SUM(total_amount) AS doanh_thu_hom_qua FROM orders WHERE status IN ('DELIVERED', 'COMPLETED') AND created_at >= date_trunc('day', now() AT TIME ZONE 'Asia/Ho_Chi_Minh') - INTERVAL '1 day' AND created_at < date_trunc('day', now() AT TIME ZONE 'Asia/Ho_Chi_Minh');`;
+    }
+    if (/(hôm nay|trong ngày)/.test(lower)) {
+      return `SELECT SUM(total_amount) AS doanh_thu_hom_nay FROM orders WHERE status IN ('DELIVERED', 'COMPLETED') AND created_at >= date_trunc('day', now() AT TIME ZONE 'Asia/Ho_Chi_Minh');`;
+    }
+    if (/(từng tháng|mỗi tháng)/.test(lower)) {
+      return `SELECT to_char(created_at, 'YYYY-MM') AS thang, COUNT(*) AS so_don, SUM(total_amount) AS doanh_thu FROM orders WHERE status IN ('DELIVERED', 'COMPLETED') AND created_at >= date_trunc('year', now() AT TIME ZONE 'Asia/Ho_Chi_Minh') GROUP BY thang ORDER BY thang ASC;`;
+    }
+    // Mặc định doanh thu năm nay nếu không nói rõ
+    return `SELECT SUM(total_amount) AS doanh_thu_nam_nay FROM orders WHERE status IN ('DELIVERED', 'COMPLETED') AND created_at >= date_trunc('year', now() AT TIME ZONE 'Asia/Ho_Chi_Minh');`;
+  }
+
   // 1. Sản phẩm hết hàng / tồn kho bằng 0
   if (/(hết hàng|tồn.*bằng 0|tồn.*=.*0|hết tồn)/.test(lower)) {
     return `SELECT product_id, name, price, stock_quantity, status FROM products WHERE stock_quantity = 0 AND status = 'ACTIVE' LIMIT 15;`;

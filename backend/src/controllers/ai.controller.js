@@ -323,7 +323,27 @@ const chatWithAi = async (req, res, next) => {
       };
     }
 
-    // 2. Nếu mô hình tự train chưa đủ tự tin (< 70%), kích hoạt Gemini AI / Regex Classifier
+    // 2. Chống nhầm lẫn ngữ nghĩa tiếng Việt: Câu hỏi lịch sự "cho tôi biết/cho tôi xem..."
+    // về doanh thu, tài chính, đơn hàng, tồn kho tuyệt đối KHÔNG phải là MY_PROFILE_TASKS
+    const lowerPrompt = promptText.toLowerCase();
+    const isAskingCompanyFinance = /(doanh thu|tài chính|dòng tiền|ngân hàng|sổ cái|vietqr)/i.test(lowerPrompt);
+    const isStrictPersonal = /(của tôi|của em|của mình|cá nhân tôi|cá nhân em|hồ sơ của tôi|thông tin của tôi|tôi là ai)/i.test(lowerPrompt);
+
+    if (isAskingCompanyFinance && !isStrictPersonal) {
+      classified = {
+        intent: 'FINANCE_REPORT',
+        subIntent: 'Báo cáo doanh thu và tài chính doanh nghiệp',
+        entities: { 
+          timePeriod: /(năm nay|cả năm|năm 2026)/i.test(lowerPrompt) ? 'THIS_YEAR' 
+            : /(tháng này)/i.test(lowerPrompt) ? 'THIS_MONTH'
+            : /(quý này|quý)/i.test(lowerPrompt) ? 'THIS_QUARTER'
+            : 'TODAY'
+        },
+        confidence: 0.99
+      };
+    }
+
+    // 3. Nếu mô hình tự train chưa đủ tự tin (< 70%), kích hoạt Gemini AI / Regex Classifier
     if (!classified) {
       const regexMatch = classifyIntentByRegex(promptText);
       const isDirectRegexIntent = ['MY_DELIVERY_TASKS', 'MY_PROFILE_TASKS', 'SECURITY_BLOCK'].includes(regexMatch.intent);

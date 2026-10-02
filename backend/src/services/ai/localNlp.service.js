@@ -166,6 +166,65 @@ const extractSlotsAndGenerateSql = async (promptText) => {
 
     // SINH SQL DỰA TRÊN SLOTS ĐÃ TRÍCH XUẤT:
     
+    // 0. Doanh thu & Tài chính theo mốc thời gian (năm nay, tháng này, quý này, hôm nay, từng tháng...)
+    if (/(doanh thu|doanh số|tiền thu|thu được)/.test(lower)) {
+      if (/(năm nay|cả năm|năm 2026)/.test(lower)) {
+        return {
+          sql: `SELECT SUM(total_amount) AS doanh_thu_nam_nay FROM orders WHERE status IN ('DELIVERED', 'COMPLETED') AND created_at >= date_trunc('year', now() AT TIME ZONE 'Asia/Ho_Chi_Minh');`,
+          intent: 'FINANCE_REPORT',
+          slots
+        };
+      }
+      if (/(tháng trước)/.test(lower)) {
+        return {
+          sql: `SELECT SUM(total_amount) AS doanh_thu_thang_truoc FROM orders WHERE status IN ('DELIVERED', 'COMPLETED') AND created_at >= date_trunc('month', now() AT TIME ZONE 'Asia/Ho_Chi_Minh') - INTERVAL '1 month' AND created_at < date_trunc('month', now() AT TIME ZONE 'Asia/Ho_Chi_Minh');`,
+          intent: 'FINANCE_REPORT',
+          slots
+        };
+      }
+      if (/(tháng này|trong tháng)/.test(lower)) {
+        return {
+          sql: `SELECT SUM(total_amount) AS doanh_thu_thang_nay FROM orders WHERE status IN ('DELIVERED', 'COMPLETED') AND created_at >= date_trunc('month', now() AT TIME ZONE 'Asia/Ho_Chi_Minh');`,
+          intent: 'FINANCE_REPORT',
+          slots
+        };
+      }
+      if (/(quý này|quý)/.test(lower)) {
+        return {
+          sql: `SELECT SUM(total_amount) AS doanh_thu_quy_nay FROM orders WHERE status IN ('DELIVERED', 'COMPLETED') AND created_at >= date_trunc('quarter', now() AT TIME ZONE 'Asia/Ho_Chi_Minh');`,
+          intent: 'FINANCE_REPORT',
+          slots
+        };
+      }
+      if (/(hôm qua)/.test(lower)) {
+        return {
+          sql: `SELECT SUM(total_amount) AS doanh_thu_hom_qua FROM orders WHERE status IN ('DELIVERED', 'COMPLETED') AND created_at >= date_trunc('day', now() AT TIME ZONE 'Asia/Ho_Chi_Minh') - INTERVAL '1 day' AND created_at < date_trunc('day', now() AT TIME ZONE 'Asia/Ho_Chi_Minh');`,
+          intent: 'FINANCE_REPORT',
+          slots
+        };
+      }
+      if (/(hôm nay|trong ngày)/.test(lower)) {
+        return {
+          sql: `SELECT SUM(total_amount) AS doanh_thu_hom_nay FROM orders WHERE status IN ('DELIVERED', 'COMPLETED') AND created_at >= date_trunc('day', now() AT TIME ZONE 'Asia/Ho_Chi_Minh');`,
+          intent: 'FINANCE_REPORT',
+          slots
+        };
+      }
+      if (/(từng tháng|mỗi tháng)/.test(lower)) {
+        return {
+          sql: `SELECT to_char(created_at, 'YYYY-MM') AS thang, COUNT(*) AS so_don, SUM(total_amount) AS doanh_thu FROM orders WHERE status IN ('DELIVERED', 'COMPLETED') AND created_at >= date_trunc('year', now() AT TIME ZONE 'Asia/Ho_Chi_Minh') GROUP BY thang ORDER BY thang ASC;`,
+          intent: 'FINANCE_REPORT',
+          slots
+        };
+      }
+      // Mặc định doanh thu năm nay nếu không rõ mốc
+      return {
+        sql: `SELECT SUM(total_amount) AS doanh_thu_nam_nay FROM orders WHERE status IN ('DELIVERED', 'COMPLETED') AND created_at >= date_trunc('year', now() AT TIME ZONE 'Asia/Ho_Chi_Minh');`,
+        intent: 'FINANCE_REPORT',
+        slots
+      };
+    }
+
     // 1. Thống kê theo trạng thái
     if (slots.isGroupStatus) {
       return {

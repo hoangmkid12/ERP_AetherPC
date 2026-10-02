@@ -638,14 +638,56 @@ export default function SystemAdmin() {
     }
   }, [activeTab]);
 
+  const getSmartInitialSql = (q) => {
+    const lower = (q || '').toLowerCase();
+    if (/(doanh thu|doanh số|tiền thu|thu được)/.test(lower)) {
+      if (/(năm nay|cả năm|năm 2026)/.test(lower)) {
+        return `SELECT SUM(total_amount) AS doanh_thu_nam_nay FROM orders WHERE status IN ('DELIVERED', 'COMPLETED') AND created_at >= date_trunc('year', now() AT TIME ZONE 'Asia/Ho_Chi_Minh');`;
+      }
+      if (/(tháng trước)/.test(lower)) {
+        return `SELECT SUM(total_amount) AS doanh_thu_thang_truoc FROM orders WHERE status IN ('DELIVERED', 'COMPLETED') AND created_at >= date_trunc('month', now() AT TIME ZONE 'Asia/Ho_Chi_Minh') - INTERVAL '1 month' AND created_at < date_trunc('month', now() AT TIME ZONE 'Asia/Ho_Chi_Minh');`;
+      }
+      if (/(tháng này|trong tháng)/.test(lower)) {
+        return `SELECT SUM(total_amount) AS doanh_thu_thang_nay FROM orders WHERE status IN ('DELIVERED', 'COMPLETED') AND created_at >= date_trunc('month', now() AT TIME ZONE 'Asia/Ho_Chi_Minh');`;
+      }
+      if (/(quý này|quý)/.test(lower)) {
+        return `SELECT SUM(total_amount) AS doanh_thu_quy_nay FROM orders WHERE status IN ('DELIVERED', 'COMPLETED') AND created_at >= date_trunc('quarter', now() AT TIME ZONE 'Asia/Ho_Chi_Minh');`;
+      }
+      if (/(hôm qua)/.test(lower)) {
+        return `SELECT SUM(total_amount) AS doanh_thu_hom_qua FROM orders WHERE status IN ('DELIVERED', 'COMPLETED') AND created_at >= date_trunc('day', now() AT TIME ZONE 'Asia/Ho_Chi_Minh') - INTERVAL '1 day' AND created_at < date_trunc('day', now() AT TIME ZONE 'Asia/Ho_Chi_Minh');`;
+      }
+      if (/(hôm nay|trong ngày)/.test(lower)) {
+        return `SELECT SUM(total_amount) AS doanh_thu_hom_nay FROM orders WHERE status IN ('DELIVERED', 'COMPLETED') AND created_at >= date_trunc('day', now() AT TIME ZONE 'Asia/Ho_Chi_Minh');`;
+      }
+      if (/(từng tháng|mỗi tháng)/.test(lower)) {
+        return `SELECT to_char(created_at, 'YYYY-MM') AS thang, COUNT(*) AS so_don, SUM(total_amount) AS doanh_thu FROM orders WHERE status IN ('DELIVERED', 'COMPLETED') AND created_at >= date_trunc('year', now() AT TIME ZONE 'Asia/Ho_Chi_Minh') GROUP BY thang ORDER BY thang ASC;`;
+      }
+      return `SELECT SUM(total_amount) AS doanh_thu_nam_nay FROM orders WHERE status IN ('DELIVERED', 'COMPLETED') AND created_at >= date_trunc('year', now() AT TIME ZONE 'Asia/Ho_Chi_Minh');`;
+    }
+    if (/(hết hàng|tồn.*=.*0|tồn.*bằng 0)/.test(lower)) {
+      return `SELECT product_id, name, price, stock_quantity, status FROM products WHERE stock_quantity = 0 AND status = 'ACTIVE' LIMIT 15;`;
+    }
+    if (/(tồn kho|sản phẩm|linh kiện)/.test(lower)) {
+      return `SELECT product_id, name, sku, stock_quantity, retail_price FROM products WHERE stock_quantity > 0 ORDER BY stock_quantity DESC LIMIT 15;`;
+    }
+    if (/(đang giao|đang ship)/.test(lower)) {
+      return `SELECT order_id, total_amount, shipping_address, status, created_at FROM orders WHERE status = 'SHIPPED' ORDER BY created_at DESC LIMIT 15;`;
+    }
+    if (/(chờ giao|chờ ship)/.test(lower)) {
+      return `SELECT order_id, total_amount, shipping_address, status, created_at FROM orders WHERE status = 'READY_TO_SHIP' ORDER BY created_at ASC LIMIT 15;`;
+    }
+    return `SELECT order_id, total_amount, status, created_at FROM orders ORDER BY created_at DESC LIMIT 10;`;
+  };
+
   const handleOpenTrainingModal = async (item, isFeedback = false) => {
     const questionText = isFeedback ? item.prompt : item.userPrompt;
+    const initialSql = getSmartInitialSql(questionText);
     
-    // Khởi tạo form với template ban đầu
+    // Khởi tạo form với template ban đầu chuẩn xác tức thì
     setTrainingForm({
       feedbackId: isFeedback ? item.id : null,
       question: questionText || '',
-      sql: 'Đang phân tích và gợi ý câu lệnh SQL chuẩn...',
+      sql: initialSql,
       description: `Kỹ năng huấn luyện từ câu hỏi: ${questionText?.slice(0, 100)}`,
       title: questionText ? `Quy trình & Hướng dẫn: ${questionText.slice(0, 50)}` : '',
       category: 'WARRANTY_RMA',
@@ -655,14 +697,14 @@ export default function SystemAdmin() {
     setTestSqlResult(null);
     setShowTrainingModal(true);
 
-    // Tự động gọi AI phân tích câu hỏi để điền câu lệnh SQL chuẩn nhất (vd doanh thu năm nay -> date_trunc('year'...))
+    // Tự động gọi backend để phân tích sâu hơn hoặc bổ sung Few-Shot động
     try {
       const suggestRes = await api.post('/ai/suggest-sql', { question: questionText });
       if (suggestRes?.sql) {
         setTrainingForm(prev => ({ ...prev, sql: suggestRes.sql }));
       }
     } catch (e) {
-      setTrainingForm(prev => ({ ...prev, sql: 'SELECT order_id, total_amount, status, created_at FROM orders ORDER BY created_at DESC LIMIT 10;' }));
+      // Đã có initialSql thông minh, giữ nguyên không bị gián đoạn
     }
   };
 
@@ -680,10 +722,19 @@ export default function SystemAdmin() {
         question: trainingForm.question 
       });
       if (res?.success) {
+        let displayContent = JSON.stringify(res.data.rows, null, 2);
+        // Nếu là kết quả tổng hợp số tiền / doanh thu thì định dạng thêm VND
+        if (res.data.rows?.length === 1 && typeof res.data.rows[0] === 'object') {
+          const firstRow = res.data.rows[0];
+          const entries = Object.entries(firstRow);
+          if (entries.length === 1 && !isNaN(Number(entries[0][1]))) {
+            const val = Number(entries[0][1]);
+            displayContent = `💰 [KẾT QUẢ TÍNH TOÁN]: ${val.toLocaleString('vi-VN')} VNĐ (${entries[0][0]})\n\n` + displayContent;
+          }
+        }
         setTestSqlResult({
           success: true,
-          preview: `✅ Truy vấn thành công (${res.data.rowCount} bản ghi trả về):\n` +
-            JSON.stringify(res.data.rows, null, 2)
+          preview: `✅ Truy vấn thành công (${res.data.rowCount} bản ghi trả về):\n` + displayContent
         });
         notify(`Kiểm thử SQL thành công (${res.data.rowCount} bản ghi)`, 'success');
       }
