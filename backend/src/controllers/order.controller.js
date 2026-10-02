@@ -329,10 +329,17 @@ const createOrder = async (req, res, next) => {
       }).catch(err => console.warn('[Email] Lỗi gửi email xác nhận:', err.message));
     }
 
+    const pad = (n) => String(n).padStart(2, '0');
+    const createdDate = order.createdAt ? new Date(order.createdAt) : new Date();
+    const dateFormatted = `${pad(createdDate.getHours())}:${pad(createdDate.getMinutes())} ${pad(createdDate.getDate())}/${pad(createdDate.getMonth() + 1)}/${createdDate.getFullYear()}`;
+
     res.status(201).json({
       success: true,
       message: 'Đặt hàng thành công!',
-      data: order
+      data: {
+        ...order,
+        date: dateFormatted
+      }
     });
   } catch (err) {
     next(err);
@@ -531,20 +538,29 @@ const getCustomerOrders = async (req, res, next) => {
     const openJobByOrder = new Map(openJobs.map(j => [j.orderId, j]));
 
     // Format dữ liệu đồng bộ với frontend
-    const formattedOrders = orders.map(ord => ({
-      ...ord,
-      id: ord.orderId,
-      customerName: ord.customer?.name || 'Khách Hàng',
-      phone: ord.customer?.phone || '',
-      email: ord.customer?.email || '',
-      address: ord.shippingAddress,
-      total: parseFloat(ord.totalAmount),
-      ...(openJobByOrder.has(ord.orderId) ? {
-        assemblyPending: true,
-        assemblyJobCode: openJobByOrder.get(ord.orderId).jobCode,
-        assemblyJobStatus: openJobByOrder.get(ord.orderId).status
-      } : {})
-    }));
+    const pad = (n) => String(n).padStart(2, '0');
+    const formattedOrders = orders.map(ord => {
+      const createdDate = ord.createdAt ? new Date(ord.createdAt) : null;
+      const dateFormatted = createdDate && !isNaN(createdDate.getTime())
+        ? `${pad(createdDate.getHours())}:${pad(createdDate.getMinutes())} ${pad(createdDate.getDate())}/${pad(createdDate.getMonth() + 1)}/${createdDate.getFullYear()}`
+        : '';
+
+      return {
+        ...ord,
+        id: ord.orderId,
+        customerName: ord.customer?.name || 'Khách Hàng',
+        phone: ord.customer?.phone || '',
+        email: ord.customer?.email || '',
+        address: ord.shippingAddress,
+        total: parseFloat(ord.totalAmount),
+        date: dateFormatted,
+        ...(openJobByOrder.has(ord.orderId) ? {
+          assemblyPending: true,
+          assemblyJobCode: openJobByOrder.get(ord.orderId).jobCode,
+          assemblyJobStatus: openJobByOrder.get(ord.orderId).status
+        } : {})
+      };
+    });
 
     res.json({
       success: true,

@@ -112,14 +112,22 @@ export const useSalesStore = create((set, get) => ({
         const merged = [...localOnlyOrders, ...apiOrders];
         const now = Date.now();
         const fortyEightHoursMs = 48 * 60 * 60 * 1000;
+        const pad = (n) => String(n).padStart(2, '0');
         const processed = merged.map(o => {
-          if (o.status === 'DELIVERED') {
-            const deliveredAtTime = o.deliveredAt ? new Date(o.deliveredAt).getTime() : (o.date ? new Date(o.date).getTime() : null);
-            if (deliveredAtTime && (now - deliveredAtTime >= fortyEightHoursMs)) {
-              return { ...o, status: 'COMPLETED', paymentStatus: 'PAID' };
+          let orderDate = o.date;
+          if (!orderDate && o.createdAt) {
+            const d = new Date(o.createdAt);
+            if (!isNaN(d.getTime())) {
+              orderDate = `${pad(d.getHours())}:${pad(d.getMinutes())} ${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
             }
           }
-          return o;
+          if (o.status === 'DELIVERED') {
+            const deliveredAtTime = o.deliveredAt ? new Date(o.deliveredAt).getTime() : (o.createdAt ? new Date(o.createdAt).getTime() : (o.date ? new Date(o.date).getTime() : null));
+            if (deliveredAtTime && (now - deliveredAtTime >= fortyEightHoursMs)) {
+              return { ...o, date: orderDate || o.date, status: 'COMPLETED', paymentStatus: 'PAID' };
+            }
+          }
+          return { ...o, date: orderDate || o.date };
         });
 
         try {
@@ -369,15 +377,20 @@ export const useSalesStore = create((set, get) => ({
       set({ error: null });
       const newOrder = await api.post('/orders', orderData);
       
+      const pad = (n) => String(n).padStart(2, '0');
+      const d = newOrder?.createdAt ? new Date(newOrder.createdAt) : new Date();
+      const orderDate = newOrder?.date || `${pad(d.getHours())}:${pad(d.getMinutes())} ${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
+      const orderWithDate = { ...newOrder, date: orderDate };
+
       set(state => {
-        const updated = [...state.orders, newOrder];
+        const updated = [...state.orders, orderWithDate];
         try {
           localStorage.setItem(STORAGE_KEYS.orders, JSON.stringify(updated));
         } catch (e) {}
         return { orders: updated };
       });
       
-      return newOrder;
+      return orderWithDate;
     } catch (err) {
       const errorMsg = err.message || 'Failed to create order';
       set({ error: errorMsg });

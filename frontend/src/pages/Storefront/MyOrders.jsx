@@ -351,6 +351,28 @@ export default function MyOrders() {
     return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price || 0);
   };
 
+  const formatOrderDate = (dateVal, createdAtVal) => {
+    if (dateVal && typeof dateVal === 'string' && dateVal.trim() !== '') {
+      if (dateVal.includes('T') && dateVal.includes('Z')) {
+        const d = new Date(dateVal);
+        if (!isNaN(d.getTime())) {
+          const pad = (n) => String(n).padStart(2, '0');
+          return `${pad(d.getHours())}:${pad(d.getMinutes())} ${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
+        }
+      }
+      return dateVal;
+    }
+    if (createdAtVal) {
+      const d = new Date(createdAtVal);
+      if (!isNaN(d.getTime())) {
+        const pad = (n) => String(n).padStart(2, '0');
+        return `${pad(d.getHours())}:${pad(d.getMinutes())} ${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
+      }
+      return String(createdAtVal);
+    }
+    return '---';
+  };
+
   const getOrderStatusLabel = (order) => {
     const status = typeof order === 'string' ? order : order?.status;
     const isOrderRefunded = typeof order === 'object' && (order?.paymentStatus === 'REFUNDED' || order?.status === 'REFUNDED');
@@ -1031,7 +1053,7 @@ export default function MyOrders() {
                       })()}
                     </div>
                     <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'flex', justifyContent: 'space-between' }}>
-                      <span>Ngày: {order.date}</span>
+                      <span>Ngày: {formatOrderDate(order.date, order.createdAt)}</span>
                       <strong style={{ color: 'var(--success)' }}>{formatPrice(order.totalAmount)}</strong>
                     </div>
 
@@ -1162,7 +1184,7 @@ export default function MyOrders() {
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
                             <p style={{ fontSize: '0.8125rem', color: '#64748b', margin: 0 }}>
-                              Khách hàng: <strong style={{ color: '#0f172a' }}>{selectedOrder.customerName}</strong> | Ngày mua: {selectedOrder.date}
+                              Khách hàng: <strong style={{ color: '#0f172a' }}>{selectedOrder.customerName}</strong> | Ngày mua: <strong style={{ color: '#0f172a' }}>{formatOrderDate(selectedOrder.date, selectedOrder.createdAt)}</strong>
                             </p>
                             {(selectedOrder.originalOrderId || (String(selectedOrder.orderId).startsWith('ORD-EXC-') && orders.some(o => o.orderId === String(selectedOrder.orderId).replace('ORD-EXC-', 'ORD-')))) && (() => {
                               const origId = selectedOrder.originalOrderId || String(selectedOrder.orderId).replace('ORD-EXC-', 'ORD-');
@@ -2495,7 +2517,7 @@ export default function MyOrders() {
                 >
                   <option value="">-- Chọn đơn hàng liên quan (Không bắt buộc) --</option>
                   {matchedOrders.map(o => (
-                    <option key={o.orderId} value={o.orderId}>{o.orderId} - {formatPrice(o.totalAmount)} ({o.date})</option>
+                    <option key={o.orderId} value={o.orderId}>{o.orderId} - {formatPrice(o.totalAmount)} ({formatOrderDate(o.date, o.createdAt)})</option>
                   ))}
                 </select>
               </div>
