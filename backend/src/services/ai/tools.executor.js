@@ -29,6 +29,118 @@ const executeToolCall = async (toolName, params, user) => {
   }
 };
 
+// Từ điển ngữ nghĩa chuyên ngành Máy tính, Phần cứng & Quy chế ERP AetherPC
+// Ánh xạ ngôn ngữ giao tiếp đời thường của khách hàng/nhân viên vào văn bản quy chế chính thức
+const SEMANTIC_DOMAIN_THESAURUS = [
+  {
+    topic: 'WARRANTY_RMA',
+    slug: 'chinh-sach-bao-hanh-doi-tra-linh-kien-1-doi-1',
+    tags: ['bảo hành', 'đổi trả', '1 đổi 1', 'rma', 'lỗi kỹ thuật', 'linh kiện'],
+    patterns: [
+      /không lên hình|màn hình đen|không nhận|chập cháy|cháy nổ|quạt không quay/i,
+      /đơ máy|treo máy|màn hình xanh|bsod|đột tử|không boot|không nhận ram/i,
+      /đổi con mới|đổi mới|đòi đổi|trả lại|hoàn tiền|1 đổi 1|30 ngày/i,
+      /cong chân|gãy chân|rách tem|tem vỡ|vào nước|ẩm mốc|rơi vỡ/i,
+      /bảo hành|đổi trả|rma|thẩm định kỹ thuật|lỗi kỹ thuật|bị hư hỏng|hư hỏng/i
+    ],
+    semanticTokens: ['đổi', 'mới', 'lỗi', 'không lên', 'kỹ thuật', '1 đổi 1', '30 ngày', 'bảo hành', 'phần cứng', 'từ chối']
+  },
+  {
+    topic: 'SALES_DISCOUNT',
+    slug: 'quy-che-chiet-khau-ban-le-chinh-sach-khach-hang-vip',
+    tags: ['chiết khấu', 'giảm giá', 'khách vip', 'sales policy', 'bán lẻ'],
+    patterns: [
+      /bớt giá|giảm giá|xin bớt|giảm thêm|kỳ kèo|mặc cả|giảm bớt/i,
+      /mua nhiều|đơn to|khách vip|hạng bạc|hạng vàng|kim cương|silver|gold|diamond/i,
+      /tự giảm|thẩm quyền|trưởng phòng duyệt|hoa hồng|chiết khấu|phần trăm/i
+    ],
+    semanticTokens: ['chiết khấu', 'vip', 'giảm', 'tối đa', 'thẩm quyền', 'trưởng phòng', 'bạc', 'vàng', 'kim cương', '50 triệu']
+  },
+  {
+    topic: 'TECHNICAL_QA',
+    slug: 'tieu-chuan-ky-thuat-lap-rap-pc-quy-trinh-test-benchmark',
+    tags: ['lắp ráp pc', 'benchmark', 'furmark', 'cinebench', 'nhiệt độ', 'qa qc'],
+    patterns: [
+      /lắp ráp|keo tản|tra keo|dây nhợ|bó dây|đi dây|chống xệ/i,
+      /nóng quá|nhiệt độ|độ c|test máy|chạy thử|stress test|benchmark|furmark|cinebench|memtest/i,
+      /xmp|expo|ram bus|tiêu chuẩn lắp|kỹ thuật viên/i
+    ],
+    semanticTokens: ['furmark', 'cinebench', 'nhiệt độ', 'benchmark', 'keo tản nhiệt', 'đi dây', 'tiêu chuẩn', 'test máy', '80 độ']
+  },
+  {
+    topic: 'LOGISTICS_PACKING',
+    slug: 'quy-trinh-giao-nhan-hang-doi-soat-tien-mat-cod-shipper',
+    tags: ['giao hàng', 'shipper', 'pod', 'tiền mặt', 'cod', 'đối soát', 'đóng gói'],
+    patterns: [
+      /đóng gói|bọc hàng|bọc xốp|thùng xốp|túi khí|bọt biển|instapak|niêm phong|băng keo/i,
+      /giao hàng|chở hàng|shipper|pod|chụp ảnh|móp hộp|khách từ chối/i,
+      /tiền mặt|thu tiền|cod|nộp tiền|đối soát|két sắt|18h|mấy giờ/i
+    ],
+    semanticTokens: ['đóng gói', 'bọt biển', 'thùng xốp', 'instapak', 'shipper', 'pod', 'chụp ảnh', 'cod', 'tiền mặt', '18h', 'đối soát']
+  },
+  {
+    topic: 'SECURITY_DATA',
+    slug: 'chinh-sach-bao-mat',
+    tags: ['bảo mật', 'an toàn thông tin', 'dữ liệu khách hàng', 'mật khẩu', 'rò rỉ dữ liệu', 'sa thải', 'nghỉ việc'],
+    patterns: [
+      /bảo mật|an toàn thông tin|dữ liệu khách hàng|rò rỉ|lộ thông tin|lộ dữ liệu/i,
+      /mật khẩu|password|pass|khóa máy|windows l|rời bàn làm việc/i,
+      /sa thải|nghỉ việc|bàn giao tài khoản|thu hồi quyền/i
+    ],
+    semanticTokens: ['mật khẩu', 'bảo mật', 'dữ liệu', 'khóa màn hình', 'sa thải', 'vi phạm', 'quy tắc', 'tiết lộ']
+  },
+  {
+    topic: 'FINANCE_BANKING',
+    slug: 'quy-dinh-quan-ly-tai-khoan-ngan-hang-doanh-nghiep-vietqr',
+    tags: ['ngân hàng', 'vietqr', 'sod', 'tài chính', 'chuyển khoản', 'kế toán'],
+    patterns: [
+      /ngân hàng|tài khoản công ty|tài khoản doanh nghiệp|vietqr|mbbank|vietcombank|vcb/i,
+      /sod|phân nhiệm|kế toán trưởng duyệt|két sắt|tiền về/i,
+      /quét qr|chuyển khoản|tài khoản mặc định/i
+    ],
+    semanticTokens: ['ngân hàng', 'vietqr', 'tài khoản', 'mbbank', 'vietcombank', 'sod', 'phân nhiệm', 'kế toán trưởng']
+  },
+  {
+    topic: 'HR_PAYROLL',
+    slug: 'quy-che-thuong-kpi-chi-tra-luong-hang-thang-cho-nhan-su',
+    tags: ['lương thưởng', 'kpi', 'hoa hồng', 'nhân sự', 'duyệt lương'],
+    patterns: [
+      /lương|bảng lương|thưởng|kpi|hoa hồng|ngày lĩnh lương|ngày nhận lương/i,
+      /ngày 5|ngày 10|chấm công|nghỉ phép|duyệt lương|quy chế lương/i
+    ],
+    semanticTokens: ['lương', 'thưởng', 'kpi', 'hoa hồng', 'ngày 5', 'ngày 10', 'nhân sự', 'chi trả']
+  }
+];
+
+const identifySemanticTopic = (query) => {
+  if (!query || typeof query !== 'string') return null;
+  const qLower = query.toLowerCase();
+  
+  let bestTopic = null;
+  let maxScore = 0;
+
+  for (const item of SEMANTIC_DOMAIN_THESAURUS) {
+    let score = 0;
+    for (const pat of item.patterns) {
+      if (pat.test(qLower)) {
+        score += 20;
+      }
+    }
+    // Điểm thưởng cho từ khóa chuyên biệt
+    for (const token of item.semanticTokens) {
+      if (qLower.includes(token)) {
+        score += 5;
+      }
+    }
+    if (score > maxScore) {
+      maxScore = score;
+      bestTopic = item;
+    }
+  }
+
+  return maxScore >= 15 ? bestTopic : null;
+};
+
 // 1. Tra cứu kho tài liệu tri thức (Knowledge Base)
 const executeLookupKnowledgeBase = async (params, userRole) => {
   const { query, category } = params || {};
@@ -52,6 +164,8 @@ const executeLookupKnowledgeBase = async (params, userRole) => {
   }
 
   const q = query.trim();
+  const matchedThesaurus = identifySemanticTopic(q);
+
   // Tách các từ khóa có nghĩa để tìm kiếm linh hoạt (tránh câu dài không khớp nguyên văn)
   const keywords = q
     .toLowerCase()
@@ -65,10 +179,19 @@ const executeLookupKnowledgeBase = async (params, userRole) => {
     { content: { contains: q, mode: 'insensitive' } }
   ];
 
+  // Nạp thêm từ khóa tách dòng
   for (const kw of keywords) {
     orConditions.push({ title: { contains: kw, mode: 'insensitive' } });
     orConditions.push({ summary: { contains: kw, mode: 'insensitive' } });
     orConditions.push({ tags: { has: kw } });
+  }
+
+  // TIER 2: Nếu câu hỏi tự nhiên khớp với Từ điển Ngữ nghĩa PC/ERP, tiêm trực tiếp Slug và Tags vào OR
+  if (matchedThesaurus) {
+    orConditions.push({ slug: matchedThesaurus.slug });
+    for (const tag of matchedThesaurus.tags) {
+      orConditions.push({ tags: { has: tag } });
+    }
   }
 
   const searchFilter = { OR: orConditions };
@@ -81,7 +204,7 @@ const executeLookupKnowledgeBase = async (params, userRole) => {
 
   const documents = await prisma.knowledgeDocument.findMany({
     where,
-    take: 3,
+    take: 5,
     select: {
       id: true,
       title: true,
@@ -103,7 +226,7 @@ const executeLookupKnowledgeBase = async (params, userRole) => {
     };
   }
 
-  // Sắp xếp theo độ liên quan cao nhất: ưu tiên từ khóa chủ đề cốt lõi
+  // Sắp xếp theo độ liên quan cao nhất: ưu tiên từ khóa chủ đề cốt lõi và Thesaurus
   const qLower = q.toLowerCase();
   const coreKeywords = [
     'mật khẩu', 'password', 'pass', 'bảo mật', 'an toàn', 'an ninh', 
@@ -117,6 +240,17 @@ const executeLookupKnowledgeBase = async (params, userRole) => {
   documents.sort((a, b) => {
     let aScore = 0;
     let bScore = 0;
+
+    // Trọng số vượt trội nếu trùng khớp Slug hoặc Tag trong Semantic Thesaurus
+    if (matchedThesaurus) {
+      if (a.slug === matchedThesaurus.slug) aScore += 120;
+      if (b.slug === matchedThesaurus.slug) bScore += 120;
+
+      for (const t of matchedThesaurus.tags) {
+        if ((a.tags || []).includes(t)) aScore += 25;
+        if ((b.tags || []).includes(t)) bScore += 25;
+      }
+    }
 
     for (const ck of matchedCoreKeywords) {
       if (a.title.toLowerCase().includes(ck) || (a.tags || []).some(t => t.toLowerCase().includes(ck))) aScore += 50;
@@ -137,8 +271,8 @@ const executeLookupKnowledgeBase = async (params, userRole) => {
     return bScore - aScore;
   });
 
-  // Nếu câu hỏi có từ khóa chủ đề cốt lõi nhưng tài liệu đứng đầu lại không hề chứa từ khóa đó, coi như không tìm thấy tài liệu phù hợp
-  if (matchedCoreKeywords.length > 0) {
+  // Nếu câu hỏi có từ khóa chủ đề cốt lõi nhưng tài liệu đứng đầu lại không hề chứa từ khóa đó (và không match thesaurus), coi như không tìm thấy
+  if (matchedCoreKeywords.length > 0 && !matchedThesaurus) {
     const topDoc = documents[0];
     const topHasCore = matchedCoreKeywords.some(ck => 
       topDoc.title.toLowerCase().includes(ck) || 
@@ -162,6 +296,13 @@ const executeLookupKnowledgeBase = async (params, userRole) => {
       .split(/\s+/)
       .filter(w => w.length >= 2 && !['trong', 'nhiêu', 'ngày', 'như', 'thế', 'nào', 'được', 'cho', 'của', 'với', 'các', 'những', 'một', 'mình', 'muốn', 'khách'].includes(w));
     
+    // Nếu có semanticTokens từ Thesaurus, thêm vào để tăng độ tập trung trích xuất điều khoản
+    if (matchedThesaurus?.semanticTokens) {
+      for (const st of matchedThesaurus.semanticTokens) {
+        if (!qTokens.includes(st)) qTokens.push(st);
+      }
+    }
+
     // Tách tài liệu theo các section (##, ĐIỀU, ###)
     const sections = content.split(/(?=\n## |\nĐIỀU |\n### )/g);
     if (sections.length <= 1) {
@@ -433,5 +574,7 @@ const executeGetFinanceKpi = async (params, userRole) => {
 };
 
 module.exports = {
-  executeToolCall
+  executeToolCall,
+  identifySemanticTopic,
+  SEMANTIC_DOMAIN_THESAURUS
 };
