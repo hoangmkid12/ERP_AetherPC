@@ -2,6 +2,7 @@ const prisma = require('../config/database');
 const { getToolsForRole } = require('../services/ai/tools.definition');
 const { executeToolCall, identifySemanticTopic } = require('../services/ai/tools.executor');
 const { classifyIntentLocal } = require('../services/ai/localNlp.service');
+const { executeUniversalDataQuery } = require('../services/ai/universalData.service');
 
 // Khởi tạo Gemini client nếu có GEMINI_API_KEY
 let GoogleGenAI = null;
@@ -463,7 +464,18 @@ Hãy trả lời trực tiếp, thân thiện, rõ ràng và chuẩn xác dựa 
             `- **Shipper phụ trách:** ${o.shipper}\n` +
             `- **Linh kiện trong đơn:** ${o.itemNames || 'Chi tiết đơn lẻ'}`;
         } else {
-          finalAiResponse = `Không tìm thấy đơn hàng nào khớp với thông tin "${orderQuery}". Vui lòng kiểm tra lại Mã đơn hàng hoặc Số điện thoại người nhận.`;
+          // Thử tra cứu qua Universal ERP Live Data Engine (cho các câu hỏi tổng hợp: thống kê trạng thái, top đơn, v.v.)
+          const universalResult = await executeUniversalDataQuery(promptText, user).catch(() => null);
+          if (universalResult && universalResult.success && universalResult.rowCount > 0) {
+            finalAiResponse = universalResult.finalResponse;
+            toolCallsExecuted.push({
+              tool: 'universal_live_data_query',
+              params: { query: promptText, sql: universalResult.sqlUsed },
+              result: { rowCount: universalResult.rowCount }
+            });
+          } else {
+            finalAiResponse = `Không tìm thấy đơn hàng nào khớp với thông tin "${orderQuery}". Vui lòng kiểm tra lại Mã đơn hàng hoặc Số điện thoại người nhận.`;
+          }
         }
         break;
       }
@@ -645,10 +657,27 @@ Hãy trả lời chính xác dựa trên dữ liệu trên. Nếu dữ liệu ch
       }
 
       // -----------------------------------------------------------------------
-      // GENERAL CHAT: Tư vấn công nghệ & hội thoại thông minh (Gemini Generative)
+      // UNIVERSAL ERP LIVE DATA & GENERAL CHAT
       // -----------------------------------------------------------------------
+      case 'UNIVERSAL_DATA_QUERY':
       case 'GENERAL_CHAT':
       default: {
+        // Thử chạy qua Universal ERP Live Data Engine (Text-to-SQL an toàn)
+        try {
+          const universalResult = await executeUniversalDataQuery(promptText, user);
+          if (universalResult && universalResult.success && universalResult.rowCount > 0) {
+            finalAiResponse = universalResult.finalResponse;
+            toolCallsExecuted.push({
+              tool: 'universal_live_data_query',
+              params: { query: promptText, sql: universalResult.sqlUsed },
+              result: { rowCount: universalResult.rowCount }
+            });
+            break;
+          }
+        } catch (uErr) {
+          console.warn('[AetherCopilot] Universal live data engine bypass:', uErr.message);
+        }
+
         if (process.env.GEMINI_API_KEY && aiClient) {
           try {
             const aiGen = await aiClient.models.generateContent({
@@ -729,7 +758,11 @@ Hãy trả lời chính xác dựa trên dữ liệu trên. Nếu dữ liệu ch
       }
     }).catch(() => {});
 
-    next(err);
+    if (typeof next === 'function') {
+      next(err);
+    } else {
+      res.status(500).json({ success: false, message: err.message });
+    }
   }
 };
 
