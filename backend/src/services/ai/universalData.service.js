@@ -282,6 +282,9 @@ const generateSqlBySemanticPattern = (userPrompt, userRole) => {
 
   // 5. Đơn hàng đang giao (SHIPPED)
   if (/(đang giao|đang ship|shipped|trên đường giao)/.test(lower)) {
+    if (userRole === 'DELIVERY') {
+      return `SELECT order_id, total_amount, shipping_address, status, created_at FROM orders WHERE status = 'SHIPPED' AND assigned_shipper_id = :userId ORDER BY created_at DESC LIMIT 15;`;
+    }
     return `SELECT order_id, total_amount, shipping_address, status, created_at FROM orders WHERE status = 'SHIPPED' ORDER BY created_at DESC LIMIT 15;`;
   }
 
@@ -444,12 +447,16 @@ const executeUniversalDataQuery = async (promptText, user) => {
     };
   }
 
-  console.log(`[UniversalData] Thực thi SQL an toàn: "${generatedSql}"`);
+  // Thay thế :userId nếu có (lọc theo người dùng hiện tại)
+  const currentUserId = Number(user?.id) || 0;
+  const finalExecutableSql = generatedSql.replace(/:userId/g, currentUserId.toString());
+
+  console.log(`[UniversalData] Thực thi SQL an toàn: "${finalExecutableSql}"`);
 
   // 3. Thực thi truy vấn đọc dữ liệu trên PostgreSQL
   let rawData = [];
   try {
-    rawData = await prisma.$queryRawUnsafe(generatedSql);
+    rawData = await prisma.$queryRawUnsafe(finalExecutableSql);
   } catch (dbErr) {
     console.warn('[UniversalData] Lỗi thực thi SQL trên database:', dbErr.message);
     return null;

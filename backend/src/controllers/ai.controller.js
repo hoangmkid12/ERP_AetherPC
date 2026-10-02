@@ -235,10 +235,10 @@ const classifyIntentByRegex = (promptText) => {
   }
 
   // 3. Tra cứu đơn giao của chính shipper
-  if (/(đơn hàng|đơn).*(giao|ship)|(giao|ship).*(đơn hàng|đơn)/.test(lower) &&
-      /(tôi|mình|của tôi|của mình)/.test(lower) &&
-      /(hôm nay|bao nhiêu|số lượng|đơn nào|danh sách)/.test(lower)) {
-    return { intent: 'MY_DELIVERY_TASKS', subIntent: 'Tra cứu đơn giao được phân công cho chính tôi', entities: {}, confidence: 0.98 };
+  if (/(đơn hàng|đơn).*(giao|ship)|(giao|ship).*(đơn hàng|đơn)/.test(lower)) {
+    if (/(tôi|mình|của tôi|của mình|đang giao|đang ship|phân công|nhiệm vụ)/.test(lower)) {
+      return { intent: 'MY_DELIVERY_TASKS', subIntent: 'Tra cứu đơn giao được phân công cho chính shipper', entities: {}, confidence: 0.98 };
+    }
   }
 
   // 4. Thống kê nhân sự toàn công ty
