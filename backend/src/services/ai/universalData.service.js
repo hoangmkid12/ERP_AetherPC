@@ -180,8 +180,20 @@ const generateSqlBySemanticPattern = (userPrompt, userRole) => {
  * Sinh câu lệnh SQL từ ngôn ngữ tự nhiên bằng LLM (Có fallback sang Semantic Pattern)
  */
 const generateSqlFromQuestion = async (userPrompt, userRole) => {
+  // 1. Bước 1: Mô hình AI tự huấn luyện (Local NLU & NER) bóc tách Slot/Thực thể trước
+  let nluResult = null;
+  try {
+    const { extractSlotsAndGenerateSql } = require('./localNlp.service');
+    nluResult = await extractSlotsAndGenerateSql(userPrompt);
+  } catch (nlpErr) {
+    console.warn('[UniversalData] Local NLU extraction bypass:', nlpErr.message);
+  }
+
+  // 2. Bước 2: Nếu có Gemini AI, kết hợp Thực thể tự train + Trí tuệ Gemini (Hybrid AI)
   if (aiClient) {
     try {
+      const slotHints = nluResult?.slots ? `\n[Gợi ý thực thể trích xuất từ Mô hình AI tự train nội bộ: ${JSON.stringify(nluResult.slots)}]` : '';
+
       const prompt = `${ERP_DATABASE_SCHEMA_PROMPT}
 
 NGUYÊN TẮC BẮT BUỘC:
@@ -191,7 +203,7 @@ NGUYÊN TẮC BẮT BUỘC:
 4. Phân quyền RBAC: Nếu người hỏi là vai trò thông thường (SALES, WAREHOUSE, DELIVERY), KHÔNG truy vấn bảng ledger_entries hay lương thưởng của người khác.
 5. Khi so sánh chuỗi tiếng Việt hoặc tên, hãy dùng ILIKE '%...%' để tìm kiếm linh hoạt không phân biệt hoa thường.
 
-Câu hỏi của người dùng: "${userPrompt}"
+Câu hỏi của người dùng: "${userPrompt}"${slotHints}
 Vai trò người hỏi: ${userRole}
 SQL Query:`;
 
@@ -212,16 +224,10 @@ SQL Query:`;
     }
   }
 
-  // 2. Ưu tiên Mô hình AI tự huấn luyện (Local NLU Slot/Entity Extraction)
-  try {
-    const { extractSlotsAndGenerateSql } = require('./localNlp.service');
-    const localExtraction = await extractSlotsAndGenerateSql(userPrompt);
-    if (localExtraction && localExtraction.sql) {
-      console.log(`[UniversalData] Mô hình NLU tự train nhận diện Slots → sinh SQL: "${localExtraction.sql}"`);
-      return localExtraction.sql;
-    }
-  } catch (nlpErr) {
-    console.warn('[UniversalData] Local NLU extraction bypass:', nlpErr.message);
+  // 3. Fallback khi Gemini offline: Sử dụng trực tiếp SQL do Mô hình Tự Train sinh ra
+  if (nluResult && nluResult.sql) {
+    console.log(`[UniversalData] Mô hình NLU tự train nhận diện Slots → sinh SQL: "${nluResult.sql}"`);
+    return nluResult.sql;
   }
 
   // 3. Fallback sang Bộ quy tắc ngữ nghĩa mở rộng
