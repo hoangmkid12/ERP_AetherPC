@@ -350,42 +350,64 @@ const executeLookupProducts = async (params) => {
     return { success: false, message: 'Vui lòng cung cấp tên linh kiện cần tra cứu.' };
   }
 
-  const q = keyword.trim();
-  const products = await prisma.product.findMany({
-    where: {
-      OR: [
-        { name: { contains: q, mode: 'insensitive' } },
-        { handle: { contains: q, mode: 'insensitive' } },
-        { sku: { contains: q, mode: 'insensitive' } }
-      ]
-    },
-    take: 5,
-    select: {
-      productId: true,
-      name: true,
-      sku: true,
-      price: true,
-      category: { select: { name: true, slug: true } },
-      brand: { select: { name: true } },
-      inventory: {
-        select: {
-          quantity: true,
-          reservedQuantity: true,
-          location: { select: { name: true, code: true } }
+  // Tách từ khóa tìm kiếm: loại bỏ các từ dư thừa câu hỏi để lấy đúng tên linh kiện
+  const cleanKeyword = keyword
+    .replace(/kiểm tra|tra cứu|tồn kho|còn hàng|giá bao nhiêu|còn mấy|giá|báo giá|cho xem|card|con|bộ|chiếc|sản phẩm|linh kiện|và|với|của|cho|hỏi|ạ|shop|bên mình/gi, ' ')
+    .trim()
+    .replace(/\s+/g, ' ');
+
+  const searchTerms = [];
+  if (cleanKeyword && cleanKeyword.length >= 2) searchTerms.push(cleanKeyword);
+  searchTerms.push(keyword.trim());
+
+  let products = [];
+  for (const term of searchTerms) {
+    products = await prisma.product.findMany({
+      where: {
+        OR: [
+          { name: { contains: term, mode: 'insensitive' } },
+          { handle: { contains: term, mode: 'insensitive' } },
+          { sku: { contains: term, mode: 'insensitive' } }
+        ]
+      },
+      take: 5,
+      select: {
+        productId: true,
+        name: true,
+        sku: true,
+        price: true,
+        stockQuantity: true,
+        category: { select: { name: true, slug: true } },
+        brand: { select: { name: true } },
+        inventories: {
+          select: {
+            quantityOnHand: true,
+            quantityReserved: true,
+            warehouse: { select: { name: true } },
+            location: { select: { zone: true, shelf: true, bin: true } }
+          }
         }
       }
-    }
-  });
+    });
+
+    if (products.length > 0) break;
+  }
 
   if (products.length === 0) {
-    return { success: true, found: false, message: `Không tìm thấy linh kiện nào có tên "${q}" trong hệ thống.` };
+    return { success: true, found: false, message: `Không tìm thấy linh kiện nào có tên "${cleanKeyword || keyword}" trong hệ thống.` };
   }
 
   return {
     success: true,
     found: true,
     products: products.map(p => {
-      const totalStock = (p.inventory || []).reduce((sum, inv) => sum + (inv.quantity - (inv.reservedQuantity || 0)), 0);
+      const invStock = (p.inventories || []).reduce((sum, inv) => sum + (inv.quantityOnHand - (inv.quantityReserved || 0)), 0);
+      const totalStock = invStock > 0 ? invStock : (p.stockQuantity || 0);
+      const locationNames = (p.inventories || [])
+        .filter(i => (i.quantityOnHand - (i.quantityReserved || 0)) > 0)
+        .map(i => `${i.warehouse?.name || 'Kho'}${i.location?.shelf ? ` (Kệ ${i.location.shelf}${i.location.bin ? `-${i.location.bin}` : ''})` : ''}: còn ${i.quantityOnHand - i.quantityReserved}`)
+        .join(', ');
+
       return {
         id: p.productId,
         name: p.name,
@@ -395,7 +417,7 @@ const executeLookupProducts = async (params) => {
         category: p.category?.name,
         brand: p.brand?.name,
         availableStock: Math.max(0, totalStock),
-        stockLocations: (p.inventory || []).map(i => `${i.location?.name}: còn ${i.quantity - i.reservedQuantity}`).join(', ')
+        stockLocations: locationNames || (totalStock > 0 ? 'Kho chính AetherPC' : 'Tạm hết hàng')
       };
     })
   };
@@ -474,12 +496,14 @@ const executeLookupOrderStatus = async (params) => {
   }
 
   const queryClean = String(orderIdOrPhone).trim();
+  const codeMatch = queryClean.match(/ORD-[\w-]+|DH-[\w-]+|\b0\d{9,10}\b/i)?.[0];
+  const searchTerm = codeMatch || queryClean;
 
   const order = await prisma.order.findFirst({
     where: {
       OR: [
-        { orderId: queryClean },
-        { customer: { phone: queryClean } }
+        { orderId: { equals: searchTerm, mode: 'insensitive' } },
+        { customer: { phone: searchTerm } }
       ]
     },
     orderBy: { createdAt: 'desc' },
@@ -494,16 +518,16 @@ const executeLookupOrderStatus = async (params) => {
       payments: { select: { method: true, amount: true, status: true } },
       items: {
         select: {
-          productName: true,
+          name: true,
           quantity: true,
-          unitPrice: true
+          price: true
         }
       }
     }
   });
 
   if (!order) {
-    return { success: true, found: false, message: `Không tìm thấy đơn hàng nào với thông tin "${queryClean}".` };
+    return { success: true, found: false, message: `Không tìm thấy đơn hàng nào với thông tin "${searchTerm}".` };
   }
 
   return {
@@ -519,7 +543,7 @@ const executeLookupOrderStatus = async (params) => {
       shipper: order.assignedShipper ? `${order.assignedShipper.fullName} (${order.assignedShipper.phone || 'SĐT nội bộ'})` : 'Chưa phân công shipper',
       paymentSummary: order.payments?.map(p => `${p.method}: ${Number(p.amount).toLocaleString('vi-VN')} đ (${p.status})`).join('; ') || 'Chưa thanh toán',
       itemsCount: order.items?.length || 0,
-      itemNames: order.items?.map(i => `${i.productName} (x${i.quantity})`).slice(0, 3).join(', ')
+      itemNames: order.items?.map(i => `${i.name} (x${i.quantity})`).slice(0, 3).join(', ')
     }
   };
 };
