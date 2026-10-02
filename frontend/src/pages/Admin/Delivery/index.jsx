@@ -20,7 +20,16 @@ import OrderDetailSheet from './components/OrderDetailSheet';
 import DeliveryNavigationModal from './components/DeliveryNavigationModal';
 import RejectAssignmentSheet from './components/RejectAssignmentSheet';
 import NextOrderPromptModal from './components/NextOrderPromptModal';
-import { getDeliveryIncidentStatus, getDefaultDateFilter, matchesDateFilter, getOrderDateTime, getDateFilterLabel, isOrderRedelivery } from './deliveryHelpers';
+import {
+  getDeliveryIncidentStatus,
+  getDefaultDateFilter,
+  matchesDateFilter,
+  getOrderDateTime,
+  getDateFilterLabel,
+  isOrderRedelivery,
+  isDirectlyAssignedShipper,
+  ACTIVE_DELIVERY_STATUSES
+} from './deliveryHelpers';
 
 // Refetch orders/returns while the tab is visible, paused otherwise.
 const POLL_INTERVAL_MS = 35000;
@@ -167,14 +176,39 @@ export default function Delivery() {
   const setTab = (tKey) => {
     setSearchParams({ tab: tKey });
     setSearch('');
+    if (tKey === 'active') {
+      setIncidentFilter('ALL');
+      setOrderDateFilter({
+        period: 'ALL',
+        selectedDate: '',
+        selectedMonth: '',
+        selectedYear: '',
+        customStartDate: '',
+        customEndDate: ''
+      });
+    } else if (tKey === 'history') {
+      setOrderDateFilter(getDefaultDateFilter());
+    }
   };
 
   const [search, setSearch] = useState('');
   const [regionFilter, setRegionFilter] = useState('ALL');
   const [paymentFilter, setPaymentFilter] = useState('ALL');
   const [incidentFilter, setIncidentFilter] = useState('ALL');
-  // Mặc định lọc đơn hàng là ngày realtime (Hôm nay)
-  const [orderDateFilter, setOrderDateFilter] = useState(getDefaultDateFilter);
+  // Tab Đang Giao mặc định hiển thị Tất Cả đơn đang phụ trách (không ẩn đơn tồn/đơn cũ),
+  // Tab Lịch sử mới mặc định theo Hôm Nay
+  const [orderDateFilter, setOrderDateFilter] = useState(() => {
+    const initialTab = new URLSearchParams(window.location.search).get('tab') || 'active';
+    if (initialTab === 'history') return getDefaultDateFilter();
+    return {
+      period: 'ALL',
+      selectedDate: '',
+      selectedMonth: '',
+      selectedYear: '',
+      customStartDate: '',
+      customEndDate: ''
+    };
+  });
   const [sortOrder, setSortOrder] = useState('NEWEST');
   const [selectedOrder, setSelectedOrder] = useState(null);
 
@@ -244,21 +278,11 @@ export default function Delivery() {
     } catch (_) { return new Set(); }
   };
 
+  const isDirectlyAssigned = (o) => isDirectlyAssignedShipper(o, user);
+
   const isShipperMatched = (o) => {
     if (isManagerOrAdmin) return true;
-    const shipperStr = String(o.assignedShipper || o.assignedShipperName || '').toLowerCase();
-    const assignedIdStr = String(o.assignedShipperId || o.assignedShipperUsername || '').toLowerCase();
-
-    const isDirectlyAssigned = (assignedIdStr && (
-        assignedIdStr === userIdStr.toLowerCase() ||
-        assignedIdStr === uUser ||
-        (user?.id && assignedIdStr === String(user.id).toLowerCase())
-      )) ||
-      (uName && shipperStr && shipperStr.includes(uName)) ||
-      (uUser && shipperStr && shipperStr.includes(uUser)) ||
-      (uPhone && shipperStr && shipperStr.includes(uPhone));
-
-    if (isDirectlyAssigned) return true;
+    if (isDirectlyAssigned(o)) return true;
 
     if (o.assignedShipperId || o.assignedShipper || o.assignedShipperUsername) return false;
 
@@ -303,13 +327,14 @@ export default function Delivery() {
   );
 
   const readyCount = myDeliveryOrders.filter(o => o.status === 'READY_TO_SHIP' && isShipperMatched(o)).length;
+  // Đơn Đang Giao CHỈ tính các đơn đã gán trực tiếp cho shipper này đang trong hành trình giao (hoặc admin/manager)
   const activeOrdersList = myDeliveryOrders.filter(o =>
-    ['SHIPPED', 'SHIPPING_FAILED', 'RETURNING_TO_WAREHOUSE', 'CANCELLED'].includes(o.status) && isShipperMatched(o)
+    ACTIVE_DELIVERY_STATUSES.includes(o.status) && (isManagerOrAdmin || isDirectlyAssigned(o))
   );
   const activeCount = activeOrdersList.length;
-  const doneCount = myDeliveryOrders.filter(o => o.status === 'DELIVERED' && isShipperMatched(o)).length;
+  const doneCount = myDeliveryOrders.filter(o => o.status === 'DELIVERED' && (isManagerOrAdmin || isDirectlyAssigned(o))).length;
   const failedCount = myDeliveryOrders.filter(o => {
-    if (!isShipperMatched(o)) return false;
+    if (!isManagerOrAdmin && !isDirectlyAssigned(o)) return false;
     const st = getDeliveryIncidentStatus(o);
     return st.isAwaiting || st.isRescheduled || st.isRejected || st.isReturning;
   }).length;
@@ -318,14 +343,14 @@ export default function Delivery() {
   const newCount = activeOrdersList.filter(o => getOrderTimeClassification(o).isNew).length;
   const backlogCount = activeOrdersList.filter(o => getOrderTimeClassification(o).isBacklog).length;
 
-  const countShipping = myDeliveryOrders.filter(o => isShipperMatched(o) && getDeliveryIncidentStatus(o).isShipping).length;
-  const countAwaiting = myDeliveryOrders.filter(o => isShipperMatched(o) && getDeliveryIncidentStatus(o).isAwaiting).length;
-  const countRescheduled = myDeliveryOrders.filter(o => isShipperMatched(o) && getDeliveryIncidentStatus(o).isRescheduled).length;
-  const countRejected = myDeliveryOrders.filter(o => isShipperMatched(o) && getDeliveryIncidentStatus(o).isRejected).length;
-  const countReturning = myDeliveryOrders.filter(o => isShipperMatched(o) && getDeliveryIncidentStatus(o).isReturning).length;
+  const countShipping = activeOrdersList.filter(o => getDeliveryIncidentStatus(o).isShipping).length;
+  const countAwaiting = activeOrdersList.filter(o => getDeliveryIncidentStatus(o).isAwaiting).length;
+  const countRescheduled = activeOrdersList.filter(o => getDeliveryIncidentStatus(o).isRescheduled).length;
+  const countRejected = activeOrdersList.filter(o => getDeliveryIncidentStatus(o).isRejected).length;
+  const countReturning = activeOrdersList.filter(o => getDeliveryIncidentStatus(o).isReturning).length;
 
   const totalCodCollected = myDeliveryOrders
-    .filter(o => o.status === 'DELIVERED' && isShipperMatched(o))
+    .filter(o => o.status === 'DELIVERED' && (isManagerOrAdmin || isDirectlyAssigned(o)))
     .reduce((sum, o) => sum + (o.paymentMethod === 'COD' || !o.paymentMethod ? (parseFloat(o.totalAmount || o.total || 0)) : 0), 0);
 
   const pendingReturns = allReturnRequests.filter(r => {
@@ -369,40 +394,51 @@ export default function Delivery() {
       if (paymentFilter === 'COD' && isPaid) return false;
       if (paymentFilter === 'PREPAID' && !isPaid) return false;
 
-      const incidentState = getDeliveryIncidentStatus(o);
-
-      const ordTime = getOrderTimeClassification(o);
-      if (incidentFilter === 'TODAY' && !ordTime.isToday) return false;
-      if (incidentFilter === 'NEW' && !ordTime.isNew) return false;
-      if (incidentFilter === 'BACKLOG' && !ordTime.isBacklog) return false;
-      if (incidentFilter === 'SHIPPING' && !incidentState.isShipping) return false;
-      if (incidentFilter === 'DELIVERED' && !incidentState.isDelivered) return false;
-      if (incidentFilter === 'AWAITING_CALLBACK' && !incidentState.isAwaiting) return false;
-      if (incidentFilter === 'RESCHEDULED' && !incidentState.isRescheduled) return false;
-      if (incidentFilter === 'REJECTED' && !incidentState.isRejected) return false;
-      if (incidentFilter === 'RETURNING' && !incidentState.isReturning) return false;
-
-      const ordDate = getOrderDateTime(o);
-      // Khi chọn xem "Đơn Tồn" (BACKLOG), không ép lọc theo ngày hiện tại để người dùng xem được danh sách đơn cũ
-      if (incidentFilter !== 'BACKLOG') {
-        if (!matchesDateFilter(ordDate, orderDateFilter)) return false;
+      // TAB PENDING: Sẵn sàng tại kho — hiển thị tất cả các đơn chờ nhận khớp shipper/khu vực (không lọc theo ngày)
+      if (activeTab === 'pending') {
+        return o.status === 'READY_TO_SHIP' && isShipperMatched(o);
       }
 
-      const matchesShipper = isShipperMatched(o);
-      if (!matchesShipper) return false;
-
-      if (activeTab === 'pending') return o.status === 'READY_TO_SHIP';
-
+      // TAB ACTIVE: Đang giao — hiển thị các đơn đang phụ trách giao trực tiếp
       if (activeTab === 'active') {
-        if (incidentFilter === 'DELIVERED') return o.status === 'DELIVERED';
-        return ['SHIPPED', 'SHIPPING_FAILED', 'RETURNING_TO_WAREHOUSE', 'CANCELLED'].includes(o.status);
+        const isActiveStatus = ACTIVE_DELIVERY_STATUSES.includes(o.status);
+        if (!isActiveStatus) return false;
+        if (!isManagerOrAdmin && !isDirectlyAssigned(o)) return false;
+
+        const incidentState = getDeliveryIncidentStatus(o);
+        const ordTime = getOrderTimeClassification(o);
+
+        if (incidentFilter === 'TODAY' && !ordTime.isToday) return false;
+        if (incidentFilter === 'NEW' && !ordTime.isNew) return false;
+        if (incidentFilter === 'BACKLOG' && !ordTime.isBacklog) return false;
+        if (incidentFilter === 'SHIPPING' && !incidentState.isShipping) return false;
+        if (incidentFilter === 'DELIVERED' && !incidentState.isDelivered) return false;
+        if (incidentFilter === 'AWAITING_CALLBACK' && !incidentState.isAwaiting) return false;
+        if (incidentFilter === 'RESCHEDULED' && !incidentState.isRescheduled) return false;
+        if (incidentFilter === 'REJECTED' && !incidentState.isRejected) return false;
+        if (incidentFilter === 'RETURNING' && !incidentState.isReturning) return false;
+
+        // Chỉ lọc theo ngày khi người dùng chủ động chọn khoảng ngày cụ thể (không áp dụng khi xem ALL hoặc BACKLOG)
+        if (orderDateFilter && orderDateFilter.period !== 'ALL' && incidentFilter !== 'BACKLOG') {
+          const ordDate = getOrderDateTime(o);
+          if (!matchesDateFilter(ordDate, orderDateFilter)) return false;
+        }
+
+        return true;
       }
 
+      // TAB HISTORY: Lịch sử giao hàng — các đơn hoàn tất/huỷ/sự cố của shipper
       if (activeTab === 'history') {
-        return ['DELIVERED', 'SHIPPING_FAILED', 'RETURNING_TO_WAREHOUSE', 'CANCELLED'].includes(o.status);
+        if (!['DELIVERED', 'SHIPPING_FAILED', 'RETURNING_TO_WAREHOUSE', 'CANCELLED'].includes(o.status)) return false;
+        if (!isManagerOrAdmin && !isDirectlyAssigned(o)) return false;
+
+        const ordDate = getOrderDateTime(o);
+        if (!matchesDateFilter(ordDate, orderDateFilter)) return false;
+
+        return true;
       }
 
-      return true;
+      return isShipperMatched(o);
     });
 
     return list.sort((a, b) => {

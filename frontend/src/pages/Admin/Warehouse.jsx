@@ -818,14 +818,32 @@ function RegionalShipperModal({
   const getShipperWorkload = (shipper) => {
     const statusObj = getShipperStatusObj(shipper);
     const isOnline = statusObj.isOnline !== false;
+    const sPhone = String(shipper.phone || '').replace(/\D/g, '');
+
+    // Đơn tính vào tải ca: Chỉ các đơn đang đi giao trong ca hôm nay (hoặc được kích hoạt giao lại hôm nay)
+    const isOrderInShift = (o) => {
+      const isRedeliv = Boolean(o.notes && String(o.notes).includes('[GIAO_LAI]'));
+      const dateVal = (isRedeliv && o.resumedAt)
+        ? o.resumedAt
+        : (o.shippedAt || o.updatedAt || o.createdAt || o.date);
+      if (!dateVal) return false;
+      const d = new Date(dateVal);
+      if (isNaN(d.getTime())) return false;
+      const now = new Date();
+      const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+      const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+      return d >= startOfToday && d <= endOfToday;
+    };
 
     const activeCount = (orders || []).filter(o => 
-      ['SHIPPED', 'OUT_FOR_DELIVERY', 'ASSIGNED'].includes(o.status) &&
+      ['SHIPPED', 'OUT_FOR_DELIVERY', 'ASSIGNED', 'SHIPPING_FAILED', 'RETURNING_TO_WAREHOUSE'].includes(o.status) &&
+      isOrderInShift(o) &&
       (
         String(o.assignedShipperId) === String(shipper.id) ||
         String(o.assignedShipperUsername) === String(shipper.username) ||
         (shipper.fullname && String(o.assignedShipper || o.assignedShipperName).includes(shipper.fullname)) ||
-        (shipper.name && String(o.assignedShipper || o.assignedShipperName).includes(shipper.name))
+        (shipper.name && String(o.assignedShipper || o.assignedShipperName).includes(shipper.name)) ||
+        (sPhone && sPhone.length >= 8 && String(o.assignedShipper || o.assignedShipperName).replace(/\D/g, '').includes(sPhone))
       )
     ).length;
 

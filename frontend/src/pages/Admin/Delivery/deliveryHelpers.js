@@ -533,6 +533,36 @@ export const getDateFilterLabel = (filterConfig) => {
  *  5. Cash COD collection threshold alerts
  *  6. Returning orders that need handover
  */
+/**
+ * Các trạng thái thể hiện đơn hàng đang trong hành trình giao thật sự của Shipper
+ */
+export const ACTIVE_DELIVERY_STATUSES = ['SHIPPED', 'OUT_FOR_DELIVERY', 'ASSIGNED', 'SHIPPING_FAILED', 'RETURNING_TO_WAREHOUSE'];
+
+/**
+ * Kiểm tra xem đơn hàng có được phân công TRỰC TIẾP cho Shipper chỉ định hay không
+ */
+export const isDirectlyAssignedShipper = (o, user) => {
+  if (!o || !user) return false;
+  const userIdStr = String(user.id || user.username || '').toLowerCase();
+  const uUser = String(user.username || '').toLowerCase();
+  const uName = String(user.fullname || user.name || '').toLowerCase();
+  const uPhone = String(user.phone || '').replace(/\D/g, '');
+
+  const shipperStr = String(o.assignedShipper || o.assignedShipperName || '').toLowerCase();
+  const assignedIdStr = String(o.assignedShipperId || o.assignedShipperUsername || '').toLowerCase();
+
+  return Boolean(
+    (assignedIdStr && (
+      assignedIdStr === userIdStr ||
+      assignedIdStr === uUser ||
+      (user.id && assignedIdStr === String(user.id).toLowerCase())
+    )) ||
+    (uName && shipperStr && shipperStr.includes(uName)) ||
+    (uUser && shipperStr && shipperStr.includes(uUser)) ||
+    (uPhone && shipperStr && shipperStr.includes(uPhone))
+  );
+};
+
 export const generateShipperNotifications = (
   orders = [],
   user = null,
@@ -542,27 +572,12 @@ export const generateShipperNotifications = (
   const now = new Date();
   const currentMinutes = now.getHours() * 60 + now.getMinutes();
 
-  const uName = String(user?.fullname || user?.name || '').toLowerCase();
-  const uUser = String(user?.username || '').toLowerCase();
-  const uPhone = String(user?.phone || '').replace(/\D/g, '');
   const userIdStr = String(user?.id || user?.username || '').toLowerCase();
   const shipperRegion = user?.deliveryRegion || 'HCM_KV1';
 
   const isShipperMatched = (o) => {
     if (!o) return false;
-    const shipperStr = String(o.assignedShipper || o.assignedShipperName || '').toLowerCase();
-    const assignedIdStr = String(o.assignedShipperId || o.assignedShipperUsername || '').toLowerCase();
-
-    const isDirectlyAssigned = (assignedIdStr && (
-        assignedIdStr === userIdStr ||
-        assignedIdStr === uUser ||
-        (user?.id && assignedIdStr === String(user.id).toLowerCase())
-      )) ||
-      (uName && shipperStr && shipperStr.includes(uName)) ||
-      (uUser && shipperStr && shipperStr.includes(uUser)) ||
-      (uPhone && shipperStr && shipperStr.includes(uPhone));
-
-    if (isDirectlyAssigned) return true;
+    if (isDirectlyAssignedShipper(o, user)) return true;
     if (o.assignedShipperId || o.assignedShipper || o.assignedShipperUsername) return false;
 
     if (shipperRegion === 'ALL') return true;
@@ -571,7 +586,7 @@ export const generateShipperNotifications = (
   };
 
   const assignedActiveOrders = orders.filter(o =>
-    o && ['SHIPPED', 'SHIPPING_FAILED', 'RETURNING_TO_WAREHOUSE'].includes(o.status) && isShipperMatched(o)
+    o && ACTIVE_DELIVERY_STATUSES.includes(o.status) && isDirectlyAssignedShipper(o, user)
   );
 
   const readyOrders = orders.filter(o =>

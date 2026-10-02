@@ -7,7 +7,7 @@ import useSafeViewportHeight from '../../hooks/useSafeViewportHeight';
 import { detectDeliveryRegion, DELIVERY_REGIONS } from '../../utils/deliveryRegions';
 import { Home, Package, Truck, Undo2, History, Bell, LogOut, MessageCircle, X, Send } from 'lucide-react';
 import DeliveryNotificationDropdown from '../../pages/Admin/Delivery/components/DeliveryNotificationDropdown';
-import { generateShipperNotifications } from '../../pages/Admin/Delivery/deliveryHelpers';
+import { generateShipperNotifications, isDirectlyAssignedShipper, ACTIVE_DELIVERY_STATUSES } from '../../pages/Admin/Delivery/deliveryHelpers';
 
 const TABS = [
   { id: 'overview', label: 'Tổng Quan', icon: Home },
@@ -76,20 +76,10 @@ export default function DeliveryAppShell({ children }) {
     } catch (_) { return new Set(); }
   };
 
+  const isDirectlyAssigned = (o) => isDirectlyAssignedShipper(o, user);
+
   const isShipperMatched = (o) => {
-    const shipperStr = String(o.assignedShipper || o.assignedShipperName || '').toLowerCase();
-    const assignedIdStr = String(o.assignedShipperId || o.assignedShipperUsername || '').toLowerCase();
-
-    const isDirectlyAssigned = (assignedIdStr && (
-        assignedIdStr === userIdStr ||
-        assignedIdStr === uUser ||
-        (user?.id && assignedIdStr === String(user.id).toLowerCase())
-      )) ||
-      (uName && shipperStr && shipperStr.includes(uName)) ||
-      (uUser && shipperStr && shipperStr.includes(uUser)) ||
-      (uPhone && shipperStr && shipperStr.includes(uPhone));
-
-    if (isDirectlyAssigned) return true;
+    if (isDirectlyAssigned(o)) return true;
     if (o.assignedShipperId || o.assignedShipper || o.assignedShipperUsername) return false;
 
     const orderIdStr = String(o.orderId || o.id || '');
@@ -100,8 +90,24 @@ export default function DeliveryAppShell({ children }) {
     return orderRegion === shipperRegion;
   };
 
+  const isOrderInShift = (o) => {
+    const isRedeliv = Boolean(o.notes && String(o.notes).includes('[GIAO_LAI]'));
+    const dateVal = (isRedeliv && o.resumedAt)
+      ? o.resumedAt
+      : (o.shippedAt || o.updatedAt || o.createdAt || o.date);
+    if (!dateVal) return false;
+    const d = new Date(dateVal);
+    if (isNaN(d.getTime())) return false;
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+    const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+    return d >= startOfToday && d <= endOfToday;
+  };
+
+  // Đơn ĐANG GIAO của Shipper CHỈ tính các đơn đã được phân công trực tiếp cho mình trong ca hôm nay,
+  // nếu hôm đó shipper chưa bấm nhận đơn nào thì số đơn đang giao là 0.
   const myAssignedOrders = (orders || []).filter(o =>
-    o && ['SHIPPED', 'SHIPPING_FAILED', 'RETURNING_TO_WAREHOUSE', 'CANCELLED'].includes(o.status) && isShipperMatched(o)
+    o && ACTIVE_DELIVERY_STATUSES.includes(o.status) && isDirectlyAssigned(o) && isOrderInShift(o)
   );
   const readyAtWarehouse = (orders || []).filter(o => o && o.status === 'READY_TO_SHIP' && isShipperMatched(o));
   const totalDeliveryTasks = myAssignedOrders.length + readyAtWarehouse.length;
