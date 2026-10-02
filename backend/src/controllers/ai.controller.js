@@ -134,8 +134,26 @@ const chatWithAi = async (req, res, next) => {
     if (!finalAiResponse) {
       const lower = promptText.toLowerCase();
 
-      // Ý định 1: Tra cứu chính sách, quy chế, bảo hành, đổi trả, chiết khấu, SOP
-      if (/bảo hành|đổi trả|1 đổi 1|chính sách|quy chế|chiết khấu|quy trình|tiêu chuẩn|hướng dẫn|thưởng|kpi|nộp tiền|đối soát|vietqr|sod|lắp ráp|benchmark|furmark/.test(lower)) {
+      // Ý định 0: Tra cứu nhân sự / tài khoản nhân viên
+      if (/nhân viên|tài khoản nhân viên|nhân sự|bao nhiêu nhân viên|bao nhiêu tài khoản|danh sách nhân viên/.test(lower)) {
+        if (!['ADMIN', 'CEO', 'HR'].includes(user.role)) {
+          finalAiResponse = `⚠️ **Từ chối truy cập:** Vai trò của bạn (**${user.role}**) không có thẩm quyền tra cứu dữ liệu nhân sự của công ty. Vui lòng liên hệ Quản trị viên (Admin) hoặc phòng Nhân sự.`;
+        } else {
+          const empCount = await prisma.employee.count({ where: { status: 'ACTIVE' } }).catch(() => 0);
+          const totalEmp = await prisma.employee.count().catch(() => 0);
+          const rolesGroup = await prisma.employee.groupBy({
+            by: ['role'],
+            _count: { id: true }
+          }).catch(() => []);
+          
+          finalAiResponse = `👥 **Thống kê Tài Khoản & Nhân Sự AetherPC:**\n\n- **Tổng số tài khoản nhân viên:** **${totalEmp} tài khoản** (${empCount} nhân sự đang hoạt động ACTIVE)\n- **Phân bổ theo vai trò chức năng:**\n` +
+            rolesGroup.map(r => `  • **${r.role}:** ${r._count.id} nhân sự`).join('\n') +
+            `\n\n*Ghi chú: Bạn có thể xem và quản lý chi tiết danh sách tại menu **Quản Trị Hệ Thống > Tài Khoản & Người Dùng**.*`;
+        }
+      }
+
+      // Ý định 1: Tra cứu chính sách, quy chế, bảo mật, bảo hành, đổi trả, chiết khấu, SOP
+      else if (/bảo mật|mật khẩu|an ninh|an toàn|rò rỉ|bảo hành|đổi trả|1 đổi 1|chính sách|quy chế|chiết khấu|quy trình|tiêu chuẩn|hướng dẫn|thưởng|kpi|nộp tiền|đối soát|vietqr|sod|lắp ráp|benchmark|furmark|nghỉ việc|sa thải/.test(lower)) {
         const toolResult = await executeToolCall('lookup_knowledge_base', { query: promptText }, user);
         toolCallsExecuted.push({ tool: 'lookup_knowledge_base', params: { query: promptText }, result: toolResult });
 
@@ -143,7 +161,7 @@ const chatWithAi = async (req, res, next) => {
           const doc = toolResult.documents[0];
           citations.push({ title: doc.title, slug: doc.slug, category: doc.category });
 
-          finalAiResponse = `Theo tài liệu **"${doc.title}"** của AetherPC:\n\n${doc.summary || ''}\n\n${doc.contentSnippet.slice(0, 800)}...\n\n📄 *Nguồn trích dẫn: [${doc.title}](/admin/system?tab=knowledge&doc=${doc.slug})*`;
+          finalAiResponse = `Theo tài liệu **"${doc.title}"** của AetherPC:\n\n${doc.summary ? `> **Tóm tắt cốt lõi:** ${doc.summary}\n\n` : ''}${doc.contentSnippet.slice(0, 1000)}...\n\n📄 *Nguồn trích dẫn: [${doc.title}](/admin/system?tab=knowledge&doc=${doc.slug})*`;
         } else {
           finalAiResponse = `Không tìm thấy văn bản quy định hoặc chính sách nào phù hợp với yêu cầu "${promptText}". Vui lòng liên hệ Trưởng bộ phận hoặc Admin để được cập nhật tài liệu chính thức.`;
         }
@@ -209,9 +227,17 @@ const chatWithAi = async (req, res, next) => {
         }
       }
 
-      // Mặc định: Chào mừng và hướng dẫn
+      // Thử tra cứu Knowledge Base cho bất kỳ câu hỏi nào khác
       else {
-        finalAiResponse = `Xin chào **${user.name || 'bạn'}**! Tôi là **AetherCopilot** - Trợ lý Doanh nghiệp AetherPC ERP.\n\nTôi có thể hỗ trợ bạn:\n- 📖 **Tra cứu quy trình & chính sách:** Bảo hành 1 đổi 1, quy chế chiết khấu, tiêu chuẩn lắp ráp PC, đối soát COD.\n- 🔍 **Tra cứu linh kiện & tồn kho:** Kiểm tra số lượng tồn thực tế, vị trí ngăn kệ và giá bán lẻ.\n- ⚙️ **Kiểm tra tương thích cấu hình PC:** Socket CPU vs Mainboard, chuẩn RAM DDR4/DDR5, công suất nguồn PSU.\n- 📦 **Tra cứu tiến độ đơn hàng:** Trạng thái giao vận, thông tin Shipper, đối soát thanh toán.\n${['CEO', 'ADMIN', 'ACCOUNTANT'].includes(user.role) ? '- 💰 **Báo cáo tài chính & VietQR:** Doanh thu hôm nay, số dư tài khoản ngân hàng công ty.\n' : ''}\nBạn cần tôi hỗ trợ việc gì ngay bây giờ?`;
+        const fallbackKb = await executeToolCall('lookup_knowledge_base', { query: promptText }, user).catch(() => null);
+        if (fallbackKb && fallbackKb.found && fallbackKb.documents?.length > 0) {
+          const doc = fallbackKb.documents[0];
+          toolCallsExecuted.push({ tool: 'lookup_knowledge_base', params: { query: promptText }, result: fallbackKb });
+          citations.push({ title: doc.title, slug: doc.slug, category: doc.category });
+          finalAiResponse = `Theo tài liệu **"${doc.title}"** của AetherPC:\n\n${doc.summary ? `> **Tóm tắt cốt lõi:** ${doc.summary}\n\n` : ''}${doc.contentSnippet.slice(0, 1000)}...\n\n📄 *Nguồn trích dẫn: [${doc.title}](/admin/system?tab=knowledge&doc=${doc.slug})*`;
+        } else {
+          finalAiResponse = `Xin chào **${user.name || 'bạn'}**! Tôi là **AetherCopilot** - Trợ lý Doanh nghiệp AetherPC ERP.\n\nTôi có thể hỗ trợ bạn:\n- 📖 **Tra cứu quy trình & chính sách:** Bảo hành 1 đổi 1, chính sách bảo mật, chiết khấu VIP, đối soát COD.\n- 🔍 **Tra cứu linh kiện & tồn kho:** Kiểm tra số lượng tồn thực tế, vị trí ngăn kệ và giá bán lẻ.\n- ⚙️ **Kiểm tra tương thích cấu hình PC:** Socket CPU vs Mainboard, chuẩn RAM DDR4/DDR5, nguồn PSU.\n- 📦 **Tra cứu tiến độ đơn hàng:** Trạng thái giao vận, thông tin Shipper, đối soát thanh toán.\n${['CEO', 'ADMIN', 'ACCOUNTANT'].includes(user.role) ? '- 💰 **Báo cáo tài chính & VietQR:** Doanh thu hôm nay, số dư tài khoản ngân hàng công ty.\n' : ''}\nBạn cần tôi hỗ trợ việc gì ngay bây giờ?`;
+        }
       }
     }
 
@@ -235,6 +261,7 @@ const chatWithAi = async (req, res, next) => {
     res.json({
       success: true,
       data: {
+        reply: finalAiResponse,
         response: finalAiResponse,
         citations,
         toolCalls: toolCallsExecuted.map(t => t.tool),

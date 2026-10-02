@@ -83,12 +83,13 @@ export default function AetherCopilot() {
       const response = await api.post('/ai/chat', { message: text });
       
       if (response && response.success) {
+        const replyText = response.data?.reply || response.data?.response || response.data?.message || (typeof response.data === 'string' ? response.data : '');
         const botMsg = {
           id: 'bot-' + Date.now(),
           role: 'assistant',
-          content: response.data.reply,
-          toolCalls: response.data.toolCalls || [],
-          citations: response.data.citations || [],
+          content: replyText || 'Đã ghi nhận yêu cầu nhưng không có nội dung văn bản phản hồi.',
+          toolCalls: response.data?.toolCalls || [],
+          citations: response.data?.citations || [],
           timestamp: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
         };
         setMessages(prev => [...prev, botMsg]);

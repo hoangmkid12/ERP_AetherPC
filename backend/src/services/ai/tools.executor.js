@@ -89,6 +89,7 @@ const executeLookupKnowledgeBase = async (params, userRole) => {
       category: true,
       summary: true,
       content: true,
+      tags: true,
       updatedAt: true
     }
   });
@@ -101,6 +102,16 @@ const executeLookupKnowledgeBase = async (params, userRole) => {
       documents: []
     };
   }
+
+  // Sắp xếp theo độ liên quan cao nhất: tiêu đề hoặc tags trùng từ khóa lên đầu
+  const qLower = q.toLowerCase();
+  documents.sort((a, b) => {
+    const aTitleScore = a.title.toLowerCase().includes(qLower) ? 10 : 0;
+    const bTitleScore = b.title.toLowerCase().includes(qLower) ? 10 : 0;
+    const aTagScore = (a.tags || []).some(t => qLower.includes(t.toLowerCase()) || t.toLowerCase().includes(qLower)) ? 5 : 0;
+    const bTagScore = (b.tags || []).some(t => qLower.includes(t.toLowerCase()) || t.toLowerCase().includes(qLower)) ? 5 : 0;
+    return (bTitleScore + bTagScore) - (aTitleScore + aTagScore);
+  });
 
   return {
     success: true,
