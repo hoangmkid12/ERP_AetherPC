@@ -1122,3 +1122,46 @@ model RolePermission {
   @@map("role_permissions")
 }
 
+// ============================================================================
+//   11. PHÂN HỆ TRI THỨC DOANH NGHIỆP & TRỢ LÝ AI (KNOWLEDGE BASE & AI COPILOT)
+// ============================================================================
+
+model KnowledgeDocument {
+  id           String   @id @default(uuid()) @db.VarChar(50)
+  title        String   @db.VarChar(255)
+  slug         String   @unique @db.VarChar(255)
+  category     String   @db.VarChar(50) // WARRANTY_RMA, SALES_POLICY, WAREHOUSE_LOGISTICS, TECHNICAL_SOP, ERP_MANUAL, GENERAL
+  summary      String?  @db.Text
+  content      String   @db.Text
+  tags         String[] @default([])
+  allowedRoles String[] @default(["ALL"])
+  status       String   @default("PUBLISHED") @db.VarChar(20) // DRAFT, PUBLISHED, ARCHIVED
+  viewCount    Int      @default(0) @map("view_count")
+  authorId     Int?     @map("author_id")
+  authorName   String?  @map("author_name") @db.VarChar(150)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  @@index([category, status])
+  @@map("knowledge_documents")
+}
+
+model AiAuditLog {
+  id           String   @id @default(uuid()) @db.VarChar(50)
+  userId       Int?     @map("user_id")
+  userEmail    String?  @map("user_email") @db.VarChar(150)
+  userName     String?  @map("user_name") @db.VarChar(150)
+  userRole     String?  @map("user_role") @db.VarChar(50)
+  userPrompt   String   @map("user_prompt") @db.Text
+  toolCalls    Json?    @map("tool_calls")
+  aiResponse   String?  @map("ai_response") @db.Text
+  latencyMs    Int?     @map("latency_ms")
+  status       String   @default("SUCCESS") @db.VarChar(30) // SUCCESS, ERROR, PERMISSION_DENIED
+  errorMessage String?  @map("error_message") @db.Text
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  @@index([userId, userRole])
+  @@index([createdAt])
+  @@map("ai_audit_logs")
+}
+

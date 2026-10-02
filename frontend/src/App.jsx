@@ -16,6 +16,7 @@ import Chatbot from './components/Layout/Chatbot';
 import Sidebar from './components/Layout/Sidebar';
 import DeliveryAppShell from './components/Layout/DeliveryAppShell';
 import LoadingScreen from './components/Common/LoadingScreen';
+import AetherCopilot from './components/AI/AetherCopilot';
 
 // Storefront Components
 const Home = lazy(() => import('./pages/Storefront/Home'));
@@ -101,6 +102,7 @@ const AdminLayout = () => {
     return (
       <DeliveryAppShell>
         <Outlet />
+        <AetherCopilot />
       </DeliveryAppShell>
     );
   }
@@ -189,6 +191,7 @@ const AdminLayout = () => {
       <main className="admin-main-content" style={{ flex: 1, overflowY: 'auto', maxHeight: '100vh', minHeight: '100vh', backgroundColor: 'var(--bg-app)' }}>
         <Outlet />
       </main>
+      <AetherCopilot />
     </div>
   );
 };

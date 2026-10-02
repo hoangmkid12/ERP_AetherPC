@@ -95,6 +95,8 @@ app.use('/api/v1/complaints', require('./routes/complaint.routes'));
 app.use('/api/v1/system', require('./routes/system.routes'));
 app.use('/api/v1/address', require('./routes/address.routes'));
 app.use('/api/v1/routes', require('./routes/route.routes'));
+app.use('/api/v1/knowledge', require('./routes/knowledge.routes'));
+app.use('/api/v1/ai', require('./routes/ai.routes'));
 
 // Global Error Handler Middleware
 app.use(errorMiddleware);

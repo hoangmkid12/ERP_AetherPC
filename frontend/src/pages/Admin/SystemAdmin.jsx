@@ -6,7 +6,7 @@ import {
   CheckCircle, XCircle, AlertCircle, Key, Lock, Edit, Trash2, 
   RefreshCw, Download, Upload, Server, ShieldCheck, FileText, Check, 
   AlertTriangle, HardDrive, Cpu, Layers, Activity, ArrowRight, UserCheck, UserX,
-  Building, CreditCard, QrCode
+  Building, CreditCard, QrCode, BookOpen, Sparkles
 } from 'lucide-react';
 import { Bar, Doughnut } from 'react-chartjs-2';
 import { 
@@ -449,6 +449,145 @@ export default function SystemAdmin() {
     }
   };
 
+  // =========================================================================
+  // KNOWLEDGE BASE (CƠ SỞ TRI THỨC & QUY TRÌNH SOP) STATE & HANDLERS
+  // =========================================================================
+  const [knowledgeDocs, setKnowledgeDocs] = useState([]);
+  const [knowledgeLoading, setKnowledgeLoading] = useState(false);
+  const [knowledgeCategory, setKnowledgeCategory] = useState('ALL');
+  const [knowledgeSearch, setKnowledgeSearch] = useState('');
+  const [viewingKnowledgeDoc, setViewingKnowledgeDoc] = useState(null);
+  const [editingKnowledgeDoc, setEditingKnowledgeDoc] = useState(null);
+  const [showKnowledgeModal, setShowKnowledgeModal] = useState(false);
+  const [knowledgeSubmitting, setKnowledgeSubmitting] = useState(false);
+  const [seedingKnowledge, setSeedingKnowledge] = useState(false);
+
+  const [knowledgeForm, setKnowledgeForm] = useState({
+    title: '',
+    slug: '',
+    category: 'POLICY',
+    summary: '',
+    content: '',
+    tags: '',
+    allowedRoles: ['CEO', 'ADMIN'],
+    isActive: true
+  });
+
+  const loadKnowledgeDocs = async () => {
+    setKnowledgeLoading(true);
+    try {
+      const res = await api.get('/knowledge');
+      setKnowledgeDocs(res.data || []);
+    } catch (err) {
+      notify(err?.message || 'Không thể tải danh sách tài liệu tri thức.', 'error');
+    } finally {
+      setKnowledgeLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'knowledge') {
+      loadKnowledgeDocs();
+    }
+  }, [activeTab]);
+
+  const handleOpenKnowledgeModal = (doc = null) => {
+    if (doc) {
+      setEditingKnowledgeDoc(doc);
+      setKnowledgeForm({
+        title: doc.title || '',
+        slug: doc.slug || '',
+        category: doc.category || 'POLICY',
+        summary: doc.summary || '',
+        content: doc.content || '',
+        tags: Array.isArray(doc.tags) ? doc.tags.join(', ') : (doc.tags || ''),
+        allowedRoles: Array.isArray(doc.allowedRoles) ? doc.allowedRoles : ['CEO', 'ADMIN'],
+        isActive: doc.isActive !== false
+      });
+    } else {
+      setEditingKnowledgeDoc(null);
+      setKnowledgeForm({
+        title: '',
+        slug: '',
+        category: 'POLICY',
+        summary: '',
+        content: '',
+        tags: '',
+        allowedRoles: ['CEO', 'ADMIN', 'SALES', 'QC'],
+        isActive: true
+      });
+    }
+    setShowKnowledgeModal(true);
+  };
+
+  const handleSaveKnowledge = async (e) => {
+    if (e) e.preventDefault();
+    if (!knowledgeForm.title.trim()) {
+      notify('Vui lòng nhập tiêu đề tài liệu SOP.', 'warning');
+      return;
+    }
+    if (!knowledgeForm.content.trim()) {
+      notify('Vui lòng nhập nội dung chi tiết tài liệu.', 'warning');
+      return;
+    }
+
+    const payload = {
+      ...knowledgeForm,
+      slug: knowledgeForm.slug.trim() || undefined,
+      tags: typeof knowledgeForm.tags === 'string' 
+        ? knowledgeForm.tags.split(',').map(t => t.trim()).filter(Boolean)
+        : knowledgeForm.tags
+    };
+
+    setKnowledgeSubmitting(true);
+    try {
+      if (editingKnowledgeDoc) {
+        await api.put(`/knowledge/${editingKnowledgeDoc.id}`, payload);
+        notify('Cập nhật tài liệu SOP thành công!', 'success');
+      } else {
+        await api.post('/knowledge', payload);
+        notify('Tạo tài liệu SOP mới thành công!', 'success');
+      }
+      setShowKnowledgeModal(false);
+      loadKnowledgeDocs();
+    } catch (err) {
+      notify(err?.message || 'Không thể lưu tài liệu.', 'error');
+    } finally {
+      setKnowledgeSubmitting(false);
+    }
+  };
+
+  const handleDeleteKnowledge = async (doc) => {
+    const ok = await confirm({
+      title: 'Xác nhận xóa tài liệu SOP',
+      message: `Bạn có chắc chắn muốn xóa tài liệu "${doc.title}"? AI Copilot sẽ không còn truy xuất nội dung này nữa.`,
+      confirmLabel: 'Xác nhận xóa',
+      cancelLabel: 'Hủy'
+    });
+    if (!ok) return;
+
+    try {
+      await api.delete(`/knowledge/${doc.id}`);
+      notify('Đã xóa tài liệu SOP thành công!', 'success');
+      loadKnowledgeDocs();
+    } catch (err) {
+      notify(err?.message || 'Không thể xóa tài liệu.', 'error');
+    }
+  };
+
+  const handleSeedKnowledge = async () => {
+    setSeedingKnowledge(true);
+    try {
+      const res = await api.post('/knowledge/seed');
+      notify(res?.message || 'Đã nạp 6 tài liệu quy trình chuẩn SOP thành công!', 'success');
+      loadKnowledgeDocs();
+    } catch (err) {
+      notify(err?.message || 'Lỗi khi khởi tạo tài liệu mẫu.', 'error');
+    } finally {
+      setSeedingKnowledge(false);
+    }
+  };
+
   // RBAC Selected Role & Matrix State
   const [selectedRbacRole, setSelectedRbacRole] = useState('SALES_MANAGER');
   const [savedRbacMatrix, setSavedRbacMatrix] = useState(() => getOperationalRbac());
@@ -867,11 +1006,14 @@ export default function SystemAdmin() {
             {activeTab === 'users' && 'Quản Lý Tài Khoản & Người Dùng'}
             {activeTab === 'bank-accounts' && 'Tài Khoản Ngân Hàng Doanh Nghiệp (VietQR)'}
             {activeTab === 'rbac' && 'Ma Trận Phân Quyền Vai Trò'}
+            {activeTab === 'knowledge' && 'Cơ Sở Tri Thức & Quy Trình SOP Doanh Nghiệp'}
             {activeTab === 'audit' && 'Nhật Ký Kiểm Toán & Giám Sát'}
             {activeTab === 'settings' && 'Cấu Hình & Sao Lưu Dữ Liệu'}
           </h2>
           <p style={{ color: '#64748b', fontSize: '0.82rem', margin: '0.25rem 0 0' }}>
-            Quản trị người dùng, tài khoản doanh nghiệp, phân quyền chi tiết cho từng vai trò và sao lưu dữ liệu an toàn
+            {activeTab === 'knowledge' 
+              ? 'Quản lý tài liệu chính sách, quy định chuẩn vận hành (SOP) tích hợp bộ não AetherCopilot AI'
+              : 'Quản trị người dùng, tài khoản doanh nghiệp, phân quyền chi tiết cho từng vai trò và sao lưu dữ liệu an toàn'}
           </p>
         </div>
 
@@ -917,6 +1059,50 @@ export default function SystemAdmin() {
             <Plus size={16} />
             <span>Thêm Tài Khoản Ngân Hàng</span>
           </button>
+        )}
+
+        {activeTab === 'knowledge' && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <button
+              onClick={handleSeedKnowledge}
+              disabled={seedingKnowledge}
+              style={{
+                backgroundColor: '#ffffff',
+                color: '#475569',
+                border: '1px solid #cbd5e1',
+                borderRadius: '6px',
+                padding: '0.45rem 0.85rem',
+                fontSize: '0.8rem',
+                fontWeight: 700,
+                cursor: seedingKnowledge ? 'not-allowed' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.35rem'
+              }}
+            >
+              <RefreshCw size={14} className={seedingKnowledge ? 'animate-spin' : ''} />
+              <span>{seedingKnowledge ? 'Đang tạo mẫu...' : 'Khởi Tạo 6 Quy Trình Mẫu'}</span>
+            </button>
+            <button
+              onClick={() => handleOpenKnowledgeModal()}
+              style={{
+                backgroundColor: '#2563eb',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '6px',
+                padding: '0.45rem 1rem',
+                fontSize: '0.8rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.35rem'
+              }}
+            >
+              <Plus size={16} />
+              <span>Thêm Tài Liệu SOP</span>
+            </button>
+          </div>
         )}
       </div>
 
@@ -2306,6 +2492,355 @@ export default function SystemAdmin() {
       })()}
 
       {/* ========================================================================= */}
+      {/* TAB 4: KNOWLEDGE BASE (CƠ SỞ TRI THỨC & QUY TRÌNH SOP) */}
+      {/* ========================================================================= */}
+      {activeTab === 'knowledge' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          {/* KPI Cards */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(200px, 1fr))', gap: '1rem' }}>
+            <div style={cardStyle}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 700 }}>Tổng Số Tài Liệu SOP</span>
+                <BookOpen size={18} style={{ color: '#2563eb' }} />
+              </div>
+              <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#0f172a', marginTop: '0.4rem' }}>
+                {knowledgeDocs.length}
+              </div>
+              <div style={{ fontSize: '0.72rem', color: '#16a34a', fontWeight: 600, marginTop: '0.2rem' }}>
+                {knowledgeDocs.filter(d => d.isActive).length} tài liệu đang có hiệu lực
+              </div>
+            </div>
+
+            <div style={cardStyle}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 700 }}>Chính Sách & Quy Trình</span>
+                <ShieldCheck size={18} style={{ color: '#059669' }} />
+              </div>
+              <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#0f172a', marginTop: '0.4rem' }}>
+                {knowledgeDocs.filter(d => ['POLICY', 'PROCEDURE', 'GENERAL'].includes(d.category)).length}
+              </div>
+              <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '0.2rem' }}>
+                Bảo hành, đổi trả, đối soát COD
+              </div>
+            </div>
+
+            <div style={cardStyle}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 700 }}>Kỹ Thuật & Sales Guide</span>
+                <Cpu size={18} style={{ color: '#8b5cf6' }} />
+              </div>
+              <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#0f172a', marginTop: '0.4rem' }}>
+                {knowledgeDocs.filter(d => ['SALES_GUIDE', 'TECH_SPEC', 'FINANCE', 'HR_POLICY'].includes(d.category)).length}
+              </div>
+              <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '0.2rem' }}>
+                Chiết khấu VIP, Benchmark QA, SoD
+              </div>
+            </div>
+
+            <div style={cardStyle}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 700 }}>AI Copilot Brain</span>
+                <Sparkles size={18} style={{ color: '#38bdf8' }} />
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '0.4rem' }}>
+                <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#10b981' }} />
+                <span style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0f172a' }}>Live RAG DB</span>
+              </div>
+              <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '0.2rem' }}>
+                Cập nhật tức thì không cần train lại
+              </div>
+            </div>
+          </div>
+
+          {/* Main Content Card */}
+          <div style={cardStyle}>
+            {/* Toolbar */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1.25rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                {[
+                  { key: 'ALL', label: 'Tất Cả' },
+                  { key: 'POLICY', label: 'Chính Sách' },
+                  { key: 'PROCEDURE', label: 'Quy Trình SOP' },
+                  { key: 'SALES_GUIDE', label: 'Bán Hàng' },
+                  { key: 'TECH_SPEC', label: 'Kỹ Thuật/QA' },
+                  { key: 'FINANCE', label: 'Tài Chính' },
+                  { key: 'HR_POLICY', label: 'Nhân Sự' }
+                ].map(cat => (
+                  <button
+                    key={cat.key}
+                    onClick={() => setKnowledgeCategory(cat.key)}
+                    style={{
+                      padding: '0.35rem 0.75rem',
+                      borderRadius: '20px',
+                      fontSize: '0.75rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      border: knowledgeCategory === cat.key ? '1px solid #2563eb' : '1px solid #cbd5e1',
+                      backgroundColor: knowledgeCategory === cat.key ? '#eff6ff' : '#ffffff',
+                      color: knowledgeCategory === cat.key ? '#2563eb' : '#475569',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    {cat.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Search & Refresh */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <div style={{ position: 'relative', width: '260px' }}>
+                  <Search size={15} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                  <input
+                    type="text"
+                    value={knowledgeSearch}
+                    onChange={e => setKnowledgeSearch(e.target.value)}
+                    placeholder="Tìm theo tiêu đề, slug, tag..."
+                    style={{ ...inputStyle, paddingLeft: '32px' }}
+                  />
+                  {knowledgeSearch && (
+                    <button
+                      onClick={() => setKnowledgeSearch('')}
+                      style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: 0 }}
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+
+                <button
+                  onClick={loadKnowledgeDocs}
+                  disabled={knowledgeLoading}
+                  title="Tải lại danh sách"
+                  style={{
+                    ...secondaryBtnStyle,
+                    padding: '0.45rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                >
+                  <RefreshCw size={15} className={knowledgeLoading ? 'animate-spin' : ''} />
+                </button>
+              </div>
+            </div>
+
+            {/* Table */}
+            {knowledgeLoading ? (
+              <div style={{ textAlign: 'center', padding: '3rem', color: '#64748b' }}>
+                <RefreshCw size={24} className="animate-spin" style={{ margin: '0 auto 0.75rem' }} />
+                <p style={{ margin: 0, fontSize: '0.85rem' }}>Đang tải danh mục tài liệu tri thức...</p>
+              </div>
+            ) : knowledgeDocs.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '3rem', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px dashed #cbd5e1' }}>
+                <BookOpen size={40} style={{ color: '#94a3b8', margin: '0 auto 0.75rem' }} />
+                <h4 style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a', margin: '0 0 0.4rem' }}>Chưa có tài liệu SOP nào</h4>
+                <p style={{ fontSize: '0.8rem', color: '#64748b', margin: '0 0 1rem', maxWidth: '420px', marginLeft: 'auto', marginRight: 'auto' }}>
+                  Hệ thống chưa ghi nhận tài liệu SOP. Bấm nút bên dưới để tự động nạp 6 tài liệu quy trình chuẩn (Bảo hành 1 đổi 1, Chiết khấu VIP, Benchmark QA, Đối soát COD, Quản lý tài khoản ngân hàng).
+                </p>
+                <button
+                  onClick={handleSeedKnowledge}
+                  disabled={seedingKnowledge}
+                  style={primaryBtnStyle}
+                >
+                  {seedingKnowledge ? 'Đang khởi tạo...' : 'Khởi Tạo 6 Quy Trình Mẫu Ngay'}
+                </button>
+              </div>
+            ) : (
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
+                  <thead>
+                    <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left' }}>
+                      <th style={{ padding: '0.75rem 0.6rem', fontWeight: 800, color: '#475569', width: '22%' }}>Tài Liệu & Mã SOP</th>
+                      <th style={{ padding: '0.75rem 0.6rem', fontWeight: 800, color: '#475569', width: '13%' }}>Danh Mục</th>
+                      <th style={{ padding: '0.75rem 0.6rem', fontWeight: 800, color: '#475569', width: '28%' }}>Tóm Tắt & Từ Khóa</th>
+                      <th style={{ padding: '0.75rem 0.6rem', fontWeight: 800, color: '#475569', width: '18%' }}>Quyền Truy Cập (RBAC)</th>
+                      <th style={{ padding: '0.75rem 0.6rem', fontWeight: 800, color: '#475569', width: '8%', textAlign: 'center' }}>Trạng Thái</th>
+                      <th style={{ padding: '0.75rem 0.6rem', fontWeight: 800, color: '#475569', width: '11%', textAlign: 'right' }}>Thao Tác</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {knowledgeDocs
+                      .filter(doc => knowledgeCategory === 'ALL' || doc.category === knowledgeCategory)
+                      .filter(doc => {
+                        if (!knowledgeSearch.trim()) return true;
+                        const q = knowledgeSearch.toLowerCase();
+                        return (
+                          doc.title?.toLowerCase().includes(q) ||
+                          doc.slug?.toLowerCase().includes(q) ||
+                          doc.summary?.toLowerCase().includes(q) ||
+                          (Array.isArray(doc.tags) && doc.tags.some(t => t.toLowerCase().includes(q)))
+                        );
+                      })
+                      .map((doc, idx) => {
+                        const categoryColorMap = {
+                          POLICY: '#2563eb',
+                          PROCEDURE: '#059669',
+                          SALES_GUIDE: '#d97706',
+                          TECH_SPEC: '#7c3aed',
+                          FINANCE: '#0d9488',
+                          HR_POLICY: '#db2777',
+                          GENERAL: '#475569'
+                        };
+                        const catColor = categoryColorMap[doc.category] || '#64748b';
+
+                        return (
+                          <tr
+                            key={doc.id || idx}
+                            style={{
+                              borderBottom: '1px solid #e2e8f0',
+                              backgroundColor: idx % 2 === 0 ? '#ffffff' : '#fafafa',
+                              transition: 'background-color 0.15s ease'
+                            }}
+                          >
+                            {/* Tiêu đề & slug */}
+                            <td style={{ padding: '0.75rem 0.6rem', verticalAlign: 'top' }}>
+                              <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.82rem', marginBottom: '2px' }}>
+                                {doc.title}
+                              </div>
+                              <div style={{ fontSize: '0.68rem', color: '#64748b', fontFamily: 'monospace' }}>
+                                Mã: {doc.slug}
+                              </div>
+                              <div style={{ fontSize: '0.65rem', color: '#94a3b8', marginTop: '3px' }}>
+                                Lượt xem: {doc.viewCount || 0}
+                              </div>
+                            </td>
+
+                            {/* Danh mục */}
+                            <td style={{ padding: '0.75rem 0.6rem', verticalAlign: 'top' }}>
+                              <span style={{
+                                display: 'inline-block',
+                                padding: '2px 8px',
+                                borderRadius: '10px',
+                                fontSize: '0.68rem',
+                                fontWeight: 800,
+                                backgroundColor: `${catColor}15`,
+                                color: catColor,
+                                border: `1px solid ${catColor}40`
+                              }}>
+                                {doc.category}
+                              </span>
+                            </td>
+
+                            {/* Tóm tắt & tags */}
+                            <td style={{ padding: '0.75rem 0.6rem', verticalAlign: 'top' }}>
+                              <div style={{ fontSize: '0.75rem', color: '#334155', lineHeight: 1.4, marginBottom: '4px' }}>
+                                {doc.summary || 'Chưa có tóm tắt.'}
+                              </div>
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                                {(doc.tags || []).slice(0, 5).map((t, tIdx) => (
+                                  <span key={tIdx} style={{
+                                    backgroundColor: '#f1f5f9',
+                                    color: '#475569',
+                                    padding: '1px 6px',
+                                    borderRadius: '4px',
+                                    fontSize: '0.65rem',
+                                    border: '1px solid #e2e8f0'
+                                  }}>
+                                    #{t}
+                                  </span>
+                                ))}
+                                {(doc.tags || []).length > 5 && (
+                                  <span style={{ fontSize: '0.65rem', color: '#94a3b8' }}>
+                                    +{(doc.tags || []).length - 5}
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+
+                            {/* Quyền vai trò (allowedRoles) */}
+                            <td style={{ padding: '0.75rem 0.6rem', verticalAlign: 'top' }}>
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px' }}>
+                                {(doc.allowedRoles || []).map((role, rIdx) => (
+                                  <span key={rIdx} style={{
+                                    backgroundColor: '#eff6ff',
+                                    color: '#1e40af',
+                                    padding: '2px 5px',
+                                    borderRadius: '4px',
+                                    fontSize: '0.65rem',
+                                    fontWeight: 700,
+                                    border: '1px solid #bfdbfe'
+                                  }}>
+                                    {role}
+                                  </span>
+                                ))}
+                              </div>
+                            </td>
+
+                            {/* Trạng thái */}
+                            <td style={{ padding: '0.75rem 0.6rem', verticalAlign: 'top', textAlign: 'center' }}>
+                              <span style={{
+                                display: 'inline-block',
+                                padding: '2px 8px',
+                                borderRadius: '10px',
+                                fontSize: '0.68rem',
+                                fontWeight: 800,
+                                backgroundColor: doc.isActive ? '#f0fdf4' : '#fef2f2',
+                                color: doc.isActive ? '#16a34a' : '#dc2626',
+                                border: doc.isActive ? '1px solid #bbf7d0' : '1px solid #fecaca'
+                              }}>
+                                {doc.isActive ? 'Hiệu Lực' : 'Tạm Ẩn'}
+                              </span>
+                            </td>
+
+                            {/* Thao tác */}
+                            <td style={{ padding: '0.75rem 0.6rem', verticalAlign: 'top', textAlign: 'right' }}>
+                              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '4px' }}>
+                                <button
+                                  onClick={() => setViewingKnowledgeDoc(doc)}
+                                  title="Xem nội dung chi tiết"
+                                  style={{
+                                    background: 'none',
+                                    border: '1px solid #cbd5e1',
+                                    borderRadius: '4px',
+                                    padding: '4px 6px',
+                                    cursor: 'pointer',
+                                    color: '#2563eb'
+                                  }}
+                                >
+                                  <Eye size={13} />
+                                </button>
+                                <button
+                                  onClick={() => handleOpenKnowledgeModal(doc)}
+                                  title="Chỉnh sửa tài liệu"
+                                  style={{
+                                    background: 'none',
+                                    border: '1px solid #cbd5e1',
+                                    borderRadius: '4px',
+                                    padding: '4px 6px',
+                                    cursor: 'pointer',
+                                    color: '#059669'
+                                  }}
+                                >
+                                  <Edit size={13} />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteKnowledge(doc)}
+                                  title="Xóa tài liệu"
+                                  style={{
+                                    background: 'none',
+                                    border: '1px solid #cbd5e1',
+                                    borderRadius: '4px',
+                                    padding: '4px 6px',
+                                    cursor: 'pointer',
+                                    color: '#dc2626'
+                                  }}
+                                >
+                                  <Trash2 size={13} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
       {/* TAB 4: AUDIT (NHẬT KÝ KIỂM TOÁN) */}
       {/* ========================================================================= */}
       {activeTab === 'audit' && (
@@ -3241,6 +3776,340 @@ export default function SystemAdmin() {
                   style={{ ...primaryBtnStyle, opacity: bankSubmitting ? 0.7 : 1, cursor: bankSubmitting ? 'not-allowed' : 'pointer' }}
                 >
                   {bankSubmitting ? 'Đang lưu...' : (editingBank ? 'Lưu Thay Đổi' : 'Tạo Tài Khoản')}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL XEM CHI TIẾT TÀI LIỆU KNOWLEDGE */}
+      {/* ========================================================================= */}
+      {viewingKnowledgeDoc && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(15, 23, 42, 0.65)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+          padding: '1rem',
+          backdropFilter: 'blur(3px)'
+        }}>
+          <div style={{
+            backgroundColor: '#ffffff',
+            borderRadius: '12px',
+            width: '100%',
+            maxWidth: '820px',
+            maxHeight: '90vh',
+            display: 'flex',
+            flexDirection: 'column',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+            overflow: 'hidden'
+          }}>
+            {/* Header */}
+            <div style={{
+              padding: '1.25rem',
+              borderBottom: '1px solid #e2e8f0',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              backgroundColor: '#f8fafc'
+            }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                  <span style={badgeStyle('info')}>
+                    {viewingKnowledgeDoc.category}
+                  </span>
+                  <span style={{ fontSize: '0.75rem', color: '#64748b', fontFamily: 'monospace' }}>
+                    Mã SOP: <strong>{viewingKnowledgeDoc.slug}</strong>
+                  </span>
+                  <span style={badgeStyle(viewingKnowledgeDoc.isActive ? 'success' : 'danger')}>
+                    {viewingKnowledgeDoc.isActive ? 'Hiệu Lực' : 'Tạm Ẩn'}
+                  </span>
+                </div>
+                <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#0f172a' }}>
+                  {viewingKnowledgeDoc.title}
+                </h3>
+              </div>
+              <button
+                onClick={() => setViewingKnowledgeDoc(null)}
+                style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: '4px' }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div style={{ padding: '1.25rem', overflowY: 'auto', flex: 1 }}>
+              {viewingKnowledgeDoc.summary && (
+                <div style={{
+                  padding: '0.75rem 1rem',
+                  backgroundColor: '#f0fdf4',
+                  border: '1px solid #bbf7d0',
+                  borderRadius: '8px',
+                  fontSize: '0.82rem',
+                  color: '#166534',
+                  marginBottom: '1rem',
+                  lineHeight: 1.5
+                }}>
+                  <strong>Tóm tắt cốt lõi:</strong> {viewingKnowledgeDoc.summary}
+                </div>
+              )}
+
+              <div style={{
+                fontSize: '0.85rem',
+                lineHeight: 1.65,
+                color: '#1e293b',
+                whiteSpace: 'pre-wrap',
+                backgroundColor: '#f8fafc',
+                padding: '1.25rem',
+                borderRadius: '8px',
+                border: '1px solid #e2e8f0'
+              }}>
+                {viewingKnowledgeDoc.content}
+              </div>
+
+              {/* Metadata */}
+              <div style={{ marginTop: '1.25rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', borderTop: '1px solid #e2e8f0', paddingTop: '1rem' }}>
+                <div>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', marginBottom: '6px' }}>Từ Khóa Tags:</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                    {(viewingKnowledgeDoc.tags || []).map((t, idx) => (
+                      <span key={idx} style={{ backgroundColor: '#f1f5f9', color: '#475569', padding: '2px 8px', borderRadius: '4px', fontSize: '0.7rem', border: '1px solid #e2e8f0' }}>
+                        #{t}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', marginBottom: '6px' }}>Vai Trò Được Phép Truy Cập (RBAC):</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                    {(viewingKnowledgeDoc.allowedRoles || []).map((role, idx) => (
+                      <span key={idx} style={{ backgroundColor: '#eff6ff', color: '#1e40af', padding: '2px 7px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 700, border: '1px solid #bfdbfe' }}>
+                        {role}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div style={{ padding: '0.75rem 1.25rem', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end', backgroundColor: '#f8fafc', gap: '0.5rem' }}>
+              <button
+                onClick={() => {
+                  const docToEdit = viewingKnowledgeDoc;
+                  setViewingKnowledgeDoc(null);
+                  handleOpenKnowledgeModal(docToEdit);
+                }}
+                style={secondaryBtnStyle}
+              >
+                Chỉnh Sửa Tài Liệu
+              </button>
+              <button
+                onClick={() => setViewingKnowledgeDoc(null)}
+                style={primaryBtnStyle}
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL THÊM / SỬA TÀI LIỆU KNOWLEDGE */}
+      {/* ========================================================================= */}
+      {showKnowledgeModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(15, 23, 42, 0.65)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+          padding: '1rem',
+          backdropFilter: 'blur(3px)'
+        }}>
+          <div style={{
+            backgroundColor: '#ffffff',
+            borderRadius: '12px',
+            width: '100%',
+            maxWidth: '820px',
+            maxHeight: '92vh',
+            display: 'flex',
+            flexDirection: 'column',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+            overflow: 'hidden'
+          }}>
+            {/* Header */}
+            <div style={{
+              padding: '1.25rem',
+              borderBottom: '1px solid #e2e8f0',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              backgroundColor: '#f8fafc'
+            }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#0f172a' }}>
+                  {editingKnowledgeDoc ? 'Chỉnh Sửa Tài Liệu SOP' : 'Thêm Tài Liệu Quy Trình SOP Mới'}
+                </h3>
+                <p style={{ margin: '3px 0 0', fontSize: '0.78rem', color: '#64748b' }}>
+                  Tài liệu sau khi lưu sẽ được AI Copilot lập chỉ mục tham chiếu tức thì theo phân quyền RBAC
+                </p>
+              </div>
+              <button
+                onClick={() => setShowKnowledgeModal(false)}
+                style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: '4px' }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Form */}
+            <form onSubmit={handleSaveKnowledge} style={{ padding: '1.25rem', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '0.75rem' }}>
+                <div>
+                  <label style={labelStyle}>Tiêu Đề Tài Liệu SOP <span style={{ color: '#ef4444' }}>*</span></label>
+                  <input
+                    type="text"
+                    required
+                    value={knowledgeForm.title}
+                    onChange={e => setKnowledgeForm(p => ({ ...p, title: e.target.value }))}
+                    style={inputStyle}
+                    placeholder="Ví dụ: Chính Sách Bảo Hành & Đổi Trả Linh Kiện 1 Đổi 1"
+                  />
+                </div>
+                <div>
+                  <label style={labelStyle}>Mã Định Danh (Slug)</label>
+                  <input
+                    type="text"
+                    value={knowledgeForm.slug}
+                    onChange={e => setKnowledgeForm(p => ({ ...p, slug: e.target.value }))}
+                    style={inputStyle}
+                    placeholder="Tự tạo nếu để trống (e.g. sop-warranty-01)"
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div>
+                  <label style={labelStyle}>Danh Mục Quy Trình</label>
+                  <select
+                    value={knowledgeForm.category}
+                    onChange={e => setKnowledgeForm(p => ({ ...p, category: e.target.value }))}
+                    style={inputStyle}
+                  >
+                    <option value="POLICY">Chính Sách & Quy Định (POLICY)</option>
+                    <option value="PROCEDURE">Quy Trình Chuẩn (PROCEDURE / SOP)</option>
+                    <option value="SALES_GUIDE">Hướng Dẫn Bán Hàng (SALES_GUIDE)</option>
+                    <option value="TECH_SPEC">Kỹ Thuật & QA (TECH_SPEC)</option>
+                    <option value="FINANCE">Tài Chính & Kế Toán (FINANCE)</option>
+                    <option value="HR_POLICY">Nhân Sự & Lương (HR_POLICY)</option>
+                    <option value="GENERAL">Quy Chế Chung (GENERAL)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style={labelStyle}>Trạng Thái Áp Dụng</label>
+                  <select
+                    value={knowledgeForm.isActive ? 'ACTIVE' : 'INACTIVE'}
+                    onChange={e => setKnowledgeForm(p => ({ ...p, isActive: e.target.value === 'ACTIVE' }))}
+                    style={inputStyle}
+                  >
+                    <option value="ACTIVE">Hiệu Lực (Áp dụng & Cho phép AI tra cứu)</option>
+                    <option value="INACTIVE">Tạm Ẩn (Không áp dụng)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label style={labelStyle}>Tóm Tắt Ngắn Gọn (Summary) <span style={{ color: '#64748b', fontWeight: 400 }}>(Hiển thị khi AI trích dẫn)</span></label>
+                <textarea
+                  rows={2}
+                  value={knowledgeForm.summary}
+                  onChange={e => setKnowledgeForm(p => ({ ...p, summary: e.target.value }))}
+                  style={{ ...inputStyle, resize: 'vertical' }}
+                  placeholder="Tóm tắt ngắn 1-3 câu về nội dung và điều kiện áp dụng của quy trình này..."
+                />
+              </div>
+
+              <div>
+                <label style={labelStyle}>Nội Dung Chi Tiết Tài Liệu <span style={{ color: '#ef4444' }}>*</span></label>
+                <textarea
+                  rows={9}
+                  required
+                  value={knowledgeForm.content}
+                  onChange={e => setKnowledgeForm(p => ({ ...p, content: e.target.value }))}
+                  style={{ ...inputStyle, resize: 'vertical', fontFamily: 'monospace', fontSize: '0.82rem', lineHeight: 1.5 }}
+                  placeholder="Nhập toàn văn tài liệu quy định, bao gồm các điều khoản, quy trình các bước, thẩm quyền phê duyệt, thời hạn và số liệu cụ thể..."
+                />
+              </div>
+
+              <div>
+                <label style={labelStyle}>Từ Khóa Tìm Kiếm (Tags) <span style={{ color: '#64748b', fontWeight: 400 }}>(cách nhau bằng dấu phẩy)</span></label>
+                <input
+                  type="text"
+                  value={knowledgeForm.tags}
+                  onChange={e => setKnowledgeForm(p => ({ ...p, tags: e.target.value }))}
+                  style={inputStyle}
+                  placeholder="bảo hành, đổi trả, 1 đổi 1, rma, linh kiện..."
+                />
+              </div>
+
+              <div>
+                <label style={labelStyle}>Phân Quyền Vai Trò Được Xem (RBAC) <span style={{ color: '#64748b', fontWeight: 400 }}>(Chỉ các vai trò được chọn mới tra cứu được tài liệu này)</span></label>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.5rem', marginTop: '0.4rem', backgroundColor: '#f8fafc', padding: '0.75rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                  {ROLES.map(role => {
+                    const isChecked = knowledgeForm.allowedRoles.includes(role);
+                    return (
+                      <label key={role} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600, color: isChecked ? '#1d4ed8' : '#475569' }}>
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={e => {
+                            if (e.target.checked) {
+                              setKnowledgeForm(p => ({ ...p, allowedRoles: [...p.allowedRoles, role] }));
+                            } else {
+                              setKnowledgeForm(p => ({ ...p, allowedRoles: p.allowedRoles.filter(r => r !== role) }));
+                            }
+                          }}
+                          style={{ cursor: 'pointer' }}
+                        />
+                        <span>{role}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1rem', borderTop: '1px solid #e2e8f0', paddingTop: '0.75rem' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowKnowledgeModal(false)}
+                  style={secondaryBtnStyle}
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  disabled={knowledgeSubmitting}
+                  style={{ ...primaryBtnStyle, opacity: knowledgeSubmitting ? 0.7 : 1, cursor: knowledgeSubmitting ? 'not-allowed' : 'pointer' }}
+                >
+                  {knowledgeSubmitting ? 'Đang lưu tài liệu...' : (editingKnowledgeDoc ? 'Lưu Cập Nhật' : 'Tạo Tài Liệu Mới')}
                 </button>
               </div>
             </form>
