@@ -24,6 +24,9 @@ const executeToolCall = async (toolName, params, user) => {
     case 'get_my_delivery_tasks':
       return await executeGetMyDeliveryTasks(user, userRole);
 
+    case 'get_my_profile_and_tasks':
+      return await executeGetMyProfileAndTasks(params, user);
+
     case 'get_finance_kpi':
       return await executeGetFinanceKpi(params, userRole);
 
@@ -144,9 +147,9 @@ const identifySemanticTopic = (query) => {
   return maxScore >= 15 ? bestTopic : null;
 };
 
-// 1. Tra cứu kho tài liệu tri thức (Knowledge Base)
+// 1. Tra cứu kho tài liệu tri thức (Knowledge Base) với Semantic Query Expansion
 const executeLookupKnowledgeBase = async (params, userRole) => {
-  const { query, category } = params || {};
+  const { query, category, expandedKeywords = [], semanticTopic = null } = params || {};
   if (!query || !query.trim()) {
     return { success: false, message: 'Vui lòng cung cấp từ khóa cần tra cứu.' };
   }
@@ -169,12 +172,22 @@ const executeLookupKnowledgeBase = async (params, userRole) => {
   const q = query.trim();
   const matchedThesaurus = identifySemanticTopic(q);
 
-  // Tách các từ khóa có nghĩa để tìm kiếm linh hoạt (tránh câu dài không khớp nguyên văn)
-  const keywords = q
+  // Chuẩn hóa danh sách từ khóa mở rộng (Semantic Expansion Tokens)
+  let expansionTokens = [];
+  if (Array.isArray(expandedKeywords)) {
+    expansionTokens = expandedKeywords.map(k => String(k).trim().toLowerCase()).filter(Boolean);
+  } else if (typeof expandedKeywords === 'string' && expandedKeywords.trim()) {
+    expansionTokens = expandedKeywords.split(/[,;\s]+/).map(k => k.trim().toLowerCase()).filter(k => k.length >= 2);
+  }
+
+  // Tách các từ khóa có nghĩa từ câu hỏi gốc
+  const queryTokens = q
     .toLowerCase()
     .replace(/[?,.!;:()]/g, ' ')
     .split(/\s+/)
-    .filter(w => w.length >= 3 && !['trong', 'nhiêu', 'ngày', 'như', 'thế', 'nào', 'được', 'cho', 'của', 'với', 'các', 'những', 'một', 'mình', 'muốn', 'khách'].includes(w));
+    .filter(w => w.length >= 2 && !['trong', 'nhiêu', 'ngày', 'như', 'thế', 'nào', 'được', 'cho', 'của', 'với', 'các', 'những', 'một', 'mình', 'muốn', 'khách', 'hôm', 'nay', 'phải', 'không', 'làm', 'sao'].includes(w));
+
+  const allSearchKeywords = Array.from(new Set([...queryTokens, ...expansionTokens]));
 
   const orConditions = [
     { title: { contains: q, mode: 'insensitive' } },
@@ -182,14 +195,16 @@ const executeLookupKnowledgeBase = async (params, userRole) => {
     { content: { contains: q, mode: 'insensitive' } }
   ];
 
-  // Nạp thêm từ khóa tách dòng
-  for (const kw of keywords) {
-    orConditions.push({ title: { contains: kw, mode: 'insensitive' } });
-    orConditions.push({ summary: { contains: kw, mode: 'insensitive' } });
-    orConditions.push({ tags: { has: kw } });
+  // Nạp thêm từ khóa mở rộng vào điều kiện tìm kiếm đa trường
+  for (const kw of allSearchKeywords) {
+    if (kw.length >= 2) {
+      orConditions.push({ title: { contains: kw, mode: 'insensitive' } });
+      orConditions.push({ summary: { contains: kw, mode: 'insensitive' } });
+      orConditions.push({ tags: { has: kw } });
+    }
   }
 
-  // TIER 2: Nếu câu hỏi tự nhiên khớp với Từ điển Ngữ nghĩa PC/ERP, tiêm trực tiếp Slug và Tags vào OR
+  // Nạp Slug và Tags từ Từ điển Ngữ nghĩa nếu có
   if (matchedThesaurus) {
     orConditions.push({ slug: matchedThesaurus.slug });
     for (const tag of matchedThesaurus.tags) {
@@ -207,7 +222,7 @@ const executeLookupKnowledgeBase = async (params, userRole) => {
 
   const documents = await prisma.knowledgeDocument.findMany({
     where,
-    take: 5,
+    take: 8,
     select: {
       id: true,
       title: true,
@@ -229,87 +244,56 @@ const executeLookupKnowledgeBase = async (params, userRole) => {
     };
   }
 
-  // Sắp xếp theo độ liên quan cao nhất: ưu tiên từ khóa chủ đề cốt lõi và Thesaurus
+  // Thuật toán chấm điểm và xếp hạng liên quan (Weighted Relevance Ranking)
   const qLower = q.toLowerCase();
-  const coreKeywords = [
-    'mật khẩu', 'password', 'pass', 'bảo mật', 'an toàn', 'an ninh', 
-    'bảo hành', 'đổi trả', '1 đổi 1', 'chiết khấu', 'vip', 'giảm giá',
-    'benchmark', 'furmark', 'cinebench', 'nhiệt độ', 'xmp', 
-    'sod', 'vietqr', 'tài khoản ngân hàng', 'lương', 'thưởng', 'kpi', 
-    'đóng gói', 'bọt biển', 'instapak', 'pod', 'cod', 'đối soát', 'thu tiền'
-  ];
-  const matchedCoreKeywords = coreKeywords.filter(k => qLower.includes(k));
 
   documents.sort((a, b) => {
     let aScore = 0;
     let bScore = 0;
 
-    // Trọng số vượt trội nếu trùng khớp Slug hoặc Tag trong Semantic Thesaurus
+    // 1. Trùng khớp Slug Thesaurus (+100 điểm)
     if (matchedThesaurus) {
-      if (a.slug === matchedThesaurus.slug) aScore += 120;
-      if (b.slug === matchedThesaurus.slug) bScore += 120;
-
-      for (const t of matchedThesaurus.tags) {
-        if ((a.tags || []).includes(t)) aScore += 25;
-        if ((b.tags || []).includes(t)) bScore += 25;
-      }
+      if (a.slug === matchedThesaurus.slug) aScore += 100;
+      if (b.slug === matchedThesaurus.slug) bScore += 100;
     }
 
-    for (const ck of matchedCoreKeywords) {
-      if (a.title.toLowerCase().includes(ck) || (a.tags || []).some(t => t.toLowerCase().includes(ck))) aScore += 50;
-      else if (a.content.toLowerCase().includes(ck)) aScore += 20;
+    // 2. Trùng khớp nguyên cụm câu hỏi (+50 điểm)
+    if (a.title.toLowerCase().includes(qLower)) aScore += 50;
+    if (b.title.toLowerCase().includes(qLower)) bScore += 50;
+    if ((a.summary || '').toLowerCase().includes(qLower)) aScore += 30;
+    if ((b.summary || '').toLowerCase().includes(qLower)) bScore += 30;
 
-      if (b.title.toLowerCase().includes(ck) || (b.tags || []).some(t => t.toLowerCase().includes(ck))) bScore += 50;
-      else if (b.content.toLowerCase().includes(ck)) bScore += 20;
+    // 3. Trùng khớp với từng từ khóa mở rộng (Expansion Tokens)
+    for (const token of allSearchKeywords) {
+      const aTitle = a.title.toLowerCase();
+      const bTitle = b.title.toLowerCase();
+      const aTags = (a.tags || []).map(t => t.toLowerCase());
+      const bTags = (b.tags || []).map(t => t.toLowerCase());
+      const aContent = a.content.toLowerCase();
+      const bContent = b.content.toLowerCase();
+
+      if (aTitle.includes(token)) aScore += 25;
+      if (bTitle.includes(token)) bScore += 25;
+
+      if (aTags.includes(token)) aScore += 20;
+      if (bTags.includes(token)) bScore += 20;
+
+      if (aContent.includes(token)) aScore += 10;
+      if (bContent.includes(token)) bScore += 10;
     }
-
-    if (a.title.toLowerCase().includes(qLower)) aScore += 30;
-    if (b.title.toLowerCase().includes(qLower)) bScore += 30;
-
-    const aTagMatch = (a.tags || []).some(t => qLower.includes(t.toLowerCase())) ? 10 : 0;
-    const bTagMatch = (b.tags || []).some(t => qLower.includes(t.toLowerCase())) ? 10 : 0;
-    aScore += aTagMatch;
-    bScore += bTagMatch;
 
     return bScore - aScore;
   });
 
-  // Nếu câu hỏi có từ khóa chủ đề cốt lõi nhưng tài liệu đứng đầu lại không hề chứa từ khóa đó (và không match thesaurus), coi như không tìm thấy
-  if (matchedCoreKeywords.length > 0 && !matchedThesaurus) {
-    const topDoc = documents[0];
-    const topHasCore = matchedCoreKeywords.some(ck => 
-      topDoc.title.toLowerCase().includes(ck) || 
-      (topDoc.tags || []).some(t => t.toLowerCase().includes(ck)) ||
-      topDoc.content.toLowerCase().includes(ck)
-    );
-    if (!topHasCore) {
-      return {
-        success: true,
-        found: false,
-        message: 'Không tìm thấy tài liệu quy chuẩn hoặc chính sách nào khớp với yêu cầu này.',
-        documents: []
-      };
-    }
-  }
-
-  const extractRelevantSection = (content, query) => {
+  // Thuật toán trích xuất đoạn điều khoản liên quan nhất (Dynamic Section Window)
+  const extractRelevantSection = (content, query, keywordsList) => {
     if (!content) return '';
-    const qTokens = query.toLowerCase()
-      .replace(/[?,.!;:()]/g, ' ')
-      .split(/\s+/)
-      .filter(w => w.length >= 2 && !['trong', 'nhiêu', 'ngày', 'như', 'thế', 'nào', 'được', 'cho', 'của', 'với', 'các', 'những', 'một', 'mình', 'muốn', 'khách'].includes(w));
-    
-    // Nếu có semanticTokens từ Thesaurus, thêm vào để tăng độ tập trung trích xuất điều khoản
-    if (matchedThesaurus?.semanticTokens) {
-      for (const st of matchedThesaurus.semanticTokens) {
-        if (!qTokens.includes(st)) qTokens.push(st);
-      }
-    }
+    const targetTokens = Array.from(new Set([...keywordsList, ...(matchedThesaurus?.semanticTokens || [])]));
 
     // Tách tài liệu theo các section (##, ĐIỀU, ###)
     const sections = content.split(/(?=\n## |\nĐIỀU |\n### )/g);
     if (sections.length <= 1) {
-      return content.slice(0, 1000);
+      return content.slice(0, 1200);
     }
 
     let bestSection = sections[0];
@@ -318,8 +302,8 @@ const executeLookupKnowledgeBase = async (params, userRole) => {
     for (const sec of sections) {
       const secLower = sec.toLowerCase();
       let score = 0;
-      for (const token of qTokens) {
-        if (secLower.includes(token)) score += 3;
+      for (const token of targetTokens) {
+        if (secLower.includes(token)) score += 5;
       }
       if (score > maxScore) {
         maxScore = score;
@@ -334,12 +318,12 @@ const executeLookupKnowledgeBase = async (params, userRole) => {
     success: true,
     found: true,
     count: documents.length,
-    documents: documents.map(d => ({
+    documents: documents.slice(0, 3).map(d => ({
       title: d.title,
       slug: d.slug,
       category: d.category,
       summary: d.summary,
-      relevantSection: extractRelevantSection(d.content, q),
+      relevantSection: extractRelevantSection(d.content, q, allSearchKeywords),
       contentSnippet: d.content.slice(0, 1500),
       updatedAt: d.updatedAt
     }))
@@ -636,6 +620,195 @@ const executeGetFinanceKpi = async (params, userRole) => {
       defaultQrAccount: defaultQrAcc ? `${defaultQrAcc.bankCode} - ${defaultQrAcc.accountNumber} (${defaultQrAcc.accountHolder})` : 'Chưa cấu hình',
       activeBanks: bankAccounts.map(b => `${b.bankCode}: ${b.accountNumber} - ${b.accountHolder} ${b.isDefaultQr ? '★ VietQR Mặc Định' : ''}`)
     }
+  };
+};
+
+// 6. Tra cứu hồ sơ & nhiệm vụ/chỉ số của chính nhân viên đang đăng nhập (Self Context Grounding)
+const executeGetMyProfileAndTasks = async (params, user) => {
+  const { period = 'TODAY' } = params || {};
+  const employeeId = Number(user?.id);
+  const employeeEmail = user?.email;
+
+  if ((!employeeId || isNaN(employeeId)) && !employeeEmail) {
+    return {
+      success: false,
+      error: 'INVALID_EMPLOYEE',
+      message: 'Không xác định được danh tính nhân viên từ phiên đăng nhập hiện tại.'
+    };
+  }
+
+  // 1. Tìm thông tin nhân sự trong bảng Employee
+  let employee = null;
+  if (employeeId && Number.isSafeInteger(employeeId)) {
+    employee = await prisma.employee.findUnique({
+      where: { id: employeeId }
+    });
+  }
+  if (!employee && employeeEmail) {
+    employee = await prisma.employee.findUnique({
+      where: { email: employeeEmail }
+    });
+  }
+
+  if (!employee) {
+    // Kiểm tra nếu là Nhà Cung Cấp (Supplier)
+    const supplier = await prisma.supplier.findFirst({
+      where: {
+        OR: [
+          { email: employeeEmail || '' },
+          { code: user?.code || '' }
+        ]
+      }
+    });
+    if (supplier) {
+      return {
+        success: true,
+        userType: 'SUPPLIER',
+        profile: {
+          code: supplier.code,
+          name: supplier.name,
+          email: supplier.email,
+          phone: supplier.phone || '—',
+          role: 'Nhà cung cấp đối tác AetherPC'
+        }
+      };
+    }
+
+    return {
+      success: false,
+      error: 'NOT_FOUND',
+      message: 'Không tìm thấy hồ sơ nhân sự trong cơ sở dữ liệu.'
+    };
+  }
+
+  // 2. Mốc thời gian thống kê
+  let dateFilter = {};
+  const now = new Date();
+  if (period === 'TODAY') {
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+    dateFilter = { gte: startOfToday };
+  } else if (period === 'THIS_MONTH') {
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0);
+    dateFilter = { gte: startOfMonth };
+  }
+
+  // 3. Khai thác dữ liệu theo vai trò nhân sự
+  let metrics = {};
+
+  // Với nhân viên Bán hàng (Sales, Sales Manager, Admin, CEO)
+  if (['SALES', 'SALES_MANAGER', 'ADMIN', 'CEO'].includes(employee.role)) {
+    const whereSold = { soldById: employee.id };
+    if (dateFilter.gte) whereSold.createdAt = dateFilter;
+
+    const [soldCount, soldSum, recentSoldOrders] = await Promise.all([
+      prisma.order.count({ where: whereSold }).catch(() => 0),
+      prisma.order.aggregate({
+        where: whereSold,
+        _sum: { totalAmount: true }
+      }).catch(() => ({ _sum: { totalAmount: 0 } })),
+      prisma.order.findMany({
+        where: { soldById: employee.id },
+        orderBy: { createdAt: 'desc' },
+        take: 5,
+        select: {
+          orderId: true,
+          status: true,
+          totalAmount: true,
+          createdAt: true,
+          customer: { select: { name: true } }
+        }
+      }).catch(() => [])
+    ]);
+
+    metrics.sales = {
+      period,
+      soldOrdersCount: soldCount,
+      totalRevenue: Number(soldSum._sum.totalAmount || 0).toLocaleString('vi-VN') + ' đ',
+      recentOrders: recentSoldOrders.map(o => ({
+        orderId: o.orderId,
+        customer: o.customer?.name || 'Khách lẻ',
+        total: Number(o.totalAmount).toLocaleString('vi-VN') + ' đ',
+        status: o.status
+      }))
+    };
+  }
+
+  // Với nhân viên Giao hàng (Delivery / Shipper)
+  if (['DELIVERY', 'ADMIN'].includes(employee.role)) {
+    const [assignedOrders, deliveredCount] = await Promise.all([
+      prisma.order.findMany({
+        where: {
+          assignedShipperId: employee.id,
+          status: { in: ['READY_TO_SHIP', 'SHIPPED'] }
+        },
+        orderBy: { createdAt: 'asc' },
+        select: {
+          orderId: true,
+          status: true,
+          totalAmount: true,
+          shippingAddress: true,
+          customer: { select: { name: true, phone: true } }
+        }
+      }).catch(() => []),
+      prisma.order.count({
+        where: {
+          assignedShipperId: employee.id,
+          status: 'DELIVERED',
+          ...(dateFilter.gte ? { deliveredAt: dateFilter } : {})
+        }
+      }).catch(() => 0)
+    ]);
+
+    metrics.delivery = {
+      pendingOrdersCount: assignedOrders.length,
+      pendingOrders: assignedOrders.map(o => ({
+        orderId: o.orderId,
+        status: o.status,
+        address: o.shippingAddress,
+        customer: o.customer?.name
+      })),
+      deliveredCount
+    };
+  }
+
+  // Với nhân viên Kho / Kỹ thuật
+  if (['WAREHOUSE', 'WAREHOUSE_MANAGER', 'ADMIN'].includes(employee.role)) {
+    const [assignedWorkOrders, qcCount] = await Promise.all([
+      prisma.workOrder.count({
+        where: {
+          employeeId: employee.id,
+          status: { in: ['PENDING', 'IN_PROGRESS'] }
+        }
+      }).catch(() => 0),
+      prisma.qcInspection.count({
+        where: {
+          inspectorId: employee.id
+        }
+      }).catch(() => 0)
+    ]);
+
+    metrics.warehouse = {
+      assignedWorkOrders,
+      qcInspectionsCount: qcCount
+    };
+  }
+
+  return {
+    success: true,
+    userType: 'EMPLOYEE',
+    profile: {
+      id: employee.id,
+      code: employee.employeeCode,
+      name: employee.fullName,
+      email: employee.email,
+      phone: employee.phone || 'Chưa cập nhật',
+      department: employee.department,
+      role: employee.role,
+      status: employee.status || 'ACTIVE',
+      deliveryRegion: employee.deliveryRegion || null,
+      joinedAt: employee.createdAt ? new Date(employee.createdAt).toLocaleDateString('vi-VN') : '—'
+    },
+    metrics
   };
 };
 

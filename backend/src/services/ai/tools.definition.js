@@ -78,6 +78,20 @@ const ALL_TOOL_DEFINITIONS = [
     }
   },
   {
+    name: 'get_my_profile_and_tasks',
+    description: 'Tra cứu hồ sơ cá nhân, chỉ số KPI/doanh số bán hàng, ca làm việc, hoặc nhiệm vụ/đơn hàng đang phụ trách của chính nhân viên đang đăng nhập. Không nhận ID nhân viên từ người dùng (tự động gắn theo token đăng nhập).',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        period: {
+          type: 'STRING',
+          enum: ['TODAY', 'THIS_MONTH', 'OVERALL'],
+          description: 'Khoảng thời gian thống kê số liệu cá nhân (hôm nay, tháng này hoặc toàn bộ)'
+        }
+      }
+    }
+  },
+  {
     name: 'get_finance_kpi',
     description: 'Tra cứu nhanh tổng quan tài chính: Doanh thu thực tế, số dư quỹ tiền mặt và số dư các tài khoản ngân hàng doanh nghiệp (VietQR/MBBank/VCB). LƯU Ý: Chỉ dành riêng cho CEO, Admin và Kế Toán.',
     parameters: {

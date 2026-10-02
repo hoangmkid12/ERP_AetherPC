@@ -92,7 +92,7 @@ const getPromptChips = (req, res) => {
 //   - Câu hỏi có ngữ cảnh vai trò ("của quản lý bán hàng")
 //   - Câu hỏi bị nhầm intent do chứa keyword chung (vd: "đóng gói" → order vs SOP)
 // ============================================================================
-const INTENT_CLASSIFIER_PROMPT = `Bạn là hệ thống phân loại ý định (Intent Classifier) cho trợ lý ERP AetherPC - chuyên bán lẻ linh kiện máy tính, lắp ráp PC Gaming/Workstation, bảo hành RMA, và giao vận.
+const INTENT_CLASSIFIER_PROMPT = `Bạn là hệ thống phân tích ý định (Intent & Semantic Analyzer) cho trợ lý ERP AetherPC - chuyên bán lẻ linh kiện máy tính, lắp ráp PC Gaming/Workstation, bảo hành RMA, và giao vận.
 
 Phân tích câu hỏi và trả về ĐÚNG MỘT JSON object (không markdown, không giải thích):
 
@@ -109,40 +109,41 @@ Phân tích câu hỏi và trả về ĐÚNG MỘT JSON object (không markdown,
     "psuWattage": null,
     "targetRole": null,
     "timePeriod": null,
-    "sopTopic": null
+    "sopTopic": null,
+    "expandedKeywords": []
   },
   "confidence": 0.0
 }
 
 DANH SÁCH INTENT_CODE (chỉ dùng đúng các giá trị này):
 - SECURITY_BLOCK: Yêu cầu/hỏi mật khẩu, thông tin đăng nhập của nhân viên khác
-- HR_STAFF_COUNT: Thống kê số lượng nhân sự, danh sách tài khoản nhân viên
-- MY_DELIVERY_TASKS: Hỏi số đơn giao hàng đang được phân công cho chính người hỏi
+- HR_STAFF_COUNT: Thống kê số lượng nhân sự toàn công ty, danh sách tài khoản nhân viên
+- MY_PROFILE_TASKS: Hỏi thông tin về CHÍNH BẢN THÂN người hỏi (tôi là ai, thông tin/hồ sơ của tôi, ca làm việc, phòng ban của tôi, hôm nay tôi bán được bao nhiêu, doanh số của tôi, hoa hồng của tôi, công việc/nhiệm vụ của tôi)
+- MY_DELIVERY_TASKS: Hỏi số đơn giao hàng đang được phân công cho chính shipper hỏi
 - ORDER_LOOKUP: Tra cứu đơn hàng CỤ THỂ (phải có mã đơn DH-xxx/ORD-xxx hoặc số điện thoại 10 chữ số)
 - PRODUCT_LOOKUP: Tra cứu linh kiện, giá bán, tồn kho sản phẩm cụ thể
 - PC_COMPATIBILITY: Kiểm tra tương thích phần cứng PC, hỏi nguồn bao nhiêu watt cho cấu hình
-- FINANCE_REPORT: Báo cáo doanh thu, tài chính, số dư ngân hàng, tài khoản VietQR
+- FINANCE_REPORT: Báo cáo tổng thể doanh thu, tài chính công ty, số dư ngân hàng, tài khoản VietQR
 - KNOWLEDGE_SOP: Hỏi quy trình, chính sách, quy chuẩn, SOP nội bộ công ty, hướng dẫn nghiệp vụ, bảo hành, đổi trả, chiết khấu, KPI, lương thưởng, đóng gói, giao nhận, bảo mật dữ liệu
 - GENERAL_CHAT: Kiến thức IT/phần cứng chung, chào hỏi, trò chuyện, hoặc không thuộc các nhóm trên
 
-QUY TẮC PHÂN LOẠI BẮT BUỘC:
-1. "quy chuẩn đóng gói", "tiêu chuẩn đóng gói", "cách đóng gói" → KNOWLEDGE_SOP (KHÔNG phải ORDER_LOOKUP)
-2. "chính sách bảo hành", "quy trình đổi trả", "1 đổi 1" → KNOWLEDGE_SOP (KHÔNG phải PRODUCT_LOOKUP)
-3. Chỉ xếp ORDER_LOOKUP khi có mã đơn (DH-1002, ORD-xxx) hoặc SĐT cụ thể (0912345678)
-4. "Báo cáo doanh thu hôm nay của quản lý bán hàng" → FINANCE_REPORT + targetRole="SALES_MANAGER"
-5. "Báo cáo doanh thu hôm nay" (không nhắc vai trò) → FINANCE_REPORT + targetRole=null
-6. "RTX 4070 còn hàng không?" → PRODUCT_LOOKUP + productKeyword="RTX 4070"
-7. "i5 13400 + RTX 4060 cần nguồn bao nhiêu?" → PC_COMPATIBILITY
-8. "quy trình nộp tiền COD", "đối soát shipper" → KNOWLEDGE_SOP + sopTopic="LOGISTICS_PACKING"
-9. "quy chế chiết khấu", "giảm giá cho khách VIP" → KNOWLEDGE_SOP + sopTopic="SALES_DISCOUNT"
-10. "quy chế lương thưởng", "KPI bán hàng" → KNOWLEDGE_SOP + sopTopic="HR_PAYROLL"
-11. "quy định bảo mật", "khóa màn hình", "sa thải" → KNOWLEDGE_SOP + sopTopic="SECURITY_DATA"
-12. "tiêu chuẩn lắp ráp PC", "benchmark", "furmark" → KNOWLEDGE_SOP + sopTopic="TECHNICAL_QA"
-13. Phân biệt: hỏi VỀ quy trình/chính sách (KNOWLEDGE_SOP) vs tra cứu DỮ LIỆU thực tế (ORDER/PRODUCT/FINANCE)
-14. Trích xuất targetRole nếu câu hỏi nhắc đến vai trò cụ thể: "quản lý bán hàng"→"SALES_MANAGER", "nhân viên kho"→"WAREHOUSE", "shipper"→"DELIVERY", "kế toán"→"ACCOUNTANT", "giám đốc"→"CEO"
-15. Trích xuất timePeriod: "hôm nay"→"TODAY", "tuần này"→"THIS_WEEK", "tháng này"→"THIS_MONTH", "hôm qua"→"YESTERDAY"
-16. Trích xuất productKeyword: chỉ lấy tên linh kiện/sản phẩm thực sự (RTX 4070, i5-13400, DDR5 16GB...), KHÔNG lấy các từ mô tả (giá, tồn kho, kiểm tra...)
-17. "Hôm nay tôi có bao nhiêu đơn cần giao?" → MY_DELIVERY_TASKS; không hỏi ID nhân viên và không nhầm với tra cứu đơn của khách`;
+QUY TẮC PHÂN LOẠI & MỞ RỘNG TỪ KHÓA BẮT BUỘC:
+1. Hỏi về BẢN THÂN người hỏi ("tôi", "em", "mình", "của tôi", "bản thân tôi"):
+   - "tôi là ai", "thông tin của tôi", "hồ sơ nhân sự của tôi", "tôi vào làm từ khi nào", "phòng ban của tôi" → MY_PROFILE_TASKS
+   - "hôm nay tôi bán được bao nhiêu tiền?", "doanh số của tôi tháng này", "tôi bán được mấy đơn rồi" → MY_PROFILE_TASKS (timePeriod="TODAY" hoặc "THIS_MONTH")
+   - "hôm nay tôi có bao nhiêu đơn cần giao?" → MY_DELIVERY_TASKS hoặc MY_PROFILE_TASKS
+   - "công việc hôm nay của tôi là gì?", "nhiệm vụ của tôi" → MY_PROFILE_TASKS
+   => KHÔNG bao giờ nhầm câu hỏi về bản thân sang FINANCE_REPORT (báo cáo công ty) hay GENERAL_CHAT.
+2. Mở rộng truy vấn (expandedKeywords) cho KNOWLEDGE_SOP:
+   - Hãy suy luận và sinh ra 3-6 từ khóa/thuật ngữ đồng nghĩa tiếng Việt liên quan mật thiết vào "expandedKeywords" để tìm tài liệu chính xác dù người dùng không dùng đúng từ gốc.
+   - Vd: "làm sao để không vỡ kính khi ship" → expandedKeywords=["đóng gói", "vận chuyển", "thùng xốp", "túi khí", "chèn xốp", "bể vỡ", "kính cường lực"]
+   - Vd: "card bị cháy nổ có được đổi mới không" → expandedKeywords=["bảo hành", "1 đổi 1", "cháy nổ", "từ chối", "vga", "linh kiện"]
+3. "quy chuẩn đóng gói", "tiêu chuẩn đóng gói", "cách đóng gói" → KNOWLEDGE_SOP + sopTopic="LOGISTICS_PACKING"
+4. "chính sách bảo hành", "quy trình đổi trả", "1 đổi 1" → KNOWLEDGE_SOP + sopTopic="WARRANTY_RMA"
+5. Chỉ xếp ORDER_LOOKUP khi có mã đơn (DH-1002, ORD-xxx) hoặc SĐT cụ thể (0912345678)
+6. "Báo cáo doanh thu hôm nay của quản lý bán hàng" → FINANCE_REPORT + targetRole="SALES_MANAGER"
+7. "RTX 4070 còn hàng không?" → PRODUCT_LOOKUP + productKeyword="RTX 4070"
+8. "i5 13400 + RTX 4060 cần nguồn bao nhiêu?" → PC_COMPATIBILITY`;
 
 /**
  * Phân loại ý định bằng Gemini AI (Primary Classifier)
@@ -162,7 +163,7 @@ const classifyIntent = async (promptText, userRole) => {
           text: `${INTENT_CLASSIFIER_PROMPT}\n\n---\nCâu hỏi cần phân loại: "${promptText}"\nVai trò người hỏi: ${userRole}`
         }]
       }],
-      config: { temperature: 0.05, maxOutputTokens: 400 }
+      config: { temperature: 0.05, maxOutputTokens: 450 }
     });
 
     const text = aiResult.text?.trim();
@@ -172,7 +173,11 @@ const classifyIntent = async (promptText, userRole) => {
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       const parsed = JSON.parse(jsonMatch[0]);
-      const validIntents = ['SECURITY_BLOCK', 'HR_STAFF_COUNT', 'MY_DELIVERY_TASKS', 'ORDER_LOOKUP', 'PRODUCT_LOOKUP', 'PC_COMPATIBILITY', 'FINANCE_REPORT', 'KNOWLEDGE_SOP', 'GENERAL_CHAT'];
+      const validIntents = [
+        'SECURITY_BLOCK', 'HR_STAFF_COUNT', 'MY_PROFILE_TASKS', 'MY_DELIVERY_TASKS',
+        'ORDER_LOOKUP', 'PRODUCT_LOOKUP', 'PC_COMPATIBILITY', 'FINANCE_REPORT',
+        'KNOWLEDGE_SOP', 'GENERAL_CHAT'
+      ];
       if (validIntents.includes(parsed.intent)) {
         console.log(`[IntentClassifier] AI: "${promptText.slice(0, 60)}..." → ${parsed.intent} (conf=${parsed.confidence}) | sub: ${parsed.subIntent}`);
         return parsed;
@@ -192,59 +197,76 @@ const classifyIntent = async (promptText, userRole) => {
 const classifyIntentByRegex = (promptText) => {
   const lower = promptText.toLowerCase();
 
-  // 1. Chặn bảo mật (mật khẩu, thông tin đăng nhập)
-  if (/(mật khẩu|pass|password).*(của|cho|là gì|nhân viên|shipper|admin|sales|kế toán|tài khoản)|(cho|xin|lấy|xem|biết).*(mật khẩu|pass|password)/.test(lower)) {
+  // 1. Chặn bảo mật (mật khẩu, thông tin đăng nhập của người khác)
+  if (/(mật khẩu|pass|password).*(của|cho|là gì|nhân viên|shipper|admin|sales|kế toán|tài khoản người khác)|(cho|xin|lấy|xem|biết).*(mật khẩu|pass|password)/.test(lower)) {
     return { intent: 'SECURITY_BLOCK', subIntent: 'Yêu cầu mật khẩu', entities: {}, confidence: 0.95 };
   }
 
-  // 2. Thống kê nhân sự
-  if (/(bao nhiêu|số lượng|thống kê|tổng số|danh sách).*(nhân viên|tài khoản|nhân sự)|(nhân viên|tài khoản nhân sự|nhân sự).*(bao nhiêu|số lượng|tổng số)/.test(lower)) {
-    return { intent: 'HR_STAFF_COUNT', subIntent: 'Thống kê nhân sự', entities: {}, confidence: 0.9 };
+  // 2. Tra cứu thông tin BẢN THÂN (Self Context Grounding)
+  if (/(tôi là ai|tên tôi là|tôi tên gì|thông tin.*(của tôi|của mình|cá nhân)|hồ sơ.*(của tôi|của mình|cá nhân)|tài khoản của tôi|tôi thuộc phòng nào|chức vụ của tôi|tôi vào làm|lương của tôi)/.test(lower) ||
+      (/(tôi|của tôi|mình|của mình).*(bán được|doanh số|doanh thu|hoa hồng|mấy đơn|bao nhiêu đơn|nhiệm vụ|công việc)/.test(lower)) ||
+      (/(bán được|doanh số|hoa hồng|nhiệm vụ|công việc).*(của tôi|của mình)/.test(lower))) {
+    const isToday = /hôm nay|ngày nay/.test(lower);
+    const isMonth = /tháng này|tháng/.test(lower);
+    return {
+      intent: 'MY_PROFILE_TASKS',
+      subIntent: 'Tra cứu hồ sơ, nhiệm vụ hoặc doanh số của chính nhân viên',
+      entities: {
+        timePeriod: isToday ? 'TODAY' : isMonth ? 'THIS_MONTH' : 'TODAY',
+        expandedKeywords: []
+      },
+      confidence: 0.95
+    };
   }
 
+  // 3. Tra cứu đơn giao của chính shipper
   if (/(đơn hàng|đơn).*(giao|ship)|(giao|ship).*(đơn hàng|đơn)/.test(lower) &&
       /(tôi|mình|của tôi|của mình)/.test(lower) &&
       /(hôm nay|bao nhiêu|số lượng|đơn nào|danh sách)/.test(lower)) {
     return { intent: 'MY_DELIVERY_TASKS', subIntent: 'Tra cứu đơn giao được phân công cho chính tôi', entities: {}, confidence: 0.98 };
   }
 
-  // 3. Tra cứu đơn hàng (cần có mã đơn hoặc SĐT cụ thể)
+  // 4. Thống kê nhân sự toàn công ty
+  if (/(bao nhiêu|số lượng|thống kê|tổng số|danh sách).*(nhân viên|tài khoản|nhân sự)|(nhân viên|tài khoản nhân sự|nhân sự).*(bao nhiêu|số lượng|tổng số)/.test(lower)) {
+    return { intent: 'HR_STAFF_COUNT', subIntent: 'Thống kê nhân sự', entities: {}, confidence: 0.9 };
+  }
+
+  // 5. Tra cứu đơn hàng (cần có mã đơn hoặc SĐT cụ thể)
   const orderIdMatch = promptText.match(/(?:DH|ORD)-[\w-]+/i);
   const phoneMatch = promptText.match(/\b0\d{9,10}\b/);
   if (orderIdMatch || phoneMatch) {
     return { intent: 'ORDER_LOOKUP', subIntent: 'Tra cứu đơn hàng cụ thể', entities: { orderId: orderIdMatch?.[0] || null, phoneNumber: phoneMatch?.[0] || null }, confidence: 0.95 };
   }
-  if (/đơn hàng|tiến độ đơn/.test(lower) && !/đóng gói|bọc hàng|thùng xốp|quy chuẩn|chính sách|quy trình|tiêu chuẩn/.test(lower)) {
+  if (/đơn hàng|tiến độ đơn/.test(lower) && !/đóng gói|bọc hàng|thùng xốp|quy chuẩn|chính sách|quy trình|tiêu chuẩn|vỡ kính|bảo quản/.test(lower)) {
     return { intent: 'ORDER_LOOKUP', subIntent: 'Tra cứu đơn hàng chung', entities: {}, confidence: 0.7 };
   }
 
-  // 4. Tra cứu linh kiện & tồn kho
+  // 6. Tra cứu linh kiện & tồn kho
   if (/tồn kho|còn hàng|giá bao nhiêu|còn mấy cái|tra giá/i.test(lower) ||
     (/rtx|gtx|rx\s?\d{4}|core\s?i\d|ryzen\s?\d|ddr4|ddr5|mainboard|ssd\s?\d/i.test(lower) && !/tương thích|nguồn.*watt|socket/i.test(lower))) {
     return { intent: 'PRODUCT_LOOKUP', subIntent: 'Tra cứu sản phẩm/tồn kho', entities: { productKeyword: promptText }, confidence: 0.8 };
   }
 
-  // 5. Tương thích PC
+  // 7. Tương thích PC
   if (/tương thích|socket|lắp vừa|nguồn bao nhiêu|nguồn.*watt|có đi cùng|lắp chung/.test(lower)) {
     return { intent: 'PC_COMPATIBILITY', subIntent: 'Kiểm tra tương thích phần cứng', entities: {}, confidence: 0.8 };
   }
 
-  // 6. Tài chính (ưu tiên KNOWLEDGE_SOP nếu hỏi quy trình tài chính)
+  // 8. Tài chính (ưu tiên KNOWLEDGE_SOP nếu hỏi quy trình tài chính)
   if (/doanh thu|tài chính|số dư|ngân hàng|mbbank|vcb|vietcombank|quỹ tiền|hôm nay kiếm được/.test(lower)) {
-    // Phân biệt: hỏi QUY TRÌNH tài chính vs tra cứu SỐ LIỆU tài chính
     if (/quy trình|quy định|chính sách|quy chế|sod|phân nhiệm/.test(lower)) {
       return { intent: 'KNOWLEDGE_SOP', subIntent: 'Quy trình/quy định tài chính', entities: { sopTopic: 'FINANCE_BANKING' }, confidence: 0.85 };
     }
     return { intent: 'FINANCE_REPORT', subIntent: 'Báo cáo tài chính', entities: { timePeriod: 'TODAY' }, confidence: 0.8 };
   }
 
-  // 7. Knowledge Base / SOP (quy trình, chính sách, quy chuẩn)
+  // 9. Knowledge Base / SOP (quy trình, chính sách, quy chuẩn)
   const semanticTopic = identifySemanticTopic(promptText);
-  if (semanticTopic || /bảo mật|an ninh|an toàn|rò rỉ|bảo hành|đổi trả|1 đổi 1|chính sách|quy chế|chiết khấu|quy trình|tiêu chuẩn|quy chuẩn|đóng gói|hướng dẫn|thưởng|kpi|nộp tiền|đối soát|vietqr|sod|lắp ráp|benchmark|furmark|nghỉ việc|sa thải/.test(lower)) {
+  if (semanticTopic || /bảo mật|an ninh|an toàn|rò rỉ|bảo hành|đổi trả|1 đổi 1|chính sách|quy chế|chiết khấu|quy trình|tiêu chuẩn|quy chuẩn|đóng gói|hướng dẫn|thưởng|kpi|nộp tiền|đối soát|vietqr|sod|lắp ráp|benchmark|furmark|nghỉ việc|sa thải|vỡ kính|bể kính|va đập|chèn xốp|túi khí|bọc hàng|vận chuyển|bảo quản/.test(lower)) {
     return { intent: 'KNOWLEDGE_SOP', subIntent: 'Tra cứu quy trình/chính sách', entities: { sopTopic: semanticTopic?.topic || null }, confidence: 0.75 };
   }
 
-  // 8. Mặc định: hội thoại chung
+  // 10. Mặc định: hội thoại chung
   return { intent: 'GENERAL_CHAT', subIntent: 'Câu hỏi chung', entities: {}, confidence: 0.5 };
 };
 
@@ -270,21 +292,21 @@ const chatWithAi = async (req, res, next) => {
     // ========================================================================
     // BƯỚC 1: PHÂN LOẠI Ý ĐỊNH (AI-First, Regex Fallback)
     // ========================================================================
-    const personalDeliveryQuery = classifyIntentByRegex(promptText).intent === 'MY_DELIVERY_TASKS';
-    let classified = personalDeliveryQuery
-      ? classifyIntentByRegex(promptText)
+    const regexMatch = classifyIntentByRegex(promptText);
+    const isDirectRegexIntent = ['MY_DELIVERY_TASKS', 'MY_PROFILE_TASKS', 'SECURITY_BLOCK'].includes(regexMatch.intent);
+    let classified = isDirectRegexIntent
+      ? regexMatch
       : await classifyIntent(promptText, user.role);
 
     // Reconciliation: Nếu AI không khả dụng hoặc AI trả về GENERAL_CHAT nhưng thiếu tự tin,
     // kiểm tra lại bằng regex xem có intent cụ thể hơn không
     if (!classified) {
-      classified = classifyIntentByRegex(promptText);
+      classified = regexMatch;
       console.log(`[IntentRouter] Regex fallback → ${classified.intent} (conf=${classified.confidence})`);
     } else if (classified.intent === 'GENERAL_CHAT' && (classified.confidence || 0) < 0.75) {
-      const regexResult = classifyIntentByRegex(promptText);
-      if (regexResult.intent !== 'GENERAL_CHAT') {
-        console.log(`[IntentRouter] AI uncertain (${classified.confidence}), regex override → ${regexResult.intent}`);
-        classified = regexResult;
+      if (regexMatch.intent !== 'GENERAL_CHAT') {
+        console.log(`[IntentRouter] AI uncertain (${classified.confidence}), regex override → ${regexMatch.intent}`);
+        classified = regexMatch;
       }
     }
 
@@ -298,6 +320,80 @@ const chatWithAi = async (req, res, next) => {
     // BƯỚC 2: THỰC THI THEO Ý ĐỊNH ĐÃ PHÂN LOẠI
     // ========================================================================
     switch (intent) {
+
+      // -----------------------------------------------------------------------
+      // MY PROFILE & TASKS: Tra cứu hồ sơ, doanh số, nhiệm vụ của chính nhân viên
+      // -----------------------------------------------------------------------
+      case 'MY_PROFILE_TASKS': {
+        const period = entities.timePeriod || 'TODAY';
+        const profileResult = await executeToolCall('get_my_profile_and_tasks', { period }, user);
+        toolCallsExecuted.push({ tool: 'get_my_profile_and_tasks', params: { period }, result: profileResult });
+
+        if (!profileResult.success) {
+          finalAiResponse = profileResult.message || 'Không thể tra cứu thông tin nhân sự của bạn vào lúc này.';
+        } else {
+          // Tổng hợp câu trả lời tự nhiên, thân thiện bằng Gemini AI
+          let synthesized = false;
+          if (process.env.GEMINI_API_KEY && aiClient) {
+            try {
+              const profileContext = `Dữ liệu hồ sơ & hiệu suất cá nhân từ hệ thống ERP:
+Hồ sơ nhân viên:
+- Họ tên: ${profileResult.profile.name} (Mã NV: ${profileResult.profile.code})
+- Chức danh/Vai trò: ${profileResult.profile.role}
+- Phòng ban: ${profileResult.profile.department}
+- Email: ${profileResult.profile.email} | SĐT: ${profileResult.profile.phone}
+- Trạng thái: ${profileResult.profile.status}
+- Ngày gia nhập: ${profileResult.profile.joinedAt}
+${profileResult.profile.deliveryRegion ? `- Khu vực giao hàng phụ trách: ${profileResult.profile.deliveryRegion}` : ''}
+
+Dữ liệu hoạt động/hiệu suất (${period}):
+${JSON.stringify(profileResult.metrics, null, 2)}
+
+Câu hỏi gốc của nhân viên: "${promptText}"
+Ý định cụ thể: ${subIntent || 'Hỏi thông tin bản thân/hiệu suất'}
+
+Hãy trả lời trực tiếp, thân thiện, rõ ràng và chuẩn xác dựa trên dữ liệu trên. Định dạng Markdown đẹp.`;
+
+              const aiGen = await aiClient.models.generateContent({
+                model: 'gemini-2.5-flash',
+                contents: [{ role: 'user', parts: [{ text: profileContext }] }],
+                config: { systemInstruction: SYSTEM_INSTRUCTION, temperature: 0.3 }
+              });
+              if (aiGen.text) {
+                finalAiResponse = aiGen.text;
+                synthesized = true;
+              }
+            } catch (e) {
+              console.warn('[AetherCopilot] Gemini self profile synthesis error:', e.message);
+            }
+          }
+
+          if (!synthesized) {
+            const p = profileResult.profile;
+            const m = profileResult.metrics;
+            let metricText = '';
+            if (m.sales) {
+              metricText = `\n- **Doanh số bán hàng (${period === 'TODAY' ? 'Hôm nay' : 'Tháng này'}):** **${m.sales.totalRevenue}** (${m.sales.soldOrdersCount} đơn hàng)`;
+              if (m.sales.recentOrders?.length > 0) {
+                metricText += `\n- **Đơn gần nhất:** ` + m.sales.recentOrders.map(o => `#${o.orderId} (${o.total})`).join(', ');
+              }
+            }
+            if (m.delivery) {
+              metricText = `\n- **Đơn giao đang xử lý:** **${m.delivery.pendingOrdersCount} đơn** | Đã hoàn thành: ${m.delivery.deliveredCount} đơn`;
+            }
+            if (m.warehouse) {
+              metricText = `\n- **Lệnh lắp ráp đang xử lý:** **${m.warehouse.assignedWorkOrders} lệnh** | Phiếu QC: ${m.warehouse.qcInspectionsCount}`;
+            }
+
+            finalAiResponse = `👤 **Thông tin Nhân sự & Hoạt động của bạn:**\n\n` +
+              `- **Họ và tên:** **${p.name}** (\`${p.code}\`)\n` +
+              `- **Vị trí / Chức danh:** **${p.role}** - Phòng ban: **${p.department}**\n` +
+              `- **Email:** ${p.email} | **SĐT:** ${p.phone}\n` +
+              `- **Ngày vào làm:** ${p.joinedAt} (Trạng thái: *${p.status}*)${metricText}`;
+          }
+        }
+        break;
+      }
 
       // -----------------------------------------------------------------------
       // SECURITY BLOCK: Chặn yêu cầu mật khẩu (Zero-Trust)
@@ -469,8 +565,13 @@ Hãy trả lời chính xác dựa trên dữ liệu trên. Nếu dữ liệu ch
       // KNOWLEDGE SOP: Tra cứu quy trình, chính sách, SOP nội bộ
       // -----------------------------------------------------------------------
       case 'KNOWLEDGE_SOP': {
-        const toolResult = await executeToolCall('lookup_knowledge_base', { query: promptText }, user);
-        toolCallsExecuted.push({ tool: 'lookup_knowledge_base', params: { query: promptText }, result: toolResult });
+        const lookupParams = {
+          query: promptText,
+          expandedKeywords: entities.expandedKeywords || [],
+          semanticTopic: entities.sopTopic || null
+        };
+        const toolResult = await executeToolCall('lookup_knowledge_base', lookupParams, user);
+        toolCallsExecuted.push({ tool: 'lookup_knowledge_base', params: lookupParams, result: toolResult });
 
         if (toolResult.found && toolResult.documents?.length > 0) {
           const doc = toolResult.documents[0];
@@ -501,6 +602,27 @@ Hãy trả lời chính xác dựa trên dữ liệu trên. Nếu dữ liệu ch
 
           if (!synthesized) {
             finalAiResponse = `📋 **Quy định xử lý theo văn bản AetherPC:**\n\n${excerpt}\n\n📄 *Căn cứ văn bản: [${doc.title}](/admin/system?tab=knowledge&doc=${doc.slug})*`;
+          }
+        } else {
+          // Khi tài liệu không có sẵn trong Knowledge Base, nhờ Gemini giải thích theo nghiệp vụ ERP chung
+          if (process.env.GEMINI_API_KEY && aiClient) {
+            try {
+              const aiGen = await aiClient.models.generateContent({
+                model: 'gemini-2.5-flash',
+                contents: [{
+                  role: 'user',
+                  parts: [{
+                    text: `Nhân viên AetherPC hỏi: "${promptText}".\nHệ thống Knowledge Base nội bộ hiện chưa có văn bản quy chế ban hành riêng cho chủ đề này. Hãy giải thích ngắn gọn, chuẩn mực, khách quan theo thực tiễn linh kiện máy tính / ERP và khuyên nhân viên tham khảo ý kiến Trưởng bộ phận nếu cần phê duyệt đặc biệt.`
+                  }]
+                }],
+                config: { systemInstruction: SYSTEM_INSTRUCTION, temperature: 0.3 }
+              });
+              if (aiGen.text) {
+                finalAiResponse = aiGen.text;
+              }
+            } catch (e) {
+              console.warn('[AetherCopilot] Gemini SOP fallback answer error:', e.message);
+            }
           }
         }
         break;
@@ -611,5 +733,7 @@ const getAiAuditLogs = async (req, res, next) => {
 module.exports = {
   chatWithAi,
   getPromptChips,
-  getAiAuditLogs
+  getAiAuditLogs,
+  classifyIntent,
+  classifyIntentByRegex
 };
