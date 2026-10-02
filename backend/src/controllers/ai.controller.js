@@ -20,14 +20,19 @@ const getAiClient = () => {
   return null;
 };
 
-// Prompt hệ thống chuẩn mực chống ảo giác và tuân thủ kiểm soát nội bộ
-const SYSTEM_INSTRUCTION = `Bạn là AetherCopilot - Trợ lý Doanh nghiệp Thông minh của hệ thống AetherPC ERP (Chuyên bán lẻ linh kiện máy tính, lắp ráp PC Gaming/Workstation, bảo hành RMA, và giao vận).
+// Prompt hệ thống thông minh, thân thiện, linh hoạt như các trợ lý AI hàng đầu hiện nay
+const SYSTEM_INSTRUCTION = `Bạn là AetherCopilot - Trợ lý AI Thông Minh và Đồng Nghiệp Số của hệ thống AetherPC ERP.
 
-NGUYÊN TẮC CỐT LÕI (BẮT BUỘC TUÂN THỦ):
-1. BẢO MẬT & GROUNDING: Bạn chỉ được trả lời dựa trên thông tin chính xác từ các công cụ (Tools) hoặc đoạn trích tài liệu SOP được cung cấp. Tuyệt đối KHÔNG tự bịa đặt giá cả, mã đơn hàng, số tồn kho hay chính sách.
-2. NGUYÊN TẮC TRẢ LỜI TÀI LIỆU (KNOWLEDGE BASE): Khi trích dẫn chính sách, quy chế hoặc hướng dẫn, hãy trả lời thẳng vào tình huống cụ thể của người dùng, trích dẫn rõ tên văn bản và điều khoản để người dùng đối chiếu.
-3. PHÂN QUYỀN RBAC: Không bao giờ tiết lộ thông tin tài chính nhạy cảm hoặc bí mật doanh nghiệp cho người dùng không có thẩm quyền.
-4. PHONG CÁCH: Chuyên nghiệp, nhã nhặn, chuẩn tiếng Việt, sử dụng định dạng Markdown rõ ràng (in đậm, danh sách gạch đầu dòng, bảng nếu có).`;
+PHONG CÁCH VÀ TÍNH CÁCH TRÒ CHUYỆN:
+1. TỰ NHIÊN & THÂN THIỆN: Trò chuyện gần gũi, ấm áp, nhạy bén và thông minh như một đồng nghiệp xuất sắc (tương tự ChatGPT/Claude). Biết chào hỏi, cảm ơn, hỏi thăm và thấu hiểu tâm trạng của người dùng.
+2. ĐA NĂNG & HIỂU BIẾT RỘNG:
+   - Khi người dùng hỏi chuyện xã giao, công nghệ, cuộc sống, lập trình, viết lách, học tập, hay tâm sự: Hãy trò chuyện cởi mở, sinh động, truyền cảm hứng và cuốn hút.
+   - Khi người dùng hỏi về ERP, công việc, linh kiện máy tính, đơn hàng, chính sách, tài chính: Hãy chuyển sang phong thái chuyên nghiệp, cung cấp số liệu chính xác và phân tích chuyên sâu.
+3. NGỮ CẢNH & TRÍ NHỚ HỘI THOẠI: Luôn theo sát dòng suy nghĩ và các câu hỏi trước đó trong cuộc hội thoại để phản hồi liền mạch, không hỏi lại những gì người dùng đã nói.
+4. NGUYÊN TẮC BẢO MẬT & TRUNG THỰC: 
+   - Với dữ liệu nội bộ ERP (đơn hàng, tiền nong, tồn kho): Luôn dựa trên dữ liệu thực tế từ hệ thống, không tự bịa đặt số liệu.
+   - Tuyệt đối không cung cấp mật khẩu cá nhân của nhân viên khác.
+5. ĐỊNH DẠNG: Trình bày Markdown tinh tế, gãy gọn, có ngắt đoạn rõ ràng, dùng bullet point và icon hợp lý để tạo cảm giác dễ đọc.`;
 
 // Danh sách câu hỏi gợi ý nhanh theo vai trò (Prompt Chips)
 const ROLE_PROMPT_CHIPS = {
@@ -246,10 +251,11 @@ const classifyIntentByRegex = (promptText) => {
     return { intent: 'ORDER_LOOKUP', subIntent: 'Tra cứu đơn hàng chung', entities: {}, confidence: 0.7 };
   }
 
-  // 6. Tra cứu linh kiện & tồn kho
-  if (/tồn kho|còn hàng|giá bao nhiêu|còn mấy cái|tra giá/i.test(lower) ||
-    (/rtx|gtx|rx\s?\d{4}|core\s?i\d|ryzen\s?\d|ddr4|ddr5|mainboard|ssd\s?\d/i.test(lower) && !/tương thích|nguồn.*watt|socket/i.test(lower))) {
-    return { intent: 'PRODUCT_LOOKUP', subIntent: 'Tra cứu sản phẩm/tồn kho', entities: { productKeyword: promptText }, confidence: 0.8 };
+  // 6. Tra cứu linh kiện & tồn kho (Chỉ kích hoạt khi hỏi về giá, tồn kho, mua bán)
+  const isAskingInventoryOrPrice = /tồn kho|còn hàng|giá bao nhiêu|còn mấy cái|tra giá|báo giá|bao nhiêu tiền|mua|bán lẻ|xuất kho/i.test(lower);
+  const containsHwKeyword = /rtx|gtx|rx\s?\d{4}|core\s?i\d|ryzen\s?\d|ddr4|ddr5|mainboard|ssd\s?\d/i.test(lower);
+  if (isAskingInventoryOrPrice && containsHwKeyword && !/tương thích|nguồn.*watt|socket/i.test(lower)) {
+    return { intent: 'PRODUCT_LOOKUP', subIntent: 'Tra cứu sản phẩm/tồn kho', entities: { productKeyword: promptText }, confidence: 0.85 };
   }
 
   // 7. Tương thích PC
@@ -691,13 +697,13 @@ Hãy trả lời chính xác dựa trên dữ liệu trên. Nếu dữ liệu ch
             const aiGen = await aiClient.models.generateContent({
               model: 'gemini-2.5-flash',
               contents: [
-                ...conversationHistory.slice(-4).map(h => ({
-                  role: h.sender === 'USER' ? 'user' : 'model',
-                  parts: [{ text: h.content }]
+                ...conversationHistory.slice(-8).map(h => ({
+                  role: (h.sender === 'USER' || h.role === 'user') ? 'user' : 'model',
+                  parts: [{ text: h.content || h.text || '' }]
                 })),
                 { role: 'user', parts: [{ text: promptText }] }
               ],
-              config: { systemInstruction: SYSTEM_INSTRUCTION, temperature: 0.4 }
+              config: { systemInstruction: SYSTEM_INSTRUCTION, temperature: 0.7 }
             });
             if (aiGen.text) {
               finalAiResponse = aiGen.text;
