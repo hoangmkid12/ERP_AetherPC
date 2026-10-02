@@ -1,6 +1,6 @@
 import React from 'react';
-import { X, Phone, MapPin, Package, CheckCircle, AlertTriangle, Camera, CreditCard } from 'lucide-react';
-import { ORDER_STATUS, getStatusLabel, getStatusInfo } from '../../../../utils/statusLabels';
+import { X, Phone, MapPin, Package, CheckCircle, AlertTriangle, Camera, CreditCard, Banknote, ShieldCheck } from 'lucide-react';
+import { ORDER_STATUS, getStatusLabel, getStatusInfo, isOrderPrepaid } from '../../../../utils/statusLabels';
 import DeliveryProgressStepper from '../../../../components/DeliveryProgressStepper';
 import useSafeViewportHeight from '../../../../hooks/useSafeViewportHeight';
 
@@ -12,10 +12,12 @@ export default function OrderDetailSheet({ order: ord, onClose, fmt, actions = {
 
   const orderId = ord.orderId || ord.id;
   const codAmount = parseFloat(ord.totalAmount || ord.total || 0);
-  const isPrepaid = ord.paymentStatus === 'PAID' || ord.paymentMethod === 'ONLINE_GATEWAY' || ord.paymentMethod === 'BANK_TRANSFER' || codAmount === 0;
+  const isPrepaid = isOrderPrepaid(ord);
   const isDelivered = ord.status === 'DELIVERED';
   const isFailed = ord.status === 'SHIPPING_FAILED';
   const statusInfo = getStatusInfo(ORDER_STATUS, ord.status);
+
+  const formatMoney = (val) => (fmt ? fmt(val) : `${Number(val || 0).toLocaleString('vi-VN')} ₫`);
 
   const Row = ({ label, value }) => (
     <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', padding: '0.55rem 0', borderBottom: '1px solid var(--border-glass)', fontSize: '0.82rem' }}>
@@ -67,10 +69,96 @@ export default function OrderDetailSheet({ order: ord, onClose, fmt, actions = {
             <div style={{ fontWeight: 800, fontSize: '0.88rem', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--text-primary)' }}>
               <CreditCard size={16} /> Thanh Toán
             </div>
-            <Row label="Hình thức" value={isPrepaid ? 'Đã trả online' : 'Thu hộ COD'} />
-            <Row label="Số tiền" value={isPrepaid ? '0 đ' : fmt(codAmount)} />
-            {ord.actualPaymentMethod && <Row label="Thanh toán thực tế" value={ord.actualPaymentMethod === 'BANK_TRANSFER' ? `Chuyển khoản (${ord.bankRefCode || ''})` : ord.actualPaymentMethod === 'CASH' ? 'Tiền mặt' : 'Đã trả trước'} />}
-            {ord.receivedByType && <Row label="Người nhận" value={ord.receivedByType === 'DIRECT_CUSTOMER' ? 'Khách chính chủ' : (ord.receiverNameActual || 'Nhận thay')} />}
+            <Row label="Tổng tiền đơn hàng" value={formatMoney(codAmount)} />
+            <Row label="Hình thức đặt hàng" value={isPrepaid ? 'Đã trả online' : 'Thu hộ khi nhận hàng (COD)'} />
+
+            {isDelivered ? (
+              <>
+                <Row
+                  label="Hình thức đã thu"
+                  value={
+                    ord.actualPaymentMethod === 'CASH'
+                      ? 'Tiền mặt'
+                      : ord.actualPaymentMethod === 'BANK_TRANSFER'
+                        ? 'Chuyển khoản VietQR'
+                        : ord.actualPaymentMethod === 'SPLIT'
+                          ? 'Kết hợp (Tiền mặt + QR)'
+                          : isPrepaid
+                            ? 'Đã trả trước qua cổng online'
+                            : 'Đã thanh toán'
+                  }
+                />
+                <Row
+                  label="Số tiền đã thu"
+                  value={
+                    ord.actualPaymentMethod === 'CASH'
+                      ? `${formatMoney(codAmount)} (Tiền mặt)`
+                      : ord.actualPaymentMethod === 'BANK_TRANSFER'
+                        ? `${formatMoney(codAmount)} (Chuyển khoản)`
+                        : isPrepaid
+                          ? '0 ₫ (Không thu thêm)'
+                          : formatMoney(codAmount)
+                  }
+                />
+                {ord.bankRefCode && <Row label="Mã GD ngân hàng" value={ord.bankRefCode} />}
+              </>
+            ) : (
+              <Row
+                label="Cần thu khi giao"
+                value={isPrepaid ? '0 ₫ (Đã thanh toán trước)' : formatMoney(codAmount)}
+              />
+            )}
+
+            {ord.receivedByType && (
+              <Row
+                label="Người nhận thực tế"
+                value={
+                  ord.receivedByType === 'DIRECT_CUSTOMER'
+                    ? 'Khách chính chủ'
+                    : (ord.receiverNameActual ? `Nhận thay (${ord.receiverNameActual})` : 'Người nhận thay')
+                }
+              />
+            )}
+
+            {/* Thông báo tiền mặt đang giữ cho Shipper */}
+            {isDelivered && ord.actualPaymentMethod === 'CASH' && (
+              <div style={{
+                marginTop: '0.75rem',
+                padding: '0.7rem 0.85rem',
+                backgroundColor: 'rgba(22, 163, 74, 0.08)',
+                border: '1.5px solid #86efac',
+                borderRadius: '8px',
+                fontSize: '0.8rem',
+                color: '#15803d'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontWeight: 800 }}>
+                  <Banknote size={16} /> Đã thu đủ: {formatMoney(codAmount)} tiền mặt
+                </div>
+                <div style={{ fontSize: '0.74rem', color: '#166534', marginTop: '3px', lineHeight: 1.4 }}>
+                  Shipper đang giữ <strong>{formatMoney(codAmount)}</strong> tiền mặt COD từ đơn này. Hãy đối soát và nộp lại cho Kế toán / Thu ngân khi hết ca làm việc.
+                </div>
+              </div>
+            )}
+
+            {/* Thông báo chuyển khoản */}
+            {isDelivered && ord.actualPaymentMethod === 'BANK_TRANSFER' && (
+              <div style={{
+                marginTop: '0.75rem',
+                padding: '0.7rem 0.85rem',
+                backgroundColor: 'rgba(37, 99, 235, 0.08)',
+                border: '1.5px solid #93c5fd',
+                borderRadius: '8px',
+                fontSize: '0.8rem',
+                color: '#1d4ed8'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontWeight: 800 }}>
+                  <ShieldCheck size={16} /> Đã chuyển khoản: {formatMoney(codAmount)} (VietQR)
+                </div>
+                <div style={{ fontSize: '0.74rem', color: '#1e40af', marginTop: '3px', lineHeight: 1.4 }}>
+                  Mã giao dịch: <strong>{ord.bankRefCode || 'Đã ghi nhận'}</strong> (Tiền đã vào thẳng tài khoản công ty, Shipper không giữ tiền mặt).
+                </div>
+              </div>
+            )}
           </div>
 
           {isDelivered && (

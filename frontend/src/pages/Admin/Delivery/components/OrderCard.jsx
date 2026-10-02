@@ -1,6 +1,7 @@
 import React from 'react';
 import { Truck, Clock, Eye, Navigation, Phone, MapPin, RotateCcw } from 'lucide-react';
 import { getDeliveryIncidentStatus, isOrderRedelivery, getAppointmentInfo } from '../deliveryHelpers';
+import { isOrderPrepaid } from '../../../../utils/statusLabels';
 
 // Shared full-width mobile card used by PendingTab / ActiveTab / HistoryTab.
 // `variant` controls which action buttons render:
@@ -17,7 +18,7 @@ export default function OrderCard({ order: ord, variant, fmt, getOrderTimeClassi
   const timeInfo = getOrderTimeClassification(ord);
   const appointment = getAppointmentInfo(ord);
   const codAmount = parseFloat(ord.totalAmount || ord.total || 0);
-  const isPrepaid = ord.paymentStatus === 'PAID' || ord.paymentMethod === 'ONLINE_GATEWAY' || ord.paymentMethod === 'BANK_TRANSFER' || codAmount === 0;
+  const isPrepaid = isOrderPrepaid(ord);
   const addrStr = (ord.shippingAddress || '').toLowerCase();
   const isHCM = addrStr.includes('hồ chí minh') || addrStr.includes('hcm') || addrStr.includes('tp.hcm') || addrStr.includes('quận');
 
@@ -140,13 +141,27 @@ export default function OrderCard({ order: ord, variant, fmt, getOrderTimeClassi
       <div style={{
         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
         padding: '0.55rem 0.7rem', borderRadius: 'var(--radius-md)', marginBottom: '0.65rem',
-        backgroundColor: isPrepaid ? 'rgba(37,99,235,0.08)' : 'rgba(22,163,74,0.08)'
+        backgroundColor: isDelivered
+          ? (ord.actualPaymentMethod === 'CASH' ? 'rgba(22,163,74,0.1)' : 'rgba(37,99,235,0.08)')
+          : (isPrepaid ? 'rgba(37,99,235,0.08)' : 'rgba(22,163,74,0.08)')
       }}>
-        <span style={{ fontSize: '0.7rem', fontWeight: 700, color: isPrepaid ? 'var(--primary)' : 'var(--success)' }}>
-          {isDelivered ? 'ĐÃ THU' : isPrepaid ? 'ĐÃ TRẢ ONLINE' : 'CẦN THU COD'}
+        <span style={{
+          fontSize: '0.7rem', fontWeight: 700,
+          color: isDelivered
+            ? (ord.actualPaymentMethod === 'CASH' ? '#15803d' : '#2563eb')
+            : (isPrepaid ? 'var(--primary)' : 'var(--success)')
+        }}>
+          {isDelivered
+            ? (ord.actualPaymentMethod === 'CASH' ? 'ĐÃ THU TIỀN MẶT' : ord.actualPaymentMethod === 'BANK_TRANSFER' ? 'ĐÃ THU CHUYỂN KHOẢN' : isPrepaid ? 'ĐÃ TRẢ TRƯỚC' : 'ĐÃ THU')
+            : (isPrepaid ? 'ĐÃ TRẢ ONLINE' : 'CẦN THU COD')}
         </span>
-        <strong style={{ fontSize: '0.92rem', color: isPrepaid ? 'var(--primary)' : 'var(--success)' }}>
-          {isPrepaid ? '0 đ' : fmt(codAmount)}
+        <strong style={{
+          fontSize: '0.92rem',
+          color: isDelivered
+            ? (ord.actualPaymentMethod === 'CASH' ? '#15803d' : '#2563eb')
+            : (isPrepaid ? 'var(--primary)' : 'var(--success)')
+        }}>
+          {isPrepaid && !isDelivered ? '0 đ' : fmt(codAmount)}
         </strong>
       </div>
 

@@ -4,6 +4,7 @@ import '@goongmaps/goong-js/dist/goong-js.css';
 import { fetchRoadRoute, forwardGeocode } from '../../../../utils/routingService';
 import { goongjs, GOONG_STYLE_URL, createWarehouseElement, createDestinationElement, createShipperElement, updateShipperElementHeading } from '../../../../utils/mapIcons';
 import { getAddressCoordinates } from '../../../../utils/deliveryRegions';
+import { isOrderPrepaid } from '../../../../utils/statusLabels';
 import PODCaptureSection from './PODCaptureSection';
 
 function haversineKm(a, b) {
@@ -92,7 +93,7 @@ export default function DeliveryNavigationModal({
   const phone = order?.phone || order?.customer?.phone || '';
   const address = order?.shippingAddress || order?.address || destination?.label || '';
   const codAmount = parseFloat(order?.totalAmount || order?.total || 0);
-  const isPrepaid = order?.paymentStatus === 'PAID' || order?.paymentMethod === 'ONLINE_GATEWAY' || order?.paymentMethod === 'BANK_TRANSFER' || codAmount === 0;
+  const isPrepaid = isOrderPrepaid(order);
 
   // Tự động phát GPS ngay khi vào màn hình "Bắt Đầu Giao" gộp — bỏ nút bấm
   // riêng, chỉ còn badge nhỏ trên bản đồ để tắt/bật lại khi cần.

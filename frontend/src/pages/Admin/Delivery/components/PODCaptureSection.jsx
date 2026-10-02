@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Camera, RefreshCw, CreditCard, ChevronLeft, Upload, Check, ChevronRight, XCircle } from 'lucide-react';
+import { isOrderPrepaid } from '../../../../utils/statusLabels';
 
 // Thanh trượt xác nhận (Swipe to Confirm) chống chạm nhầm khi đi đường
 function SwipeConfirmButton({ onConfirm, disabled, label = "Trượt để hoàn tất giao hàng" }) {
@@ -156,7 +157,7 @@ export default function PODCaptureSection({ order, user, fmt, onConfirm, onRejec
   const [currentTime, setCurrentTime] = useState(() => new Date());
 
   const codAmount = parseFloat(order.totalAmount || order.total || 0);
-  const isPrepaid = order.paymentStatus === 'PAID' || order.paymentMethod === 'ONLINE_GATEWAY' || order.paymentMethod === 'BANK_TRANSFER' || codAmount === 0;
+  const isPrepaid = isOrderPrepaid(order) || codAmount === 0;
 
   const [proofPhoto, setProofPhoto] = useState('');
   // Trước đây mặc định sẵn 1 câu khẳng định "khách đã ký nhận đầy đủ" dù

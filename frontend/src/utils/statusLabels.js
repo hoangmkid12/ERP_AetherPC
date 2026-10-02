@@ -27,6 +27,35 @@ export const getStatusInfo = (dictionary, status) => {
 
 export const getStatusLabel = (dictionary, status) => getStatusInfo(dictionary, status).label;
 
+// Kiểm tra xem đơn hàng là loại ĐÃ THANH TOÁN TRƯỚC (Online/Chuyển khoản trước khi giao)
+// hay là đơn THU HỘ TIỀN MẶT (COD).
+// Đơn COD dù đã giao xong và paymentStatus='PAID' thì VẪN LÀ ĐƠN COD (thu tiền mặt lúc giao),
+// KHÔNG ĐƯỢC coi là trả trước (isPrepaid=false) để tránh hiện "Số tiền là 0đ".
+export const isOrderPrepaid = (ord) => {
+  if (!ord) return false;
+  const method = String(ord.paymentMethod || '').toUpperCase();
+  const actualMethod = String(ord.actualPaymentMethod || '').toUpperCase();
+
+  // Đơn COD hoặc thanh toán thực tế là tiền mặt / split thì KHÔNG PHẢI trả trước
+  if (method === 'COD') return false;
+  if (actualMethod === 'CASH' || actualMethod === 'SPLIT') return false;
+
+  // Phương thức thanh toán online trước
+  if (
+    method === 'ONLINE_GATEWAY' ||
+    method === 'BANK_TRANSFER' ||
+    method === 'VNPAY' ||
+    method === 'MOMO' ||
+    method === 'ZALOPAY' ||
+    actualMethod === 'PREPAID'
+  ) {
+    return true;
+  }
+
+  // Nếu không ghi nhận method là COD và đã thanh toán trước khi giao
+  return ord.paymentStatus === 'PAID' && method !== 'COD' && actualMethod !== 'CASH';
+};
+
 // ─── Order.status (đơn hàng bán, 19 giá trị — order.controller.js VALID_STATUSES) ───
 export const ORDER_STATUS = {
   PENDING: { label: 'Chờ Xác Nhận', color: '#b45309', bg: '#fffbeb', border: '#fde68a' },
