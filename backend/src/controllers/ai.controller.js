@@ -484,7 +484,36 @@ Hãy trả lời trực tiếp, thân thiện, rõ ràng và chuẩn xác dựa 
               result: { rowCount: universalResult.rowCount }
             });
           } else {
-            finalAiResponse = `Không tìm thấy đơn hàng nào khớp với thông tin "${orderQuery}". Vui lòng kiểm tra lại Mã đơn hàng hoặc Số điện thoại người nhận.`;
+            // Cơ chế Khai vấn Thông minh (Intelligent Clarification & Next Best Action)
+            let clarificationGiven = false;
+            if (aiClient) {
+              try {
+                const clarifyPrompt = `Người dùng vừa hỏi: "${promptText}".
+Hệ thống ERP vừa tra cứu nhưng không tìm thấy dữ liệu trực tiếp nào khớp.
+Hãy phân tích câu hỏi trên và đưa ra phản hồi lịch sự, thân thiện:
+1. Thông báo ngắn gọn là chưa tìm thấy dữ liệu khớp hoàn toàn.
+2. Đặt câu hỏi: "💡 Có phải bạn đang muốn tìm kiếm một trong các mục sau không?"
+3. Đưa ra 2-3 hướng gợi ý cụ thể liên quan đến các nghiệp vụ ERP (tra cứu theo mã đơn, tra cứu đơn theo khu vực/trạng thái, hoặc xem tồn kho/chính sách).
+4. Hướng dẫn người dùng cung cấp thông tin chuẩn để hệ thống hỗ trợ tốt nhất.
+Định dạng Markdown đẹp, gãy gọn, tinh tế.`;
+
+                const aiGen = await aiClient.models.generateContent({
+                  model: 'gemini-2.5-flash',
+                  contents: [{ role: 'user', parts: [{ text: clarifyPrompt }] }],
+                  config: { systemInstruction: SYSTEM_INSTRUCTION, temperature: 0.3 }
+                });
+                if (aiGen.text) {
+                  finalAiResponse = aiGen.text;
+                  clarificationGiven = true;
+                }
+              } catch (e) {
+                console.warn('[AetherCopilot] Gemini clarification error:', e.message);
+              }
+            }
+
+            if (!clarificationGiven) {
+              finalAiResponse = `Mình vừa tra cứu nhưng chưa tìm thấy đơn hàng nào khớp với thông tin "${orderQuery}".\n\n💡 **Có phải bạn đang muốn:**\n- 📦 Tra cứu theo **Mã đơn hàng** (ví dụ: \`ORD-260408-0006\`, \`DH-1002\`)?\n- 📱 Tra cứu các đơn hàng đã đặt theo **Số điện thoại** người nhận?\n- 🚚 Kiểm tra danh sách các đơn hàng **đang giao** hoặc **chờ giao**?\n\nBạn có thể cung cấp thêm chi tiết để mình hỗ trợ ngay nhé!`;
+            }
           }
         }
         break;
