@@ -84,7 +84,165 @@ const getPromptChips = (req, res) => {
   res.json({ success: true, role, chips });
 };
 
-// POST /api/v1/ai/chat
+// ============================================================================
+// AI-POWERED INTENT CLASSIFIER (Phân loại ý định bằng Gemini AI)
+// Giải quyết triệt để mọi trường hợp AI hiểu sai mục đích câu hỏi:
+//   - Câu hỏi dài, phức tạp, không có keyword rõ ràng
+//   - Câu hỏi có ngữ cảnh vai trò ("của quản lý bán hàng")
+//   - Câu hỏi bị nhầm intent do chứa keyword chung (vd: "đóng gói" → order vs SOP)
+// ============================================================================
+const INTENT_CLASSIFIER_PROMPT = `Bạn là hệ thống phân loại ý định (Intent Classifier) cho trợ lý ERP AetherPC - chuyên bán lẻ linh kiện máy tính, lắp ráp PC Gaming/Workstation, bảo hành RMA, và giao vận.
+
+Phân tích câu hỏi và trả về ĐÚNG MỘT JSON object (không markdown, không giải thích):
+
+{
+  "intent": "<INTENT_CODE>",
+  "subIntent": "<mô tả ngắn gọn ý định cụ thể bằng tiếng Việt>",
+  "entities": {
+    "orderId": null,
+    "phoneNumber": null,
+    "productKeyword": null,
+    "cpuName": null,
+    "gpuName": null,
+    "mainboardName": null,
+    "psuWattage": null,
+    "targetRole": null,
+    "timePeriod": null,
+    "sopTopic": null
+  },
+  "confidence": 0.0
+}
+
+DANH SÁCH INTENT_CODE (chỉ dùng đúng các giá trị này):
+- SECURITY_BLOCK: Yêu cầu/hỏi mật khẩu, thông tin đăng nhập của nhân viên khác
+- HR_STAFF_COUNT: Thống kê số lượng nhân sự, danh sách tài khoản nhân viên
+- ORDER_LOOKUP: Tra cứu đơn hàng CỤ THỂ (phải có mã đơn DH-xxx/ORD-xxx hoặc số điện thoại 10 chữ số)
+- PRODUCT_LOOKUP: Tra cứu linh kiện, giá bán, tồn kho sản phẩm cụ thể
+- PC_COMPATIBILITY: Kiểm tra tương thích phần cứng PC, hỏi nguồn bao nhiêu watt cho cấu hình
+- FINANCE_REPORT: Báo cáo doanh thu, tài chính, số dư ngân hàng, tài khoản VietQR
+- KNOWLEDGE_SOP: Hỏi quy trình, chính sách, quy chuẩn, SOP nội bộ công ty, hướng dẫn nghiệp vụ, bảo hành, đổi trả, chiết khấu, KPI, lương thưởng, đóng gói, giao nhận, bảo mật dữ liệu
+- GENERAL_CHAT: Kiến thức IT/phần cứng chung, chào hỏi, trò chuyện, hoặc không thuộc các nhóm trên
+
+QUY TẮC PHÂN LOẠI BẮT BUỘC:
+1. "quy chuẩn đóng gói", "tiêu chuẩn đóng gói", "cách đóng gói" → KNOWLEDGE_SOP (KHÔNG phải ORDER_LOOKUP)
+2. "chính sách bảo hành", "quy trình đổi trả", "1 đổi 1" → KNOWLEDGE_SOP (KHÔNG phải PRODUCT_LOOKUP)
+3. Chỉ xếp ORDER_LOOKUP khi có mã đơn (DH-1002, ORD-xxx) hoặc SĐT cụ thể (0912345678)
+4. "Báo cáo doanh thu hôm nay của quản lý bán hàng" → FINANCE_REPORT + targetRole="SALES_MANAGER"
+5. "Báo cáo doanh thu hôm nay" (không nhắc vai trò) → FINANCE_REPORT + targetRole=null
+6. "RTX 4070 còn hàng không?" → PRODUCT_LOOKUP + productKeyword="RTX 4070"
+7. "i5 13400 + RTX 4060 cần nguồn bao nhiêu?" → PC_COMPATIBILITY
+8. "quy trình nộp tiền COD", "đối soát shipper" → KNOWLEDGE_SOP + sopTopic="LOGISTICS_PACKING"
+9. "quy chế chiết khấu", "giảm giá cho khách VIP" → KNOWLEDGE_SOP + sopTopic="SALES_DISCOUNT"
+10. "quy chế lương thưởng", "KPI bán hàng" → KNOWLEDGE_SOP + sopTopic="HR_PAYROLL"
+11. "quy định bảo mật", "khóa màn hình", "sa thải" → KNOWLEDGE_SOP + sopTopic="SECURITY_DATA"
+12. "tiêu chuẩn lắp ráp PC", "benchmark", "furmark" → KNOWLEDGE_SOP + sopTopic="TECHNICAL_QA"
+13. Phân biệt: hỏi VỀ quy trình/chính sách (KNOWLEDGE_SOP) vs tra cứu DỮ LIỆU thực tế (ORDER/PRODUCT/FINANCE)
+14. Trích xuất targetRole nếu câu hỏi nhắc đến vai trò cụ thể: "quản lý bán hàng"→"SALES_MANAGER", "nhân viên kho"→"WAREHOUSE", "shipper"→"DELIVERY", "kế toán"→"ACCOUNTANT", "giám đốc"→"CEO"
+15. Trích xuất timePeriod: "hôm nay"→"TODAY", "tuần này"→"THIS_WEEK", "tháng này"→"THIS_MONTH", "hôm qua"→"YESTERDAY"
+16. Trích xuất productKeyword: chỉ lấy tên linh kiện/sản phẩm thực sự (RTX 4070, i5-13400, DDR5 16GB...), KHÔNG lấy các từ mô tả (giá, tồn kho, kiểm tra...)`;
+
+/**
+ * Phân loại ý định bằng Gemini AI (Primary Classifier)
+ * @param {string} promptText - Câu hỏi của người dùng
+ * @param {string} userRole - Vai trò RBAC của người hỏi
+ * @returns {Object|null} - { intent, subIntent, entities, confidence } hoặc null nếu lỗi
+ */
+const classifyIntent = async (promptText, userRole) => {
+  if (!aiClient || !process.env.GEMINI_API_KEY) return null;
+
+  try {
+    const aiResult = await aiClient.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: [{
+        role: 'user',
+        parts: [{
+          text: `${INTENT_CLASSIFIER_PROMPT}\n\n---\nCâu hỏi cần phân loại: "${promptText}"\nVai trò người hỏi: ${userRole}`
+        }]
+      }],
+      config: { temperature: 0.05, maxOutputTokens: 400 }
+    });
+
+    const text = aiResult.text?.trim();
+    if (!text) return null;
+
+    // Trích xuất JSON từ phản hồi (hỗ trợ cả raw JSON và markdown-wrapped)
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
+      const validIntents = ['SECURITY_BLOCK', 'HR_STAFF_COUNT', 'ORDER_LOOKUP', 'PRODUCT_LOOKUP', 'PC_COMPATIBILITY', 'FINANCE_REPORT', 'KNOWLEDGE_SOP', 'GENERAL_CHAT'];
+      if (validIntents.includes(parsed.intent)) {
+        console.log(`[IntentClassifier] AI: "${promptText.slice(0, 60)}..." → ${parsed.intent} (conf=${parsed.confidence}) | sub: ${parsed.subIntent}`);
+        return parsed;
+      }
+    }
+  } catch (e) {
+    console.warn('[IntentClassifier] AI classification error:', e.message);
+  }
+  return null;
+};
+
+/**
+ * Phân loại ý định bằng Regex (Fallback khi Gemini AI không khả dụng)
+ * @param {string} promptText - Câu hỏi của người dùng
+ * @returns {Object} - { intent, subIntent, entities, confidence }
+ */
+const classifyIntentByRegex = (promptText) => {
+  const lower = promptText.toLowerCase();
+
+  // 1. Chặn bảo mật (mật khẩu, thông tin đăng nhập)
+  if (/(mật khẩu|pass|password).*(của|cho|là gì|nhân viên|shipper|admin|sales|kế toán|tài khoản)|(cho|xin|lấy|xem|biết).*(mật khẩu|pass|password)/.test(lower)) {
+    return { intent: 'SECURITY_BLOCK', subIntent: 'Yêu cầu mật khẩu', entities: {}, confidence: 0.95 };
+  }
+
+  // 2. Thống kê nhân sự
+  if (/(bao nhiêu|số lượng|thống kê|tổng số|danh sách).*(nhân viên|tài khoản|nhân sự)|(nhân viên|tài khoản nhân sự|nhân sự).*(bao nhiêu|số lượng|tổng số)/.test(lower)) {
+    return { intent: 'HR_STAFF_COUNT', subIntent: 'Thống kê nhân sự', entities: {}, confidence: 0.9 };
+  }
+
+  // 3. Tra cứu đơn hàng (cần có mã đơn hoặc SĐT cụ thể)
+  const orderIdMatch = promptText.match(/(?:DH|ORD)-[\w-]+/i);
+  const phoneMatch = promptText.match(/\b0\d{9,10}\b/);
+  if (orderIdMatch || phoneMatch) {
+    return { intent: 'ORDER_LOOKUP', subIntent: 'Tra cứu đơn hàng cụ thể', entities: { orderId: orderIdMatch?.[0] || null, phoneNumber: phoneMatch?.[0] || null }, confidence: 0.95 };
+  }
+  if (/đơn hàng|tiến độ đơn/.test(lower) && !/đóng gói|bọc hàng|thùng xốp|quy chuẩn|chính sách|quy trình|tiêu chuẩn/.test(lower)) {
+    return { intent: 'ORDER_LOOKUP', subIntent: 'Tra cứu đơn hàng chung', entities: {}, confidence: 0.7 };
+  }
+
+  // 4. Tra cứu linh kiện & tồn kho
+  if (/tồn kho|còn hàng|giá bao nhiêu|còn mấy cái|tra giá/i.test(lower) ||
+    (/rtx|gtx|rx\s?\d{4}|core\s?i\d|ryzen\s?\d|ddr4|ddr5|mainboard|ssd\s?\d/i.test(lower) && !/tương thích|nguồn.*watt|socket/i.test(lower))) {
+    return { intent: 'PRODUCT_LOOKUP', subIntent: 'Tra cứu sản phẩm/tồn kho', entities: { productKeyword: promptText }, confidence: 0.8 };
+  }
+
+  // 5. Tương thích PC
+  if (/tương thích|socket|lắp vừa|nguồn bao nhiêu|nguồn.*watt|có đi cùng|lắp chung/.test(lower)) {
+    return { intent: 'PC_COMPATIBILITY', subIntent: 'Kiểm tra tương thích phần cứng', entities: {}, confidence: 0.8 };
+  }
+
+  // 6. Tài chính (ưu tiên KNOWLEDGE_SOP nếu hỏi quy trình tài chính)
+  if (/doanh thu|tài chính|số dư|ngân hàng|mbbank|vcb|vietcombank|quỹ tiền|hôm nay kiếm được/.test(lower)) {
+    // Phân biệt: hỏi QUY TRÌNH tài chính vs tra cứu SỐ LIỆU tài chính
+    if (/quy trình|quy định|chính sách|quy chế|sod|phân nhiệm/.test(lower)) {
+      return { intent: 'KNOWLEDGE_SOP', subIntent: 'Quy trình/quy định tài chính', entities: { sopTopic: 'FINANCE_BANKING' }, confidence: 0.85 };
+    }
+    return { intent: 'FINANCE_REPORT', subIntent: 'Báo cáo tài chính', entities: { timePeriod: 'TODAY' }, confidence: 0.8 };
+  }
+
+  // 7. Knowledge Base / SOP (quy trình, chính sách, quy chuẩn)
+  const semanticTopic = identifySemanticTopic(promptText);
+  if (semanticTopic || /bảo mật|an ninh|an toàn|rò rỉ|bảo hành|đổi trả|1 đổi 1|chính sách|quy chế|chiết khấu|quy trình|tiêu chuẩn|quy chuẩn|đóng gói|hướng dẫn|thưởng|kpi|nộp tiền|đối soát|vietqr|sod|lắp ráp|benchmark|furmark|nghỉ việc|sa thải/.test(lower)) {
+    return { intent: 'KNOWLEDGE_SOP', subIntent: 'Tra cứu quy trình/chính sách', entities: { sopTopic: semanticTopic?.topic || null }, confidence: 0.75 };
+  }
+
+  // 8. Mặc định: hội thoại chung
+  return { intent: 'GENERAL_CHAT', subIntent: 'Câu hỏi chung', entities: {}, confidence: 0.5 };
+};
+
+// ============================================================================
+// POST /api/v1/ai/chat - Hàm xử lý chat chính
+// Flow: AI Intent Classification → Route to Handler → Synthesize Response
+// ============================================================================
 const chatWithAi = async (req, res, next) => {
   const startTime = Date.now();
   const { message, conversationHistory = [] } = req.body;
@@ -95,189 +253,264 @@ const chatWithAi = async (req, res, next) => {
   }
 
   const promptText = message.trim();
-  const lower = promptText.toLowerCase();
-  const allowedTools = getToolsForRole(user.role);
   let toolCallsExecuted = [];
   let finalAiResponse = '';
   let citations = [];
 
   try {
-    // ------------------------------------------------------------------------
-    // CẢNH BÁO BẢO MẬT 0: Zero-Trust Interceptor (Ngăn chặn dò mật khẩu nhân sự)
-    // ------------------------------------------------------------------------
-    if (/(mật khẩu|pass|password).*(của|cho|là gì|nhân viên|shipper|admin|sales|kế toán|tài khoản)|(cho|xin|lấy|xem|biết).*(mật khẩu|pass|password)/.test(lower)) {
-      finalAiResponse = `🔒 **Cảnh Báo Bảo Mật & An Toàn Thông Tin (Zero-Trust Security):**\n\n` +
-        `- Hệ thống AetherCopilot **tuyệt đối không lưu trữ, không tra cứu và không thể cung cấp mật khẩu** của bất kỳ nhân sự hoặc tài khoản nào trong hệ thống.\n` +
-        `- Toàn bộ mật khẩu của nhân viên (kể cả nhân viên giao hàng / Shipper) đều được mã hóa một chiều (Bcrypt Salted Hash) theo tiêu chuẩn an ninh dữ liệu.\n` +
-        `- **Quy trình cấp lại:** Nếu nhân sự quên mật khẩu hoặc cần cấp mới, Quản trị viên (Admin) có thể thực hiện tại menu: **Quản Trị Hệ Thống > Tài Khoản & Người Dùng** (nút *Đổi Mật Khẩu*).\n\n` +
-        `📄 *Căn cứ: Điều 2 - Quy tắc bảo mật tài khoản & đăng nhập (Chính sách Bảo Mật AetherPC)*`;
-      citations.push({ title: 'Chính sách bảo mật', slug: 'chinh-sach-bao-mat', category: 'POLICY' });
-    }
+    // ========================================================================
+    // BƯỚC 1: PHÂN LOẠI Ý ĐỊNH (AI-First, Regex Fallback)
+    // ========================================================================
+    let classified = await classifyIntent(promptText, user.role);
 
-    // ------------------------------------------------------------------------
-    // Ý ĐỊNH 0: Thống kê số lượng tài khoản / nhân sự (Kiểm soát quyền RBAC)
-    // ------------------------------------------------------------------------
-    else if (/(bao nhiêu|số lượng|thống kê|tổng số|danh sách).*(nhân viên|tài khoản|nhân sự)|(nhân viên|tài khoản nhân sự|nhân sự).*(bao nhiêu|số lượng|tổng số)/.test(lower)) {
-      if (!['ADMIN', 'CEO', 'HR'].includes(user.role)) {
-        finalAiResponse = `⚠️ **Từ chối truy cập:** Vai trò của bạn (**${user.role}**) không có thẩm quyền tra cứu dữ liệu nhân sự của công ty. Vui lòng liên hệ Quản trị viên (Admin) hoặc phòng Nhân sự.`;
-      } else {
-        const empCount = await prisma.employee.count({ where: { status: 'ACTIVE' } }).catch(() => 0);
-        const totalEmp = await prisma.employee.count().catch(() => 0);
-        const rolesGroup = await prisma.employee.groupBy({
-          by: ['role'],
-          _count: { id: true }
-        }).catch(() => []);
-        
-        finalAiResponse = `👥 **Thống kê Tài Khoản & Nhân Sự AetherPC:**\n\n- **Tổng số tài khoản nhân viên:** **${totalEmp} tài khoản** (${empCount} nhân sự đang hoạt động ACTIVE)\n- **Phân bổ theo vai trò chức năng:**\n` +
-          rolesGroup.map(r => `  • **${r.role}:** ${r._count.id} nhân sự`).join('\n') +
-          `\n\n*Ghi chú: Bạn có thể xem và quản lý chi tiết danh sách tại menu **Quản Trị Hệ Thống > Tài Khoản & Người Dùng**.*`;
+    // Reconciliation: Nếu AI không khả dụng hoặc AI trả về GENERAL_CHAT nhưng thiếu tự tin,
+    // kiểm tra lại bằng regex xem có intent cụ thể hơn không
+    if (!classified) {
+      classified = classifyIntentByRegex(promptText);
+      console.log(`[IntentRouter] Regex fallback → ${classified.intent} (conf=${classified.confidence})`);
+    } else if (classified.intent === 'GENERAL_CHAT' && (classified.confidence || 0) < 0.75) {
+      const regexResult = classifyIntentByRegex(promptText);
+      if (regexResult.intent !== 'GENERAL_CHAT') {
+        console.log(`[IntentRouter] AI uncertain (${classified.confidence}), regex override → ${regexResult.intent}`);
+        classified = regexResult;
       }
     }
 
-    // ------------------------------------------------------------------------
-    // Ý ĐỊNH 1: Tra cứu tiến độ đơn hàng thực tế (Live Order Tracking từ Database)
-    // ------------------------------------------------------------------------
-    if (!finalAiResponse && (/dh-?\d+|0\d{9}/i.test(promptText) || (/đơn|đơn hàng|tiến độ đơn/.test(lower) && !/đóng gói|bọc hàng|thùng xốp/.test(lower)))) {
-      const orderMatch = promptText.match(/dh-?\d+|0\d{9}/i)?.[0] || promptText;
-      const orderResult = await executeToolCall('lookup_order_status', { orderIdOrPhone: orderMatch }, user);
-      toolCallsExecuted.push({ tool: 'lookup_order_status', params: { orderIdOrPhone: orderMatch }, result: orderResult });
+    const intent = classified.intent;
+    const entities = classified.entities || {};
+    const subIntent = classified.subIntent || '';
 
-      if (orderResult.found && orderResult.order) {
-        const o = orderResult.order;
-        finalAiResponse = `📦 **Thông tin Đơn hàng #${o.orderId}:**\n\n- **Trạng thái:** **${o.status}**\n- **Khách hàng:** ${o.customerName} (${o.customerPhone})\n- **Tổng giá trị:** ${o.totalAmount}\n- **Thanh toán:** ${o.paymentSummary}\n- **Shipper phụ trách:** ${o.shipper}\n- **Linh kiện trong đơn:** ${o.itemNames || 'Chi tiết đơn lẻ'}`;
-      } else {
-        finalAiResponse = `Không tìm thấy đơn hàng nào khớp với thông tin "${orderMatch}". Vui lòng kiểm tra lại Mã đơn hàng hoặc Số điện thoại người nhận.`;
+    console.log(`[IntentRouter] FINAL: intent=${intent} | sub="${subIntent}" | entities=${JSON.stringify(entities)}`);
+
+    // ========================================================================
+    // BƯỚC 2: THỰC THI THEO Ý ĐỊNH ĐÃ PHÂN LOẠI
+    // ========================================================================
+    switch (intent) {
+
+      // -----------------------------------------------------------------------
+      // SECURITY BLOCK: Chặn yêu cầu mật khẩu (Zero-Trust)
+      // -----------------------------------------------------------------------
+      case 'SECURITY_BLOCK': {
+        finalAiResponse = `🔒 **Cảnh Báo Bảo Mật & An Toàn Thông Tin (Zero-Trust Security):**\n\n` +
+          `- Hệ thống AetherCopilot **tuyệt đối không lưu trữ, không tra cứu và không thể cung cấp mật khẩu** của bất kỳ nhân sự hoặc tài khoản nào trong hệ thống.\n` +
+          `- Toàn bộ mật khẩu của nhân viên (kể cả nhân viên giao hàng / Shipper) đều được mã hóa một chiều (Bcrypt Salted Hash) theo tiêu chuẩn an ninh dữ liệu.\n` +
+          `- **Quy trình cấp lại:** Nếu nhân sự quên mật khẩu hoặc cần cấp mới, Quản trị viên (Admin) có thể thực hiện tại menu: **Quản Trị Hệ Thống > Tài Khoản & Người Dùng** (nút *Đổi Mật Khẩu*).\n\n` +
+          `📄 *Căn cứ: Điều 2 - Quy tắc bảo mật tài khoản & đăng nhập (Chính sách Bảo Mật AetherPC)*`;
+        citations.push({ title: 'Chính sách bảo mật', slug: 'chinh-sach-bao-mat', category: 'POLICY' });
+        break;
       }
-    }
 
-    // ------------------------------------------------------------------------
-    // Ý ĐỊNH 2: Tra cứu linh kiện & tồn kho thời gian thực (Live Products & Stock từ Database)
-    // ------------------------------------------------------------------------
-    else if (!finalAiResponse && (/tồn kho|còn hàng|giá bao nhiêu|còn mấy cái|tra giá/i.test(lower) || (/rtx|gtx|rx\s?\d{4}|core\s?i\d|ryzen\s?\d|ddr4|ddr5|mainboard|ssd\s?\d/i.test(lower) && !/tương thích|nguồn.*watt|socket/i.test(lower)))) {
-      const productResult = await executeToolCall('lookup_products', { keyword: promptText }, user);
-      toolCallsExecuted.push({ tool: 'lookup_products', params: { keyword: promptText }, result: productResult });
+      // -----------------------------------------------------------------------
+      // HR STAFF COUNT: Thống kê nhân sự (kiểm soát RBAC)
+      // -----------------------------------------------------------------------
+      case 'HR_STAFF_COUNT': {
+        if (!['ADMIN', 'CEO', 'HR'].includes(user.role)) {
+          finalAiResponse = `⚠️ **Từ chối truy cập:** Vai trò của bạn (**${user.role}**) không có thẩm quyền tra cứu dữ liệu nhân sự của công ty. Vui lòng liên hệ Quản trị viên (Admin) hoặc phòng Nhân sự.`;
+        } else {
+          const empCount = await prisma.employee.count({ where: { status: 'ACTIVE' } }).catch(() => 0);
+          const totalEmp = await prisma.employee.count().catch(() => 0);
+          const rolesGroup = await prisma.employee.groupBy({ by: ['role'], _count: { id: true } }).catch(() => []);
 
-      if (productResult.found && productResult.products?.length > 0) {
-        finalAiResponse = `🔍 **Tìm thấy ${productResult.products.length} linh kiện phù hợp trong kho AetherPC:**\n\n` +
-          productResult.products.map(p => 
-            `- **${p.name}**\n  • Giá bán lẻ: **${p.retailPriceFormatted}**\n  • Tồn kho khả dụng: **${p.availableStock} sản phẩm** (${p.stockLocations || 'Kho chính'})\n  • Mã SKU: \`${p.sku || 'N/A'}\``
-          ).join('\n\n');
-      } else {
-        finalAiResponse = `Hiện tại kho của AetherPC không tìm thấy linh kiện nào có tên "${promptText}". Bạn có thể kiểm tra danh mục trên trang Kho hoặc tạo Phiếu yêu cầu nhập hàng (PR).`;
+          finalAiResponse = `👥 **Thống kê Tài Khoản & Nhân Sự AetherPC:**\n\n` +
+            `- **Tổng số tài khoản nhân viên:** **${totalEmp} tài khoản** (${empCount} nhân sự đang hoạt động ACTIVE)\n` +
+            `- **Phân bổ theo vai trò chức năng:**\n` +
+            rolesGroup.map(r => `  • **${r.role}:** ${r._count.id} nhân sự`).join('\n') +
+            `\n\n*Ghi chú: Bạn có thể xem và quản lý chi tiết danh sách tại menu **Quản Trị Hệ Thống > Tài Khoản & Người Dùng**.*`;
+        }
+        break;
       }
-    }
 
-    // ------------------------------------------------------------------------
-    // Ý ĐỊNH 3: Kiểm tra tương thích cấu hình linh kiện PC (PC Compatibility Engine)
-    // ------------------------------------------------------------------------
-    else if (!finalAiResponse && /tương thích|socket|lắp vừa|nguồn bao nhiêu|nguồn.*watt|có đi cùng|lắp chung/.test(lower)) {
-      let cpuMatch = promptText.match(/i[3579]-?\d{4,5}[A-Z]?|ryzen\s?[3579]\s?\d{4}[A-Z]?/i)?.[0] || 'Intel Core i5-13400F';
-      let mbMatch = promptText.match(/[hbz]\d{3}[A-Z]?|a620|b650|x670/i)?.[0] || 'B760M';
-      let gpuMatch = promptText.match(/rtx\s?\d{4}[A-Z\s]*|gtx\s?\d{4}|rx\s?\d{4}[A-Z]*/i)?.[0] || 'RTX 4060';
-      let psuMatch = parseInt(promptText.match(/(\d{3})\s?w/i)?.[1] || '0', 10);
+      // -----------------------------------------------------------------------
+      // ORDER LOOKUP: Tra cứu tiến độ đơn hàng (Live Database)
+      // -----------------------------------------------------------------------
+      case 'ORDER_LOOKUP': {
+        // Ưu tiên entity đã trích xuất từ AI classifier, fallback sang regex
+        const orderQuery = entities.orderId || entities.phoneNumber || promptText.match(/(?:DH|ORD)-[\w-]+|0\d{9,10}/i)?.[0] || promptText;
+        const orderResult = await executeToolCall('lookup_order_status', { orderIdOrPhone: orderQuery }, user);
+        toolCallsExecuted.push({ tool: 'lookup_order_status', params: { orderIdOrPhone: orderQuery }, result: orderResult });
 
-      const compResult = executeToolCall('check_pc_compatibility', {
-        cpuName: cpuMatch,
-        mainboardName: mbMatch,
-        gpuName: gpuMatch,
-        psuWattage: psuMatch
-      });
-      toolCallsExecuted.push({ tool: 'check_pc_compatibility', result: compResult });
-
-      finalAiResponse = `🔧 **Kết quả thẩm định tương thích linh kiện PC:**\n\n- **Cấu hình kiểm tra:** CPU ${cpuMatch} + Mainboard ${mbMatch} + Card ${gpuMatch} ${psuMatch > 0 ? `(Nguồn ${psuMatch}W)` : ''}\n- **Đánh giá:** **${compResult.summary}**\n\n${compResult.issues.length > 0 ? `⚠️ **Vấn đề cảnh báo:**\n` + compResult.issues.map(i => `- ${i}`).join('\n') + '\n\n' : ''}${compResult.notes.map(n => `✅ ${n}`).join('\n')}`;
-    }
-
-    // ------------------------------------------------------------------------
-    // Ý ĐỊNH 4: Tra cứu tài chính, doanh thu, tài khoản ngân hàng SoD (Live Ledger)
-    // ------------------------------------------------------------------------
-    else if (!finalAiResponse && /doanh thu|tài chính|số dư|ngân hàng|mbbank|vcb|vietcombank|quỹ tiền|hôm nay kiếm được/.test(lower)) {
-      const toolResult = await executeToolCall('get_finance_kpi', { period: 'TODAY' }, user);
-      toolCallsExecuted.push({ tool: 'get_finance_kpi', params: { period: 'TODAY' }, result: toolResult });
-
-      if (!toolResult.success && toolResult.error === 'PERMISSION_DENIED') {
-        finalAiResponse = `⚠️ **Từ chối truy cập:** Vai trò của bạn (**${user.role}**) không có thẩm quyền tra cứu dữ liệu tài chính của doanh nghiệp. Vui lòng liên hệ Ban Giám Đốc (CEO) hoặc Kế Toán Trưởng.`;
-      } else if (toolResult.data) {
-        finalAiResponse = `📊 **Báo cáo Dòng Tiền & Tài Khoản Doanh Nghiệp (Hôm nay):**\n\n- **Doanh thu thực thu trong ngày:** **${toolResult.data.todayRevenue}**\n- **Tài khoản VietQR nhận tiền mặc định:** **${toolResult.data.defaultQrAccount}**\n- **Số lượng tài khoản hoạt động:** ${toolResult.data.activeBankCount} tài khoản.\n\n*Lưu ý: Dữ liệu được trích xuất từ Sổ cái kế toán thời gian thực theo chuẩn phân nhiệm SoD.*`;
+        if (orderResult.found && orderResult.order) {
+          const o = orderResult.order;
+          finalAiResponse = `📦 **Thông tin Đơn hàng #${o.orderId}:**\n\n` +
+            `- **Trạng thái:** **${o.status}**\n` +
+            `- **Khách hàng:** ${o.customerName} (${o.customerPhone})\n` +
+            `- **Tổng giá trị:** ${o.totalAmount}\n` +
+            `- **Thanh toán:** ${o.paymentSummary}\n` +
+            `- **Shipper phụ trách:** ${o.shipper}\n` +
+            `- **Linh kiện trong đơn:** ${o.itemNames || 'Chi tiết đơn lẻ'}`;
+        } else {
+          finalAiResponse = `Không tìm thấy đơn hàng nào khớp với thông tin "${orderQuery}". Vui lòng kiểm tra lại Mã đơn hàng hoặc Số điện thoại người nhận.`;
+        }
+        break;
       }
-    }
 
-    // ------------------------------------------------------------------------
-    // Ý ĐỊNH 5: TWO-TIER SEMANTIC ROUTER (Quy chuẩn, chính sách, SOP nội bộ)
-    // ------------------------------------------------------------------------
-    const semanticTopic = !finalAiResponse ? identifySemanticTopic(promptText) : null;
-    const hasSopKeywords = !finalAiResponse && /bảo mật|mật khẩu|an ninh|an toàn|rò rỉ|bảo hành|đổi trả|1 đổi 1|chính sách|quy chế|chiết khấu|quy trình|tiêu chuẩn|quy chuẩn|đóng gói|hướng dẫn|thưởng|kpi|nộp tiền|đối soát|vietqr|sod|lắp ráp|benchmark|furmark|nghỉ việc|sa thải/.test(lower);
+      // -----------------------------------------------------------------------
+      // PRODUCT LOOKUP: Tra cứu linh kiện & tồn kho (Live Database)
+      // -----------------------------------------------------------------------
+      case 'PRODUCT_LOOKUP': {
+        // Dùng productKeyword từ AI classifier nếu có (đã được AI làm sạch)
+        const keyword = entities.productKeyword || promptText;
+        const productResult = await executeToolCall('lookup_products', { keyword }, user);
+        toolCallsExecuted.push({ tool: 'lookup_products', params: { keyword }, result: productResult });
 
-    if (!finalAiResponse && (semanticTopic || hasSopKeywords)) {
-      const toolResult = await executeToolCall('lookup_knowledge_base', { query: promptText }, user);
-      toolCallsExecuted.push({ tool: 'lookup_knowledge_base', params: { query: promptText }, result: toolResult });
+        if (productResult.found && productResult.products?.length > 0) {
+          finalAiResponse = `🔍 **Tìm thấy ${productResult.products.length} linh kiện phù hợp trong kho AetherPC:**\n\n` +
+            productResult.products.map(p =>
+              `- **${p.name}**\n  • Giá bán lẻ: **${p.retailPriceFormatted}**\n  • Tồn kho khả dụng: **${p.availableStock} sản phẩm** (${p.stockLocations || 'Kho chính'})\n  • Mã SKU: \`${p.sku || 'N/A'}\``
+            ).join('\n\n');
+        } else {
+          finalAiResponse = `Hiện tại kho của AetherPC không tìm thấy linh kiện nào có tên "${keyword}". Bạn có thể kiểm tra danh mục trên trang Kho hoặc tạo Phiếu yêu cầu nhập hàng (PR).`;
+        }
+        break;
+      }
 
-      if (toolResult.found && toolResult.documents?.length > 0) {
-        const doc = toolResult.documents[0];
-        citations.push({ title: doc.title, slug: doc.slug, category: doc.category });
-        const excerpt = (doc.relevantSection || doc.contentSnippet || '').trim();
+      // -----------------------------------------------------------------------
+      // PC COMPATIBILITY: Kiểm tra tương thích phần cứng PC
+      // -----------------------------------------------------------------------
+      case 'PC_COMPATIBILITY': {
+        // Ưu tiên entity từ AI classifier, fallback sang regex extraction
+        let cpuMatch = entities.cpuName || promptText.match(/i[3579]-?\d{4,5}[A-Z]?|ryzen\s?[3579]\s?\d{4}[A-Z]?/i)?.[0] || 'Intel Core i5-13400F';
+        let mbMatch = entities.mainboardName || promptText.match(/[hbz]\d{3}[A-Z]?|a620|b650|x670/i)?.[0] || 'B760M';
+        let gpuMatch = entities.gpuName || promptText.match(/rtx\s?\d{4}[A-Z\s]*|gtx\s?\d{4}|rx\s?\d{4}[A-Z]*/i)?.[0] || 'RTX 4060';
+        let psuMatch = entities.psuWattage || parseInt(promptText.match(/(\d{3})\s?w/i)?.[1] || '0', 10);
 
-        let synthesized = false;
+        const compResult = executeToolCall('check_pc_compatibility', {
+          cpuName: cpuMatch, mainboardName: mbMatch, gpuName: gpuMatch, psuWattage: psuMatch
+        });
+        toolCallsExecuted.push({ tool: 'check_pc_compatibility', result: compResult });
+
+        finalAiResponse = `🔧 **Kết quả thẩm định tương thích linh kiện PC:**\n\n` +
+          `- **Cấu hình kiểm tra:** CPU ${cpuMatch} + Mainboard ${mbMatch} + Card ${gpuMatch} ${psuMatch > 0 ? `(Nguồn ${psuMatch}W)` : ''}\n` +
+          `- **Đánh giá:** **${compResult.summary}**\n\n` +
+          (compResult.issues.length > 0 ? `⚠️ **Vấn đề cảnh báo:**\n${compResult.issues.map(i => `- ${i}`).join('\n')}\n\n` : '') +
+          compResult.notes.map(n => `✅ ${n}`).join('\n');
+        break;
+      }
+
+      // -----------------------------------------------------------------------
+      // FINANCE REPORT: Tra cứu tài chính, doanh thu, tài khoản ngân hàng SoD
+      // Hỗ trợ ngữ cảnh: targetRole, timePeriod, subIntent
+      // -----------------------------------------------------------------------
+      case 'FINANCE_REPORT': {
+        const toolResult = await executeToolCall('get_finance_kpi', { period: entities.timePeriod || 'TODAY' }, user);
+        toolCallsExecuted.push({ tool: 'get_finance_kpi', params: { period: entities.timePeriod || 'TODAY' }, result: toolResult });
+
+        if (!toolResult.success && toolResult.error === 'PERMISSION_DENIED') {
+          finalAiResponse = `⚠️ **Từ chối truy cập:** Vai trò của bạn (**${user.role}**) không có thẩm quyền tra cứu dữ liệu tài chính của doanh nghiệp. Vui lòng liên hệ Ban Giám Đốc (CEO) hoặc Kế Toán Trưởng.`;
+        } else if (toolResult.data) {
+          // Nếu câu hỏi có ngữ cảnh đặc biệt (targetRole, subIntent cụ thể), dùng Gemini tổng hợp phản hồi phù hợp ngữ cảnh
+          const hasContext = entities.targetRole || (subIntent && subIntent !== 'Báo cáo tài chính');
+          if (hasContext && aiClient) {
+            try {
+              const contextPrompt = `Dữ liệu tài chính AetherPC:
+- Doanh thu thực thu trong ngày: ${toolResult.data.todayRevenue}
+- Tài khoản VietQR nhận tiền mặc định: ${toolResult.data.defaultQrAccount}
+- Số lượng tài khoản ngân hàng hoạt động: ${toolResult.data.activeBankCount}
+- Chi tiết tài khoản: ${(toolResult.data.activeBanks || []).join('; ')}
+
+Câu hỏi gốc của nhân viên: "${promptText}"
+${entities.targetRole ? `Vai trò/bộ phận được nhắc đến: ${entities.targetRole}` : ''}
+${subIntent ? `Ý định cụ thể: ${subIntent}` : ''}
+Vai trò người hỏi: ${user.role}
+
+Hãy trả lời chính xác dựa trên dữ liệu trên. Nếu dữ liệu chưa đủ chi tiết cho vai trò/bộ phận cụ thể được nhắc đến, hãy cung cấp dữ liệu tổng quan có sẵn kèm gợi ý nơi xem chi tiết hơn. Dùng Markdown đẹp, chuyên nghiệp.`;
+
+              const aiGen = await aiClient.models.generateContent({
+                model: 'gemini-2.5-flash',
+                contents: [{ role: 'user', parts: [{ text: contextPrompt }] }],
+                config: { systemInstruction: SYSTEM_INSTRUCTION, temperature: 0.3 }
+              });
+              if (aiGen.text) finalAiResponse = aiGen.text;
+            } catch (e) {
+              console.warn('[AetherCopilot] Contextualized finance response error:', e.message);
+            }
+          }
+
+          // Fallback template nếu Gemini synthesis thất bại hoặc không có context đặc biệt
+          if (!finalAiResponse) {
+            finalAiResponse = `📊 **Báo cáo Dòng Tiền & Tài Khoản Doanh Nghiệp (Hôm nay):**\n\n` +
+              `- **Doanh thu thực thu trong ngày:** **${toolResult.data.todayRevenue}**\n` +
+              `- **Tài khoản VietQR nhận tiền mặc định:** **${toolResult.data.defaultQrAccount}**\n` +
+              `- **Số lượng tài khoản hoạt động:** ${toolResult.data.activeBankCount} tài khoản.\n\n` +
+              `*Lưu ý: Dữ liệu được trích xuất từ Sổ cái kế toán thời gian thực theo chuẩn phân nhiệm SoD.*`;
+          }
+        }
+        break;
+      }
+
+      // -----------------------------------------------------------------------
+      // KNOWLEDGE SOP: Tra cứu quy trình, chính sách, SOP nội bộ
+      // -----------------------------------------------------------------------
+      case 'KNOWLEDGE_SOP': {
+        const toolResult = await executeToolCall('lookup_knowledge_base', { query: promptText }, user);
+        toolCallsExecuted.push({ tool: 'lookup_knowledge_base', params: { query: promptText }, result: toolResult });
+
+        if (toolResult.found && toolResult.documents?.length > 0) {
+          const doc = toolResult.documents[0];
+          citations.push({ title: doc.title, slug: doc.slug, category: doc.category });
+          const excerpt = (doc.relevantSection || doc.contentSnippet || '').trim();
+
+          let synthesized = false;
+          if (process.env.GEMINI_API_KEY && aiClient) {
+            try {
+              const aiGen = await aiClient.models.generateContent({
+                model: 'gemini-2.5-flash',
+                contents: [{
+                  role: 'user',
+                  parts: [{
+                    text: `Bạn là trợ lý ERP AetherPC. Dựa trên trích đoạn tài liệu quy chế sau đây:\n"""\n${excerpt}\n"""\nHãy trả lời trực tiếp, rõ ràng, thực tế và gãy gọn cho câu hỏi của nhân viên: "${promptText}".\n${subIntent ? `Ý định cụ thể: ${subIntent}` : ''}\n${entities.sopTopic ? `Chủ đề SOP: ${entities.sopTopic}` : ''}\nNêu rõ phương án xử lý theo quy định, không sao chép thừa thãi.`
+                  }]
+                }],
+                config: { systemInstruction: SYSTEM_INSTRUCTION, temperature: 0.2 }
+              });
+              if (aiGen.text) {
+                finalAiResponse = `${aiGen.text}\n\n📄 *Căn cứ văn bản: [${doc.title}](/admin/system?tab=knowledge&doc=${doc.slug})*`;
+                synthesized = true;
+              }
+            } catch (e) {
+              console.warn('[AetherCopilot] Gemini SOP synthesis error, falling back to local format:', e.message);
+            }
+          }
+
+          if (!synthesized) {
+            finalAiResponse = `📋 **Quy định xử lý theo văn bản AetherPC:**\n\n${excerpt}\n\n📄 *Căn cứ văn bản: [${doc.title}](/admin/system?tab=knowledge&doc=${doc.slug})*`;
+          }
+        }
+        break;
+      }
+
+      // -----------------------------------------------------------------------
+      // GENERAL CHAT: Tư vấn công nghệ & hội thoại thông minh (Gemini Generative)
+      // -----------------------------------------------------------------------
+      case 'GENERAL_CHAT':
+      default: {
         if (process.env.GEMINI_API_KEY && aiClient) {
           try {
             const aiGen = await aiClient.models.generateContent({
               model: 'gemini-2.5-flash',
-              contents: [{
-                role: 'user',
-                parts: [{
-                  text: `Bạn là trợ lý ERP AetherPC. Dựa trên trích đoạn tài liệu quy chế sau đây:\n"""\n${excerpt}\n"""\nHãy trả lời trực tiếp, rõ ràng, thực tế và gãy gọn cho câu hỏi của nhân viên: "${promptText}". Nêu rõ phương án xử lý theo quy định, không sao chép thừa thãi.`
-                }]
-              }],
-              config: {
-                systemInstruction: SYSTEM_INSTRUCTION,
-                temperature: 0.2
-              }
+              contents: [
+                ...conversationHistory.slice(-4).map(h => ({
+                  role: h.sender === 'USER' ? 'user' : 'model',
+                  parts: [{ text: h.content }]
+                })),
+                { role: 'user', parts: [{ text: promptText }] }
+              ],
+              config: { systemInstruction: SYSTEM_INSTRUCTION, temperature: 0.4 }
             });
             if (aiGen.text) {
-              finalAiResponse = `${aiGen.text}\n\n📄 *Căn cứ văn bản: [${doc.title}](/admin/system?tab=knowledge&doc=${doc.slug})*`;
-              synthesized = true;
+              finalAiResponse = aiGen.text;
             }
           } catch (e) {
-            console.warn('[AetherCopilot] Gemini synthesis error, falling back to local format:', e.message);
+            console.warn('[AetherCopilot] Gemini general response error:', e.message);
           }
         }
-
-        if (!synthesized) {
-          finalAiResponse = `📋 **Quy định xử lý theo văn bản AetherPC:**\n\n${excerpt}\n\n📄 *Căn cứ văn bản: [${doc.title}](/admin/system?tab=knowledge&doc=${doc.slug})*`;
-        }
+        break;
       }
     }
 
-    // ------------------------------------------------------------------------
-    // Ý ĐỊNH 6: TƯ VẤN CÔNG NGHỆ & HỘI THOẠI THÔNG MINH (Gemini AI Generative Live)
-    // Trả lời kiến thức phần cứng máy tính, tư vấn build PC, giải thích kỹ thuật
-    // ------------------------------------------------------------------------
-    if (!finalAiResponse && process.env.GEMINI_API_KEY && aiClient) {
-      try {
-        const aiGen = await aiClient.models.generateContent({
-          model: 'gemini-2.5-flash',
-          contents: [
-            ...conversationHistory.slice(-4).map(h => ({
-              role: h.sender === 'USER' ? 'user' : 'model',
-              parts: [{ text: h.content }]
-            })),
-            { role: 'user', parts: [{ text: promptText }] }
-          ],
-          config: {
-            systemInstruction: SYSTEM_INSTRUCTION,
-            temperature: 0.4
-          }
-        });
-        if (aiGen.text) {
-          finalAiResponse = aiGen.text;
-        }
-      } catch (e) {
-        console.warn('[AetherCopilot] Gemini general response error:', e.message);
-      }
-    }
-
-    // ------------------------------------------------------------------------
-    // Ý ĐỊNH DỰ PHÒNG CUỐI CÙNG: Hiển thị Menu trợ lý điều hướng ERP
-    // ------------------------------------------------------------------------
+    // ========================================================================
+    // BƯỚC 3: FALLBACK CUỐI CÙNG - Menu trợ lý điều hướng ERP
+    // ========================================================================
     if (!finalAiResponse) {
       finalAiResponse = `Xin chào **${user.name || 'bạn'}**! Tôi là **AetherCopilot** - Trợ lý Doanh nghiệp AetherPC ERP.\n\nTôi có thể hỗ trợ bạn trực tiếp các tác vụ:\n- 🔍 **Tra cứu tồn kho & Giá:** *"Kiểm tra tồn kho card RTX 4070"*, *"Giá CPU i5 13400"*\n- 📦 **Kiểm tra tiến độ đơn hàng:** *"Tra cứu đơn hàng DH-1002"*, *"Đơn hàng theo SĐT 0912345678"*\n- ⚙️ **Thẩm định tương thích PC:** *"i5 13400 + RTX 4060 cần nguồn bao nhiêu Watt?"*\n- 📖 **Tra cứu quy trình & chính sách:** *"Chính sách bảo hành 1 đổi 1"*, *"Quy chuẩn đóng gói thùng xốp"*\n${['CEO', 'ADMIN', 'ACCOUNTANT'].includes(user.role) ? '- 💰 **Báo cáo tài chính:** *"Báo cáo doanh thu hôm nay và tài khoản VietQR"*\n' : ''}\nBạn cần tôi hỗ trợ việc gì ngay bây giờ?`;
     }
