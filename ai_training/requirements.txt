@@ -1,0 +1,10 @@
+torch>=2.0.0
+transformers>=4.30.0
+pyvi>=0.1.1
+scikit-learn>=1.2.0
+pandas>=2.0.0
+matplotlib>=3.7.0
+seaborn>=0.12.0
+onnx>=1.14.0
+onnxruntime>=1.15.0
+accelerate>=0.20.0

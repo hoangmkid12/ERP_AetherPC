@@ -1,6 +1,7 @@
 const prisma = require('../config/database');
 const { getToolsForRole } = require('../services/ai/tools.definition');
 const { executeToolCall, identifySemanticTopic } = require('../services/ai/tools.executor');
+const { classifyIntentLocal } = require('../services/ai/localNlp.service');
 
 // Khởi tạo Gemini client nếu có GEMINI_API_KEY
 let GoogleGenAI = null;
@@ -290,23 +291,38 @@ const chatWithAi = async (req, res, next) => {
 
   try {
     // ========================================================================
-    // BƯỚC 1: PHÂN LOẠI Ý ĐỊNH (AI-First, Regex Fallback)
+    // BƯỚC 1: PHÂN LOẠI Ý ĐỊNH BẰNG MÔ HÌNH AI TỰ HUẤN LUYỆN (SELF-TRAINED AI)
     // ========================================================================
-    const regexMatch = classifyIntentByRegex(promptText);
-    const isDirectRegexIntent = ['MY_DELIVERY_TASKS', 'MY_PROFILE_TASKS', 'SECURITY_BLOCK'].includes(regexMatch.intent);
-    let classified = isDirectRegexIntent
-      ? regexMatch
-      : await classifyIntent(promptText, user.role);
+    let classified = null;
 
-    // Reconciliation: Nếu AI không khả dụng hoặc AI trả về GENERAL_CHAT nhưng thiếu tự tin,
-    // kiểm tra lại bằng regex xem có intent cụ thể hơn không
+    // 1. Ưu tiên Mô hình AI NLP tự huấn luyện cục bộ (Self-Trained Model Inference)
+    const localNlpResult = await classifyIntentLocal(promptText);
+    if (localNlpResult && localNlpResult.confidence >= 0.70) {
+      console.log(`[SelfTrainedAI] Mô hình tự train → ${localNlpResult.intent} (conf=${(localNlpResult.confidence * 100).toFixed(1)}%)`);
+      classified = {
+        intent: localNlpResult.intent,
+        subIntent: 'Phân loại bởi Mô hình AI tự huấn luyện (Local NLU Model)',
+        entities: { expandedKeywords: [] },
+        confidence: localNlpResult.confidence
+      };
+    }
+
+    // 2. Nếu mô hình tự train chưa đủ tự tin (< 70%), kích hoạt Gemini AI / Regex Classifier
     if (!classified) {
-      classified = regexMatch;
-      console.log(`[IntentRouter] Regex fallback → ${classified.intent} (conf=${classified.confidence})`);
-    } else if (classified.intent === 'GENERAL_CHAT' && (classified.confidence || 0) < 0.75) {
-      if (regexMatch.intent !== 'GENERAL_CHAT') {
-        console.log(`[IntentRouter] AI uncertain (${classified.confidence}), regex override → ${regexMatch.intent}`);
+      const regexMatch = classifyIntentByRegex(promptText);
+      const isDirectRegexIntent = ['MY_DELIVERY_TASKS', 'MY_PROFILE_TASKS', 'SECURITY_BLOCK'].includes(regexMatch.intent);
+      classified = isDirectRegexIntent
+        ? regexMatch
+        : await classifyIntent(promptText, user.role);
+
+      if (!classified) {
         classified = regexMatch;
+        console.log(`[IntentRouter] Regex fallback → ${classified.intent} (conf=${classified.confidence})`);
+      } else if (classified.intent === 'GENERAL_CHAT' && (classified.confidence || 0) < 0.75) {
+        if (regexMatch.intent !== 'GENERAL_CHAT') {
+          console.log(`[IntentRouter] AI uncertain (${classified.confidence}), regex override → ${regexMatch.intent}`);
+          classified = regexMatch;
+        }
       }
     }
 
