@@ -212,7 +212,19 @@ SQL Query:`;
     }
   }
 
-  // Fallback offline sang Bộ sinh mẫu câu ngữ nghĩa
+  // 2. Ưu tiên Mô hình AI tự huấn luyện (Local NLU Slot/Entity Extraction)
+  try {
+    const { extractSlotsAndGenerateSql } = require('./localNlp.service');
+    const localExtraction = await extractSlotsAndGenerateSql(userPrompt);
+    if (localExtraction && localExtraction.sql) {
+      console.log(`[UniversalData] Mô hình NLU tự train nhận diện Slots → sinh SQL: "${localExtraction.sql}"`);
+      return localExtraction.sql;
+    }
+  } catch (nlpErr) {
+    console.warn('[UniversalData] Local NLU extraction bypass:', nlpErr.message);
+  }
+
+  // 3. Fallback sang Bộ quy tắc ngữ nghĩa mở rộng
   return generateSqlBySemanticPattern(userPrompt, userRole);
 };
 

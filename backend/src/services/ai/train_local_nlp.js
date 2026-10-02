@@ -21,6 +21,10 @@ async function trainLocalNlp() {
     nlu: { log: false }
   });
 
+  // Đăng ký các thực thể nghiệp vụ ERP (Named Entity Recognition - NER)
+  const { registerErpEntities } = require('./localNlp.service');
+  registerErpEntities(manager);
+
   // Chia dữ liệu Train (80%) và Test (20%)
   const shuffled = [...rawData].sort(() => 0.5 - Math.random());
   const splitIndex = Math.floor(shuffled.length * 0.8);
