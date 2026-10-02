@@ -575,14 +575,13 @@ export const generateShipperNotifications = (
   const userIdStr = String(user?.id || user?.username || '').toLowerCase();
   const shipperRegion = user?.deliveryRegion || 'HCM_KV1';
 
+  const isManagerOrAdmin = ['CEO', 'ADMIN', 'WAREHOUSE_MANAGER', 'SALES_MANAGER'].includes(user?.role);
+
   const isShipperMatched = (o) => {
     if (!o) return false;
-    if (isDirectlyAssignedShipper(o, user)) return true;
-    if (o.assignedShipperId || o.assignedShipper || o.assignedShipperUsername) return false;
-
-    if (shipperRegion === 'ALL') return true;
-    const orderRegion = o.deliveryRegion || detectDeliveryRegion(o.shippingAddress || o.address || '');
-    return orderRegion === shipperRegion;
+    if (isManagerOrAdmin) return true;
+    // Đơn hàng CHỈ xuất hiện cho Shipper khi đã được Kho phân công trực tiếp
+    return isDirectlyAssignedShipper(o, user);
   };
 
   const assignedActiveOrders = orders.filter(o =>

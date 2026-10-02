@@ -282,16 +282,8 @@ export default function Delivery() {
 
   const isShipperMatched = (o) => {
     if (isManagerOrAdmin) return true;
-    if (isDirectlyAssigned(o)) return true;
-
-    if (o.assignedShipperId || o.assignedShipper || o.assignedShipperUsername) return false;
-
-    const orderIdStr = String(o.orderId || o.id || '');
-    if (orderIdStr && getRejectedAssignmentIds().has(orderIdStr)) return false;
-
-    if (shipperRegion === 'ALL') return true;
-    const orderRegion = o.deliveryRegion || detectDeliveryRegion(o.shippingAddress || o.address || '');
-    return orderRegion === shipperRegion;
+    // Đơn hàng CHỈ xuất hiện cho Shipper khi đã được Kho phân công trực tiếp
+    return isDirectlyAssigned(o);
   };
 
   const getOrderTimeClassification = (ord) => {

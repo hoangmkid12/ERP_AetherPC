@@ -77,17 +77,12 @@ export default function DeliveryAppShell({ children }) {
   };
 
   const isDirectlyAssigned = (o) => isDirectlyAssignedShipper(o, user);
+  const isManagerOrAdmin = ['CEO', 'ADMIN', 'WAREHOUSE_MANAGER', 'SALES_MANAGER'].includes(user?.role);
 
   const isShipperMatched = (o) => {
-    if (isDirectlyAssigned(o)) return true;
-    if (o.assignedShipperId || o.assignedShipper || o.assignedShipperUsername) return false;
-
-    const orderIdStr = String(o.orderId || o.id || '');
-    if (orderIdStr && getRejectedAssignmentIds().has(orderIdStr)) return false;
-
-    if (shipperRegion === 'ALL') return true;
-    const orderRegion = o.deliveryRegion || detectDeliveryRegion(o.shippingAddress || o.address || '');
-    return orderRegion === shipperRegion;
+    if (isManagerOrAdmin) return true;
+    // Đơn hàng CHỈ xuất hiện cho Shipper khi đã được Kho phân công trực tiếp
+    return isDirectlyAssigned(o);
   };
 
   const isOrderInShift = (o) => {
