@@ -293,28 +293,26 @@ const executeUniversalDataQuery = async (promptText, user) => {
   if (aiClient) {
     try {
       const summaryPrompt = `Bạn là trợ lý AetherCopilot của hệ thống AetherPC ERP.
-Dữ liệu thực tế trích xuất trực tiếp từ Cơ sở dữ liệu PostgreSQL:
+Dữ liệu thực tế trích xuất trực tiếp từ Cơ sở dữ liệu PostgreSQL (${rowCount} bản ghi):
 \`\`\`json
-${JSON.stringify(cleanData.slice(0, 15), null, 2)}
+${JSON.stringify(cleanData.slice(0, 10), null, 2)}
 \`\`\`
-Tổng số dòng tìm thấy: ${rowCount}
 
-Câu hỏi gốc của nhân viên: "${promptText}"
+Câu hỏi của người dùng: "${promptText}"
 Vai trò người hỏi: ${userRole}
 
 Nhiệm vụ:
-- Trả lời thẳng thắn, chính xác và phân tích số liệu trên một cách chuyên nghiệp.
-- Sử dụng bảng Markdown (Markdown Table), danh sách gạch đầu dòng, in đậm các con số quan trọng.
-- Định dạng tiền tệ VND (vd: 15.000.000 đ) và ngày tháng chuẩn tiếng Việt nếu có.
-- Trả lời súc tích, trực quan, không thừa thãi.`;
+- Trả lời trực tiếp, rõ ràng, gãy gọn.
+- Định dạng danh sách gạch đầu dòng Markdown rõ ràng (Mã đơn, Số tiền VNĐ, Trạng thái, Phương thức thanh toán).
+- Không dài dòng, không cắt ngang câu.`;
 
       const aiGen = await aiClient.models.generateContent({
         model: 'gemini-2.5-flash',
         contents: [{ role: 'user', parts: [{ text: summaryPrompt }] }],
-        config: { temperature: 0.2, maxOutputTokens: 600 }
+        config: { temperature: 0.2, maxOutputTokens: 1500 }
       });
 
-      if (aiGen.text) {
+      if (aiGen.text && aiGen.text.length > 50) {
         finalAiResponse = aiGen.text;
       }
     } catch (e) {
