@@ -480,16 +480,17 @@ const executeUniversalDataQuery = async (promptText, user) => {
       const summaryPrompt = `Bạn là trợ lý AetherCopilot của hệ thống AetherPC ERP.
 Dữ liệu thực tế trích xuất trực tiếp từ Cơ sở dữ liệu PostgreSQL (${rowCount} bản ghi):
 \`\`\`json
-${JSON.stringify(cleanData.slice(0, 10), null, 2)}
+${JSON.stringify(cleanData.slice(0, 15), null, 2)}
 \`\`\`
 
 Câu hỏi của người dùng: "${promptText}"
 Vai trò người hỏi: ${userRole}
 
 Nhiệm vụ:
-- Trả lời trực tiếp, rõ ràng, gãy gọn.
-- Định dạng danh sách gạch đầu dòng Markdown rõ ràng (Mã đơn, Số tiền VNĐ, Trạng thái, Phương thức thanh toán).
-- Không dài dòng, không cắt ngang câu.`;
+- Trả lời trực tiếp, tự nhiên và chuẩn xác vào câu hỏi.
+- Nếu là câu hỏi tổng hợp doanh thu/số lượng: Nêu rõ con số cụ thể kèm định dạng tiền tệ VND (ví dụ: "Tổng doanh thu năm nay của AetherPC là **10.718.796.960 VNĐ**...").
+- Nếu là danh sách đơn/sản phẩm: Liệt kê rõ ràng dạng Markdown (gạch đầu dòng hoặc bảng).
+- Định dạng Markdown đẹp mắt, chuyên nghiệp.`;
 
       const aiGen = await aiClientSummary.models.generateContent({
         model: 'gemini-2.5-flash',
