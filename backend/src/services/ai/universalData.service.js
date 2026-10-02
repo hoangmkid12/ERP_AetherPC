@@ -1,16 +1,18 @@
 const prisma = require('../../config/database');
 
-// Khởi tạo Gemini client
+// Khởi tạo Gemini client linh hoạt (Dynamic Lazy Initialization)
 let GoogleGenAI = null;
-let aiClient = null;
-
 try {
   const genaiPkg = require('@google/genai');
   GoogleGenAI = genaiPkg.GoogleGenAI;
-  if (process.env.GEMINI_API_KEY && GoogleGenAI) {
-    aiClient = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-  }
 } catch (e) {}
+
+const getAiClient = () => {
+  if (process.env.GEMINI_API_KEY && GoogleGenAI) {
+    return new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  }
+  return null;
+};
 
 /**
  * Tóm tắt Schema Cơ Sở Dữ Liệu PostgreSQL của AetherPC ERP
@@ -190,6 +192,7 @@ const generateSqlFromQuestion = async (userPrompt, userRole) => {
   }
 
   // 2. Bước 2: Nếu có Gemini AI, kết hợp Thực thể tự train + Trí tuệ Gemini (Hybrid AI)
+  const aiClient = getAiClient();
   if (aiClient) {
     try {
       const slotHints = nluResult?.slots ? `\n[Gợi ý thực thể trích xuất từ Mô hình AI tự train nội bộ: ${JSON.stringify(nluResult.slots)}]` : '';
@@ -290,7 +293,8 @@ const executeUniversalDataQuery = async (promptText, user) => {
 
   // 5. Cho Gemini đọc kết quả thô từ Database và trình bày dạng bảng / tóm tắt chuyên nghiệp
   let finalAiResponse = '';
-  if (aiClient) {
+  const aiClientSummary = getAiClient();
+  if (aiClientSummary) {
     try {
       const summaryPrompt = `Bạn là trợ lý AetherCopilot của hệ thống AetherPC ERP.
 Dữ liệu thực tế trích xuất trực tiếp từ Cơ sở dữ liệu PostgreSQL (${rowCount} bản ghi):
@@ -306,7 +310,7 @@ Nhiệm vụ:
 - Định dạng danh sách gạch đầu dòng Markdown rõ ràng (Mã đơn, Số tiền VNĐ, Trạng thái, Phương thức thanh toán).
 - Không dài dòng, không cắt ngang câu.`;
 
-      const aiGen = await aiClient.models.generateContent({
+      const aiGen = await aiClientSummary.models.generateContent({
         model: 'gemini-2.5-flash',
         contents: [{ role: 'user', parts: [{ text: summaryPrompt }] }],
         config: { temperature: 0.2, maxOutputTokens: 1500 }

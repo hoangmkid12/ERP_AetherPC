@@ -6,17 +6,19 @@ const { executeUniversalDataQuery } = require('../services/ai/universalData.serv
 
 // Khởi tạo Gemini client nếu có GEMINI_API_KEY
 let GoogleGenAI = null;
-let aiClient = null;
-
 try {
   const genaiPkg = require('@google/genai');
   GoogleGenAI = genaiPkg.GoogleGenAI;
-  if (process.env.GEMINI_API_KEY && GoogleGenAI) {
-    aiClient = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-  }
 } catch (e) {
   // @google/genai optional fallback
 }
+
+const getAiClient = () => {
+  if (process.env.GEMINI_API_KEY && GoogleGenAI) {
+    return new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  }
+  return null;
+};
 
 // Prompt hệ thống chuẩn mực chống ảo giác và tuân thủ kiểm soát nội bộ
 const SYSTEM_INSTRUCTION = `Bạn là AetherCopilot - Trợ lý Doanh nghiệp Thông minh của hệ thống AetherPC ERP (Chuyên bán lẻ linh kiện máy tính, lắp ráp PC Gaming/Workstation, bảo hành RMA, và giao vận).
