@@ -6,7 +6,7 @@ import { COMPLAINT_STATUS, getStatusInfo, getStatusLabel, formatRmaCode } from '
 import { Search, Package, Clock, ShieldCheck, CheckCircle2, ChevronRight, HelpCircle, RefreshCw, X, AlertCircle, Sparkles, Eye, Upload, CheckCircle, MapPin, Camera } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { api } from '../../services/api';
-import { REGION_COORDS, detectDeliveryRegion } from '../../utils/deliveryRegions';
+import { REGION_COORDS, detectDeliveryRegion, getAddressCoordinates } from '../../utils/deliveryRegions';
 import ReturnRequestModal from '../../components/ReturnRequestModal';
 import DeliveryMap from '../../components/DeliveryMap';
 
@@ -2310,7 +2310,7 @@ export default function MyOrders() {
                       ? { lat: 21.0139, lng: 105.8228, name: 'Kho AetherPC Hà Nội', address: 'Quận Đống Đa, Hà Nội' }
                       : { lat: 10.7756, lng: 106.6919, name: 'Kho Tổng AetherPC TP.HCM', address: 'Quận 1, TP.HCM' });
                     const orderDestination = {
-                      ...(REGION_COORDS[orderRegion] || REGION_COORDS.ALL),
+                      ...getAddressCoordinates(trackingData?.shippingAddress || selectedOrder.shippingAddress || selectedOrder.address || ''),
                       label: trackingData?.shippingAddress || selectedOrder.shippingAddress || selectedOrder.address || 'Địa chỉ nhận hàng'
                     };
                     const orderShipperName = trackingData?.shipper?.name || selectedOrder.assignedShipper || 'Shipper Nội Bộ AetherPC';

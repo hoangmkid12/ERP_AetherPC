@@ -4,7 +4,7 @@ import { MapPin, Phone, PackageSearch, CheckCircle2 } from 'lucide-react';
 import { api } from '../../services/api';
 import DeliveryMap from '../../components/DeliveryMap';
 import DeliveryProgressStepper from '../../components/DeliveryProgressStepper';
-import { REGION_COORDS, detectDeliveryRegion } from '../../utils/deliveryRegions';
+import { REGION_COORDS, detectDeliveryRegion, getAddressCoordinates } from '../../utils/deliveryRegions';
 
 // Trang theo dõi đơn công khai — không cần đăng nhập, chỉ cần biết mã đơn
 // hàng (giống tra cứu mã vận đơn GHTK/Grab). Dùng lại đúng REST endpoint và
@@ -106,9 +106,8 @@ export default function TrackOrder() {
           {tracking.status === 'SHIPPED' && tracking.warehouse && (() => {
             const currentOriginType = livePosition?.originType || tracking.originType || 'warehouse';
             const currentOriginCoord = livePosition?.originCoord || tracking.originCoord || null;
-            const region = tracking.deliveryRegion || detectDeliveryRegion(tracking.shippingAddress || '');
             const destination = {
-              ...(REGION_COORDS[region] || REGION_COORDS.ALL),
+              ...getAddressCoordinates(tracking.shippingAddress || ''),
               label: tracking.shippingAddress || 'Địa chỉ nhận hàng'
             };
             return (

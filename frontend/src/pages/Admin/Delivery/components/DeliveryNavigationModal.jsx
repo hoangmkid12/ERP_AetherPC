@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { X, Navigation, Phone, MapPin, Compass, AlertCircle, Gauge, ExternalLink, Pause } from 'lucide-react';
+import { X, Navigation, Phone, MapPin, Compass, AlertCircle, Gauge, ExternalLink, Pause, Locate } from 'lucide-react';
 import '@goongmaps/goong-js/dist/goong-js.css';
 import { fetchRoadRoute, forwardGeocode } from '../../../../utils/routingService';
-import { goongjs, GOONG_STYLE_URL, createWarehouseElement, createDestinationElement, createShipperElement } from '../../../../utils/mapIcons';
+import { goongjs, GOONG_STYLE_URL, createWarehouseElement, createDestinationElement, createShipperElement, updateShipperElementHeading } from '../../../../utils/mapIcons';
+import { getAddressCoordinates } from '../../../../utils/deliveryRegions';
 import PODCaptureSection from './PODCaptureSection';
 
 function haversineKm(a, b) {
@@ -104,9 +105,21 @@ export default function DeliveryNavigationModal({
   }, []);
 
   // Tự động phân giải địa chỉ thực tế (Forward Geocoding) để lấy toạ độ chính xác thay vì chỉ toạ độ khu vực
-  const [exactDestination, setExactDestination] = useState(destination);
+  const [exactDestination, setExactDestination] = useState(() => {
+    if (address) {
+      const quick = getAddressCoordinates(address);
+      if (quick?.lat && quick?.lng) return { ...destination, ...quick };
+    }
+    return destination;
+  });
 
   useEffect(() => {
+    if (address) {
+      const quick = getAddressCoordinates(address);
+      if (quick?.lat && quick?.lng) {
+        setExactDestination(prev => ({ ...prev, ...quick, label: address }));
+      }
+    }
     let isMounted = true;
     if (address) {
       forwardGeocode(address).then(geo => {
@@ -189,32 +202,117 @@ export default function DeliveryNavigationModal({
     };
   }, []);
 
-  // 2. Thử lấy vị trí GPS hiện tại của Shipper ngay khi mở modal
+  // Cảm biến con quay hồi chuyển & la bàn điện thoại (DeviceOrientation)
+  const [compassHeading, setCompassHeading] = useState(0);
+  const [followHeading, setFollowHeading] = useState(false);
+  const followHeadingRef = useRef(false);
+  followHeadingRef.current = followHeading;
+  const compassHeadingRef = useRef(0);
+
+  // Lắng nghe cảm biến con quay hồi chuyển / xoay điện thoại trái phải
   useEffect(() => {
+    let lastStateUpdate = 0;
+    const handleOrientation = (e) => {
+      let h = null;
+      if (typeof e.webkitCompassHeading === 'number') {
+        // iOS Safari: webkitCompassHeading là góc la bàn tuyệt đối (0=Bắc, 90=Đông)
+        h = e.webkitCompassHeading;
+      } else if (e.alpha != null) {
+        // Android Chrome: góc quay quanh trục Z
+        h = (360 - e.alpha) % 360;
+      }
+
+      if (h != null && !isNaN(h)) {
+        const rounded = Math.round(h);
+        compassHeadingRef.current = rounded;
+
+        // Xoay hình nón định hướng & mũi tên xe trực tiếp 60fps trên Marker DOM
+        if (markersRef.current.shipper) {
+          updateShipperElementHeading(markersRef.current.shipper.getElement(), rounded);
+        }
+
+        // Nếu bật chế độ "Xoay bản đồ theo hướng nhìn" (Heading Up mode như Google Maps)
+        if (followHeadingRef.current && mapRef.current) {
+          mapRef.current.setBearing(rounded);
+        }
+
+        const now = Date.now();
+        if (now - lastStateUpdate > 150) {
+          lastStateUpdate = now;
+          setCompassHeading(rounded);
+        }
+      }
+    };
+
+    window.addEventListener('deviceorientation', handleOrientation, true);
+    window.addEventListener('deviceorientationabsolute', handleOrientation, true);
+
+    return () => {
+      window.removeEventListener('deviceorientation', handleOrientation, true);
+      window.removeEventListener('deviceorientationabsolute', handleOrientation, true);
+    };
+  }, []);
+
+  const handleToggleFollowHeading = async () => {
+    // Yêu cầu quyền cảm biến la bàn trên iOS nếu cần
+    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+      try {
+        await DeviceOrientationEvent.requestPermission();
+      } catch (_) {}
+    }
+
+    setFollowHeading(prev => {
+      const next = !prev;
+      if (!next && mapRef.current) {
+        mapRef.current.easeTo({ bearing: 0, duration: 300 });
+      }
+      return next;
+    });
+  };
+
+  // 2. Lấy vị trí GPS hiện tại của Shipper
+  const fetchCurrentPosition = useCallback((isInitial = false) => {
     if (!navigator.geolocation) {
       setLocError('Thiết bị hoặc trình duyệt không hỗ trợ Geolocation API.');
       return;
     }
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        setShipperLoc({
+        const newLoc = {
           lat: pos.coords.latitude,
           lng: pos.coords.longitude,
           speed: pos.coords.speed,
-          heading: pos.coords.heading
-        });
+          heading: (pos.coords.heading != null && !isNaN(pos.coords.heading)) ? pos.coords.heading : compassHeadingRef.current
+        };
+        setShipperLoc(newLoc);
+        setLocError('');
         if (pos.coords.speed != null && pos.coords.speed > 0) {
           setSpeedKmh(Math.round(pos.coords.speed * 3.6));
+        }
+
+        // Nếu người dùng bấm nút định vị lại, pan mượt về vị trí Shipper
+        if (!isInitial && mapRef.current) {
+          lastUserInteractionRef.current = 0;
+          mapRef.current.flyTo({
+            center: [newLoc.lng, newLoc.lat],
+            zoom: 16,
+            duration: 800
+          });
         }
       },
       (err) => {
         console.warn('Không thể lấy vị trí tức thời của Shipper:', err.message);
-        // Fallback: xuất phát từ Kho
-        setLocError('Chưa có GPS vệ tinh - Sử dụng vị trí Kho xuất phát làm điểm bắt đầu.');
+        if (isInitial) {
+          setLocError('Chưa có GPS vệ tinh - Sử dụng vị trí Kho xuất phát làm điểm bắt đầu.');
+        }
       },
-      { enableHighAccuracy: true, timeout: 8000, maximumAge: 10000 }
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: isInitial ? 10000 : 0 }
     );
   }, []);
+
+  useEffect(() => {
+    fetchCurrentPosition(true);
+  }, [fetchCurrentPosition]);
 
   // Tần suất tính lại lộ trình "còn lại" theo GPS sống của Shipper. GPS thực
   // tế bắn toạ độ mới mỗi vài giây (kể cả lúc đứng yên, do sai số vệ tinh) —
@@ -226,24 +324,27 @@ export default function DeliveryNavigationModal({
   const LIVE_RECALC_INTERVAL_MS = 15000;
   const lastLiveRecalcRef = useRef(0);
 
-  // 3a. Vẽ lộ trình gốc (Kho → Điểm giao) + marker + fitBounds — chỉ chạy lại
-  // khi Kho/Điểm giao đổi, KHÔNG phụ thuộc vị trí GPS sống của Shipper.
+  // 3a. Vẽ lộ trình chính (Ưu tiên xuất phát từ chính vị trí GPS của Shipper nếu đã có, fallback về Kho)
+  const effectiveOrigin = (shipperLoc?.lat && shipperLoc?.lng) ? shipperLoc : warehouse;
+
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !styleReadyRef.current || !warehouse || !exactDestination) return;
+    if (!map || !styleReadyRef.current || !effectiveOrigin || !exactDestination) return;
 
     setLoadingRoute(true);
-    lastLiveRecalcRef.current = 0;
 
-    // Xoá các marker cũ; đường "còn lại" reset về rỗng
-    if (markersRef.current.warehouse) markersRef.current.warehouse.remove();
+    // Xoá marker đích cũ nếu có
     if (markersRef.current.destination) markersRef.current.destination.remove();
-    map.getSource('remaining-route')?.setData(EMPTY_LINE);
 
-    markersRef.current.warehouse = new goongjs.Marker({ element: createWarehouseElement(), anchor: 'bottom' })
-      .setLngLat([warehouse.lng, warehouse.lat])
-      .setPopup(new goongjs.Popup({ offset: 28 }).setHTML(`<strong>🏬 Kho Xuất Phát:</strong><br/>${warehouse.name || 'Kho AetherPC'}`))
-      .addTo(map);
+    // Marker Kho chỉ vẽ nếu có toạ độ Kho và Kho cách xa Shipper
+    if (warehouse?.lat && warehouse?.lng) {
+      if (!markersRef.current.warehouse) {
+        markersRef.current.warehouse = new goongjs.Marker({ element: createWarehouseElement(), anchor: 'bottom' })
+          .setLngLat([warehouse.lng, warehouse.lat])
+          .setPopup(new goongjs.Popup({ offset: 28 }).setHTML(`<strong>🏬 Kho Xuất Phát:</strong><br/>${warehouse.name || 'Kho AetherPC'}`))
+          .addTo(map);
+      }
+    }
 
     markersRef.current.destination = new goongjs.Marker({ element: createDestinationElement(), anchor: 'bottom' })
       .setLngLat([exactDestination.lng, exactDestination.lat])
@@ -251,7 +352,7 @@ export default function DeliveryNavigationModal({
       .addTo(map);
 
     let isMounted = true;
-    fetchRoadRoute(warehouse, exactDestination).then(route => {
+    fetchRoadRoute(effectiveOrigin, exactDestination).then(route => {
       if (!isMounted || !mapRef.current) return;
       setLoadingRoute(false);
 
@@ -262,21 +363,18 @@ export default function DeliveryNavigationModal({
         const feature = toLineFeature(route.coordinates);
         mapRef.current.getSource('main-route')?.setData(feature);
 
-        // Căn góc nhìn bao trọn tuyến đường — chỉ làm 1 lần lúc khởi tạo
+        // Căn góc nhìn bao trọn tuyến đường lúc khởi tạo
         const coords = feature.geometry.coordinates;
         const bounds = coords.reduce((b, c) => b.extend(c), new goongjs.LngLatBounds(coords[0], coords[0]));
         if (shipperLoc) bounds.extend([shipperLoc.lng, shipperLoc.lat]);
-        mapRef.current.fitBounds(bounds, { padding: 40 });
+        mapRef.current.fitBounds(bounds, { padding: 45 });
       }
     });
 
     return () => { isMounted = false; };
-  }, [warehouse?.lat, warehouse?.lng, exactDestination?.lat, exactDestination?.lng, styleReadyTick]);
+  }, [effectiveOrigin?.lat, effectiveOrigin?.lng, exactDestination?.lat, exactDestination?.lng, styleReadyTick]);
 
-  // 3b. Tính lại lộ trình "còn lại" (Shipper hiện tại → Điểm giao) mỗi khi có
-  // GPS mới — có throttle theo LIVE_RECALC_INTERVAL_MS, chỉ vẽ đè 1 đường màu
-  // xanh, KHÔNG đụng tới marker Kho/Điểm giao và KHÔNG gọi fitBounds, nên
-  // không làm mất zoom người dùng vừa chỉnh tay.
+  // 3b. Tính lại lộ trình "còn lại" khi Shipper di chuyển tiếp
   useEffect(() => {
     if (!mapRef.current || !styleReadyRef.current || !shipperLoc || !exactDestination) return;
     const now = Date.now();
@@ -294,16 +392,18 @@ export default function DeliveryNavigationModal({
     return () => { cancelled = true; };
   }, [shipperLoc?.lat, shipperLoc?.lng, exactDestination?.lat, exactDestination?.lng, styleReadyTick]);
 
-  // 4. Cập nhật vị trí Marker Shipper theo thời gian thực
+  // 4. Cập nhật vị trí Marker Shipper theo thời gian thực (kèm xoay hướng la bàn)
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !shipperLoc) return;
     const pos = [shipperLoc.lng, shipperLoc.lat];
+    const initialHeading = compassHeadingRef.current || (typeof shipperLoc.heading === 'number' && !isNaN(shipperLoc.heading) ? shipperLoc.heading : 0);
 
     if (markersRef.current.shipper) {
       markersRef.current.shipper.setLngLat(pos);
+      updateShipperElementHeading(markersRef.current.shipper.getElement(), initialHeading);
     } else {
-      markersRef.current.shipper = new goongjs.Marker({ element: createShipperElement() })
+      markersRef.current.shipper = new goongjs.Marker({ element: createShipperElement({ heading: initialHeading }) })
         .setLngLat(pos)
         .setPopup(new goongjs.Popup({ offset: 18 }).setHTML(`<strong>🛵 Vị Trí Của Bạn (Shipper)</strong><br/><span style="color:#16a34a;">● Đang phát tín hiệu GPS trực tiếp</span>`))
         .addTo(map);
@@ -322,11 +422,15 @@ export default function DeliveryNavigationModal({
 
     const watchId = navigator.geolocation.watchPosition(
       (pos) => {
+        const effectiveH = (pos.coords.heading != null && !isNaN(pos.coords.heading))
+          ? pos.coords.heading
+          : compassHeadingRef.current;
+
         setShipperLoc({
           lat: pos.coords.latitude,
           lng: pos.coords.longitude,
           speed: pos.coords.speed,
-          heading: pos.coords.heading
+          heading: effectiveH
         });
         if (pos.coords.speed != null && pos.coords.speed > 0) {
           setSpeedKmh(Math.round(pos.coords.speed * 3.6));
@@ -344,13 +448,11 @@ export default function DeliveryNavigationModal({
   const fitFullRoute = useCallback(() => {
     const map = mapRef.current;
     if (!map) return;
-    // Bấm nút này là tín hiệu Shipper chủ động muốn quay lại theo dõi toàn
-    // tuyến — bật lại auto-follow ngay, không đợi hết cooldown.
     lastUserInteractionRef.current = 0;
     if (routeCoordsRef.current.length > 0) {
       const coords = routeCoordsRef.current.map(([lat, lng]) => [lng, lat]);
       const bounds = coords.reduce((b, c) => b.extend(c), new goongjs.LngLatBounds(coords[0], coords[0]));
-      map.fitBounds(bounds, { padding: 40, animate: true });
+      map.fitBounds(bounds, { padding: 45, animate: true });
     }
   }, []);
 
@@ -498,65 +600,154 @@ export default function DeliveryNavigationModal({
           <ExternalLink size={12} />
         </a>
 
-        {/* Nút căn góc nhìn — tròn tối giản, nhất quán với DeliveryMap.jsx */}
-        <button
-          type="button"
-          onClick={fitFullRoute}
-          title="Căn giữa lộ trình"
-          style={{
-            position: 'absolute',
-            top: '10px',
-            right: '10px',
-            zIndex: 999,
-            width: '38px',
-            height: '38px',
-            backgroundColor: '#fff',
-            border: 'none',
-            borderRadius: '50%',
-            cursor: 'pointer',
-            boxShadow: '0 1px 4px rgba(0,0,0,0.3)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
-          }}
-        >
-          <Compass size={17} color="#5f6368" />
-        </button>
+        {/* Cụm nút công cụ nổi bên phải bản đồ */}
+        <div style={{
+          position: 'absolute',
+          top: '10px',
+          right: '10px',
+          zIndex: 999,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '8px'
+        }}>
+          {/* Nút La bàn / Xoay bản đồ theo hướng nhìn (Heading Up mode) */}
+          <button
+            type="button"
+            onClick={handleToggleFollowHeading}
+            title={followHeading ? 'Bản đồ đang xoay theo hướng điện thoại — Bấm để khóa hướng Bắc' : 'Bấm để bật chế độ xoay bản đồ theo hướng nhìn'}
+            style={{
+              width: '40px',
+              height: '40px',
+              backgroundColor: followHeading ? '#1d4ed8' : '#ffffff',
+              color: followHeading ? '#ffffff' : '#1e293b',
+              border: followHeading ? '2px solid #60a5fa' : '1px solid #cbd5e1',
+              borderRadius: '50%',
+              cursor: 'pointer',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.2s'
+            }}
+          >
+            <Compass
+              size={18}
+              style={{
+                transform: followHeading ? 'none' : `rotate(${-compassHeading}deg)`,
+                transition: 'transform 0.15s ease-out'
+              }}
+            />
+            <span style={{ fontSize: '0.58rem', fontWeight: 800, marginTop: '-2px', lineHeight: 1 }}>
+              {compassHeading}°
+            </span>
+          </button>
 
-        {/* Badge trạng thái GPS — bấm được để tắt/bật lại, thay cho nút
-            Bắt Đầu Giao/Tạm Dừng lớn trước đây (GPS giờ tự bật khi vào
-            màn hình, badge này chỉ còn dùng khi cần tạm dừng thủ công). */}
-        <button
-          type="button"
-          onClick={() => (isEffectiveGpsActive ? (onStopGps && onStopGps(order)) : (onStartDeliveryWithGps && onStartDeliveryWithGps(order, shipperLoc)))}
-          title={isEffectiveGpsActive ? 'Bấm để tạm dừng phát GPS' : 'Bấm để bật lại GPS'}
-          style={{
-            position: 'absolute',
-            bottom: '12px',
-            left: '12px',
-            zIndex: 999,
-            border: 'none',
-            cursor: 'pointer',
-            backgroundColor: isEffectiveGpsActive ? '#15803d' : 'rgba(15, 23, 42, 0.85)',
+          {/* Nút Định vị lại vị trí GPS của tôi */}
+          <button
+            type="button"
+            onClick={() => fetchCurrentPosition(false)}
+            title="Định vị lại vị trí GPS của bạn và đưa về giữa bản đồ"
+            style={{
+              width: '40px',
+              height: '40px',
+              backgroundColor: '#ffffff',
+              color: '#2563eb',
+              border: '1px solid #cbd5e1',
+              borderRadius: '50%',
+              cursor: 'pointer',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+          >
+            <Locate size={18} />
+          </button>
+
+          {/* Nút căn góc nhìn toàn tuyến */}
+          <button
+            type="button"
+            onClick={fitFullRoute}
+            title="Căn giữa toàn bộ tuyến đường"
+            style={{
+              width: '40px',
+              height: '40px',
+              backgroundColor: '#ffffff',
+              color: '#5f6368',
+              border: '1px solid #cbd5e1',
+              borderRadius: '50%',
+              cursor: 'pointer',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+          >
+            <MapPin size={17} />
+          </button>
+        </div>
+
+        {/* Thanh trạng thái GPS & Telemetry tốc độ / góc nhìn */}
+        <div style={{
+          position: 'absolute',
+          bottom: '12px',
+          left: '12px',
+          zIndex: 999,
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px',
+          flexWrap: 'wrap'
+        }}>
+          <button
+            type="button"
+            onClick={() => (isEffectiveGpsActive ? (onStopGps && onStopGps(order)) : (onStartDeliveryWithGps && onStartDeliveryWithGps(order, shipperLoc)))}
+            title={isEffectiveGpsActive ? 'Bấm để tạm dừng phát GPS' : 'Bấm để bật lại GPS'}
+            style={{
+              border: 'none',
+              cursor: 'pointer',
+              backgroundColor: isEffectiveGpsActive ? '#15803d' : 'rgba(15, 23, 42, 0.85)',
+              color: '#ffffff',
+              padding: '6px 12px',
+              borderRadius: '999px',
+              fontSize: '0.74rem',
+              fontWeight: 700,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.25)'
+            }}
+          >
+            {isEffectiveGpsActive ? <Pause size={12} /> : <Navigation size={12} />}
+            <span style={{
+              width: '8px', height: '8px', borderRadius: '50%',
+              backgroundColor: isEffectiveGpsActive ? '#4ade80' : '#f59e0b',
+              boxShadow: isEffectiveGpsActive ? '0 0 8px #4ade80' : 'none'
+            }} />
+            {isEffectiveGpsActive ? 'GPS ĐANG BẬT' : 'CHƯA BẬT GPS'}
+          </button>
+
+          {/* Telemetry Badge */}
+          <div style={{
+            backgroundColor: 'rgba(15, 23, 42, 0.85)',
+            backdropFilter: 'blur(4px)',
             color: '#ffffff',
-            padding: '5px 12px',
+            padding: '5px 10px',
             borderRadius: '999px',
-            fontSize: '0.75rem',
+            fontSize: '0.72rem',
             fontWeight: 700,
             display: 'flex',
             alignItems: 'center',
-            gap: '0.4rem',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
-          }}
-        >
-          {isEffectiveGpsActive ? <Pause size={12} /> : <Navigation size={12} />}
-          <span style={{
-            width: '8px', height: '8px', borderRadius: '50%',
-            backgroundColor: isEffectiveGpsActive ? '#4ade80' : '#f59e0b',
-            boxShadow: isEffectiveGpsActive ? '0 0 8px #4ade80' : 'none'
-          }} />
-          {isEffectiveGpsActive ? 'GPS ĐANG BẬT — BẤM ĐỂ TẠM DỪNG' : 'CHƯA BẬT GPS — BẤM ĐỂ BẬT'}
-        </button>
+            gap: '0.45rem',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.25)'
+          }}>
+            <span style={{ color: '#60a5fa' }}>🧭 {compassHeading}°</span>
+            <span>•</span>
+            <span style={{ color: speedKmh > 0 ? '#4ade80' : '#94a3b8' }}>
+              {speedKmh > 0 ? `${speedKmh} km/h` : 'Đang dừng'}
+            </span>
+          </div>
+        </div>
       </div>
 
       {/* Thẻ ETA phẳng */}

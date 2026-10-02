@@ -4,7 +4,7 @@ import { useSalesStore } from '../../../stores';
 import { useAuth } from '../../../context/AuthContext';
 import { useNotification, notify } from '../../../context/NotificationContext';
 import { api } from '../../../services/api';
-import { detectDeliveryRegion, REGION_COORDS } from '../../../utils/deliveryRegions';
+import { detectDeliveryRegion, REGION_COORDS, getAddressCoordinates } from '../../../utils/deliveryRegions';
 import { fetchRoadRoute, sampleRoutePoints } from '../../../utils/routingService';
 
 import OverviewTab from './OverviewTab';
@@ -826,13 +826,41 @@ export default function Delivery() {
     setGpsOrderId(null);
   }, [closeGpsSocket]);
 
+  const deviceHeadingRef = useRef(null);
+
+  // Lắng nghe cảm biến con quay hồi chuyển / la bàn điện thoại (DeviceOrientation)
+  // để gửi hướng xoay thực tế của tài xế khi xoay điện thoại hoặc đổi hướng xe
+  useEffect(() => {
+    const handleOrientation = (e) => {
+      let h = null;
+      if (typeof e.webkitCompassHeading === 'number') {
+        h = e.webkitCompassHeading;
+      } else if (e.alpha != null) {
+        h = (360 - e.alpha) % 360;
+      }
+      if (h != null && !isNaN(h)) {
+        deviceHeadingRef.current = Math.round(h);
+      }
+    };
+    window.addEventListener('deviceorientation', handleOrientation, true);
+    window.addEventListener('deviceorientationabsolute', handleOrientation, true);
+    return () => {
+      window.removeEventListener('deviceorientation', handleOrientation, true);
+      window.removeEventListener('deviceorientationabsolute', handleOrientation, true);
+    };
+  }, []);
+
   const sendLocation = (orderId, coords) => {
+    const effectiveHeading = (coords.heading != null && !isNaN(coords.heading))
+      ? coords.heading
+      : deviceHeadingRef.current;
+
     const payload = {
       orderId,
       lat: coords.lat,
       lng: coords.lng,
       speed: coords.speed ?? null,
-      heading: coords.heading ?? null,
+      heading: effectiveHeading ?? null,
       originType: currentRouteOrigin?.originMode || 'warehouse',
       originCoord: currentRouteOrigin?.originCoord || null
     };
@@ -952,7 +980,7 @@ export default function Delivery() {
 
     const region = ord.deliveryRegion || detectDeliveryRegion(ord.shippingAddress || ord.address || '');
     const from = getOriginForRegion(region);
-    const to = REGION_COORDS[region] || REGION_COORDS.ALL;
+    const to = getAddressCoordinates(ord.shippingAddress || ord.address || '');
 
     setSimulatingOrderId(orderId);
     addNotification(`Đang tính toán tuyến đường phố thực tế cho đơn #${orderId}...`, 'info');
@@ -1143,7 +1171,7 @@ export default function Delivery() {
           originType={currentRouteOrigin?.originMode || 'warehouse'}
           originCoord={currentRouteOrigin?.originCoord}
           destination={{
-            ...(REGION_COORDS[navigationModalOrder.deliveryRegion || detectDeliveryRegion(navigationModalOrder.shippingAddress || navigationModalOrder.address || '')] || REGION_COORDS.ALL),
+            ...getAddressCoordinates(navigationModalOrder.shippingAddress || navigationModalOrder.address || ''),
             label: navigationModalOrder.shippingAddress || navigationModalOrder.address || 'Địa chỉ nhận hàng'
           }}
           isGpsActive={gpsOrderId === String(navigationModalOrder.orderId || navigationModalOrder.id)}

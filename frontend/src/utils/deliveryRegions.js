@@ -16,7 +16,7 @@ export const DELIVERY_REGIONS = [
 // trên Order.deliveryRegion đã có sẵn (xem detectDeliveryRegion bên dưới).
 export const REGION_COORDS = {
   HCM_KV1: { lat: 10.7769, lng: 106.7009 },
-  HCM_KV2: { lat: 10.8231, lng: 106.7300 },
+  HCM_KV2: { lat: 10.8386, lng: 106.6653 }, // Gò Vấp / Đông TP.HCM mặc định trọng tâm Gò Vấp
   HCM_KV3: { lat: 10.7411, lng: 106.6989 },
   HCM_KV4: { lat: 10.7756, lng: 106.6250 },
   HN_NORTH: { lat: 21.0285, lng: 105.8542 },
@@ -24,6 +24,139 @@ export const REGION_COORDS = {
   SOUTH_PROVINCE: { lat: 10.9804, lng: 106.6519 },
   ALL: { lat: 10.7769, lng: 106.7009 }
 };
+
+// Từ điển toạ độ chi tiết từng Quận/Huyện/Phường trọng điểm
+// Giúp bản đồ xác định ngay toạ độ chuẩn của quận/phường khách hàng,
+// không bị lệch 10-15km sang Rạch Chiếc hay trung tâm khu vực rộng.
+export const DISTRICT_COORDS = [
+  // Gò Vấp - Từng phường & tuyến đường
+  { match: ['go vap', 'phuong 3'], lat: 10.8242, lng: 106.6785 },
+  { match: ['go vap', 'p.3'], lat: 10.8242, lng: 106.6785 },
+  { match: ['go vap', 'p3'], lat: 10.8242, lng: 106.6785 },
+  { match: ['go vap', 'phuong 1'], lat: 10.8215, lng: 106.6850 },
+  { match: ['go vap', 'phuong 4'], lat: 10.8260, lng: 106.6810 },
+  { match: ['go vap', 'phuong 5'], lat: 10.8335, lng: 106.6872 },
+  { match: ['go vap', 'phuong 6'], lat: 10.8410, lng: 106.6840 },
+  { match: ['go vap', 'phuong 7'], lat: 10.8310, lng: 106.6815 },
+  { match: ['go vap', 'phuong 8'], lat: 10.8415, lng: 106.6570 },
+  { match: ['go vap', 'phuong 9'], lat: 10.8420, lng: 106.6620 },
+  { match: ['go vap', 'phuong 10'], lat: 10.8350, lng: 106.6660 },
+  { match: ['go vap', 'phuong 11'], lat: 10.8425, lng: 106.6510 },
+  { match: ['go vap', 'phuong 12'], lat: 10.8470, lng: 106.6430 },
+  { match: ['go vap', 'phuong 13'], lat: 10.8520, lng: 106.6420 },
+  { match: ['go vap', 'phuong 14'], lat: 10.8560, lng: 106.6410 },
+  { match: ['go vap', 'phuong 15'], lat: 10.8550, lng: 106.6780 },
+  { match: ['go vap', 'phuong 16'], lat: 10.8460, lng: 106.6710 },
+  { match: ['go vap', 'phuong 17'], lat: 10.8480, lng: 106.6790 },
+  { match: ['go vap', 'phan van tri'], lat: 10.8327, lng: 106.6725 },
+  { match: ['go vap', 'nguyen oanh'], lat: 10.8390, lng: 106.6780 },
+  { match: ['go vap', 'quang trung'], lat: 10.8360, lng: 106.6610 },
+  { match: ['go vap', 'le duc tho'], lat: 10.8450, lng: 106.6730 },
+  { match: ['go vap', 'nguyen thai son'], lat: 10.8290, lng: 106.6850 },
+  { match: ['go vap', 'pham van dong'], lat: 10.8250, lng: 106.6890 },
+  { match: ['go vap'], lat: 10.8386, lng: 106.6653 },
+
+  // Bình Thạnh
+  { match: ['binh thanh', 'dien bien phu'], lat: 10.7955, lng: 106.7019 },
+  { match: ['binh thanh', 'bach dang'], lat: 10.8035, lng: 106.7020 },
+  { match: ['binh thanh', 'xo viet nghe tinh'], lat: 10.8010, lng: 106.7110 },
+  { match: ['binh thanh', 'thanh da'], lat: 10.8250, lng: 106.7260 },
+  { match: ['binh thanh'], lat: 10.8012, lng: 106.7114 },
+
+  // TP. Thủ Đức, Q2, Q9
+  { match: ['thao dien'], lat: 10.8039, lng: 106.7329 },
+  { match: ['an phu'], lat: 10.8012, lng: 106.7455 },
+  { match: ['quan 2'], lat: 10.7872, lng: 106.7498 },
+  { match: ['quan 9'], lat: 10.8428, lng: 106.7944 },
+  { match: ['thu duc'], lat: 10.8494, lng: 106.7717 },
+
+  // Phú Nhuận
+  { match: ['phu nhuan'], lat: 10.7992, lng: 106.6803 },
+
+  // Tân Bình
+  { match: ['tan binh', 'cong hoa'], lat: 10.8010, lng: 106.6500 },
+  { match: ['tan binh'], lat: 10.8015, lng: 106.6526 },
+
+  // Tân Phú
+  { match: ['tan phu'], lat: 10.7900, lng: 106.6285 },
+
+  // Quận 1
+  { match: ['ben nghe'], lat: 10.7713, lng: 106.7058 },
+  { match: ['ben thanh'], lat: 10.7725, lng: 106.6980 },
+  { match: ['da kao'], lat: 10.7861, lng: 106.6942 },
+  { match: ['quan 1'], lat: 10.7769, lng: 106.7009 },
+
+  // Quận 3
+  { match: ['quan 3'], lat: 10.7844, lng: 106.6845 },
+
+  // Quận 4
+  { match: ['quan 4'], lat: 10.7578, lng: 106.7013 },
+
+  // Quận 5
+  { match: ['quan 5'], lat: 10.7540, lng: 106.6634 },
+
+  // Quận 6
+  { match: ['quan 6'], lat: 10.7481, lng: 106.6352 },
+
+  // Quận 7
+  { match: ['phu my hung'], lat: 10.7290, lng: 106.7160 },
+  { match: ['tan phong'], lat: 10.7350, lng: 106.7080 },
+  { match: ['quan 7'], lat: 10.7411, lng: 106.6989 },
+
+  // Quận 8
+  { match: ['quan 8'], lat: 10.7241, lng: 106.6286 },
+
+  // Quận 10
+  { match: ['quan 10'], lat: 10.7674, lng: 106.6669 },
+
+  // Quận 11
+  { match: ['quan 11'], lat: 10.7629, lng: 106.6504 },
+
+  // Quận 12
+  { match: ['quan 12'], lat: 10.8672, lng: 106.6413 },
+
+  // Bình Tân
+  { match: ['binh tan'], lat: 10.7654, lng: 106.6038 },
+
+  // Huyện ngoại thành
+  { match: ['hoc mon'], lat: 10.8839, lng: 106.5933 },
+  { match: ['cu chi'], lat: 10.9733, lng: 106.4938 },
+  { match: ['nha be'], lat: 10.6953, lng: 106.7297 },
+  { match: ['binh chanh'], lat: 10.6874, lng: 106.5939 },
+  { match: ['can gio'], lat: 10.4114, lng: 106.9547 },
+
+  // Các tỉnh lân cận và miền khác
+  { match: ['di an'], lat: 10.9069, lng: 106.7722 },
+  { match: ['thuan an'], lat: 10.9238, lng: 106.6974 },
+  { match: ['thu dau mot'], lat: 10.9804, lng: 106.6519 },
+  { match: ['binh duong'], lat: 10.9804, lng: 106.6519 },
+  { match: ['bien hoa'], lat: 10.9574, lng: 106.8427 },
+  { match: ['dong nai'], lat: 10.9574, lng: 106.8427 },
+  { match: ['tan phuoc', 'phu my'], lat: 10.5502574, lng: 107.0511265 },
+  { match: ['phu my'], lat: 10.5960, lng: 107.0673 },
+  { match: ['vung tau'], lat: 10.3460, lng: 107.0843 },
+  { match: ['ba ria'], lat: 10.4960, lng: 107.1685 },
+  { match: ['cau giay'], lat: 21.0362, lng: 105.7906 },
+  { match: ['dong da'], lat: 21.0181, lng: 105.8273 },
+  { match: ['hoan kiem'], lat: 21.0285, lng: 105.8542 },
+  { match: ['ha noi'], lat: 21.0285, lng: 105.8542 },
+  { match: ['hai chau'], lat: 16.0544, lng: 108.2022 },
+  { match: ['da nang'], lat: 16.0544, lng: 108.2022 },
+  { match: ['ninh kieu'], lat: 10.0342, lng: 105.7876 },
+  { match: ['can tho'], lat: 10.0342, lng: 105.7876 }
+];
+
+export function getAddressCoordinates(address) {
+  if (!address || typeof address !== 'string') return REGION_COORDS.ALL;
+  const norm = address.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd');
+  for (const item of DISTRICT_COORDS) {
+    if (item.match.every(m => norm.includes(m))) {
+      return { lat: item.lat, lng: item.lng };
+    }
+  }
+  const region = detectDeliveryRegion(address);
+  return REGION_COORDS[region] || REGION_COORDS.ALL;
+}
 
 export const detectDeliveryRegion = (address = '') => {
   const addr = (address || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');

@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import '@goongmaps/goong-js/dist/goong-js.css';
 import { fetchRoadRoute, reverseGeocode, forwardGeocode } from '../utils/routingService';
+import { getAddressCoordinates } from '../utils/deliveryRegions';
 import {
   goongjs,
   GOONG_STYLE_URL,
@@ -8,7 +9,8 @@ import {
   createOriginHubElement,
   createGpsOriginElement,
   createDestinationElement,
-  createShipperElement
+  createShipperElement,
+  updateShipperElementHeading
 } from '../utils/mapIcons';
 
 // Tần suất gọi lại OSRM/Nominatim khi Shipper di chuyển — GPS gửi mỗi 8s
@@ -87,9 +89,22 @@ export default function DeliveryMap({
   const [styleReadyTick, setStyleReadyTick] = useState(0);
 
   // Tự động phân giải địa chỉ thực tế (Forward Geocoding) để lấy toạ độ chính xác thay vì chỉ toạ độ khu vực
-  const [exactDestination, setExactDestination] = useState(destination);
+  const [exactDestination, setExactDestination] = useState(() => {
+    if (destination?.label) {
+      const quick = getAddressCoordinates(destination.label);
+      if (quick?.lat && quick?.lng) return { ...destination, ...quick };
+    }
+    return destination;
+  });
 
   useEffect(() => {
+    if (destination?.label) {
+      const quick = getAddressCoordinates(destination.label);
+      if (quick?.lat && quick?.lng) {
+        setExactDestination(prev => ({ ...prev, ...quick, label: destination.label }));
+        return;
+      }
+    }
     setExactDestination(destination);
   }, [destination?.lat, destination?.lng, destination?.label]);
 
@@ -268,21 +283,36 @@ export default function DeliveryMap({
     };
   }, [effectiveOrigin?.lat, effectiveOrigin?.lng, exactDestination?.lat, exactDestination?.lng, styleReadyTick, originType]);
 
-  // Marker Shipper — trượt mượt giữa 2 điểm GPS liên tiếp thay vì nhảy tức thời
+  const currentHeadingRef = useRef(0);
+
+  // Marker Shipper — trượt mượt giữa 2 điểm GPS liên tiếp & xoay mượt theo hướng la bàn/chuyển động của Shipper
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !shipperPosition) return;
     const newLngLat = [shipperPosition.lng, shipperPosition.lat];
+    const targetHeading = typeof shipperPosition.heading === 'number' && !isNaN(shipperPosition.heading)
+      ? shipperPosition.heading
+      : null;
 
     if (!markersRef.current.shipper) {
-      markersRef.current.shipper = new goongjs.Marker({ element: createShipperElement() })
+      markersRef.current.shipper = new goongjs.Marker({ element: createShipperElement({ heading: targetHeading || 0 }) })
         .setLngLat(newLngLat)
         .setPopup(new goongjs.Popup({ offset: 18 }).setHTML(`<div style="font-size:0.82rem;"><strong>${shipperName || 'Shipper AetherPC'}</strong>${shipperPhone ? `<br/>${shipperPhone}` : ''}<br/><span style="font-size:0.74rem;color:#1a73e8;">Đang di chuyển giao hàng</span></div>`))
         .addTo(map);
+      if (targetHeading != null) currentHeadingRef.current = targetHeading;
     } else {
       const marker = markersRef.current.shipper;
       const start = marker.getLngLat();
       const startLngLat = [start.lng, start.lat];
+
+      const startH = currentHeadingRef.current || 0;
+      let diffH = 0;
+      if (targetHeading != null) {
+        diffH = (targetHeading - startH) % 360;
+        if (diffH > 180) diffH -= 360;
+        if (diffH < -180) diffH += 360;
+      }
+
       if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
       const startTime = performance.now();
       const tick = (time) => {
@@ -291,6 +321,13 @@ export default function DeliveryMap({
           startLngLat[0] + (newLngLat[0] - startLngLat[0]) * t,
           startLngLat[1] + (newLngLat[1] - startLngLat[1]) * t
         ]);
+
+        if (targetHeading != null) {
+          const curH = (startH + diffH * t + 360) % 360;
+          currentHeadingRef.current = curH;
+          updateShipperElementHeading(marker.getElement(), curH);
+        }
+
         if (t < 1) {
           animFrameRef.current = requestAnimationFrame(tick);
         } else {
@@ -455,11 +492,23 @@ export default function DeliveryMap({
               {shipperPhone}
             </a>
           )}
-          <div style={{ marginTop: '0.15rem' }}>
+          <div style={{ marginTop: '0.15rem', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.35rem', flexWrap: 'wrap' }}>
             {shipperPosition ? (
-              <span style={{ color: '#188038', fontWeight: 600, fontSize: '0.72rem' }}>
-                ● Trực tiếp {lastUpdatedLabel ? `(${lastUpdatedLabel})` : ''}
-              </span>
+              <>
+                <span style={{ color: '#188038', fontWeight: 700, fontSize: '0.72rem' }}>
+                  ● Trực tiếp {lastUpdatedLabel ? `(${lastUpdatedLabel})` : ''}
+                </span>
+                {typeof shipperPosition.heading === 'number' && !isNaN(shipperPosition.heading) && (
+                  <span style={{ color: '#2563eb', fontSize: '0.7rem', fontWeight: 600, backgroundColor: '#eff6ff', padding: '1px 5px', borderRadius: '4px' }}>
+                    🧭 {Math.round(shipperPosition.heading)}°
+                  </span>
+                )}
+                {typeof shipperPosition.speed === 'number' && shipperPosition.speed > 0 && (
+                  <span style={{ color: '#059669', fontSize: '0.7rem', fontWeight: 600, backgroundColor: '#ecfdf5', padding: '1px 5px', borderRadius: '4px' }}>
+                    ⚡ {Math.round(shipperPosition.speed * 3.6)} km/h
+                  </span>
+                )}
+              </>
             ) : (
               <span style={{ color: '#9aa0a6', fontSize: '0.72rem' }}>Chờ tín hiệu GPS...</span>
             )}
