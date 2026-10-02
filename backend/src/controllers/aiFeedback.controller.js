@@ -270,11 +270,67 @@ const deleteDynamicSkill = async (req, res, next) => {
   }
 };
 
+// Kiểm thử câu lệnh SQL trực tiếp và trả về kết quả thời gian thực
+const executeTestSql = async (req, res, next) => {
+  try {
+    const { sql, question } = req.body || {};
+    if (!sql || !sql.trim()) {
+      return res.status(400).json({ success: false, message: 'Vui lòng cung cấp câu lệnh SQL để kiểm thử.' });
+    }
+
+    const { isSafeSqlQuery } = require('../services/ai/universalData.service');
+    if (!isSafeSqlQuery(sql)) {
+      return res.status(400).json({ success: false, message: 'Câu lệnh SQL không an toàn (chỉ cho phép SELECT đọc dữ liệu).' });
+    }
+
+    const currentUserId = Number(req.user?.id) || 0;
+    const finalSql = sql.replace(/:userId/g, currentUserId.toString());
+
+    // Thực thi trực tiếp trên PostgreSQL
+    const rawData = await prisma.$queryRawUnsafe(finalSql);
+    const cleanData = JSON.parse(JSON.stringify(rawData, (key, value) =>
+      typeof value === 'bigint' ? value.toString() : value
+    ));
+
+    res.json({
+      success: true,
+      data: {
+        rowCount: cleanData.length,
+        rows: cleanData.slice(0, 10),
+        previewSql: finalSql
+      }
+    });
+  } catch (err) {
+    res.status(400).json({ success: false, message: `Lỗi SQL: ${err.message}` });
+  }
+};
+
+// Gợi ý câu lệnh SQL thông minh cho câu hỏi dựa trên Gemini NL2SQL
+const generateSuggestedSql = async (req, res, next) => {
+  try {
+    const { question } = req.body || {};
+    if (!question || !question.trim()) {
+      return res.status(400).json({ success: false, message: 'Thiếu câu hỏi cần gợi ý SQL.' });
+    }
+
+    const { generateSqlFromQuestion } = require('../services/ai/universalData.service');
+    const sql = await generateSqlFromQuestion(question.trim(), req.user?.role || 'ADMIN');
+    res.json({
+      success: true,
+      sql: sql || 'SELECT order_id, total_amount, status, created_at FROM orders ORDER BY created_at DESC LIMIT 10;'
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 module.exports = {
   submitAiFeedback,
   getPendingAiFeedback,
   reviewAiFeedback,
   getDynamicSkills,
   saveDynamicSkill,
-  deleteDynamicSkill
+  deleteDynamicSkill,
+  executeTestSql,
+  generateSuggestedSql
 };

@@ -638,16 +638,14 @@ export default function SystemAdmin() {
     }
   }, [activeTab]);
 
-  const handleOpenTrainingModal = (item, isFeedback = false) => {
+  const handleOpenTrainingModal = async (item, isFeedback = false) => {
     const questionText = isFeedback ? item.prompt : item.userPrompt;
-    const initialSql = isFeedback 
-      ? `SELECT order_id, total_amount, status FROM orders LIMIT 10;`
-      : (item.toolCalls?.[0]?.params?.sql || `SELECT * FROM orders LIMIT 10;`);
-
+    
+    // Khởi tạo form với template ban đầu
     setTrainingForm({
       feedbackId: isFeedback ? item.id : null,
       question: questionText || '',
-      sql: initialSql,
+      sql: 'Đang phân tích và gợi ý câu lệnh SQL chuẩn...',
       description: `Kỹ năng huấn luyện từ câu hỏi: ${questionText?.slice(0, 100)}`,
       title: questionText ? `Quy trình & Hướng dẫn: ${questionText.slice(0, 50)}` : '',
       category: 'WARRANTY_RMA',
@@ -656,6 +654,16 @@ export default function SystemAdmin() {
     setTrainingMode('SQL');
     setTestSqlResult(null);
     setShowTrainingModal(true);
+
+    // Tự động gọi AI phân tích câu hỏi để điền câu lệnh SQL chuẩn nhất (vd doanh thu năm nay -> date_trunc('year'...))
+    try {
+      const suggestRes = await api.post('/ai/suggest-sql', { question: questionText });
+      if (suggestRes?.sql) {
+        setTrainingForm(prev => ({ ...prev, sql: suggestRes.sql }));
+      }
+    } catch (e) {
+      setTrainingForm(prev => ({ ...prev, sql: 'SELECT order_id, total_amount, status, created_at FROM orders ORDER BY created_at DESC LIMIT 10;' }));
+    }
   };
 
   const handleTestSql = async () => {
@@ -666,18 +674,25 @@ export default function SystemAdmin() {
     setTestingSql(true);
     setTestSqlResult(null);
     try {
-      // Gửi câu hỏi kèm câu SQL để test nhanh
-      const res = await api.post('/ai/chat', { message: trainingForm.question });
-      setTestSqlResult({
-        success: true,
-        preview: res?.data?.reply || 'Truy vấn thành công!'
+      // Thực thi trực tiếp câu lệnh SQL trên Database qua API /ai/test-sql
+      const res = await api.post('/ai/test-sql', { 
+        sql: trainingForm.sql,
+        question: trainingForm.question 
       });
-      notify('Kiểm thử phản hồi AI hoàn tất!', 'success');
+      if (res?.success) {
+        setTestSqlResult({
+          success: true,
+          preview: `✅ Truy vấn thành công (${res.data.rowCount} bản ghi trả về):\n` +
+            JSON.stringify(res.data.rows, null, 2)
+        });
+        notify(`Kiểm thử SQL thành công (${res.data.rowCount} bản ghi)`, 'success');
+      }
     } catch (err) {
       setTestSqlResult({
         success: false,
-        error: err?.message || 'Lỗi khi thực thi kiểm thử.'
+        error: err?.message || 'Lỗi khi thực thi câu lệnh SQL trên cơ sở dữ liệu.'
       });
+      notify('Câu lệnh SQL bị lỗi.', 'error');
     } finally {
       setTestingSql(false);
     }
