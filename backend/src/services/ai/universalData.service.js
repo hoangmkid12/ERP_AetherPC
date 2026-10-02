@@ -109,10 +109,10 @@ const generateSqlBySemanticPattern = (userPrompt, userRole) => {
     return `SELECT status, COUNT(*) AS so_luong, SUM(total_amount) AS tong_gia_tri FROM orders GROUP BY status ORDER BY so_luong DESC;`;
   }
 
-  // 4. Top đơn hàng giá trị cao nhất (Đọc số lượng động: top 2, top 3, top 5, top 10...)
-  if (/(top|đơn hàng|giá trị cao nhất|tiền to nhất|nhiều tiền nhất)/.test(lower) && /đơn/.test(lower) && /(top|cao nhất|lớn nhất|tiền to)/.test(lower)) {
-    const numMatch = lower.match(/top\s*(\d+)|(\d+)\s*đơn/);
-    const limitNum = numMatch ? Math.min(parseInt(numMatch[1] || numMatch[2], 10), 20) : 5;
+  // 4. Top/Danh sách đơn hàng giá trị cao nhất (Đọc số lượng động: 6 đơn hàng, top 2, top 3, 10 đơn...)
+  if (/đơn/.test(lower) && (/(giá trị cao|tiền to|nhiều tiền|cao nhất|lớn nhất)/.test(lower) || (/top/.test(lower) && /\d+/.test(lower)))) {
+    const numMatch = lower.match(/top\s*(\d+)|(\d+)\s*đơn|(\d+)/);
+    const limitNum = numMatch ? Math.min(parseInt(numMatch[1] || numMatch[2] || numMatch[3], 10), 25) : 5;
     return `SELECT order_id, total_amount, payment_method, status, created_at FROM orders ORDER BY total_amount DESC LIMIT ${limitNum};`;
   }
 
