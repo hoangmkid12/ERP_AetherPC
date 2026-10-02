@@ -325,7 +325,7 @@ const generateSuggestedSql = async (req, res, next) => {
       if (/(doanh thu|doanh số|tiền thu|thu được)/.test(lower)) {
         sql = `SELECT SUM(total_amount) AS doanh_thu_nam_nay FROM orders WHERE status IN ('DELIVERED', 'COMPLETED') AND created_at >= date_trunc('year', now() AT TIME ZONE 'Asia/Ho_Chi_Minh');`;
       } else if (/(tồn kho|hết hàng|sản phẩm)/.test(lower)) {
-        sql = `SELECT product_id, name, sku, stock_quantity, retail_price FROM products WHERE stock_quantity > 0 ORDER BY stock_quantity DESC LIMIT 15;`;
+        sql = `SELECT product_id, name, sku, stock_quantity, price FROM products WHERE stock_quantity > 0 ORDER BY stock_quantity DESC LIMIT 15;`;
       } else {
         sql = `SELECT order_id, total_amount, status, created_at FROM orders ORDER BY created_at DESC LIMIT 10;`;
       }
@@ -340,6 +340,74 @@ const generateSuggestedSql = async (req, res, next) => {
   }
 };
 
+// Tự động phân tích lỗi SQL và sửa lại cho đúng theo schema PostgreSQL của AetherPC
+const autoFixSql = async (req, res, next) => {
+  try {
+    const { sql, error, question } = req.body || {};
+    if (!sql || !sql.trim()) {
+      return res.status(400).json({ success: false, message: 'Thiếu câu SQL cần sửa.' });
+    }
+
+    let fixedSql = sql.trim();
+
+    // 1. Khắc phục các lỗi cột thông dụng (Common schema column fixes)
+    fixedSql = fixedSql.replace(/\bretail_price\b/gi, 'price');
+    fixedSql = fixedSql.replace(/\bproduct_name\b/gi, 'name');
+    fixedSql = fixedSql.replace(/\bcustomer_name\b/gi, 'name');
+    fixedSql = fixedSql.replace(/\bamount\b/gi, 'total_amount');
+    fixedSql = fixedSql.replace(/\border_date\b/gi, 'created_at');
+    fixedSql = fixedSql.replace(/\bquantity\b/gi, 'stock_quantity');
+    fixedSql = fixedSql.replace(/\bstock\b/gi, 'stock_quantity');
+
+    // 2. Nếu có Gemini AI, kết hợp sửa lỗi thông minh theo Error Message
+    let GoogleGenAI = null;
+    try {
+      GoogleGenAI = require('@google/genai').GoogleGenAI;
+    } catch (e) {}
+
+    if (GoogleGenAI && process.env.GEMINI_API_KEY) {
+      try {
+        const aiClient = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+        const { ERP_DATABASE_SCHEMA_PROMPT } = require('../services/ai/universalData.service');
+        const prompt = `${ERP_DATABASE_SCHEMA_PROMPT}
+
+CÂU LỆNH SQL ĐANG BỊ LỖI KHI CHẠY TRÊN POSTGRESQL:
+"${sql}"
+
+THÔNG BÁO LỖI TỪ DATABASE:
+"${error || 'Lỗi không xác định'}"
+
+CÂU HỎI GỐC CỦA NGƯỜI DÙNG:
+"${question || ''}"
+
+YÊU CẦU:
+Hãy sửa lại câu lệnh SQL trên để chạy thành công 100% trên PostgreSQL AetherPC.
+CHỈ TRẢ VỀ ĐÚNG 1 CÂU LỆNH SQL DUY NHẤT (không markdown, không giải thích).`;
+
+        const aiGen = await aiClient.models.generateContent({
+          model: 'gemini-2.5-flash',
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          config: { temperature: 0.05, maxOutputTokens: 300 }
+        });
+        const aiClean = aiGen.text?.replace(/```sql/gi, '').replace(/```/g, '').trim();
+        if (aiClean && aiClean.toUpperCase().startsWith('SELECT')) {
+          fixedSql = aiClean;
+        }
+      } catch (aiErr) {
+        console.warn('[AutoFixSql] Gemini error, using rule-based fix:', aiErr.message);
+      }
+    }
+
+    res.json({
+      success: true,
+      fixedSql,
+      message: 'Đã tự động sửa câu lệnh SQL phù hợp với cấu trúc dữ liệu.'
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 module.exports = {
   submitAiFeedback,
   getPendingAiFeedback,
@@ -348,5 +416,6 @@ module.exports = {
   saveDynamicSkill,
   deleteDynamicSkill,
   executeTestSql,
-  generateSuggestedSql
+  generateSuggestedSql,
+  autoFixSql
 };

@@ -600,6 +600,7 @@ export default function SystemAdmin() {
   const [trainingMode, setTrainingMode] = useState('SQL'); // 'SQL' | 'KNOWLEDGE'
   const [showTrainingModal, setShowTrainingModal] = useState(false);
   const [testingSql, setTestingSql] = useState(false);
+  const [fixingSql, setFixingSql] = useState(false);
   const [testSqlResult, setTestSqlResult] = useState(null);
 
   const [trainingForm, setTrainingForm] = useState({
@@ -664,11 +665,15 @@ export default function SystemAdmin() {
       }
       return `SELECT SUM(total_amount) AS doanh_thu_nam_nay FROM orders WHERE status IN ('DELIVERED', 'COMPLETED') AND created_at >= date_trunc('year', now() AT TIME ZONE 'Asia/Ho_Chi_Minh');`;
     }
+    // "đơn tồn" / "đơn hàng tồn đọng" / "đơn chờ xuất kho"
+    if (/đơn/.test(lower) && /(tồn|chưa giao|chờ xuất|đọng)/.test(lower)) {
+      return `SELECT order_id, total_amount, status, created_at FROM orders WHERE status NOT IN ('COMPLETED', 'DELIVERED', 'CANCELLED') ORDER BY created_at DESC LIMIT 15;`;
+    }
     if (/(hết hàng|tồn.*=.*0|tồn.*bằng 0)/.test(lower)) {
       return `SELECT product_id, name, price, stock_quantity, status FROM products WHERE stock_quantity = 0 AND status = 'ACTIVE' LIMIT 15;`;
     }
     if (/(tồn kho|sản phẩm|linh kiện)/.test(lower)) {
-      return `SELECT product_id, name, sku, stock_quantity, retail_price FROM products WHERE stock_quantity > 0 ORDER BY stock_quantity DESC LIMIT 15;`;
+      return `SELECT product_id, name, sku, stock_quantity, price FROM products WHERE stock_quantity > 0 ORDER BY stock_quantity DESC LIMIT 15;`;
     }
     if (/(đang giao|đang ship)/.test(lower)) {
       return `SELECT order_id, total_amount, shipping_address, status, created_at FROM orders WHERE status = 'SHIPPED' ORDER BY created_at DESC LIMIT 15;`;
@@ -746,6 +751,57 @@ export default function SystemAdmin() {
       notify('Câu lệnh SQL bị lỗi.', 'error');
     } finally {
       setTestingSql(false);
+    }
+  };
+
+  const handleAutoFixSql = async () => {
+    if (!testSqlResult?.error && !trainingForm.sql) return;
+    setFixingSql(true);
+    try {
+      const res = await api.post('/ai/fix-sql', {
+        sql: trainingForm.sql,
+        error: testSqlResult?.error || '',
+        question: trainingForm.question
+      });
+      if (res?.success && res.fixedSql) {
+        setTrainingForm(prev => ({ ...prev, sql: res.fixedSql }));
+        notify('AI đã tự động sửa câu lệnh SQL! Đang kiểm thử lại...', 'success');
+        
+        // Tự động kiểm thử lại với câu SQL mới vừa sửa
+        setTimeout(async () => {
+          setTestingSql(true);
+          try {
+            const testRes = await api.post('/ai/test-sql', { 
+              sql: res.fixedSql, 
+              question: trainingForm.question 
+            });
+            if (testRes?.success) {
+              let displayContent = JSON.stringify(testRes.data.rows, null, 2);
+              if (testRes.data.rows?.length === 1 && typeof testRes.data.rows[0] === 'object') {
+                const firstRow = testRes.data.rows[0];
+                const entries = Object.entries(firstRow);
+                if (entries.length === 1 && !isNaN(Number(entries[0][1]))) {
+                  const val = Number(entries[0][1]);
+                  displayContent = `💰 [KẾT QUẢ TÍNH TOÁN]: ${val.toLocaleString('vi-VN')} VNĐ (${entries[0][0]})\n\n` + displayContent;
+                }
+              }
+              setTestSqlResult({
+                success: true,
+                preview: `✅ AI đã sửa và kiểm thử thành công (${testRes.data.rowCount} bản ghi):\n` + displayContent
+              });
+              notify('Kiểm thử SQL thành công!', 'success');
+            }
+          } catch (e2) {
+            setTestSqlResult({ success: false, error: e2?.message || 'Lỗi khi kiểm thử lại.' });
+          } finally {
+            setTestingSql(false);
+          }
+        }, 300);
+      }
+    } catch (err) {
+      notify('Không thể tự động sửa SQL: ' + (err?.message || 'Lỗi không xác định'), 'error');
+    } finally {
+      setFixingSql(false);
     }
   };
 
@@ -3530,14 +3586,44 @@ export default function SystemAdmin() {
                     <span style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '2px', display: 'block' }}>
                       * Chỉ hỗ trợ câu lệnh SELECT an toàn. Kết quả sẽ được AI đọc và trả về con số thực tế tại thời điểm hỏi.
                     </span>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginTop: '0.4rem', fontSize: '0.7rem', color: '#64748b' }}>
+                      <span style={{ fontWeight: 600, color: '#475569' }}>Cột chuẩn PostgreSQL:</span>
+                      <span style={{ backgroundColor: '#f1f5f9', border: '1px solid #e2e8f0', padding: '0.1rem 0.4rem', borderRadius: '4px', cursor: 'pointer' }} title="Bấm để chèn" onClick={() => setTrainingForm(p => ({ ...p, sql: p.sql + ' price' }))}>products.price</span>
+                      <span style={{ backgroundColor: '#f1f5f9', border: '1px solid #e2e8f0', padding: '0.1rem 0.4rem', borderRadius: '4px', cursor: 'pointer' }} title="Bấm để chèn" onClick={() => setTrainingForm(p => ({ ...p, sql: p.sql + ' stock_quantity' }))}>products.stock_quantity</span>
+                      <span style={{ backgroundColor: '#f1f5f9', border: '1px solid #e2e8f0', padding: '0.1rem 0.4rem', borderRadius: '4px', cursor: 'pointer' }} title="Bấm để chèn" onClick={() => setTrainingForm(p => ({ ...p, sql: p.sql + ' total_amount' }))}>orders.total_amount</span>
+                      <span style={{ backgroundColor: '#f1f5f9', border: '1px solid #e2e8f0', padding: '0.1rem 0.4rem', borderRadius: '4px', cursor: 'pointer' }} title="Bấm để chèn" onClick={() => setTrainingForm(p => ({ ...p, sql: p.sql + ' status' }))}>orders.status</span>
+                      <span style={{ backgroundColor: '#f1f5f9', border: '1px solid #e2e8f0', padding: '0.1rem 0.4rem', borderRadius: '4px', cursor: 'pointer' }} title="Bấm để chèn" onClick={() => setTrainingForm(p => ({ ...p, sql: p.sql + ' created_at' }))}>orders.created_at</span>
+                    </div>
                   </div>
 
                   {testSqlResult && (
-                    <div style={{ padding: '0.65rem', borderRadius: '6px', backgroundColor: testSqlResult.success ? '#f0fdf4' : '#fef2f2', border: `1px solid ${testSqlResult.success ? '#bbf7d0' : '#fecaca'}`, fontSize: '0.75rem' }}>
-                      <div style={{ fontWeight: 700, color: testSqlResult.success ? '#16a34a' : '#dc2626' }}>
-                        {testSqlResult.success ? '✅ Kết quả phản hồi mẫu của AI:' : '❌ Lỗi kiểm thử:'}
+                    <div style={{ padding: '0.75rem', borderRadius: '6px', backgroundColor: testSqlResult.success ? '#f0fdf4' : '#fef2f2', border: `1px solid ${testSqlResult.success ? '#bbf7d0' : '#fecaca'}`, fontSize: '0.75rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: 700, color: testSqlResult.success ? '#16a34a' : '#dc2626' }}>
+                        <span>{testSqlResult.success ? '✅ Kết quả thực thi từ Database:' : '❌ Lỗi kiểm thử SQL:'}</span>
+                        {!testSqlResult.success && (
+                          <button
+                            type="button"
+                            onClick={handleAutoFixSql}
+                            disabled={fixingSql}
+                            style={{
+                              backgroundColor: '#6366f1',
+                              color: '#ffffff',
+                              border: 'none',
+                              borderRadius: '4px',
+                              padding: '0.25rem 0.65rem',
+                              fontSize: '0.72rem',
+                              fontWeight: 700,
+                              cursor: fixingSql ? 'wait' : 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.25rem'
+                            }}
+                          >
+                            {fixingSql ? '⏳ AI đang sửa...' : '🪄 Nhờ AI Tự Động Sửa Lỗi SQL Này'}
+                          </button>
+                        )}
                       </div>
-                      <div style={{ marginTop: '0.25rem', whiteSpace: 'pre-wrap', color: '#0f172a' }}>
+                      <div style={{ marginTop: '0.35rem', whiteSpace: 'pre-wrap', color: '#0f172a', fontFamily: testSqlResult.success ? 'monospace' : 'inherit' }}>
                         {testSqlResult.success ? testSqlResult.preview : testSqlResult.error}
                       </div>
                     </div>

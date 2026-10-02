@@ -57,6 +57,11 @@ router.post('/test-sql', authMiddleware(['ADMIN', 'CEO']), executeTestSql);
 // AI tự động gợi ý câu lệnh SQL chuẩn xác cho câu hỏi trong modal training
 router.post('/suggest-sql', authMiddleware(['ADMIN', 'CEO']), generateSuggestedSql);
 
+// @route   POST /api/v1/ai/fix-sql
+// AI tự động sửa lỗi SQL dựa trên schema và thông báo lỗi database
+const { autoFixSql } = require('../controllers/aiFeedback.controller');
+router.post('/fix-sql', authMiddleware(['ADMIN', 'CEO']), autoFixSql);
+
 // @route   GET /api/v1/ai/audit-logs
 // Nhật ký kiểm toán gọi tool của AI (Chỉ Admin / CEO)
 router.get('/audit-logs', authMiddleware(['ADMIN', 'CEO']), getAiAuditLogs);
