@@ -116,9 +116,19 @@ const generateSqlBySemanticPattern = (userPrompt, userRole) => {
     return `SELECT order_id, total_amount, payment_method, status, created_at FROM orders ORDER BY total_amount DESC LIMIT ${limitNum};`;
   }
 
-  // 5. Đơn hàng đang chờ giao (READY_TO_SHIP) hoặc đang giao (SHIPPED)
-  if (/(chờ giao|chờ ship|ready to ship)/.test(lower)) {
-    return `SELECT order_id, total_amount, shipping_address, status FROM orders WHERE status = 'READY_TO_SHIP' ORDER BY created_at ASC LIMIT 15;`;
+  // 5. Đơn hàng đang giao (SHIPPED)
+  if (/(đang giao|đang ship|shipped|trên đường giao)/.test(lower)) {
+    return `SELECT order_id, total_amount, shipping_address, status, created_at FROM orders WHERE status = 'SHIPPED' ORDER BY created_at DESC LIMIT 15;`;
+  }
+
+  // 6. Đơn hàng chờ giao (READY_TO_SHIP)
+  if (/(chờ giao|chờ ship|chờ lấy hàng|ready to ship)/.test(lower)) {
+    return `SELECT order_id, total_amount, shipping_address, status, created_at FROM orders WHERE status = 'READY_TO_SHIP' ORDER BY created_at ASC LIMIT 15;`;
+  }
+
+  // 7. Đơn hàng đã giao thành công / hoàn tất
+  if (/(đã giao|giao thành công|hoàn tất|completed|delivered)/.test(lower) && /đơn/.test(lower)) {
+    return `SELECT order_id, total_amount, status, created_at FROM orders WHERE status IN ('COMPLETED', 'DELIVERED') ORDER BY created_at DESC LIMIT 10;`;
   }
 
   // 6. Đơn hàng bị hủy
