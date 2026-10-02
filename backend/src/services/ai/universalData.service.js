@@ -109,9 +109,11 @@ const generateSqlBySemanticPattern = (userPrompt, userRole) => {
     return `SELECT status, COUNT(*) AS so_luong, SUM(total_amount) AS tong_gia_tri FROM orders GROUP BY status ORDER BY so_luong DESC;`;
   }
 
-  // 4. Top đơn hàng giá trị cao nhất
+  // 4. Top đơn hàng giá trị cao nhất (Đọc số lượng động: top 2, top 3, top 5, top 10...)
   if (/(top|đơn hàng|giá trị cao nhất|tiền to nhất|nhiều tiền nhất)/.test(lower) && /đơn/.test(lower) && /(top|cao nhất|lớn nhất|tiền to)/.test(lower)) {
-    return `SELECT order_id, total_amount, payment_method, status, created_at FROM orders ORDER BY total_amount DESC LIMIT 5;`;
+    const numMatch = lower.match(/top\s*(\d+)|(\d+)\s*đơn/);
+    const limitNum = numMatch ? Math.min(parseInt(numMatch[1] || numMatch[2], 10), 20) : 5;
+    return `SELECT order_id, total_amount, payment_method, status, created_at FROM orders ORDER BY total_amount DESC LIMIT ${limitNum};`;
   }
 
   // 5. Đơn hàng đang chờ giao (READY_TO_SHIP) hoặc đang giao (SHIPPED)
@@ -292,24 +294,28 @@ Nhiệm vụ:
     }
   }
 
-  // Fallback định dạng Bảng Markdown nếu Gemini tạm thời offline
+  // Fallback định dạng danh sách thẻ nếu Gemini tạm thời offline
   if (!finalAiResponse) {
     const keys = Object.keys(cleanData[0] || {});
-    const header = `| ` + keys.map(k => k.replace(/_/g, ' ').toUpperCase()).join(' | ') + ` |`;
-    const separator = `| ` + keys.map(() => '---').join(' | ') + ` |`;
-    const rows = cleanData.slice(0, 10).map(row => {
-      return `| ` + keys.map(k => {
-        let v = row[k];
-        if (v === null || v === undefined) return '—';
-        if (typeof v === 'number' && (k.includes('amount') || k.includes('price') || k.includes('gia') || k.includes('tien'))) {
-          return Number(v).toLocaleString('vi-VN') + ' đ';
+    // Trình bày theo dạng danh sách thẻ rõ ràng, trực quan, thân thiện với bubble chat
+    const formattedCards = cleanData.map((row, idx) => {
+      const details = keys.map(k => {
+        let label = k.replace(/_/g, ' ').toUpperCase();
+        let val = row[k];
+        if (val === null || val === undefined) val = '—';
+        const isMoneyField = k.includes('amount') || k.includes('price') || k.includes('gia') || k.includes('tien');
+        if (isMoneyField && !isNaN(Number(val)) && val !== '') {
+          val = Number(val).toLocaleString('vi-VN') + ' đ';
+        } else if (k.includes('created_at') && typeof val === 'string') {
+          try { val = new Date(val).toLocaleString('vi-VN'); } catch (_) {}
         }
-        return String(v);
-      }).join(' | ') + ` |`;
-    }).join('\n');
+        return `  • **${label}:** ${val}`;
+      }).join('\n');
+      return `**#${idx + 1}. ${row.order_id || row.name || row.po_number || row.ticket_code || 'Bản ghi'}**\n${details}`;
+    }).join('\n\n');
 
     finalAiResponse = `📊 **Kết quả trích xuất dữ liệu thời gian thực (${rowCount} bản ghi):**\n\n` +
-      `${header}\n${separator}\n${rows}\n\n` +
+      `${formattedCards}\n\n` +
       `*(Dữ liệu được truy vấn trực tiếp từ cơ sở dữ liệu AetherPC ERP theo chuẩn phân quyền)*`;
   }
 
