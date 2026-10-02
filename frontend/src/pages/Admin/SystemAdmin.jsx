@@ -2507,7 +2507,7 @@ export default function SystemAdmin() {
                 {knowledgeDocs.length}
               </div>
               <div style={{ fontSize: '0.72rem', color: '#16a34a', fontWeight: 600, marginTop: '0.2rem' }}>
-                {knowledgeDocs.filter(d => d.isActive).length} tài liệu đang có hiệu lực
+                {knowledgeDocs.filter(d => d.status === 'PUBLISHED' || d.isActive === true).length} tài liệu đang có hiệu lực
               </div>
             </div>
 
@@ -2768,18 +2768,23 @@ export default function SystemAdmin() {
 
                             {/* Trạng thái */}
                             <td style={{ padding: '0.75rem 0.6rem', verticalAlign: 'top', textAlign: 'center' }}>
-                              <span style={{
-                                display: 'inline-block',
-                                padding: '2px 8px',
-                                borderRadius: '10px',
-                                fontSize: '0.68rem',
-                                fontWeight: 800,
-                                backgroundColor: doc.isActive ? '#f0fdf4' : '#fef2f2',
-                                color: doc.isActive ? '#16a34a' : '#dc2626',
-                                border: doc.isActive ? '1px solid #bbf7d0' : '1px solid #fecaca'
-                              }}>
-                                {doc.isActive ? 'Hiệu Lực' : 'Tạm Ẩn'}
-                              </span>
+                              {(() => {
+                                const isPublished = doc.status === 'PUBLISHED' || doc.isActive === true;
+                                return (
+                                  <span style={{
+                                    display: 'inline-block',
+                                    padding: '2px 8px',
+                                    borderRadius: '10px',
+                                    fontSize: '0.68rem',
+                                    fontWeight: 800,
+                                    backgroundColor: isPublished ? '#f0fdf4' : '#fef2f2',
+                                    color: isPublished ? '#16a34a' : '#dc2626',
+                                    border: isPublished ? '1px solid #bbf7d0' : '1px solid #fecaca'
+                                  }}>
+                                    {isPublished ? 'Hiệu Lực' : 'Tạm Ẩn'}
+                                  </span>
+                                );
+                              })()}
                             </td>
 
                             {/* Thao tác */}

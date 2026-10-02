@@ -103,15 +103,57 @@ const executeLookupKnowledgeBase = async (params, userRole) => {
     };
   }
 
-  // Sắp xếp theo độ liên quan cao nhất: tiêu đề hoặc tags trùng từ khóa lên đầu
+  // Sắp xếp theo độ liên quan cao nhất: ưu tiên từ khóa chủ đề cốt lõi
   const qLower = q.toLowerCase();
+  const coreKeywords = [
+    'mật khẩu', 'password', 'pass', 'bảo mật', 'an toàn', 'an ninh', 
+    'bảo hành', 'đổi trả', '1 đổi 1', 'chiết khấu', 'vip', 'giảm giá',
+    'benchmark', 'furmark', 'cinebench', 'nhiệt độ', 'xmp', 
+    'sod', 'vietqr', 'tài khoản ngân hàng', 'lương', 'thưởng', 'kpi', 
+    'đóng gói', 'bọt biển', 'instapak', 'pod', 'cod', 'đối soát', 'thu tiền'
+  ];
+  const matchedCoreKeywords = coreKeywords.filter(k => qLower.includes(k));
+
   documents.sort((a, b) => {
-    const aTitleScore = a.title.toLowerCase().includes(qLower) ? 10 : 0;
-    const bTitleScore = b.title.toLowerCase().includes(qLower) ? 10 : 0;
-    const aTagScore = (a.tags || []).some(t => qLower.includes(t.toLowerCase()) || t.toLowerCase().includes(qLower)) ? 5 : 0;
-    const bTagScore = (b.tags || []).some(t => qLower.includes(t.toLowerCase()) || t.toLowerCase().includes(qLower)) ? 5 : 0;
-    return (bTitleScore + bTagScore) - (aTitleScore + aTagScore);
+    let aScore = 0;
+    let bScore = 0;
+
+    for (const ck of matchedCoreKeywords) {
+      if (a.title.toLowerCase().includes(ck) || (a.tags || []).some(t => t.toLowerCase().includes(ck))) aScore += 50;
+      else if (a.content.toLowerCase().includes(ck)) aScore += 20;
+
+      if (b.title.toLowerCase().includes(ck) || (b.tags || []).some(t => t.toLowerCase().includes(ck))) bScore += 50;
+      else if (b.content.toLowerCase().includes(ck)) bScore += 20;
+    }
+
+    if (a.title.toLowerCase().includes(qLower)) aScore += 30;
+    if (b.title.toLowerCase().includes(qLower)) bScore += 30;
+
+    const aTagMatch = (a.tags || []).some(t => qLower.includes(t.toLowerCase())) ? 10 : 0;
+    const bTagMatch = (b.tags || []).some(t => qLower.includes(t.toLowerCase())) ? 10 : 0;
+    aScore += aTagMatch;
+    bScore += bTagMatch;
+
+    return bScore - aScore;
   });
+
+  // Nếu câu hỏi có từ khóa chủ đề cốt lõi nhưng tài liệu đứng đầu lại không hề chứa từ khóa đó, coi như không tìm thấy tài liệu phù hợp
+  if (matchedCoreKeywords.length > 0) {
+    const topDoc = documents[0];
+    const topHasCore = matchedCoreKeywords.some(ck => 
+      topDoc.title.toLowerCase().includes(ck) || 
+      (topDoc.tags || []).some(t => t.toLowerCase().includes(ck)) ||
+      topDoc.content.toLowerCase().includes(ck)
+    );
+    if (!topHasCore) {
+      return {
+        success: true,
+        found: false,
+        message: 'Không tìm thấy tài liệu quy chuẩn hoặc chính sách nào khớp với yêu cầu này.',
+        documents: []
+      };
+    }
+  }
 
   const extractRelevantSection = (content, query) => {
     if (!content) return '';

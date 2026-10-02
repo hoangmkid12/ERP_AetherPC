@@ -134,8 +134,18 @@ const chatWithAi = async (req, res, next) => {
     if (!finalAiResponse) {
       const lower = promptText.toLowerCase();
 
+      // Cảnh báo Bảo mật 0: Ngăn chặn tuyệt đối việc xin hoặc hỏi mật khẩu cá nhân / tài khoản nhân sự
+      if (/(mật khẩu|pass|password).*(của|cho|là gì|nhân viên|shipper|admin|sales|kế toán|tài khoản)|(cho|xin|lấy|xem|biết).*(mật khẩu|pass|password)/.test(lower)) {
+        finalAiResponse = `🔒 **Cảnh Báo Bảo Mật & An Toàn Thông Tin (Zero-Trust Security):**\n\n` +
+          `- Hệ thống AetherCopilot **tuyệt đối không lưu trữ, không tra cứu và không thể cung cấp mật khẩu** của bất kỳ nhân sự hoặc tài khoản nào trong hệ thống.\n` +
+          `- Toàn bộ mật khẩu của nhân viên (kể cả nhân viên giao hàng / Shipper) đều được mã hóa một chiều (Bcrypt Salted Hash) theo tiêu chuẩn an ninh dữ liệu.\n` +
+          `- **Quy trình cấp lại:** Nếu nhân sự quên mật khẩu hoặc cần cấp mới, Quản trị viên (Admin) có thể thực hiện tại menu: **Quản Trị Hệ Thống > Tài Khoản & Người Dùng** (nút *Đổi Mật Khẩu*).\n\n` +
+          `📄 *Căn cứ: Điều 2 - Quy tắc bảo mật tài khoản & đăng nhập (Chính sách Bảo Mật AetherPC)*`;
+        citations.push({ title: 'Chính sách bảo mật', slug: 'chinh-sach-bao-mat', category: 'POLICY' });
+      }
+
       // Ý định 0: Tra cứu số lượng / danh sách nhân sự (chỉ khi hỏi về số lượng, thống kê)
-      if (/(bao nhiêu|số lượng|thống kê|tổng số|danh sách).*(nhân viên|tài khoản|nhân sự)|(nhân viên|tài khoản nhân sự|nhân sự).*(bao nhiêu|số lượng|tổng số)/.test(lower)) {
+      else if (/(bao nhiêu|số lượng|thống kê|tổng số|danh sách).*(nhân viên|tài khoản|nhân sự)|(nhân viên|tài khoản nhân sự|nhân sự).*(bao nhiêu|số lượng|tổng số)/.test(lower)) {
         if (!['ADMIN', 'CEO', 'HR'].includes(user.role)) {
           finalAiResponse = `⚠️ **Từ chối truy cập:** Vai trò của bạn (**${user.role}**) không có thẩm quyền tra cứu dữ liệu nhân sự của công ty. Vui lòng liên hệ Quản trị viên (Admin) hoặc phòng Nhân sự.`;
         } else {
