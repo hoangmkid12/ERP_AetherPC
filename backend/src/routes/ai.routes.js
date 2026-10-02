@@ -9,7 +9,10 @@ const {
 const {
   submitAiFeedback,
   getPendingAiFeedback,
-  reviewAiFeedback
+  reviewAiFeedback,
+  getDynamicSkills,
+  saveDynamicSkill,
+  deleteDynamicSkill
 } = require('../controllers/aiFeedback.controller');
 
 // @route   GET /api/v1/ai/prompt-chips
@@ -31,6 +34,18 @@ router.get('/feedback/pending', authMiddleware(['ADMIN', 'CEO']), getPendingAiFe
 // @route   POST /api/v1/ai/feedback/:id/review
 // Duyệt phản hồi và bổ sung nội dung đã hiệu chỉnh vào kho tri thức
 router.post('/feedback/:id/review', authMiddleware(['ADMIN', 'CEO']), reviewAiFeedback);
+
+// @route   GET /api/v1/ai/dynamic-skills
+// Lấy danh sách kỹ năng huấn luyện SQL động
+router.get('/dynamic-skills', authMiddleware(['ADMIN', 'CEO']), getDynamicSkills);
+
+// @route   POST /api/v1/ai/dynamic-skills
+// Lưu kỹ năng huấn luyện SQL mới
+router.post('/dynamic-skills', authMiddleware(['ADMIN', 'CEO']), saveDynamicSkill);
+
+// @route   DELETE /api/v1/ai/dynamic-skills/:id
+// Xóa kỹ năng huấn luyện SQL
+router.delete('/dynamic-skills/:id', authMiddleware(['ADMIN', 'CEO']), deleteDynamicSkill);
 
 // @route   GET /api/v1/ai/audit-logs
 // Nhật ký kiểm toán gọi tool của AI (Chỉ Admin / CEO)

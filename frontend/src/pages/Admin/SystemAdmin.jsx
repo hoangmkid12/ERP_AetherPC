@@ -588,6 +588,163 @@ export default function SystemAdmin() {
     }
   };
 
+  // =========================================================================
+  // AI TRAINING HUB (TRUNG TÂM HUẤN LUYỆN & ĐÀO TẠO AI) STATE & HANDLERS
+  // =========================================================================
+  const [aiAuditLogs, setAiAuditLogs] = useState([]);
+  const [aiPendingFeedback, setAiPendingFeedback] = useState([]);
+  const [aiDynamicSkills, setAiDynamicSkills] = useState([]);
+  const [aiTrainingLoading, setAiTrainingLoading] = useState(false);
+  const [aiTrainingSubTab, setAiTrainingSubTab] = useState('feedbacks'); // 'feedbacks' | 'audit_logs' | 'sql_skills'
+  const [selectedAuditLog, setSelectedAuditLog] = useState(null);
+  const [trainingMode, setTrainingMode] = useState('SQL'); // 'SQL' | 'KNOWLEDGE'
+  const [showTrainingModal, setShowTrainingModal] = useState(false);
+  const [testingSql, setTestingSql] = useState(false);
+  const [testSqlResult, setTestSqlResult] = useState(null);
+
+  const [trainingForm, setTrainingForm] = useState({
+    feedbackId: null,
+    question: '',
+    // Dành cho SQL Skill
+    sql: '',
+    description: '',
+    // Dành cho Knowledge SOP
+    title: '',
+    category: 'WARRANTY_RMA',
+    content: ''
+  });
+
+  const loadAiTrainingData = async () => {
+    setAiTrainingLoading(true);
+    try {
+      const [logsRes, feedbackRes, skillsRes] = await Promise.all([
+        api.get('/ai/audit-logs').catch(() => ({ data: [] })),
+        api.get('/ai/feedback/pending').catch(() => ({ data: [] })),
+        api.get('/ai/dynamic-skills').catch(() => ({ data: [] }))
+      ]);
+      setAiAuditLogs(logsRes?.data || []);
+      setAiPendingFeedback(feedbackRes?.data || []);
+      setAiDynamicSkills(skillsRes?.data || []);
+    } catch (err) {
+      console.warn('Lỗi tải dữ liệu AI Training Hub:', err.message);
+    } finally {
+      setAiTrainingLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'ai-training') {
+      loadAiTrainingData();
+    }
+  }, [activeTab]);
+
+  const handleOpenTrainingModal = (item, isFeedback = false) => {
+    const questionText = isFeedback ? item.prompt : item.userPrompt;
+    const initialSql = isFeedback 
+      ? `SELECT order_id, total_amount, status FROM orders LIMIT 10;`
+      : (item.toolCalls?.[0]?.params?.sql || `SELECT * FROM orders LIMIT 10;`);
+
+    setTrainingForm({
+      feedbackId: isFeedback ? item.id : null,
+      question: questionText || '',
+      sql: initialSql,
+      description: `Kỹ năng huấn luyện từ câu hỏi: ${questionText?.slice(0, 100)}`,
+      title: questionText ? `Quy trình & Hướng dẫn: ${questionText.slice(0, 50)}` : '',
+      category: 'WARRANTY_RMA',
+      content: item.correction || item.aiResponse || ''
+    });
+    setTrainingMode('SQL');
+    setTestSqlResult(null);
+    setShowTrainingModal(true);
+  };
+
+  const handleTestSql = async () => {
+    if (!trainingForm.sql.trim()) {
+      notify('Vui lòng nhập câu lệnh SQL cần kiểm thử.', 'warning');
+      return;
+    }
+    setTestingSql(true);
+    setTestSqlResult(null);
+    try {
+      // Gửi câu hỏi kèm câu SQL để test nhanh
+      const res = await api.post('/ai/chat', { message: trainingForm.question });
+      setTestSqlResult({
+        success: true,
+        preview: res?.data?.reply || 'Truy vấn thành công!'
+      });
+      notify('Kiểm thử phản hồi AI hoàn tất!', 'success');
+    } catch (err) {
+      setTestSqlResult({
+        success: false,
+        error: err?.message || 'Lỗi khi thực thi kiểm thử.'
+      });
+    } finally {
+      setTestingSql(false);
+    }
+  };
+
+  const handleSaveTrainingSkill = async () => {
+    if (!trainingForm.question.trim()) {
+      notify('Vui lòng nhập câu hỏi mẫu.', 'warning');
+      return;
+    }
+
+    try {
+      if (trainingMode === 'SQL') {
+        if (!trainingForm.sql.trim()) {
+          notify('Vui lòng nhập câu lệnh SQL mẫu.', 'warning');
+          return;
+        }
+        await api.post('/ai/dynamic-skills', {
+          question: trainingForm.question,
+          sql: trainingForm.sql,
+          description: trainingForm.description,
+          feedbackId: trainingForm.feedbackId
+        });
+        notify('Đã huấn luyện kỹ năng SQL cho AI Copilot thành công!', 'success');
+      } else {
+        // Nạp vào Knowledge Base SOP
+        if (!trainingForm.title.trim() || !trainingForm.content.trim()) {
+          notify('Vui lòng nhập tiêu đề và nội dung quy chế.', 'warning');
+          return;
+        }
+        if (trainingForm.feedbackId) {
+          await api.post(`/ai/feedback/${trainingForm.feedbackId}/review`, {
+            action: 'APPROVE',
+            title: trainingForm.title,
+            category: trainingForm.category,
+            content: trainingForm.content
+          });
+        } else {
+          await api.post('/knowledge', {
+            title: trainingForm.title,
+            category: trainingForm.category,
+            summary: `Được huấn luyện từ câu hỏi: ${trainingForm.question.slice(0, 200)}`,
+            content: trainingForm.content,
+            allowedRoles: ['ALL'],
+            status: 'PUBLISHED'
+          });
+        }
+        notify('Đã nạp văn bản mới vào Kho Tri Thức SOP của AI!', 'success');
+      }
+
+      setShowTrainingModal(false);
+      loadAiTrainingData();
+    } catch (err) {
+      notify(err?.message || 'Lưu huấn luyện thất bại.', 'error');
+    }
+  };
+
+  const handleDeleteDynamicSkill = async (skillId) => {
+    try {
+      await api.delete(`/ai/dynamic-skills/${skillId}`);
+      notify('Đã xóa kỹ năng huấn luyện.', 'success');
+      loadAiTrainingData();
+    } catch (err) {
+      notify(err?.message || 'Không thể xóa kỹ năng.', 'error');
+    }
+  };
+
   // RBAC Selected Role & Matrix State
   const [selectedRbacRole, setSelectedRbacRole] = useState('SALES_MANAGER');
   const [savedRbacMatrix, setSavedRbacMatrix] = useState(() => getOperationalRbac());
@@ -1007,12 +1164,15 @@ export default function SystemAdmin() {
             {activeTab === 'bank-accounts' && 'Tài Khoản Ngân Hàng Doanh Nghiệp (VietQR)'}
             {activeTab === 'rbac' && 'Ma Trận Phân Quyền Vai Trò'}
             {activeTab === 'knowledge' && 'Cơ Sở Tri Thức & Quy Trình SOP Doanh Nghiệp'}
+            {activeTab === 'ai-training' && 'Trung Tâm Huấn Luyện & Đào Tạo AI (AI Training Hub)'}
             {activeTab === 'audit' && 'Nhật Ký Kiểm Toán & Giám Sát'}
             {activeTab === 'settings' && 'Cấu Hình & Sao Lưu Dữ Liệu'}
           </h2>
           <p style={{ color: '#64748b', fontSize: '0.82rem', margin: '0.25rem 0 0' }}>
             {activeTab === 'knowledge' 
               ? 'Quản lý tài liệu chính sách, quy định chuẩn vận hành (SOP) tích hợp bộ não AetherCopilot AI'
+              : activeTab === 'ai-training'
+              ? 'Kiểm duyệt câu hỏi thực tế của người dùng, phân loại tri thức SOP và huấn luyện câu lệnh SQL động cho AI'
               : 'Quản trị người dùng, tài khoản doanh nghiệp, phân quyền chi tiết cho từng vai trò và sao lưu dữ liệu an toàn'}
           </p>
         </div>
@@ -2841,6 +3001,559 @@ export default function SystemAdmin() {
                 </table>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* TAB: AI TRAINING HUB (TRUNG TÂM HUẤN LUYỆN & ĐÀO TẠO AI) */}
+      {/* ========================================================================= */}
+      {activeTab === 'ai-training' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          
+          {/* KPI Cards */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(200px, 1fr))', gap: '1rem' }}>
+            <div style={{ ...cardStyle, display: 'flex', alignItems: 'center', gap: '1rem', borderLeft: '4px solid #ef4444' }}>
+              <div style={{ width: '48px', height: '48px', borderRadius: '10px', backgroundColor: '#fef2f2', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ef4444' }}>
+                <AlertCircle size={24} />
+              </div>
+              <div>
+                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b' }}>PHẢN HỒI CẦN CẢI THIỆN</div>
+                <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#0f172a' }}>{aiPendingFeedback.length}</div>
+                <div style={{ fontSize: '0.7rem', color: '#ef4444', fontWeight: 600 }}>Người dùng bấm "Chưa đúng"</div>
+              </div>
+            </div>
+
+            <div style={{ ...cardStyle, display: 'flex', alignItems: 'center', gap: '1rem', borderLeft: '4px solid #2563eb' }}>
+              <div style={{ width: '48px', height: '48px', borderRadius: '10px', backgroundColor: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2563eb' }}>
+                <Sparkles size={24} />
+              </div>
+              <div>
+                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b' }}>KỸ NĂNG SQL ĐÃ HUẤN LUYỆN</div>
+                <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#0f172a' }}>{aiDynamicSkills.length}</div>
+                <div style={{ fontSize: '0.7rem', color: '#2563eb', fontWeight: 600 }}>Cập nhật số liệu tự động</div>
+              </div>
+            </div>
+
+            <div style={{ ...cardStyle, display: 'flex', alignItems: 'center', gap: '1rem', borderLeft: '4px solid #10b981' }}>
+              <div style={{ width: '48px', height: '48px', borderRadius: '10px', backgroundColor: '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#10b981' }}>
+                <Activity size={24} />
+              </div>
+              <div>
+                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b' }}>TỔNG CÂU HỎI ĐÃ GHI NHẬN</div>
+                <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#0f172a' }}>{aiAuditLogs.length}</div>
+                <div style={{ fontSize: '0.7rem', color: '#10b981', fontWeight: 600 }}>Nhật ký hội thoại AI Copilot</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Sub Navigation Tabs */}
+          <div style={{ display: 'flex', gap: '0.5rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.5rem' }}>
+            <button
+              onClick={() => setAiTrainingSubTab('feedbacks')}
+              style={{
+                backgroundColor: aiTrainingSubTab === 'feedbacks' ? '#2563eb' : '#ffffff',
+                color: aiTrainingSubTab === 'feedbacks' ? '#ffffff' : '#64748b',
+                border: '1px solid #cbd5e1',
+                borderRadius: '6px',
+                padding: '0.45rem 1rem',
+                fontSize: '0.8rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.4rem'
+              }}
+            >
+              <span>Phản Hồi Chờ Huấn Luyện ({aiPendingFeedback.length})</span>
+            </button>
+
+            <button
+              onClick={() => setAiTrainingSubTab('audit_logs')}
+              style={{
+                backgroundColor: aiTrainingSubTab === 'audit_logs' ? '#2563eb' : '#ffffff',
+                color: aiTrainingSubTab === 'audit_logs' ? '#ffffff' : '#64748b',
+                border: '1px solid #cbd5e1',
+                borderRadius: '6px',
+                padding: '0.45rem 1rem',
+                fontSize: '0.8rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.4rem'
+              }}
+            >
+              <span>Toàn Bộ Nhật Ký Câu Hỏi ({aiAuditLogs.length})</span>
+            </button>
+
+            <button
+              onClick={() => setAiTrainingSubTab('sql_skills')}
+              style={{
+                backgroundColor: aiTrainingSubTab === 'sql_skills' ? '#2563eb' : '#ffffff',
+                color: aiTrainingSubTab === 'sql_skills' ? '#ffffff' : '#64748b',
+                border: '1px solid #cbd5e1',
+                borderRadius: '6px',
+                padding: '0.45rem 1rem',
+                fontSize: '0.8rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.4rem'
+              }}
+            >
+              <span>Kỹ Năng SQL Động Đang Áp Dụng ({aiDynamicSkills.length})</span>
+            </button>
+          </div>
+
+          {/* SubTab 1: Feedbacks cần cải thiện */}
+          {aiTrainingSubTab === 'feedbacks' && (
+            <div style={cardStyle}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                <h3 style={sectionTitleStyle}>
+                  <span>Danh Sách Câu Hỏi Người Dùng Đánh Giá "Chưa Đúng"</span>
+                </h3>
+                <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Admin duyệt và huấn luyện lại câu trả lời chuẩn xác cho AI</span>
+              </div>
+
+              {aiPendingFeedback.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '3rem 1rem', color: '#94a3b8' }}>
+                  <CheckCircle size={36} style={{ color: '#10b981', marginBottom: '0.5rem' }} />
+                  <div style={{ fontWeight: 700, color: '#0f172a' }}>Không có phản hồi nào đang chờ xử lý!</div>
+                  <div style={{ fontSize: '0.8rem', marginTop: '0.2rem' }}>AI Copilot đang hoạt động tốt hoặc người dùng chưa gắn cờ câu trả lời nào.</div>
+                </div>
+              ) : (
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
+                    <thead>
+                      <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569' }}>
+                        <th style={{ padding: '0.65rem 0.85rem' }}>Người Hỏi / Vai Trò</th>
+                        <th style={{ padding: '0.65rem 0.85rem' }}>Câu Hỏi Gốc</th>
+                        <th style={{ padding: '0.65rem 0.85rem' }}>Câu Trả Lời Cũ Của AI</th>
+                        <th style={{ padding: '0.65rem 0.85rem' }}>Góp Ý Người Dùng</th>
+                        <th style={{ padding: '0.65rem 0.85rem', textAlign: 'right' }}>Hành Động</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {aiPendingFeedback.map(fb => (
+                        <tr key={fb.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                          <td style={{ padding: '0.65rem 0.85rem', verticalAlign: 'top', width: '160px' }}>
+                            <div style={{ fontWeight: 700, color: '#0f172a' }}>{fb.userName || 'Người dùng'}</div>
+                            <span style={{ backgroundColor: '#f1f5f9', color: '#475569', padding: '2px 6px', borderRadius: '4px', fontSize: '0.68rem', fontWeight: 700 }}>
+                              {fb.userRole || 'USER'}
+                            </span>
+                            <div style={{ fontSize: '0.68rem', color: '#94a3b8', marginTop: '3px' }}>
+                              {new Date(fb.createdAt).toLocaleDateString('vi-VN')}
+                            </div>
+                          </td>
+                          <td style={{ padding: '0.65rem 0.85rem', verticalAlign: 'top', fontWeight: 600, color: '#1e293b', width: '220px' }}>
+                            "{fb.prompt}"
+                          </td>
+                          <td style={{ padding: '0.65rem 0.85rem', verticalAlign: 'top', color: '#64748b', maxWidth: '300px' }}>
+                            <div style={{ maxHeight: '70px', overflowY: 'auto', whiteSpace: 'pre-wrap', fontSize: '0.75rem', backgroundColor: '#f8fafc', padding: '6px', borderRadius: '4px', border: '1px solid #e2e8f0' }}>
+                              {fb.response}
+                            </div>
+                          </td>
+                          <td style={{ padding: '0.65rem 0.85rem', verticalAlign: 'top', color: '#dc2626', fontWeight: 600, width: '200px' }}>
+                            {fb.correction ? `"${fb.correction}"` : '—'}
+                          </td>
+                          <td style={{ padding: '0.65rem 0.85rem', verticalAlign: 'top', textAlign: 'right', width: '150px' }}>
+                            <button
+                              onClick={() => handleOpenTrainingModal(fb, true)}
+                              style={{
+                                backgroundColor: '#2563eb',
+                                color: '#ffffff',
+                                border: 'none',
+                                borderRadius: '6px',
+                                padding: '0.4rem 0.75rem',
+                                fontSize: '0.75rem',
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.3rem'
+                              }}
+                            >
+                              <Sparkles size={12} />
+                              <span>Huấn Luyện Lại</span>
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* SubTab 2: Toàn bộ Audit Logs */}
+          {aiTrainingSubTab === 'audit_logs' && (
+            <div style={cardStyle}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                <h3 style={sectionTitleStyle}>
+                  <span>Lịch Sử Tương Tác Của Người Dùng Với AetherCopilot</span>
+                </h3>
+                <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Admin có thể chọn bất kỳ câu hỏi nào để thêm vào mẫu huấn luyện</span>
+              </div>
+
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
+                  <thead>
+                    <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569' }}>
+                      <th style={{ padding: '0.65rem 0.85rem' }}>Thời Gian</th>
+                      <th style={{ padding: '0.65rem 0.85rem' }}>Người Hỏi / Role</th>
+                      <th style={{ padding: '0.65rem 0.85rem' }}>Câu Hỏi</th>
+                      <th style={{ padding: '0.65rem 0.85rem' }}>Phản Hồi Của AI</th>
+                      <th style={{ padding: '0.65rem 0.85rem', textAlign: 'right' }}>Thao Tác</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {aiAuditLogs.map(log => (
+                      <tr key={log.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                        <td style={{ padding: '0.65rem 0.85rem', verticalAlign: 'top', color: '#64748b', fontSize: '0.72rem', width: '120px' }}>
+                          {new Date(log.createdAt).toLocaleString('vi-VN')}
+                        </td>
+                        <td style={{ padding: '0.65rem 0.85rem', verticalAlign: 'top', width: '160px' }}>
+                          <div style={{ fontWeight: 700, color: '#0f172a' }}>{log.userName || log.userEmail}</div>
+                          <span style={{ backgroundColor: '#eff6ff', color: '#1e40af', padding: '1px 5px', borderRadius: '4px', fontSize: '0.68rem', fontWeight: 700 }}>
+                            {log.userRole}
+                          </span>
+                        </td>
+                        <td style={{ padding: '0.65rem 0.85rem', verticalAlign: 'top', fontWeight: 600, color: '#1e293b', width: '260px' }}>
+                          "{log.userPrompt}"
+                        </td>
+                        <td style={{ padding: '0.65rem 0.85rem', verticalAlign: 'top', color: '#64748b', maxWidth: '350px' }}>
+                          <div style={{ maxHeight: '60px', overflowY: 'auto', whiteSpace: 'pre-wrap', fontSize: '0.72rem' }}>
+                            {log.aiResponse}
+                          </div>
+                        </td>
+                        <td style={{ padding: '0.65rem 0.85rem', verticalAlign: 'top', textAlign: 'right', width: '140px' }}>
+                          <button
+                            onClick={() => handleOpenTrainingModal(log, false)}
+                            style={{
+                              backgroundColor: '#ffffff',
+                              color: '#2563eb',
+                              border: '1px solid #bfdbfe',
+                              borderRadius: '4px',
+                              padding: '0.35rem 0.65rem',
+                              fontSize: '0.72rem',
+                              fontWeight: 700,
+                              cursor: 'pointer'
+                            }}
+                          >
+                            + Dạy Câu Này
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* SubTab 3: Kỹ năng SQL động đã huấn luyện */}
+          {aiTrainingSubTab === 'sql_skills' && (
+            <div style={cardStyle}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                <div>
+                  <h3 style={sectionTitleStyle}>
+                    <span>Kỹ Năng Truy Vấn SQL Động (Dynamic Few-Shots)</span>
+                  </h3>
+                  <p style={{ margin: '3px 0 0', fontSize: '0.75rem', color: '#64748b' }}>
+                    Các câu SQL mẫu do Admin dạy. Khi có dữ liệu mới phát sinh trong Database, AI sẽ tự động chạy câu lệnh này để tính ra con số mới nhất!
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    setTrainingForm({
+                      feedbackId: null,
+                      question: '',
+                      sql: 'SELECT order_id, total_amount, status FROM orders LIMIT 10;',
+                      description: 'Kỹ năng mới do Admin thêm thủ công',
+                      title: '',
+                      category: 'WARRANTY_RMA',
+                      content: ''
+                    });
+                    setTrainingMode('SQL');
+                    setShowTrainingModal(true);
+                  }}
+                  style={{ ...primaryBtnStyle, display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+                >
+                  <Plus size={14} />
+                  <span>Dạy Kỹ Năng Mới</span>
+                </button>
+              </div>
+
+              {aiDynamicSkills.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '2.5rem', color: '#94a3b8' }}>
+                  Chưa có kỹ năng SQL tùy chỉnh nào. Bạn có thể bấm "+ Dạy Kỹ Năng Mới" để huấn luyện câu truy vấn mới cho AI!
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  {aiDynamicSkills.map(skill => (
+                    <div key={skill.id} style={{ border: '1px solid #e2e8f0', borderRadius: '8px', padding: '1rem', backgroundColor: '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem' }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <span style={{ backgroundColor: '#dbeafe', color: '#1e40af', padding: '2px 6px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 800 }}>
+                            CÂU HỎI MẪU
+                          </span>
+                          <span style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.88rem' }}>
+                            "{skill.question}"
+                          </span>
+                        </div>
+                        <div style={{ marginTop: '0.5rem', backgroundColor: '#0f172a', color: '#38bdf8', padding: '0.65rem 0.85rem', borderRadius: '6px', fontFamily: 'monospace', fontSize: '0.78rem', overflowX: 'auto' }}>
+                          {skill.sql}
+                        </div>
+                        <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '0.4rem', display: 'flex', gap: '1rem' }}>
+                          <span>📝 {skill.description}</span>
+                          <span>👤 Tạo bởi: {skill.createdBy}</span>
+                          <span>🕒 {new Date(skill.createdAt).toLocaleDateString('vi-VN')}</span>
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() => handleDeleteDynamicSkill(skill.id)}
+                        title="Xóa kỹ năng này"
+                        style={{ backgroundColor: '#ffffff', color: '#ef4444', border: '1px solid #fca5a5', borderRadius: '6px', padding: '0.4rem 0.6rem', cursor: 'pointer' }}
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL HUẤN LUYỆN AI THÔNG MINH (AI TRAINING MODAL) */}
+      {/* ========================================================================= */}
+      {showTrainingModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(15, 23, 42, 0.65)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+          padding: '1rem',
+          backdropFilter: 'blur(3px)'
+        }}>
+          <div style={{
+            backgroundColor: '#ffffff',
+            borderRadius: '12px',
+            width: '100%',
+            maxWidth: '750px',
+            maxHeight: '92vh',
+            display: 'flex',
+            flexDirection: 'column',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+            overflow: 'hidden'
+          }}>
+            {/* Modal Header */}
+            <div style={{
+              padding: '1.25rem',
+              borderBottom: '1px solid #e2e8f0',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              backgroundColor: '#f8fafc'
+            }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <Sparkles size={18} style={{ color: '#2563eb' }} />
+                  <span>Huấn Luyện & Cập Nhật Tri Thức Cho AI</span>
+                </h3>
+                <p style={{ margin: '3px 0 0', fontSize: '0.78rem', color: '#64748b' }}>
+                  Chọn nạp câu hỏi vào Cơ sở dữ liệu động (SQL) hoặc Quy chế văn bản (Kho tri thức SOP)
+                </p>
+              </div>
+              <button
+                onClick={() => setShowTrainingModal(false)}
+                style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: '4px' }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div style={{ padding: '1.25rem', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              
+              {/* Phân loại bản chất */}
+              <div>
+                <label style={labelStyle}>Phân Loại Bản Chất Kiến Thức Cần Huấn Luyện</label>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginTop: '0.35rem' }}>
+                  <div
+                    onClick={() => setTrainingMode('SQL')}
+                    style={{
+                      border: `2px solid ${trainingMode === 'SQL' ? '#2563eb' : '#cbd5e1'}`,
+                      backgroundColor: trainingMode === 'SQL' ? '#eff6ff' : '#ffffff',
+                      borderRadius: '8px',
+                      padding: '0.75rem',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <div style={{ fontWeight: 800, color: '#1e40af', fontSize: '0.85rem' }}>📊 Dữ Liệu Động (Live Business Data)</div>
+                    <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '2px' }}>
+                      Doanh thu, đơn hàng, tồn kho, công nợ... Số liệu sẽ tự động tính mới mỗi khi Database thay đổi.
+                    </div>
+                  </div>
+
+                  <div
+                    onClick={() => setTrainingMode('KNOWLEDGE')}
+                    style={{
+                      border: `2px solid ${trainingMode === 'KNOWLEDGE' ? '#2563eb' : '#cbd5e1'}`,
+                      backgroundColor: trainingMode === 'KNOWLEDGE' ? '#eff6ff' : '#ffffff',
+                      borderRadius: '8px',
+                      padding: '0.75rem',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <div style={{ fontWeight: 800, color: '#1e40af', fontSize: '0.85rem' }}>📖 Tri Thức Văn Bản (SOP / Chính Sách)</div>
+                    <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '2px' }}>
+                      Quy định bảo hành, đổi trả, quy chuẩn đóng gói, quy chế lương thưởng... AI sẽ trích xuất văn bản.
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Câu hỏi mẫu */}
+              <div>
+                <label style={labelStyle}>Câu Hỏi Mẫu Của Người Dùng <span style={{ color: '#ef4444' }}>*</span></label>
+                <input
+                  type="text"
+                  value={trainingForm.question}
+                  onChange={e => setTrainingForm(p => ({ ...p, question: e.target.value }))}
+                  style={inputStyle}
+                  placeholder="Ví dụ: có bao nhiêu đơn đang chờ lắp ráp?"
+                />
+              </div>
+
+              {/* Nhánh 1: SQL Template */}
+              {trainingMode === 'SQL' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem' }}>
+                      <label style={labelStyle}>Câu Lệnh SQL Tương Ứng (PostgreSQL) <span style={{ color: '#ef4444' }}>*</span></label>
+                      <button
+                        type="button"
+                        onClick={handleTestSql}
+                        disabled={testingSql}
+                        style={{ backgroundColor: '#10b981', color: '#ffffff', border: 'none', borderRadius: '4px', padding: '0.25rem 0.65rem', fontSize: '0.72rem', fontWeight: 700, cursor: testingSql ? 'not-allowed' : 'pointer' }}
+                      >
+                        {testingSql ? 'Đang chạy test...' : '▶ Chạy Thử SQL'}
+                      </button>
+                    </div>
+                    <textarea
+                      rows={4}
+                      value={trainingForm.sql}
+                      onChange={e => setTrainingForm(p => ({ ...p, sql: e.target.value }))}
+                      style={{ ...inputStyle, fontFamily: 'monospace', fontSize: '0.8rem', backgroundColor: '#0f172a', color: '#38bdf8' }}
+                      placeholder="SELECT order_id, total_amount, status FROM orders WHERE status = 'CONFIRMED' LIMIT 10;"
+                    />
+                    <span style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '2px', display: 'block' }}>
+                      * Chỉ hỗ trợ câu lệnh SELECT an toàn. Kết quả sẽ được AI đọc và trả về con số thực tế tại thời điểm hỏi.
+                    </span>
+                  </div>
+
+                  {testSqlResult && (
+                    <div style={{ padding: '0.65rem', borderRadius: '6px', backgroundColor: testSqlResult.success ? '#f0fdf4' : '#fef2f2', border: `1px solid ${testSqlResult.success ? '#bbf7d0' : '#fecaca'}`, fontSize: '0.75rem' }}>
+                      <div style={{ fontWeight: 700, color: testSqlResult.success ? '#16a34a' : '#dc2626' }}>
+                        {testSqlResult.success ? '✅ Kết quả phản hồi mẫu của AI:' : '❌ Lỗi kiểm thử:'}
+                      </div>
+                      <div style={{ marginTop: '0.25rem', whiteSpace: 'pre-wrap', color: '#0f172a' }}>
+                        {testSqlResult.success ? testSqlResult.preview : testSqlResult.error}
+                      </div>
+                    </div>
+                  )}
+
+                  <div>
+                    <label style={labelStyle}>Mô Tả / Ghi Chú Kỹ Năng</label>
+                    <input
+                      type="text"
+                      value={trainingForm.description}
+                      onChange={e => setTrainingForm(p => ({ ...p, description: e.target.value }))}
+                      style={inputStyle}
+                      placeholder="Ví dụ: Kỹ năng tra cứu các đơn lắp ráp"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Nhánh 2: Tri thức SOP */}
+              {trainingMode === 'KNOWLEDGE' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '0.75rem' }}>
+                    <div>
+                      <label style={labelStyle}>Tiêu Đề Văn Bản SOP <span style={{ color: '#ef4444' }}>*</span></label>
+                      <input
+                        type="text"
+                        value={trainingForm.title}
+                        onChange={e => setTrainingForm(p => ({ ...p, title: e.target.value }))}
+                        style={inputStyle}
+                        placeholder="Ví dụ: Quy định về điều kiện áp dụng chiết khấu VIP"
+                      />
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Chuyên Mục</label>
+                      <select
+                        value={trainingForm.category}
+                        onChange={e => setTrainingForm(p => ({ ...p, category: e.target.value }))}
+                        style={inputStyle}
+                      >
+                        <option value="WARRANTY_RMA">Bảo Hành & Đổi Trả (RMA)</option>
+                        <option value="SALES_POLICY">Chính Sách Bán Hàng & Chiết Khấu</option>
+                        <option value="WAREHOUSE_LOGISTICS">Kho Vận & Đóng Gói</option>
+                        <option value="TECHNICAL_SOP">Kỹ Thuật Lắp Ráp & Benchmark</option>
+                        <option value="ERP_MANUAL">Hướng Dẫn Vận Hành Hệ Thống</option>
+                        <option value="GENERAL">Quy Chế Chung Toàn Doanh Nghiệp</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={labelStyle}>Nội Dung Quy Định / Trả Lời Chuẩn Xác <span style={{ color: '#ef4444' }}>*</span></label>
+                    <textarea
+                      rows={6}
+                      value={trainingForm.content}
+                      onChange={e => setTrainingForm(p => ({ ...p, content: e.target.value }))}
+                      style={inputStyle}
+                      placeholder="Nhập nội dung quy chế hoặc giải đáp chuẩn xác để AI đối chiếu khi người dùng hỏi..."
+                    />
+                  </div>
+                </div>
+              )}
+
+            </div>
+
+            {/* Modal Footer */}
+            <div style={{ padding: '0.75rem 1.25rem', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end', backgroundColor: '#f8fafc', gap: '0.5rem' }}>
+              <button
+                type="button"
+                onClick={() => setShowTrainingModal(false)}
+                style={secondaryBtnStyle}
+              >
+                Hủy Bỏ
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveTrainingSkill}
+                style={{ ...primaryBtnStyle, display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+              >
+                <Sparkles size={14} />
+                <span>Lưu & Áp Dụng Ngay Cho AI</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

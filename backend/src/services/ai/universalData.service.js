@@ -362,7 +362,22 @@ const generateSqlFromQuestion = async (userPrompt, userRole) => {
     try {
       const slotHints = nluResult?.slots ? `\n[Gợi ý thực thể trích xuất từ Mô hình AI tự train nội bộ: ${JSON.stringify(nluResult.slots)}]` : '';
 
-      const prompt = `${ERP_DATABASE_SCHEMA_PROMPT}
+      // Tải các kỹ năng SQL do Admin huấn luyện trực tiếp trên giao diện
+      let adminTrainedFewShots = '';
+      const fs = require('fs');
+      const path = require('path');
+      const dynamicPath = path.join(__dirname, 'dynamic_few_shots.json');
+      if (fs.existsSync(dynamicPath)) {
+        try {
+          const dynamicSkills = JSON.parse(fs.readFileSync(dynamicPath, 'utf8'));
+          if (Array.isArray(dynamicSkills) && dynamicSkills.length > 0) {
+            adminTrainedFewShots = `\n\n==================================================\nPHẦN 3.B: CÁC KỸ NĂNG SQL DO ADMIN HUẤN LUYỆN TRỰC TIẾP (ƯU TIÊN CAO NHẤT)\n==================================================\n` +
+              dynamicSkills.slice(0, 10).map(s => `User: "${s.question}"\nSQL: ${s.sql}`).join('\n\n');
+          }
+        } catch (e) {}
+      }
+
+      const prompt = `${ERP_DATABASE_SCHEMA_PROMPT}${adminTrainedFewShots}
 
 NGUYÊN TẮC BẮT BUỘC:
 1. Bạn CHỈ ĐƯỢC sinh ra ĐÚNG 1 câu lệnh SQL "SELECT" duy nhất, thuần túy, KHÔNG markdown (không \`\`\`sql), KHÔNG giải thích.

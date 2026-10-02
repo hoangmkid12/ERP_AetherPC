@@ -189,8 +189,92 @@ const reviewAiFeedback = async (req, res, next) => {
   }
 };
 
+const fs = require('fs');
+const path = require('path');
+const DYNAMIC_SKILLS_PATH = path.join(__dirname, '../services/ai/dynamic_few_shots.json');
+
+// Lấy danh sách kỹ năng huấn luyện SQL động
+const getDynamicSkills = async (req, res, next) => {
+  try {
+    let skills = [];
+    if (fs.existsSync(DYNAMIC_SKILLS_PATH)) {
+      skills = JSON.parse(fs.readFileSync(DYNAMIC_SKILLS_PATH, 'utf8'));
+    }
+    res.json({ success: true, data: skills });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// Lưu kỹ năng huấn luyện SQL động mới
+const saveDynamicSkill = async (req, res, next) => {
+  try {
+    const { question, sql, description, feedbackId } = req.body || {};
+    if (!question || !question.trim() || !sql || !sql.trim()) {
+      return res.status(400).json({ success: false, message: 'Vui lòng cung cấp cả câu hỏi mẫu và câu lệnh SQL tương ứng.' });
+    }
+
+    let skills = [];
+    if (fs.existsSync(DYNAMIC_SKILLS_PATH)) {
+      skills = JSON.parse(fs.readFileSync(DYNAMIC_SKILLS_PATH, 'utf8'));
+    }
+
+    const newSkill = {
+      id: 'SKILL-' + Date.now(),
+      question: question.trim(),
+      sql: sql.trim(),
+      description: description?.trim() || 'Kỹ năng do Admin huấn luyện trực tiếp',
+      createdBy: req.user?.name || req.user?.fullName || req.user?.email || 'Admin',
+      createdAt: new Date().toISOString()
+    };
+
+    skills.unshift(newSkill);
+    fs.writeFileSync(DYNAMIC_SKILLS_PATH, JSON.stringify(skills, null, 2), 'utf8');
+
+    // Nếu tạo từ một Feedback cụ thể, đánh dấu feedback là APPROVED
+    if (feedbackId) {
+      await prisma.aiFeedback.updateMany({
+        where: { id: feedbackId, status: 'PENDING' },
+        data: {
+          status: 'APPROVED',
+          reviewedById: req.user?.id != null ? String(req.user.id) : null,
+          reviewedByName: req.user?.name || req.user?.fullName || null,
+          reviewedAt: new Date()
+        }
+      }).catch(() => {});
+    }
+
+    res.json({
+      success: true,
+      data: newSkill,
+      message: 'Đã lưu kỹ năng SQL thành công! AI Copilot sẽ tự động học mẫu truy vấn này.'
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// Xóa kỹ năng huấn luyện SQL
+const deleteDynamicSkill = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    let skills = [];
+    if (fs.existsSync(DYNAMIC_SKILLS_PATH)) {
+      skills = JSON.parse(fs.readFileSync(DYNAMIC_SKILLS_PATH, 'utf8'));
+    }
+    skills = skills.filter(s => s.id !== id);
+    fs.writeFileSync(DYNAMIC_SKILLS_PATH, JSON.stringify(skills, null, 2), 'utf8');
+    res.json({ success: true, message: 'Đã xóa kỹ năng huấn luyện.' });
+  } catch (err) {
+    next(err);
+  }
+};
+
 module.exports = {
   submitAiFeedback,
   getPendingAiFeedback,
-  reviewAiFeedback
+  reviewAiFeedback,
+  getDynamicSkills,
+  saveDynamicSkill,
+  deleteDynamicSkill
 };

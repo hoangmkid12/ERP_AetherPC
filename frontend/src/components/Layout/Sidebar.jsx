@@ -133,6 +133,7 @@ export default function Sidebar({ isOpen = false, onClose }) {
     { tab: 'bank-accounts', label: 'Tài Khoản Doanh Nghiệp' },
     { tab: 'rbac', label: 'Ma Trận Phân Quyền' },
     { tab: 'knowledge', label: 'Cơ Sở Tri Thức & SOP' },
+    { tab: 'ai-training', label: 'Huấn Luyện & Đào Tạo AI' },
     { tab: 'audit', label: 'Nhật Ký Kiểm Toán' },
     { tab: 'settings', label: 'Cấu Hình & Sao Lưu' }
   ];
