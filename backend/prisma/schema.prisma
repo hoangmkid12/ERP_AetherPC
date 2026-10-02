@@ -1165,3 +1165,24 @@ model AiAuditLog {
   @@map("ai_audit_logs")
 }
 
+model AiFeedback {
+  id            String   @id @default(uuid()) @db.VarChar(50)
+  chatLogId     String?  @map("chat_log_id") @db.VarChar(50)
+  userId        String?  @map("user_id") @db.VarChar(50)
+  userName      String?  @map("user_name") @db.VarChar(150)
+  userRole      String?  @map("user_role") @db.VarChar(50)
+  prompt        String   @db.Text
+  response      String   @db.Text
+  rating        String   @db.VarChar(30)
+  correction    String?  @db.Text
+  status        String   @default("RECORDED") @db.VarChar(20)
+  reviewedById  String?  @map("reviewed_by_id") @db.VarChar(50)
+  reviewedByName String? @map("reviewed_by_name") @db.VarChar(150)
+  knowledgeDocumentId String? @map("knowledge_document_id") @db.VarChar(50)
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  reviewedAt    DateTime? @map("reviewed_at") @db.Timestamptz()
+
+  @@index([status, createdAt])
+  @@index([userId, chatLogId])
+  @@map("ai_feedback")
+}

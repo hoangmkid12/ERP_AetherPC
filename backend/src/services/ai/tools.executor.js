@@ -21,6 +21,9 @@ const executeToolCall = async (toolName, params, user) => {
     case 'lookup_order_status':
       return await executeLookupOrderStatus(params, userRole);
 
+    case 'get_my_delivery_tasks':
+      return await executeGetMyDeliveryTasks(user, userRole);
+
     case 'get_finance_kpi':
       return await executeGetFinanceKpi(params, userRole);
 
@@ -545,6 +548,45 @@ const executeLookupOrderStatus = async (params) => {
       itemsCount: order.items?.length || 0,
       itemNames: order.items?.map(i => `${i.name} (x${i.quantity})`).slice(0, 3).join(', ')
     }
+  };
+};
+
+const executeGetMyDeliveryTasks = async (user, userRole) => {
+  if (userRole !== 'DELIVERY') {
+    return {
+      success: false,
+      error: 'PERMISSION_DENIED',
+      message: 'Chỉ shipper mới có thể tra cứu danh sách đơn giao được phân công.'
+    };
+  }
+
+  const employeeId = Number(user?.id);
+  if (!Number.isSafeInteger(employeeId) || employeeId <= 0) {
+    return {
+      success: false,
+      error: 'INVALID_EMPLOYEE',
+      message: 'Không xác định được tài khoản nhân viên đang đăng nhập.'
+    };
+  }
+
+  const pendingStatuses = ['READY_TO_SHIP', 'SHIPPED'];
+  const orders = await prisma.order.findMany({
+    where: {
+      assignedShipperId: employeeId,
+      status: { in: pendingStatuses }
+    },
+    orderBy: { createdAt: 'asc' },
+    select: {
+      orderId: true,
+      status: true
+    }
+  });
+
+  return {
+    success: true,
+    count: orders.length,
+    orders,
+    note: 'Hệ thống chưa lưu ngày giao dự kiến; số liệu là các đơn chưa hoàn tất đang được phân công cho bạn.'
   };
 };
 

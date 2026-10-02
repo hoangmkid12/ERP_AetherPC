@@ -70,6 +70,14 @@ const ALL_TOOL_DEFINITIONS = [
     }
   },
   {
+    name: 'get_my_delivery_tasks',
+    description: 'Đếm các đơn giao hàng chưa hoàn tất đang được phân công cho shipper hiện đăng nhập. Không nhận ID nhân viên từ người dùng.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {}
+    }
+  },
+  {
     name: 'get_finance_kpi',
     description: 'Tra cứu nhanh tổng quan tài chính: Doanh thu thực tế, số dư quỹ tiền mặt và số dư các tài khoản ngân hàng doanh nghiệp (VietQR/MBBank/VCB). LƯU Ý: Chỉ dành riêng cho CEO, Admin và Kế Toán.',
     parameters: {
@@ -93,6 +101,9 @@ const getToolsForRole = (userRole) => {
     // Nếu là tool tài chính nhạy cảm, chỉ cung cấp cho CEO, ADMIN, ACCOUNTANT
     if (tool.name === 'get_finance_kpi') {
       return SENSITIVE_FINANCE_ROLES.includes(userRole);
+    }
+    if (tool.name === 'get_my_delivery_tasks') {
+      return userRole === 'DELIVERY';
     }
     return true;
   });

@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   Bot, Sparkles, X, Send, Trash2, ChevronDown, ExternalLink, 
   ShieldCheck, AlertCircle, RefreshCw, FileText, CheckCircle2,
-  Cpu, DollarSign, Package, Truck, ArrowRight, Minimize2, Maximize2
+  Cpu, DollarSign, Package, Truck, ArrowRight, Minimize2, Maximize2,
+  ThumbsUp, ThumbsDown, ClipboardCheck
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../services/api';
@@ -26,7 +27,16 @@ export default function AetherCopilot() {
   const [promptChips, setPromptChips] = useState([]);
   const [selectedDocModal, setSelectedDocModal] = useState(null);
   const [modalLoading, setModalLoading] = useState(false);
+  const [feedbackDraftId, setFeedbackDraftId] = useState(null);
+  const [feedbackDraft, setFeedbackDraft] = useState('');
+  const [feedbackBusyId, setFeedbackBusyId] = useState(null);
+  const [reviewModalOpen, setReviewModalOpen] = useState(false);
+  const [feedbackQueue, setFeedbackQueue] = useState([]);
+  const [selectedFeedback, setSelectedFeedback] = useState(null);
+  const [reviewForm, setReviewForm] = useState({ title: '', category: 'GENERAL', content: '' });
+  const [reviewBusy, setReviewBusy] = useState(false);
   const messagesEndRef = useRef(null);
+  const canReviewAiFeedback = ['ADMIN', 'CEO'].includes(user?.role);
 
   // Auto-scroll to bottom of messages
   const scrollToBottom = () => {
@@ -87,9 +97,11 @@ export default function AetherCopilot() {
         const botMsg = {
           id: 'bot-' + Date.now(),
           role: 'assistant',
+          prompt: text,
           content: replyText || 'Đã ghi nhận yêu cầu nhưng không có nội dung văn bản phản hồi.',
           toolCalls: response.data?.toolCalls || [],
           citations: response.data?.citations || [],
+          auditLogId: response.data?.auditLogId || null,
           timestamp: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
         };
         setMessages(prev => [...prev, botMsg]);
@@ -136,6 +148,79 @@ export default function AetherCopilot() {
       notify(err.message || 'Không thể mở tài liệu.', 'error');
     } finally {
       setModalLoading(false);
+    }
+  };
+
+  const submitFeedback = async (msg, rating, correction = '') => {
+    setFeedbackBusyId(msg.id);
+    try {
+      await api.post('/ai/feedback', {
+        chatLogId: msg.auditLogId,
+        prompt: msg.prompt,
+        response: msg.content,
+        rating,
+        correction
+      });
+      setMessages(prev => prev.map(item => item.id === msg.id ? { ...item, feedbackSubmitted: true } : item));
+      setFeedbackDraftId(null);
+      setFeedbackDraft('');
+      notify('Cảm ơn bạn đã góp ý cho AetherCopilot.', 'success');
+    } catch (err) {
+      notify(err.message || 'Không thể lưu phản hồi AI.', 'error');
+    } finally {
+      setFeedbackBusyId(null);
+    }
+  };
+
+  const loadFeedbackQueue = async () => {
+    try {
+      const res = await api.get('/ai/feedback/pending');
+      const queue = res.data || [];
+      setFeedbackQueue(queue);
+      if (queue.length > 0) {
+        const next = queue[0];
+        setSelectedFeedback(next);
+        setReviewForm({
+          title: next.prompt.slice(0, 80),
+          category: 'GENERAL',
+          content: next.correction || ''
+        });
+      } else {
+        setSelectedFeedback(null);
+        setReviewForm({ title: '', category: 'GENERAL', content: '' });
+      }
+    } catch (err) {
+      notify(err.message || 'Không thể tải phản hồi đang chờ duyệt.', 'error');
+    }
+  };
+
+  const openFeedbackReview = async () => {
+    setReviewModalOpen(true);
+    await loadFeedbackQueue();
+  };
+
+  const selectFeedbackForReview = (item) => {
+    setSelectedFeedback(item);
+    setReviewForm({
+      title: item.prompt.slice(0, 80),
+      category: 'GENERAL',
+      content: item.correction || ''
+    });
+  };
+
+  const reviewFeedback = async (action) => {
+    if (!selectedFeedback) return;
+    setReviewBusy(true);
+    try {
+      await api.post(`/ai/feedback/${selectedFeedback.id}/review`, action === 'APPROVE'
+        ? { action, ...reviewForm }
+        : { action });
+      notify(action === 'APPROVE' ? 'Đã duyệt và bổ sung vào kho tri thức.' : 'Đã từ chối phản hồi.', 'success');
+      await loadFeedbackQueue();
+    } catch (err) {
+      notify(err.message || 'Không thể xử lý phản hồi.', 'error');
+    } finally {
+      setReviewBusy(false);
     }
   };
 
@@ -320,6 +405,25 @@ export default function AetherCopilot() {
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              {canReviewAiFeedback && (
+                <button
+                  onClick={openFeedbackReview}
+                  title="Duyệt phản hồi AI"
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: '#94a3b8',
+                    cursor: 'pointer',
+                    padding: '6px',
+                    borderRadius: '6px',
+                    display: 'flex'
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.color = '#ffffff'}
+                  onMouseLeave={e => e.currentTarget.style.color = '#94a3b8'}
+                >
+                  <ClipboardCheck size={16} />
+                </button>
+              )}
               <button
                 onClick={handleClearHistory}
                 title="Làm mới đoạn chat"
@@ -449,6 +553,7 @@ export default function AetherCopilot() {
                           if (t.name === 'lookup_products') return 'Kho & Sản phẩm';
                           if (t.name === 'get_finance_kpi') return 'Chỉ số Tài chính';
                           if (t.name === 'lookup_order_status') return 'Trạng thái Đơn hàng';
+                          if (t.name === 'get_my_delivery_tasks') return 'Đơn giao được phân công';
                           return t.name;
                         }).join(', ')}
                       </span>
@@ -507,6 +612,57 @@ export default function AetherCopilot() {
                     </div>
                   )}
                 </div>
+
+                {msg.role === 'assistant' && !msg.id.startsWith('welcome') && !msg.id.startsWith('err') && (
+                  <div style={{ marginTop: '4px', padding: '0 4px', maxWidth: '94%' }}>
+                    {msg.feedbackSubmitted ? (
+                      <span style={{ fontSize: '0.68rem', color: '#059669' }}>Đã ghi nhận đánh giá</span>
+                    ) : feedbackDraftId === msg.id ? (
+                      <div style={{ display: 'flex', gap: '5px', alignItems: 'flex-start' }}>
+                        <textarea
+                          value={feedbackDraft}
+                          onChange={e => setFeedbackDraft(e.target.value)}
+                          placeholder="Góp ý hoặc câu trả lời đúng hơn (không bắt buộc)"
+                          rows={2}
+                          maxLength={5000}
+                          style={{ width: '250px', maxWidth: '55vw', resize: 'vertical', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '6px', fontSize: '0.72rem' }}
+                        />
+                        <button
+                          onClick={() => submitFeedback(msg, 'NEEDS_IMPROVEMENT', feedbackDraft)}
+                          disabled={feedbackBusyId === msg.id}
+                          style={{ border: 'none', borderRadius: '6px', padding: '6px 8px', background: '#2563eb', color: '#fff', cursor: 'pointer', fontSize: '0.7rem' }}
+                        >
+                          Gửi
+                        </button>
+                        <button
+                          onClick={() => { setFeedbackDraftId(null); setFeedbackDraft(''); }}
+                          style={{ border: 'none', background: 'transparent', color: '#64748b', cursor: 'pointer', fontSize: '0.7rem' }}
+                        >
+                          Hủy
+                        </button>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', gap: '4px' }}>
+                        <button
+                          onClick={() => submitFeedback(msg, 'HELPFUL')}
+                          disabled={feedbackBusyId === msg.id}
+                          title="Câu trả lời hữu ích"
+                          style={{ display: 'flex', alignItems: 'center', gap: '4px', border: 'none', background: 'transparent', color: '#64748b', cursor: 'pointer', fontSize: '0.68rem', padding: '2px 4px' }}
+                        >
+                          <ThumbsUp size={13} /> Hữu ích
+                        </button>
+                        <button
+                          onClick={() => { setFeedbackDraftId(msg.id); setFeedbackDraft(''); }}
+                          disabled={feedbackBusyId === msg.id}
+                          title="Câu trả lời cần cải thiện"
+                          style={{ display: 'flex', alignItems: 'center', gap: '4px', border: 'none', background: 'transparent', color: '#64748b', cursor: 'pointer', fontSize: '0.68rem', padding: '2px 4px' }}
+                        >
+                          <ThumbsDown size={13} /> Chưa đúng
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 <div style={{
                   fontSize: '0.62rem',
@@ -645,6 +801,77 @@ export default function AetherCopilot() {
               <Send size={16} />
             </button>
           </form>
+        </div>
+      )}
+
+      {reviewModalOpen && canReviewAiFeedback && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.65)', zIndex: 10001, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+          <div style={{ background: '#fff', borderRadius: '12px', width: '100%', maxWidth: '900px', maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 25px 50px -12px rgba(15, 23, 42, 0.4)' }}>
+            <div style={{ padding: '14px 18px', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div>
+                <h3 style={{ margin: 0, color: '#0f172a', fontSize: '1rem' }}>Duyệt phản hồi AetherCopilot</h3>
+                <span style={{ color: '#64748b', fontSize: '0.75rem' }}>{feedbackQueue.length} phản hồi đang chờ</span>
+              </div>
+              <button onClick={() => setReviewModalOpen(false)} title="Đóng" style={{ border: 0, background: 'transparent', color: '#64748b', cursor: 'pointer' }}>
+                <X size={20} />
+              </button>
+            </div>
+
+            {feedbackQueue.length === 0 ? (
+              <div style={{ padding: '32px', textAlign: 'center', color: '#64748b' }}>Không có phản hồi cần duyệt.</div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'minmax(200px, 0.8fr) minmax(0, 1.5fr)', minHeight: '420px', overflow: 'auto' }}>
+                <div style={{ borderRight: '1px solid #e2e8f0', padding: '10px', overflowY: 'auto' }}>
+                  {feedbackQueue.map(item => (
+                    <button
+                      key={item.id}
+                      onClick={() => selectFeedbackForReview(item)}
+                      style={{ display: 'block', width: '100%', textAlign: 'left', padding: '9px', marginBottom: '6px', borderRadius: '7px', border: selectedFeedback?.id === item.id ? '1px solid #60a5fa' : '1px solid #e2e8f0', background: selectedFeedback?.id === item.id ? '#eff6ff' : '#fff', cursor: 'pointer' }}
+                    >
+                      <div style={{ color: '#0f172a', fontSize: '0.75rem', fontWeight: 700 }}>{item.userName || 'Nhân viên'} · {item.userRole || '—'}</div>
+                      <div style={{ color: '#64748b', fontSize: '0.72rem', marginTop: '4px' }}>{item.prompt}</div>
+                    </button>
+                  ))}
+                </div>
+
+                {selectedFeedback && (
+                  <div style={{ padding: '14px 18px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <div>
+                      <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#475569' }}>Câu hỏi</div>
+                      <div style={{ fontSize: '0.78rem', color: '#0f172a', marginTop: '3px' }}>{selectedFeedback.prompt}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#475569' }}>Câu trả lời AI</div>
+                      <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '3px', whiteSpace: 'pre-wrap', maxHeight: '100px', overflow: 'auto' }}>{selectedFeedback.response}</div>
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>Tiêu đề tri thức</label>
+                      <input value={reviewForm.title} maxLength={255} onChange={e => setReviewForm(prev => ({ ...prev, title: e.target.value }))} style={{ width: '100%', boxSizing: 'border-box', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.78rem' }} />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>Chuyên mục</label>
+                      <select value={reviewForm.category} onChange={e => setReviewForm(prev => ({ ...prev, category: e.target.value }))} style={{ width: '100%', boxSizing: 'border-box', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.78rem' }}>
+                        <option value="GENERAL">Chính sách chung</option>
+                        <option value="WARRANTY_RMA">Bảo hành & đổi trả</option>
+                        <option value="SALES_POLICY">Bán hàng & chiết khấu</option>
+                        <option value="WAREHOUSE_LOGISTICS">Kho vận & giao hàng</option>
+                        <option value="TECHNICAL_SOP">Kỹ thuật & lắp ráp</option>
+                        <option value="ERP_MANUAL">Hướng dẫn ERP</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>Nội dung đã kiểm chứng</label>
+                      <textarea value={reviewForm.content} maxLength={20000} rows={7} onChange={e => setReviewForm(prev => ({ ...prev, content: e.target.value }))} placeholder="Nhập câu trả lời đã xác minh để bổ sung vào kho tri thức" style={{ width: '100%', boxSizing: 'border-box', resize: 'vertical', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.78rem' }} />
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', paddingTop: '4px' }}>
+                      <button onClick={() => reviewFeedback('REJECT')} disabled={reviewBusy} style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid #fecaca', background: '#fff', color: '#b91c1c', cursor: 'pointer' }}>Từ chối</button>
+                      <button onClick={() => reviewFeedback('APPROVE')} disabled={reviewBusy || !reviewForm.title.trim() || !reviewForm.content.trim()} style={{ padding: '8px 12px', borderRadius: '6px', border: 0, background: reviewBusy || !reviewForm.title.trim() || !reviewForm.content.trim() ? '#94a3b8' : '#2563eb', color: '#fff', cursor: reviewBusy ? 'wait' : 'pointer' }}>Duyệt và thêm vào tri thức</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       )}
 

@@ -52,6 +52,7 @@ const ROLE_PROMPT_CHIPS = {
     'Quy chuẩn bàn giao đơn hàng cho shipper'
   ],
   DELIVERY: [
+    'Hôm nay tôi có bao nhiêu đơn cần giao?',
     'Quy định chụp ảnh POD khi giao hàng cho khách?',
     'Quy trình nộp tiền mặt COD về kế toán trước mấy giờ?',
     'Khách quét VietQR chuyển khoản thì dùng tài khoản nào?',
@@ -116,6 +117,7 @@ Phân tích câu hỏi và trả về ĐÚNG MỘT JSON object (không markdown,
 DANH SÁCH INTENT_CODE (chỉ dùng đúng các giá trị này):
 - SECURITY_BLOCK: Yêu cầu/hỏi mật khẩu, thông tin đăng nhập của nhân viên khác
 - HR_STAFF_COUNT: Thống kê số lượng nhân sự, danh sách tài khoản nhân viên
+- MY_DELIVERY_TASKS: Hỏi số đơn giao hàng đang được phân công cho chính người hỏi
 - ORDER_LOOKUP: Tra cứu đơn hàng CỤ THỂ (phải có mã đơn DH-xxx/ORD-xxx hoặc số điện thoại 10 chữ số)
 - PRODUCT_LOOKUP: Tra cứu linh kiện, giá bán, tồn kho sản phẩm cụ thể
 - PC_COMPATIBILITY: Kiểm tra tương thích phần cứng PC, hỏi nguồn bao nhiêu watt cho cấu hình
@@ -139,7 +141,8 @@ QUY TẮC PHÂN LOẠI BẮT BUỘC:
 13. Phân biệt: hỏi VỀ quy trình/chính sách (KNOWLEDGE_SOP) vs tra cứu DỮ LIỆU thực tế (ORDER/PRODUCT/FINANCE)
 14. Trích xuất targetRole nếu câu hỏi nhắc đến vai trò cụ thể: "quản lý bán hàng"→"SALES_MANAGER", "nhân viên kho"→"WAREHOUSE", "shipper"→"DELIVERY", "kế toán"→"ACCOUNTANT", "giám đốc"→"CEO"
 15. Trích xuất timePeriod: "hôm nay"→"TODAY", "tuần này"→"THIS_WEEK", "tháng này"→"THIS_MONTH", "hôm qua"→"YESTERDAY"
-16. Trích xuất productKeyword: chỉ lấy tên linh kiện/sản phẩm thực sự (RTX 4070, i5-13400, DDR5 16GB...), KHÔNG lấy các từ mô tả (giá, tồn kho, kiểm tra...)`;
+16. Trích xuất productKeyword: chỉ lấy tên linh kiện/sản phẩm thực sự (RTX 4070, i5-13400, DDR5 16GB...), KHÔNG lấy các từ mô tả (giá, tồn kho, kiểm tra...)
+17. "Hôm nay tôi có bao nhiêu đơn cần giao?" → MY_DELIVERY_TASKS; không hỏi ID nhân viên và không nhầm với tra cứu đơn của khách`;
 
 /**
  * Phân loại ý định bằng Gemini AI (Primary Classifier)
@@ -169,7 +172,7 @@ const classifyIntent = async (promptText, userRole) => {
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       const parsed = JSON.parse(jsonMatch[0]);
-      const validIntents = ['SECURITY_BLOCK', 'HR_STAFF_COUNT', 'ORDER_LOOKUP', 'PRODUCT_LOOKUP', 'PC_COMPATIBILITY', 'FINANCE_REPORT', 'KNOWLEDGE_SOP', 'GENERAL_CHAT'];
+      const validIntents = ['SECURITY_BLOCK', 'HR_STAFF_COUNT', 'MY_DELIVERY_TASKS', 'ORDER_LOOKUP', 'PRODUCT_LOOKUP', 'PC_COMPATIBILITY', 'FINANCE_REPORT', 'KNOWLEDGE_SOP', 'GENERAL_CHAT'];
       if (validIntents.includes(parsed.intent)) {
         console.log(`[IntentClassifier] AI: "${promptText.slice(0, 60)}..." → ${parsed.intent} (conf=${parsed.confidence}) | sub: ${parsed.subIntent}`);
         return parsed;
@@ -197,6 +200,12 @@ const classifyIntentByRegex = (promptText) => {
   // 2. Thống kê nhân sự
   if (/(bao nhiêu|số lượng|thống kê|tổng số|danh sách).*(nhân viên|tài khoản|nhân sự)|(nhân viên|tài khoản nhân sự|nhân sự).*(bao nhiêu|số lượng|tổng số)/.test(lower)) {
     return { intent: 'HR_STAFF_COUNT', subIntent: 'Thống kê nhân sự', entities: {}, confidence: 0.9 };
+  }
+
+  if (/(đơn hàng|đơn).*(giao|ship)|(giao|ship).*(đơn hàng|đơn)/.test(lower) &&
+      /(tôi|mình|của tôi|của mình)/.test(lower) &&
+      /(hôm nay|bao nhiêu|số lượng|đơn nào|danh sách)/.test(lower)) {
+    return { intent: 'MY_DELIVERY_TASKS', subIntent: 'Tra cứu đơn giao được phân công cho chính tôi', entities: {}, confidence: 0.98 };
   }
 
   // 3. Tra cứu đơn hàng (cần có mã đơn hoặc SĐT cụ thể)
@@ -261,7 +270,10 @@ const chatWithAi = async (req, res, next) => {
     // ========================================================================
     // BƯỚC 1: PHÂN LOẠI Ý ĐỊNH (AI-First, Regex Fallback)
     // ========================================================================
-    let classified = await classifyIntent(promptText, user.role);
+    const personalDeliveryQuery = classifyIntentByRegex(promptText).intent === 'MY_DELIVERY_TASKS';
+    let classified = personalDeliveryQuery
+      ? classifyIntentByRegex(promptText)
+      : await classifyIntent(promptText, user.role);
 
     // Reconciliation: Nếu AI không khả dụng hoặc AI trả về GENERAL_CHAT nhưng thiếu tự tin,
     // kiểm tra lại bằng regex xem có intent cụ thể hơn không
@@ -340,6 +352,21 @@ const chatWithAi = async (req, res, next) => {
             `- **Linh kiện trong đơn:** ${o.itemNames || 'Chi tiết đơn lẻ'}`;
         } else {
           finalAiResponse = `Không tìm thấy đơn hàng nào khớp với thông tin "${orderQuery}". Vui lòng kiểm tra lại Mã đơn hàng hoặc Số điện thoại người nhận.`;
+        }
+        break;
+      }
+
+      case 'MY_DELIVERY_TASKS': {
+        const result = await executeToolCall('get_my_delivery_tasks', {}, user);
+        toolCallsExecuted.push({ tool: 'get_my_delivery_tasks', result });
+
+        if (result.error === 'PERMISSION_DENIED') {
+          finalAiResponse = 'Tính năng này chỉ dành cho tài khoản nhân viên giao hàng.';
+        } else if (result.error === 'INVALID_EMPLOYEE') {
+          finalAiResponse = 'Không xác định được tài khoản nhân viên của bạn để tra cứu đơn được phân công.';
+        } else if (result.success) {
+          const orderLines = result.orders.map(order => `- **${order.orderId}** (${order.status})`).join('\n');
+          finalAiResponse = `Hôm nay bạn đang được phân công **${result.count} đơn chưa hoàn tất**${result.count ? `:\n\n${orderLines}` : '.'}\n\n*${result.note}*`;
         }
         break;
       }
@@ -518,7 +545,7 @@ Hãy trả lời chính xác dựa trên dữ liệu trên. Nếu dữ liệu ch
     const latencyMs = Date.now() - startTime;
 
     // Ghi vết vào bảng AiAuditLog để phục vụ kiểm toán an toàn thông tin
-    await prisma.aiAuditLog.create({
+    const auditLog = await prisma.aiAuditLog.create({
       data: {
         userId: user.id || null,
         userEmail: user.email || 'internal@aetherpc.com',
@@ -530,7 +557,10 @@ Hãy trả lời chính xác dựa trên dữ liệu trên. Nếu dữ liệu ch
         latencyMs,
         status: 'SUCCESS'
       }
-    }).catch(err => console.warn('[AetherCopilot] Ghi Audit Log thất bại:', err.message));
+    }).catch(err => {
+      console.warn('[AetherCopilot] Ghi Audit Log thất bại:', err.message);
+      return null;
+    });
 
     res.json({
       success: true,
@@ -539,7 +569,8 @@ Hãy trả lời chính xác dựa trên dữ liệu trên. Nếu dữ liệu ch
         response: finalAiResponse,
         citations,
         toolCalls: toolCallsExecuted.map(t => t.tool),
-        latencyMs
+        latencyMs,
+        auditLogId: auditLog?.id || null
       }
     });
   } catch (err) {
