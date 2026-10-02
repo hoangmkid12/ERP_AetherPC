@@ -156,6 +156,7 @@ QUY TẮC PHÂN LOẠI & MỞ RỘNG TỪ KHÓA BẮT BUỘC:
  * @returns {Object|null} - { intent, subIntent, entities, confidence } hoặc null nếu lỗi
  */
 const classifyIntent = async (promptText, userRole) => {
+  const aiClient = getAiClient();
   if (!aiClient || !process.env.GEMINI_API_KEY) return null;
 
   try {
@@ -288,6 +289,7 @@ const chatWithAi = async (req, res, next) => {
   }
 
   const promptText = message.trim();
+  const aiClient = getAiClient();
   let toolCallsExecuted = [];
   let finalAiResponse = '';
   let citations = [];
@@ -664,20 +666,24 @@ Hãy trả lời chính xác dựa trên dữ liệu trên. Nếu dữ liệu ch
       case 'UNIVERSAL_DATA_QUERY':
       case 'GENERAL_CHAT':
       default: {
-        // Thử chạy qua Universal ERP Live Data Engine (Text-to-SQL an toàn)
-        try {
-          const universalResult = await executeUniversalDataQuery(promptText, user);
-          if (universalResult && universalResult.success && universalResult.rowCount > 0) {
-            finalAiResponse = universalResult.finalResponse;
-            toolCallsExecuted.push({
-              tool: 'universal_live_data_query',
-              params: { query: promptText, sql: universalResult.sqlUsed },
-              result: { rowCount: universalResult.rowCount }
-            });
-            break;
+        const isGreeting = /^(chào|xin chào|hi|hello|hey|bạn là ai|alo|cảm ơn|thank)/i.test(promptText);
+
+        // Chỉ chạy qua Universal SQL khi câu hỏi thực sự hỏi về dữ liệu hoặc thống kê ERP
+        if (!isGreeting) {
+          try {
+            const universalResult = await executeUniversalDataQuery(promptText, user);
+            if (universalResult && universalResult.success && universalResult.rowCount > 0) {
+              finalAiResponse = universalResult.finalResponse;
+              toolCallsExecuted.push({
+                tool: 'universal_live_data_query',
+                params: { query: promptText, sql: universalResult.sqlUsed },
+                result: { rowCount: universalResult.rowCount }
+              });
+              break;
+            }
+          } catch (uErr) {
+            console.warn('[AetherCopilot] Universal live data engine bypass:', uErr.message);
           }
-        } catch (uErr) {
-          console.warn('[AetherCopilot] Universal live data engine bypass:', uErr.message);
         }
 
         if (process.env.GEMINI_API_KEY && aiClient) {
