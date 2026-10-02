@@ -213,20 +213,25 @@ const classifyIntentByRegex = (promptText) => {
   }
 
   // 2. Tra cứu thông tin BẢN THÂN (Self Context Grounding)
-  if (/(tôi là ai|tên tôi là|tôi tên gì|thông tin.*(của tôi|của mình|cá nhân)|hồ sơ.*(của tôi|của mình|cá nhân)|tài khoản của tôi|tôi thuộc phòng nào|chức vụ của tôi|tôi vào làm|lương của tôi)/.test(lower) ||
-      (/(tôi|của tôi|mình|của mình).*(bán được|doanh số|doanh thu|hoa hồng|mấy đơn|bao nhiêu đơn|nhiệm vụ|công việc)/.test(lower)) ||
-      (/(bán được|doanh số|hoa hồng|nhiệm vụ|công việc).*(của tôi|của mình)/.test(lower))) {
-    const isToday = /hôm nay|ngày nay/.test(lower);
-    const isMonth = /tháng này|tháng/.test(lower);
-    return {
-      intent: 'MY_PROFILE_TASKS',
-      subIntent: 'Tra cứu hồ sơ, nhiệm vụ hoặc doanh số của chính nhân viên',
-      entities: {
-        timePeriod: isToday ? 'TODAY' : isMonth ? 'THIS_MONTH' : 'TODAY',
-        expandedKeywords: []
-      },
-      confidence: 0.95
-    };
+  // Chỉ kích hoạt khi thực sự hỏi về cá nhân: "tôi là ai", "hồ sơ của tôi", "doanh số của tôi", "hoa hồng của tôi"
+  // TUYỆT ĐỐI KHÔNG bắt nhầm câu hỏi bắt đầu bằng "cho tôi biết...", "cho tôi xem..." về doanh thu công ty
+  const isAskingCompanyData = /(cho tôi|tôi muốn).*(doanh thu|đơn hàng|sản phẩm|tồn kho|báo cáo|tài chính|tiến độ|khách hàng)/i.test(lower);
+  if (!isAskingCompanyData) {
+    if (/(tôi là ai|tên tôi là|tôi tên gì|thông tin.*(của tôi|của mình|cá nhân)|hồ sơ.*(của tôi|của mình|cá nhân)|tài khoản của tôi|tôi thuộc phòng nào|chức vụ của tôi|tôi vào làm|lương của tôi)/.test(lower) ||
+        (/(của tôi|của mình).*(bán được|doanh số|doanh thu|hoa hồng|mấy đơn|nhiệm vụ|công việc)/.test(lower)) ||
+        (/(doanh số|hoa hồng|nhiệm vụ|công việc).*(của tôi|của mình)/.test(lower))) {
+      const isToday = /hôm nay|ngày nay/.test(lower);
+      const isMonth = /tháng này|tháng/.test(lower);
+      return {
+        intent: 'MY_PROFILE_TASKS',
+        subIntent: 'Tra cứu hồ sơ, nhiệm vụ hoặc doanh số của chính nhân viên',
+        entities: {
+          timePeriod: isToday ? 'TODAY' : isMonth ? 'THIS_MONTH' : 'TODAY',
+          expandedKeywords: []
+        },
+        confidence: 0.95
+      };
+    }
   }
 
   // 3. Tra cứu đơn giao của chính shipper
@@ -735,7 +740,7 @@ Hãy trả lời chính xác dựa trên dữ liệu trên. Dùng Markdown đẹ
         if (!isGreeting) {
           try {
             const universalResult = await executeUniversalDataQuery(promptText, user);
-            if (universalResult && universalResult.success && universalResult.rowCount > 0) {
+            if (universalResult && universalResult.success && universalResult.finalResponse) {
               finalAiResponse = universalResult.finalResponse;
               toolCallsExecuted.push({
                 tool: 'universal_live_data_query',
