@@ -104,6 +104,7 @@ export const OPERATIONAL_PERMISSIONS = [
 
   // 10. Phân Hệ Báo Cáo Tổng Quan & Quản Trị
   { id: 'dashboard_view_kpi', moduleId: 'dashboard', name: 'Xem báo cáo tổng thể KPI, doanh thu & lợi nhuận P&L', desc: 'Theo dõi bức tranh tài chính, dòng tiền và hiệu quả kinh doanh toàn doanh nghiệp' },
+  { id: 'system_manage_bank_accounts', moduleId: 'system', name: 'Quản lý tài khoản ngân hàng doanh nghiệp (VietQR/Thụ hưởng)', desc: 'Thêm, cập nhật, đóng tài khoản và cấu hình QR thụ hưởng cho toàn hệ thống', backendEnforced: true },
   { id: 'system_admin_full', moduleId: 'system', name: 'Toàn quyền cấu hình hệ thống, tài khoản & sao lưu', desc: 'Quản lý phân quyền RBAC, kiểm soát bảo mật và sao lưu dữ liệu' }
 ];
 
@@ -130,7 +131,7 @@ export const DEFAULT_OPERATIONAL_MATRIX = {
     accounting_pay_po: true, accounting_settle_cod: true, accounting_disburse_payroll: true, accounting_manage_invoices: true,
     cskh_handle_tickets: true, cskh_approve_exchange: true,
     hr_manage_employees: true, hr_prepare_payroll: true, hr_approve_payroll_ceo: true,
-    dashboard_view_kpi: true, system_admin_full: true
+    dashboard_view_kpi: true, system_manage_bank_accounts: true, system_admin_full: true
   },
   CEO: {
     dashboard_view_kpi: true,
@@ -155,7 +156,9 @@ export const DEFAULT_OPERATIONAL_MATRIX = {
     hr_manage_employees: true,
     // promotion.routes.js MANAGE_ROLES = ['SALES_MANAGER','CEO','ADMIN'] cấp
     // quyền thật cho CEO tạo/sửa/xóa khuyến mãi — cùng lỗi thiếu như trên.
-    sales_manage_promotions: true
+    sales_manage_promotions: true,
+    system_manage_bank_accounts: true,
+    system_admin_full: true
   },
   SALES_MANAGER: {
     sales_view_orders: true,

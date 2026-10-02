@@ -216,7 +216,9 @@ export const useFinanceStore = create((set, get) => ({
       amount: entryAmount,
       description: fullDescription,
       date: entryDate,
-      ...(referenceId ? { referenceId } : {})
+      ...(referenceId ? { referenceId } : {}),
+      ...(typeOrEntry?.channel ? { channel: typeOrEntry.channel } : {}),
+      ...(typeOrEntry?.bankAccountId ? { bankAccountId: typeOrEntry.bankAccountId } : {})
     });
     const newTx = res?.data;
     if (!newTx) throw new Error(res?.message || 'Không thể ghi bút toán vào Sổ Cái.');

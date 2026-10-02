@@ -6,7 +6,7 @@ import {
   CheckCircle, XCircle, AlertCircle, Key, Lock, Edit, Trash2, 
   RefreshCw, Download, Upload, Server, ShieldCheck, FileText, Check, 
   AlertTriangle, HardDrive, Cpu, Layers, Activity, ArrowRight, UserCheck, UserX,
-  Building
+  Building, CreditCard, QrCode
 } from 'lucide-react';
 import { Bar, Doughnut } from 'react-chartjs-2';
 import { 
@@ -34,6 +34,20 @@ import {
   getOperationalRbac,
   saveOperationalRbac
 } from '../../utils/rbacEngine';
+
+// Danh sách các ngân hàng phổ biến tại Việt Nam hỗ trợ VietQR NAPAS 247
+export const VIETNAMESE_BANKS = [
+  { code: 'MB', name: 'MBBank (Ngân hàng TMCP Quân Đội)' },
+  { code: 'VCB', name: 'Vietcombank (Ngân hàng TMCP Ngoại Thương VN)' },
+  { code: 'TCB', name: 'Techcombank (Ngân hàng TMCP Kỹ Thương VN)' },
+  { code: 'ACB', name: 'ACB (Ngân hàng TMCP Á Châu)' },
+  { code: 'CTG', name: 'VietinBank (Ngân hàng TMCP Công Thương VN)' },
+  { code: 'BIDV', name: 'BIDV (Ngân hàng TMCP Đầu Tư & Phát Triển VN)' },
+  { code: 'VPB', name: 'VPBank (Ngân hàng TMCP Việt Nam Thịnh Vượng)' },
+  { code: 'TPB', name: 'TPBank (Ngân hàng TMCP Tiên Phong)' },
+  { code: 'STB', name: 'Sacombank (Ngân hàng TMCP Sài Gòn Thương Tín)' },
+  { code: 'HDB', name: 'HDBank (Ngân hàng TMCP Phát Triển TP.HCM)' }
+];
 
 // Register ChartJS modules
 ChartJS.register(
@@ -294,6 +308,144 @@ export default function SystemAdmin() {
       notify(err?.message || 'Không thể xóa tài khoản.', 'error');
     } finally {
       setCustActionBusyId(null);
+    }
+  };
+
+  // =========================================================================
+  // Quản lý Tài khoản Ngân hàng Doanh nghiệp (/api/v1/system/bank-accounts)
+  // =========================================================================
+  const [bankAccounts, setBankAccounts] = useState([]);
+  const [bankLoading, setBankLoading] = useState(false);
+  const [showBankModal, setShowBankModal] = useState(false);
+  const [editingBank, setEditingBank] = useState(null);
+  const [bankSubmitting, setBankSubmitting] = useState(false);
+  const [bankForm, setBankForm] = useState({
+    bankCode: 'MB',
+    bankName: 'MBBank (Ngân hàng TMCP Quân Đội)',
+    accountNumber: '',
+    accountHolder: 'CÔNG TY TNHH AETHERPC',
+    branch: 'Hội Sở Chính',
+    purpose: 'Tài khoản nhận thanh toán đơn hàng & VietQR',
+    isDefaultQr: false,
+    status: 'ACTIVE'
+  });
+
+  const loadBankAccounts = async () => {
+    setBankLoading(true);
+    try {
+      const res = await api.get('/system/bank-accounts');
+      setBankAccounts(res.data || []);
+    } catch (err) {
+      notify(err?.message || 'Không thể tải danh sách tài khoản ngân hàng.', 'error');
+    } finally {
+      setBankLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'bank-accounts') {
+      loadBankAccounts();
+    }
+  }, [activeTab]);
+
+  const handleOpenBankModal = (account = null) => {
+    if (account) {
+      setEditingBank(account);
+      setBankForm({
+        bankCode: account.bankCode || 'MB',
+        bankName: account.bankName || 'MBBank (Ngân hàng TMCP Quân Đội)',
+        accountNumber: account.accountNumber || '',
+        accountHolder: account.accountHolder || 'CÔNG TY TNHH AETHERPC',
+        branch: account.branch || '',
+        purpose: account.purpose || '',
+        isDefaultQr: Boolean(account.isDefaultQr),
+        status: account.status || 'ACTIVE'
+      });
+    } else {
+      setEditingBank(null);
+      setBankForm({
+        bankCode: 'MB',
+        bankName: 'MBBank (Ngân hàng TMCP Quân Đội)',
+        accountNumber: '',
+        accountHolder: 'CÔNG TY TNHH AETHERPC',
+        branch: 'Hội Sở Chính',
+        purpose: 'Tài khoản nhận thanh toán đơn hàng & VietQR',
+        isDefaultQr: bankAccounts.length === 0,
+        status: 'ACTIVE'
+      });
+    }
+    setShowBankModal(true);
+  };
+
+  const handleSaveBankAccount = async (e) => {
+    if (e) e.preventDefault();
+    if (!bankForm.accountNumber.trim()) {
+      notify('Vui lòng nhập số tài khoản ngân hàng.', 'warning');
+      return;
+    }
+    if (!bankForm.accountHolder.trim()) {
+      notify('Vui lòng nhập tên chủ tài khoản.', 'warning');
+      return;
+    }
+
+    setBankSubmitting(true);
+    try {
+      if (editingBank) {
+        await api.put(`/system/bank-accounts/${editingBank.id}`, bankForm);
+        notify('Cập nhật tài khoản ngân hàng thành công!', 'success');
+      } else {
+        await api.post('/system/bank-accounts', bankForm);
+        notify('Thêm tài khoản ngân hàng doanh nghiệp thành công!', 'success');
+      }
+      setShowBankModal(false);
+      loadBankAccounts();
+    } catch (err) {
+      notify(err?.message || 'Lỗi khi lưu tài khoản ngân hàng.', 'error');
+    } finally {
+      setBankSubmitting(false);
+    }
+  };
+
+  const handleSetDefaultQr = async (acc) => {
+    try {
+      await api.patch(`/system/bank-accounts/${acc.id}/default-qr`);
+      notify(`Đã kích hoạt VietQR mặc định cho tài khoản ${acc.bankCode} - ${acc.accountNumber}`, 'success');
+      loadBankAccounts();
+    } catch (err) {
+      notify(err?.message || 'Không thể cập nhật VietQR mặc định.', 'error');
+    }
+  };
+
+  const handleToggleBankStatus = async (acc) => {
+    const nextStatus = acc.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
+    try {
+      await api.put(`/system/bank-accounts/${acc.id}`, { status: nextStatus });
+      notify(`Đã ${nextStatus === 'ACTIVE' ? 'kích hoạt' : 'tạm ngưng'} tài khoản ${acc.accountNumber}`, 'success');
+      loadBankAccounts();
+    } catch (err) {
+      notify(err?.message || 'Lỗi khi cập nhật trạng thái tài khoản.', 'error');
+    }
+  };
+
+  const handleDeleteBankAccount = async (acc) => {
+    if (acc.isDefaultQr) {
+      notify('Không thể xóa tài khoản đang là VietQR mặc định của hệ thống!', 'warning');
+      return;
+    }
+    const ok = await confirm({
+      title: 'Xác nhận xóa tài khoản ngân hàng',
+      message: `Bạn có chắc chắn muốn xóa tài khoản ${acc.bankCode} (${acc.accountNumber})? Hành động này sẽ được ghi vào nhật ký kiểm toán.`,
+      confirmLabel: 'Xác nhận xóa',
+      cancelLabel: 'Hủy'
+    });
+    if (!ok) return;
+
+    try {
+      await api.delete(`/system/bank-accounts/${acc.id}`);
+      notify('Đã xóa tài khoản ngân hàng thành công!', 'success');
+      loadBankAccounts();
+    } catch (err) {
+      notify(err?.message || 'Không thể xóa tài khoản (có thể đã có bút toán sổ cái liên kết).', 'error');
     }
   };
 
@@ -713,12 +865,13 @@ export default function SystemAdmin() {
             <Settings size={24} style={{ color: '#2563eb' }} />
             {activeTab === 'overview' && 'Tổng Quan Quản Trị Hệ Thống'}
             {activeTab === 'users' && 'Quản Lý Tài Khoản & Người Dùng'}
+            {activeTab === 'bank-accounts' && 'Tài Khoản Ngân Hàng Doanh Nghiệp (VietQR)'}
             {activeTab === 'rbac' && 'Ma Trận Phân Quyền Vai Trò'}
             {activeTab === 'audit' && 'Nhật Ký Kiểm Toán & Giám Sát'}
             {activeTab === 'settings' && 'Cấu Hình & Sao Lưu Dữ Liệu'}
           </h2>
           <p style={{ color: '#64748b', fontSize: '0.82rem', margin: '0.25rem 0 0' }}>
-            Quản trị người dùng, phân quyền chi tiết cho từng vai trò và sao lưu dữ liệu an toàn
+            Quản trị người dùng, tài khoản doanh nghiệp, phân quyền chi tiết cho từng vai trò và sao lưu dữ liệu an toàn
           </p>
         </div>
 
@@ -741,6 +894,28 @@ export default function SystemAdmin() {
           >
             <Plus size={16} />
             <span>Thêm Nhân Viên Mới</span>
+          </button>
+        )}
+
+        {activeTab === 'bank-accounts' && (
+          <button
+            onClick={() => handleOpenBankModal()}
+            style={{
+              backgroundColor: '#2563eb',
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: '6px',
+              padding: '0.45rem 1rem',
+              fontSize: '0.8rem',
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.35rem'
+            }}
+          >
+            <Plus size={16} />
+            <span>Thêm Tài Khoản Ngân Hàng</span>
           </button>
         )}
       </div>
@@ -1218,6 +1393,226 @@ export default function SystemAdmin() {
           )}
         </div>
         </>
+      )}
+
+      {/* ========================================================================= */}
+      {/* TAB: BANK ACCOUNTS (QUẢN LÝ TÀI KHOẢN NGÂN HÀNG DOANH NGHIỆP & VIETQR) */}
+      {/* ========================================================================= */}
+      {activeTab === 'bank-accounts' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          
+          {/* Banner Kiểm Soát Nội Bộ & Tách Biệt Quyền Hạn (SoD) */}
+          <div style={{ ...cardStyle, borderLeft: '4px solid #2563eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', backgroundColor: '#eff6ff' }}>
+            <div>
+              <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#1e40af', margin: '0 0 0.25rem 0', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <ShieldCheck size={20} style={{ color: '#2563eb' }} />
+                Kiểm Soát Nội Bộ & Phân Nhiệm (Segregation of Duties - SoD)
+              </h3>
+              <p style={{ margin: 0, fontSize: '0.8rem', color: '#1e3a8a', lineHeight: 1.5 }}>
+                Chỉ <strong>Ban Giám Đốc (CEO)</strong> và <strong>Quản Trị Hệ Thống (ADMIN)</strong> mới có quyền thêm, cập nhật, đổi tài khoản thụ hưởng hoặc kích hoạt VietQR mặc định.
+                Bộ phận Kế toán và Giao vận chỉ được quyền tra cứu các tài khoản đang hoạt động để đối soát, lập bút toán và hướng dẫn khách quét mã QR.
+              </p>
+            </div>
+            <button
+              onClick={() => handleOpenBankModal()}
+              style={{ ...primaryBtnStyle, display: 'flex', alignItems: 'center', gap: '0.4rem', whiteSpace: 'nowrap' }}
+            >
+              <Plus size={16} /> Thêm Tài Khoản Mới
+            </button>
+          </div>
+
+          {/* Thẻ Thống Kê & Tài Khoản VietQR Mặc Định */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
+            <div style={cardStyle}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Tổng Số Tài Khoản Doanh Nghiệp</div>
+                  <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#0f172a', marginTop: '0.25rem' }}>{bankAccounts.length}</div>
+                </div>
+                <div style={{ padding: '8px', borderRadius: '8px', backgroundColor: '#eff6ff', color: '#2563eb' }}>
+                  <CreditCard size={22} />
+                </div>
+              </div>
+              <div style={{ fontSize: '0.75rem', color: '#16a34a', fontWeight: 600, marginTop: '0.5rem' }}>
+                {bankAccounts.filter(b => b.status === 'ACTIVE').length} tài khoản đang hoạt động nhận tiền
+              </div>
+            </div>
+
+            {/* Thẻ QR Mặc Định */}
+            {(() => {
+              const defaultAcc = bankAccounts.find(b => b.isDefaultQr);
+              return (
+                <div style={{ ...cardStyle, background: 'linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%)', color: '#ffffff', border: 'none' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div>
+                      <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#bfdbfe', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                        <QrCode size={14} /> VIETQR MẶC ĐỊNH TOÀN HỆ THỐNG
+                      </div>
+                      {defaultAcc ? (
+                        <>
+                          <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#ffffff', marginTop: '0.4rem', letterSpacing: '0.03em' }}>
+                            {defaultAcc.accountNumber}
+                          </div>
+                          <div style={{ fontSize: '0.8rem', color: '#e0e7ff', fontWeight: 600 }}>
+                            {defaultAcc.bankName} ({defaultAcc.bankCode})
+                          </div>
+                          <div style={{ fontSize: '0.75rem', color: '#bfdbfe', marginTop: '0.2rem' }}>
+                            Chủ TK: <strong>{defaultAcc.accountHolder}</strong>
+                          </div>
+                        </>
+                      ) : (
+                        <div style={{ fontSize: '0.85rem', color: '#cbd5e1', marginTop: '0.5rem' }}>
+                          Chưa thiết lập tài khoản QR mặc định
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ padding: '8px', borderRadius: '8px', backgroundColor: 'rgba(255, 255, 255, 0.15)', color: '#ffffff' }}>
+                      <QrCode size={24} />
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+
+          {/* Bảng Danh Sách Tài Khoản */}
+          <div style={cardStyle}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+              <h3 style={sectionTitleStyle}>
+                <Building size={18} style={{ color: '#2563eb' }} />
+                <span>Danh Sách Tài Khoản Ngân Hàng Đang Cấu Hình</span>
+              </h3>
+              <button
+                onClick={loadBankAccounts}
+                disabled={bankLoading}
+                style={{ ...secondaryBtnStyle, display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+              >
+                <RefreshCw size={14} className={bankLoading ? 'animate-spin' : ''} /> Làm mới
+              </button>
+            </div>
+
+            {bankLoading ? (
+              <div style={{ padding: '2.5rem', textAlign: 'center', color: '#64748b' }}>Đang tải danh sách tài khoản...</div>
+            ) : bankAccounts.length === 0 ? (
+              <div style={{ padding: '2.5rem', textAlign: 'center', color: '#64748b' }}>
+                Chưa có tài khoản ngân hàng nào. Bấm <strong>"Thêm Tài Khoản Mới"</strong> để khởi tạo.
+              </div>
+            ) : (
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+                  <thead>
+                    <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', color: '#475569', textAlign: 'left' }}>
+                      <th style={{ padding: '0.6rem 0.75rem' }}>Ngân Hàng</th>
+                      <th style={{ padding: '0.6rem 0.75rem' }}>Số Tài Khoản & Chủ TK</th>
+                      <th style={{ padding: '0.6rem 0.75rem' }}>Chi Nhánh & Mục Đích</th>
+                      <th style={{ padding: '0.6rem 0.75rem', textAlign: 'center' }}>Bút Toán Sổ Cái</th>
+                      <th style={{ padding: '0.6rem 0.75rem', textAlign: 'center' }}>Trạng Thái</th>
+                      <th style={{ padding: '0.6rem 0.75rem', textAlign: 'center' }}>VietQR Thu Tiền</th>
+                      <th style={{ padding: '0.6rem 0.75rem', textAlign: 'right' }}>Thao Tác</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {bankAccounts.map(acc => (
+                      <tr key={acc.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                        <td style={{ padding: '0.75rem' }}>
+                          <div style={{ fontWeight: 800, color: '#0f172a' }}>{acc.bankCode}</div>
+                          <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{acc.bankName}</div>
+                        </td>
+                        <td style={{ padding: '0.75rem' }}>
+                          <div style={{ fontWeight: 800, color: '#2563eb', fontSize: '0.9rem', letterSpacing: '0.02em', fontFamily: 'monospace' }}>
+                            {acc.accountNumber}
+                          </div>
+                          <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#334155' }}>
+                            {acc.accountHolder}
+                          </div>
+                        </td>
+                        <td style={{ padding: '0.75rem' }}>
+                          <div style={{ color: '#334155', fontWeight: 500 }}>{acc.branch || '—'}</div>
+                          <div style={{ fontSize: '0.72rem', color: '#64748b' }}>{acc.purpose || 'Thu/chi chung'}</div>
+                        </td>
+                        <td style={{ padding: '0.75rem', textAlign: 'center' }}>
+                          <span style={{ fontWeight: 700, color: acc._count?.ledgerEntries > 0 ? '#0f172a' : '#94a3b8' }}>
+                            {acc._count?.ledgerEntries || 0}
+                          </span>
+                        </td>
+                        <td style={{ padding: '0.75rem', textAlign: 'center' }}>
+                          <span style={badgeStyle(acc.status === 'ACTIVE' ? 'success' : 'neutral')}>
+                            {acc.status === 'ACTIVE' ? 'Đang hoạt động' : 'Tạm ngưng'}
+                          </span>
+                        </td>
+                        <td style={{ padding: '0.75rem', textAlign: 'center' }}>
+                          {acc.isDefaultQr ? (
+                            <span style={{ ...badgeStyle('info'), display: 'inline-flex', alignItems: 'center', gap: '0.25rem', padding: '4px 10px' }}>
+                              <CheckCircle size={12} /> Mặc Định Thu Tiền
+                            </span>
+                          ) : (
+                            <button
+                              onClick={() => handleSetDefaultQr(acc)}
+                              disabled={acc.status !== 'ACTIVE'}
+                              style={{
+                                backgroundColor: '#ffffff',
+                                color: acc.status === 'ACTIVE' ? '#2563eb' : '#94a3b8',
+                                border: `1px solid ${acc.status === 'ACTIVE' ? '#bfdbfe' : '#e2e8f0'}`,
+                                borderRadius: '4px',
+                                padding: '3px 8px',
+                                fontSize: '0.72rem',
+                                fontWeight: 700,
+                                cursor: acc.status === 'ACTIVE' ? 'pointer' : 'not-allowed'
+                              }}
+                              title={acc.status !== 'ACTIVE' ? 'Cần kích hoạt tài khoản trước khi đặt làm QR mặc định' : 'Đặt làm VietQR mặc định'}
+                            >
+                              Đặt làm QR mặc định
+                            </button>
+                          )}
+                        </td>
+                        <td style={{ padding: '0.75rem', textAlign: 'right' }}>
+                          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.4rem' }}>
+                            <button
+                              onClick={() => handleOpenBankModal(acc)}
+                              title="Chỉnh sửa tài khoản"
+                              style={{ padding: '4px 8px', backgroundColor: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer', color: '#334155' }}
+                            >
+                              <Edit size={14} />
+                            </button>
+                            <button
+                              onClick={() => handleToggleBankStatus(acc)}
+                              title={acc.status === 'ACTIVE' ? 'Tạm ngưng tài khoản' : 'Kích hoạt tài khoản'}
+                              style={{ padding: '4px 8px', backgroundColor: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer', color: acc.status === 'ACTIVE' ? '#d97706' : '#16a34a' }}
+                            >
+                              {acc.status === 'ACTIVE' ? <UserX size={14} /> : <UserCheck size={14} />}
+                            </button>
+                            <button
+                              onClick={() => handleDeleteBankAccount(acc)}
+                              disabled={acc.isDefaultQr || (acc._count?.ledgerEntries > 0)}
+                              title={
+                                acc.isDefaultQr 
+                                  ? 'Không thể xóa tài khoản QR mặc định' 
+                                  : (acc._count?.ledgerEntries > 0)
+                                    ? 'Không thể xóa tài khoản đã có bút toán sổ cái'
+                                    : 'Xóa tài khoản'
+                              }
+                              style={{
+                                padding: '4px 8px',
+                                backgroundColor: '#fef2f2',
+                                border: '1px solid #fecaca',
+                                borderRadius: '4px',
+                                cursor: (acc.isDefaultQr || acc._count?.ledgerEntries > 0) ? 'not-allowed' : 'pointer',
+                                color: (acc.isDefaultQr || acc._count?.ledgerEntries > 0) ? '#94a3b8' : '#dc2626',
+                                opacity: (acc.isDefaultQr || acc._count?.ledgerEntries > 0) ? 0.5 : 1
+                              }}
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
       )}
 
       {/* ========================================================================= */}
@@ -2700,6 +3095,155 @@ export default function SystemAdmin() {
               </button>
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL: THÊM / SỬA TÀI KHOẢN NGÂN HÀNG DOANH NGHIỆP */}
+      {/* ========================================================================= */}
+      {showBankModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15, 23, 42, 0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 9999, padding: '1rem' }}>
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', width: '100%', maxWidth: '540px', maxHeight: '90vh', overflowY: 'auto', padding: '1.5rem', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.75rem', marginBottom: '1.25rem' }}>
+              <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <CreditCard size={20} style={{ color: '#2563eb' }} />
+                <span>{editingBank ? 'Chỉnh Sửa Tài Khoản Ngân Hàng' : 'Thêm Tài Khoản Ngân Hàng Doanh Nghiệp'}</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowBankModal(false)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveBankAccount} style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem', fontSize: '0.82rem' }}>
+              <div>
+                <label style={labelStyle}>Ngân Hàng <span style={{ color: '#dc2626' }}>*</span></label>
+                <select
+                  value={bankForm.bankCode}
+                  onChange={(e) => {
+                    const sel = VIETNAMESE_BANKS.find(b => b.code === e.target.value);
+                    setBankForm(p => ({
+                      ...p,
+                      bankCode: e.target.value,
+                      bankName: sel ? sel.name : p.bankName
+                    }));
+                  }}
+                  style={inputStyle}
+                  required
+                >
+                  {VIETNAMESE_BANKS.map(b => (
+                    <option key={b.code} value={b.code}>
+                      {b.code} — {b.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label style={labelStyle}>Tên Ngân Hàng Đầy Đủ</label>
+                <input
+                  type="text"
+                  value={bankForm.bankName}
+                  onChange={e => setBankForm(p => ({ ...p, bankName: e.target.value }))}
+                  style={inputStyle}
+                  placeholder="Ví dụ: MBBank (Ngân hàng TMCP Quân Đội)"
+                  required
+                />
+              </div>
+
+              <div>
+                <label style={labelStyle}>Số Tài Khoản <span style={{ color: '#dc2626' }}>*</span></label>
+                <input
+                  type="text"
+                  value={bankForm.accountNumber}
+                  onChange={e => setBankForm(p => ({ ...p, accountNumber: e.target.value.replace(/\s+/g, '') }))}
+                  style={{ ...inputStyle, fontFamily: 'monospace', fontWeight: 700, fontSize: '0.95rem', letterSpacing: '0.05em' }}
+                  placeholder="Nhập số tài khoản"
+                  required
+                />
+              </div>
+
+              <div>
+                <label style={labelStyle}>Chủ Tài Khoản (In hoa không dấu) <span style={{ color: '#dc2626' }}>*</span></label>
+                <input
+                  type="text"
+                  value={bankForm.accountHolder}
+                  onChange={e => setBankForm(p => ({ ...p, accountHolder: e.target.value.toUpperCase() }))}
+                  style={{ ...inputStyle, textTransform: 'uppercase', fontWeight: 700 }}
+                  placeholder="CÔNG TY TNHH AETHERPC"
+                  required
+                />
+              </div>
+
+              <div>
+                <label style={labelStyle}>Chi Nhánh</label>
+                <input
+                  type="text"
+                  value={bankForm.branch}
+                  onChange={e => setBankForm(p => ({ ...p, branch: e.target.value }))}
+                  style={inputStyle}
+                  placeholder="Chi nhánh / Phòng giao dịch"
+                />
+              </div>
+
+              <div>
+                <label style={labelStyle}>Mục Đích Sử Dụng</label>
+                <input
+                  type="text"
+                  value={bankForm.purpose}
+                  onChange={e => setBankForm(p => ({ ...p, purpose: e.target.value }))}
+                  style={inputStyle}
+                  placeholder="Ví dụ: Tài khoản nhận tiền hàng & VietQR"
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginTop: '0.25rem' }}>
+                <div>
+                  <label style={labelStyle}>Trạng Thái</label>
+                  <select
+                    value={bankForm.status}
+                    onChange={e => setBankForm(p => ({ ...p, status: e.target.value }))}
+                    style={inputStyle}
+                  >
+                    <option value="ACTIVE">Hoạt động (ACTIVE)</option>
+                    <option value="INACTIVE">Tạm ngưng (INACTIVE)</option>
+                  </select>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', marginTop: '1.4rem' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontWeight: 600, color: '#1e40af' }}>
+                    <input
+                      type="checkbox"
+                      checked={bankForm.isDefaultQr}
+                      onChange={e => setBankForm(p => ({ ...p, isDefaultQr: e.target.checked }))}
+                      style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                    />
+                    <span>Đặt làm VietQR mặc định</span>
+                  </label>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1.25rem', borderTop: '1px solid #e2e8f0', paddingTop: '0.75rem' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowBankModal(false)}
+                  style={secondaryBtnStyle}
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  disabled={bankSubmitting}
+                  style={{ ...primaryBtnStyle, opacity: bankSubmitting ? 0.7 : 1, cursor: bankSubmitting ? 'not-allowed' : 'pointer' }}
+                >
+                  {bankSubmitting ? 'Đang lưu...' : (editingBank ? 'Lưu Thay Đổi' : 'Tạo Tài Khoản')}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

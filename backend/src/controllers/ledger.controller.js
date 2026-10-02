@@ -6,7 +6,14 @@ const VALID_TYPES = ['INCOME', 'EXPENSE', 'EXPENSE_PROJECTED', 'SHIPPING', 'REFU
 // GET /api/v1/ledger
 const getLedger = async (req, res, next) => {
   try {
-    const entries = await prisma.ledgerEntry.findMany({ orderBy: { date: 'desc' } });
+    const entries = await prisma.ledgerEntry.findMany({
+      orderBy: { date: 'desc' },
+      include: {
+        bankAccount: {
+          select: { id: true, bankCode: true, bankName: true, accountNumber: true, isDefaultQr: true }
+        }
+      }
+    });
     res.json({ success: true, data: entries });
   } catch (err) {
     next(err);
@@ -16,7 +23,7 @@ const getLedger = async (req, res, next) => {
 // POST /api/v1/ledger
 const createLedgerEntry = async (req, res, next) => {
   try {
-    const { type, amount, description, referenceId, date } = req.body;
+    const { type, amount, description, referenceId, channel, bankAccountId, date } = req.body;
     const entryType = String(type || '').toUpperCase();
 
     if (!VALID_TYPES.includes(entryType)) {
@@ -36,13 +43,41 @@ const createLedgerEntry = async (req, res, next) => {
       throw error;
     }
 
+    const finalChannel = channel === 'CASH' ? 'CASH' : 'BANK';
+    let targetBankAccountId = null;
+
+    if (finalChannel === 'BANK' && bankAccountId) {
+      const bankAcc = await prisma.companyBankAccount.findUnique({ where: { id: bankAccountId } });
+      if (bankAcc) {
+        targetBankAccountId = bankAcc.id;
+        if (entryType === 'INCOME') {
+          await prisma.companyBankAccount.update({
+            where: { id: bankAcc.id },
+            data: { currentBalance: { increment: parsedAmount } }
+          }).catch(err => console.warn('[LedgerEntry] Không thể cập nhật số dư TK:', err.message));
+        } else if (entryType === 'EXPENSE' || entryType === 'REFUND') {
+          await prisma.companyBankAccount.update({
+            where: { id: bankAcc.id },
+            data: { currentBalance: { decrement: parsedAmount } }
+          }).catch(err => console.warn('[LedgerEntry] Không thể cập nhật số dư TK:', err.message));
+        }
+      }
+    }
+
     const entry = await prisma.ledgerEntry.create({
       data: {
         type: entryType,
         amount: parsedAmount,
         description: String(description).trim(),
         referenceId: referenceId || null,
+        channel: finalChannel,
+        bankAccountId: targetBankAccountId,
         date: date ? new Date(date) : new Date()
+      },
+      include: {
+        bankAccount: {
+          select: { id: true, bankCode: true, bankName: true, accountNumber: true, isDefaultQr: true }
+        }
       }
     });
     res.status(201).json({ success: true, data: entry });
@@ -255,6 +290,7 @@ const settleCodForShipper = async (req, res, next) => {
         data: {
           type: 'INCOME',
           amount: totalAmount,
+          channel: 'CASH',
           description: `Thu tiền mặt COD từ shipper ${shipperName} (${pendingPayments.length} đơn hàng)`,
           referenceId: `COD-SETTLE-${shipperId}-${Date.now().toString().slice(-6)}`,
           date: now

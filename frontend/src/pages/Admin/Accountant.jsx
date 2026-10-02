@@ -109,12 +109,38 @@ export default function Accountant() {
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('ALL');
   
+  // Quản lý xem tài khoản ngân hàng hoạt động của doanh nghiệp (/api/v1/system/bank-accounts/active)
+  const [activeBankAccounts, setActiveBankAccounts] = useState([]);
+  const [loadingActiveBanks, setLoadingActiveBanks] = useState(false);
+
+  const loadActiveBankAccounts = async () => {
+    setLoadingActiveBanks(true);
+    try {
+      const res = await api.get('/system/bank-accounts/active');
+      const list = res.data || [];
+      setActiveBankAccounts(list);
+      if (list.length > 0) {
+        const defAcc = list.find(b => b.isDefaultQr) || list[0];
+        setManualForm(p => ({
+          ...p,
+          bankAccountId: p.bankAccountId || defAcc.id
+        }));
+      }
+    } catch (err) {
+      console.warn('Lỗi tải danh sách TK ngân hàng hoạt động:', err.message);
+    } finally {
+      setLoadingActiveBanks(false);
+    }
+  };
+
   // Manual Entry Modal
   const [showManualModal, setShowManualModal] = useState(false);
   const [manualForm, setManualForm] = useState({
     type: 'EXPENSE',
     amount: '',
     category: 'Vận hành văn phòng',
+    channel: 'BANK',
+    bankAccountId: '',
     description: ''
   });
 
@@ -163,6 +189,7 @@ export default function Accountant() {
     if (typeof getPayrolls === 'function') getPayrolls().catch(() => {});
     if (typeof getEmployees === 'function') getEmployees().catch(() => {});
     loadCodSettlement();
+    loadActiveBankAccounts();
   }, []);
 
   useEffect(() => {
@@ -401,9 +428,18 @@ export default function Accountant() {
         amount: amt,
         description: manualForm.description,
         category: manualForm.category,
+        channel: manualForm.channel,
+        bankAccountId: manualForm.channel === 'BANK' ? manualForm.bankAccountId : null,
         date: new Date().toLocaleDateString('vi-VN')
       });
-      setManualForm({ type: 'EXPENSE', amount: '', category: 'Vận hành văn phòng', description: '' });
+      setManualForm({
+        type: 'EXPENSE',
+        amount: '',
+        category: 'Vận hành văn phòng',
+        channel: 'BANK',
+        bankAccountId: activeBankAccounts[0]?.id || '',
+        description: ''
+      });
       setShowManualModal(false);
       notify('Đã thêm bút toán vào Sổ Cái thành công.', 'success');
     } catch (err) {
@@ -1180,6 +1216,71 @@ export default function Accountant() {
             </div>
           </div>
 
+          {/* ========================================================================= */}
+          {/* TÀI KHOẢN NGÂN HÀNG DOANH NGHIỆP (TRA CỨU & NGUỒN TIỀN - SOD) */}
+          {/* ========================================================================= */}
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem', marginTop: '1.25rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+              <div>
+                <h3 style={{ fontSize: '0.92rem', fontWeight: 800, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <Building2 size={18} style={{ color: '#2563eb' }} />
+                  <span>Tài Khoản Doanh Nghiệp Nhận & Chi Tiền (Chế Độ Tra Cứu)</span>
+                </h3>
+                <p style={{ fontSize: '0.75rem', color: '#64748b', margin: '0.2rem 0 0' }}>
+                  Theo chính sách Phân nhiệm Kiểm soát nội bộ (SoD), việc Thêm/Sửa/Xóa tài khoản và cấu hình VietQR thu tiền chỉ được thực hiện bởi Ban Giám Đốc (CEO) & Quản Trị Hệ Thống (ADMIN).
+                </p>
+              </div>
+            </div>
+
+            {loadingActiveBanks ? (
+              <div style={{ padding: '1rem', textAlign: 'center', color: '#64748b', fontSize: '0.8rem' }}>Đang tải danh sách tài khoản...</div>
+            ) : activeBankAccounts.length === 0 ? (
+              <div style={{ padding: '1rem', textAlign: 'center', color: '#64748b', fontSize: '0.8rem' }}>Chưa có tài khoản ngân hàng hoạt động nào.</div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '0.75rem', marginTop: '0.5rem' }}>
+                {activeBankAccounts.map(b => (
+                  <div
+                    key={b.id}
+                    style={{
+                      border: b.isDefaultQr ? '1.5px solid #3b82f6' : '1px solid #e2e8f0',
+                      borderRadius: '8px',
+                      padding: '0.85rem 1rem',
+                      backgroundColor: b.isDefaultQr ? '#f8faff' : '#ffffff',
+                      position: 'relative'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <div>
+                        <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.85rem' }}>{b.bankCode} — {b.bankName}</div>
+                        <div style={{ fontFamily: 'monospace', fontWeight: 800, color: '#2563eb', fontSize: '1.05rem', marginTop: '0.25rem', letterSpacing: '0.04em' }}>
+                          {b.accountNumber}
+                        </div>
+                        <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#334155', marginTop: '0.2rem' }}>
+                          {b.accountHolder}
+                        </div>
+                        {b.branch && (
+                          <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '0.15rem' }}>
+                            CN: {b.branch}
+                          </div>
+                        )}
+                        {b.purpose && (
+                          <div style={{ fontSize: '0.7rem', color: '#475569', marginTop: '0.2rem', fontStyle: 'italic' }}>
+                            {b.purpose}
+                          </div>
+                        )}
+                      </div>
+                      {b.isDefaultQr && (
+                        <span style={{ backgroundColor: '#2563eb', color: '#ffffff', fontSize: '0.68rem', fontWeight: 800, padding: '3px 7px', borderRadius: '4px' }}>
+                          ★ VietQR Mặc Định
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
         </div>
       )}
 
@@ -1281,6 +1382,17 @@ export default function Accountant() {
                           }}>
                             {isIncome ? '▲ Thu Tiền' : isRefund ? '▼ Hoàn Tiền' : '▼ Chi Tiền'}
                           </span>
+                          <div style={{ marginTop: '0.25rem', fontSize: '0.68rem', color: '#64748b' }}>
+                            {tx.channel === 'CASH' ? (
+                              <span style={{ backgroundColor: '#f1f5f9', padding: '2px 6px', borderRadius: '3px', fontWeight: 600 }}>💵 Tiền mặt</span>
+                            ) : tx.bankAccount ? (
+                              <span style={{ backgroundColor: '#eff6ff', color: '#2563eb', padding: '2px 6px', borderRadius: '3px', border: '1px solid #dbeafe', fontWeight: 700 }}>
+                                🏦 {tx.bankAccount.bankCode} ({tx.bankAccount.accountNumber})
+                              </span>
+                            ) : (
+                              <span style={{ backgroundColor: '#eff6ff', color: '#2563eb', padding: '2px 6px', borderRadius: '3px', fontWeight: 600 }}>🏦 Chuyển khoản</span>
+                            )}
+                          </div>
                         </td>
                         <td style={{ padding: '0.75rem 1rem', color: '#0f172a', fontWeight: 500, verticalAlign: 'middle', lineHeight: '1.45' }}>
                           {tx.description || 'Giao dịch thu chi'}
@@ -1951,6 +2063,37 @@ export default function Accountant() {
                   <option value="Khác">Hạng mục khác</option>
                 </select>
               </div>
+
+              <div>
+                <label style={{ display: 'block', fontWeight: 700, color: '#0f172a', marginBottom: '0.3rem' }}>Hình thức thanh toán / Dòng tiền *</label>
+                <select
+                  value={manualForm.channel}
+                  onChange={e => setManualForm(p => ({ ...p, channel: e.target.value }))}
+                  style={{ width: '100%', padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
+                >
+                  <option value="BANK">Tài Khoản Ngân Hàng (Chuyển khoản)</option>
+                  <option value="CASH">Tiền Mặt (Quỹ tiền mặt tại két)</option>
+                </select>
+              </div>
+
+              {manualForm.channel === 'BANK' && (
+                <div>
+                  <label style={{ display: 'block', fontWeight: 700, color: '#0f172a', marginBottom: '0.3rem' }}>
+                    Tài khoản ngân hàng {manualForm.type === 'INCOME' ? 'thụ hưởng (+)' : 'trích tiền (-)'} *
+                  </label>
+                  <select
+                    value={manualForm.bankAccountId}
+                    onChange={e => setManualForm(p => ({ ...p, bankAccountId: e.target.value }))}
+                    style={{ width: '100%', padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
+                  >
+                    {activeBankAccounts.map(b => (
+                      <option key={b.id} value={b.id}>
+                        {b.bankCode} — {b.accountNumber} ({b.accountHolder}) {b.isDefaultQr ? '★ QR Mặc Định' : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <div>
                 <label style={{ display: 'block', fontWeight: 700, color: '#0f172a', marginBottom: '0.3rem' }}>Nội dung diễn giải *</label>

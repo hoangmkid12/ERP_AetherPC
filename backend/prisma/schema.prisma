@@ -1022,17 +1022,40 @@ model QcInspection {
   @@map("qc_inspections")
 }
 
+model CompanyBankAccount {
+  id              Int           @id @default(autoincrement())
+  bankCode        String        @map("bank_code") @db.VarChar(20)      // MB, VCB, TCB, ACB, ICB, VPB...
+  bankName        String        @map("bank_name") @db.VarChar(100)     // Ngân hàng TMCP Quân Đội (MBBank)
+  accountNumber   String        @unique @map("account_number") @db.VarChar(50)
+  accountHolder   String        @map("account_holder") @db.VarChar(150) // CTY TNHH AETHERPC ERP
+  branch          String?       @db.VarChar(150)                       // Chi nhánh
+  purpose         String        @default("GENERAL") @db.VarChar(30)    // COLLECTION (Chuyên thu), DISBURSEMENT (Chuyên chi), GENERAL (Dùng chung)
+  currentBalance  Decimal       @default(0.00) @map("current_balance") @db.Decimal(15, 2)
+  isDefaultQr     Boolean       @default(false) @map("is_default_qr") // Tài khoản nhận VietQR mặc định
+  status          String        @default("ACTIVE") @db.VarChar(20)     // ACTIVE, INACTIVE
+  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt       DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  ledgerEntries   LedgerEntry[]
+
+  @@map("company_bank_accounts")
+}
+
 model LedgerEntry {
-  id             String    @id @default(uuid()) @map("id")
-  type           String    @db.VarChar(30) // INCOME, EXPENSE, EXPENSE_PROJECTED, SHIPPING, REFUND
-  amount         Decimal   @db.Decimal(15, 2)
-  description    String    @db.Text
-  referenceId    String?   @map("reference_id") @db.VarChar(50)
-  date           DateTime  @default(now()) @db.Timestamptz()
-  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  id             String              @id @default(uuid()) @map("id")
+  type           String              @db.VarChar(30) // INCOME, EXPENSE, EXPENSE_PROJECTED, SHIPPING, REFUND
+  amount         Decimal             @db.Decimal(15, 2)
+  description    String              @db.Text
+  referenceId    String?             @map("reference_id") @db.VarChar(50)
+  date           DateTime            @default(now()) @db.Timestamptz()
+  channel        String?             @default("BANK_TRANSFER") @db.VarChar(20) // BANK_TRANSFER | CASH
+  bankAccountId  Int?                @map("bank_account_id")
+  bankAccount    CompanyBankAccount? @relation(fields: [bankAccountId], references: [id], onDelete: SetNull)
+  createdAt      DateTime            @default(now()) @map("created_at") @db.Timestamptz()
 
   @@index([type])
   @@index([date])
+  @@index([bankAccountId])
   @@map("ledger_entries")
 }
 

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Camera, RefreshCw, CreditCard, ChevronLeft, Upload, Check, ChevronRight, XCircle } from 'lucide-react';
 import { isOrderPrepaid } from '../../../../utils/statusLabels';
+import { api } from '../../../../services/api';
 
 // Thanh trượt xác nhận (Swipe to Confirm) chống chạm nhầm khi đi đường
 function SwipeConfirmButton({ onConfirm, disabled, label = "Trượt để hoàn tất giao hàng" }) {
@@ -177,6 +178,27 @@ export default function PODCaptureSection({ order, user, fmt, onConfirm, onRejec
   const [cashInput, setCashInput] = useState('');
   const [bankInput, setBankInput] = useState('');
 
+  // Tài khoản ngân hàng mặc định của công ty dùng cho VietQR
+  const [companyBank, setCompanyBank] = useState({
+    bankCode: 'MB',
+    bankName: 'MBBank (Quân Đội)',
+    accountNumber: '1133668899',
+    accountHolder: 'AETHERPC ERP CORP',
+    vietqrBin: '970415'
+  });
+
+  useEffect(() => {
+    let active = true;
+    api.get('/system/bank-accounts/public-default')
+      .then(res => {
+        if (active && res?.data) {
+          setCompanyBank(res.data);
+        }
+      })
+      .catch(() => {});
+    return () => { active = false; };
+  }, []);
+
   const startCamera = async () => {
     try {
       setCameraError('');
@@ -306,7 +328,10 @@ export default function PODCaptureSection({ order, user, fmt, onConfirm, onRejec
   };
 
   const cleanOrdCode = String(order.orderId || order.id || '').replace(/[^a-zA-Z0-9]/g, '');
-  const qrUrl = `https://img.vietqr.io/image/970415-1133668899-compact2.jpg?amount=${Math.round(codAmount)}&addInfo=DH%20${cleanOrdCode}&accountName=AETHERPC%20ERP%20CORP`;
+  const bankBinOrCode = companyBank?.vietqrBin || companyBank?.bankCode || '970415';
+  const bankAccNo = companyBank?.accountNumber || '1133668899';
+  const bankHolder = companyBank?.accountHolder || 'AETHERPC ERP CORP';
+  const qrUrl = `https://img.vietqr.io/image/${bankBinOrCode}-${bankAccNo}-compact2.jpg?amount=${Math.round(codAmount)}&addInfo=DH%20${cleanOrdCode}&accountName=${encodeURIComponent(bankHolder)}`;
 
   // Tổng đã nhập khi split
   const cashAmt  = parseFloat(cashInput)  || 0;
@@ -599,13 +624,13 @@ export default function PODCaptureSection({ order, user, fmt, onConfirm, onRejec
           {/* QR hiển thị đúng số tiền CK — SPLIT dùng bankAmt, còn lại dùng toàn bộ */}
           {(() => {
             const qrAmt = actualPaymentMethod === 'SPLIT' ? (bankAmt || codAmount) : codAmount;
-            const qrUrlDynamic = `https://img.vietqr.io/image/970415-1133668899-compact2.jpg?amount=${Math.round(qrAmt)}&addInfo=DH%20${cleanOrdCode}&accountName=AETHERPC%20ERP%20CORP`;
+            const qrUrlDynamic = `https://img.vietqr.io/image/${bankBinOrCode}-${bankAccNo}-compact2.jpg?amount=${Math.round(qrAmt)}&addInfo=DH%20${cleanOrdCode}&accountName=${encodeURIComponent(bankHolder)}`;
             return (
               <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
                 <img src={qrUrlDynamic} alt="VietQR Payment" style={{ width: '110px', height: 'auto', borderRadius: '6px', backgroundColor: '#fff', padding: '0.3rem', flexShrink: 0 }} />
                 <div style={{ fontSize: '0.74rem', color: 'var(--text-primary)', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                  <div>VietinBank — 1133668899</div>
-                  <div>CTY TNHH AETHERPC ERP</div>
+                  <div style={{ fontWeight: 700, color: 'var(--primary)' }}>{companyBank.bankName || companyBank.bankCode} — {bankAccNo}</div>
+                  <div style={{ fontWeight: 600 }}>{bankHolder}</div>
                   <div style={{ color: 'var(--danger)', fontWeight: 800 }}>{fmt(qrAmt)}</div>
                   <div>ND: <code>DH {cleanOrdCode}</code></div>
                 </div>

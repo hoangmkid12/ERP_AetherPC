@@ -130,6 +130,7 @@ export default function Sidebar({ isOpen = false, onClose }) {
   const adminSubItems = [
     { tab: 'overview', label: 'Tổng Quan Quản Trị' },
     { tab: 'users', label: 'Tài Khoản & Người Dùng' },
+    { tab: 'bank-accounts', label: 'Tài Khoản Doanh Nghiệp' },
     { tab: 'rbac', label: 'Ma Trận Phân Quyền' },
     { tab: 'audit', label: 'Nhật Ký Kiểm Toán' },
     { tab: 'settings', label: 'Cấu Hình & Sao Lưu' }

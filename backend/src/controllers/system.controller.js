@@ -200,6 +200,353 @@ const restoreDatabase = async (req, res, next) => {
   }
 };
 
+// ============================================================================
+//   QUẢN LÝ TÀI KHOẢN NGÂN HÀNG DOANH NGHIỆP (COMPANY BANK ACCOUNTS)
+//   Chỉ dành riêng cho CEO và ADMIN (Kiểm soát nội bộ / Segregation of Duties)
+// ============================================================================
+
+// GET /api/v1/system/bank-accounts/public-default (Public/Fallback cho Storefront & Shipper)
+const getDefaultQrAccount = async (req, res, next) => {
+  try {
+    let account = await prisma.companyBankAccount.findFirst({
+      where: { isDefaultQr: true, status: 'ACTIVE' }
+    });
+    if (!account) {
+      account = await prisma.companyBankAccount.findFirst({
+        where: { status: 'ACTIVE' },
+        orderBy: { id: 'asc' }
+      });
+    }
+    // Fallback nếu CSDL chưa có tài khoản nào
+    if (!account) {
+      return res.json({
+        success: true,
+        data: {
+          bankCode: 'MB',
+          bankName: 'Ngân hàng TMCP Quân Đội (MBBank)',
+          accountNumber: '1133668899',
+          accountHolder: 'AETHERPC ERP CORP',
+          isDefaultQr: true
+        }
+      });
+    }
+    res.json({ success: true, data: account });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// GET /api/v1/system/bank-accounts/active (Dành cho Kế toán, Bán hàng, Shipper chọn khi giao dịch)
+const getActiveBankAccounts = async (req, res, next) => {
+  try {
+    let accounts = await prisma.companyBankAccount.findMany({
+      where: { status: 'ACTIVE' },
+      orderBy: [{ isDefaultQr: 'desc' }, { id: 'asc' }]
+    });
+
+    // Nếu chưa có tài khoản nào, tự khởi tạo 2 tài khoản mẫu cho công ty
+    if (accounts.length === 0) {
+      await prisma.companyBankAccount.createMany({
+        data: [
+          {
+            bankCode: 'MB',
+            bankName: 'Ngân hàng TMCP Quân Đội (MBBank)',
+            accountNumber: '1133668899',
+            accountHolder: 'CTY TNHH AETHERPC ERP',
+            branch: 'Chi nhánh TP. Hồ Chí Minh',
+            purpose: 'COLLECTION',
+            isDefaultQr: true,
+            status: 'ACTIVE',
+            currentBalance: 50000000
+          },
+          {
+            bankCode: 'VCB',
+            bankName: 'Ngân hàng TMCP Ngoại Thương VN (Vietcombank)',
+            accountNumber: '0071001234567',
+            accountHolder: 'CTY TNHH AETHERPC ERP',
+            branch: 'Chi nhánh Tân Định - TP.HCM',
+            purpose: 'DISBURSEMENT',
+            isDefaultQr: false,
+            status: 'ACTIVE',
+            currentBalance: 120000000
+          }
+        ]
+      });
+      accounts = await prisma.companyBankAccount.findMany({
+        where: { status: 'ACTIVE' },
+        orderBy: [{ isDefaultQr: 'desc' }, { id: 'asc' }]
+      });
+    }
+
+    res.json({ success: true, data: accounts });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// GET /api/v1/system/bank-accounts (Toàn bộ tài khoản cho CEO/ADMIN quản lý)
+const getBankAccounts = async (req, res, next) => {
+  try {
+    let accounts = await prisma.companyBankAccount.findMany({
+      orderBy: [{ isDefaultQr: 'desc' }, { id: 'asc' }],
+      include: {
+        _count: {
+          select: { ledgerEntries: true }
+        }
+      }
+    });
+
+    if (accounts.length === 0) {
+      await prisma.companyBankAccount.createMany({
+        data: [
+          {
+            bankCode: 'MB',
+            bankName: 'Ngân hàng TMCP Quân Đội (MBBank)',
+            accountNumber: '1133668899',
+            accountHolder: 'CTY TNHH AETHERPC ERP',
+            branch: 'Chi nhánh TP. Hồ Chí Minh',
+            purpose: 'COLLECTION',
+            isDefaultQr: true,
+            status: 'ACTIVE',
+            currentBalance: 50000000
+          },
+          {
+            bankCode: 'VCB',
+            bankName: 'Ngân hàng TMCP Ngoại Thương VN (Vietcombank)',
+            accountNumber: '0071001234567',
+            accountHolder: 'CTY TNHH AETHERPC ERP',
+            branch: 'Chi nhánh Tân Định - TP.HCM',
+            purpose: 'DISBURSEMENT',
+            isDefaultQr: false,
+            status: 'ACTIVE',
+            currentBalance: 120000000
+          }
+        ]
+      });
+      accounts = await prisma.companyBankAccount.findMany({
+        orderBy: [{ isDefaultQr: 'desc' }, { id: 'asc' }],
+        include: {
+          _count: {
+            select: { ledgerEntries: true }
+          }
+        }
+      });
+    }
+
+    res.json({ success: true, data: accounts });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// POST /api/v1/system/bank-accounts (Thêm mới tài khoản - CEO/ADMIN)
+const createBankAccount = async (req, res, next) => {
+  try {
+    const { bankCode, bankName, accountNumber, accountHolder, branch, purpose, isDefaultQr } = req.body;
+
+    if (!bankCode || !bankName || !accountNumber || !accountHolder) {
+      return res.status(400).json({
+        success: false,
+        message: 'Vui lòng điền đầy đủ mã ngân hàng, tên ngân hàng, số tài khoản và tên chủ tài khoản.'
+      });
+    }
+
+    const cleanAccNo = String(accountNumber).trim().replace(/\s+/g, '');
+    const cleanHolder = String(accountHolder).trim().toUpperCase();
+
+    const existing = await prisma.companyBankAccount.findUnique({
+      where: { accountNumber: cleanAccNo }
+    });
+    if (existing) {
+      return res.status(409).json({
+        success: false,
+        message: `Số tài khoản ${cleanAccNo} đã tồn tại trong hệ thống!`
+      });
+    }
+
+    // Nếu chọn làm QR mặc định, gỡ cờ mặc định của các tài khoản cũ
+    if (isDefaultQr === true) {
+      await prisma.companyBankAccount.updateMany({
+        where: { isDefaultQr: true },
+        data: { isDefaultQr: false }
+      });
+    }
+
+    const totalCount = await prisma.companyBankAccount.count();
+    const shouldBeDefault = isDefaultQr === true || totalCount === 0;
+
+    const account = await prisma.companyBankAccount.create({
+      data: {
+        bankCode: String(bankCode).trim().toUpperCase(),
+        bankName: String(bankName).trim(),
+        accountNumber: cleanAccNo,
+        accountHolder: cleanHolder,
+        branch: branch ? String(branch).trim() : null,
+        purpose: purpose || 'GENERAL',
+        isDefaultQr: shouldBeDefault,
+        status: 'ACTIVE'
+      }
+    });
+
+    logAudit({
+      req,
+      action: 'CREATE_BANK_ACCOUNT',
+      module: 'Quản Trị Hệ Thống',
+      targetId: String(account.id),
+      note: `Thêm tài khoản ngân hàng ${account.bankName} - ${account.accountNumber} (${account.accountHolder})`
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'Thêm tài khoản ngân hàng thành công!',
+      data: account
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// PUT /api/v1/system/bank-accounts/:id (Cập nhật thông tin - CEO/ADMIN)
+const updateBankAccount = async (req, res, next) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const { bankCode, bankName, accountNumber, accountHolder, branch, purpose, status, isDefaultQr } = req.body;
+
+    const existing = await prisma.companyBankAccount.findUnique({ where: { id } });
+    if (!existing) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy tài khoản ngân hàng.' });
+    }
+
+    const cleanAccNo = accountNumber ? String(accountNumber).trim().replace(/\s+/g, '') : existing.accountNumber;
+    if (cleanAccNo !== existing.accountNumber) {
+      const duplicate = await prisma.companyBankAccount.findUnique({ where: { accountNumber: cleanAccNo } });
+      if (duplicate) {
+        return res.status(409).json({ success: false, message: `Số tài khoản ${cleanAccNo} đã thuộc tài khoản khác!` });
+      }
+    }
+
+    if (isDefaultQr === true && !existing.isDefaultQr) {
+      await prisma.companyBankAccount.updateMany({
+        where: { isDefaultQr: true },
+        data: { isDefaultQr: false }
+      });
+    }
+
+    const updated = await prisma.companyBankAccount.update({
+      where: { id },
+      data: {
+        ...(bankCode ? { bankCode: String(bankCode).trim().toUpperCase() } : {}),
+        ...(bankName ? { bankName: String(bankName).trim() } : {}),
+        ...(accountNumber ? { accountNumber: cleanAccNo } : {}),
+        ...(accountHolder ? { accountHolder: String(accountHolder).trim().toUpperCase() } : {}),
+        ...(branch !== undefined ? { branch: branch ? String(branch).trim() : null } : {}),
+        ...(purpose ? { purpose } : {}),
+        ...(status ? { status } : {}),
+        ...(isDefaultQr !== undefined ? { isDefaultQr: Boolean(isDefaultQr) } : {})
+      }
+    });
+
+    logAudit({
+      req,
+      action: 'UPDATE_BANK_ACCOUNT',
+      module: 'Quản Trị Hệ Thống',
+      targetId: String(id),
+      note: `Cập nhật tài khoản ${updated.bankName} - ${updated.accountNumber}`
+    });
+
+    res.json({
+      success: true,
+      message: 'Cập nhật tài khoản ngân hàng thành công!',
+      data: updated
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// PATCH /api/v1/system/bank-accounts/:id/default-qr (Gán làm tài khoản nhận QR mặc định)
+const setDefaultQrAccount = async (req, res, next) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const existing = await prisma.companyBankAccount.findUnique({ where: { id } });
+    if (!existing) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy tài khoản ngân hàng.' });
+    }
+
+    await prisma.companyBankAccount.updateMany({
+      where: { isDefaultQr: true },
+      data: { isDefaultQr: false }
+    });
+
+    const updated = await prisma.companyBankAccount.update({
+      where: { id },
+      data: { isDefaultQr: true, status: 'ACTIVE' }
+    });
+
+    logAudit({
+      req,
+      action: 'SET_DEFAULT_QR_BANK',
+      module: 'Quản Trị Hệ Thống',
+      targetId: String(id),
+      note: `Đặt ${updated.bankName} - ${updated.accountNumber} làm tài khoản nhận VietQR mặc định toàn hệ thống`
+    });
+
+    res.json({
+      success: true,
+      message: `Đã thiết lập ${updated.bankName} (${updated.accountNumber}) làm tài khoản nhận VietQR chính!`,
+      data: updated
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// DELETE /api/v1/system/bank-accounts/:id (Xóa tài khoản - CEO/ADMIN)
+const deleteBankAccount = async (req, res, next) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const existing = await prisma.companyBankAccount.findUnique({
+      where: { id },
+      include: { _count: { select: { ledgerEntries: true } } }
+    });
+
+    if (!existing) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy tài khoản ngân hàng.' });
+    }
+
+    if (existing._count.ledgerEntries > 0) {
+      return res.status(400).json({
+        success: false,
+        message: `Tài khoản này đã có ${existing._count.ledgerEntries} bút toán giao dịch trong Sổ Cái. Không thể xóa để đảm bảo toàn vẹn kế toán. Bạn có thể chuyển trạng thái sang "Ngưng hoạt động".`
+      });
+    }
+
+    if (existing.isDefaultQr) {
+      return res.status(400).json({
+        success: false,
+        message: 'Không thể xóa tài khoản đang được chọn làm VietQR mặc định. Hãy chỉ định tài khoản khác trước.'
+      });
+    }
+
+    await prisma.companyBankAccount.delete({ where: { id } });
+
+    logAudit({
+      req,
+      action: 'DELETE_BANK_ACCOUNT',
+      module: 'Quản Trị Hệ Thống',
+      targetId: String(id),
+      note: `Xóa tài khoản ${existing.bankName} - ${existing.accountNumber}`
+    });
+
+    res.json({
+      success: true,
+      message: 'Đã xóa tài khoản ngân hàng.'
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 module.exports = {
   getAuditLogs,
   getSettings,
@@ -207,5 +554,12 @@ module.exports = {
   getRolePermissions,
   updateRolePermissions,
   backupDatabase,
-  restoreDatabase
+  restoreDatabase,
+  getDefaultQrAccount,
+  getActiveBankAccounts,
+  getBankAccounts,
+  createBankAccount,
+  updateBankAccount,
+  setDefaultQrAccount,
+  deleteBankAccount
 };

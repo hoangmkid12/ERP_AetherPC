@@ -8,7 +8,14 @@ const {
   getRolePermissions,
   updateRolePermissions,
   backupDatabase,
-  restoreDatabase
+  restoreDatabase,
+  getDefaultQrAccount,
+  getActiveBankAccounts,
+  getBankAccounts,
+  createBankAccount,
+  updateBankAccount,
+  setDefaultQrAccount,
+  deleteBankAccount
 } = require('../controllers/system.controller');
 
 // @route   GET /api/v1/system/audit-logs
@@ -17,6 +24,19 @@ router.get('/audit-logs', authMiddleware(['ADMIN']), getAuditLogs);
 // @route   GET/PUT /api/v1/system/settings
 router.get('/settings', authMiddleware(['ADMIN', 'CEO']), getSettings);
 router.put('/settings', authMiddleware(['ADMIN']), updateSettings);
+
+// @route   GET /api/v1/system/bank-accounts/public-default (Public fallback QR cho storefront & shipper)
+router.get('/bank-accounts/public-default', getDefaultQrAccount);
+
+// @route   GET /api/v1/system/bank-accounts/active (Danh sách tài khoản hoạt động cho Kế toán / Thu ngân / Bán hàng)
+router.get('/bank-accounts/active', authMiddleware(), getActiveBankAccounts);
+
+// @route   CRUD /api/v1/system/bank-accounts (Chỉ dành riêng cho CEO và ADMIN - Kiểm soát nội bộ)
+router.get('/bank-accounts', authMiddleware(['ADMIN', 'CEO']), getBankAccounts);
+router.post('/bank-accounts', authMiddleware(['ADMIN', 'CEO']), createBankAccount);
+router.put('/bank-accounts/:id', authMiddleware(['ADMIN', 'CEO']), updateBankAccount);
+router.patch('/bank-accounts/:id/default-qr', authMiddleware(['ADMIN', 'CEO']), setDefaultQrAccount);
+router.delete('/bank-accounts/:id', authMiddleware(['ADMIN', 'CEO']), deleteBankAccount);
 
 // @route   GET/PUT /api/v1/system/rbac
 // GET is any authenticated role, not just ADMIN — every logged-in user's
