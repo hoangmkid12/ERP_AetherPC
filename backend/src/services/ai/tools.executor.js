@@ -113,6 +113,37 @@ const executeLookupKnowledgeBase = async (params, userRole) => {
     return (bTitleScore + bTagScore) - (aTitleScore + aTagScore);
   });
 
+  const extractRelevantSection = (content, query) => {
+    if (!content) return '';
+    const qTokens = query.toLowerCase()
+      .replace(/[?,.!;:()]/g, ' ')
+      .split(/\s+/)
+      .filter(w => w.length >= 2 && !['trong', 'nhiêu', 'ngày', 'như', 'thế', 'nào', 'được', 'cho', 'của', 'với', 'các', 'những', 'một', 'mình', 'muốn', 'khách'].includes(w));
+    
+    // Tách tài liệu theo các section (##, ĐIỀU, ###)
+    const sections = content.split(/(?=\n## |\nĐIỀU |\n### )/g);
+    if (sections.length <= 1) {
+      return content.slice(0, 1000);
+    }
+
+    let bestSection = sections[0];
+    let maxScore = -1;
+
+    for (const sec of sections) {
+      const secLower = sec.toLowerCase();
+      let score = 0;
+      for (const token of qTokens) {
+        if (secLower.includes(token)) score += 3;
+      }
+      if (score > maxScore) {
+        maxScore = score;
+        bestSection = sec;
+      }
+    }
+
+    return bestSection.trim();
+  };
+
   return {
     success: true,
     found: true,
@@ -122,7 +153,8 @@ const executeLookupKnowledgeBase = async (params, userRole) => {
       slug: d.slug,
       category: d.category,
       summary: d.summary,
-      contentSnippet: d.content.slice(0, 1500), // Trích đoạn ngắn gọn để vừa token LLM
+      relevantSection: extractRelevantSection(d.content, q),
+      contentSnippet: d.content.slice(0, 1500),
       updatedAt: d.updatedAt
     }))
   };

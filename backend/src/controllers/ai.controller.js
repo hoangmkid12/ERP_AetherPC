@@ -134,8 +134,8 @@ const chatWithAi = async (req, res, next) => {
     if (!finalAiResponse) {
       const lower = promptText.toLowerCase();
 
-      // Ý định 0: Tra cứu nhân sự / tài khoản nhân viên
-      if (/nhân viên|tài khoản nhân viên|nhân sự|bao nhiêu nhân viên|bao nhiêu tài khoản|danh sách nhân viên/.test(lower)) {
+      // Ý định 0: Tra cứu số lượng / danh sách nhân sự (chỉ khi hỏi về số lượng, thống kê)
+      if (/(bao nhiêu|số lượng|thống kê|tổng số|danh sách).*(nhân viên|tài khoản|nhân sự)|(nhân viên|tài khoản nhân sự|nhân sự).*(bao nhiêu|số lượng|tổng số)/.test(lower)) {
         if (!['ADMIN', 'CEO', 'HR'].includes(user.role)) {
           finalAiResponse = `⚠️ **Từ chối truy cập:** Vai trò của bạn (**${user.role}**) không có thẩm quyền tra cứu dữ liệu nhân sự của công ty. Vui lòng liên hệ Quản trị viên (Admin) hoặc phòng Nhân sự.`;
         } else {
@@ -152,16 +152,39 @@ const chatWithAi = async (req, res, next) => {
         }
       }
 
-      // Ý định 1: Tra cứu chính sách, quy chế, bảo mật, bảo hành, đổi trả, chiết khấu, SOP
-      else if (/bảo mật|mật khẩu|an ninh|an toàn|rò rỉ|bảo hành|đổi trả|1 đổi 1|chính sách|quy chế|chiết khấu|quy trình|tiêu chuẩn|hướng dẫn|thưởng|kpi|nộp tiền|đối soát|vietqr|sod|lắp ráp|benchmark|furmark|nghỉ việc|sa thải/.test(lower)) {
+      // Ý định 1: Tra cứu chính sách, quy chế, bảo mật, bảo hành, đổi trả, chiết khấu, SOP, quy chuẩn đóng gói...
+      else if (/bảo mật|mật khẩu|an ninh|an toàn|rò rỉ|bảo hành|đổi trả|1 đổi 1|chính sách|quy chế|chiết khấu|quy trình|tiêu chuẩn|quy chuẩn|đóng gói|hướng dẫn|thưởng|kpi|nộp tiền|đối soát|vietqr|sod|lắp ráp|benchmark|furmark|nghỉ việc|sa thải/.test(lower)) {
         const toolResult = await executeToolCall('lookup_knowledge_base', { query: promptText }, user);
         toolCallsExecuted.push({ tool: 'lookup_knowledge_base', params: { query: promptText }, result: toolResult });
 
         if (toolResult.found && toolResult.documents?.length > 0) {
           const doc = toolResult.documents[0];
           citations.push({ title: doc.title, slug: doc.slug, category: doc.category });
+          const excerpt = (doc.relevantSection || doc.contentSnippet || '').trim();
 
-          finalAiResponse = `Theo tài liệu **"${doc.title}"** của AetherPC:\n\n${doc.summary ? `> **Tóm tắt cốt lõi:** ${doc.summary}\n\n` : ''}${doc.contentSnippet.slice(0, 1000)}...\n\n📄 *Nguồn trích dẫn: [${doc.title}](/admin/system?tab=knowledge&doc=${doc.slug})*`;
+          // Nếu có Gemini API Key, nhờ Gemini tóm tắt trả lời trực tiếp câu hỏi dựa trên đoạn trích xuất
+          let synthesized = false;
+          if (process.env.GEMINI_API_KEY && aiClient) {
+            try {
+              const aiGen = await aiClient.models.generateContent({
+                model: 'gemini-2.5-flash',
+                contents: [{
+                  role: 'user',
+                  parts: [{
+                    text: `Bạn là trợ lý ERP AetherPC. Dựa trên trích đoạn tài liệu sau:\n"""\n${excerpt}\n"""\nHãy trả lời trực tiếp, rõ ràng và gãy gọn câu hỏi của nhân viên: "${promptText}". Không sao chép các phần không liên quan.`
+                  }]
+                }]
+              });
+              if (aiGen.text) {
+                finalAiResponse = `${aiGen.text}\n\n📄 *Căn cứ văn bản: [${doc.title}](/admin/system?tab=knowledge&doc=${doc.slug})*`;
+                synthesized = true;
+              }
+            } catch (e) {}
+          }
+
+          if (!synthesized) {
+            finalAiResponse = `📋 **Quy định về "${promptText}" tại AetherPC:**\n\n${excerpt}\n\n📄 *Căn cứ văn bản: [${doc.title}](/admin/system?tab=knowledge&doc=${doc.slug})*`;
+          }
         } else {
           finalAiResponse = `Không tìm thấy văn bản quy định hoặc chính sách nào phù hợp với yêu cầu "${promptText}". Vui lòng liên hệ Trưởng bộ phận hoặc Admin để được cập nhật tài liệu chính thức.`;
         }
@@ -234,7 +257,8 @@ const chatWithAi = async (req, res, next) => {
           const doc = fallbackKb.documents[0];
           toolCallsExecuted.push({ tool: 'lookup_knowledge_base', params: { query: promptText }, result: fallbackKb });
           citations.push({ title: doc.title, slug: doc.slug, category: doc.category });
-          finalAiResponse = `Theo tài liệu **"${doc.title}"** của AetherPC:\n\n${doc.summary ? `> **Tóm tắt cốt lõi:** ${doc.summary}\n\n` : ''}${doc.contentSnippet.slice(0, 1000)}...\n\n📄 *Nguồn trích dẫn: [${doc.title}](/admin/system?tab=knowledge&doc=${doc.slug})*`;
+          const excerpt = (doc.relevantSection || doc.contentSnippet || '').trim();
+          finalAiResponse = `📋 **Quy định về "${promptText}" tại AetherPC:**\n\n${excerpt}\n\n📄 *Căn cứ văn bản: [${doc.title}](/admin/system?tab=knowledge&doc=${doc.slug})*`;
         } else {
           finalAiResponse = `Xin chào **${user.name || 'bạn'}**! Tôi là **AetherCopilot** - Trợ lý Doanh nghiệp AetherPC ERP.\n\nTôi có thể hỗ trợ bạn:\n- 📖 **Tra cứu quy trình & chính sách:** Bảo hành 1 đổi 1, chính sách bảo mật, chiết khấu VIP, đối soát COD.\n- 🔍 **Tra cứu linh kiện & tồn kho:** Kiểm tra số lượng tồn thực tế, vị trí ngăn kệ và giá bán lẻ.\n- ⚙️ **Kiểm tra tương thích cấu hình PC:** Socket CPU vs Mainboard, chuẩn RAM DDR4/DDR5, nguồn PSU.\n- 📦 **Tra cứu tiến độ đơn hàng:** Trạng thái giao vận, thông tin Shipper, đối soát thanh toán.\n${['CEO', 'ADMIN', 'ACCOUNTANT'].includes(user.role) ? '- 💰 **Báo cáo tài chính & VietQR:** Doanh thu hôm nay, số dư tài khoản ngân hàng công ty.\n' : ''}\nBạn cần tôi hỗ trợ việc gì ngay bây giờ?`;
         }
