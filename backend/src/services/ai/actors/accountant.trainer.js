@@ -1,9 +1,10 @@
 /**
  * ACCOUNTANT TRAINER - HUẤN LUYỆN CHUYÊN BIỆT CHO PHÒNG KẾ TOÁN & THU NGÂN
- * Thiết kế chuẩn hóa theo BaseActorTrainer - Dễ dàng mở rộng và train thêm tình huống mới.
+ * Thiết kế chuẩn hóa theo Giai đoạn 1: Intent Catalog + Parameterized Prisma Handlers
  */
 
 const BaseActorTrainer = require('./BaseActorTrainer');
+const { getStartOfDay, getStartOfMonth, getStartOfYear, formatVND } = require('../utils/dateHelper');
 
 const accountantTrainer = new BaseActorTrainer({
   role: 'ACCOUNTANT',
@@ -19,7 +20,7 @@ const accountantTrainer = new BaseActorTrainer({
 });
 
 // ============================================================================
-// 1. NHÓM KỸ NĂNG TRUY VẤN DỮ LIỆU ĐỘNG (LIVE SQL)
+// 1. NHÓM KỸ NĂNG TRUY VẤN DỮ LIỆU PRISMA (TYPE-SAFE HANDLERS)
 // ============================================================================
 
 // Kỹ năng 1: Doanh thu năm nay
@@ -27,7 +28,7 @@ accountantTrainer.addSkill({
   id: 'ANNUAL_REVENUE',
   title: 'Báo cáo tổng doanh thu công ty năm nay',
   description: 'Tổng doanh thu thực thu lũy kế từ đầu năm đến thời điểm hiện tại',
-  type: 'LIVE_SQL',
+  type: 'PRISMA_QUERY',
   examples: [
     'báo cáo tổng doanh thu công ty năm nay là bao nhiêu?',
     'báo cáo tổng doanh thu công ty năm nay là bao nhiêu',
@@ -39,6 +40,27 @@ accountantTrainer.addSkill({
   patterns: [
     /(doanh thu|thực thu|tiền thu).*(năm nay|cả năm|năm 2026)/i
   ],
+  allowedRoles: ['ACCOUNTANT', 'ADMIN_CEO', 'ADMIN'],
+  handler: async (prisma) => {
+    const res = await prisma.order.aggregate({
+      where: {
+        status: { in: ['DELIVERED', 'COMPLETED'] },
+        createdAt: { gte: getStartOfYear() }
+      },
+      _sum: { totalAmount: true },
+      _count: { orderId: true }
+    });
+    return {
+      revenue: Number(res._sum.totalAmount || 0),
+      orderCount: res._count.orderId || 0
+    };
+  },
+  template: (data) => {
+    return `💰 **BÁO CÁO DOANH THU TOÀN CÔNG TY LŨY KẾ NĂM NAY:**\n\n` +
+           `- 📈 Tổng doanh thu thực thu: **${formatVND(data.revenue)}**\n` +
+           `- 📦 Tổng số đơn hoàn tất: **${data.orderCount} đơn hàng**\n` +
+           `- 📊 Giá trị trung bình/đơn: **${data.orderCount ? formatVND(data.revenue / data.orderCount) : '0 ₫'}**`;
+  },
   sql: () => `SELECT SUM(total_amount) AS doanh_thu_nam_nay, COUNT(order_id) AS tong_so_don FROM orders WHERE status IN ('DELIVERED', 'COMPLETED') AND created_at >= date_trunc('year', now() AT TIME ZONE 'Asia/Ho_Chi_Minh');`
 });
 
@@ -47,7 +69,7 @@ accountantTrainer.addSkill({
   id: 'TODAY_REVENUE',
   title: 'Báo cáo doanh thu thực tế hôm nay',
   description: 'Tính tổng doanh thu bán hàng thực thu trong ngày',
-  type: 'LIVE_SQL',
+  type: 'PRISMA_QUERY',
   examples: [
     'doanh thu thực tế hôm nay của công ty là bao nhiêu',
     'hôm nay thu được bao nhiêu tiền',
@@ -57,15 +79,35 @@ accountantTrainer.addSkill({
   patterns: [
     /(doanh thu|thực thu|tiền thu).*(hôm nay|trong ngày)/i
   ],
+  allowedRoles: ['ACCOUNTANT', 'ADMIN_CEO', 'ADMIN'],
+  handler: async (prisma) => {
+    const res = await prisma.order.aggregate({
+      where: {
+        status: { in: ['DELIVERED', 'COMPLETED'] },
+        createdAt: { gte: getStartOfDay() }
+      },
+      _sum: { totalAmount: true },
+      _count: { orderId: true }
+    });
+    return {
+      revenueToday: Number(res._sum.totalAmount || 0),
+      orderCountToday: res._count.orderId || 0
+    };
+  },
+  template: (data) => {
+    return `💵 **DOANH THU THỰC TẾ TRONG NGÀY HÔM NAY:**\n\n` +
+           `- Doanh thu ghi nhận: **${formatVND(data.revenueToday)}**\n` +
+           `- Số đơn hoàn tất: **${data.orderCountToday} đơn**`;
+  },
   sql: () => `SELECT COALESCE(SUM(total_amount), 0) AS doanh_thu_hom_nay, COUNT(order_id) AS so_don_hom_nay FROM orders WHERE status IN ('DELIVERED', 'COMPLETED') AND created_at >= date_trunc('day', now() AT TIME ZONE 'Asia/Ho_Chi_Minh');`
 });
 
-// Kỹ năng 3: Doanh thu tháng này & so sánh tháng trước
+// Kỹ năng 3: Doanh thu tháng này
 accountantTrainer.addSkill({
   id: 'MONTHLY_REVENUE',
-  title: 'Báo cáo doanh thu theo tháng',
-  description: 'Tổng hợp doanh thu tháng này hoặc so sánh với các tháng trước',
-  type: 'LIVE_SQL',
+  title: 'Báo cáo doanh thu tháng này',
+  description: 'Tổng hợp doanh thu trong tháng hiện tại',
+  type: 'PRISMA_QUERY',
   examples: [
     'doanh thu tháng này của công ty',
     'tổng kết doanh thu tháng này',
@@ -74,6 +116,26 @@ accountantTrainer.addSkill({
   patterns: [
     /(doanh thu|thực thu).*(tháng này|từng tháng|mỗi tháng)/i
   ],
+  allowedRoles: ['ACCOUNTANT', 'ADMIN_CEO', 'ADMIN'],
+  handler: async (prisma) => {
+    const res = await prisma.order.aggregate({
+      where: {
+        status: { in: ['DELIVERED', 'COMPLETED'] },
+        createdAt: { gte: getStartOfMonth() }
+      },
+      _sum: { totalAmount: true },
+      _count: { orderId: true }
+    });
+    return {
+      monthlyRevenue: Number(res._sum.totalAmount || 0),
+      monthlyOrders: res._count.orderId || 0
+    };
+  },
+  template: (data) => {
+    return `📊 **DOANH THU THỰC THU THÁNG NÀY:**\n\n` +
+           `- Tổng tiền thu: **${formatVND(data.monthlyRevenue)}**\n` +
+           `- Số đơn hàng: **${data.monthlyOrders} đơn**`;
+  },
   sql: () => `SELECT to_char(created_at, 'YYYY-MM') AS thang, COUNT(order_id) AS so_don, SUM(total_amount) AS doanh_thu FROM orders WHERE status IN ('DELIVERED', 'COMPLETED') AND created_at >= date_trunc('year', now() AT TIME ZONE 'Asia/Ho_Chi_Minh') GROUP BY thang ORDER BY thang ASC;`
 });
 
@@ -82,7 +144,7 @@ accountantTrainer.addSkill({
   id: 'BANK_ACCOUNT_BALANCES',
   title: 'Số dư hiện tại trong các tài khoản ngân hàng',
   description: 'Tra cứu số dư thực tế trong tất cả tài khoản ngân hàng MBBank, VCB',
-  type: 'LIVE_SQL',
+  type: 'PRISMA_QUERY',
   examples: [
     'số dư hiện tại trong các tài khoản ngân hàng?',
     'số dư hiện tại trong các tài khoản ngân hàng của công ty',
@@ -93,6 +155,32 @@ accountantTrainer.addSkill({
   patterns: [
     /(số dư|tài khoản ngân hàng|mbbank|vietcombank|ngân hàng|quỹ tiền|vietqr.*mặc định)/i
   ],
+  allowedRoles: ['ACCOUNTANT', 'ADMIN_CEO', 'ADMIN'],
+  handler: async (prisma) => {
+    return await prisma.companyBankAccount.findMany({
+      where: { status: 'ACTIVE' },
+      select: {
+        bankName: true,
+        accountNumber: true,
+        accountHolder: true,
+        currentBalance: true,
+        isDefaultQr: true
+      },
+      orderBy: { currentBalance: 'desc' }
+    });
+  },
+  template: (accounts) => {
+    if (!accounts || accounts.length === 0) {
+      return '⚠️ **Chưa cấu hình tài khoản ngân hàng nào trong hệ thống.**';
+    }
+    const totalBalance = accounts.reduce((sum, a) => sum + Number(a.currentBalance), 0);
+    let res = `🏦 **SỐ DƯ CÁC TÀI KHOẢN NGÂN HÀNG DOANH NGHIỆP (TỔNG: ${formatVND(totalBalance)}):**\n\n`;
+    accounts.forEach((a, idx) => {
+      res += `${idx + 1}. **${a.bankName}** (${a.accountNumber}) ${a.isDefaultQr ? '⭐ [Mặc định VietQR]' : ''}\n`;
+      res += `   Chủ TK: ${a.accountHolder} | Số dư: **${formatVND(a.currentBalance)}**\n`;
+    });
+    return res.trim();
+  },
   sql: () => `SELECT bank_name, account_number, account_holder, current_balance, is_default_vietqr FROM company_bank_accounts WHERE status = 'ACTIVE' ORDER BY current_balance DESC;`
 });
 
@@ -101,7 +189,7 @@ accountantTrainer.addSkill({
   id: 'UNPAID_ORDERS',
   title: 'Các đơn hàng chưa thanh toán tiền',
   description: 'Danh sách đơn hàng chưa hoàn tất thanh toán hoặc công nợ khách chưa thu',
-  type: 'LIVE_SQL',
+  type: 'PRISMA_QUERY',
   examples: [
     'các đơn hàng nào chưa thanh toán tiền?',
     'các đơn hàng nào chưa thanh toán tiền',
@@ -112,6 +200,37 @@ accountantTrainer.addSkill({
   patterns: [
     /(chưa thanh toán|chưa trả tiền|nợ tiền|công nợ khách)/i
   ],
+  allowedRoles: ['ACCOUNTANT', 'ADMIN_CEO', 'ADMIN'],
+  handler: async (prisma) => {
+    return await prisma.order.findMany({
+      where: {
+        paymentStatus: { not: 'PAID' },
+        status: { notIn: ['CANCELLED', 'RETURNED'] }
+      },
+      select: {
+        orderId: true,
+        customerId: true,
+        totalAmount: true,
+        paymentStatus: true,
+        paymentMethod: true,
+        createdAt: true
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 20
+    });
+  },
+  template: (orders) => {
+    if (!orders || orders.length === 0) {
+      return '🎉 **Tuyệt vời! Hiện không có đơn hàng nào bị đọng công nợ chưa thanh toán.**';
+    }
+    const totalDebt = orders.reduce((sum, o) => sum + Number(o.totalAmount), 0);
+    let res = `⏳ **DANH SÁCH ${orders.length} ĐƠN HÀNG CHƯA THANH TOÁN (TỔNG CÔNG NỢ: ${formatVND(totalDebt)}):**\n\n`;
+    orders.forEach((o, idx) => {
+      res += `${idx + 1}. **Đơn #${o.orderId}** - ${formatVND(o.totalAmount)}\n`;
+      res += `   Phương thức: ${o.paymentMethod} | Trạng thái TT: \`${o.paymentStatus}\`\n`;
+    });
+    return res.trim();
+  },
   sql: () => `SELECT order_id, customer_id, total_amount, payment_status, payment_method, created_at FROM orders WHERE payment_status != 'PAID' AND status NOT IN ('CANCELLED', 'RETURNED') ORDER BY created_at DESC LIMIT 20;`
 });
 
@@ -120,7 +239,7 @@ accountantTrainer.addSkill({
   id: 'UNRECONCILED_COD_ORDERS',
   title: 'Đối soát các đơn COD chưa nộp tiền',
   description: 'Danh sách đơn hàng đã giao thành công nhưng chưa xác nhận thanh toán COD',
-  type: 'LIVE_SQL',
+  type: 'PRISMA_QUERY',
   examples: [
     'có đơn hàng cod nào đã giao nhưng chưa nộp tiền về kế toán không',
     'shipper nào chưa nộp tiền cod',
@@ -130,6 +249,39 @@ accountantTrainer.addSkill({
   patterns: [
     /(đối soát|nợ cod|treo tiền|chưa nộp tiền|chưa đối soát)/i
   ],
+  allowedRoles: ['ACCOUNTANT', 'ADMIN_CEO', 'ADMIN'],
+  handler: async (prisma) => {
+    return await prisma.order.findMany({
+      where: {
+        status: { in: ['DELIVERED', 'COMPLETED'] },
+        paymentMethod: 'COD',
+        paymentStatus: 'PENDING'
+      },
+      select: {
+        orderId: true,
+        totalAmount: true,
+        deliveredAt: true,
+        assignedShipper: {
+          select: {
+            fullName: true
+          }
+        }
+      },
+      orderBy: { deliveredAt: 'asc' }
+    });
+  },
+  template: (orders) => {
+    if (!orders || orders.length === 0) {
+      return '✅ **Tất cả các đơn COD đã giao thành công đều đã được đối soát nộp tiền vào quỹ!**';
+    }
+    const totalCod = orders.reduce((sum, o) => sum + Number(o.totalAmount), 0);
+    let res = `⚠️ **CÓ ${orders.length} ĐƠN COD ĐÃ GIAO NHƯNG CHƯA NỘP TIỀN (TREO: ${formatVND(totalCod)}):**\n\n`;
+    orders.forEach((o, idx) => {
+      res += `${idx + 1}. **Đơn #${o.orderId}**: ${formatVND(o.totalAmount)}\n`;
+      res += `   Shipper phụ trách: **${o.assignedShipper ? o.assignedShipper.fullName : 'Chưa phân bổ'}**\n`;
+    });
+    return res.trim();
+  },
   sql: () => `SELECT o.order_id, o.total_amount, e.full_name AS ten_shipper, o.delivered_at FROM orders o JOIN employees e ON e.id = o.assigned_shipper_id WHERE o.status IN ('DELIVERED', 'COMPLETED') AND o.payment_method = 'COD' AND o.payment_status = 'PENDING' ORDER BY o.delivered_at ASC;`
 });
 
@@ -138,7 +290,7 @@ accountantTrainer.addSkill({
   id: 'PAYMENT_METHODS_BREAKDOWN',
   title: 'Tỷ trọng doanh thu theo từng phương thức thanh toán',
   description: 'Phân tích cơ cấu dòng tiền qua VietQR, COD, Tiền mặt, Thẻ',
-  type: 'LIVE_SQL',
+  type: 'PRISMA_QUERY',
   examples: [
     'tỷ trọng doanh thu theo từng phương thức thanh toán tháng này',
     'khách thanh toán vietqr nhiều hơn hay cod nhiều hơn',
@@ -147,6 +299,33 @@ accountantTrainer.addSkill({
   patterns: [
     /(phương thức thanh toán|vietqr.*cod|hình thức thanh toán)/i
   ],
+  allowedRoles: ['ACCOUNTANT', 'ADMIN_CEO', 'ADMIN'],
+  handler: async (prisma) => {
+    const res = await prisma.order.groupBy({
+      by: ['paymentMethod'],
+      where: {
+        status: { in: ['DELIVERED', 'COMPLETED'] },
+        createdAt: { gte: getStartOfMonth() }
+      },
+      _count: { orderId: true },
+      _sum: { totalAmount: true }
+    });
+    return res.map(r => ({
+      method: r.paymentMethod,
+      count: r._count.orderId,
+      amount: Number(r._sum.totalAmount || 0)
+    }));
+  },
+  template: (breakdown) => {
+    if (!breakdown || breakdown.length === 0) {
+      return 'Tháng này chưa ghi nhận đơn hàng thành công nào.';
+    }
+    let res = `💳 **CƠ CẤU PHƯƠNG THỨC THANH TOÁN TRONG THÁNG:**\n\n`;
+    breakdown.forEach((b, idx) => {
+      res += `${idx + 1}. **${b.method}**: ${formatVND(b.amount)} (${b.count} đơn)\n`;
+    });
+    return res.trim();
+  },
   sql: () => `SELECT payment_method, COUNT(*) AS so_don, SUM(total_amount) AS tong_tien FROM orders WHERE status IN ('DELIVERED', 'COMPLETED') AND created_at >= date_trunc('month', now() AT TIME ZONE 'Asia/Ho_Chi_Minh') GROUP BY payment_method ORDER BY tong_tien DESC;`
 });
 

@@ -1,9 +1,10 @@
 /**
  * SALES TRAINER - HUẤN LUYỆN CHUYÊN BIỆT CHO BỘ PHẬN KINH DOANH & TƯ VẤN BÁN HÀNG
- * Thiết kế chuẩn hóa theo BaseActorTrainer - Dễ dàng mở rộng và train thêm tình huống mới.
+ * Thiết kế chuẩn hóa theo Giai đoạn 1: Intent Catalog + Parameterized Prisma Handlers
  */
 
 const BaseActorTrainer = require('./BaseActorTrainer');
+const { getStartOfDay, getStartOfMonth, formatVND } = require('../utils/dateHelper');
 
 const salesTrainer = new BaseActorTrainer({
   role: 'SALES',
@@ -18,7 +19,7 @@ const salesTrainer = new BaseActorTrainer({
 });
 
 // ============================================================================
-// 1. NHÓM KỸ NĂNG TRUY VẤN DỮ LIỆU ĐỘNG (LIVE SQL)
+// 1. NHÓM KỸ NĂNG TRUY VẤN DỮ LIỆU PRISMA (TYPE-SAFE HANDLERS)
 // ============================================================================
 
 // Kỹ năng 1: Tra cứu giá bán lẻ & tồn kho sản phẩm cụ thể
@@ -26,7 +27,7 @@ salesTrainer.addSkill({
   id: 'PRODUCT_PRICE_STOCK',
   title: 'Tra cứu giá bán lẻ và tồn kho khả dụng',
   description: 'Tìm kiếm sản phẩm theo tên hoặc mã để báo giá cho khách',
-  type: 'LIVE_SQL',
+  type: 'PRISMA_QUERY',
   examples: [
     'card rtx 4070 còn hàng không và giá bao nhiêu?',
     'card rtx 4070 còn hàng không và giá bao nhiêu',
@@ -37,6 +38,37 @@ salesTrainer.addSkill({
   patterns: [
     /(giá bao nhiêu|còn hàng không|còn mấy cái|báo giá|tồn kho.*linh kiện)/i
   ],
+  allowedRoles: ['SALES', 'ADMIN_CEO', 'ADMIN', 'WAREHOUSE'],
+  handler: async (prisma, params, _user) => {
+    const rawKw = params.productName || params.keyword || '';
+    return await prisma.product.findMany({
+      where: {
+        ...(rawKw ? { name: { contains: rawKw, mode: 'insensitive' } } : { stockQuantity: { gt: 0 } }),
+        status: 'ACTIVE'
+      },
+      select: {
+        productId: true,
+        name: true,
+        sku: true,
+        price: true,
+        stockQuantity: true
+      },
+      orderBy: { stockQuantity: 'desc' },
+      take: 10
+    });
+  },
+  template: (products, params) => {
+    if (!products || products.length === 0) {
+      return `❌ **Không tìm thấy sản phẩm nào khớp với từ khóa "${params?.productName || ''}".**`;
+    }
+    let res = `🔎 **THÔNG TIN GIÁ BÁN & TỒN KHO LINH KIỆN:**\n\n`;
+    products.forEach((p, idx) => {
+      const stockStatus = p.stockQuantity > 0 ? `Còn hàng (**${p.stockQuantity}** cái)` : `❌ Tạm hết hàng`;
+      res += `${idx + 1}. **${p.name}**\n`;
+      res += `   💰 Giá niêm yết: **${formatVND(p.price)}** | Tồn kho: ${stockStatus}\n`;
+    });
+    return res.trim();
+  },
   sql: (_userId, lower) => {
     const hwMatch = lower.match(/(rtx\s?\d{4}(?:\s?(?:ti|super))?|gtx\s?\d{4}|rx\s?\d{4}(?:\s?xt)?|core\s?i[3579][\w-]*|ryzen\s?[3579][\w-]*|b\d{3}|z\d{3})/i);
     const kw = hwMatch ? hwMatch[1].trim() : '';
@@ -52,7 +84,7 @@ salesTrainer.addSkill({
   id: 'PSU_RECOMMENDATION',
   title: 'Gợi ý nguồn máy tính (PSU) phù hợp cấu hình',
   description: 'Tra cứu các mã nguồn 550W - 850W tương thích',
-  type: 'LIVE_SQL',
+  type: 'PRISMA_QUERY',
   examples: [
     'cấu hình i5 13400 + rtx 4060 cần nguồn bao nhiêu watt',
     'rtx 4070 super dùng nguồn 650w có đủ không',
@@ -61,6 +93,40 @@ salesTrainer.addSkill({
   patterns: [
     /(nguồn bao nhiêu watt|cần nguồn bao nhiêu|nguồn.*đủ không|nguồn.*kéo nổi)/i
   ],
+  allowedRoles: ['SALES', 'ADMIN_CEO', 'ADMIN'],
+  handler: async (prisma) => {
+    return await prisma.product.findMany({
+      where: {
+        category: {
+          OR: [
+            { slug: { contains: 'psu', mode: 'insensitive' } },
+            { slug: { contains: 'nguon', mode: 'insensitive' } }
+          ]
+        },
+        stockQuantity: { gt: 0 },
+        status: 'ACTIVE'
+      },
+      select: {
+        productId: true,
+        name: true,
+        price: true,
+        stockQuantity: true
+      },
+      orderBy: { price: 'asc' },
+      take: 10
+    });
+  },
+  template: (psus) => {
+    if (!psus || psus.length === 0) {
+      return '⚠️ **Hiện các mã nguồn máy tính phù hợp đang tạm hết hàng trong kho.**';
+    }
+    let res = `⚡ **DANH SÁCH BỘ NGUỒN CÔNG SUẤT THỰC (PSU) KHUYẾN NGHỊ:**\n\n`;
+    psus.forEach((p, idx) => {
+      res += `${idx + 1}. **${p.name}**\n`;
+      res += `   Giá bán: **${formatVND(p.price)}** (Còn ${p.stockQuantity} chiếc)\n`;
+    });
+    return res.trim();
+  },
   sql: () => `SELECT p.name, p.price, p.stock_quantity, p.specs FROM products p JOIN categories c ON c.id = p.category_id WHERE (c.slug ILIKE '%psu%' OR c.slug ILIKE '%nguon%') AND p.stock_quantity > 0 ORDER BY p.price ASC LIMIT 10;`
 });
 
@@ -69,7 +135,7 @@ salesTrainer.addSkill({
   id: 'ACTIVE_PROMOTIONS',
   title: 'Danh sách sản phẩm đang có chiết khấu giảm giá',
   description: 'Tìm các linh kiện đang sale tốt để giới thiệu khách hàng',
-  type: 'LIVE_SQL',
+  type: 'PRISMA_QUERY',
   examples: [
     'danh sách sản phẩm đang có chương trình giảm giá tốt?',
     'danh sách sản phẩm đang có chương trình giảm giá tốt',
@@ -80,6 +146,36 @@ salesTrainer.addSkill({
   patterns: [
     /(giảm giá|khuyến mãi|sale|chiết khấu cao|ưu đãi)/i
   ],
+  allowedRoles: ['SALES', 'ADMIN_CEO', 'ADMIN'],
+  handler: async (prisma) => {
+    return await prisma.product.findMany({
+      where: {
+        discountPercent: { gt: 0 },
+        stockQuantity: { gt: 0 },
+        status: 'ACTIVE'
+      },
+      select: {
+        productId: true,
+        name: true,
+        price: true,
+        discountPercent: true,
+        stockQuantity: true
+      },
+      orderBy: { discountPercent: 'desc' },
+      take: 15
+    });
+  },
+  template: (promotions) => {
+    if (!promotions || promotions.length === 0) {
+      return 'Hiện tại chưa có chương trình giảm giá trực tiếp cho linh kiện.';
+    }
+    let res = `🔥 **TOP CÁC LINH KIỆN GIẢM GIÁ TỐT NHẤT HÔM NAY:**\n\n`;
+    promotions.forEach((p, idx) => {
+      res += `${idx + 1}. **${p.name}**\n`;
+      res += `   Giảm: 🔥 **-${p.discountPercent}%** | Giá ưu đãi: **${formatVND(p.price)}** (Tồn: ${p.stockQuantity})\n`;
+    });
+    return res.trim();
+  },
   sql: () => `SELECT product_id, name, original_price, price, discount_percent, stock_quantity FROM products WHERE discount_percent > 0 AND stock_quantity > 0 AND status = 'ACTIVE' ORDER BY discount_percent DESC LIMIT 15;`
 });
 
@@ -88,7 +184,7 @@ salesTrainer.addSkill({
   id: 'SALES_MY_PERFORMANCE',
   title: 'Doanh số bán hàng cá nhân của nhân viên Sales',
   description: 'Thống kê số đơn chốt và tổng tiền bán được của nhân viên theo ngày hoặc tháng',
-  type: 'LIVE_SQL',
+  type: 'PRISMA_QUERY',
   examples: [
     'tháng này tôi đã bán được bao nhiêu doanh số?',
     'tháng này tôi đã bán được bao nhiêu doanh số',
@@ -100,6 +196,33 @@ salesTrainer.addSkill({
   patterns: [
     /(doanh số.*(của tôi|tôi bán)|tôi bán được bao nhiêu|tôi chốt được mấy đơn)/i
   ],
+  allowedRoles: ['SALES', 'ADMIN_CEO', 'ADMIN'],
+  handler: async (prisma, params, user) => {
+    const isMonth = /(tháng|thang)/i.test(params.period || '');
+    const since = isMonth ? getStartOfMonth() : getStartOfDay();
+    const sellerId = Number(user.id || params.userId || 0);
+
+    const res = await prisma.order.aggregate({
+      where: {
+        soldById: sellerId,
+        createdAt: { gte: since }
+      },
+      _count: { orderId: true },
+      _sum: { totalAmount: true }
+    });
+
+    return {
+      period: isMonth ? 'tháng này' : 'hôm nay',
+      orderCount: res._count.orderId || 0,
+      revenue: Number(res._sum.totalAmount || 0)
+    };
+  },
+  template: (data) => {
+    return `🎯 **KẾT QUẢ KINH DOANH CÁ NHÂN (${data.period.toUpperCase()}):**\n\n` +
+           `- Số đơn đã chốt: **${data.orderCount} đơn**\n` +
+           `- Tổng doanh số bán: **${formatVND(data.revenue)}**\n` +
+           `Hoa hồng ước tính 1%: **${formatVND(data.revenue * 0.01)}**. Tiếp tục chốt đơn nhé!`;
+  },
   sql: (userId, lower) => {
     const isMonth = /(tháng|thang)/i.test(lower || '');
     const dateTrunc = isMonth ? 'month' : 'day';
@@ -112,7 +235,7 @@ salesTrainer.addSkill({
   id: 'VIP_CUSTOMERS_LIST',
   title: 'Danh sách khách hàng VIP nhất công ty',
   description: 'Khách hàng hạng Kim Cương, Vàng có điểm tích lũy cao',
-  type: 'LIVE_SQL',
+  type: 'PRISMA_QUERY',
   examples: [
     'danh sách khách hàng vip nhất của công ty',
     'khách hàng mua nhiều nhất',
@@ -122,6 +245,31 @@ salesTrainer.addSkill({
   patterns: [
     /(khách hàng vip|khách vip|mua nhiều nhất|tích điểm cao|hạng kim cương)/i
   ],
+  allowedRoles: ['SALES', 'ADMIN_CEO', 'ADMIN'],
+  handler: async (prisma) => {
+    return await prisma.customer.findMany({
+      select: {
+        customerId: true,
+        name: true,
+        phone: true,
+        tier: true,
+        loyaltyPoints: true
+      },
+      orderBy: { loyaltyPoints: 'desc' },
+      take: 10
+    });
+  },
+  template: (vips) => {
+    if (!vips || vips.length === 0) {
+      return 'Chưa có dữ liệu khách hàng VIP.';
+    }
+    let res = `👑 **TOP KHÁCH HÀNG THÂN THIẾT / VIP CỦA AETHERPC:**\n\n`;
+    vips.forEach((v, idx) => {
+      res += `${idx + 1}. **${v.name}** (${v.phone || 'SĐT ẩn'})\n`;
+      res += `   Hạng: 💎 \`${v.tier || 'STANDARD'}\` | Điểm tích lũy: **${v.loyaltyPoints} điểm**\n`;
+    });
+    return res.trim();
+  },
   sql: () => `SELECT customer_id, name, phone, tier, loyalty_points FROM customers ORDER BY loyalty_points DESC LIMIT 10;`
 });
 

@@ -1,10 +1,11 @@
 /**
  * BASE ACTOR TRAINER - LỚP CƠ SỞ CHUẨN HÓA CHO MỌI ACTOR TRONG ERP AETHERPC
- * Giúp mở rộng, thêm tình huống (train thêm) cực kỳ nhanh chóng và bài bản:
- * - Khai báo tình huống bằng danh sách câu hỏi mẫu (examples) & từ khóa (keywords)
- * - Tự động đối soát và sinh câu lệnh SQL hoặc trích xuất tri thức SOP
- * - Tự động xuất Few-Shots chuẩn cho Gemini / Mô hình AI
- * - Cho phép thêm kỹ năng mới chỉ bằng cách gọi .addSkill({ ... })
+ * Thiết kế theo kiến trúc: Intent Catalog + Parameterized Prisma Handlers (Giai đoạn 1)
+ *
+ * 1. Khai báo danh mục ý định (Intent Catalog) gồm mã, câu hỏi mẫu, tham số bắt buộc.
+ * 2. Gắn kết trực tiếp hàm truy vấn an toàn bằng Prisma ORM (Type-Safe Handlers).
+ * 3. Điền kết quả vào mẫu trả lời (Template Formatter) hoặc trả về khối dữ liệu cấu trúc.
+ * 4. Kiểm soát phân quyền người dùng (RBAC) trước khi thực thi hàm.
  */
 
 class BaseActorTrainer {
@@ -18,22 +19,25 @@ class BaseActorTrainer {
     this.role = role;
     this.name = name;
     this.systemPrompt = systemPrompt;
-    this.skills = []; // Danh sách toàn bộ kỹ năng đã train cho Actor
+    this.skills = []; // Danh sách toàn bộ kỹ năng / ý định đã train cho Actor
   }
 
   /**
    * Đăng ký thêm 1 tình huống / kỹ năng mới cho Actor
    * @param {Object} skill
-   * @param {string} skill.id - Mã kỹ năng (vd: DELIVERY_ORDERS_TODAY)
+   * @param {string} skill.id - Mã định danh ý định (vd: ASSIGNED_ORDERS_TODAY)
    * @param {string} skill.title - Tiêu đề ngắn gọn của tình huống
    * @param {string} skill.description - Mô tả mục đích
-   * @param {'LIVE_SQL' | 'KNOWLEDGE_SOP'} skill.type - Loại xử lý: Dữ liệu SQL hay Quy chế văn bản SOP
-   * @param {string[]} skill.examples - Danh sách câu hỏi mẫu của người dùng (Thêm tùy ý bao nhiêu câu cũng được)
+   * @param {'PRISMA_QUERY' | 'LIVE_SQL' | 'KNOWLEDGE_SOP'} [skill.type='PRISMA_QUERY'] - Loại xử lý
+   * @param {string[]} skill.examples - Danh sách câu hỏi mẫu của người dùng
    * @param {RegExp|RegExp[]} [skill.patterns] - Biểu thức regex nhận diện nhanh
    * @param {string[]} [skill.keywords] - Mảng từ khóa cốt lõi
-   * @param {string|Function} [skill.sql] - Câu lệnh SQL (hoặc hàm sinh SQL)
+   * @param {string[]} [skill.requiredParams] - Danh sách tham số bắt buộc (vd: ['productName'])
+   * @param {string[]} [skill.allowedRoles] - Danh sách vai trò được phép thực thi
+   * @param {Function} [skill.handler] - Hàm truy vấn Prisma: async (prisma, params, user) => data
+   * @param {string|Function} [skill.template] - Mẫu định dạng câu trả lời (Template Formatter)
+   * @param {string|Function} [skill.sql] - Câu lệnh SQL dự phòng (nếu cần đối soát)
    * @param {string} [skill.sop] - Nội dung quy chuẩn / văn bản SOP
-   * @param {Function} [skill.formatter] - Hàm format kết quả chuyên biệt cho vai trò
    */
   addSkill(skill) {
     if (!skill.id || !skill.title) {
@@ -44,24 +48,27 @@ class BaseActorTrainer {
       id: skill.id,
       title: skill.title,
       description: skill.description || skill.title,
-      type: skill.type || 'LIVE_SQL',
+      type: skill.type || (skill.sop ? 'KNOWLEDGE_SOP' : 'PRISMA_QUERY'),
       examples: Array.isArray(skill.examples) ? skill.examples : [],
       patterns: Array.isArray(skill.patterns) ? skill.patterns : (skill.patterns ? [skill.patterns] : []),
       keywords: Array.isArray(skill.keywords) ? skill.keywords : [],
+      requiredParams: Array.isArray(skill.requiredParams) ? skill.requiredParams : [],
+      allowedRoles: Array.isArray(skill.allowedRoles) ? skill.allowedRoles : [this.role, 'ADMIN_CEO', 'ADMIN'],
+      handler: typeof skill.handler === 'function' ? skill.handler : null,
+      template: skill.template || null,
       sql: skill.sql || '',
       sop: skill.sop || '',
       formatter: typeof skill.formatter === 'function' ? skill.formatter : null
     };
 
     this.skills.push(normalizedSkill);
-    return this; // Hỗ trợ chain gọi method liên tục
+    return this;
   }
 
   /**
-   * Khớp câu hỏi của người dùng với kỹ năng đã được huấn luyện bằng thuật toán tính điểm ưu tiên (Score-based Matching)
-   * Đảm bảo: Khớp chính xác câu hỏi mẫu luôn thắng điểm, Regex cụ thể thắng Regex chung, Từ khóa phụ trợ hỗ trợ phân loại.
+   * So khớp câu hỏi của người dùng với danh mục ý định
    * @param {string} userPrompt - Câu hỏi của người dùng
-   * @param {number|string} [userId] - ID của người dùng (nếu có)
+   * @param {number|string} [userId] - ID của người dùng
    * @returns {{matched: boolean, skill: Object, score: number, executableSql?: string, sopContent?: string}|null}
    */
   match(userPrompt, userId) {
@@ -82,7 +89,7 @@ class BaseActorTrainer {
         const cleanEx = rawEx.replace(/[?!.,;:()]/g, ' ').replace(/\s+/g, ' ').trim();
 
         if (cleanPrompt === cleanEx || rawLower === rawEx) {
-          score += 1000; // Khớp chính xác hoàn toàn câu hỏi đã được train
+          score += 1000;
           break;
         } else if (cleanPrompt.includes(cleanEx) && cleanEx.length >= 8) {
           score = Math.max(score, 500 + cleanEx.length);
@@ -91,7 +98,7 @@ class BaseActorTrainer {
         }
       }
 
-      // 2. So khớp biểu thức chính quy (patterns)
+      // 2. So khớp biểu thức regex (patterns)
       if (skill.patterns && skill.patterns.length > 0) {
         for (const pattern of skill.patterns) {
           if (pattern.test(rawLower) || pattern.test(cleanPrompt)) {
@@ -119,7 +126,7 @@ class BaseActorTrainer {
     if (!bestSkill) return null;
 
     let executableSql = '';
-    if (bestSkill.type === 'LIVE_SQL') {
+    if (bestSkill.sql) {
       if (typeof bestSkill.sql === 'function') {
         executableSql = bestSkill.sql(userId, rawLower);
       } else if (typeof bestSkill.sql === 'string') {
@@ -137,11 +144,107 @@ class BaseActorTrainer {
   }
 
   /**
-   * Xuất danh sách Few-Shots SQL mẫu cho mô hình Gemini / LLM Prompt
+   * Thực thi trực tiếp ý định thông qua Prisma Client an toàn (Type-safe Handler Execution)
+   * @param {Object} skill - Kỹ năng / ý định đã khớp
+   * @param {Object} prisma - Prisma Client instance
+   * @param {Object} params - Các tham số đã trích xuất (tên sản phẩm, thời gian, số lượng...)
+   * @param {Object} user - Người dùng đang đăng nhập ({ id, role, fullName })
+   */
+  async execute(skill, prisma, params = {}, user = {}) {
+    if (!skill) {
+      return { status: 'ERROR', message: 'Không tìm thấy ý định xử lý' };
+    }
+
+    // 1. Kiểm tra quyền hạn (RBAC)
+    const userRole = (user.role || '').toUpperCase();
+    const isAllowed = skill.allowedRoles.some(r => r.toUpperCase() === userRole || userRole === 'ADMIN' || userRole === 'CEO');
+    if (!isAllowed) {
+      return {
+        status: 'FORBIDDEN',
+        message: `Bạn với vai trò [${user.role || 'GUEST'}] không có quyền thực hiện thao tác: ${skill.title}`
+      };
+    }
+
+    // 2. Kiểm tra tham số bắt buộc (Missing required parameters)
+    const missingParams = skill.requiredParams.filter(p => !params[p] && params[p] !== 0);
+    if (missingParams.length > 0) {
+      return {
+        status: 'MISSING_PARAMS',
+        intent: skill.id,
+        missing: missingParams,
+        message: `Vui lòng cung cấp thêm thông tin: ${missingParams.join(', ')}`
+      };
+    }
+
+    // 3. Nếu là tài liệu quy chuẩn SOP
+    if (skill.type === 'KNOWLEDGE_SOP' && skill.sop) {
+      return {
+        status: 'SUCCESS',
+        intent: skill.id,
+        type: 'KNOWLEDGE_SOP',
+        title: skill.title,
+        text: skill.sop,
+        data: null
+      };
+    }
+
+    // 4. Nếu là hàm xử lý dữ liệu Prisma
+    if (typeof skill.handler === 'function') {
+      try {
+        const rawResult = await skill.handler(prisma, params, user);
+        let formattedText = '';
+
+        if (typeof skill.template === 'function') {
+          formattedText = skill.template(rawResult, params, user);
+        } else if (typeof skill.template === 'string') {
+          formattedText = this.fillStringTemplate(skill.template, rawResult);
+        } else if (typeof skill.formatter === 'function') {
+          formattedText = skill.formatter(rawResult);
+        } else {
+          formattedText = JSON.stringify(rawResult, null, 2);
+        }
+
+        return {
+          status: 'SUCCESS',
+          intent: skill.id,
+          type: 'PRISMA_QUERY',
+          title: skill.title,
+          data: rawResult,
+          text: formattedText
+        };
+      } catch (err) {
+        console.error(`[BaseActorTrainer] Lỗi khi chạy Prisma Handler cho intent [${skill.id}]:`, err);
+        return {
+          status: 'ERROR',
+          intent: skill.id,
+          message: `Lỗi truy vấn dữ liệu: ${err.message}`
+        };
+      }
+    }
+
+    return {
+      status: 'NOT_IMPLEMENTED',
+      intent: skill.id,
+      message: `Ý định ${skill.title} chưa được cấu hình hàm xử lý Prisma.`
+    };
+  }
+
+  /**
+   * Tiện ích điền giá trị vào chuỗi template mẫu {key}
+   */
+  fillStringTemplate(template, data) {
+    if (!template || typeof template !== 'string') return '';
+    return template.replace(/\{(\w+)\}/g, (match, key) => {
+      return data && data[key] !== undefined ? data[key] : match;
+    });
+  }
+
+  /**
+   * Xuất danh sách Few-Shots mẫu
    */
   getFewShots() {
     return this.skills
-      .filter(s => s.type === 'LIVE_SQL' && s.sql)
+      .filter(s => s.sql)
       .map(s => {
         const sampleQuestion = s.examples[0] || s.title;
         const rawSql = typeof s.sql === 'function' ? s.sql(':userId', sampleQuestion) : s.sql;
@@ -154,7 +257,7 @@ class BaseActorTrainer {
   }
 
   /**
-   * Xuất danh sách các văn bản tri thức SOP của Actor
+   * Xuất danh sách các văn bản tri thức SOP
    */
   getKnowledgeSOP() {
     const sops = {};
@@ -170,7 +273,7 @@ class BaseActorTrainer {
   }
 
   /**
-   * Xuất dữ liệu huấn luyện tương thích cho mô hình NLP cục bộ (dataset_intent.json)
+   * Xuất dữ liệu huấn luyện NLP
    */
   exportNlpDataset() {
     const dataset = [];

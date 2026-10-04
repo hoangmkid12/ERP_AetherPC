@@ -1,16 +1,17 @@
 /**
  * DELIVERY TRAINER - HUẤN LUYỆN CHUYÊN BIỆT CHO NHÂN VIÊN GIAO HÀNG (SHIPPER)
- * Thiết kế chuẩn hóa theo BaseActorTrainer - Dễ dàng mở rộng và train thêm tình huống mới.
+ * Thiết kế chuẩn hóa theo Giai đoạn 1: Intent Catalog + Parameterized Prisma Handlers
  */
 
 const BaseActorTrainer = require('./BaseActorTrainer');
+const { getStartOfMonth, formatVND } = require('../utils/dateHelper');
 
 const deliveryTrainer = new BaseActorTrainer({
   role: 'DELIVERY',
   name: 'Nhân viên Giao hàng (Shipper)',
   systemPrompt: `BẠN LÀ TRỢ LÝ ĐỒNG HÀNH CHUYÊN BIỆT CHO NHÂN VIÊN GIAO HÀNG (SHIPPER) AETHERPC:
 - PHONG CÁCH: Gãy gọn, nhanh chóng, trực diện. Shipper đang di chuyển ngoài đường nên KHÔNG trả lời dài dòng.
-- THÔNG TIN ƯU TIÊN: Luôn làm nổi bật ngay 3 thông tin sống còn:
+- THÔNG TIN ƯU TIÊN:
   1. 📍 ĐỊA CHỈ GIAO HÀNG (Kèm ghi chú chỉ đường nếu có).
   2. 📞 SỐ ĐIỆN THOẠI KHÁCH HÀNG (để bấm gọi ngay).
   3. 💰 TIỀN THU HỘ COD (Đã thanh toán hay cần thu bao nhiêu tiền mặt).
@@ -18,7 +19,7 @@ const deliveryTrainer = new BaseActorTrainer({
 });
 
 // ============================================================================
-// 1. NHÓM KỸ NĂNG TRUY VẤN DỮ LIỆU ĐỘNG (LIVE SQL)
+// 1. NHÓM KỸ NĂNG TRUY VẤN DỮ LIỆU PRISMA (TYPE-SAFE HANDLERS)
 // ============================================================================
 
 // Kỹ năng 1: Đơn hàng cần giao hôm nay
@@ -26,7 +27,7 @@ deliveryTrainer.addSkill({
   id: 'ASSIGNED_ORDERS_TODAY',
   title: 'Tra cứu đơn hàng cần giao hôm nay',
   description: 'Lấy danh sách các đơn hàng đang phân công cho chính shipper',
-  type: 'LIVE_SQL',
+  type: 'PRISMA_QUERY',
   examples: [
     'hôm nay tôi có bao nhiêu đơn cần giao?',
     'hôm nay tôi có bao nhiêu đơn cần giao',
@@ -40,6 +41,40 @@ deliveryTrainer.addSkill({
     /(hôm nay.*(giao|ship|đơn)|cần giao hôm nay|đang giao|đang ship|phân công.*giao|nhiệm vụ.*giao)/i
   ],
   keywords: ['đơn', 'giao'],
+  allowedRoles: ['DELIVERY', 'ADMIN_CEO', 'ADMIN'],
+  handler: async (prisma, params, user) => {
+    const shipperId = Number(user.id || params.userId || 0);
+    return await prisma.order.findMany({
+      where: {
+        assignedShipperId: shipperId,
+        status: { in: ['CONFIRMED', 'PROCESSING', 'READY_TO_SHIP', 'SHIPPED'] }
+      },
+      select: {
+        orderId: true,
+        shippingAddress: true,
+        customer: { select: { phone: true, name: true } },
+        totalAmount: true,
+        paymentMethod: true,
+        paymentStatus: true,
+        status: true,
+        createdAt: true
+      },
+      orderBy: { createdAt: 'asc' }
+    });
+  },
+  template: (orders) => {
+    if (!orders || orders.length === 0) {
+      return '🛵 **Hôm nay bạn hiện không có đơn hàng nào cần giao.** Chúc bạn một ngày làm việc thuận lợi!';
+    }
+    let res = `🛵 **HÔM NAY BẠN ĐANG CÓ ${orders.length} ĐƠN CẦN GIAO:**\n\n`;
+    orders.forEach((o, idx) => {
+      res += `${idx + 1}. **Đơn #${o.orderId}** - ${formatVND(o.totalAmount)} (${o.paymentMethod === 'COD' ? '💵 Thu COD' : '💳 Đã TT'})\n`;
+      res += `   📍 Địa chỉ: ${o.shippingAddress}\n`;
+      res += `   📞 SĐT khách: ${o.customer?.phone || 'Chưa cập nhật'}\n`;
+      res += `   Trạng thái: \`${o.status}\`\n\n`;
+    });
+    return res.trim();
+  },
   sql: (userId) => `SELECT order_id, shipping_address, shipping_phone, total_amount, payment_method, payment_status, status FROM orders WHERE assigned_shipper_id = ${userId || ':userId'} AND status IN ('CONFIRMED', 'PROCESSING', 'READY_TO_SHIP', 'SHIPPED') ORDER BY created_at ASC;`
 });
 
@@ -48,7 +83,7 @@ deliveryTrainer.addSkill({
   id: 'COD_ORDERS_TO_COLLECT',
   title: 'Tra cứu các đơn cần thu tiền mặt COD',
   description: 'Lọc các đơn hàng chưa thanh toán cần thu tiền mặt khi giao',
-  type: 'LIVE_SQL',
+  type: 'PRISMA_QUERY',
   examples: [
     'đơn nào của tôi cần thu tiền cod?',
     'đơn nào của tôi cần thu tiền cod',
@@ -61,6 +96,38 @@ deliveryTrainer.addSkill({
     /(thu hộ|tiền cod|thu cod|tiền mặt|thu bao nhiêu)/i
   ],
   keywords: ['cod'],
+  allowedRoles: ['DELIVERY', 'ADMIN_CEO', 'ADMIN'],
+  handler: async (prisma, params, user) => {
+    const shipperId = Number(user.id || params.userId || 0);
+    return await prisma.order.findMany({
+      where: {
+        assignedShipperId: shipperId,
+        paymentMethod: 'COD',
+        paymentStatus: { not: 'PAID' },
+        status: { in: ['READY_TO_SHIP', 'SHIPPED'] }
+      },
+      select: {
+        orderId: true,
+        shippingAddress: true,
+        customer: { select: { phone: true, name: true } },
+        totalAmount: true,
+        paymentStatus: true
+      },
+      orderBy: { createdAt: 'asc' }
+    });
+  },
+  template: (orders) => {
+    if (!orders || orders.length === 0) {
+      return '✅ **Không có đơn nào cần thu tiền mặt COD.** Các đơn của bạn đều đã thanh toán trước hoặc chưa sẵn sàng ship!';
+    }
+    const totalCod = orders.reduce((sum, o) => sum + Number(o.totalAmount), 0);
+    let res = `💵 **BẠN CÓ ${orders.length} ĐƠN CẦN THU TIỀN COD (TỔNG CỘNG: ${formatVND(totalCod)}):**\n\n`;
+    orders.forEach((o, idx) => {
+      res += `${idx + 1}. **Đơn #${o.orderId}**: Cần thu **${formatVND(o.totalAmount)}** tiền mặt\n`;
+      res += `   📍 Địa chỉ: ${o.shippingAddress} (📞 ${o.customer?.phone || 'Chưa có SĐT'})\n`;
+    });
+    return res.trim();
+  },
   sql: (userId) => `SELECT order_id, shipping_address, shipping_phone, total_amount, payment_status FROM orders WHERE assigned_shipper_id = ${userId || ':userId'} AND payment_method = 'COD' AND payment_status != 'PAID' AND status IN ('READY_TO_SHIP', 'SHIPPED') ORDER BY created_at ASC;`
 });
 
@@ -69,7 +136,7 @@ deliveryTrainer.addSkill({
   id: 'MONTHLY_PERFORMANCE',
   title: 'Hiệu suất số đơn giao thành công trong tháng',
   description: 'Thống kê tổng số đơn giao thành công và giá trị đã giao của shipper',
-  type: 'LIVE_SQL',
+  type: 'PRISMA_QUERY',
   examples: [
     'tháng này tôi đã giao thành công được bao nhiêu đơn?',
     'tháng này tôi đã giao thành công được bao nhiêu đơn',
@@ -81,6 +148,30 @@ deliveryTrainer.addSkill({
     /(tháng này.*(thành công|hoàn thành|giao)|hiệu suất giao)/i
   ],
   keywords: ['tháng này'],
+  allowedRoles: ['DELIVERY', 'ADMIN_CEO', 'ADMIN'],
+  handler: async (prisma, params, user) => {
+    const shipperId = Number(user.id || params.userId || 0);
+    const startMonth = getStartOfMonth();
+    const result = await prisma.order.aggregate({
+      where: {
+        assignedShipperId: shipperId,
+        status: { in: ['DELIVERED', 'COMPLETED'] },
+        deliveredAt: { gte: startMonth }
+      },
+      _count: { orderId: true },
+      _sum: { totalAmount: true }
+    });
+    return {
+      deliveredCount: result._count.orderId || 0,
+      totalRevenue: Number(result._sum.totalAmount || 0)
+    };
+  },
+  template: (res) => {
+    return `🏆 **HIỆU SUẤT GIAO HÀNG THÁNG NÀY CỦA BẠN:**\n` +
+           `- Số đơn giao thành công: **${res.deliveredCount} đơn**\n` +
+           `- Tổng giá trị hàng đã giao: **${formatVND(res.totalRevenue)}**\n` +
+           `Cố gắng hoàn thành chỉ tiêu để nhận thưởng chuyên cần nhé!`;
+  },
   sql: (userId) => `SELECT COUNT(*) AS so_don_thanh_cong, COALESCE(SUM(total_amount), 0) AS tong_gia_tri_giao FROM orders WHERE assigned_shipper_id = ${userId || ':userId'} AND status IN ('DELIVERED', 'COMPLETED') AND delivered_at >= date_trunc('month', now() AT TIME ZONE 'Asia/Ho_Chi_Minh');`
 });
 
@@ -89,7 +180,7 @@ deliveryTrainer.addSkill({
   id: 'FAILED_OR_RETURNED_ORDERS',
   title: 'Các đơn giao không thành công hoặc chuyển hoàn',
   description: 'Kiểm tra đơn bị bom hoặc khách từ chối nhận',
-  type: 'LIVE_SQL',
+  type: 'PRISMA_QUERY',
   examples: [
     'có đơn nào của tôi bị bom không',
     'các đơn chuyển hoàn của tôi',
@@ -99,6 +190,38 @@ deliveryTrainer.addSkill({
   patterns: [
     /(bị bom|chuyển hoàn|giao xịt|không nhận hàng|giao thất bại)/i
   ],
+  allowedRoles: ['DELIVERY', 'ADMIN_CEO', 'ADMIN'],
+  handler: async (prisma, params, user) => {
+    const shipperId = Number(user.id || params.userId || 0);
+    return await prisma.order.findMany({
+      where: {
+        assignedShipperId: shipperId,
+        status: { in: ['FAILED_DELIVERY', 'RETURNING_TO_WAREHOUSE', 'CANCELLED'] },
+        updatedAt: { gte: getStartOfMonth() }
+      },
+      select: {
+        orderId: true,
+        shippingAddress: true,
+        customer: { select: { phone: true, name: true } },
+        status: true,
+        failReason: true,
+        updatedAt: true
+      },
+      orderBy: { updatedAt: 'desc' }
+    });
+  },
+  template: (orders) => {
+    if (!orders || orders.length === 0) {
+      return '🎉 **Tuyệt vời! Không có đơn nào bị bom hoặc chuyển hoàn trong tháng này.**';
+    }
+    let res = `⚠️ **DANH SÁCH ${orders.length} ĐƠN HOÀN / GIAO THẤT BẠI TRONG THÁNG:**\n\n`;
+    orders.forEach((o, idx) => {
+      res += `${idx + 1}. **Đơn #${o.orderId}** - Trạng thái: \`${o.status}\`\n`;
+      res += `   Lý do: ${o.failReason || 'Khách hẹn lại / Không nghe máy'}\n`;
+      res += `   Địa chỉ: ${o.shippingAddress}\n`;
+    });
+    return res.trim();
+  },
   sql: (userId) => `SELECT order_id, shipping_address, shipping_phone, status, updated_at FROM orders WHERE assigned_shipper_id = ${userId || ':userId'} AND status IN ('FAILED_DELIVERY', 'RETURNING_TO_WAREHOUSE', 'CANCELLED') AND updated_at >= date_trunc('month', now() AT TIME ZONE 'Asia/Ho_Chi_Minh') ORDER BY updated_at DESC;`
 });
 

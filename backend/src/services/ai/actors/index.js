@@ -7,7 +7,9 @@
  * - SALES: Chuyên viên tư vấn & Bán lẻ
  * - ADMIN_CEO: Ban Giám Đốc & Quản trị hệ thống
  *
- * Cho phép nhà phát triển dễ dàng mở rộng, train thêm kỹ năng mới qua hàm addSkill()
+ * Hỗ trợ đồng thời 2 cơ chế:
+ * 1. Cơ chế mới (Giai đoạn 1): Intent Catalog + Parameterized Prisma Handlers (An toàn, Offline, Type-safe)
+ * 2. Cơ chế cũ (Legacy NL2SQL): Semantic SQL Rule Matching & Few-Shots
  */
 
 const BaseActorTrainer = require('./BaseActorTrainer');
@@ -94,6 +96,34 @@ const matchActorSkill = (userPrompt, role, userId) => {
 };
 
 /**
+ * THỰC THI TRỰC TIẾP Ý ĐỊNH BẰNG PRISMA HANDLER (KIẾN TRÚC GIAI ĐOẠN 1)
+ * Pipeline hoàn chỉnh: So khớp ý định -> Kiểm tra RBAC -> Chạy Prisma Handler -> Điền kết quả vào Template
+ * @param {string} userPrompt - Câu hỏi của người dùng
+ * @param {string} role - Vai trò của người dùng (DELIVERY, WAREHOUSE, ACCOUNTANT, SALES, ADMIN_CEO)
+ * @param {Object} prisma - Prisma Client instance
+ * @param {Object} [user={}] - Thông tin user { id, role, fullName }
+ * @param {Object} [params={}] - Các tham số đã trích xuất (tên sản phẩm, mốc thời gian...)
+ */
+const executeActorIntent = async (userPrompt, role, prisma, user = {}, params = {}) => {
+  const trainer = getTrainer(role);
+  if (!trainer) {
+    return { status: 'NOT_FOUND', message: `Không tìm thấy bộ huấn luyện cho vai trò ${role}` };
+  }
+
+  const matchResult = trainer.match(userPrompt, user.id);
+  if (!matchResult) {
+    return null; // Không khớp ý định đã định nghĩa
+  }
+
+  const execResult = await trainer.execute(matchResult.skill, prisma, params, user);
+  return {
+    ...execResult,
+    matchScore: matchResult.score,
+    role: trainer.role
+  };
+};
+
+/**
  * Lấy tài liệu quy chuẩn SOP đặc thù cho vai trò
  */
 const getActorKnowledgeSOP = (role) => {
@@ -121,9 +151,9 @@ module.exports = {
   getActorFewShots,
   evaluateActorSemanticRules,
   matchActorSkill,
+  executeActorIntent,
   getActorKnowledgeSOP,
   exportAllNlpDatasets,
-  // Xuất trực tiếp các trainer để người dùng có thể import và train thêm từ bất cứ đâu
   deliveryTrainer,
   warehouseTrainer,
   accountantTrainer,
