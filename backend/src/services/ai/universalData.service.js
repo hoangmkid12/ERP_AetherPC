@@ -251,11 +251,17 @@ const isSafeSqlQuery = (sql) => {
   return true;
 };
 
+const { evaluateActorSemanticRules, getActorFewShots, getActorSystemPrompt } = require('./actors');
+
 /**
  * Bộ sinh truy vấn SQL theo ngữ nghĩa (Semantic Rule-based NL2SQL)
  * Hoạt động 100% offline không cần API key nếu Gemini tạm thời chưa cấu hình
  */
-const generateSqlBySemanticPattern = (userPrompt, userRole) => {
+const generateSqlBySemanticPattern = (userPrompt, userRole, userId) => {
+  // 0. Ưu tiên bộ quy tắc chuyên biệt được huấn luyện cho từng Actor
+  const actorSql = evaluateActorSemanticRules(userPrompt, userRole, userId);
+  if (actorSql) return actorSql;
+
   const lower = userPrompt.toLowerCase();
 
   // 0. Doanh thu & Dòng tiền theo mốc thời gian (Năm nay, Tháng này, Quý này, Hôm nay, Hôm qua, Từng tháng...)
@@ -373,7 +379,14 @@ const generateSqlBySemanticPattern = (userPrompt, userRole) => {
 /**
  * Sinh câu lệnh SQL từ ngôn ngữ tự nhiên bằng LLM (Có fallback sang Semantic Pattern)
  */
-const generateSqlFromQuestion = async (userPrompt, userRole) => {
+const generateSqlFromQuestion = async (userPrompt, userRole, userId) => {
+  // 0. Bước 0: Ưu tiên bộ quy tắc chuyên biệt được huấn luyện cho từng Actor (Nhanh & Chuẩn xác 100%)
+  const actorMatchSql = evaluateActorSemanticRules(userPrompt, userRole, userId);
+  if (actorMatchSql && isSafeSqlQuery(actorMatchSql)) {
+    console.log(`[UniversalData] Khớp mẫu Actor-Specific Semantic Rule (${userRole}) → "${actorMatchSql}"`);
+    return actorMatchSql;
+  }
+
   // 1. Bước 1: Mô hình AI tự huấn luyện (Local NLU & NER) bóc tách Slot/Thực thể trước
   let nluResult = null;
   try {
@@ -404,7 +417,15 @@ const generateSqlFromQuestion = async (userPrompt, userRole) => {
         } catch (e) {}
       }
 
-      const prompt = `${ERP_DATABASE_SCHEMA_PROMPT}${adminTrainedFewShots}
+      // Tải các kịch bản Few-Shots chuyên biệt cho Actor
+      let actorFewShotsPrompt = '';
+      const actorFewShotsList = getActorFewShots(userRole);
+      if (actorFewShotsList && actorFewShotsList.length > 0) {
+        actorFewShotsPrompt = `\n\n==================================================\nBẢNG MẪU SQL HUẤN LUYỆN CHUYÊN BIỆT CHO VAI TRÒ [${userRole}]:\n==================================================\n` +
+          actorFewShotsList.map(s => `User: "${s.question}"\nSQL: ${s.sql}`).join('\n\n');
+      }
+
+      const prompt = `${ERP_DATABASE_SCHEMA_PROMPT}${adminTrainedFewShots}${actorFewShotsPrompt}
 
 NGUYÊN TẮC BẮT BUỘC:
 1. Bạn CHỈ ĐƯỢC sinh ra ĐÚNG 1 câu lệnh SQL "SELECT" duy nhất, thuần túy, KHÔNG markdown (không \`\`\`sql), KHÔNG giải thích.
@@ -459,8 +480,8 @@ SQL Query:`;
     return nluResult.sql;
   }
 
-  // 3. Fallback sang Bộ quy tắc ngữ nghĩa mở rộng
-  return generateSqlBySemanticPattern(userPrompt, userRole);
+  // 4. Fallback sang Bộ quy tắc ngữ nghĩa mở rộng
+  return generateSqlBySemanticPattern(userPrompt, userRole, userId);
 };
 
 /**
@@ -471,9 +492,10 @@ SQL Query:`;
  */
 const executeUniversalDataQuery = async (promptText, user) => {
   const userRole = user?.role || 'SALES';
+  const userId = user?.id || 0;
 
   // 1. Sinh câu lệnh SQL tối ưu từ câu hỏi tự nhiên
-  const generatedSql = await generateSqlFromQuestion(promptText, userRole);
+  const generatedSql = await generateSqlFromQuestion(promptText, userRole, userId);
   if (!generatedSql) {
     return null;
   }

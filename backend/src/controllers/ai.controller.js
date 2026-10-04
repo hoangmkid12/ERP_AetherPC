@@ -34,6 +34,16 @@ PHONG CÁCH VÀ TÍNH CÁCH TRÒ CHUYỆN:
    - Tuyệt đối không cung cấp mật khẩu cá nhân của nhân viên khác.
 5. ĐỊNH DẠNG: Trình bày Markdown tinh tế, gãy gọn, có ngắt đoạn rõ ràng, dùng bullet point và icon hợp lý để tạo cảm giác dễ đọc.`;
 
+const { getActorSystemPrompt, evaluateActorSemanticRules } = require('../services/ai/actors');
+
+/**
+ * Kết hợp System Instruction chung với Persona chuyên biệt của từng Actor
+ */
+const getEffectiveSystemInstruction = (role) => {
+  const actorPrompt = getActorSystemPrompt(role);
+  return `${SYSTEM_INSTRUCTION}\n\n==================================================\nHƯỚNG DẪN CHUYÊN BIỆT THEO VAI TRÒ NGƯỜI DÙNG (${role}):\n==================================================\n${actorPrompt}`;
+};
+
 // Danh sách câu hỏi gợi ý nhanh theo vai trò (Prompt Chips)
 const ROLE_PROMPT_CHIPS = {
   SALES: [
@@ -311,16 +321,30 @@ const chatWithAi = async (req, res, next) => {
     // ========================================================================
     let classified = null;
 
-    // 1. Ưu tiên Mô hình AI NLP tự huấn luyện cục bộ (Self-Trained Model Inference)
-    const localNlpResult = await classifyIntentLocal(promptText);
-    if (localNlpResult && localNlpResult.confidence >= 0.70) {
-      console.log(`[SelfTrainedAI] Mô hình tự train → ${localNlpResult.intent} (conf=${(localNlpResult.confidence * 100).toFixed(1)}%)`);
+    // 0. Ưu tiên Kịch bản Huấn luyện chuyên biệt theo Actor (Role-Based Engine)
+    const actorSpecificSql = evaluateActorSemanticRules(promptText, user.role, user.id);
+    if (actorSpecificSql) {
+      console.log(`[ActorTraining] Khớp kịch bản Actor (${user.role}) → UNIVERSAL_DATA_QUERY`);
       classified = {
-        intent: localNlpResult.intent,
-        subIntent: 'Phân loại bởi Mô hình AI tự huấn luyện (Local NLU Model)',
-        entities: { expandedKeywords: [] },
-        confidence: localNlpResult.confidence
+        intent: 'UNIVERSAL_DATA_QUERY',
+        subIntent: `Kịch bản chuyên biệt cho vai trò ${user.role}`,
+        entities: {},
+        confidence: 1.0
       };
+    }
+
+    // 1. Ưu tiên Mô hình AI NLP tự huấn luyện cục bộ (Self-Trained Model Inference)
+    if (!classified) {
+      const localNlpResult = await classifyIntentLocal(promptText);
+      if (localNlpResult && localNlpResult.confidence >= 0.70) {
+        console.log(`[SelfTrainedAI] Mô hình tự train → ${localNlpResult.intent} (conf=${(localNlpResult.confidence * 100).toFixed(1)}%)`);
+        classified = {
+          intent: localNlpResult.intent,
+          subIntent: 'Phân loại bởi Mô hình AI tự huấn luyện (Local NLU Model)',
+          entities: { expandedKeywords: [] },
+          confidence: localNlpResult.confidence
+        };
+      }
     }
 
     // 2. Chống nhầm lẫn ngữ nghĩa tiếng Việt: Câu hỏi lịch sự "cho tôi biết/cho tôi xem..."
@@ -785,7 +809,7 @@ Hãy trả lời chính xác dựa trên dữ liệu trên. Dùng Markdown đẹ
                 })),
                 { role: 'user', parts: [{ text: promptText }] }
               ],
-              config: { systemInstruction: SYSTEM_INSTRUCTION, temperature: 0.7 }
+              config: { systemInstruction: getEffectiveSystemInstruction(user.role), temperature: 0.7 }
             });
             if (aiGen.text) {
               finalAiResponse = aiGen.text;

@@ -31,8 +31,8 @@ const submitAiFeedback = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'Mã hội thoại không hợp lệ.' });
     }
     if (prompt.length > 5000 || response.length > 10000 ||
-        (correction !== undefined && typeof correction !== 'string') ||
-        (typeof correction === 'string' && correction.length > 5000)) {
+      (correction !== undefined && typeof correction !== 'string') ||
+      (typeof correction === 'string' && correction.length > 5000)) {
       return res.status(400).json({ success: false, message: 'Nội dung phản hồi vượt quá giới hạn cho phép.' });
     }
 
@@ -117,8 +117,8 @@ const reviewAiFeedback = async (req, res, next) => {
     }
 
     if (typeof title !== 'string' || !title.trim() ||
-        typeof content !== 'string' || !content.trim() ||
-        !KNOWLEDGE_CATEGORIES.includes(category)) {
+      typeof content !== 'string' || !content.trim() ||
+      !KNOWLEDGE_CATEGORIES.includes(category)) {
       return res.status(400).json({ success: false, message: 'Khi duyệt, cần nhập tiêu đề, nội dung và chuyên mục hợp lệ.' });
     }
     if (title.trim().length > 255 || content.trim().length > 20000) {
@@ -241,7 +241,7 @@ const saveDynamicSkill = async (req, res, next) => {
           reviewedByName: req.user?.name || req.user?.fullName || null,
           reviewedAt: new Date()
         }
-      }).catch(() => {});
+      }).catch(() => { });
     }
 
     res.json({
@@ -363,7 +363,7 @@ const autoFixSql = async (req, res, next) => {
     let GoogleGenAI = null;
     try {
       GoogleGenAI = require('@google/genai').GoogleGenAI;
-    } catch (e) {}
+    } catch (e) { }
 
     if (GoogleGenAI && process.env.GEMINI_API_KEY) {
       try {
