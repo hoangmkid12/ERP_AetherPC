@@ -138,9 +138,25 @@ const executeActorIntent = async (userPrompt, role, prisma, user = {}, params = 
   }
 
   const sessionId = params.sessionId || user.id || 'default_session';
+  const isAdminCeo = trainer.role === 'ADMIN_CEO' || user.role === 'ADMIN' || user.role === 'CEO';
 
   // 1. Tầng 1: So khớp bằng Regex Patterns nhanh
   let matchResult = trainer.match(userPrompt, user.id);
+  let executingTrainer = trainer;
+
+  // Nếu là ADMIN / CEO và chưa khớp kịch bản của ADMIN, thử khớp với các Actor nghiệp vụ khác
+  if (!matchResult && isAdminCeo) {
+    const otherTrainers = [salesTrainer, warehouseTrainer, accountantTrainer, deliveryTrainer];
+    for (const ot of otherTrainers) {
+      const res = ot.match(userPrompt, user.id);
+      if (res && res.score >= 120) {
+        matchResult = res;
+        executingTrainer = ot;
+        break;
+      }
+    }
+  }
+
   let matchedSkill = matchResult ? matchResult.skill : null;
   let matchScore = matchResult ? matchResult.score : 0;
   let matchSource = 'PATTERN_RULE';
@@ -151,7 +167,7 @@ const executeActorIntent = async (userPrompt, role, prisma, user = {}, params = 
     if (anaphoraCheck.isDateFollowUp) {
       const recentTurns = conversationContext.getRecentTurns(sessionId, 3);
       if (recentTurns.length > 0 && recentTurns[0].skillId) {
-        const prevSkill = trainer.getSkill(recentTurns[0].skillId);
+        const prevSkill = executingTrainer.getSkill(recentTurns[0].skillId) || trainer.getSkill(recentTurns[0].skillId);
         if (prevSkill) {
           matchedSkill = prevSkill;
           matchScore = 0.95;
@@ -163,7 +179,8 @@ const executeActorIntent = async (userPrompt, role, prisma, user = {}, params = 
 
   // 2. Tầng 2 & 3: Nếu Regex không khớp hoặc điểm thấp -> Kích hoạt Vector Embedding & Cosine Similarity (Stage 3)
   if (!matchedSkill) {
-    const hybridMatch = await matchHybridIntent(userPrompt, trainer.role, trainer);
+    const searchRole = isAdminCeo ? null : trainer.role;
+    const hybridMatch = await matchHybridIntent(userPrompt, searchRole, trainer);
     if (hybridMatch && hybridMatch.skill) {
       if (hybridMatch.status === 'UNCERTAIN') {
         const suggestionText = hybridMatch.suggestions && hybridMatch.suggestions.length > 0
@@ -175,7 +192,7 @@ const executeActorIntent = async (userPrompt, role, prisma, user = {}, params = 
           status: 'UNCERTAIN',
           intent: hybridMatch.intent,
           matchScore: hybridMatch.score,
-          role: trainer.role,
+          role: executingTrainer.role,
           suggestions: hybridMatch.suggestions,
           text: `🤔 **Hệ thống chưa hoàn toàn chắc chắn về câu hỏi của bạn** (Độ tương đồng: ${(hybridMatch.score * 100).toFixed(1)}%).${suggestionText}\n\nBạn có thể thử diễn đạt lại câu hỏi rõ hơn nhé!`
         };
@@ -184,6 +201,9 @@ const executeActorIntent = async (userPrompt, role, prisma, user = {}, params = 
       matchedSkill = hybridMatch.skill;
       matchScore = hybridMatch.score;
       matchSource = hybridMatch.source;
+      if (hybridMatch.role && TRAINERS[hybridMatch.role]) {
+        executingTrainer = TRAINERS[hybridMatch.role];
+      }
     }
   }
 
@@ -193,11 +213,13 @@ const executeActorIntent = async (userPrompt, role, prisma, user = {}, params = 
     const recentTurns = conversationContext.getRecentTurns(sessionId, 3);
     if (ellipticalType && recentTurns.length > 0) {
       if (ellipticalType === 'PRODUCT') {
-        matchedSkill = trainer.getSkill('PRODUCT_PRICE_STOCK');
+        executingTrainer = salesTrainer;
+        matchedSkill = salesTrainer.getSkill('PRODUCT_PRICE_STOCK');
         matchScore = 0.90;
         matchSource = 'ELLIPTICAL_CONTEXT';
       } else if (ellipticalType === 'ORDER') {
-        matchedSkill = trainer.getSkill('DELIVERY_TRACK_ORDER') || trainer.getSkill('ORDER_DETAIL_LOOKUP');
+        executingTrainer = deliveryTrainer;
+        matchedSkill = deliveryTrainer.getSkill('DELIVERY_TRACK_ORDER') || deliveryTrainer.getSkill('ORDER_DETAIL_LOOKUP');
         matchScore = 0.90;
         matchSource = 'ELLIPTICAL_CONTEXT';
       }
@@ -228,17 +250,17 @@ const executeActorIntent = async (userPrompt, role, prisma, user = {}, params = 
       text: clarification.message,
       matchScore,
       matchSource,
-      role: trainer.role
+      role: executingTrainer.role
     };
   }
 
   // GIAI ĐOẠN 1: Chạy Prisma Handler và kiểm tra bảo mật RBAC
-  const execResult = await trainer.execute(matchedSkill, prisma, resolvedParams, user);
+  const execResult = await executingTrainer.execute(matchedSkill, prisma, resolvedParams, user);
 
   // GIAI ĐOẠN 4: Ghi lại lượt hội thoại vào Session Context
   conversationContext.recordTurn(sessionId, {
     userPrompt,
-    role: trainer.role,
+    role: executingTrainer.role,
     intent: matchedSkill.id,
     skillId: matchedSkill.id,
     extractedParams: resolvedParams,
@@ -252,7 +274,7 @@ const executeActorIntent = async (userPrompt, role, prisma, user = {}, params = 
     inheritedParams: inherited,
     matchScore,
     matchSource,
-    role: trainer.role
+    role: executingTrainer.role
   };
 
   // GIAI ĐOẠN 5: Lưu kết quả vào Query Cache với TTL tối ưu

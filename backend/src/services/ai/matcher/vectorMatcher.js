@@ -98,7 +98,9 @@ class VectorMatcher {
     }
 
     // Lọc theo vai trò nếu được chỉ định
-    const filterFn = filterRole && filterRole !== 'ALL'
+    // ĐẶC BIỆT: ADMIN và CEO là vai trò quản trị tối cao, có quyền tra cứu toàn bộ kỹ năng ERP (Sales, Kho, Kế toán, Delivery)
+    const isAdminCeo = filterRole === 'ADMIN_CEO' || filterRole === 'ADMIN' || filterRole === 'CEO';
+    const filterFn = (filterRole && filterRole !== 'ALL' && !isAdminCeo)
       ? (doc) => doc.metadata.role === filterRole
       : null;
 
