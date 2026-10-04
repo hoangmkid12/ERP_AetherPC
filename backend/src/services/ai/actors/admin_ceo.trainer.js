@@ -737,5 +737,77 @@ adminCeoTrainer.addSkill({
   }
 });
 
+// Kỹ năng 18: Thống kê tình hình nhân sự nghỉ phép & đơn xin phép chờ duyệt
+adminCeoTrainer.addSkill({
+  id: 'HR_LEAVE_REQUESTS',
+  title: 'Thống kê tình hình nhân sự nghỉ phép & đơn xin phép chờ duyệt',
+  description: 'Báo cáo danh sách nhân viên đang nghỉ phép hoặc nộp đơn xin phép chờ Giám đốc duyệt',
+  type: 'PRISMA_QUERY',
+  examples: [
+    'Thống kê tình hình nhân sự nghỉ phép',
+    'tình hình nhân sự nghỉ phép',
+    'có đơn nghỉ phép nào chờ duyệt không',
+    'danh sách nhân viên xin nghỉ phép',
+    'ai đang nghỉ phép',
+    'đơn xin nghỉ phép chưa duyệt',
+    'tình hình nghỉ phép toàn công ty'
+  ],
+  patterns: [
+    /(nghỉ phép|xin nghỉ|vắng mặt|đơn nghỉ phép|ai đang nghỉ)/i
+  ],
+  allowedRoles: ['ADMIN_CEO', 'ADMIN', 'HR'],
+  handler: async (prisma) => {
+    return await prisma.leaveRequest.findMany({
+      include: {
+        employee: {
+          select: { fullName: true, department: true, role: true }
+        }
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 6
+    });
+  },
+  template: (data) => {
+    if (!data || data.length === 0) {
+      return '🎉 **Hiện toàn bộ nhân sự đang làm việc đầy đủ, không có đơn xin nghỉ phép nào ghi nhận.**';
+    }
+    const pendingCount = data.filter(d => d.status === 'PENDING').length;
+    let res = `📋 **BÁO CÁO TÌNH HÌNH NHÂN SỰ NGHỈ PHÉP (TỔNG CỘNG: ${data.length} ĐƠN):**\n\n` +
+              `🔔 *Cảnh báo phê duyệt:* Có **${pendingCount} đơn đang chờ Ban Giám Đốc xét duyệt (PENDING)**\n\n`;
+    data.forEach((l, idx) => {
+      const emp = l.employee || {};
+      const statusBadge = l.status === 'PENDING' ? '⏳ `CHỜ DUYỆT`' : (l.status === 'APPROVED' ? '✅ `ĐÃ DUYỆT`' : '❌ `TỪ CHỐI`');
+      const startStr = formatDateVN(l.startDate).split(' ')[1] || 'N/A';
+      const endStr = formatDateVN(l.endDate).split(' ')[1] || 'N/A';
+      res += `${idx + 1}. **${emp.fullName || 'Nhân viên'}** (${emp.department || emp.role})\n` +
+             `   Loại phép: **${l.type}** | Trạng thái: ${statusBadge}\n` +
+             `   Thời gian: từ **${startStr}** đến **${endStr}**\n` +
+             `   Lý do: *"${l.reason || 'Việc cá nhân'}"*\n\n`;
+    });
+    return res.trim();
+  }
+});
+
+// Kỹ năng 19: Quy định và quy trình đổi trả hàng hóa lỗi kỹ thuật (RMA SOP)
+adminCeoTrainer.addSkill({
+  id: 'SOP_RMA_POLICY',
+  title: 'Quy trình đổi trả sản phẩm lỗi kỹ thuật và hoàn tiền (RMA)',
+  description: 'Tài liệu chuẩn mực hướng dẫn tiếp nhận, kiểm định và giải quyết đổi trả hàng',
+  type: 'KNOWLEDGE_SOP',
+  examples: [
+    'Quy trình đổi trả sản phẩm lỗi của công ty',
+    'chính sách đổi trả hàng hóa',
+    'quy định trả hàng hoàn tiền',
+    'thủ tục nhận lại hàng lỗi từ khách'
+  ],
+  patterns: [
+    /(quy trình đổi trả|chính sách đổi trả|quy định đổi trả|thủ tục.*đổi trả)/i
+  ],
+  sop: `🔄 **QUY CHẾ TIẾP NHẬN & XỬ LÝ ĐỔI TRẢ HÀNG HÓA (RMA STANDARD):**
+1. **Thời hạn đổi mới 100%:** Trong vòng **30 ngày đầu tiên** kể từ ngày mua nếu sản phẩm gặp lỗi do Nhà sản xuất (yêu cầu giữ nguyên vỏ hộp, phụ kiện và tem bảo hành AetherPC).
+2. **Thời gian thẩm định QC:** Tối đa **24 giờ làm việc** kể từ khi nhận sản phẩm tại Trung tâm Kỹ thuật. Nếu đúng lỗi phần cứng, lập phiếu đổi mới ngay lập tức.
+3. **Chính sách hoàn tiền (Refund):** Trường hợp kho hết hàng thay thế hoặc khách không đồng ý đổi sang dòng tương đương, kế toán thực hiện lệnh hoàn tiền 100% qua tài khoản ngân hàng chính chủ trong vòng **48 giờ làm việc**.`
+});
+
 module.exports = adminCeoTrainer;
 
