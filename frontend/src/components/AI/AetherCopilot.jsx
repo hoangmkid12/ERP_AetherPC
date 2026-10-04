@@ -90,7 +90,14 @@ export default function AetherCopilot() {
     setLoading(true);
 
     try {
-      const response = await api.post('/ai/chat', { message: text });
+      const response = await api.post('/ai/chat', { 
+        message: text,
+        sessionId: `session_${user?.id || 'anon'}`,
+        conversationHistory: messages.slice(-6).map(m => ({
+          role: m.role,
+          content: m.content
+        }))
+      });
       
       if (response && response.success) {
         const replyText = response.data?.reply || response.data?.response || response.data?.message || (typeof response.data === 'string' ? response.data : '');
@@ -102,6 +109,10 @@ export default function AetherCopilot() {
           toolCalls: response.data?.toolCalls || [],
           citations: response.data?.citations || [],
           auditLogId: response.data?.auditLogId || null,
+          isCached: response.data?.isCached || false,
+          matchSource: response.data?.matchSource || null,
+          latencyMs: response.data?.latencyMs || null,
+          skillId: response.data?.skillId || null,
           timestamp: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
         };
         setMessages(prev => [...prev, botMsg]);
@@ -531,6 +542,30 @@ export default function AetherCopilot() {
                     wordBreak: 'break-word'
                   }}
                 >
+                  {/* Offline Engine / Cache Badge */}
+                  {msg.role === 'assistant' && (msg.matchSource || msg.isCached) && (
+                    <div style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      marginBottom: '6px',
+                      padding: '2px 8px',
+                      backgroundColor: msg.isCached ? '#ecfdf5' : '#f0fdf4',
+                      borderRadius: '12px',
+                      border: msg.isCached ? '1px solid #a7f3d0' : '1px solid #bbf7d0',
+                      fontSize: '0.68rem',
+                      color: msg.isCached ? '#047857' : '#15803d',
+                      fontWeight: 700
+                    }}>
+                      <ShieldCheck size={12} style={{ color: msg.isCached ? '#059669' : '#16a34a' }} />
+                      <span>
+                        {msg.isCached 
+                          ? `⚡ Bộ nhớ đệm (< 1ms)` 
+                          : `🔒 Offline Deterministic Engine (${msg.latencyMs ? msg.latencyMs + 'ms' : '< 30ms'})`}
+                      </span>
+                    </div>
+                  )}
+
                   {/* Tool execution badge */}
                   {msg.toolCalls && msg.toolCalls.length > 0 && (
                     <div style={{

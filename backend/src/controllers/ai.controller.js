@@ -35,6 +35,7 @@ PHONG CÁCH VÀ TÍNH CÁCH TRÒ CHUYỆN:
 5. ĐỊNH DẠNG: Trình bày Markdown tinh tế, gãy gọn, có ngắt đoạn rõ ràng, dùng bullet point và icon hợp lý để tạo cảm giác dễ đọc.`;
 
 const { getActorSystemPrompt, evaluateActorSemanticRules, executeActorIntent } = require('../services/ai/actors');
+const { queryCache } = require('../services/ai/cache');
 
 /**
  * Kết hợp System Instruction chung với Persona chuyên biệt của từng Actor
@@ -101,7 +102,7 @@ const ROLE_PROMPT_CHIPS = {
 const getPromptChips = (req, res) => {
   const role = req.user?.role || 'SALES';
   const chips = ROLE_PROMPT_CHIPS[role] || ROLE_PROMPT_CHIPS.SALES;
-  res.json({ success: true, role, chips });
+  res.json({ success: true, role, chips, data: chips });
 };
 
 // ============================================================================
@@ -321,6 +322,7 @@ const chatWithAi = async (req, res, next) => {
     // Pipeline: Vector/Hybrid Matcher -> Entity Extraction -> Context/Anaphora Resolution -> RBAC Prisma Handler
     // ========================================================================
     const sessionId = req.body.sessionId || (user.id ? String(user.id) : 'session_default');
+    let offlineMetadata = null;
     const actorResult = await executeActorIntent(promptText, user.role, prisma, user, {
       sessionId,
       conversationHistory
@@ -328,13 +330,20 @@ const chatWithAi = async (req, res, next) => {
 
     if (actorResult && (actorResult.status === 'SUCCESS' || actorResult.status === 'CLARIFICATION_REQUIRED' || actorResult.status === 'ACCESS_DENIED' || actorResult.status === 'UNCERTAIN')) {
       finalAiResponse = actorResult.text || actorResult.message;
+      offlineMetadata = {
+        isCached: Boolean(actorResult.fromCache),
+        matchSource: actorResult.matchSource,
+        matchScore: actorResult.matchScore,
+        skillId: actorResult.skillId || actorResult.intent
+      };
       toolCallsExecuted.push({
         tool: actorResult.skillId || actorResult.intent || 'offline_actor_handler',
         params: actorResult.extractedParams || {},
         result: {
           status: actorResult.status,
           matchSource: actorResult.matchSource,
-          matchScore: actorResult.matchScore
+          matchScore: actorResult.matchScore,
+          isCached: Boolean(actorResult.fromCache)
         }
       });
       if (actorResult.citations && Array.isArray(actorResult.citations)) {
@@ -885,7 +894,11 @@ Hãy trả lời chính xác dựa trên dữ liệu trên. Dùng Markdown đẹ
         citations,
         toolCalls: toolCallsExecuted.map(t => t.tool),
         latencyMs,
-        auditLogId: auditLog?.id || null
+        auditLogId: auditLog?.id || null,
+        isCached: offlineMetadata?.isCached || false,
+        matchSource: offlineMetadata?.matchSource || null,
+        matchScore: offlineMetadata?.matchScore || null,
+        skillId: offlineMetadata?.skillId || null
       }
     });
   } catch (err) {
@@ -927,10 +940,45 @@ const getAiAuditLogs = async (req, res, next) => {
   }
 };
 
+// GET /api/v1/ai/stats (Chỉ Admin / CEO)
+const getAiStats = async (req, res, next) => {
+  try {
+    const cacheStats = queryCache.getStats();
+    const totalLogs = await prisma.aiAuditLog.count();
+    const recentLogs = await prisma.aiAuditLog.findMany({
+      take: 100,
+      orderBy: { createdAt: 'desc' },
+      select: { latencyMs: true, status: true, userRole: true }
+    });
+
+    const avgLatency = recentLogs.length > 0
+      ? Math.round(recentLogs.reduce((sum, l) => sum + (l.latencyMs || 0), 0) / recentLogs.length)
+      : 0;
+
+    const successCount = recentLogs.filter(l => l.status === 'SUCCESS').length;
+    const successRate = recentLogs.length > 0 ? Number(((successCount / recentLogs.length) * 100).toFixed(1)) : 100;
+
+    res.json({
+      success: true,
+      data: {
+        cache: cacheStats,
+        totalQueries: totalLogs,
+        recentAvgLatencyMs: avgLatency,
+        successRate,
+        offlineReady: true,
+        pipelineStages: 5
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 module.exports = {
   chatWithAi,
   getPromptChips,
   getAiAuditLogs,
+  getAiStats,
   classifyIntent,
   classifyIntentByRegex
 };

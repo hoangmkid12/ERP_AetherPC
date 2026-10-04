@@ -4,7 +4,8 @@ const { authMiddleware } = require('../middlewares/auth.middleware');
 const {
   chatWithAi,
   getPromptChips,
-  getAiAuditLogs
+  getAiAuditLogs,
+  getAiStats
 } = require('../controllers/ai.controller');
 const {
   submitAiFeedback,
@@ -65,5 +66,9 @@ router.post('/fix-sql', authMiddleware(['ADMIN', 'CEO']), autoFixSql);
 // @route   GET /api/v1/ai/audit-logs
 // Nhật ký kiểm toán gọi tool của AI (Chỉ Admin / CEO)
 router.get('/audit-logs', authMiddleware(['ADMIN', 'CEO']), getAiAuditLogs);
+
+// @route   GET /api/v1/ai/stats
+// Thống kê hiệu năng cache, độ trễ và số lượt truy vấn (Chỉ Admin / CEO)
+router.get('/stats', authMiddleware(['ADMIN', 'CEO']), getAiStats);
 
 module.exports = router;
