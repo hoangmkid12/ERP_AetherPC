@@ -33,10 +33,12 @@ salesTrainer.addSkill({
     'card rtx 4070 còn hàng không và giá bao nhiêu',
     'giá bán cpu intel core i5 13400f hiện tại',
     'ram ddr5 corsair dominator giá thế nào',
-    'trong kho còn mấy chiếc mainboard b760m'
+    'trong kho còn mấy chiếc mainboard b760m',
+    'báo giá cho tôi con vga 4060',
+    'sản phẩm này giá bao nhiêu và còn tồn không'
   ],
   patterns: [
-    /(giá bao nhiêu|còn hàng không|còn mấy cái|báo giá|tồn kho.*linh kiện)/i
+    /(giá bao nhiêu|còn hàng không|còn mấy cái|báo giá|tồn kho.*linh kiện|giá.*hiện tại)/i
   ],
   allowedRoles: ['SALES', 'ADMIN_CEO', 'ADMIN', 'WAREHOUSE'],
   handler: async (prisma, params, _user) => {
@@ -79,7 +81,52 @@ salesTrainer.addSkill({
   }
 });
 
-// Kỹ năng 2: Tư vấn nguồn công suất thực phù hợp cấu hình
+// Kỹ năng 2: Tư vấn tương thích CPU và Bo mạch chủ (Compatibility)
+salesTrainer.addSkill({
+  id: 'CHECK_CPU_MOTHERBOARD_COMPATIBILITY',
+  title: 'Tư vấn tương thích CPU Intel / AMD và Bo mạch chủ',
+  description: 'Hướng dẫn phối ghép Socket LGA1700, AM5 và chipset B760, Z790',
+  type: 'PRISMA_QUERY',
+  examples: [
+    'cpu i5 13400f lắp với main b760 có tương thích không?',
+    'mainboard b760m cắm được i7 14700k không',
+    'ryzen 7 7800x3d đi với bo mạch chủ nào',
+    'tư vấn mainboard phù hợp cho cpu intel gen 14',
+    'cpu này có gắn vừa bo mạch chủ kia không'
+  ],
+  patterns: [
+    /(tương thích|lắp được không|cắm được không|đi với main nào|socket.*gắn vừa)/i
+  ],
+  allowedRoles: ['SALES', 'ADMIN_CEO', 'ADMIN'],
+  handler: async (prisma) => {
+    // Trả về top bo mạch chủ bán chạy
+    return await prisma.product.findMany({
+      where: {
+        category: {
+          OR: [
+            { slug: { contains: 'main', mode: 'insensitive' } },
+            { name: { contains: 'bo mạch', mode: 'insensitive' } }
+          ]
+        },
+        stockQuantity: { gt: 0 }
+      },
+      select: { name: true, price: true, stockQuantity: true },
+      take: 5
+    });
+  },
+  template: (mbs) => {
+    let res = `🔧 **TƯ VẤN ĐỘ TƯƠNG THÍCH PHẦN CỨNG:**\n\n` +
+              `1. **Intel Gen 12/13/14 (LGA1700):** Tương thích 100% với các bo mạch chủ chipset **H610, B760, Z790** (với i7/i9 khuyến nghị dùng B760 dàn VRM tốt hoặc Z790).\n` +
+              `2. **AMD Ryzen 7000/8000/9000 (Socket AM5):** Tương thích với **B650, X670** và chuẩn RAM DDR5 bắt buộc.\n\n` +
+              `👉 **CÁC DÒNG BO MẠCH CHỦ CÓ SẴN TRONG KHO:**\n`;
+    mbs.forEach((m, idx) => {
+      res += `${idx + 1}. **${m.name}** - ${formatVND(m.price)} (Còn ${m.stockQuantity} cái)\n`;
+    });
+    return res.trim();
+  }
+});
+
+// Kỹ năng 3: Tư vấn nguồn công suất thực phù hợp cấu hình
 salesTrainer.addSkill({
   id: 'PSU_RECOMMENDATION',
   title: 'Gợi ý nguồn máy tính (PSU) phù hợp cấu hình',
@@ -88,7 +135,8 @@ salesTrainer.addSkill({
   examples: [
     'cấu hình i5 13400 + rtx 4060 cần nguồn bao nhiêu watt',
     'rtx 4070 super dùng nguồn 650w có đủ không',
-    'tư vấn nguồn cho dàn i7 và vga 4080'
+    'tư vấn nguồn cho dàn i7 và vga 4080',
+    'nguồn bao nhiêu watt để kéo rtx 4070'
   ],
   patterns: [
     /(nguồn bao nhiêu watt|cần nguồn bao nhiêu|nguồn.*đủ không|nguồn.*kéo nổi)/i
@@ -130,7 +178,7 @@ salesTrainer.addSkill({
   sql: () => `SELECT p.name, p.price, p.stock_quantity, p.specs FROM products p JOIN categories c ON c.id = p.category_id WHERE (c.slug ILIKE '%psu%' OR c.slug ILIKE '%nguon%') AND p.stock_quantity > 0 ORDER BY p.price ASC LIMIT 10;`
 });
 
-// Kỹ năng 3: Sản phẩm đang có khuyến mãi giảm giá
+// Kỹ năng 4: Sản phẩm đang có khuyến mãi giảm giá
 salesTrainer.addSkill({
   id: 'ACTIVE_PROMOTIONS',
   title: 'Danh sách sản phẩm đang có chiết khấu giảm giá',
@@ -141,7 +189,8 @@ salesTrainer.addSkill({
     'danh sách sản phẩm đang có chương trình giảm giá tốt',
     'hôm nay có linh kiện nào đang sale không',
     'sản phẩm có mức chiết khấu cao',
-    'linh kiện giảm giá hot'
+    'linh kiện giảm giá hot',
+    'các mặt hàng đang có ưu đãi lớn'
   ],
   patterns: [
     /(giảm giá|khuyến mãi|sale|chiết khấu cao|ưu đãi)/i
@@ -179,7 +228,7 @@ salesTrainer.addSkill({
   sql: () => `SELECT product_id, name, original_price, price, discount_percent, stock_quantity FROM products WHERE discount_percent > 0 AND stock_quantity > 0 AND status = 'ACTIVE' ORDER BY discount_percent DESC LIMIT 15;`
 });
 
-// Kỹ năng 4: Doanh số cá nhân của nhân viên Sales
+// Kỹ năng 5: Doanh số cá nhân của nhân viên Sales
 salesTrainer.addSkill({
   id: 'SALES_MY_PERFORMANCE',
   title: 'Doanh số bán hàng cá nhân của nhân viên Sales',
@@ -191,7 +240,8 @@ salesTrainer.addSkill({
     'hôm nay tôi đã bán được bao nhiêu tiền doanh số',
     'doanh số cá nhân của tôi hôm nay',
     'tôi chốt được mấy đơn rồi',
-    'hôm nay bán được bao nhiêu'
+    'hôm nay bán được bao nhiêu',
+    'tổng kết số đơn tôi bán được trong tháng'
   ],
   patterns: [
     /(doanh số.*(của tôi|tôi bán)|tôi bán được bao nhiêu|tôi chốt được mấy đơn)/i
@@ -226,11 +276,11 @@ salesTrainer.addSkill({
   sql: (userId, lower) => {
     const isMonth = /(tháng|thang)/i.test(lower || '');
     const dateTrunc = isMonth ? 'month' : 'day';
-    return `SELECT COUNT(order_id) AS so_don_da_chot, COALESCE(SUM(total_amount), 0) AS doanh_so_ca_nhan FROM orders WHERE sold_by_id = ${userId || ':userId'} AND created_at >= date_trunc('${dateTrunc}', now() AT TIME ZONE 'Asia/Ho_Chi_Minh');`;
+    return `SELECT COUNT(order_id) AS so_don_da_chot, COALESCE(SUM(total_amount), 0) AS doanh_so_ca_nhan FROM orders WHERE sold_by_id = ${userId || ':userId'} AND created_at >= date_trunc('${dateTrunc}', now() AT TIME ZONE 'Asia/Ho_Chi_Minh');`
   }
 });
 
-// Kỹ năng 5: Danh sách khách hàng VIP
+// Kỹ năng 6: Danh sách khách hàng VIP
 salesTrainer.addSkill({
   id: 'VIP_CUSTOMERS_LIST',
   title: 'Danh sách khách hàng VIP nhất công ty',
@@ -240,7 +290,8 @@ salesTrainer.addSkill({
     'danh sách khách hàng vip nhất của công ty',
     'khách hàng mua nhiều nhất',
     'top khách hàng tích điểm cao',
-    'danh sách khách vip'
+    'danh sách khách vip',
+    'những khách hàng thân thiết hàng đầu'
   ],
   patterns: [
     /(khách hàng vip|khách vip|mua nhiều nhất|tích điểm cao|hạng kim cương)/i
@@ -277,7 +328,28 @@ salesTrainer.addSkill({
 // 2. NHÓM KỸ NĂNG QUY TRÌNH & TRI THỨC VĂN BẢN (KNOWLEDGE SOP)
 // ============================================================================
 
-// Kỹ năng 6: Chính sách bảo hành 1 đổi 1 trong 30 ngày
+// Kỹ năng 7: Chính sách mua PC trả góp 0%
+salesTrainer.addSkill({
+  id: 'SOP_INSTALLMENT_POLICY',
+  title: 'Chính sách mua PC trả góp 0% qua thẻ tín dụng và CCCD',
+  description: 'Điều kiện trả góp HD Saison, Home Credit và chuyển đổi trả góp thẻ',
+  type: 'KNOWLEDGE_SOP',
+  examples: [
+    'mua pc trả góp 0% như thế nào',
+    'chính sách trả góp qua thẻ tín dụng',
+    'trả góp qua căn cước công dân cần trả trước bao nhiêu',
+    'điều kiện mua trả góp linh kiện'
+  ],
+  patterns: [
+    /(trả góp|lãi suất 0%|trả trước bao nhiêu|thẻ tín dụng.*trả góp)/i
+  ],
+  sop: `💳 **HƯỚNG DẪN TƯ VẤN MUA HÀNG TRẢ GÓP:**
+1. **Trả góp 0% qua Thẻ Tín Dụng (Visa/Mastercard):** Hỗ trợ qua 25 ngân hàng đối tác (mPOS), kỳ hạn 3 - 6 - 9 - 12 tháng. Phí chuyển đổi từ 2.5% - 4.5% tùy ngân hàng.
+2. **Trả góp qua CCCD (Công ty tài chính):** Khách đủ 18 tuổi trở lên, trả trước tối thiểu 20% giá trị bộ máy, duyệt hồ sơ online trong 15 phút.
+3. **Áp dụng:** Cho toàn bộ dàn PC Full Bộ hoặc hóa đơn linh kiện từ 3.000.000 VNĐ trở lên.`
+});
+
+// Kỹ năng 8: Chính sách bảo hành 1 đổi 1 trong 30 ngày
 salesTrainer.addSkill({
   id: 'SOP_WARRANTY_POLICY',
   title: 'Chính sách bảo hành 1 đổi 1 trong 30 ngày đầu',
@@ -298,7 +370,7 @@ salesTrainer.addSkill({
 3. **Từ chối bảo hành đổi mới:** Cháy nổ chip, cong chân socket CPU do tự lắp đặt sai, vô nước hoặc rơi vỡ móp méo vỏ linh kiện.`
 });
 
-// Kỹ năng 7: Quy chế duyệt chiết khấu khách VIP & B2B
+// Kỹ năng 9: Quy chế duyệt chiết khấu khách VIP & B2B
 salesTrainer.addSkill({
   id: 'SOP_VIP_DISCOUNT_POLICY',
   title: 'Quy chế duyệt chiết khấu cho khách VIP và khách B2B',

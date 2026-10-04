@@ -4,7 +4,7 @@
  */
 
 const BaseActorTrainer = require('./BaseActorTrainer');
-const { getStartOfDay, getStartOfMonth, getStartOfYear, formatVND } = require('../utils/dateHelper');
+const { getStartOfDay, getStartOfMonth, getStartOfYear, formatVND, formatDateVN } = require('../utils/dateHelper');
 
 const accountantTrainer = new BaseActorTrainer({
   role: 'ACCOUNTANT',
@@ -35,10 +35,12 @@ accountantTrainer.addSkill({
     'doanh thu năm nay của công ty',
     'tổng thu cả năm 2026',
     'cho tôi biết doanh thu năm nay',
-    'doanh thu năm nay'
+    'doanh thu năm nay',
+    'tổng kết dòng tiền bán hàng năm nay',
+    'doanh số lũy kế từ đầu năm đến nay'
   ],
   patterns: [
-    /(doanh thu|thực thu|tiền thu).*(năm nay|cả năm|năm 2026)/i
+    /(doanh thu|thực thu|tiền thu).*(năm nay|cả năm|năm 2026|lũy kế)/i
   ],
   allowedRoles: ['ACCOUNTANT', 'ADMIN_CEO', 'ADMIN'],
   handler: async (prisma) => {
@@ -74,10 +76,12 @@ accountantTrainer.addSkill({
     'doanh thu thực tế hôm nay của công ty là bao nhiêu',
     'hôm nay thu được bao nhiêu tiền',
     'báo cáo doanh thu ngày hôm nay',
-    'doanh thu hôm nay'
+    'doanh thu hôm nay',
+    'bữa nay bán được bao nhiêu tiền',
+    'tổng kết thu tiền hôm nay'
   ],
   patterns: [
-    /(doanh thu|thực thu|tiền thu).*(hôm nay|trong ngày)/i
+    /(doanh thu|thực thu|tiền thu).*(hôm nay|trong ngày|bữa nay)/i
   ],
   allowedRoles: ['ACCOUNTANT', 'ADMIN_CEO', 'ADMIN'],
   handler: async (prisma) => {
@@ -111,7 +115,8 @@ accountantTrainer.addSkill({
   examples: [
     'doanh thu tháng này của công ty',
     'tổng kết doanh thu tháng này',
-    'doanh thu theo từng tháng trong năm nay'
+    'doanh thu theo từng tháng trong năm nay',
+    'tháng này bán được bao nhiêu doanh số'
   ],
   patterns: [
     /(doanh thu|thực thu).*(tháng này|từng tháng|mỗi tháng)/i
@@ -150,7 +155,8 @@ accountantTrainer.addSkill({
     'số dư hiện tại trong các tài khoản ngân hàng của công ty',
     'tài khoản ngân hàng mbbank và vietcombank còn bao nhiêu tiền',
     'tài khoản nào đang bật vietqr tự động',
-    'số dư quỹ tiền ngân hàng'
+    'số dư quỹ tiền ngân hàng',
+    'tổng số tiền hiện có trong ngân hàng'
   ],
   patterns: [
     /(số dư|tài khoản ngân hàng|mbbank|vietcombank|ngân hàng|quỹ tiền|vietqr.*mặc định)/i
@@ -181,7 +187,7 @@ accountantTrainer.addSkill({
     });
     return res.trim();
   },
-  sql: () => `SELECT bank_name, account_number, account_holder, current_balance, is_default_vietqr FROM company_bank_accounts WHERE status = 'ACTIVE' ORDER BY current_balance DESC;`
+  sql: () => `SELECT bank_name, account_number, account_holder, current_balance, is_default_qr FROM company_bank_accounts WHERE status = 'ACTIVE' ORDER BY current_balance DESC;`
 });
 
 // Kỹ năng 5: Các đơn hàng chưa thanh toán tiền (Công nợ phải thu)
@@ -195,10 +201,11 @@ accountantTrainer.addSkill({
     'các đơn hàng nào chưa thanh toán tiền',
     'danh sách đơn chưa thanh toán',
     'đơn hàng công nợ chưa thu',
-    'những đơn khách chưa trả tiền'
+    'những đơn khách chưa trả tiền',
+    'danh sách nợ đọng tiền hàng'
   ],
   patterns: [
-    /(chưa thanh toán|chưa trả tiền|nợ tiền|công nợ khách)/i
+    /(chưa thanh toán|chưa trả tiền|nợ tiền|công nợ khách|nợ đọng)/i
   ],
   allowedRoles: ['ACCOUNTANT', 'ADMIN_CEO', 'ADMIN'],
   handler: async (prisma) => {
@@ -244,10 +251,11 @@ accountantTrainer.addSkill({
     'có đơn hàng cod nào đã giao nhưng chưa nộp tiền về kế toán không',
     'shipper nào chưa nộp tiền cod',
     'danh sách đơn cod còn treo tiền',
-    'đối soát nợ tiền cod shipper'
+    'đối soát nợ tiền cod shipper',
+    'tiền cod shipper đang giữ chưa bàn giao'
   ],
   patterns: [
-    /(đối soát|nợ cod|treo tiền|chưa nộp tiền|chưa đối soát)/i
+    /(đối soát|nợ cod|treo tiền|chưa nộp tiền|chưa đối soát|chưa bàn giao.*cod)/i
   ],
   allowedRoles: ['ACCOUNTANT', 'ADMIN_CEO', 'ADMIN'],
   handler: async (prisma) => {
@@ -285,7 +293,90 @@ accountantTrainer.addSkill({
   sql: () => `SELECT o.order_id, o.total_amount, e.full_name AS ten_shipper, o.delivered_at FROM orders o JOIN employees e ON e.id = o.assigned_shipper_id WHERE o.status IN ('DELIVERED', 'COMPLETED') AND o.payment_method = 'COD' AND o.payment_status = 'PENDING' ORDER BY o.delivered_at ASC;`
 });
 
-// Kỹ năng 7: Tỷ trọng phương thức thanh toán
+// Kỹ năng 7: Công nợ phải trả nhà cung cấp sắp tới hạn (Vendor Bills)
+accountantTrainer.addSkill({
+  id: 'VENDOR_BILLS_DUE',
+  title: 'Công nợ phải trả nhà cung cấp sắp tới hạn (Vendor Bills)',
+  description: 'Danh sách các hóa đơn mua hàng từ NCC sắp tới hạn thanh toán',
+  type: 'PRISMA_QUERY',
+  examples: [
+    'hóa đơn mua hàng nào sắp tới hạn trả nợ nhà cung cấp?',
+    'danh sách công nợ phải trả nhà cung cấp',
+    'tiền nợ nhà phân phối sắp tới hạn',
+    'các khoản phải trả sắp đến hạn',
+    'hóa đơn ncc chưa trả tiền'
+  ],
+  patterns: [
+    /(phải trả nhà cung cấp|công nợ ncc|nợ nhà cung cấp|tới hạn trả nợ|hóa đơn ncc)/i
+  ],
+  allowedRoles: ['ACCOUNTANT', 'ADMIN_CEO', 'ADMIN'],
+  handler: async (prisma) => {
+    return await prisma.vendorBill.findMany({
+      where: {
+        status: { in: ['OPEN', 'PARTIAL', 'PENDING'] }
+      },
+      select: {
+        billNumber: true,
+        supplierCode: true,
+        amountTotal: true,
+        amountDue: true,
+        dueDate: true,
+        status: true
+      },
+      orderBy: { dueDate: 'asc' },
+      take: 10
+    });
+  },
+  template: (bills) => {
+    if (!bills || bills.length === 0) {
+      return '🎉 **Tuyệt vời! Công ty không còn khoản công nợ tồn đọng nào cần trả nhà cung cấp.**';
+    }
+    const totalDue = bills.reduce((sum, b) => sum + Number(b.amountDue || b.amountTotal || 0), 0);
+    let res = `📋 **DANH SÁCH ${bills.length} HÓA ĐƠN NCC SẮP TỚI HẠN (TỔNG NỢ: ${formatVND(totalDue)}):**\n\n`;
+    bills.forEach((b, idx) => {
+      res += `${idx + 1}. **Hóa đơn #${b.billNumber}** (NCC: \`${b.supplierCode}\`)\n`;
+      res += `   Còn phải trả: **${formatVND(b.amountDue || b.amountTotal)}** | Hạn trả: ${formatDateVN(b.dueDate)}\n`;
+    });
+    return res.trim();
+  }
+});
+
+// Kỹ năng 8: Báo cáo quỹ lương dự kiến trong tháng (Payroll Summary)
+accountantTrainer.addSkill({
+  id: 'PAYROLL_SUMMARY_CURRENT_MONTH',
+  title: 'Báo cáo quỹ lương dự kiến trong tháng',
+  description: 'Tổng tiền lương thực nhận dự toán cần chi trả cho nhân sự',
+  type: 'PRISMA_QUERY',
+  examples: [
+    'quỹ lương tháng này của công ty là bao nhiêu?',
+    'tổng tiền lương phải chi trong tháng',
+    'báo cáo bảng lương tháng này',
+    'chi phí lương nhân viên',
+    'tháng này cần chuẩn bị bao nhiêu tiền trả lương'
+  ],
+  patterns: [
+    /(quỹ lương|bảng lương|chi phí lương|tiền lương.*tháng|trả lương)/i
+  ],
+  allowedRoles: ['ACCOUNTANT', 'ADMIN_CEO', 'ADMIN'],
+  handler: async (prisma) => {
+    const res = await prisma.payroll.aggregate({
+      _sum: { netSalary: true },
+      _count: { id: true }
+    });
+    return {
+      headcount: res._count.id || 0,
+      totalPayroll: Number(res._sum.netSalary || 0)
+    };
+  },
+  template: (data) => {
+    return `💼 **DỰ TOÁN QUỸ LƯƠNG NHÂN SỰ TOÀN HỆ THỐNG:**\n\n` +
+           `- Số lượng bảng lương tính toán: **${data.headcount} nhân sự**\n` +
+           `- 💵 **Tổng quỹ lương thực nhận (Net Salary): ${formatVND(data.totalPayroll)}**\n\n` +
+           `Kế toán cần đảm bảo số dư thanh khoản ngân hàng trước ngày 05 hàng tháng để chi lương.`;
+  }
+});
+
+// Kỹ năng 9: Tỷ trọng phương thức thanh toán
 accountantTrainer.addSkill({
   id: 'PAYMENT_METHODS_BREAKDOWN',
   title: 'Tỷ trọng doanh thu theo từng phương thức thanh toán',
@@ -333,7 +424,27 @@ accountantTrainer.addSkill({
 // 2. NHÓM KỸ NĂNG QUY TRÌNH & TRI THỨC VĂN BẢN (KNOWLEDGE SOP)
 // ============================================================================
 
-// Kỹ năng 8: Nguyên tắc phân nhiệm SoD
+// Kỹ năng 10: Quy định chi tiêu quỹ tiền mặt nhỏ khẩn cấp
+accountantTrainer.addSkill({
+  id: 'SOP_PETTY_CASH_EXPENSE',
+  title: 'Quy định chi tiêu quỹ tiền mặt nhỏ khẩn cấp dưới 2 triệu',
+  description: 'Thủ tục chi tạm ứng mua văn phòng phẩm và nước uống',
+  type: 'KNOWLEDGE_SOP',
+  examples: [
+    'quy định chi quỹ tiền mặt khẩn cấp',
+    'chi tiền mặt dưới 2 triệu cần những giấy tờ gì',
+    'thủ tục thanh toán chi phí tiếp khách văn phòng'
+  ],
+  patterns: [
+    /(quỹ tiền mặt|chi khẩn cấp|dưới 2 triệu|tiếp khách|mua văn phòng phẩm)/i
+  ],
+  sop: `💵 **QUY CHẾ QUẢN LÝ QUỸ TIỀN MẶT NHỎ (PETTY CASH):**
+1. **Hạn mức:** Chỉ áp dụng cho các khoản mua sắm khẩn cấp phát sinh dưới 2.000.000 VNĐ (nước uống, văn phòng phẩm, tiền gửi xe giao hàng).
+2. **Chứng từ bắt buộc:** Hóa đơn bán lẻ hoặc phiếu thu có chữ ký người nhận tiền $\rightarrow$ Kèm giấy đề nghị thanh toán có chữ ký Trưởng bộ phận.
+3. **Hoàn ứng:** Thời hạn quyết toán hoàn ứng tối đa 48 giờ làm việc kể từ thời điểm nhận tiền tạm ứng.`
+});
+
+// Kỹ năng 11: Nguyên tắc phân nhiệm SoD
 accountantTrainer.addSkill({
   id: 'SOP_SOD_INTERNAL_CONTROL',
   title: 'Nguyên tắc phân nhiệm SoD (Segregation of Duties) trong kế toán',
@@ -353,7 +464,7 @@ accountantTrainer.addSkill({
 3. **Mã PIN/OTP:** Nghiêm cấm chia sẻ mã OTP ngân hàng doanh nghiệp hoặc đăng nhập chéo tài khoản của nhau.`
 });
 
-// Kỹ năng 9: Quy chuẩn đối soát VietQR tự động
+// Kỹ năng 12: Quy chuẩn đối soát VietQR tự động
 accountantTrainer.addSkill({
   id: 'SOP_VIETQR_RECONCILIATION',
   title: 'Quy chuẩn đối soát VietQR và webhook ngân hàng',

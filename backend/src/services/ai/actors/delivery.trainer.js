@@ -35,10 +35,13 @@ deliveryTrainer.addSkill({
     'tôi đang có những đơn nào',
     'đơn cần ship hôm nay',
     'hôm nay giao mấy đơn',
-    'nhiệm vụ giao hàng hôm nay của tôi'
+    'nhiệm vụ giao hàng hôm nay của tôi',
+    'xem các đơn phân công cho tôi',
+    'hôm nay phải chạy những đơn nào',
+    'danh sách kiện hàng cần phát trong ngày'
   ],
   patterns: [
-    /(hôm nay.*(giao|ship|đơn)|cần giao hôm nay|đang giao|đang ship|phân công.*giao|nhiệm vụ.*giao)/i
+    /(hôm nay.*(giao|ship|đơn)|cần giao hôm nay|đang giao|đang ship|phân công.*giao|nhiệm vụ.*giao|chạy.*đơn|cần phát)/i
   ],
   keywords: ['đơn', 'giao'],
   allowedRoles: ['DELIVERY', 'ADMIN_CEO', 'ADMIN'],
@@ -64,18 +67,18 @@ deliveryTrainer.addSkill({
   },
   template: (orders) => {
     if (!orders || orders.length === 0) {
-      return '🛵 **Hôm nay bạn hiện không có đơn hàng nào cần giao.** Chúc bạn một ngày làm việc thuận lợi!';
+      return '🛵 **Hôm nay bạn hiện không có đơn hàng nào cần giao.** Chúc bạn một ngày làm việc an toàn!';
     }
     let res = `🛵 **HÔM NAY BẠN ĐANG CÓ ${orders.length} ĐƠN CẦN GIAO:**\n\n`;
     orders.forEach((o, idx) => {
       res += `${idx + 1}. **Đơn #${o.orderId}** - ${formatVND(o.totalAmount)} (${o.paymentMethod === 'COD' ? '💵 Thu COD' : '💳 Đã TT'})\n`;
       res += `   📍 Địa chỉ: ${o.shippingAddress}\n`;
-      res += `   📞 SĐT khách: ${o.customer?.phone || 'Chưa cập nhật'}\n`;
+      res += `   📞 SĐT khách: ${o.customer?.phone || 'Chưa cập nhật'} (${o.customer?.name || 'Khách'})\n`;
       res += `   Trạng thái: \`${o.status}\`\n\n`;
     });
     return res.trim();
   },
-  sql: (userId) => `SELECT order_id, shipping_address, shipping_phone, total_amount, payment_method, payment_status, status FROM orders WHERE assigned_shipper_id = ${userId || ':userId'} AND status IN ('CONFIRMED', 'PROCESSING', 'READY_TO_SHIP', 'SHIPPED') ORDER BY created_at ASC;`
+  sql: (userId) => `SELECT order_id, shipping_address, total_amount, payment_method, payment_status, status FROM orders WHERE assigned_shipper_id = ${userId || ':userId'} AND status IN ('CONFIRMED', 'PROCESSING', 'READY_TO_SHIP', 'SHIPPED') ORDER BY created_at ASC;`
 });
 
 // Kỹ năng 2: Lọc các đơn cần thu tiền mặt COD
@@ -90,10 +93,12 @@ deliveryTrainer.addSkill({
     'thu cod bao nhiêu tiền',
     'những đơn nào phải thu tiền mặt',
     'hôm nay cần thu hộ bao nhiêu tiền',
-    'danh sách đơn thu tiền tận nơi'
+    'danh sách đơn thu tiền tận nơi',
+    'tổng tiền cod phải cầm về hôm nay',
+    'đơn nào chưa trả tiền cần thu tay'
   ],
   patterns: [
-    /(thu hộ|tiền cod|thu cod|tiền mặt|thu bao nhiêu)/i
+    /(thu hộ|tiền cod|thu cod|tiền mặt|thu bao nhiêu|thu tận nơi)/i
   ],
   keywords: ['cod'],
   allowedRoles: ['DELIVERY', 'ADMIN_CEO', 'ADMIN'],
@@ -118,7 +123,7 @@ deliveryTrainer.addSkill({
   },
   template: (orders) => {
     if (!orders || orders.length === 0) {
-      return '✅ **Không có đơn nào cần thu tiền mặt COD.** Các đơn của bạn đều đã thanh toán trước hoặc chưa sẵn sàng ship!';
+      return '✅ **Không có đơn nào cần thu tiền mặt COD.** Các đơn của bạn đều đã thanh toán trước qua chuyển khoản!';
     }
     const totalCod = orders.reduce((sum, o) => sum + Number(o.totalAmount), 0);
     let res = `💵 **BẠN CÓ ${orders.length} ĐƠN CẦN THU TIỀN COD (TỔNG CỘNG: ${formatVND(totalCod)}):**\n\n`;
@@ -128,7 +133,7 @@ deliveryTrainer.addSkill({
     });
     return res.trim();
   },
-  sql: (userId) => `SELECT order_id, shipping_address, shipping_phone, total_amount, payment_status FROM orders WHERE assigned_shipper_id = ${userId || ':userId'} AND payment_method = 'COD' AND payment_status != 'PAID' AND status IN ('READY_TO_SHIP', 'SHIPPED') ORDER BY created_at ASC;`
+  sql: (userId) => `SELECT order_id, shipping_address, total_amount, payment_status FROM orders WHERE assigned_shipper_id = ${userId || ':userId'} AND payment_method = 'COD' AND payment_status != 'PAID' AND status IN ('READY_TO_SHIP', 'SHIPPED') ORDER BY created_at ASC;`
 });
 
 // Kỹ năng 3: Hiệu suất giao hàng tháng này
@@ -142,10 +147,12 @@ deliveryTrainer.addSkill({
     'tháng này tôi đã giao thành công được bao nhiêu đơn',
     'hiệu suất giao hàng tháng này của tôi',
     'tháng này tôi hoàn thành được mấy đơn',
-    'tổng kết số đơn đã giao trong tháng'
+    'tổng kết số đơn đã giao trong tháng',
+    'tỷ lệ giao hàng tháng này của tôi',
+    'tổng số kiện hàng tôi đã giao xong tháng này'
   ],
   patterns: [
-    /(tháng này.*(thành công|hoàn thành|giao)|hiệu suất giao)/i
+    /(tháng này.*(thành công|hoàn thành|giao)|hiệu suất giao|giao xong tháng này)/i
   ],
   keywords: ['tháng này'],
   allowedRoles: ['DELIVERY', 'ADMIN_CEO', 'ADMIN'],
@@ -175,7 +182,96 @@ deliveryTrainer.addSkill({
   sql: (userId) => `SELECT COUNT(*) AS so_don_thanh_cong, COALESCE(SUM(total_amount), 0) AS tong_gia_tri_giao FROM orders WHERE assigned_shipper_id = ${userId || ':userId'} AND status IN ('DELIVERED', 'COMPLETED') AND delivered_at >= date_trunc('month', now() AT TIME ZONE 'Asia/Ho_Chi_Minh');`
 });
 
-// Kỹ năng 4: Đơn hàng bị thất bại, hoàn hàng
+// Kỹ năng 4: Ước tính hoa hồng & tiền công giao hàng tháng này
+deliveryTrainer.addSkill({
+  id: 'SHIPPER_ESTIMATED_COMMISSION',
+  title: 'Ước tính hoa hồng và tiền thưởng giao hàng tháng này',
+  description: 'Tính tiền công giao hàng tạm tính (20.000 VNĐ / đơn hoàn tất)',
+  type: 'PRISMA_QUERY',
+  examples: [
+    'tháng này tôi được bao nhiêu tiền hoa hồng ship hàng?',
+    'tiền thưởng giao hàng tháng này của tôi',
+    'ước tính hoa hồng shipper tháng này',
+    'tôi nhận được bao nhiêu tiền ship tháng này',
+    'tính tiền công giao hàng của tôi',
+    'hoa hồng giao hàng tạm tính'
+  ],
+  patterns: [
+    /(hoa hồng|tiền thưởng|tiền công|tiền ship.*nhận|tạm tính).*(giao hàng|shipper|ship)/i
+  ],
+  allowedRoles: ['DELIVERY', 'ADMIN_CEO', 'ADMIN'],
+  handler: async (prisma, params, user) => {
+    const shipperId = Number(user.id || params.userId || 0);
+    const startMonth = getStartOfMonth();
+    const count = await prisma.order.count({
+      where: {
+        assignedShipperId: shipperId,
+        status: { in: ['DELIVERED', 'COMPLETED'] },
+        deliveredAt: { gte: startMonth }
+      }
+    });
+    const feePerOrder = 20000; // 20k VNĐ / đơn
+    return {
+      count,
+      feePerOrder,
+      estimatedTotal: count * feePerOrder
+    };
+  },
+  template: (data) => {
+    return `💰 **HOA HỒNG GIAO HÀNG TẠM TÍNH (THÁNG NÀY):**\n\n` +
+           `- Số đơn hoàn thành: **${data.count} đơn**\n` +
+           `- Đơn giá hoa hồng: **${formatVND(data.feePerOrder)} / đơn**\n` +
+           `- 💵 **Tổng tiền công tạm tính: ${formatVND(data.estimatedTotal)}**\n\n` +
+           `Số tiền sẽ được cộng trực tiếp vào kỳ lương cuối tháng của bạn.`;
+  }
+});
+
+// Kỹ năng 5: Xem lại các đơn vừa giao thành công gần đây
+deliveryTrainer.addSkill({
+  id: 'DELIVERY_HISTORY_RECENT',
+  title: 'Xem lại các đơn hàng vừa giao thành công gần nhất',
+  description: 'Tra cứu 5 đơn hàng vừa hoàn tất giao nhận',
+  type: 'PRISMA_QUERY',
+  examples: [
+    'các đơn hàng tôi vừa giao thành công gần đây',
+    'xem lại các đơn đã giao xong',
+    'lịch sử đơn hàng tôi vừa giao',
+    '5 đơn vừa ship thành công',
+    'vừa giao xong đơn nào'
+  ],
+  patterns: [
+    /(vừa giao thành công|đã giao xong|lịch sử.*đã giao|vừa ship)/i
+  ],
+  allowedRoles: ['DELIVERY', 'ADMIN_CEO', 'ADMIN'],
+  handler: async (prisma, params, user) => {
+    const shipperId = Number(user.id || params.userId || 0);
+    return await prisma.order.findMany({
+      where: {
+        assignedShipperId: shipperId,
+        status: { in: ['DELIVERED', 'COMPLETED'] }
+      },
+      select: {
+        orderId: true,
+        shippingAddress: true,
+        totalAmount: true,
+        deliveredAt: true
+      },
+      orderBy: { deliveredAt: 'desc' },
+      take: 5
+    });
+  },
+  template: (orders) => {
+    if (!orders || orders.length === 0) return 'Bạn chưa có lịch sử đơn giao thành công nào gần đây.';
+    let res = `📋 **5 ĐƠN HÀNG VỪA GIAO THÀNH CÔNG GẦN ĐÂY:**\n\n`;
+    orders.forEach((o, idx) => {
+      res += `${idx + 1}. **Đơn #${o.orderId}** - ${formatVND(o.totalAmount)}\n`;
+      res += `   📍 Nơi giao: ${o.shippingAddress}\n`;
+    });
+    return res.trim();
+  }
+});
+
+// Kỹ năng 6: Đơn hàng bị thất bại, hoàn hàng
 deliveryTrainer.addSkill({
   id: 'FAILED_OR_RETURNED_ORDERS',
   title: 'Các đơn giao không thành công hoặc chuyển hoàn',
@@ -185,7 +281,8 @@ deliveryTrainer.addSkill({
     'có đơn nào của tôi bị bom không',
     'các đơn chuyển hoàn của tôi',
     'đơn giao không thành công gần đây',
-    'đơn khách từ chối nhận'
+    'đơn khách từ chối nhận',
+    'danh sách đơn giao xịt trong tháng'
   ],
   patterns: [
     /(bị bom|chuyển hoàn|giao xịt|không nhận hàng|giao thất bại)/i
@@ -222,14 +319,14 @@ deliveryTrainer.addSkill({
     });
     return res.trim();
   },
-  sql: (userId) => `SELECT order_id, shipping_address, shipping_phone, status, updated_at FROM orders WHERE assigned_shipper_id = ${userId || ':userId'} AND status IN ('FAILED_DELIVERY', 'RETURNING_TO_WAREHOUSE', 'CANCELLED') AND updated_at >= date_trunc('month', now() AT TIME ZONE 'Asia/Ho_Chi_Minh') ORDER BY updated_at DESC;`
+  sql: (userId) => `SELECT order_id, shipping_address, status, updated_at FROM orders WHERE assigned_shipper_id = ${userId || ':userId'} AND status IN ('FAILED_DELIVERY', 'RETURNING_TO_WAREHOUSE', 'CANCELLED') AND updated_at >= date_trunc('month', now() AT TIME ZONE 'Asia/Ho_Chi_Minh') ORDER BY updated_at DESC;`
 });
 
 // ============================================================================
 // 2. NHÓM KỸ NĂNG QUY TRÌNH & TRI THỨC VĂN BẢN (KNOWLEDGE SOP)
 // ============================================================================
 
-// Kỹ năng 5: Tiêu chuẩn chụp ảnh bằng chứng giao hàng (POD)
+// Kỹ năng 7: Tiêu chuẩn chụp ảnh bằng chứng giao hàng (POD)
 deliveryTrainer.addSkill({
   id: 'SOP_POD_RULES',
   title: 'Quy chuẩn chụp ảnh bằng chứng giao hàng (POD)',
@@ -239,7 +336,8 @@ deliveryTrainer.addSkill({
     'quy định chụp ảnh pod như thế nào',
     'cách chụp ảnh xác nhận đã giao hàng',
     'chụp pod cần chụp những gì',
-    'khách không cho chụp mặt thì làm sao'
+    'khách không cho chụp mặt thì làm sao',
+    'hướng dẫn chụp hình chứng minh giao thành công'
   ],
   patterns: [
     /(chụp ảnh pod|chụp pod|bằng chứng giao hàng|ảnh giao hàng|chụp mặt)/i
@@ -251,7 +349,7 @@ deliveryTrainer.addSkill({
 4. **Tải lên:** Bắt buộc bấm nút **[Chụp ảnh POD]** trên ứng dụng giao hàng trước khi ấn [Giao Thành Công].`
 });
 
-// Kỹ năng 6: Quy trình nộp tiền mặt COD về kế toán
+// Kỹ năng 8: Quy trình nộp tiền mặt COD về kế toán
 deliveryTrainer.addSkill({
   id: 'SOP_COD_DEPOSIT',
   title: 'Quy trình nộp tiền mặt COD cho kế toán',
@@ -261,7 +359,8 @@ deliveryTrainer.addSkill({
     'shipper nộp tiền cod trước mấy giờ',
     'quy định nộp tiền mặt cod hàng ngày',
     'về trễ thì nộp tiền cod thế nào',
-    'số tài khoản nộp tiền cod của công ty'
+    'số tài khoản nộp tiền cod của công ty',
+    'cú pháp chuyển tiền cod cho thủ quỹ'
   ],
   patterns: [
     /(nộp tiền cod|mấy giờ.*nộp tiền|nộp cod.*trễ|nộp tiền mặt)/i
@@ -272,7 +371,28 @@ deliveryTrainer.addSkill({
 3. Kế toán sẽ đối soát và bấm xác nhận hoàn tất nộp COD trên phần mềm quản trị.`
 });
 
-// Kỹ năng 7: Xử lý sự cố móp hộp / khách từ chối nhận
+// Kỹ năng 9: Quy trình hẹn giao lại và xử lý khách không nghe máy
+deliveryTrainer.addSkill({
+  id: 'SOP_REDELIVERY_POLICY',
+  title: 'Quy trình hẹn giao lại và xử lý khách không nghe máy',
+  description: 'Quy chuẩn gọi tối thiểu 3 cuộc và cập nhật hẹn giao lại',
+  type: 'KNOWLEDGE_SOP',
+  examples: [
+    'khách không nghe máy thì xử lý thế nào',
+    'gọi khách 3 cuộc không được thì làm sao',
+    'quy định hẹn giao lại lần 2 lần 3',
+    'khách hẹn giao vào ngày mai thì bấm nút gì'
+  ],
+  patterns: [
+    /(không nghe máy|hẹn giao lại|gọi không được|hẹn ngày mai)/i
+  ],
+  sop: `📞 **QUY TRÌNH XỬ LÝ KHÁCH HÀNG KHÔNG LIÊN LẠC ĐƯỢC:**
+1. **Số lần gọi:** Gọi tối thiểu 3 cuộc cách nhau 15 phút (cuộc 1: lúc tới nơi, cuộc 2: sau 10p, cuộc 3: sau 20p).
+2. **Nhắn tin SMS/Zalo:** Gửi tin nhắn mẫu: "AetherPC đang giao đơn hàng #... cho quý khách nhưng chưa liên lạc được, vui lòng liên hệ lại số...".
+3. **Cập nhật ứng dụng:** Chọn trạng thái **[Giao Thất Bại - Hẹn Lại]** $\rightarrow$ Chọn lý do "Khách không nghe máy" để hệ thống tự động xếp lịch giao vào ngày mai.`
+});
+
+// Kỹ năng 10: Xử lý sự cố móp hộp / khách từ chối nhận
 deliveryTrainer.addSkill({
   id: 'SOP_DAMAGED_BOX',
   title: 'Xử lý khi kiện hàng bị móp hộp hoặc khách từ chối nhận',

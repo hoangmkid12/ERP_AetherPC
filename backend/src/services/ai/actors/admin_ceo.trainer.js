@@ -4,7 +4,7 @@
  */
 
 const BaseActorTrainer = require('./BaseActorTrainer');
-const { getStartOfYear, formatVND } = require('../utils/dateHelper');
+const { getStartOfYear, formatVND, formatDateVN } = require('../utils/dateHelper');
 
 const adminCeoTrainer = new BaseActorTrainer({
   role: 'ADMIN_CEO',
@@ -31,7 +31,8 @@ adminCeoTrainer.addSkill({
     'tổng kết kinh doanh từ đầu năm',
     'tình hình kinh doanh năm nay thế nào',
     'doanh số và đơn hàng năm nay của công ty',
-    'báo cáo kết quả kinh doanh năm nay'
+    'báo cáo kết quả kinh doanh năm nay',
+    'kpi doanh thu toàn hệ thống năm nay'
   ],
   patterns: [
     /(tổng quan|tổng kết|kết quả).*(kinh doanh|doanh thu).*năm nay/i,
@@ -77,10 +78,11 @@ adminCeoTrainer.addSkill({
     'công ty hiện có bao nhiêu nhân viên',
     'cơ cấu nhân sự các bộ phận',
     'thống kê nhân viên theo vai trò',
-    'tổng số nhân sự đang hoạt động'
+    'tổng số nhân sự đang hoạt động',
+    'báo cáo định biên nhân sự các phòng ban'
   ],
   patterns: [
-    /(nhân sự|nhân viên|cơ cấu nhân sự)/i
+    /(nhân sự|nhân viên|cơ cấu nhân sự|định biên)/i
   ],
   keywords: ['nhân sự'],
   allowedRoles: ['ADMIN_CEO', 'ADMIN'],
@@ -157,10 +159,11 @@ adminCeoTrainer.addSkill({
     'sản phẩm nào bán chạy nhất',
     'top sản phẩm doanh thu cao nhất',
     'mặt hàng sinh lời nhiều nhất',
-    'những linh kiện đem lại doanh thu cao'
+    'những linh kiện đem lại doanh thu cao',
+    'sản phẩm đóng góp doanh số chủ lực'
   ],
   patterns: [
-    /(top.*sản phẩm|sản phẩm.*doanh thu cao|mặt hàng bán chạy|sinh lời cao nhất)/i
+    /(top.*sản phẩm|sản phẩm.*doanh thu cao|mặt hàng bán chạy|sinh lời cao nhất|chủ lực)/i
   ],
   allowedRoles: ['ADMIN_CEO', 'ADMIN'],
   handler: async (prisma) => {
@@ -241,11 +244,52 @@ adminCeoTrainer.addSkill({
   sql: () => `SELECT status, COUNT(*) AS so_luong, ROUND(COUNT(*) * 100.0 / (SELECT COUNT(*) FROM orders), 1) AS ty_le_phan_tram FROM orders GROUP BY status ORDER BY so_luong DESC;`
 });
 
+// Kỹ năng 6: Nhật ký các thao tác nhạy cảm gần đây trong hệ thống (Audit Logs)
+adminCeoTrainer.addSkill({
+  id: 'AUDIT_LOGS_SUSPICIOUS_ACTIONS',
+  title: 'Nhật ký các thao tác nhạy cảm gần đây trong hệ thống',
+  description: 'Truy vết các hành động xóa dữ liệu, chỉnh sửa giá, phân quyền (Audit Trail)',
+  type: 'PRISMA_QUERY',
+  examples: [
+    'gần đây có nhân viên nào xóa đơn hoặc đổi giá không',
+    'xem nhật ký thao tác kiểm toán hệ thống',
+    'nhật ký audit logs gần nhất',
+    'ai vừa sửa thông tin hệ thống',
+    'nhật ký bảo mật và truy vết hoạt động'
+  ],
+  patterns: [
+    /(nhật ký.*(thao tác|kiểm toán|audit)|xóa đơn|đổi giá|sửa thông tin|truy vết)/i
+  ],
+  allowedRoles: ['ADMIN_CEO', 'ADMIN'],
+  handler: async (prisma) => {
+    return await prisma.auditLog.findMany({
+      select: {
+        actorName: true,
+        actorRole: true,
+        action: true,
+        module: true,
+        createdAt: true
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 8
+    });
+  },
+  template: (logs) => {
+    if (!logs || logs.length === 0) return 'Chưa ghi nhận thao tác nhạy cảm nào trong hệ thống.';
+    let res = `🛡️ **NHẬT KÝ KIỂM TOÁN HOẠT ĐỘNG (AUDIT TRAIL GẦN NHẤT):**\n\n`;
+    logs.forEach((l, idx) => {
+      res += `${idx + 1}. **${l.actorName || 'Hệ thống'}** (\`${l.actorRole || 'SYSTEM'}\`)\n`;
+      res += `   Hành động: \`${l.action}\` trên phân hệ [${l.module}] lúc ${formatDateVN(l.createdAt)}\n`;
+    });
+    return res.trim();
+  }
+});
+
 // ============================================================================
 // 2. NHÓM KỸ NĂNG QUY TRÌNH & TRI THỨC VĂN BẢN (KNOWLEDGE SOP)
 // ============================================================================
 
-// Kỹ năng 6: Chính sách an toàn thông tin & kiểm toán hệ thống
+// Kỹ năng 7: Chính sách an toàn thông tin & kiểm toán hệ thống
 adminCeoTrainer.addSkill({
   id: 'SOP_INTERNAL_SECURITY',
   title: 'Chính sách an toàn thông tin & kiểm toán hệ thống',
@@ -266,7 +310,7 @@ adminCeoTrainer.addSkill({
 3. **Sao lưu dữ liệu:** Cơ sở dữ liệu PostgreSQL được backup tự động hàng ngày lúc 02:00 sáng và lưu trữ mã hóa đa vùng.`
 });
 
-// Kỹ năng 7: Quy trình ứng phó khẩn cấp và phục hồi thảm họa
+// Kỹ năng 8: Quy trình ứng phó khẩn cấp và phục hồi thảm họa
 adminCeoTrainer.addSkill({
   id: 'SOP_DISASTER_RECOVERY',
   title: 'Quy trình ứng phó khẩn cấp và phục hồi thảm họa',

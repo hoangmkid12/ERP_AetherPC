@@ -4,7 +4,7 @@
  */
 
 const BaseActorTrainer = require('./BaseActorTrainer');
-const { formatVND } = require('../utils/dateHelper');
+const { formatVND, formatDateVN } = require('../utils/dateHelper');
 
 const warehouseTrainer = new BaseActorTrainer({
   role: 'WAREHOUSE',
@@ -33,10 +33,12 @@ warehouseTrainer.addSkill({
     'có bao nhiêu đơn đang chờ đóng gói xuất kho',
     'danh sách đơn chờ xuất kho',
     'những đơn hàng cần đóng gói hôm nay',
-    'đơn sẵn sàng bàn giao shipper'
+    'đơn sẵn sàng bàn giao shipper',
+    'danh sách hàng chờ đóng hộp xuất kho',
+    'các đơn đã duyệt chờ thủ kho lấy hàng'
   ],
   patterns: [
-    /(chờ đóng gói|xuất kho|đóng gói xuất kho|sẵn sàng giao|ready_to_ship)/i
+    /(chờ đóng gói|xuất kho|đóng gói xuất kho|sẵn sàng giao|ready_to_ship|chờ lấy hàng)/i
   ],
   allowedRoles: ['WAREHOUSE', 'ADMIN_CEO', 'ADMIN'],
   handler: async (prisma) => {
@@ -78,10 +80,11 @@ warehouseTrainer.addSkill({
     'linh kiện nào trong kho đang bị hết hàng hoàn toàn',
     'sản phẩm nào tồn kho bằng 0',
     'kho còn hàng nào bị cháy hàng không',
-    'danh sách hàng hết tồn'
+    'danh sách hàng hết tồn',
+    'mặt hàng nào đã cạn kiệt trong kho'
   ],
   patterns: [
-    /(hết hàng hoàn toàn|tồn.*bằng 0|tồn.*=.*0|cháy hàng|hết tồn)/i
+    /(hết hàng hoàn toàn|tồn.*bằng 0|tồn.*=.*0|cháy hàng|hết tồn|cạn kiệt)/i
   ],
   allowedRoles: ['WAREHOUSE', 'ADMIN_CEO', 'ADMIN', 'SALES'],
   handler: async (prisma) => {
@@ -125,10 +128,11 @@ warehouseTrainer.addSkill({
     'những sản phẩm nào sắp hết hàng cần cảnh báo',
     'linh kiện nào tồn kho thấp',
     'sản phẩm nào còn dưới 5 cái',
-    'cảnh báo tồn kho linh kiện'
+    'cảnh báo tồn kho linh kiện',
+    'hàng nào sắp cạn cần đặt thêm'
   ],
   patterns: [
-    /(sắp hết hàng|tồn kho thấp|cảnh báo tồn|sắp hết|dưới 5)/i
+    /(sắp hết hàng|tồn kho thấp|cảnh báo tồn|sắp hết|dưới 5|sắp cạn)/i
   ],
   allowedRoles: ['WAREHOUSE', 'ADMIN_CEO', 'ADMIN', 'SALES'],
   handler: async (prisma) => {
@@ -172,7 +176,8 @@ warehouseTrainer.addSkill({
     'kiểm tra tồn kho linh kiện card màn hình vga hiện tại',
     'trong kho còn những card đồ họa nào',
     'card vga còn nhiều không',
-    'tồn kho card đồ họa rtx'
+    'tồn kho card đồ họa rtx',
+    'danh sách các mã vga đang có sẵn trong kho'
   ],
   patterns: [
     /(tồn kho.*(vga|card màn hình|card đồ họa)|(vga|card đồ họa).*còn hàng)/i
@@ -215,7 +220,113 @@ warehouseTrainer.addSkill({
   sql: () => `SELECT p.product_id, p.name, p.sku, p.stock_quantity, p.price FROM products p JOIN categories c ON c.id = p.category_id WHERE (c.slug ILIKE '%vga%' OR c.slug ILIKE '%card%' OR c.name ILIKE '%card%') AND p.status = 'ACTIVE' ORDER BY p.stock_quantity DESC LIMIT 20;`
 });
 
-// Kỹ năng 5: Phiếu nhập hàng PO đang chờ
+// Kỹ năng 5: Kiểm tra tồn kho theo hãng sản xuất (ASUS, MSI, GIGABYTE, Corsair)
+warehouseTrainer.addSkill({
+  id: 'CHECK_STOCK_BY_BRAND',
+  title: 'Kiểm tra tồn kho linh kiện theo hãng sản xuất',
+  description: 'Tra cứu tồn kho các sản phẩm theo thương hiệu cụ thể',
+  type: 'PRISMA_QUERY',
+  examples: [
+    'trong kho còn những linh kiện nào của asus?',
+    'trong kho còn những linh kiện nào của asus',
+    'kiểm tra tồn kho hàng msi',
+    'kho còn bao nhiêu món của gigabyte',
+    'hàng corsair trong kho còn nhiều không',
+    'tra cứu linh kiện theo thương hiệu'
+  ],
+  patterns: [
+    /(tồn kho.*(asus|msi|gigabyte|corsair|kingston|intel|amd)|hàng.*(asus|msi|gigabyte|corsair))/i
+  ],
+  allowedRoles: ['WAREHOUSE', 'ADMIN_CEO', 'ADMIN', 'SALES'],
+  handler: async (prisma, params, _user) => {
+    const rawPrompt = (params.keyword || params.brandName || '').toLowerCase();
+    let brand = 'asus';
+    if (rawPrompt.includes('msi')) brand = 'msi';
+    else if (rawPrompt.includes('gigabyte')) brand = 'gigabyte';
+    else if (rawPrompt.includes('corsair')) brand = 'corsair';
+    else if (rawPrompt.includes('kingston')) brand = 'kingston';
+    else if (rawPrompt.includes('intel')) brand = 'intel';
+    else if (rawPrompt.includes('amd')) brand = 'amd';
+
+    return await prisma.product.findMany({
+      where: {
+        OR: [
+          { name: { contains: brand, mode: 'insensitive' } },
+          { brand: { name: { contains: brand, mode: 'insensitive' } } }
+        ],
+        stockQuantity: { gt: 0 },
+        status: 'ACTIVE'
+      },
+      select: {
+        productId: true,
+        name: true,
+        sku: true,
+        stockQuantity: true,
+        price: true
+      },
+      orderBy: { stockQuantity: 'desc' },
+      take: 10
+    });
+  },
+  template: (products) => {
+    if (!products || products.length === 0) {
+      return 'Không tìm thấy linh kiện nào của hãng này đang còn tồn kho.';
+    }
+    let res = `🏷️ **DANH SÁCH LINH KIỆN CÒN TỒN KHO THEO HÃNG:**\n\n`;
+    products.forEach((p, idx) => {
+      res += `${idx + 1}. **${p.name}**\n`;
+      res += `   Tồn: **${p.stockQuantity}** chiếc | Giá: ${formatVND(p.price)}\n`;
+    });
+    return res.trim();
+  }
+});
+
+// Kỹ năng 6: Lịch sử nhập xuất kho gần đây (Stock Movement)
+warehouseTrainer.addSkill({
+  id: 'RECENT_STOCK_MOVEMENTS',
+  title: 'Lịch sử nhập xuất kho linh kiện gần đây',
+  description: 'Tra cứu 10 giao dịch xuất / nhập kho mới nhất trong hệ thống',
+  type: 'PRISMA_QUERY',
+  examples: [
+    'lịch sử nhập xuất kho gần đây',
+    'hôm nay có phiếu xuất nhập nào mới không',
+    'xem các biến động kho gần nhất',
+    'nhật ký dịch chuyển kho',
+    'lịch sử điều chuyển kho hàng'
+  ],
+  patterns: [
+    /(lịch sử nhập xuất|biến động kho|dịch chuyển kho|xuất nhập gần đây|nhật ký kho)/i
+  ],
+  allowedRoles: ['WAREHOUSE', 'ADMIN_CEO', 'ADMIN'],
+  handler: async (prisma) => {
+    return await prisma.stockMovement.findMany({
+      select: {
+        id: true,
+        type: true,
+        quantity: true,
+        note: true,
+        createdAt: true,
+        product: {
+          select: { name: true, sku: true }
+        }
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 10
+    });
+  },
+  template: (movements) => {
+    if (!movements || movements.length === 0) return 'Chưa ghi nhận biến động kho nào gần đây.';
+    let res = `🔄 **10 GIAO DỊCH DỊCH CHUYỂN KHO GẦN ĐÂY NHẤT:**\n\n`;
+    movements.forEach((m, idx) => {
+      const typeLabel = m.type === 'IN' || m.type === 'IMPORT' ? '📥 [NHẬP]' : '📤 [XUẤT]';
+      res += `${idx + 1}. ${typeLabel} **${m.product ? m.product.name : 'Sản phẩm'}**\n`;
+      res += `   Số lượng: **${m.quantity}** cái | Lúc: ${formatDateVN(m.createdAt)}\n`;
+    });
+    return res.trim();
+  }
+});
+
+// Kỹ năng 7: Phiếu nhập hàng PO đang chờ
 warehouseTrainer.addSkill({
   id: 'PENDING_PURCHASE_ORDERS',
   title: 'Phiếu mua hàng PO đang chờ nhập kho',
@@ -260,7 +371,7 @@ warehouseTrainer.addSkill({
   sql: () => `SELECT po_number, supplier_code, total_amount, status, created_at FROM purchase_orders WHERE status IN ('APPROVED', 'PENDING', 'ORDERED') ORDER BY created_at ASC LIMIT 15;`
 });
 
-// Kỹ năng 6: Máy tính đang chờ ráp và kiểm tra (Assembly Jobs cho Kỹ thuật viên)
+// Kỹ năng 8: Máy tính đang chờ ráp và kiểm tra (Assembly Jobs cho Kỹ thuật viên)
 warehouseTrainer.addSkill({
   id: 'PENDING_ASSEMBLY_JOBS',
   title: 'Máy tính đang chờ ráp và kiểm tra (Assembly Jobs)',
@@ -271,10 +382,11 @@ warehouseTrainer.addSkill({
     'có bao nhiêu máy đang chờ ráp và kiểm tra',
     'danh sách pc đang chờ lắp ráp',
     'các máy cần test kiểm tra hôm nay',
-    'công việc lắp ráp máy tính đang chờ'
+    'công việc lắp ráp máy tính đang chờ',
+    'hôm nay kỹ thuật phải ráp mấy bộ pc'
   ],
   patterns: [
-    /(chờ ráp|lắp ráp|chờ lắp|test máy|benchmark|kiểm tra.*máy)/i
+    /(chờ ráp|lắp ráp|chờ lắp|test máy|benchmark|kiểm tra.*máy|ráp mấy bộ)/i
   ],
   allowedRoles: ['WAREHOUSE', 'ADMIN_CEO', 'ADMIN'],
   handler: async (prisma) => {
@@ -283,10 +395,10 @@ warehouseTrainer.addSkill({
         status: { in: ['ASSIGNED', 'IN_PROGRESS', 'TESTING'] }
       },
       select: {
-        jobNumber: true,
+        jobCode: true,
         orderId: true,
         status: true,
-        assignedTo: true,
+        createdBy: true,
         createdAt: true
       },
       orderBy: { createdAt: 'asc' }
@@ -298,19 +410,73 @@ warehouseTrainer.addSkill({
     }
     let res = `🛠️ **HIỆN CÓ ${jobs.length} BỘ MÁY ĐANG TRONG TIẾN TRÌNH LẮP RÁP / KIỂM ĐỊNH:**\n\n`;
     jobs.forEach((j, idx) => {
-      res += `${idx + 1}. **Mã ráp #${j.jobNumber}** (Đơn hàng: #${j.orderId})\n`;
-      res += `   Trạng thái: \`${j.status}\` | Kỹ thuật viên phụ trách: NV #${j.assignedTo || 'Chưa gán'}\n`;
+      res += `${idx + 1}. **Mã ráp #${j.jobCode}** (Đơn hàng: #${j.orderId})\n`;
+      res += `   Trạng thái: \`${j.status}\` | Kỹ thuật viên phụ trách: NV #${j.createdBy || 'Chưa gán'}\n`;
     });
     return res.trim();
   },
   sql: () => `SELECT job_number, order_id, status, assigned_to, created_at FROM assembly_jobs WHERE status IN ('ASSIGNED', 'IN_PROGRESS', 'TESTING') ORDER BY created_at ASC;`
 });
 
+// Kỹ năng 9: Danh sách các nhà cung cấp linh kiện PC đang hợp tác
+warehouseTrainer.addSkill({
+  id: 'SUPPLIER_LIST_LOOKUP',
+  title: 'Danh sách các nhà cung cấp linh kiện PC đang hợp tác',
+  description: 'Tra cứu danh bạ nhà phân phối linh kiện (ASUS, MSI, Synnex FPT...)',
+  type: 'PRISMA_QUERY',
+  examples: [
+    'danh sách các nhà cung cấp linh kiện của công ty',
+    'công ty đang nhập hàng từ những nhà cung cấp nào',
+    'thông tin liên hệ các nhà cung cấp',
+    'danh sách đối tác cung ứng'
+  ],
+  patterns: [
+    /(nhà cung cấp|đối tác cung ứng|danh sách supplier|thông tin ncc)/i
+  ],
+  allowedRoles: ['WAREHOUSE', 'ADMIN_CEO', 'ADMIN', 'ACCOUNTANT'],
+  handler: async (prisma) => {
+    return await prisma.supplier.findMany({
+      where: { status: 'ACTIVE' },
+      select: { code: true, name: true, phone: true, email: true },
+      take: 10
+    });
+  },
+  template: (suppliers) => {
+    if (!suppliers || suppliers.length === 0) return 'Chưa có thông tin nhà cung cấp.';
+    let res = `🏭 **DANH SÁCH NHÀ CUNG CẤP / ĐỐI TÁC CUNG ỨNG LINH KIỆN:**\n\n`;
+    suppliers.forEach((s, idx) => {
+      res += `${idx + 1}. **${s.name}** (Mã: \`${s.code}\`)\n`;
+      res += `   📞 Hotline: ${s.phone || 'Chưa có SĐT'} | Email: ${s.email || 'N/A'}\n`;
+    });
+    return res.trim();
+  }
+});
+
 // ============================================================================
 // 2. NHÓM KỸ NĂNG QUY TRÌNH & TRI THỨC VĂN BẢN (KNOWLEDGE SOP)
 // ============================================================================
 
-// Kỹ năng 7: Quy chuẩn đóng gói thùng xốp PC Gaming
+// Kỹ năng 10: Tiêu chuẩn an toàn tĩnh điện (ESD)
+warehouseTrainer.addSkill({
+  id: 'SOP_STATIC_ELECTRICITY_ESD',
+  title: 'Tiêu chuẩn bảo hộ chống tĩnh điện (ESD) khi thao tác linh kiện',
+  description: 'Quy định đeo vòng tay ESD và thảm khử tĩnh điện khi lắp ráp',
+  type: 'KNOWLEDGE_SOP',
+  examples: [
+    'quy định đeo vòng chống tĩnh điện esd',
+    'an toàn tĩnh điện khi lắp ráp mainboard và vga',
+    'tiêu chuẩn esd tại bàn kỹ thuật'
+  ],
+  patterns: [
+    /(chống tĩnh điện|vòng esd|an toàn esd|tĩnh điện)/i
+  ],
+  sop: `⚡ **QUY TẮC AN TOÀN CHỐNG TĨNH ĐIỆN (ESD PROTECTION):**
+1. **Trang bị bắt buộc:** Kỹ thuật viên bắt buộc đeo vòng tay chống tĩnh điện (kẹp nối đất) và trải thảm cao su ESD tại bàn ráp máy.
+2. **Cầm nắm linh kiện:** Tuyệt đối KHÔNG chạm tay trực tiếp vào chân socket CPU, tụ điện trên bo mạch chủ hoặc chân mạ vàng PCIe của Card màn hình.
+3. **Bao bì:** Chỉ khui linh kiện ra khỏi túi bạc tĩnh điện (Antistatic Bag) ngay trước khi đặt vào case máy tính.`
+});
+
+// Kỹ năng 11: Quy chuẩn đóng gói thùng xốp PC Gaming
 warehouseTrainer.addSkill({
   id: 'SOP_PACKING_PC',
   title: 'Quy chuẩn đóng gói thùng xốp & bọc kính case PC',
@@ -332,7 +498,7 @@ warehouseTrainer.addSkill({
 4. **Tem cảnh báo:** Dán tem niêm phong "HÀNG DỄ VỠ - XIN NHẸ TAY" và tem mũi tên chỉ chiều đứng bắt buộc.`
 });
 
-// Kỹ năng 8: Quy trình kiểm thử chạy rà Benchmark PC
+// Kỹ năng 12: Quy trình kiểm thử chạy rà Benchmark PC
 warehouseTrainer.addSkill({
   id: 'SOP_BENCHMARK_QC',
   title: 'Quy trình kiểm thử chạy rà Benchmark PC trước khi xuất xưởng',
