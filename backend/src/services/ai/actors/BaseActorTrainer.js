@@ -240,6 +240,13 @@ class BaseActorTrainer {
   }
 
   /**
+   * Lấy danh sách toàn bộ kỹ năng của Actor
+   */
+  getSkills() {
+    return this.skills;
+  }
+
+  /**
    * Xuất danh sách Few-Shots mẫu
    */
   getFewShots() {

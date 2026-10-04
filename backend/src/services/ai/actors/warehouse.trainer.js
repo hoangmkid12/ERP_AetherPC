@@ -129,7 +129,9 @@ warehouseTrainer.addSkill({
     'linh kiện nào tồn kho thấp',
     'sản phẩm nào còn dưới 5 cái',
     'cảnh báo tồn kho linh kiện',
-    'hàng nào sắp cạn cần đặt thêm'
+    'hàng nào sắp cạn cần đặt thêm',
+    'mặt hàng nào sắp hết tồn kho cảnh báo giúp tôi',
+    'hàng sắp hết tồn kho'
   ],
   patterns: [
     /(sắp hết hàng|tồn kho thấp|cảnh báo tồn|sắp hết|dưới 5|sắp cạn)/i
@@ -635,7 +637,8 @@ warehouseTrainer.addSkill({
     'serial này thuộc sản phẩm nào và đang ở đâu',
     'kiểm tra mã serial number trong kho',
     'danh sách số serial linh kiện mới nhập',
-    'tra cứu bảo hành theo serial'
+    'tra cứu bảo hành theo serial',
+    'tra cứu nguồn gốc serial number linh kiện'
   ],
   patterns: [
     /(số serial|mã serial|serial number|tra cứu serial|vòng đời serial)/i

@@ -96,10 +96,16 @@ const matchActorSkill = (userPrompt, role, userId) => {
 };
 
 const { extractParameters } = require('../extractors');
+const { matchHybridIntent } = require('../matcher');
 
 /**
- * THỰC THI TRỰC TIẾP Ý ĐỊNH BẰNG PRISMA HANDLER (KIẾN TRÚC GIAI ĐOẠN 1 & 2)
- * Pipeline hoàn chỉnh: So khớp ý định -> Trích xuất tham số (Stage 2) -> Kiểm tra RBAC -> Chạy Prisma Handler -> Điền kết quả vào Template
+ * THỰC THI TRỰC TIẾP Ý ĐỊNH BẰNG PRISMA HANDLER (KIẾN TRÚC TOÀN DIỆN GIAI ĐOẠN 1, 2 & 3)
+ * Pipeline hoàn chỉnh:
+ * 1. So khớp ý định bằng Vector Cosine & Hybrid Matcher (Stage 3)
+ * 2. Tự động bóc tách thực thể & chuẩn hóa tham số (Stage 2)
+ * 3. Kiểm tra RBAC & thực thi Prisma Handler an toàn (Stage 1)
+ * 4. Điền kết quả vào Template giao diện người dùng
+ * 
  * @param {string} userPrompt - Câu hỏi của người dùng
  * @param {string} role - Vai trò của người dùng (DELIVERY, WAREHOUSE, ACCOUNTANT, SALES, ADMIN_CEO)
  * @param {Object} prisma - Prisma Client instance
@@ -112,19 +118,52 @@ const executeActorIntent = async (userPrompt, role, prisma, user = {}, params = 
     return { status: 'NOT_FOUND', message: `Không tìm thấy bộ huấn luyện cho vai trò ${role}` };
   }
 
-  const matchResult = trainer.match(userPrompt, user.id);
-  if (!matchResult) {
-    return null; // Không khớp ý định đã định nghĩa
+  // 1. Tầng 1: So khớp bằng Regex Patterns nhanh
+  let matchResult = trainer.match(userPrompt, user.id);
+  let matchedSkill = matchResult ? matchResult.skill : null;
+  let matchScore = matchResult ? matchResult.score : 0;
+  let matchSource = 'PATTERN_RULE';
+
+  // 2. Tầng 2 & 3: Nếu Regex không khớp hoặc điểm thấp -> Kích hoạt Vector Embedding & Cosine Similarity (Stage 3)
+  if (!matchedSkill) {
+    const hybridMatch = await matchHybridIntent(userPrompt, trainer.role, trainer);
+    if (hybridMatch && hybridMatch.skill) {
+      if (hybridMatch.status === 'UNCERTAIN') {
+        const suggestionText = hybridMatch.suggestions && hybridMatch.suggestions.length > 0
+          ? '\n\n💡 **GỢI Ý CÁC CHỦ ĐỀ LIÊN QUAN:**\n' +
+            hybridMatch.suggestions.map((s, idx) => `${idx + 1}. **${s.title}**`).join('\n')
+          : '';
+
+        return {
+          status: 'UNCERTAIN',
+          intent: hybridMatch.intent,
+          matchScore: hybridMatch.score,
+          role: trainer.role,
+          suggestions: hybridMatch.suggestions,
+          text: `🤔 **Hệ thống chưa hoàn toàn chắc chắn về câu hỏi của bạn** (Độ tương đồng: ${(hybridMatch.score * 100).toFixed(1)}%).${suggestionText}\n\nBạn có thể thử diễn đạt lại câu hỏi rõ hơn nhé!`
+        };
+      }
+
+      matchedSkill = hybridMatch.skill;
+      matchScore = hybridMatch.score;
+      matchSource = hybridMatch.source;
+    }
+  }
+
+  if (!matchedSkill) {
+    return null; // Không nhận diện được ý định nào phù hợp
   }
 
   // GIAI ĐOẠN 2: Tự động bóc tách thực thể, ngày tháng, mã phiếu, ngân sách từ câu hỏi
   const resolvedParams = await extractParameters(userPrompt, prisma, user, params);
 
-  const execResult = await trainer.execute(matchResult.skill, prisma, resolvedParams, user);
+  // GIAI ĐOẠN 1: Chạy Prisma Handler và kiểm tra bảo mật RBAC
+  const execResult = await trainer.execute(matchedSkill, prisma, resolvedParams, user);
   return {
     ...execResult,
     extractedParams: resolvedParams,
-    matchScore: matchResult.score,
+    matchScore,
+    matchSource,
     role: trainer.role
   };
 };
