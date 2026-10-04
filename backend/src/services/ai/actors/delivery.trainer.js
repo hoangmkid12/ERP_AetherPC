@@ -590,5 +590,68 @@ deliveryTrainer.addSkill({
 3. **Nghiêm cấm:** Tuyệt đối không để kiện hàng linh kiện tiếp xúc trực tiếp với nước mưa trên xe máy; mọi rủi ro chập cháy bo mạch do ngấm nước shipper chịu trách nhiệm theo biên chế bồi thường.`
 });
 
+// Kỹ năng 16: Tra cứu tiến độ và người giao của đơn hàng cụ thể
+deliveryTrainer.addSkill({
+  id: 'DELIVERY_TRACK_ORDER',
+  title: 'Tra cứu tiến độ và thông tin giao nhận đơn hàng cụ thể',
+  description: 'Kiểm tra trạng thái giao hàng, shipper phụ trách, tiền thu hộ COD của một đơn hàng',
+  type: 'PRISMA_QUERY',
+  examples: [
+    'kiểm tra tiến độ đơn hàng DH-1002',
+    'kiểm tra tiến độ đơn hàng',
+    'kiểm tra đơn hàng DH-1002',
+    'đơn hàng 1002 giao tới đâu rồi',
+    'ai đang đi giao đơn này',
+    'khách đã trả tiền chưa',
+    'tiến độ giao hàng của đơn',
+    'tra cứu trạng thái giao đơn hàng'
+  ],
+  patterns: [
+    /(tiến độ đơn hàng|kiểm tra đơn|giao tới đâu|ai đang.*giao|khách.*trả tiền|trạng thái đơn hàng)/i
+  ],
+  allowedRoles: ['DELIVERY', 'SALES', 'WAREHOUSE', 'ACCOUNTANT', 'ADMIN_CEO', 'ADMIN'],
+  handler: async (prisma, params) => {
+    let orderId = Number(params?.orderId || 0);
+    if (!orderId && params?.orderId) {
+      const numMatch = String(params.orderId).match(/\d+/);
+      if (numMatch) orderId = parseInt(numMatch[0], 10);
+    }
+    if (!orderId) return null;
+
+    return await prisma.order.findUnique({
+      where: { orderId },
+      select: {
+        orderId: true,
+        trackingNumber: true,
+        deliveryStatus: true,
+        status: true,
+        shippingAddress: true,
+        paymentStatus: true,
+        paymentMethod: true,
+        totalAmount: true,
+        customer: { select: { name: true, phone: true } },
+        assignedShipper: { select: { fullName: true, phone: true } }
+      }
+    });
+  },
+  template: (order) => {
+    if (!order) {
+      return '⚠️ **Không tìm thấy thông tin đơn hàng này trong hệ thống.**';
+    }
+    const shipperInfo = order.assignedShipper
+      ? `**${order.assignedShipper.fullName}** (📞 ${order.assignedShipper.phone || 'Chưa cập nhật'})`
+      : '*Chưa phân công shipper*';
+    const payStatus = order.paymentStatus === 'PAID' ? '✅ Đã thanh toán đủ' : '💵 Chưa thanh toán (Thu COD)';
+
+    return `📦 **THÔNG TIN TIẾN ĐỘ ĐƠN HÀNG #${order.orderId}:**\n\n` +
+           `- **Trạng thái:** \`${order.deliveryStatus || order.status}\`\n` +
+           `- **Shipper phụ trách:** ${shipperInfo}\n` +
+           `- **Thanh toán:** ${payStatus} (Tổng tiền: **${formatVND(order.totalAmount)}**)\n` +
+           `- **Địa chỉ nhận:** ${order.shippingAddress || 'Nội thành'}\n` +
+           `- **Khách hàng:** ${order.customer?.name || 'Khách'} (📞 ${order.customer?.phone || 'Chưa có SĐT'})`;
+  }
+});
+
 module.exports = deliveryTrainer;
+
 

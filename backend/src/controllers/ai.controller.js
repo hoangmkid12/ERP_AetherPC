@@ -34,7 +34,7 @@ PHONG CÁCH VÀ TÍNH CÁCH TRÒ CHUYỆN:
    - Tuyệt đối không cung cấp mật khẩu cá nhân của nhân viên khác.
 5. ĐỊNH DẠNG: Trình bày Markdown tinh tế, gãy gọn, có ngắt đoạn rõ ràng, dùng bullet point và icon hợp lý để tạo cảm giác dễ đọc.`;
 
-const { getActorSystemPrompt, evaluateActorSemanticRules } = require('../services/ai/actors');
+const { getActorSystemPrompt, evaluateActorSemanticRules, executeActorIntent } = require('../services/ai/actors');
 
 /**
  * Kết hợp System Instruction chung với Persona chuyên biệt của từng Actor
@@ -317,9 +317,36 @@ const chatWithAi = async (req, res, next) => {
 
   try {
     // ========================================================================
-    // BƯỚC 1: PHÂN LOẠI Ý ĐỊNH BẰNG MÔ HÌNH AI TỰ HUẤN LUYỆN (SELF-TRAINED AI)
+    // BƯỚC 0: KIẾN TRÚC OFFLINE DETERMINISTIC PIPELINE (GIAI ĐOẠN 1, 2, 3 & 4)
+    // Pipeline: Vector/Hybrid Matcher -> Entity Extraction -> Context/Anaphora Resolution -> RBAC Prisma Handler
     // ========================================================================
-    let classified = null;
+    const sessionId = req.body.sessionId || (user.id ? String(user.id) : 'session_default');
+    const actorResult = await executeActorIntent(promptText, user.role, prisma, user, {
+      sessionId,
+      conversationHistory
+    });
+
+    if (actorResult && (actorResult.status === 'SUCCESS' || actorResult.status === 'CLARIFICATION_REQUIRED' || actorResult.status === 'ACCESS_DENIED' || actorResult.status === 'UNCERTAIN')) {
+      finalAiResponse = actorResult.text || actorResult.message;
+      toolCallsExecuted.push({
+        tool: actorResult.skillId || actorResult.intent || 'offline_actor_handler',
+        params: actorResult.extractedParams || {},
+        result: {
+          status: actorResult.status,
+          matchSource: actorResult.matchSource,
+          matchScore: actorResult.matchScore
+        }
+      });
+      if (actorResult.citations && Array.isArray(actorResult.citations)) {
+        citations = actorResult.citations;
+      }
+    }
+
+    if (!finalAiResponse) {
+      // ========================================================================
+      // BƯỚC 1: PHÂN LOẠI Ý ĐỊNH BẰNG MÔ HÌNH AI TỰ HUẤN LUYỆN (SELF-TRAINED AI)
+      // ========================================================================
+      let classified = null;
 
     // 0. Ưu tiên Kịch bản Huấn luyện chuyên biệt theo Actor (Role-Based Engine)
     const actorSpecificSql = evaluateActorSemanticRules(promptText, user.role, user.id);
@@ -821,6 +848,7 @@ Hãy trả lời chính xác dựa trên dữ liệu trên. Dùng Markdown đẹ
         break;
       }
     }
+  }
 
     // ========================================================================
     // BƯỚC 3: FALLBACK CUỐI CÙNG - Menu trợ lý điều hướng ERP

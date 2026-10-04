@@ -66,6 +66,15 @@ class BaseActorTrainer {
   }
 
   /**
+   * Lấy thông tin kỹ năng theo mã ID
+   * @param {string} skillId
+   * @returns {Object|null}
+   */
+  getSkill(skillId) {
+    return this.skills.find(s => s.id === skillId) || null;
+  }
+
+  /**
    * So khớp câu hỏi của người dùng với danh mục ý định
    * @param {string} userPrompt - Câu hỏi của người dùng
    * @param {number|string} [userId] - ID của người dùng

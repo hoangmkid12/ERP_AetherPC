@@ -97,20 +97,23 @@ const matchActorSkill = (userPrompt, role, userId) => {
 
 const { extractParameters } = require('../extractors');
 const { matchHybridIntent } = require('../matcher');
+const { conversationContext } = require('../context');
 
 /**
- * THỰC THI TRỰC TIẾP Ý ĐỊNH BẰNG PRISMA HANDLER (KIẾN TRÚC TOÀN DIỆN GIAI ĐOẠN 1, 2 & 3)
+ * THỰC THI TRỰC TIẾP Ý ĐỊNH BẰNG PRISMA HANDLER (KIẾN TRÚC TOÀN DIỆN GIAI ĐOẠN 1, 2, 3 & 4)
  * Pipeline hoàn chỉnh:
- * 1. So khớp ý định bằng Vector Cosine & Hybrid Matcher (Stage 3)
- * 2. Tự động bóc tách thực thể & chuẩn hóa tham số (Stage 2)
- * 3. Kiểm tra RBAC & thực thi Prisma Handler an toàn (Stage 1)
- * 4. Điền kết quả vào Template giao diện người dùng
+ * 1. Phân tích ngữ cảnh & hồi chỉ từ các lượt trước (Stage 4)
+ * 2. So khớp ý định bằng Vector Cosine & Hybrid Matcher (Stage 3)
+ * 3. Tự động bóc tách thực thể & kế thừa tham số qua ngữ cảnh (Stage 2 & 4)
+ * 4. Kiểm tra điều kiện cần làm rõ (Clarification Prompting)
+ * 5. Kiểm tra RBAC & thực thi Prisma Handler an toàn (Stage 1)
+ * 6. Lưu ngữ cảnh lượt trò chuyện vào Session Store (Stage 4)
  * 
  * @param {string} userPrompt - Câu hỏi của người dùng
  * @param {string} role - Vai trò của người dùng (DELIVERY, WAREHOUSE, ACCOUNTANT, SALES, ADMIN_CEO)
  * @param {Object} prisma - Prisma Client instance
  * @param {Object} [user={}] - Thông tin user { id, role, fullName }
- * @param {Object} [params={}] - Các tham số đã trích xuất hoặc tham số bổ sung
+ * @param {Object} [params={}] - Các tham số đã trích xuất hoặc options { sessionId, conversationHistory }
  */
 const executeActorIntent = async (userPrompt, role, prisma, user = {}, params = {}) => {
   const trainer = getTrainer(role);
@@ -118,11 +121,29 @@ const executeActorIntent = async (userPrompt, role, prisma, user = {}, params = 
     return { status: 'NOT_FOUND', message: `Không tìm thấy bộ huấn luyện cho vai trò ${role}` };
   }
 
+  const sessionId = params.sessionId || user.id || 'default_session';
+
   // 1. Tầng 1: So khớp bằng Regex Patterns nhanh
   let matchResult = trainer.match(userPrompt, user.id);
   let matchedSkill = matchResult ? matchResult.skill : null;
   let matchScore = matchResult ? matchResult.score : 0;
   let matchSource = 'PATTERN_RULE';
+
+  // 1.1 Kiểm tra xem có phải câu hỏi tiếp nối theo thời gian (Follow-up Date Query) không
+  if (!matchedSkill) {
+    const anaphoraCheck = conversationContext.detectAnaphora(userPrompt);
+    if (anaphoraCheck.isDateFollowUp) {
+      const recentTurns = conversationContext.getRecentTurns(sessionId, 3);
+      if (recentTurns.length > 0 && recentTurns[0].skillId) {
+        const prevSkill = trainer.getSkill(recentTurns[0].skillId);
+        if (prevSkill) {
+          matchedSkill = prevSkill;
+          matchScore = 0.95;
+          matchSource = 'CONTEXT_FOLLOW_UP';
+        }
+      }
+    }
+  }
 
   // 2. Tầng 2 & 3: Nếu Regex không khớp hoặc điểm thấp -> Kích hoạt Vector Embedding & Cosine Similarity (Stage 3)
   if (!matchedSkill) {
@@ -150,18 +171,69 @@ const executeActorIntent = async (userPrompt, role, prisma, user = {}, params = 
     }
   }
 
+  // 2.1 Nếu vẫn chưa có skill, kiểm tra xem có phải câu hỏi tỉnh lược (Elliptical Query) dựa vào context không
+  if (!matchedSkill) {
+    const ellipticalType = conversationContext.detectEllipticalType(userPrompt);
+    const recentTurns = conversationContext.getRecentTurns(sessionId, 3);
+    if (ellipticalType && recentTurns.length > 0) {
+      if (ellipticalType === 'PRODUCT') {
+        matchedSkill = trainer.getSkill('PRODUCT_PRICE_STOCK');
+        matchScore = 0.90;
+        matchSource = 'ELLIPTICAL_CONTEXT';
+      } else if (ellipticalType === 'ORDER') {
+        matchedSkill = trainer.getSkill('DELIVERY_TRACK_ORDER') || trainer.getSkill('ORDER_DETAIL_LOOKUP');
+        matchScore = 0.90;
+        matchSource = 'ELLIPTICAL_CONTEXT';
+      }
+    }
+  }
+
   if (!matchedSkill) {
     return null; // Không nhận diện được ý định nào phù hợp
   }
 
   // GIAI ĐOẠN 2: Tự động bóc tách thực thể, ngày tháng, mã phiếu, ngân sách từ câu hỏi
-  const resolvedParams = await extractParameters(userPrompt, prisma, user, params);
+  const initialParams = await extractParameters(userPrompt, prisma, user, params);
+
+  // GIAI ĐOẠN 4: Kế thừa thực thể qua ngữ cảnh nhiều lượt (Anaphora & Context Backfilling)
+  const { resolvedParams, inherited } = conversationContext.resolveContextAndBackfill(
+    userPrompt,
+    initialParams,
+    sessionId
+  );
+
+  // GIAI ĐOẠN 4: Kiểm tra xem có thiếu tham số bắt buộc cần người dùng làm rõ không
+  const clarification = conversationContext.checkClarificationNeeded(matchedSkill, resolvedParams, userPrompt);
+  if (clarification) {
+    return {
+      status: 'CLARIFICATION_REQUIRED',
+      skillId: matchedSkill.id,
+      missingParam: clarification.missingParam,
+      text: clarification.message,
+      matchScore,
+      matchSource,
+      role: trainer.role
+    };
+  }
 
   // GIAI ĐOẠN 1: Chạy Prisma Handler và kiểm tra bảo mật RBAC
   const execResult = await trainer.execute(matchedSkill, prisma, resolvedParams, user);
+
+  // GIAI ĐOẠN 4: Ghi lại lượt hội thoại vào Session Context
+  conversationContext.recordTurn(sessionId, {
+    userPrompt,
+    role: trainer.role,
+    intent: matchedSkill.id,
+    skillId: matchedSkill.id,
+    extractedParams: resolvedParams,
+    response: execResult.text,
+    status: execResult.status
+  });
+
   return {
     ...execResult,
     extractedParams: resolvedParams,
+    inheritedParams: inherited,
     matchScore,
     matchSource,
     role: trainer.role

@@ -70,8 +70,8 @@ const extractCodes = (text) => {
     if (hashMatch) {
       orderId = hashMatch[1];
     } else {
-      const naturalOrderMatch = lower.match(/(?:đơn\s*hàng|mã\s*đơn|đơn|order)(?:\s+(?:số|mã))?\s+([A-Za-z0-9_-]+)/i);
-      if (naturalOrderMatch && !/^(hàng|nào|gần đây|hôm nay|cần|chưa|đã|mới|này|kia)$/i.test(naturalOrderMatch[1])) {
+      const naturalOrderMatch = str.match(/(?:đơn\s*hàng|mã\s*đơn|đơn|order)(?:\s+(?:số|mã))?\s+([A-Za-z0-9_-]*\d+[A-Za-z0-9_-]*)/i);
+      if (naturalOrderMatch) {
         orderId = naturalOrderMatch[1].toUpperCase();
       }
     }
