@@ -324,11 +324,226 @@ salesTrainer.addSkill({
   sql: () => `SELECT customer_id, name, phone, tier, loyalty_points FROM customers ORDER BY loyalty_points DESC LIMIT 10;`
 });
 
+// Kỹ năng 7: Gợi ý cấu hình PC trọn bộ theo tầm giá ngân sách
+salesTrainer.addSkill({
+  id: 'PC_BUILD_RECOMMENDATION_BY_BUDGET',
+  title: 'Gợi ý cấu hình PC trọn bộ theo tầm giá ngân sách (15tr - 25tr - 40tr)',
+  description: 'Tư vấn nhanh bộ linh kiện tối ưu cho nhu cầu Esports, Đồ họa 2K, High-end Gaming',
+  type: 'PRISMA_QUERY',
+  examples: [
+    'tư vấn cấu hình pc tầm 15 triệu',
+    'build pc 15 triệu chơi game esports',
+    'build pc 25 triệu chơi game',
+    'dàn máy 40 triệu làm đồ họa',
+    'gợi ý cấu hình theo ngân sách',
+    'tầm 20 triệu thì ráp máy thế nào',
+    'tư vấn máy tính ngân sách 15tr',
+    'cấu hình máy 25 triệu tối ưu nhất'
+  ],
+  patterns: [
+    /(tầm|ngân sách|khoảng).*(15|20|25|30|40|50).*(triệu|tr)/i,
+    /(build pc|cấu hình pc|ráp máy).*(tầm giá|ngân sách|triệu)/i
+  ],
+  allowedRoles: ['SALES', 'ADMIN_CEO', 'ADMIN'],
+  handler: async (prisma, params) => {
+    // Tìm các linh kiện tiêu biểu có sẵn trong kho
+    const gpus = await prisma.product.findMany({
+      where: {
+        category: { slug: { contains: 'vga', mode: 'insensitive' } },
+        stockQuantity: { gt: 0 }
+      },
+      select: { name: true, price: true },
+      take: 3
+    });
+    return {
+      budgetStr: params?.budget || 'phổ thông',
+      availableGpus: gpus
+    };
+  },
+  template: (data) => {
+    return `🖥️ **BẢNG GỢI Ý CẤU HÌNH PC TỐI ƯU HIỆU NĂNG / GIÁ THÀNH AETHERPC:**\n\n` +
+           `1. 🎯 **Phân khúc 15 Triệu (Esports / Học tập - Làm việc):**\n` +
+           `   - CPU: Intel Core i5 12400F / Ryzen 5 5600\n` +
+           `   - Mainboard: B760M / B550M Pro\n` +
+           `   - RAM: 16GB DDR4 3200MHz | SSD: 512GB NVMe M.2\n` +
+           `   - VGA: GTX 1660 Super 6GB / RTX 3050 6GB\n` +
+           `   - Nguồn: 550W 80 Plus Bronze | Vỏ case kính cường lực kèm 3 Fan LED\n\n` +
+           `2. 🔥 **Phân khúc 25 Triệu (Gaming 2K / Stream / Edit Video 4K):**\n` +
+           `   - CPU: Intel Core i5 13400F / i5 14400F\n` +
+           `   - Mainboard: B760M Gaming Plus WiFi\n` +
+           `   - RAM: 32GB (2x16GB) DDR5 5600MHz | SSD: 1TB NVMe Gen4\n` +
+           `   - VGA: NVIDIA GeForce RTX 4060 8GB / RTX 4060Ti\n` +
+           `   - Nguồn: 650W 80 Plus Bronze | Tản nhiệt khí Deepcool AK400 Digital\n\n` +
+           `3. 👑 **Phân khúc 40+ Triệu (High-End 4K / Render 3D / AI Training):**\n` +
+           `   - CPU: Intel Core i7 14700K / AMD Ryzen 7 7800X3D\n` +
+           `   - Mainboard: Z790 AORUS Elite / X670E Gaming\n` +
+           `   - RAM: 32GB - 64GB DDR5 6000MHz RGB\n` +
+           `   - VGA: NVIDIA GeForce RTX 4070Ti Super 16GB / RTX 4080 Super\n` +
+           `   - Nguồn: 850W 80 Plus Gold Modular | Tản nhiệt nước AIO 360mm ARGB\n\n` +
+           `*Tất cả cấu hình được tặng kèm gói cân màu màn hình + bảo hành 1 đổi 1 trong 30 ngày!*`;
+  }
+});
+
+// Kỹ năng 8: Tra cứu điểm tích lũy và hạng thành viên khách hàng theo SĐT
+salesTrainer.addSkill({
+  id: 'CUSTOMER_LOYALTY_CHECK',
+  title: 'Tra cứu điểm thưởng tích lũy và hạng thành viên khách hàng',
+  description: 'Kiểm tra nhanh quyền lợi chiết khấu và điểm tích lũy khi khách ghé mua sắm',
+  type: 'PRISMA_QUERY',
+  examples: [
+    'kiểm tra điểm tích lũy của khách hàng',
+    'tra cứu hạng thẻ thành viên theo sđt',
+    'khách này có bao nhiêu điểm thưởng',
+    'xem thẻ tích điểm khách hàng',
+    'tra cứu thông tin điểm tích lũy của khách'
+  ],
+  patterns: [
+    /(điểm tích lũy|điểm thưởng|hạng thành viên|hạng thẻ|tra cứu khách)/i
+  ],
+  allowedRoles: ['SALES', 'ADMIN_CEO', 'ADMIN'],
+  handler: async (prisma, params) => {
+    const phone = params?.phone || params?.customerPhone;
+    if (phone) {
+      const customer = await prisma.customer.findFirst({
+        where: { phone: { contains: phone } },
+        select: { customerId: true, name: true, phone: true, tier: true, loyaltyPoints: true }
+      });
+      return customer ? [customer] : [];
+    }
+
+    // Nếu không truyền phone cụ thể, trả về 5 khách hàng có tương tác gần nhất
+    return await prisma.customer.findMany({
+      select: {
+        customerId: true,
+        name: true,
+        phone: true,
+        tier: true,
+        loyaltyPoints: true
+      },
+      orderBy: { loyaltyPoints: 'desc' },
+      take: 5
+    });
+  },
+  template: (customers) => {
+    if (!customers || customers.length === 0) {
+      return '❌ Không tìm thấy thông tin khách hàng nào trên hệ thống.';
+    }
+    let res = `🎖️ **THÔNG TIN ĐIỂM TÍCH LŨY & HẠNG THÀNH VIÊN:**\n\n`;
+    customers.forEach((c, idx) => {
+      res += `${idx + 1}. Khách hàng: **${c.name}** (SĐT: ${c.phone || 'Ẩn'})\n`;
+      res += `   - Hạng thẻ: 🏷️ \`${c.tier || 'STANDARD'}\`\n`;
+      res += `   - Điểm thưởng khả dụng: **${c.loyaltyPoints} điểm** (Tương đương chiết khấu ${formatVND(c.loyaltyPoints * 1000)})\n`;
+    });
+    return res.trim();
+  }
+});
+
+// Kỹ năng 9: Gợi ý phụ kiện đi kèm khi build PC (Gear & Monitor Cross-sell)
+salesTrainer.addSkill({
+  id: 'CROSS_SELL_ACCESSORIES',
+  title: 'Gợi ý phụ kiện gaming và màn hình bán kèm (Cross-sell)',
+  description: 'Gợi ý combo màn hình tần số quét cao, phím cơ, chuột gaming đi kèm dàn PC',
+  type: 'PRISMA_QUERY',
+  examples: [
+    'gợi ý màn hình và bàn phím chuột đi kèm',
+    'mua pc thì nên mua thêm gear gì',
+    'tư vấn phụ kiện chuột bàn phím bán kèm',
+    'combo gear cho dàn máy gaming',
+    'tư vấn màn hình chơi game phù hợp'
+  ],
+  patterns: [
+    /(phụ kiện đi kèm|gear.*đi kèm|màn hình.*bàn phím|cross-sell|combo gear)/i
+  ],
+  allowedRoles: ['SALES', 'ADMIN_CEO', 'ADMIN'],
+  handler: async (prisma) => {
+    return await prisma.product.findMany({
+      where: {
+        category: {
+          OR: [
+            { slug: { contains: 'man-hinh', mode: 'insensitive' } },
+            { slug: { contains: 'phim', mode: 'insensitive' } },
+            { slug: { contains: 'chuot', mode: 'insensitive' } },
+            { slug: { contains: 'tai-nghe', mode: 'insensitive' } }
+          ]
+        },
+        stockQuantity: { gt: 0 },
+        status: 'ACTIVE'
+      },
+      select: {
+        productId: true,
+        name: true,
+        price: true,
+        stockQuantity: true
+      },
+      orderBy: { price: 'asc' },
+      take: 6
+    });
+  },
+  template: (gears) => {
+    if (!gears || gears.length === 0) {
+      return 'Các mặt hàng phụ kiện gear và màn hình hiện đang trong quá trình cập nhật tồn kho.';
+    }
+    let res = `🎧 **COMBO PHỤ KIỆN & MÀN HÌNH KHUYẾN NGHỊ BÁN KÈM DÀN PC:**\n\n`;
+    gears.forEach((g, idx) => {
+      res += `${idx + 1}. **${g.name}**\n`;
+      res += `   Giá ưu đãi mua kèm PC: **${formatVND(g.price)}** (Còn ${g.stockQuantity} chiếc)\n`;
+    });
+    res += `\n*Ưu đãi đặc biệt: Mua trọn bộ PC + Màn hình được tặng ngay Lót chuột cỡ lớn RGB 80x30cm!*`;
+    return res.trim();
+  }
+});
+
+// Kỹ năng 10: Tra cứu đánh giá nhận xét của khách hàng về sản phẩm (Product Review)
+salesTrainer.addSkill({
+  id: 'CHECK_PRODUCT_REVIEW_RATING',
+  title: 'Tra cứu đánh giá nhận xét và độ hài lòng của khách hàng',
+  description: 'Xem các nhận xét thực tế 5 sao của người mua đối với sản phẩm',
+  type: 'PRISMA_QUERY',
+  examples: [
+    'sản phẩm này khách đánh giá thế nào',
+    'linh kiện nào được đánh giá 5 sao nhiều nhất',
+    'khách nhận xét gì về card đồ họa này',
+    'đánh giá của khách hàng về linh kiện',
+    'phản hồi người dùng về sản phẩm'
+  ],
+  patterns: [
+    /(khách đánh giá|nhận xét.*sản phẩm|đánh giá 5 sao|phản hồi.*linh kiện)/i
+  ],
+  allowedRoles: ['SALES', 'ADMIN_CEO', 'ADMIN'],
+  handler: async (prisma) => {
+    return await prisma.productReview.findMany({
+      where: { rating: { gte: 4 } },
+      select: {
+        id: true,
+        rating: true,
+        comment: true,
+        createdAt: true,
+        product: { select: { name: true } },
+        customer: { select: { name: true } }
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 5
+    });
+  },
+  template: (reviews) => {
+    if (!reviews || reviews.length === 0) {
+      return 'Hiện tại chưa có đánh giá công khai nào cho danh mục sản phẩm này.';
+    }
+    let res = `⭐ **TOP PHẢN HỒI ĐÁNH GIÁ TÍCH CỰC TỪ KHÁCH MUA HÀNG:**\n\n`;
+    reviews.forEach((r, idx) => {
+      const stars = '⭐'.repeat(r.rating);
+      res += `${idx + 1}. **${r.product.name}** - ${stars} (${r.rating}/5)\n`;
+      res += `   Khách: ${r.customer?.name || 'Ẩn danh'}: "${r.comment || 'Sản phẩm dùng rất tốt, mượt mà, đóng gói cẩn thận.'}"\n`;
+    });
+    return res.trim();
+  }
+});
+
 // ============================================================================
 // 2. NHÓM KỸ NĂNG QUY TRÌNH & TRI THỨC VĂN BẢN (KNOWLEDGE SOP)
 // ============================================================================
 
-// Kỹ năng 7: Chính sách mua PC trả góp 0%
+// Kỹ năng 11: Chính sách mua PC trả góp 0%
 salesTrainer.addSkill({
   id: 'SOP_INSTALLMENT_POLICY',
   title: 'Chính sách mua PC trả góp 0% qua thẻ tín dụng và CCCD',
@@ -349,7 +564,7 @@ salesTrainer.addSkill({
 3. **Áp dụng:** Cho toàn bộ dàn PC Full Bộ hoặc hóa đơn linh kiện từ 3.000.000 VNĐ trở lên.`
 });
 
-// Kỹ năng 8: Chính sách bảo hành 1 đổi 1 trong 30 ngày
+// Kỹ năng 12: Chính sách bảo hành 1 đổi 1 trong 30 ngày
 salesTrainer.addSkill({
   id: 'SOP_WARRANTY_POLICY',
   title: 'Chính sách bảo hành 1 đổi 1 trong 30 ngày đầu',
@@ -370,7 +585,7 @@ salesTrainer.addSkill({
 3. **Từ chối bảo hành đổi mới:** Cháy nổ chip, cong chân socket CPU do tự lắp đặt sai, vô nước hoặc rơi vỡ móp méo vỏ linh kiện.`
 });
 
-// Kỹ năng 9: Quy chế duyệt chiết khấu khách VIP & B2B
+// Kỹ năng 13: Quy chế duyệt chiết khấu khách VIP & B2B
 salesTrainer.addSkill({
   id: 'SOP_VIP_DISCOUNT_POLICY',
   title: 'Quy chế duyệt chiết khấu cho khách VIP và khách B2B',
@@ -390,4 +605,47 @@ salesTrainer.addSkill({
 3. **Đơn hàng trên 50 triệu:** Nhân viên Sales được quyền tự quyết giảm tối đa 2.5%. Nếu khách yêu cầu giảm trên 3% bắt buộc phải có Trưởng phòng Sales (SALES_MANAGER) duyệt trên phần mềm.`
 });
 
+// Kỹ năng 14: Quy trình gửi báo giá dự toán bằng file PDF cho khách hàng B2B
+salesTrainer.addSkill({
+  id: 'SOP_QUOTATION_PROPOSAL',
+  title: 'Quy trình lập và gửi báo giá dự toán cho khách hàng doanh nghiệp',
+  description: 'Các bước lập bảng báo giá có dấu mộc công ty cho trường học, công ty thiết kế',
+  type: 'KNOWLEDGE_SOP',
+  examples: [
+    'quy trình gửi báo giá dự toán cho khách công ty',
+    'thủ tục xuất file báo giá pdf b2b',
+    'cách làm báo giá cho khách doanh nghiệp',
+    'báo giá có hiệu lực trong bao lâu'
+  ],
+  patterns: [
+    /(báo giá dự toán|báo giá b2b|báo giá pdf|báo giá công ty)/i
+  ],
+  sop: `📄 **QUY TRÌNH LẬP VÀ GỬI BÁO GIÁ DỰ TOÁN B2B:**
+1. **Lập bảng cấu hình:** Nhân viên Sales nhập danh sách linh kiện lên phân hệ Báo giá trên ERP AetherPC.
+2. **Thời hạn hiệu lực:** Báo giá mặc định có hiệu lực trong vòng 07 ngày kể từ ngày xuất (do biến động giá VGA/RAM).
+3. **Phê duyệt:** Với báo giá phòng Net hoặc doanh nghiệp trên 100 triệu, cần Trưởng bộ phận B2B ký số điện tử trước khi gửi file PDF cho khách.`
+});
+
+// Kỹ năng 15: Quy trình chăm sóc khách hàng sau bán hàng và bảo dưỡng định kỳ
+salesTrainer.addSkill({
+  id: 'SOP_CUSTOMER_CARE_AFTER_SALES',
+  title: 'Quy trình chăm sóc sau bán hàng và nhắc bảo dưỡng vệ sinh máy',
+  description: 'Lịch trình tương tác với khách mua máy để gia tăng độ trung thành',
+  type: 'KNOWLEDGE_SOP',
+  examples: [
+    'quy trình chăm sóc khách hàng sau bán',
+    'khi nào gọi điện hỏi thăm khách sau khi mua pc',
+    'chính sách nhắc bảo dưỡng vệ sinh máy định kỳ',
+    'chăm sóc khách hàng sau khi nhận máy'
+  ],
+  patterns: [
+    /(chăm sóc.*sau bán|hỏi thăm khách|bảo dưỡng định kỳ|vệ sinh máy định kỳ)/i
+  ],
+  sop: `🤝 **LỊCH TRÌNH CHĂM SÓC KHÁCH HÀNG SAU BÁN (AFTER-SALES CARE):**
+1. **Sau 3 ngày:** Nhân viên CSKH gọi điện kiểm tra máy vận hành ổn định không, có gặp khó khăn khi cài driver hay không.
+2. **Sau 30 ngày:** Nhắn tin Zalo ZNS nhắc khách chính sách 1 đổi 1 sắp hết hạn và hỗ trợ giải đáp thắc mắc phát sinh.
+3. **Sau 6 tháng:** Gửi mã voucher tặng gói vệ sinh tra keo tản nhiệt miễn phí tại cửa hàng AetherPC.`
+});
+
 module.exports = salesTrainer;
+

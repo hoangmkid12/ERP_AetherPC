@@ -413,4 +413,182 @@ deliveryTrainer.addSkill({
 3. **Nếu có bể vỡ thật:** Chụp ảnh hiện trạng 3 góc $\rightarrow$ Báo ngay về Hotline Trưởng Kho $\rightarrow$ Cập nhật trạng thái đơn thành **FAILED_DELIVERY** kèm lý do "Bể vỡ vận chuyển".`
 });
 
+// Kỹ năng 11: Đơn hàng đã thanh toán trước (Không cần thu tiền COD)
+deliveryTrainer.addSkill({
+  id: 'PREPAID_ORDERS_TODAY',
+  title: 'Đơn hàng đã thanh toán trước (Không cần thu tiền mặt)',
+  description: 'Lọc các đơn hàng khách đã chuyển khoản 100%, shipper chỉ cần giao và chụp POD',
+  type: 'PRISMA_QUERY',
+  examples: [
+    'đơn nào của tôi đã thanh toán trước rồi?',
+    'những đơn không cần thu tiền',
+    'đơn khách chuyển khoản rồi',
+    'hôm nay có bao nhiêu đơn đã trả tiền trước',
+    'danh sách đơn đã trả đủ tiền chỉ việc giao'
+  ],
+  patterns: [
+    /(thanh toán trước|không cần thu tiền|chuyển khoản rồi|đã trả tiền|chỉ việc giao)/i
+  ],
+  allowedRoles: ['DELIVERY', 'ADMIN_CEO', 'ADMIN'],
+  handler: async (prisma, params, user) => {
+    const shipperId = Number(user.id || params.userId || 0);
+    return await prisma.order.findMany({
+      where: {
+        assignedShipperId: shipperId,
+        paymentStatus: 'PAID',
+        status: { in: ['READY_TO_SHIP', 'SHIPPED'] }
+      },
+      select: {
+        orderId: true,
+        shippingAddress: true,
+        customer: { select: { phone: true, name: true } },
+        totalAmount: true
+      },
+      orderBy: { createdAt: 'asc' }
+    });
+  },
+  template: (orders) => {
+    if (!orders || orders.length === 0) {
+      return 'Hiện không có đơn nào thanh toán trước, các đơn đang chờ của bạn đều là đơn COD thu tiền mặt.';
+    }
+    let res = `💳 **CÓ ${orders.length} ĐƠN ĐÃ THANH TOÁN TRƯỚC (KHÔNG THU TIỀN MẶT):**\n\n`;
+    orders.forEach((o, idx) => {
+      res += `${idx + 1}. **Đơn #${o.orderId}** - Trị giá: ${formatVND(o.totalAmount)} (ĐÃ TRẢ ĐỦ)\n`;
+      res += `   📍 Địa chỉ: ${o.shippingAddress} (📞 ${o.customer?.phone || 'Chưa có SĐT'})\n`;
+    });
+    return res.trim();
+  }
+});
+
+// Kỹ năng 12: Thông tin và địa chỉ kho lấy hàng xuất phát
+deliveryTrainer.addSkill({
+  id: 'WAREHOUSE_PICKUP_LOCATION',
+  title: 'Thông tin và địa chỉ kho lấy hàng xuất phát',
+  description: 'Tra cứu địa chỉ các kho hàng trung tâm của AetherPC để shipper qua lấy hàng',
+  type: 'PRISMA_QUERY',
+  examples: [
+    'kho lấy hàng ở địa chỉ nào?',
+    'tôi cần đến đâu để nhận kiện hàng',
+    'địa chỉ kho trung tâm xuất hàng',
+    'kho chính aetherpc ở đâu',
+    'địa điểm lấy hàng của shipper'
+  ],
+  patterns: [
+    /(kho lấy hàng|địa chỉ kho|đến đâu.*nhận hàng|kho chính.*ở đâu|địa điểm lấy hàng)/i
+  ],
+  allowedRoles: ['DELIVERY', 'ADMIN_CEO', 'ADMIN'],
+  handler: async (prisma) => {
+    return await prisma.warehouse.findMany({
+      where: { isActive: true },
+      select: { name: true, address: true }
+    });
+  },
+  template: (warehouses) => {
+    if (!warehouses || warehouses.length === 0) return 'Chưa có thông tin kho hoạt động.';
+    let res = `🏢 **ĐỊA ĐIỂM KHO TRUNG TÂM XUẤT HÀNG AETHERPC:**\n\n`;
+    warehouses.forEach((w, idx) => {
+      res += `${idx + 1}. **${w.name}**\n`;
+      res += `   📍 Địa chỉ: ${w.address || 'Trung tâm công nghệ AetherPC'}\n`;
+    });
+    return res.trim();
+  }
+});
+
+// Kỹ năng 13: Quy định bàn giao hàng cho người nhận hộ
+deliveryTrainer.addSkill({
+  id: 'SOP_THIRD_PARTY_RECIPIENT',
+  title: 'Quy định bàn giao hàng cho người nhận hộ',
+  description: 'Hướng dẫn giao cho bảo vệ chung cư, đồng nghiệp, người thân nhận thay',
+  type: 'KNOWLEDGE_SOP',
+  examples: [
+    'khách nhờ bảo vệ chung cư nhận hộ thì làm sao?',
+    'giao cho đồng nghiệp nhận thay có được không',
+    'người nhà nhận hộ gói hàng cần thủ tục gì',
+    'quy định giao hàng cho người nhận thay'
+  ],
+  patterns: [
+    /(nhận hộ|nhận thay|bảo vệ chung cư|đồng nghiệp nhận|người nhà nhận)/i
+  ],
+  sop: `🤝 **QUY ĐỊNH BÀN GIAO HÀNG CHO NGƯỜI NHẬN THAY:**
+1. **Xác nhận từ chính chủ:** Bắt buộc gọi điện thoại trực tiếp cho số khách đặt hàng để ghi âm hoặc có tin nhắn xác nhận: "Đồng ý cho người nhận thay [Tên / Quan hệ]".
+2. **Đối với đơn COD:** Người nhận thay bắt buộc thanh toán đủ 100% tiền mặt hoặc quét mã VietQR trước khi shipper bàn giao kiện hàng.
+3. **Ảnh POD:** Chụp ảnh người nhận hộ cầm kiện hàng kèm ghi chú trong app: \`Nhận hộ bởi: [Tên + SĐT người nhận hộ]\`.`
+});
+
+// Kỹ năng 14: Thống kê các đơn giao không thành công hoặc bị hoàn trả
+deliveryTrainer.addSkill({
+  id: 'FAILED_DELIVERY_REASONS',
+  title: 'Thống kê danh sách đơn giao không thành công hoặc bị hoàn trả',
+  description: 'Theo dõi các đơn hàng bị khách từ chối, không liên lạc được hoặc yêu cầu hoàn trả',
+  type: 'PRISMA_QUERY',
+  examples: [
+    'lý do các đơn giao thất bại gần đây',
+    'những đơn nào bị khách từ chối nhận',
+    'danh sách đơn bị hoàn trả',
+    'các đơn ship không thành công',
+    'đơn hàng bị boom hoặc hủy tại chỗ'
+  ],
+  patterns: [
+    /(giao thất bại|từ chối nhận|hoàn trả.*đơn|ship không thành công|bị boom|hủy tại chỗ)/i
+  ],
+  allowedRoles: ['DELIVERY', 'ADMIN_CEO', 'ADMIN'],
+  handler: async (prisma, _params, user) => {
+    const shipperId = Number(user?.id || 0);
+    const isShipper = user?.role === 'DELIVERY';
+
+    return await prisma.order.findMany({
+      where: {
+        status: { in: ['RETURNED', 'CANCELLED'] },
+        ...(isShipper && shipperId ? { assignedShipperId: shipperId } : {})
+      },
+      select: {
+        orderId: true,
+        totalAmount: true,
+        status: true,
+        shippingAddress: true,
+        customer: { select: { name: true, phone: true } },
+        failReason: true,
+        failNote: true,
+        createdAt: true
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 6
+    });
+  },
+  template: (orders) => {
+    if (!orders || orders.length === 0) {
+      return '🎉 **Tuyệt vời! Không có đơn hàng nào bị hủy hoặc hoàn trả gần đây.**';
+    }
+    let res = `⚠️ **DANH SÁCH CÁC ĐƠN HÀNG GIAO THẤT BẠI / HOÀN TRẢ GẦN NHẤT:**\n\n`;
+    orders.forEach((o, idx) => {
+      const reasonStr = o.failReason ? ` | Lý do: ${o.failReason}` : '';
+      res += `${idx + 1}. **Đơn #${o.orderId}** - ${formatVND(o.totalAmount)} (Trạng thái: \`${o.status}\`${reasonStr})\n`;
+      res += `   Khách: ${o.customer?.name || 'Khách'} (${o.customer?.phone || 'Ẩn'}) | Địa chỉ: ${o.shippingAddress}\n`;
+    });
+    return res.trim();
+  }
+});
+
+// Kỹ năng 15: Quy định giao hàng linh kiện an toàn khi trời mưa bão
+deliveryTrainer.addSkill({
+  id: 'SOP_INCLEMENT_WEATHER_DELIVERY',
+  title: 'Quy định giao hàng linh kiện điện tử an toàn trong thời tiết mưa bão',
+  description: 'Biện pháp bảo quản thùng PC và linh kiện tránh bị ẩm ướt nước mưa',
+  type: 'KNOWLEDGE_SOP',
+  examples: [
+    'quy định giao hàng khi trời mưa to bão gió',
+    'làm sao bảo vệ linh kiện khi đi giao trời mưa',
+    'có được hoãn giao hàng khi thời tiết xấu không',
+    'hướng dẫn bọc hàng chống nước khi đi ship'
+  ],
+  patterns: [
+    /(trời mưa|mưa bão|thời tiết xấu|chống nước|bọc kiện hàng)/i
+  ],
+  sop: `🌧️ **QUY ĐỊNH GIAO HÀNG LINH KIỆN ĐIỆN TỬ TRỜI MƯA BÃO:**
+1. **Bảo quản chống nước:** Toàn bộ thùng máy PC và hộp linh kiện (VGA, CPU, Main) bắt buộc bọc màng co nilon hoặc trùm áo mưa bọc hàng chuyên dụng trước khi rời khỏi kho.
+2. **Quyền hoãn giao:** Nếu mưa ngập sâu hoặc giông bão sấm sét cấp 6 trở lên: Shipper được quyền chủ động liên hệ khách hàng dời lịch hẹn giao sang thời điểm tạnh mưa an toàn.
+3. **Nghiêm cấm:** Tuyệt đối không để kiện hàng linh kiện tiếp xúc trực tiếp với nước mưa trên xe máy; mọi rủi ro chập cháy bo mạch do ngấm nước shipper chịu trách nhiệm theo biên chế bồi thường.`
+});
+
 module.exports = deliveryTrainer;
+

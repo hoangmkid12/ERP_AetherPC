@@ -420,11 +420,225 @@ accountantTrainer.addSkill({
   sql: () => `SELECT payment_method, COUNT(*) AS so_don, SUM(total_amount) AS tong_tien FROM orders WHERE status IN ('DELIVERED', 'COMPLETED') AND created_at >= date_trunc('month', now() AT TIME ZONE 'Asia/Ho_Chi_Minh') GROUP BY payment_method ORDER BY tong_tien DESC;`
 });
 
+// Kỹ năng 10: Ước tính nghĩa vụ thuế VAT đầu ra (10%)
+accountantTrainer.addSkill({
+  id: 'VAT_OUTPUT_ESTIMATE',
+  title: 'Ước tính thuế VAT đầu ra phát sinh từ các đơn hàng hoàn tất',
+  description: 'Tính toán nghĩa vụ thuế Giá trị Gia tăng (VAT 10%) dự kiến phải nộp ngân sách',
+  type: 'PRISMA_QUERY',
+  examples: [
+    'ước tính thuế vat đầu ra tháng này',
+    'ước tính thuế vat đầu ra năm nay',
+    'thuế giá trị gia tăng phải nộp tháng này là bao nhiêu',
+    'báo cáo vat đầu ra',
+    'tổng tiền thuế vat bán hàng',
+    'dự toán nghĩa vụ thuế vat'
+  ],
+  patterns: [
+    /(thuế vat|vat đầu ra|thuế giá trị gia tăng|nghĩa vụ thuế)/i
+  ],
+  allowedRoles: ['ACCOUNTANT', 'ADMIN_CEO', 'ADMIN'],
+  handler: async (prisma, params) => {
+    const isYear = /(năm|nam)/i.test(params?.period || '');
+    const since = isYear ? getStartOfYear() : getStartOfMonth();
+
+    const res = await prisma.order.aggregate({
+      where: {
+        status: { in: ['DELIVERED', 'COMPLETED'] },
+        createdAt: { gte: since }
+      },
+      _sum: { totalAmount: true },
+      _count: { orderId: true }
+    });
+
+    const revenue = Number(res._sum.totalAmount || 0);
+    // Giả định thuế VAT 10% tính trên doanh thu bán hàng bao gồm VAT: VAT = DoanhThu / 1.1 * 0.1
+    const netRevenue = Math.round(revenue / 1.1);
+    const estimatedVat = revenue - netRevenue;
+
+    return {
+      period: isYear ? 'năm nay (YTD)' : 'tháng này',
+      revenue,
+      netRevenue,
+      estimatedVat,
+      orderCount: res._count.orderId || 0
+    };
+  },
+  template: (data) => {
+    return `🏛️ **ƯỚC TÍNH NGHĨA VỤ THUẾ VAT ĐẦU RA (${data.period.toUpperCase()}):**\n\n` +
+           `- 📈 Tổng doanh thu bán hàng (đã gồm VAT): **${formatVND(data.revenue)}** (${data.orderCount} đơn)\n` +
+           `- 📦 Doanh thu thuần trước thuế (Net): **${formatVND(data.netRevenue)}**\n` +
+           `- 🧾 **Thuế GTGT (VAT 10%) ước tính phải nộp: ${formatVND(data.estimatedVat)}**\n\n` +
+           `*Lưu ý: Số thuế thực tế được khấu trừ thêm với thuế VAT đầu vào từ các hóa đơn mua hàng (Vendor Bills) hợp lệ.*`;
+  }
+});
+
+// Kỹ năng 11: Lịch sử thanh toán chi tiết của đơn hàng
+accountantTrainer.addSkill({
+  id: 'ORDER_PAYMENT_HISTORY',
+  title: 'Tra cứu lịch sử thanh toán chi tiết của đơn hàng',
+  description: 'Xem các lần khách thanh toán, đặt cọc hoặc chuyển khoản của đơn hàng',
+  type: 'PRISMA_QUERY',
+  examples: [
+    'lịch sử thanh toán của đơn hàng này',
+    'giao dịch thanh toán gần nhất của các đơn hàng',
+    'tra cứu phiếu thu thanh toán của đơn hàng',
+    'khách đã trả những lần nào cho đơn hàng',
+    'các đợt nộp tiền của đơn hàng'
+  ],
+  patterns: [
+    /(lịch sử thanh toán|phiếu thu thanh toán|các lần trả tiền|các đợt nộp tiền)/i
+  ],
+  allowedRoles: ['ACCOUNTANT', 'ADMIN_CEO', 'ADMIN'],
+  handler: async (prisma, params) => {
+    const orderId = params?.orderId;
+    return await prisma.orderPayment.findMany({
+      where: {
+        ...(orderId ? { orderId } : {})
+      },
+      select: {
+        id: true,
+        orderId: true,
+        method: true,
+        amount: true,
+        transactionId: true,
+        status: true,
+        settledAt: true,
+        createdAt: true
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 6
+    });
+  },
+  template: (payments) => {
+    if (!payments || payments.length === 0) {
+      return 'Chưa ghi nhận giao dịch thanh toán nào được ghi vào sổ thanh toán đơn hàng.';
+    }
+    let res = `💳 **LỊCH SỬ CÁC GIAO DỊCH THANH TOÁN GẦN NHẤT:**\n\n`;
+    payments.forEach((p, idx) => {
+      const settleStatus = p.settledAt ? `(Đã đối soát: ${formatDateVN(p.settledAt)})` : `(Chưa đối soát)`;
+      res += `${idx + 1}. **Đơn #${p.orderId}** - Số tiền: **${formatVND(p.amount)}**\n`;
+      res += `   Phương thức: \`${p.method}\` | GD: \`${p.transactionId || 'TIEN_MAT'}\` | TT: \`${p.status}\` ${settleStatus}\n`;
+    });
+    return res.trim();
+  }
+});
+
+// Kỹ năng 12: Tổng kết chi phí ghi nhận trong sổ cái thu chi (Ledger Entries)
+accountantTrainer.addSkill({
+  id: 'LEDGER_EXPENSES_SUMMARY',
+  title: 'Tổng kết chi phí thực tế ghi nhận trong sổ cái thu chi',
+  description: 'Tổng hợp các khoản chi phí vận hành, giao hàng, hoàn tiền trong tháng',
+  type: 'PRISMA_QUERY',
+  examples: [
+    'tổng chi phí tháng này trong sổ cái',
+    'báo cáo chi phí hoạt động tháng này',
+    'sổ cái thu chi tháng này thế nào',
+    'các khoản chi phí lớn nhất tháng',
+    'tổng tiền đã chi ra trong tháng'
+  ],
+  patterns: [
+    /(chi phí.*sổ cái|sổ cái thu chi|khoản chi phí|tiền đã chi)/i
+  ],
+  allowedRoles: ['ACCOUNTANT', 'ADMIN_CEO', 'ADMIN'],
+  handler: async (prisma) => {
+    const expenses = await prisma.ledgerEntry.groupBy({
+      by: ['type'],
+      where: {
+        date: { gte: getStartOfMonth() }
+      },
+      _sum: { amount: true },
+      _count: { id: true }
+    });
+
+    return expenses.map(e => ({
+      type: e.type,
+      count: e._count.id,
+      amount: Number(e._sum.amount || 0)
+    }));
+  },
+  template: (entries) => {
+    if (!entries || entries.length === 0) {
+      return 'Chưa có khoản thu chi nào được ghi nhận trong sổ cái thu chi tháng này.';
+    }
+    const totalExp = entries
+      .filter(e => ['EXPENSE', 'SHIPPING', 'REFUND', 'EXPENSE_PROJECTED'].includes(e.type))
+      .reduce((sum, e) => sum + e.amount, 0);
+
+    let res = `📒 **TỔNG HỢP SỔ CÁI THU CHI THÁNG NÀY (TỔNG CHI: ${formatVND(totalExp)}):**\n\n`;
+    entries.forEach((e, idx) => {
+      res += `${idx + 1}. Phân loại \`${e.type}\`: **${formatVND(e.amount)}** (${e.count} giao dịch)\n`;
+    });
+    return res.trim();
+  }
+});
+
+// Kỹ năng 13: Báo cáo công nợ COD chi tiết theo từng shipper
+accountantTrainer.addSkill({
+  id: 'OUTSTANDING_COD_BY_SHIPPER',
+  title: 'Báo cáo công nợ tiền COD chi tiết theo từng shipper',
+  description: 'Xác định nhân viên giao hàng nào đang giữ tiền COD chưa nộp',
+  type: 'PRISMA_QUERY',
+  examples: [
+    'shipper nào đang giữ nhiều tiền cod nhất',
+    'báo cáo công nợ cod theo từng shipper',
+    'chi tiết nợ cod của từng người giao hàng',
+    'danh sách shipper chưa nộp tiền thu hộ'
+  ],
+  patterns: [
+    /(shipper nào.*tiền cod|công nợ cod.*từng shipper|nợ cod.*người giao hàng)/i
+  ],
+  allowedRoles: ['ACCOUNTANT', 'ADMIN_CEO', 'ADMIN'],
+  handler: async (prisma) => {
+    const codOrders = await prisma.order.findMany({
+      where: {
+        status: { in: ['DELIVERED', 'COMPLETED'] },
+        paymentMethod: 'COD',
+        paymentStatus: 'PENDING',
+        assignedShipperId: { not: null }
+      },
+      select: {
+        orderId: true,
+        totalAmount: true,
+        assignedShipperId: true,
+        assignedShipper: {
+          select: { fullName: true, phone: true }
+        }
+      }
+    });
+
+    const shipperMap = {};
+    codOrders.forEach(o => {
+      const sId = o.assignedShipperId;
+      const sName = o.assignedShipper?.fullName || `Shipper #${sId}`;
+      const sPhone = o.assignedShipper?.phone || '';
+      if (!shipperMap[sId]) {
+        shipperMap[sId] = { id: sId, name: sName, phone: sPhone, totalCod: 0, orderCount: 0 };
+      }
+      shipperMap[sId].totalCod += Number(o.totalAmount);
+      shipperMap[sId].orderCount += 1;
+    });
+
+    return Object.values(shipperMap).sort((a, b) => b.totalCod - a.totalCod);
+  },
+  template: (shippers) => {
+    if (!shippers || shippers.length === 0) {
+      return '🎉 **Tuyệt vời! Toàn bộ shipper đã bàn giao và nộp đầy đủ tiền COD về thủ quỹ kế toán.**';
+    }
+    let res = `🛵 **BÁO CÁO CÔNG NỢ COD THEO NHÂN VIÊN GIAO HÀNG:**\n\n`;
+    shippers.forEach((s, idx) => {
+      res += `${idx + 1}. **${s.name}** (${s.phone || 'SĐT ẩn'})\n`;
+      res += `   - Tiền COD đang giữ: **${formatVND(s.totalCod)}** (${s.orderCount} đơn chưa nộp)\n`;
+    });
+    return res.trim();
+  }
+});
+
 // ============================================================================
 // 2. NHÓM KỸ NĂNG QUY TRÌNH & TRI THỨC VĂN BẢN (KNOWLEDGE SOP)
 // ============================================================================
 
-// Kỹ năng 10: Quy định chi tiêu quỹ tiền mặt nhỏ khẩn cấp
+// Kỹ năng 14: Quy định chi tiêu quỹ tiền mặt nhỏ khẩn cấp
 accountantTrainer.addSkill({
   id: 'SOP_PETTY_CASH_EXPENSE',
   title: 'Quy định chi tiêu quỹ tiền mặt nhỏ khẩn cấp dưới 2 triệu',
@@ -444,7 +658,7 @@ accountantTrainer.addSkill({
 3. **Hoàn ứng:** Thời hạn quyết toán hoàn ứng tối đa 48 giờ làm việc kể từ thời điểm nhận tiền tạm ứng.`
 });
 
-// Kỹ năng 11: Nguyên tắc phân nhiệm SoD
+// Kỹ năng 15: Nguyên tắc phân nhiệm SoD
 accountantTrainer.addSkill({
   id: 'SOP_SOD_INTERNAL_CONTROL',
   title: 'Nguyên tắc phân nhiệm SoD (Segregation of Duties) trong kế toán',
@@ -464,7 +678,7 @@ accountantTrainer.addSkill({
 3. **Mã PIN/OTP:** Nghiêm cấm chia sẻ mã OTP ngân hàng doanh nghiệp hoặc đăng nhập chéo tài khoản của nhau.`
 });
 
-// Kỹ năng 12: Quy chuẩn đối soát VietQR tự động
+// Kỹ năng 16: Quy chuẩn đối soát VietQR tự động
 accountantTrainer.addSkill({
   id: 'SOP_VIETQR_RECONCILIATION',
   title: 'Quy chuẩn đối soát VietQR và webhook ngân hàng',
@@ -484,4 +698,47 @@ accountantTrainer.addSkill({
 3. **Lệch số tiền:** Nếu khách chuyển thiếu tiền: Hệ thống tự động ghi nhận là "Đã cọc một phần" (PARTIAL_PAID), nhân viên liên hệ khách để bổ sung.`
 });
 
+// Kỹ năng 17: Quy trình xuất hóa đơn đỏ điện tử (e-Invoice)
+accountantTrainer.addSkill({
+  id: 'SOP_E_INVOICE_ISSUANCE',
+  title: 'Quy trình xuất hóa đơn điện tử VAT (Hóa đơn đỏ)',
+  description: 'Thủ tục lập và phát hành hóa đơn giá trị gia tăng điện tử cho khách hàng',
+  type: 'KNOWLEDGE_SOP',
+  examples: [
+    'quy trình xuất hóa đơn đỏ vat điện tử',
+    'thủ tục xuất hóa đơn công ty cho khách',
+    'khách đòi hóa đơn vat thì làm thế nào',
+    'quy định xuất hóa đơn điện tử trong ngày'
+  ],
+  patterns: [
+    /(xuất hóa đơn đỏ|hóa đơn vat|hóa đơn điện tử|e-invoice|thông tin xuất vat)/i
+  ],
+  sop: `🧾 **QUY TRÌNH XUẤT HÓA ĐƠN ĐIỆN TỬ VAT (E-INVOICE):**
+1. **Thông tin bắt buộc:** Tên công ty, Mã số thuế (MST), Địa chỉ đăng ký kinh doanh và Email nhận hóa đơn của người mua.
+2. **Thời điểm xuất:** Hóa đơn điện tử phải được xuất trong vòng 24 giờ sau khi đơn hàng chuyển sang trạng thái \`DELIVERED\` hoặc \`COMPLETED\`.
+3. **Đơn hàng cá nhân không lấy hóa đơn:** Kế toán tập hợp vào bảng kê xuất hóa đơn gộp cuối ngày "Người mua không lấy hóa đơn" theo đúng quy định Thuế.`
+});
+
+// Kỹ năng 18: Quy trình đối chiếu sổ phụ ngân hàng định kỳ cuối tháng
+accountantTrainer.addSkill({
+  id: 'SOP_BANK_STATEMENT_RECONCILIATION',
+  title: 'Quy trình đối chiếu sổ phụ ngân hàng định kỳ cuối tháng',
+  description: 'Hướng dẫn chốt số dư và đối chiếu giao dịch ngân hàng với sổ sách ERP',
+  type: 'KNOWLEDGE_SOP',
+  examples: [
+    'quy trình đối chiếu sổ phụ ngân hàng',
+    'thủ tục chốt số dư ngân hàng cuối tháng',
+    'hướng dẫn đối soát sao kê tài khoản công ty'
+  ],
+  patterns: [
+    /(sổ phụ ngân hàng|chốt số dư ngân hàng|đối chiếu sao kê)/i
+  ],
+  sop: `📑 **QUY TRÌNH ĐỐI CHIẾU SỔ PHỤ NGÂN HÀNG (BANK RECONCILIATION):**
+1. **Thời điểm thực hiện:** Vào ngày cuối cùng của tháng tài chính (chậm nhất ngày 02 tháng tiếp theo).
+2. **Thu thập tài liệu:** Tải file sao kê chi tiết (Excel/PDF) từ Internet Banking Vietcombank & MBBank.
+3. **Đối chiếu số dư:** Khớp số dư đầu kỳ, tổng phát sinh Nợ/Có và số dư cuối kỳ với báo cáo tài khoản ngân hàng trên ERP AetherPC.
+4. **Xử lý chênh lệch:** Nếu có chênh lệch do phí ngân hàng hoặc giao dịch treo, lập phiếu điều chỉnh ghi sổ kèm chữ ký Kế toán trưởng.`
+});
+
 module.exports = accountantTrainer;
+

@@ -519,4 +519,205 @@ warehouseTrainer.addSkill({
 4. **Biên bản bàn giao:** Ký xác nhận vào tem dán sau case máy tính trước khi chuyển kho xuất hàng.`
 });
 
+// Kỹ năng 13: Định giá tổng tài sản hàng tồn kho
+warehouseTrainer.addSkill({
+  id: 'WAREHOUSE_INVENTORY_VALUATION',
+  title: 'Tổng giá trị tài sản tồn kho toàn bộ linh kiện',
+  description: 'Tính tổng giá trị quy đổi thành tiền của tất cả linh kiện còn trong kho',
+  type: 'PRISMA_QUERY',
+  examples: [
+    'tổng giá trị tồn kho linh kiện hiện tại là bao nhiêu?',
+    'tổng tài sản hàng tồn kho của công ty',
+    'kho linh kiện đang có giá trị bao nhiêu tiền',
+    'định giá hàng tồn kho hiện nay',
+    'tổng giá trị tiền hàng đang nằm trong kho'
+  ],
+  patterns: [
+    /(tổng giá trị tồn kho|tài sản.*tồn kho|định giá.*kho|kho.*trị giá bao nhiêu|tiền hàng.*trong kho)/i
+  ],
+  allowedRoles: ['WAREHOUSE', 'ADMIN_CEO', 'ADMIN', 'ACCOUNTANT'],
+  handler: async (prisma) => {
+    const products = await prisma.product.findMany({
+      where: { status: 'ACTIVE', stockQuantity: { gt: 0 } },
+      select: { stockQuantity: true, price: true }
+    });
+    const totalUnits = products.reduce((sum, p) => sum + p.stockQuantity, 0);
+    const totalValue = products.reduce((sum, p) => sum + (p.stockQuantity * Number(p.price)), 0);
+    return { totalUnits, totalValue, productCount: products.length };
+  },
+  template: (data) => {
+    return `💎 **ĐỊNH GIÁ TÀI SẢN LINH KIỆN TỒN KHO AETHERPC:**\n\n` +
+           `- Số mã sản phẩm có tồn: **${data.productCount} danh mục**\n` +
+           `- Tổng số lượng linh kiện vật lý: **${data.totalUnits.toLocaleString('vi-VN')} chiếc**\n` +
+           `- 💰 **TỔNG GIÁ TRỊ TÀI SẢN KHO: ${formatVND(data.totalValue)}**\n\n` +
+           `Kho hàng đang được bảo hiểm rủi ro cháy nổ và kiểm kê định kỳ 30 ngày/lần.`;
+  }
+});
+
+// Kỹ năng 14: Danh sách yêu cầu đổi trả RMA đang chờ tiếp nhận
+warehouseTrainer.addSkill({
+  id: 'RETURN_REQUESTS_PENDING',
+  title: 'Danh sách yêu cầu đổi trả RMA đang chờ tiếp nhận',
+  description: 'Theo dõi các kiện hàng khách gửi đổi trả bảo hành đang trên đường về kho',
+  type: 'PRISMA_QUERY',
+  examples: [
+    'có bao nhiêu yêu cầu đổi trả rma đang chờ xử lý?',
+    'danh sách hàng bảo hành khách trả về',
+    'các yêu cầu hoàn hàng đổi mới đang chờ duyệt',
+    'tình hình tiếp nhận rma kho',
+    'kiện hàng rma nào đang gửi về kho'
+  ],
+  patterns: [
+    /(đổi trả.*rma|yêu cầu đổi trả|hàng bảo hành.*trả về|tiếp nhận rma|kiện hàng rma)/i
+  ],
+  allowedRoles: ['WAREHOUSE', 'ADMIN_CEO', 'ADMIN'],
+  handler: async (prisma) => {
+    return await prisma.returnRequest.findMany({
+      where: {
+        status: { in: ['PENDING', 'APPROVED', 'PICKED_UP', 'RECEIVED_AT_WAREHOUSE'] }
+      },
+      select: {
+        rmaCode: true,
+        orderId: true,
+        customerName: true,
+        reason: true,
+        status: true
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 10
+    });
+  },
+  template: (rmas) => {
+    if (!rmas || rmas.length === 0) {
+      return '✅ **Hiện không có yêu cầu đổi trả / bảo hành RMA nào đang chờ xử lý.**';
+    }
+    let res = `🔧 **DANH SÁCH ${rmas.length} PHIẾU RMA ĐỔI TRẢ ĐANG CHỜ KHO TIẾP NHẬN:**\n\n`;
+    rmas.forEach((r, idx) => {
+      res += `${idx + 1}. **Mã RMA #${r.rmaCode}** (Đơn #${r.orderId})\n`;
+      res += `   Khách: ${r.customerName || 'Khách hàng'} | Lý do: \`${r.reason}\` | Trạng thái: \`${r.status}\`\n`;
+    });
+    return res.trim();
+  }
+});
+
+// Kỹ năng 15: Quy định dán tem vỡ bảo hành và quét Serial
+warehouseTrainer.addSkill({
+  id: 'SOP_SERIAL_STICKER_POLICY',
+  title: 'Quy định dán tem vỡ bảo hành và quét mã Serial khi xuất kho',
+  description: 'Tiêu chuẩn bảo hành vật lý và lưu vết linh kiện trên ERP',
+  type: 'KNOWLEDGE_SOP',
+  examples: [
+    'quy định dán tem vỡ bảo hành aetherpc',
+    'lúc xuất kho có cần quét mã serial number không',
+    'vị trí dán tem bảo hành trên vga và ram',
+    'thủ tục dán tem niêm phong xuất xưởng'
+  ],
+  patterns: [
+    /(tem vỡ|dán tem bảo hành|quét mã serial|vị trí dán tem|tem niêm phong)/i
+  ],
+  sop: `🏷️ **QUY TRÌNH DÁN TEM BẢO HÀNH & QUÉT MÃ SERIAL NUMBER:**
+1. **Quét mã vạch (Barcode/QR):** Trước khi đóng gói, thủ kho bắt buộc dùng máy quét barcode ghi nhận mã Serial của từng linh kiện vào đơn hàng trên hệ thống.
+2. **Vị trí dán tem:**
+   - **VGA:** Dán tem đè lên 1 ốc giữ tản nhiệt mặt lưng (Backplate) để chống tháo rời trái phép.
+   - **RAM & SSD:** Dán tem lên phần thân nhãn của thanh RAM, không dán đè lên chân tiếp xúc mạ vàng.
+   - **Mainboard:** Dán tem vỡ góc dưới cạnh pin CMOS.
+3. **Tem xuất xưởng:** Dán tem niêm phong ngày xuất xưởng của AetherPC kèm chữ ký Kỹ thuật viên ráp máy.`
+});
+
+// Kỹ năng 16: Tra cứu thông tin và nguồn gốc Serial Number
+warehouseTrainer.addSkill({
+  id: 'SERIAL_NUMBER_TRACKING',
+  title: 'Tra cứu thông tin và vòng đời mã Serial linh kiện',
+  description: 'Kiểm tra trạng thái linh kiện theo số Serial (Sẵn sàng bán, Đang gắn vào đơn, Lỗi bảo hành)',
+  type: 'PRISMA_QUERY',
+  examples: [
+    'tra cứu số serial linh kiện',
+    'serial này thuộc sản phẩm nào và đang ở đâu',
+    'kiểm tra mã serial number trong kho',
+    'danh sách số serial linh kiện mới nhập',
+    'tra cứu bảo hành theo serial'
+  ],
+  patterns: [
+    /(số serial|mã serial|serial number|tra cứu serial|vòng đời serial)/i
+  ],
+  allowedRoles: ['WAREHOUSE', 'ADMIN_CEO', 'ADMIN'],
+  handler: async (prisma, params) => {
+    const serialKw = params?.serial || params?.keyword;
+    return await prisma.serialNumber.findMany({
+      where: {
+        ...(serialKw ? { serial: { contains: serialKw, mode: 'insensitive' } } : {})
+      },
+      select: {
+        serial: true,
+        status: true,
+        warrantyMonths: true,
+        orderId: true,
+        product: { select: { name: true, sku: true } }
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 8
+    });
+  },
+  template: (serials) => {
+    if (!serials || serials.length === 0) {
+      return 'Không tìm thấy thông tin Serial Number nào khớp trên hệ thống.';
+    }
+    let res = `🔎 **THÔNG TIN TRUY VẾT MÃ SERIAL NUMBER LINH KIỆN:**\n\n`;
+    serials.forEach((s, idx) => {
+      const orderInfo = s.orderId ? `(Đã xuất cho Đơn #${s.orderId})` : `(Trong kho)`;
+      res += `${idx + 1}. **Serial: \`${s.serial}\`** - ${s.product?.name}\n`;
+      res += `   Trạng thái: \`${s.status}\` ${orderInfo} | BH: ${s.warrantyMonths || 36} tháng\n`;
+    });
+    return res.trim();
+  }
+});
+
+// Kỹ năng 17: Báo cáo kiểm định chất lượng hàng hóa nhập kho (QC Inspections)
+warehouseTrainer.addSkill({
+  id: 'QC_INSPECTION_SUMMARY',
+  title: 'Tình hình kiểm định chất lượng hàng hóa nhập kho (QC Inspection)',
+  description: 'Thống kê kết quả kiểm tra chất lượng linh kiện nhập từ Nhà Cung Cấp',
+  type: 'PRISMA_QUERY',
+  examples: [
+    'tình hình kiểm định chất lượng hàng nhập qc',
+    'kết quả kiểm tra chất lượng linh kiện gần đây',
+    'có linh kiện nào bị lỗi khi kiểm tra qc không',
+    'báo cáo kiểm định chất lượng nhập kho',
+    'tỷ lệ đạt kiểm định qc hàng nhập'
+  ],
+  patterns: [
+    /(kiểm định chất lượng|kiểm tra qc|qc inspection|hàng nhập bị lỗi|tỷ lệ đạt qc)/i
+  ],
+  allowedRoles: ['WAREHOUSE', 'ADMIN_CEO', 'ADMIN'],
+  handler: async (prisma) => {
+    return await prisma.qcInspection.findMany({
+      select: {
+        id: true,
+        sampleRate: true,
+        passedQuantity: true,
+        defectiveQuantity: true,
+        status: true,
+        notes: true,
+        inspectedAt: true,
+        inspector: { select: { fullName: true } }
+      },
+      orderBy: { inspectedAt: 'desc' },
+      take: 6
+    });
+  },
+  template: (inspections) => {
+    if (!inspections || inspections.length === 0) {
+      return 'Chưa có biên bản kiểm tra chất lượng QC nào được lưu trong hệ thống.';
+    }
+    let res = `🔬 **BÁO CÁO KIỂM ĐỊNH CHẤT LƯỢNG HÀNG NHẬP (QC INSPECTIONS):**\n\n`;
+    inspections.forEach((qc, idx) => {
+      res += `${idx + 1}. **Biên bản QC #${qc.id}** (${formatDateVN(qc.inspectedAt)})\n`;
+      res += `   Trạng thái: **${qc.status === 'PASSED' ? '✅ ĐẠT CHUẨN' : '⚠️ CÓ LỖI'}** | Đạt: ${qc.passedQuantity} | Lỗi: ${qc.defectiveQuantity}\n`;
+      res += `   Kiểm định viên: ${qc.inspector?.fullName || 'Bộ phận QC'} | Ghi chú: "${qc.notes || 'Hàng nguyên seal, không móp méo'}"\n`;
+    });
+    return res.trim();
+  }
+});
+
 module.exports = warehouseTrainer;
+

@@ -285,11 +285,216 @@ adminCeoTrainer.addSkill({
   }
 });
 
+// Kỹ năng 7: Ước tính lợi nhuận gộp kinh doanh (Gross Profit Margin)
+adminCeoTrainer.addSkill({
+  id: 'ESTIMATED_GROSS_PROFIT',
+  title: 'Ước tính lợi nhuận gộp toàn công ty (Gross Profit & Margin)',
+  description: 'Tổng hợp doanh thu thuần trừ đi giá vốn mua hàng nhà cung cấp (COGS)',
+  type: 'PRISMA_QUERY',
+  examples: [
+    'ước tính lợi nhuận gộp toàn công ty năm nay',
+    'lợi nhuận gộp kinh doanh là bao nhiêu',
+    'ước tính lãi gộp bán hàng',
+    'doanh thu trừ chi phí vốn còn bao nhiêu',
+    'tỷ suất lợi nhuận gộp năm nay'
+  ],
+  patterns: [
+    /(lợi nhuận gộp|lãi gộp|doanh thu trừ chi phí|gross profit|tỷ suất lợi nhuận)/i
+  ],
+  allowedRoles: ['ADMIN_CEO', 'ADMIN'],
+  handler: async (prisma) => {
+    // 1. Doanh thu đơn DELIVERED / COMPLETED năm nay
+    const revRes = await prisma.order.aggregate({
+      where: {
+        status: { in: ['DELIVERED', 'COMPLETED'] },
+        createdAt: { gte: getStartOfYear() }
+      },
+      _sum: { totalAmount: true }
+    });
+    const totalRev = Number(revRes._sum.totalAmount || 0);
+
+    // 2. Chi phí mua hàng từ NCC (Vendor Bills)
+    const costRes = await prisma.vendorBill.aggregate({
+      where: {
+        status: { not: 'CANCELLED' }
+      },
+      _sum: { amountTotal: true }
+    });
+    const totalCost = Number(costRes._sum.amountTotal || 0);
+
+    const grossProfit = totalRev - totalCost;
+    const grossMargin = totalRev > 0 ? Number(((grossProfit / totalRev) * 100).toFixed(1)) : 0;
+
+    return {
+      revenue: totalRev,
+      cogs: totalCost,
+      grossProfit,
+      grossMargin
+    };
+  },
+  template: (data) => {
+    return `💎 **BÁO CÁO LỢI NHUẬN GỘP KINH DOANH LŨY KẾ (YTD 2026):**\n\n` +
+           `- 📈 Tổng doanh thu bán hàng: **${formatVND(data.revenue)}**\n` +
+           `- 📦 Tổng giá vốn mua hàng (COGS): **${formatVND(data.cogs)}**\n` +
+           `- 💰 **Lợi nhuận gộp (Gross Profit): ${formatVND(data.grossProfit)}**\n` +
+           `- 📊 Biên lợi nhuận gộp (Gross Margin): **${data.grossMargin}%**\n\n` +
+           `Chỉ số biên lợi nhuận trên 15% là mức an toàn cao đối với mô hình bán lẻ linh kiện PC.`;
+  }
+});
+
+// Kỹ năng 8: Xếp hạng nhân viên Sales xuất sắc nhất (Top Performers)
+adminCeoTrainer.addSkill({
+  id: 'TOP_SALES_REPRESENTATIVES',
+  title: 'Bảng xếp hạng nhân viên kinh doanh (Sales) xuất sắc nhất',
+  description: 'Thống kê top nhân viên mang về doanh số bán hàng cao nhất toàn công ty',
+  type: 'PRISMA_QUERY',
+  examples: [
+    'nhân viên sales nào bán được nhiều nhất',
+    'bảng xếp hạng nhân viên kinh doanh xuất sắc',
+    'top nhân viên sales năm nay',
+    'ai là nhân viên bán hàng tốt nhất',
+    'thống kê doanh số theo từng nhân viên sales'
+  ],
+  patterns: [
+    /(nhân viên sales nào|xếp hạng.*kinh doanh|top nhân viên sales|bán hàng tốt nhất|doanh số.*từng nhân viên)/i
+  ],
+  allowedRoles: ['ADMIN_CEO', 'ADMIN'],
+  handler: async (prisma) => {
+    const topSales = await prisma.order.groupBy({
+      by: ['soldById'],
+      where: {
+        status: { in: ['DELIVERED', 'COMPLETED'] },
+        soldById: { not: null }
+      },
+      _count: { orderId: true },
+      _sum: { totalAmount: true },
+      orderBy: { _sum: { totalAmount: 'desc' } },
+      take: 5
+    });
+
+    const sellerIds = topSales.map(s => s.soldById);
+    const sellers = await prisma.employee.findMany({
+      where: { id: { in: sellerIds } },
+      select: { id: true, fullName: true, phone: true }
+    });
+    const sellerMap = Object.fromEntries(sellers.map(s => [s.id, s]));
+
+    return topSales.map(ts => ({
+      name: sellerMap[ts.soldById]?.fullName || `NV #${ts.soldById}`,
+      phone: sellerMap[ts.soldById]?.phone || '',
+      orderCount: ts._count.orderId,
+      revenue: Number(ts._sum.totalAmount || 0)
+    }));
+  },
+  template: (sellers) => {
+    if (!sellers || sellers.length === 0) return 'Chưa có đủ số liệu kinh doanh của nhân viên.';
+    let res = `🌟 **BẢNG XẾP HẠNG TOP NHÂN VIÊN KINH DOANH XUẤT SẮC:**\n\n`;
+    sellers.forEach((s, idx) => {
+      res += `${idx + 1}. **${s.name}**\n`;
+      res += `   - Doanh số: **${formatVND(s.revenue)}** (${s.orderCount} đơn chốt thành công)\n`;
+    });
+    return res.trim();
+  }
+});
+
+// Kỹ năng 9: Danh sách các đơn hàng có giá trị khủng nhất (Top High-Value Orders)
+adminCeoTrainer.addSkill({
+  id: 'TOP_HIGH_VALUE_ORDERS',
+  title: 'Danh sách các đơn hàng có giá trị lớn nhất từ trước đến nay',
+  description: 'Tra cứu các hợp đồng dự án, dàn PC Workstation siêu khủng',
+  type: 'PRISMA_QUERY',
+  examples: [
+    'các đơn hàng có giá trị lớn nhất công ty',
+    'top những đơn hàng khủng nhất',
+    'đơn hàng doanh số cao kỷ lục',
+    'những đơn hàng giá trị cao nhất từng bán',
+    'danh sách đơn hàng vip giá trị lớn'
+  ],
+  patterns: [
+    /(đơn hàng.*giá trị lớn|đơn hàng khủng|kỷ lục|giá trị cao nhất)/i
+  ],
+  allowedRoles: ['ADMIN_CEO', 'ADMIN'],
+  handler: async (prisma) => {
+    return await prisma.order.findMany({
+      where: {
+        status: { in: ['DELIVERED', 'COMPLETED', 'CONFIRMED', 'PROCESSING'] }
+      },
+      select: {
+        orderId: true,
+        totalAmount: true,
+        status: true,
+        createdAt: true,
+        customer: { select: { name: true, phone: true } }
+      },
+      orderBy: { totalAmount: 'desc' },
+      take: 5
+    });
+  },
+  template: (orders) => {
+    if (!orders || orders.length === 0) return 'Chưa có đơn hàng nào được ghi nhận.';
+    let res = `🏆 **TOP 5 ĐƠN HÀNG CÓ GIÁ TRỊ CAO NHẤT HỆ THỐNG:**\n\n`;
+    orders.forEach((o, idx) => {
+      res += `${idx + 1}. **Đơn #${o.orderId}** - Trị giá: **${formatVND(o.totalAmount)}**\n`;
+      res += `   Khách: **${o.customer?.name || 'Khách vãng lai'}** | Trạng thái: \`${o.status}\` (${formatDateVN(o.createdAt)})\n`;
+    });
+    return res.trim();
+  }
+});
+
+// Kỹ năng 10: Thống kê nhân viên đang nghỉ phép / vắng mặt (Leave Requests)
+adminCeoTrainer.addSkill({
+  id: 'LEAVE_REQUESTS_SUMMARY',
+  title: 'Thống kê tình hình nhân sự nghỉ phép và vắng mặt',
+  description: 'Xem số lượng nhân viên đang nghỉ ốm, nghỉ phép năm hoặc đơn đang chờ duyệt',
+  type: 'PRISMA_QUERY',
+  examples: [
+    'hôm nay có những nhân viên nào nghỉ phép',
+    'tình hình nhân sự xin nghỉ phép tuần này',
+    'ai đang vắng mặt nghỉ ốm',
+    'danh sách đơn xin nghỉ phép gần đây',
+    'nhân sự nào đang nghỉ phép'
+  ],
+  patterns: [
+    /(nhân viên.*nghỉ phép|ai đang nghỉ|vắng mặt|đơn xin nghỉ phép|tình hình nghỉ phép)/i
+  ],
+  allowedRoles: ['ADMIN_CEO', 'ADMIN'],
+  handler: async (prisma) => {
+    return await prisma.leaveRequest.findMany({
+      where: {
+        status: { in: ['APPROVED', 'PENDING'] }
+      },
+      select: {
+        id: true,
+        type: true,
+        status: true,
+        startDate: true,
+        endDate: true,
+        reason: true,
+        employee: { select: { fullName: true, role: true } }
+      },
+      orderBy: { startDate: 'desc' },
+      take: 6
+    });
+  },
+  template: (leaves) => {
+    if (!leaves || leaves.length === 0) {
+      return '🟢 **Hiện không có nhân viên nào đang nghỉ phép hoặc có đơn xin nghỉ phép tồn đọng.** Toàn bộ quân số đi làm đầy đủ!';
+    }
+    let res = `📋 **TÌNH HÌNH NHÂN SỰ NGHỈ PHÉP / ĐƠN CHỜ DUYỆT GẦN ĐÂY:**\n\n`;
+    leaves.forEach((l, idx) => {
+      res += `${idx + 1}. **${l.employee.fullName}** (\`${l.employee.role}\`) - Loại: \`${l.type}\`\n`;
+      res += `   Thời gian: ${formatDateVN(l.startDate)} $\\rightarrow$ ${formatDateVN(l.endDate)} | TT: \`${l.status}\`\n`;
+      if (l.reason) res += `   Lý do: "${l.reason}"\n`;
+    });
+    return res.trim();
+  }
+});
+
 // ============================================================================
 // 2. NHÓM KỸ NĂNG QUY TRÌNH & TRI THỨC VĂN BẢN (KNOWLEDGE SOP)
 // ============================================================================
 
-// Kỹ năng 7: Chính sách an toàn thông tin & kiểm toán hệ thống
+// Kỹ năng 11: Chính sách an toàn thông tin & kiểm toán hệ thống
 adminCeoTrainer.addSkill({
   id: 'SOP_INTERNAL_SECURITY',
   title: 'Chính sách an toàn thông tin & kiểm toán hệ thống',
@@ -310,7 +515,7 @@ adminCeoTrainer.addSkill({
 3. **Sao lưu dữ liệu:** Cơ sở dữ liệu PostgreSQL được backup tự động hàng ngày lúc 02:00 sáng và lưu trữ mã hóa đa vùng.`
 });
 
-// Kỹ năng 8: Quy trình ứng phó khẩn cấp và phục hồi thảm họa
+// Kỹ năng 12: Quy trình ứng phó khẩn cấp và phục hồi thảm họa
 adminCeoTrainer.addSkill({
   id: 'SOP_DISASTER_RECOVERY',
   title: 'Quy trình ứng phó khẩn cấp và phục hồi thảm họa',
@@ -331,4 +536,47 @@ adminCeoTrainer.addSkill({
 3. **Phục hồi:** Khôi phục điểm snapshot gần nhất từ máy chủ sao lưu dự phòng (DR Site).`
 });
 
+// Kỹ năng 13: Quy chế xử lý vi phạm kỷ luật và bồi thường thiệt hại hàng hóa
+adminCeoTrainer.addSkill({
+  id: 'SOP_INTERNAL_DISCIPLINE_POLICY',
+  title: 'Quy chế xử lý vi phạm kỷ luật và bồi thường thiệt hại',
+  description: 'Quy tắc chế tài xử lý khi làm vỡ hỏng linh kiện hoặc thất thoát hàng hóa',
+  type: 'KNOWLEDGE_SOP',
+  examples: [
+    'quy chế xử lý kỷ luật nhân viên',
+    'quy định bồi thường khi làm vỡ hỏng linh kiện',
+    'xử lý thế nào khi nhân viên vi phạm kỷ luật nội bộ',
+    'chế tài xử phạt thất thoát linh kiện trong kho'
+  ],
+  patterns: [
+    /(kỷ luật nhân viên|bồi thường.*hư hỏng|thất thoát linh kiện|chế tài xử phạt)/i
+  ],
+  sop: `⚖️ **QUY CHẾ XỬ LÝ KỶ LUẬT & BỒI THƯỜNG THIỆT HẠI HÀNG HÓA:**
+1. **Lỗi vô ý làm hỏng (Rơi vỡ khi lắp ráp/vận chuyển):** Nhân viên bồi thường 30% giá vốn nhập hàng, công ty hỗ trợ 70% còn lại.
+2. **Làm mất/thất thoát không có lý do:** Bồi thường 100% giá bán lẻ niêm yết và trừ trực tiếp vào quỹ lương tháng.
+3. **Vi phạm cố ý tráo đổi linh kiện hoặc biển thủ công nợ:** Sa thải ngay lập tức, chuyển hồ sơ cho cơ quan chức năng xử lý theo Pháp luật.`
+});
+
+// Kỹ năng 14: Quy chế thẩm quyền phê duyệt chi tiêu và đầu tư tài sản
+adminCeoTrainer.addSkill({
+  id: 'SOP_EXECUTIVE_DECISION_FRAMEWORK',
+  title: 'Quy chế thẩm quyền phê duyệt đầu tư và chi tiêu ngân sách',
+  description: 'Phân cấp quyền phê duyệt mua sắm trang thiết bị và ký hợp đồng thương mại',
+  type: 'KNOWLEDGE_SOP',
+  examples: [
+    'thẩm quyền phê duyệt chi tiêu của ban giám đốc',
+    'khoản chi bao nhiêu tiền thì cần ceo duyệt',
+    'quy chế phê duyệt ngân sách mua sắm tài sản',
+    'hạn mức ký duyệt hợp đồng kinh tế'
+  ],
+  patterns: [
+    /(thẩm quyền phê duyệt|hạn mức ký duyệt|cần ceo duyệt|phê duyệt chi tiêu)/i
+  ],
+  sop: `🏛️ **QUY CHẾ THẨM QUYỀN PHÊ DUYỆT CHI TIÊU & ĐẦU TƯ:**
+1. **Dưới 20.000.000 VNĐ:** Trưởng các phòng ban (Kế toán trưởng, Giám đốc kho) được quyền tự ký duyệt trong hạn mức ngân sách tháng đã phê duyệt.
+2. **Từ 20.000.000 - 100.000.000 VNĐ:** Bắt buộc có chữ ký duyệt điện tử của Phó Giám đốc vận hành (COO) hoặc Giám đốc Điều hành (CEO).
+3. **Trên 100.000.000 VNĐ hoặc hợp đồng thuê mặt bằng/đầu tư xe vận tải:** Phải thông qua Hội đồng Quản trị và CEO phê chuẩn bằng văn bản.`
+});
+
 module.exports = adminCeoTrainer;
+

@@ -89,6 +89,20 @@ const runTests = async () => {
       user: { id: 3, role: 'ACCOUNTANT' },
       expectedIntent: 'PAYROLL_SUMMARY_CURRENT_MONTH'
     },
+    {
+      name: 'Kế toán ước tính thuế VAT đầu ra',
+      query: 'ước tính thuế vat đầu ra tháng này',
+      role: 'ACCOUNTANT',
+      user: { id: 3, role: 'ACCOUNTANT' },
+      expectedIntent: 'VAT_OUTPUT_ESTIMATE'
+    },
+    {
+      name: 'Kế toán xem lịch sử thanh toán gần nhất',
+      query: 'lịch sử thanh toán của đơn hàng này',
+      role: 'ACCOUNTANT',
+      user: { id: 3, role: 'ACCOUNTANT' },
+      expectedIntent: 'ORDER_PAYMENT_HISTORY'
+    },
 
     // SALES (Tư vấn bán hàng)
     {
@@ -113,6 +127,20 @@ const runTests = async () => {
       user: { id: 7, role: 'SALES' },
       expectedIntent: 'ACTIVE_PROMOTIONS'
     },
+    {
+      name: 'Sales gợi ý cấu hình PC theo tầm giá',
+      query: 'tư vấn cấu hình pc tầm 15 triệu',
+      role: 'SALES',
+      user: { id: 7, role: 'SALES' },
+      expectedIntent: 'PC_BUILD_RECOMMENDATION_BY_BUDGET'
+    },
+    {
+      name: 'Sales tra cứu điểm thưởng tích lũy của khách',
+      query: 'kiểm tra điểm tích lũy của khách hàng',
+      role: 'SALES',
+      user: { id: 7, role: 'SALES' },
+      expectedIntent: 'CUSTOMER_LOYALTY_CHECK'
+    },
 
     // ADMIN_CEO (Ban Giám Đốc)
     {
@@ -128,6 +156,36 @@ const runTests = async () => {
       role: 'CEO',
       user: { id: 1, role: 'CEO' },
       expectedIntent: 'AUDIT_LOGS_SUSPICIOUS_ACTIONS'
+    },
+    {
+      name: 'CEO ước tính lợi nhuận gộp toàn công ty',
+      query: 'ước tính lợi nhuận gộp toàn công ty năm nay',
+      role: 'CEO',
+      user: { id: 1, role: 'CEO' },
+      expectedIntent: 'ESTIMATED_GROSS_PROFIT'
+    },
+    {
+      name: 'CEO xem bảng xếp hạng nhân viên sales xuất sắc',
+      query: 'nhân viên sales nào bán được nhiều nhất',
+      role: 'CEO',
+      user: { id: 1, role: 'CEO' },
+      expectedIntent: 'TOP_SALES_REPRESENTATIVES'
+    },
+
+    // WAREHOUSE & DELIVERY MỞ RỘNG
+    {
+      name: 'Kho tra cứu số serial linh kiện',
+      query: 'tra cứu số serial linh kiện',
+      role: 'WAREHOUSE',
+      user: { id: 5, role: 'WAREHOUSE' },
+      expectedIntent: 'SERIAL_NUMBER_TRACKING'
+    },
+    {
+      name: 'Shipper xem danh sách đơn hoàn trả',
+      query: 'lý do các đơn giao thất bại gần đây',
+      role: 'DELIVERY',
+      user: { id: 9, role: 'DELIVERY' },
+      expectedIntent: 'FAILED_DELIVERY_REASONS'
     },
 
     // RBAC Security Check
