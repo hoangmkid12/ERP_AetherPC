@@ -59,6 +59,15 @@ class ConversationContextService {
   }
 
   /**
+   * Xóa toàn bộ lịch sử ngữ cảnh của một session
+   */
+  clearSession(sessionId) {
+    if (sessionId) {
+      this.sessions.delete(sessionId);
+    }
+  }
+
+  /**
    * Ghi lại một lượt hội thoại vào Session
    */
   recordTurn(sessionId, turnData) {

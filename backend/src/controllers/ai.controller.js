@@ -974,11 +974,36 @@ const getAiStats = async (req, res, next) => {
   }
 };
 
+/**
+ * @desc    Xóa phiên hội thoại và dọn dẹp bộ nhớ đệm AI (Khi nhấn icon thùng rác)
+ * @route   POST /api/v1/ai/session/clear
+ * @access  Private
+ */
+const clearAiSession = async (req, res, next) => {
+  try {
+    const { sessionId } = req.body;
+    const sid = sessionId || `session_${req.user?.id || 'anon'}`;
+    const { conversationContext } = require('../services/ai/context');
+    const { queryCache } = require('../services/ai/cache');
+
+    conversationContext.clearSession(sid);
+    queryCache.clear(); // Xóa sạch cache để đảm bảo không bị dính câu trả lời cũ
+
+    res.json({
+      success: true,
+      message: 'Đã làm mới phiên hội thoại và bộ nhớ đệm AI thành công.'
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 module.exports = {
   chatWithAi,
   getPromptChips,
   getAiAuditLogs,
   getAiStats,
+  clearAiSession,
   classifyIntent,
   classifyIntentByRegex
 };

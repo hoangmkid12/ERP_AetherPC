@@ -133,12 +133,18 @@ export default function AetherCopilot() {
     }
   };
 
-  const handleClearHistory = () => {
+  const handleClearHistory = async () => {
+    try {
+      api.post('/ai/session/clear', { sessionId: `session_${user?.id || 'anon'}` }).catch(() => {});
+    } catch {
+      // Bỏ qua lỗi ngầm
+    }
+
     setMessages([
       {
         id: 'welcome-' + Date.now(),
         role: 'assistant',
-        content: `Đã làm mới phiên hội thoại. Tôi sẵn sàng hỗ trợ các câu hỏi tra cứu dữ liệu & tài liệu SOP của bạn.`,
+        content: `Đã làm mới phiên hội thoại và bộ nhớ đệm AI. Tôi sẵn sàng hỗ trợ các câu hỏi tra cứu dữ liệu & tài liệu SOP của bạn.`,
         timestamp: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
         citations: []
       }

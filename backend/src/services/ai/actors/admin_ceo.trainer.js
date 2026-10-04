@@ -681,5 +681,61 @@ adminCeoTrainer.addSkill({
   }
 });
 
+// Kỹ năng 17: Xem chi tiết và đào sâu dữ liệu (F2 Drill-Down Inspection)
+adminCeoTrainer.addSkill({
+  id: 'DRILLDOWN_DETAILS',
+  title: 'Xem danh sách chi tiết và thông tin chuyên sâu (Drill-Down)',
+  description: 'Trích xuất dữ liệu chi tiết của chủ đề vừa hỏi (khiếu nại gấp, đơn hàng lớn, thông tin khách)',
+  type: 'PRISMA_QUERY',
+  examples: [
+    'cho xem danh sách cụ thể',
+    'chi tiết từng cái',
+    'khiếu nại nào gấp nhất',
+    'cụ thể là những cái nào',
+    'xem chi tiết hơn',
+    'thông tin chi tiết các ca đó'
+  ],
+  patterns: [
+    /(danh sách cụ thể|chi tiết từng cái|khiếu nại nào gấp nhất|cụ thể là những cái nào|xem chi tiết hơn|thông tin chi tiết)/i
+  ],
+  allowedRoles: ['ADMIN_CEO', 'ADMIN', 'CSKH', 'WAREHOUSE', 'SALES', 'ACCOUNTANT'],
+  handler: async (prisma) => {
+    return await prisma.complaint.findMany({
+      where: {
+        status: { notIn: ['RESOLVED', 'CLOSED'] }
+      },
+      select: {
+        id: true,
+        orderId: true,
+        customerName: true,
+        phone: true,
+        email: true,
+        subject: true,
+        description: true,
+        priority: true,
+        status: true,
+        createdAt: true
+      },
+      orderBy: [{ priority: 'asc' }, { createdAt: 'desc' }],
+      take: 4
+    });
+  },
+  template: (data) => {
+    if (!data || data.length === 0) {
+      return '🎉 **Hiện không có vụ việc hoặc khiếu nại nào cần chú ý khẩn cấp.**';
+    }
+    let res = `🔍 **THÔNG TIN CHI TIẾT CÁC VỤ VIỆC CẦN ƯU TIÊN XỬ LÝ (DRILL-DOWN):**\n\n`;
+    data.forEach((c, idx) => {
+      const dateStr = formatDateVN(c.createdAt);
+      res += `${idx + 1}. **[${c.priority}] - ${c.customerName || 'Khách hàng'}** (${c.phone || 'SĐT N/A'})\n` +
+             `   Đơn hàng: **#${c.orderId || 'N/A'}** | Email: \`${c.email || 'N/A'}\`\n` +
+             `   Tiêu đề: *${c.subject}*\n` +
+             `   Nội dung: *"${c.description || 'Không có mô tả thêm'}"*\n` +
+             `   Thời gian tiếp nhận: ${dateStr}\n\n`;
+    });
+    return res.trim();
+  }
+});
+
 module.exports = adminCeoTrainer;
 

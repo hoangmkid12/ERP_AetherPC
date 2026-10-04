@@ -40,11 +40,23 @@ const formatDateVN = (date) => {
   return new Date(date).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
 };
 
+const getStartOfLastMonth = (date = new Date()) => {
+  const d = new Date(date);
+  return new Date(d.getFullYear(), d.getMonth() - 1, 1, 0, 0, 0, 0);
+};
+
+const getEndOfLastMonth = (date = new Date()) => {
+  const d = new Date(date);
+  return new Date(d.getFullYear(), d.getMonth(), 0, 23, 59, 59, 999);
+};
+
 module.exports = {
   getStartOfDay,
   getEndOfDay,
   getStartOfMonth,
   getEndOfMonth,
+  getStartOfLastMonth,
+  getEndOfLastMonth,
   getStartOfYear,
   formatVND,
   formatDateVN

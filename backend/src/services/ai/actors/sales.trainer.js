@@ -647,5 +647,50 @@ salesTrainer.addSkill({
 3. **Sau 6 tháng:** Gửi mã voucher tặng gói vệ sinh tra keo tản nhiệt miễn phí tại cửa hàng AetherPC.`
 });
 
+// Kỹ năng 16: Trả lời ngôn ngữ tự nhiên / khẩu ngữ của nhân viên bán hàng (F1 Colloquial)
+salesTrainer.addSkill({
+  id: 'COLLOQUIAL_SALES_CHAT',
+  title: 'Hỏi thăm tình hình buôn bán bằng khẩu ngữ thực tế',
+  description: 'Nhận diện các cách hỏi tự nhiên hàng ngày như "ế quá", "nổ đơn chưa", "buôn bán thế nào"',
+  type: 'PRISMA_QUERY',
+  examples: [
+    'hôm nay có vẻ ế nhỉ, từ sáng giờ nổ được mấy đơn rồi',
+    'từ sáng giờ nổ được mấy đơn rồi',
+    'hôm nay bán buôn thế nào',
+    'từ sáng đến giờ bán được gì chưa',
+    'hôm nay có đơn nào nổ chưa',
+    'tình hình hôm nay ế ẩm quá không',
+    'sáng giờ có ai mua gì chưa'
+  ],
+  patterns: [
+    /(ế nhỉ|nổ.*mấy đơn|bán buôn thế nào|bán được gì chưa|có đơn nào nổ chưa|ế ẩm quá)/i
+  ],
+  allowedRoles: ['SALES', 'ADMIN_CEO', 'ADMIN'],
+  handler: async (prisma) => {
+    const todayStart = getStartOfDay();
+    const res = await prisma.order.aggregate({
+      where: {
+        createdAt: { gte: todayStart }
+      },
+      _count: { orderId: true },
+      _sum: { totalAmount: true }
+    });
+    return {
+      orderCount: res._count?.orderId || 0,
+      revenue: Number(res._sum?.totalAmount || 0)
+    };
+  },
+  template: (data) => {
+    if (data.orderCount === 0) {
+      return `☕ **TÌNH HÌNH BÁN HÀNG TỪ ĐẦU NGÀY:**\n\n` +
+             `Sáng giờ hệ thống chưa ghi nhận đơn chốt thành công. Đầu ngày có thể hơi chậm một chút, bạn hãy chủ động nhắn tin tư vấn cho các khách đang hỏi báo giá hoặc gợi ý các combo linh kiện đang giảm giá sốc hôm nay nhé. Chúc bạn chiều nay bùng nổ doanh số!`;
+    }
+    return `🎯 **TÌNH HÌNH BÁN HÀNG TỪ ĐẦU NGÀY ĐẾN NAY:**\n\n` +
+           `- Số đơn đã chốt: **${data.orderCount} đơn hàng**\n` +
+           `- Tổng giá trị ghi nhận: **${formatVND(data.revenue)}**\n\n` +
+           `🔥 Tốc độ chốt đơn đang khá tích cực! Tiếp tục chăm sóc khách hàng và chốt thêm các bộ PC gaming cao cấp nhé!`;
+  }
+});
+
 module.exports = salesTrainer;
 

@@ -71,4 +71,9 @@ router.get('/audit-logs', authMiddleware(['ADMIN', 'CEO']), getAiAuditLogs);
 // Thống kê hiệu năng cache, độ trễ và số lượt truy vấn (Chỉ Admin / CEO)
 router.get('/stats', authMiddleware(['ADMIN', 'CEO']), getAiStats);
 
+// @route   POST /api/v1/ai/session/clear
+// Làm mới phiên hội thoại và bộ nhớ đệm AI
+const { clearAiSession } = require('../controllers/ai.controller');
+router.post('/session/clear', authMiddleware(), clearAiSession);
+
 module.exports = router;

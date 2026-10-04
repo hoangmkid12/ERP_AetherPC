@@ -4,7 +4,7 @@
  */
 
 const BaseActorTrainer = require('./BaseActorTrainer');
-const { getStartOfDay, getStartOfMonth, getStartOfYear, formatVND, formatDateVN } = require('../utils/dateHelper');
+const { getStartOfDay, getStartOfMonth, getStartOfLastMonth, getEndOfLastMonth, getStartOfYear, formatVND, formatDateVN } = require('../utils/dateHelper');
 
 const accountantTrainer = new BaseActorTrainer({
   role: 'ACCOUNTANT',
@@ -738,6 +738,130 @@ accountantTrainer.addSkill({
 2. **Thu thập tài liệu:** Tải file sao kê chi tiết (Excel/PDF) từ Internet Banking Vietcombank & MBBank.
 3. **Đối chiếu số dư:** Khớp số dư đầu kỳ, tổng phát sinh Nợ/Có và số dư cuối kỳ với báo cáo tài khoản ngân hàng trên ERP AetherPC.
 4. **Xử lý chênh lệch:** Nếu có chênh lệch do phí ngân hàng hoặc giao dịch treo, lập phiếu điều chỉnh ghi sổ kèm chữ ký Kế toán trưởng.`
+});
+
+// Kỹ năng 19: Phân tích tăng trưởng và so sánh doanh thu với kỳ trước (F1)
+accountantTrainer.addSkill({
+  id: 'COMPARATIVE_REVENUE_GROWTH',
+  title: 'Phân tích tăng trưởng và đối chiếu doanh thu với kỳ trước',
+  description: 'So sánh doanh thu thực tế hiện tại với kỳ trước (tháng trước, kỳ trước) và tính biến động %',
+  type: 'PRISMA_QUERY',
+  examples: [
+    'so với tháng trước thì tăng hay giảm bao nhiêu %',
+    'so với tháng trước',
+    'so sánh doanh thu với tháng trước',
+    'tăng hay giảm bao nhiêu so với tháng trước',
+    'tăng trưởng doanh thu tháng này',
+    'so với kỳ trước thì thế nào',
+    'tỷ lệ tăng trưởng so với tháng trước'
+  ],
+  patterns: [
+    /(so với.*(tháng trước|kỳ trước)|tăng hay giảm bao nhiêu|tăng trưởng.*tháng trước|so sánh.*tháng trước)/i
+  ],
+  allowedRoles: ['ACCOUNTANT', 'ADMIN_CEO', 'ADMIN', 'SALES'],
+  handler: async (prisma) => {
+    const curStart = getStartOfMonth();
+    const prevStart = getStartOfLastMonth();
+    const prevEnd = getEndOfLastMonth();
+
+    const [curRes, prevRes] = await Promise.all([
+      prisma.order.aggregate({
+        where: {
+          status: { in: ['DELIVERED', 'COMPLETED'] },
+          createdAt: { gte: curStart }
+        },
+        _sum: { totalAmount: true },
+        _count: { orderId: true }
+      }),
+      prisma.order.aggregate({
+        where: {
+          status: { in: ['DELIVERED', 'COMPLETED'] },
+          createdAt: { gte: prevStart, lte: prevEnd }
+        },
+        _sum: { totalAmount: true },
+        _count: { orderId: true }
+      })
+    ]);
+
+    const curRev = Number(curRes._sum?.totalAmount || 0);
+    const prevRev = Number(prevRes._sum?.totalAmount || 0);
+    const curCount = curRes._count?.orderId || 0;
+    const prevCount = prevRes._count?.orderId || 0;
+    const diff = curRev - prevRev;
+    const pct = prevRev > 0 ? Number(((diff / prevRev) * 100).toFixed(1)) : (curRev > 0 ? 100 : 0);
+
+    return { curRev, prevRev, curCount, prevCount, diff, pct };
+  },
+  template: (data) => {
+    const isUp = data.pct >= 0;
+    const icon = isUp ? '📈' : '📉';
+    const directionWord = isUp ? 'Tăng trưởng' : 'Giảm';
+    return `${icon} **PHÂN TÍCH TĂNG TRƯỞNG & ĐỐI CHIẾU DOANH THU (SO VỚI THÁNG TRƯỚC):**\n\n` +
+           `- 💵 Doanh thu tháng này: **${formatVND(data.curRev)}** (Tổng cộng: **${data.curCount} đơn hoàn tất**)\n` +
+           `- 📅 Doanh thu tháng trước: **${formatVND(data.prevRev)}** (Tổng cộng: **${data.prevCount} đơn hoàn tất**)\n` +
+           `- 📊 Biến động doanh thu: **${isUp ? '+' : ''}${data.pct}%** (${directionWord} **${formatVND(Math.abs(data.diff))}**)\n\n` +
+           `💡 *Nhận định:* ${isUp ? 'Đà kinh doanh đang duy trì tốc độ phát triển ổn định.' : 'Doanh thu tháng này có sự chững lại so với tháng trước, đề xuất thúc đẩy thêm các chương trình khuyến mãi và quà tặng kèm PC.'}`;
+  }
+});
+
+// Kỹ năng 20: Lọc đơn hàng giá trị cao chưa thanh toán (F1)
+accountantTrainer.addSkill({
+  id: 'HIGH_VALUE_UNPAID_ORDERS',
+  title: 'Lọc danh sách đơn hàng giá trị cao chưa thanh toán',
+  description: 'Truy vấn các đơn hàng có giá trị lớn (trên 10M / 20M) nhưng thanh toán chưa hoàn tất',
+  type: 'PRISMA_QUERY',
+  examples: [
+    'những đơn trên 10 triệu mà chưa thanh toán',
+    'lọc các đơn chưa thanh toán trên 20 triệu',
+    'đơn hàng giá trị cao chưa trả tiền',
+    'những đơn lớn chưa thanh toán tiền',
+    'đơn chưa thanh toán trên 10tr',
+    'các đơn tiền lớn chưa thu được'
+  ],
+  patterns: [
+    /(đơn.*(trên|hơn).*(triệu|tr).*chưa.*(thanh toán|trả tiền)|chưa thanh toán.*(trên|hơn).*(triệu|tr)|đơn lớn chưa thanh toán)/i
+  ],
+  allowedRoles: ['ACCOUNTANT', 'ADMIN_CEO', 'ADMIN'],
+  handler: async (prisma, params, _user) => {
+    const rawPrompt = (params && params.keyword) || '';
+    let minAmount = 10000000;
+    if (/20\s*(triệu|tr)/i.test(rawPrompt)) minAmount = 20000000;
+    if (/50\s*(triệu|tr)/i.test(rawPrompt)) minAmount = 50000000;
+
+    const orders = await prisma.order.findMany({
+      where: {
+        totalAmount: { gte: minAmount },
+        paymentStatus: { in: ['UNPAID', 'PENDING', 'PARTIAL'] }
+      },
+      select: {
+        orderId: true,
+        customerName: true,
+        customerPhone: true,
+        totalAmount: true,
+        paymentMethod: true,
+        paymentStatus: true,
+        status: true,
+        createdAt: true
+      },
+      orderBy: { totalAmount: 'desc' },
+      take: 8
+    });
+
+    return { orders, minAmount };
+  },
+  template: (data) => {
+    if (!data.orders || data.orders.length === 0) {
+      return `🎉 **Tuyệt vời! Không có đơn hàng nào trên ${formatVND(data.minAmount)} bị treo trạng thái chưa thanh toán.**`;
+    }
+    let res = `⚠️ **DANH SÁCH ĐƠN HÀNG GIÁ TRỊ CAO (>= ${formatVND(data.minAmount)}) CHƯA THANH TOÁN:**\n\n`;
+    data.orders.forEach((o, idx) => {
+      const dateStr = formatDateVN(o.createdAt);
+      res += `${idx + 1}. **#${o.orderId}** - Trị giá: **${formatVND(o.totalAmount)}**\n` +
+             `   Khách: **${o.customerName || 'N/A'}** (${o.customerPhone || 'SĐT N/A'}) | Phương thức: \`${o.paymentMethod}\`\n` +
+             `   Trạng thái đơn: \`${o.status}\` | Thanh toán: \`${o.paymentStatus}\` (${dateStr})\n`;
+    });
+    return res.trim();
+  }
 });
 
 module.exports = accountantTrainer;
