@@ -1,13 +1,16 @@
 /**
  * ACTOR KNOWLEDGE & INTENT DISPATCHER (BỘ ĐIỀU PHỐI HUẤN LUYỆN THEO ACTOR)
- * Nạp chính xác tập tri thức, kịch bản nghiệp vụ và câu lệnh SQL theo từng vai trò:
+ * Quản lý và điều phối 5 mô hình huấn luyện chuyên biệt theo Actor:
  * - DELIVERY: Nhân viên giao hàng (Shipper)
- * - WAREHOUSE / WAREHOUSE_MANAGER: Kho & Kỹ thuật lắp ráp
+ * - WAREHOUSE: Thủ kho & Kỹ thuật viên lắp ráp PC
  * - ACCOUNTANT: Kế toán & Dòng tiền
- * - SALES / SALES_MANAGER: Tư vấn bán hàng & Báo giá
- * - ADMIN / CEO: Ban Giám Đốc & Quản trị hệ thống
+ * - SALES: Chuyên viên tư vấn & Bán lẻ
+ * - ADMIN_CEO: Ban Giám Đốc & Quản trị hệ thống
+ *
+ * Cho phép nhà phát triển dễ dàng mở rộng, train thêm kỹ năng mới qua hàm addSkill()
  */
 
+const BaseActorTrainer = require('./BaseActorTrainer');
 const deliveryTrainer = require('./delivery.trainer');
 const warehouseTrainer = require('./warehouse.trainer');
 const accountantTrainer = require('./accountant.trainer');
@@ -15,12 +18,23 @@ const salesTrainer = require('./sales.trainer');
 const adminCeoTrainer = require('./admin_ceo.trainer');
 
 /**
+ * Bảng ánh xạ Trainer theo chuẩn hóa vai trò
+ */
+const TRAINERS = {
+  DELIVERY: deliveryTrainer,
+  WAREHOUSE: warehouseTrainer,
+  ACCOUNTANT: accountantTrainer,
+  SALES: salesTrainer,
+  ADMIN_CEO: adminCeoTrainer
+};
+
+/**
  * Chuẩn hóa vai trò người dùng về 5 nhóm Actor chính
  */
 const normalizeActorRole = (role) => {
   const r = (role || '').toUpperCase();
   if (r === 'DELIVERY' || r.includes('SHIPPER')) return 'DELIVERY';
-  if (r.includes('WAREHOUSE') || r.includes('KHO') || r.includes('QC') || r.includes('TECH')) return 'WAREHOUSE';
+  if (r.includes('WAREHOUSE') || r.includes('KHO') || r.includes('QC') || r.includes('TECH') || r.includes('ASSEMBLY')) return 'WAREHOUSE';
   if (r.includes('ACCOUNT') || r.includes('KETOAN') || r.includes('CASHIER')) return 'ACCOUNTANT';
   if (r.includes('SALES') || r.includes('BANHANG')) return 'SALES';
   if (r.includes('ADMIN') || r === 'CEO' || r.includes('MANAGER') || r.includes('DIRECTOR')) return 'ADMIN_CEO';
@@ -28,95 +42,91 @@ const normalizeActorRole = (role) => {
 };
 
 /**
+ * Lấy Trainer instance theo vai trò
+ * @param {string} role
+ * @returns {BaseActorTrainer}
+ */
+const getTrainer = (role) => {
+  const actor = normalizeActorRole(role);
+  return TRAINERS[actor] || salesTrainer;
+};
+
+/**
+ * Lấy toàn bộ danh sách Trainers trong hệ thống
+ */
+const getAllTrainers = () => TRAINERS;
+
+/**
  * Lấy System Instruction chuyên môn hóa theo vai trò
  */
 const getActorSystemPrompt = (role) => {
-  const actor = normalizeActorRole(role);
-  switch (actor) {
-    case 'DELIVERY':
-      return deliveryTrainer.DELIVERY_SYSTEM_PROMPT;
-    case 'WAREHOUSE':
-      return warehouseTrainer.WAREHOUSE_SYSTEM_PROMPT;
-    case 'ACCOUNTANT':
-      return accountantTrainer.ACCOUNTANT_SYSTEM_PROMPT;
-    case 'SALES':
-      return salesTrainer.SALES_SYSTEM_PROMPT;
-    case 'ADMIN_CEO':
-      return adminCeoTrainer.ADMIN_CEO_SYSTEM_PROMPT;
-    default:
-      return salesTrainer.SALES_SYSTEM_PROMPT;
-  }
+  const trainer = getTrainer(role);
+  return trainer ? trainer.systemPrompt : salesTrainer.systemPrompt;
 };
 
 /**
  * Lấy danh sách Few-Shots SQL mẫu đặc thù của vai trò
  */
 const getActorFewShots = (role) => {
-  const actor = normalizeActorRole(role);
-  switch (actor) {
-    case 'DELIVERY':
-      return deliveryTrainer.DELIVERY_FEW_SHOTS;
-    case 'WAREHOUSE':
-      return warehouseTrainer.WAREHOUSE_FEW_SHOTS;
-    case 'ACCOUNTANT':
-      return accountantTrainer.ACCOUNTANT_FEW_SHOTS;
-    case 'SALES':
-      return salesTrainer.SALES_FEW_SHOTS;
-    case 'ADMIN_CEO':
-      return adminCeoTrainer.ADMIN_CEO_FEW_SHOTS;
-    default:
-      return salesTrainer.SALES_FEW_SHOTS;
-  }
+  const trainer = getTrainer(role);
+  return trainer ? trainer.getFewShots() : salesTrainer.getFewShots();
 };
 
 /**
  * Chạy quy tắc nhận diện câu hỏi nhanh theo vai trò (Semantic Rule Matching)
+ * Trả về câu lệnh SQL thực thi trực tiếp nếu câu hỏi khớp kịch bản dữ liệu
  */
 const evaluateActorSemanticRules = (userPrompt, role, userId) => {
-  const lower = (userPrompt || '').toLowerCase();
-  const actor = normalizeActorRole(role);
+  const trainer = getTrainer(role);
+  if (!trainer) return null;
 
-  switch (actor) {
-    case 'DELIVERY':
-      return deliveryTrainer.DELIVERY_SEMANTIC_RULES(lower, userId);
-    case 'WAREHOUSE':
-      return warehouseTrainer.WAREHOUSE_SEMANTIC_RULES(lower);
-    case 'ACCOUNTANT':
-      return accountantTrainer.ACCOUNTANT_SEMANTIC_RULES(lower);
-    case 'SALES':
-      return salesTrainer.SALES_SEMANTIC_RULES(lower);
-    case 'ADMIN_CEO':
-      return adminCeoTrainer.ADMIN_CEO_SEMANTIC_RULES(lower);
-    default:
-      return null;
-  }
+  const matchResult = trainer.match(userPrompt, userId);
+  return matchResult && matchResult.executableSql ? matchResult.executableSql : null;
+};
+
+/**
+ * Khớp kỹ năng tổng quát theo vai trò (hỗ trợ cả SQL và SOP tài liệu)
+ */
+const matchActorSkill = (userPrompt, role, userId) => {
+  const trainer = getTrainer(role);
+  if (!trainer) return null;
+  return trainer.match(userPrompt, userId);
 };
 
 /**
  * Lấy tài liệu quy chuẩn SOP đặc thù cho vai trò
  */
 const getActorKnowledgeSOP = (role) => {
-  const actor = normalizeActorRole(role);
-  switch (actor) {
-    case 'DELIVERY':
-      return deliveryTrainer.DELIVERY_KNOWLEDGE_SOP;
-    case 'WAREHOUSE':
-      return warehouseTrainer.WAREHOUSE_KNOWLEDGE_SOP;
-    case 'ACCOUNTANT':
-      return accountantTrainer.ACCOUNTANT_KNOWLEDGE_SOP;
-    case 'SALES':
-      return salesTrainer.SALES_KNOWLEDGE_SOP;
-    case 'ADMIN_CEO':
-      return adminCeoTrainer.ADMIN_CEO_KNOWLEDGE_SOP;
-    default:
-      return salesTrainer.SALES_KNOWLEDGE_SOP;
-  }
+  const trainer = getTrainer(role);
+  return trainer ? trainer.getKnowledgeSOP() : salesTrainer.getKnowledgeSOP();
+};
+
+/**
+ * Xuất toàn bộ bộ dữ liệu NLP từ tất cả Actors để huấn luyện mô hình phân loại cục bộ
+ */
+const exportAllNlpDatasets = () => {
+  let combinedDataset = [];
+  Object.values(TRAINERS).forEach(trainer => {
+    combinedDataset = combinedDataset.concat(trainer.exportNlpDataset());
+  });
+  return combinedDataset;
 };
 
 module.exports = {
+  BaseActorTrainer,
   normalizeActorRole,
+  getTrainer,
+  getAllTrainers,
   getActorSystemPrompt,
   getActorFewShots,
   evaluateActorSemanticRules,
-  getActorKnowledgeSOP
+  matchActorSkill,
+  getActorKnowledgeSOP,
+  exportAllNlpDatasets,
+  // Xuất trực tiếp các trainer để người dùng có thể import và train thêm từ bất cứ đâu
+  deliveryTrainer,
+  warehouseTrainer,
+  accountantTrainer,
+  salesTrainer,
+  adminCeoTrainer
 };

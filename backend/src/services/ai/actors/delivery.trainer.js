@@ -1,96 +1,173 @@
 /**
  * DELIVERY TRAINER - HUẤN LUYỆN CHUYÊN BIỆT CHO NHÂN VIÊN GIAO HÀNG (SHIPPER)
- * Bao quát 100% các tình huống thực tế của Shipper trong ERP AetherPC:
- * 1. Tra cứu đơn được phân công hôm nay, đơn chưa hoàn tất, đơn cần giao lại.
- * 2. Xem nhanh thông tin giao nhận: Địa chỉ, Số điện thoại người nhận, Số tiền thu hộ COD.
- * 3. Hướng dẫn chụp ảnh bằng chứng giao hàng (POD), xử lý khi khách không nhận / móp hộp.
- * 4. Quy định nộp tiền mặt COD cho kế toán, số tài khoản VietQR để khách quét mã.
- * 5. Hiệu suất giao hàng của chính shipper.
+ * Thiết kế chuẩn hóa theo BaseActorTrainer - Dễ dàng mở rộng và train thêm tình huống mới.
  */
 
-const DELIVERY_SYSTEM_PROMPT = `BẠN LÀ TRỢ LÝ ĐỒNG HÀNH CHUYÊN BIỆT CHO NHÂN VIÊN GIAO HÀNG (SHIPPER) AETHERPC:
+const BaseActorTrainer = require('./BaseActorTrainer');
+
+const deliveryTrainer = new BaseActorTrainer({
+  role: 'DELIVERY',
+  name: 'Nhân viên Giao hàng (Shipper)',
+  systemPrompt: `BẠN LÀ TRỢ LÝ ĐỒNG HÀNH CHUYÊN BIỆT CHO NHÂN VIÊN GIAO HÀNG (SHIPPER) AETHERPC:
 - PHONG CÁCH: Gãy gọn, nhanh chóng, trực diện. Shipper đang di chuyển ngoài đường nên KHÔNG trả lời dài dòng.
 - THÔNG TIN ƯU TIÊN: Luôn làm nổi bật ngay 3 thông tin sống còn:
   1. 📍 ĐỊA CHỈ GIAO HÀNG (Kèm ghi chú chỉ đường nếu có).
   2. 📞 SỐ ĐIỆN THOẠI KHÁCH HÀNG (để bấm gọi ngay).
   3. 💰 TIỀN THU HỘ COD (Đã thanh toán hay cần thu bao nhiêu tiền mặt).
-- AN TOÀN HÀNG HÓA: Linh kiện PC và case kính rất dễ vỡ, luôn nhắc shipper giữ thẳng đứng thùng máy.`;
+- AN TOÀN HÀNG HÓA: Linh kiện PC và case kính rất dễ vỡ, luôn nhắc shipper giữ thẳng đứng thùng máy.`
+});
 
-const DELIVERY_FEW_SHOTS = [
-  {
-    question: "Hôm nay tôi có bao nhiêu đơn cần giao?",
-    sql: "SELECT order_id, shipping_address, shipping_phone, total_amount, payment_method, payment_status, status FROM orders WHERE assigned_shipper_id = :userId AND status IN ('CONFIRMED', 'PROCESSING', 'READY_TO_SHIP', 'SHIPPED') ORDER BY created_at ASC;",
-    description: "Lấy danh sách các đơn hàng đang được phân công cho chính shipper hỏi"
-  },
-  {
-    question: "Đơn nào của tôi cần thu tiền mặt COD?",
-    sql: "SELECT order_id, shipping_address, shipping_phone, total_amount, payment_status FROM orders WHERE assigned_shipper_id = :userId AND payment_method = 'COD' AND payment_status != 'PAID' AND status IN ('READY_TO_SHIP', 'SHIPPED') ORDER BY created_at ASC;",
-    description: "Lọc các đơn hàng cần thu tiền mặt COD của shipper"
-  },
-  {
-    question: "Tra cứu thông tin người nhận đơn hàng này",
-    sql: "SELECT order_id, shipping_address, shipping_phone, total_amount, payment_method, payment_status, status FROM orders WHERE order_id = ':orderId' AND assigned_shipper_id = :userId LIMIT 1;",
-    description: "Xem chi tiết địa chỉ và số điện thoại khách của 1 đơn cụ thể"
-  },
-  {
-    question: "Tháng này tôi đã giao thành công được bao nhiêu đơn?",
-    sql: "SELECT COUNT(*) AS so_don_thanh_cong, COALESCE(SUM(total_amount), 0) AS tong_gia_tri_giao FROM orders WHERE assigned_shipper_id = :userId AND status IN ('DELIVERED', 'COMPLETED') AND delivered_at >= date_trunc('month', now() AT TIME ZONE 'Asia/Ho_Chi_Minh');",
-    description: "Thống kê hiệu suất số đơn giao thành công trong tháng của shipper"
-  },
-  {
-    question: "Có đơn nào của tôi bị bom hoặc khách không nhận không?",
-    sql: "SELECT order_id, shipping_address, shipping_phone, status, updated_at FROM orders WHERE assigned_shipper_id = :userId AND status IN ('FAILED_DELIVERY', 'RETURNING_TO_WAREHOUSE', 'CANCELLED') AND updated_at >= date_trunc('month', now() AT TIME ZONE 'Asia/Ho_Chi_Minh') ORDER BY updated_at DESC;",
-    description: "Kiểm tra các đơn giao không thành công hoặc chuyển hoàn"
-  }
-];
+// ============================================================================
+// 1. NHÓM KỸ NĂNG TRUY VẤN DỮ LIỆU ĐỘNG (LIVE SQL)
+// ============================================================================
 
-const DELIVERY_SEMANTIC_RULES = (lower, userId) => {
-  // 1. Hỏi về đơn giao hôm nay / đơn cần giao / việc hôm nay
-  if (/(hôm nay|cần giao|đang giao|đang ship|phân công|nhiệm vụ|mấy đơn|bao nhiêu đơn)/.test(lower) && /(tôi|mình|em|của tôi)/.test(lower)) {
-    return `SELECT order_id, shipping_address, shipping_phone, total_amount, payment_method, payment_status, status FROM orders WHERE assigned_shipper_id = ${userId || ':userId'} AND status IN ('CONFIRMED', 'PROCESSING', 'READY_TO_SHIP', 'SHIPPED') ORDER BY created_at ASC;`;
-  }
+// Kỹ năng 1: Đơn hàng cần giao hôm nay
+deliveryTrainer.addSkill({
+  id: 'ASSIGNED_ORDERS_TODAY',
+  title: 'Tra cứu đơn hàng cần giao hôm nay',
+  description: 'Lấy danh sách các đơn hàng đang phân công cho chính shipper',
+  type: 'LIVE_SQL',
+  examples: [
+    'hôm nay tôi có bao nhiêu đơn cần giao?',
+    'hôm nay tôi có bao nhiêu đơn cần giao',
+    'danh sách đơn của tôi hôm nay',
+    'tôi đang có những đơn nào',
+    'đơn cần ship hôm nay',
+    'hôm nay giao mấy đơn',
+    'nhiệm vụ giao hàng hôm nay của tôi'
+  ],
+  patterns: [
+    /(hôm nay.*(giao|ship|đơn)|cần giao hôm nay|đang giao|đang ship|phân công.*giao|nhiệm vụ.*giao)/i
+  ],
+  keywords: ['đơn', 'giao'],
+  sql: (userId) => `SELECT order_id, shipping_address, shipping_phone, total_amount, payment_method, payment_status, status FROM orders WHERE assigned_shipper_id = ${userId || ':userId'} AND status IN ('CONFIRMED', 'PROCESSING', 'READY_TO_SHIP', 'SHIPPED') ORDER BY created_at ASC;`
+});
 
-  // 2. Hỏi về thu tiền COD / tiền mặt
-  if (/(thu hộ|tiền cod|thu cod|tiền mặt|thu bao nhiêu)/.test(lower)) {
-    return `SELECT order_id, shipping_address, shipping_phone, total_amount, payment_status FROM orders WHERE assigned_shipper_id = ${userId || ':userId'} AND payment_method = 'COD' AND payment_status != 'PAID' AND status IN ('READY_TO_SHIP', 'SHIPPED') ORDER BY created_at ASC;`;
-  }
+// Kỹ năng 2: Lọc các đơn cần thu tiền mặt COD
+deliveryTrainer.addSkill({
+  id: 'COD_ORDERS_TO_COLLECT',
+  title: 'Tra cứu các đơn cần thu tiền mặt COD',
+  description: 'Lọc các đơn hàng chưa thanh toán cần thu tiền mặt khi giao',
+  type: 'LIVE_SQL',
+  examples: [
+    'đơn nào của tôi cần thu tiền cod?',
+    'đơn nào của tôi cần thu tiền cod',
+    'thu cod bao nhiêu tiền',
+    'những đơn nào phải thu tiền mặt',
+    'hôm nay cần thu hộ bao nhiêu tiền',
+    'danh sách đơn thu tiền tận nơi'
+  ],
+  patterns: [
+    /(thu hộ|tiền cod|thu cod|tiền mặt|thu bao nhiêu)/i
+  ],
+  keywords: ['cod'],
+  sql: (userId) => `SELECT order_id, shipping_address, shipping_phone, total_amount, payment_status FROM orders WHERE assigned_shipper_id = ${userId || ':userId'} AND payment_method = 'COD' AND payment_status != 'PAID' AND status IN ('READY_TO_SHIP', 'SHIPPED') ORDER BY created_at ASC;`
+});
 
-  // 3. Hiệu suất tháng này
-  if (/(thành công|hoàn thành|được mấy đơn|doanh số|hiệu suất)/.test(lower) && /(tháng này|trong tháng)/.test(lower)) {
-    return `SELECT COUNT(*) AS so_don_thanh_cong, COALESCE(SUM(total_amount), 0) AS tong_gia_tri_giao FROM orders WHERE assigned_shipper_id = ${userId || ':userId'} AND status IN ('DELIVERED', 'COMPLETED') AND delivered_at >= date_trunc('month', now() AT TIME ZONE 'Asia/Ho_Chi_Minh');`;
-  }
+// Kỹ năng 3: Hiệu suất giao hàng tháng này
+deliveryTrainer.addSkill({
+  id: 'MONTHLY_PERFORMANCE',
+  title: 'Hiệu suất số đơn giao thành công trong tháng',
+  description: 'Thống kê tổng số đơn giao thành công và giá trị đã giao của shipper',
+  type: 'LIVE_SQL',
+  examples: [
+    'tháng này tôi đã giao thành công được bao nhiêu đơn?',
+    'tháng này tôi đã giao thành công được bao nhiêu đơn',
+    'hiệu suất giao hàng tháng này của tôi',
+    'tháng này tôi hoàn thành được mấy đơn',
+    'tổng kết số đơn đã giao trong tháng'
+  ],
+  patterns: [
+    /(tháng này.*(thành công|hoàn thành|giao)|hiệu suất giao)/i
+  ],
+  keywords: ['tháng này'],
+  sql: (userId) => `SELECT COUNT(*) AS so_don_thanh_cong, COALESCE(SUM(total_amount), 0) AS tong_gia_tri_giao FROM orders WHERE assigned_shipper_id = ${userId || ':userId'} AND status IN ('DELIVERED', 'COMPLETED') AND delivered_at >= date_trunc('month', now() AT TIME ZONE 'Asia/Ho_Chi_Minh');`
+});
 
-  return null;
-};
+// Kỹ năng 4: Đơn hàng bị thất bại, hoàn hàng
+deliveryTrainer.addSkill({
+  id: 'FAILED_OR_RETURNED_ORDERS',
+  title: 'Các đơn giao không thành công hoặc chuyển hoàn',
+  description: 'Kiểm tra đơn bị bom hoặc khách từ chối nhận',
+  type: 'LIVE_SQL',
+  examples: [
+    'có đơn nào của tôi bị bom không',
+    'các đơn chuyển hoàn của tôi',
+    'đơn giao không thành công gần đây',
+    'đơn khách từ chối nhận'
+  ],
+  patterns: [
+    /(bị bom|chuyển hoàn|giao xịt|không nhận hàng|giao thất bại)/i
+  ],
+  sql: (userId) => `SELECT order_id, shipping_address, shipping_phone, status, updated_at FROM orders WHERE assigned_shipper_id = ${userId || ':userId'} AND status IN ('FAILED_DELIVERY', 'RETURNING_TO_WAREHOUSE', 'CANCELLED') AND updated_at >= date_trunc('month', now() AT TIME ZONE 'Asia/Ho_Chi_Minh') ORDER BY updated_at DESC;`
+});
 
-const DELIVERY_KNOWLEDGE_SOP = {
-  pod_rules: {
-    title: "Quy Chuẩn Chụp Ảnh Bằng Chứng Giao Hàng (POD)",
-    content: `📸 **QUY ĐỊNH CHỤP ẢNH POD (PROOF OF DELIVERY):**
-1. Chụp rõ ràng kiện hàng nguyên vẹn đặt tại địa chỉ khách (rõ số nhà/cửa hàng nếu có).
-2. Chụp rõ góc tem bưu kiện AetherPC còn nguyên vẹn, không rách vỡ tem niêm phong.
-3. Nếu khách cho phép: Chụp ảnh người nhận cầm gói hàng. Nếu khách từ chối chụp mặt: Chụp tay nhận hàng hoặc kiện hàng đặt trước cửa có sự chứng kiến.
-4. Tải ảnh lên ngay tại nút **[Chụp ảnh POD]** trên ứng dụng giao hàng trước khi ấn [Giao Thành Công].`
-  },
-  cod_deposit: {
-    title: "Quy Trình Nộp Tiền COD Về Kế Toán",
-    content: `💵 **QUY ĐỊNH NỘP TIỀN COD HÀNG NGÀY:**
-1. Toàn bộ tiền mặt thu từ khách (COD) phải được bàn giao về Phòng Kế toán trước **18h00 cùng ngày**.
-2. Trường hợp đi giao về trễ sau 18h00: Shipper có thể quét mã VietQR của công ty để chuyển khoản nộp COD kèm cú pháp: \`NOP COD - [Tên Shipper] - [Mã các đơn]\`.
-3. Kế toán sẽ đối soát và bấm xác nhận hoàn tất nộp COD trên hệ thống.`
-  },
-  damaged_box: {
-    title: "Xử Lý Sự Cố Khách Từ Chối Nhận / Thùng Móp Hộp",
-    content: `⚠️ **XỬ LÝ KHI KHÁCH KHIẾU NẠI MÓP HỘP HOẶC TỪ CHỐI NHẬN:**
-1. Giữ bình tĩnh, lịch sự giải thích hàng bên trong có đệm mút xốp chống sốc Instapak đa lớp.
-2. Mời khách đồng kiểm: Khách được quyền mở hộp kiểm tra ngoại quan (vỏ case không móp, mặt kính cường lực không nứt vỡ).
-3. Nếu linh kiện bên trong bị nứt vỡ thật: Chụp ảnh hiện trạng 3 góc $\rightarrow$ Báo ngay về Zalo/Hotline Trưởng Kho $\rightarrow$ Cập nhật trạng thái đơn thành **FAILED_DELIVERY** kèm lý do "Bể vỡ vận chuyển".`
-  }
-};
+// ============================================================================
+// 2. NHÓM KỸ NĂNG QUY TRÌNH & TRI THỨC VĂN BẢN (KNOWLEDGE SOP)
+// ============================================================================
 
-module.exports = {
-  DELIVERY_SYSTEM_PROMPT,
-  DELIVERY_FEW_SHOTS,
-  DELIVERY_SEMANTIC_RULES,
-  DELIVERY_KNOWLEDGE_SOP
-};
+// Kỹ năng 5: Tiêu chuẩn chụp ảnh bằng chứng giao hàng (POD)
+deliveryTrainer.addSkill({
+  id: 'SOP_POD_RULES',
+  title: 'Quy chuẩn chụp ảnh bằng chứng giao hàng (POD)',
+  description: 'Hướng dẫn góc chụp và yêu cầu bắt buộc của ảnh POD',
+  type: 'KNOWLEDGE_SOP',
+  examples: [
+    'quy định chụp ảnh pod như thế nào',
+    'cách chụp ảnh xác nhận đã giao hàng',
+    'chụp pod cần chụp những gì',
+    'khách không cho chụp mặt thì làm sao'
+  ],
+  patterns: [
+    /(chụp ảnh pod|chụp pod|bằng chứng giao hàng|ảnh giao hàng|chụp mặt)/i
+  ],
+  sop: `📸 **QUY ĐỊNH CHỤP ẢNH BẰNG CHỨNG GIAO HÀNG (POD):**
+1. **Góc chụp kiện hàng:** Chụp rõ ràng kiện hàng nguyên vẹn đặt tại địa chỉ khách (thấy rõ số nhà/cửa hàng nếu có).
+2. **Tem niêm phong:** Chụp rõ góc tem bưu kiện AetherPC còn nguyên vẹn, không rách vỡ tem niêm phong.
+3. **Người nhận:** Nếu khách cho phép, chụp ảnh khách cầm gói hàng. Nếu khách từ chối chụp mặt: Chụp tay nhận hàng hoặc gói hàng đặt trước cửa có sự chứng kiến của khách.
+4. **Tải lên:** Bắt buộc bấm nút **[Chụp ảnh POD]** trên ứng dụng giao hàng trước khi ấn [Giao Thành Công].`
+});
+
+// Kỹ năng 6: Quy trình nộp tiền mặt COD về kế toán
+deliveryTrainer.addSkill({
+  id: 'SOP_COD_DEPOSIT',
+  title: 'Quy trình nộp tiền mặt COD cho kế toán',
+  description: 'Khung giờ nộp tiền COD và cú pháp chuyển khoản nộp COD trễ',
+  type: 'KNOWLEDGE_SOP',
+  examples: [
+    'shipper nộp tiền cod trước mấy giờ',
+    'quy định nộp tiền mặt cod hàng ngày',
+    'về trễ thì nộp tiền cod thế nào',
+    'số tài khoản nộp tiền cod của công ty'
+  ],
+  patterns: [
+    /(nộp tiền cod|mấy giờ.*nộp tiền|nộp cod.*trễ|nộp tiền mặt)/i
+  ],
+  sop: `💵 **QUY ĐỊNH NỘP TIỀN COD HÀNG NGÀY:**
+1. **Khung giờ:** Toàn bộ tiền mặt thu từ khách (COD) phải được bàn giao về Phòng Kế toán trước **18h00 cùng ngày**.
+2. **Trường hợp đi giao về trễ:** Shipper quét mã VietQR thụ hưởng của công ty để nộp tiền tài khoản kèm cú pháp: \`NOP COD - [Tên Shipper] - [Mã các đơn]\`.
+3. Kế toán sẽ đối soát và bấm xác nhận hoàn tất nộp COD trên phần mềm quản trị.`
+});
+
+// Kỹ năng 7: Xử lý sự cố móp hộp / khách từ chối nhận
+deliveryTrainer.addSkill({
+  id: 'SOP_DAMAGED_BOX',
+  title: 'Xử lý khi kiện hàng bị móp hộp hoặc khách từ chối nhận',
+  description: 'Quy trình xử lý ngoại quan và đồng kiểm với khách',
+  type: 'KNOWLEDGE_SOP',
+  examples: [
+    'khách từ chối nhận hàng do móp hộp thì xử lý thế nào',
+    'thùng máy bị móp kính có cho khách xem không',
+    'khách muốn mở hộp xem hàng trước khi nhận',
+    'vỡ kính khi vận chuyển thì làm sao'
+  ],
+  patterns: [
+    /(móp hộp|từ chối nhận|bể kính|vỡ kính|đồng kiểm|mở hộp)/i
+  ],
+  sop: `⚠️ **XỬ LÝ KHI KHÁCH KHIẾU NẠI MÓP HỘP HOẶC TỪ CHỐI NHẬN:**
+1. **Lịch sự giải thích:** Thùng máy tính có đệm xốp Instapak dày bảo vệ linh kiện bên trong an toàn.
+2. **Mời khách đồng kiểm:** Khách được quyền kiểm tra ngoại quan (vỏ case không móp méo, mặt kính cường lực không nứt vỡ).
+3. **Nếu có bể vỡ thật:** Chụp ảnh hiện trạng 3 góc $\rightarrow$ Báo ngay về Hotline Trưởng Kho $\rightarrow$ Cập nhật trạng thái đơn thành **FAILED_DELIVERY** kèm lý do "Bể vỡ vận chuyển".`
+});
+
+module.exports = deliveryTrainer;
