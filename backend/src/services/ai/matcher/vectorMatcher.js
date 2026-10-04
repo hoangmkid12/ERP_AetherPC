@@ -76,6 +76,50 @@ class VectorMatcher {
       }
     }
 
+    // Nạp các kịch bản SQL do Quản trị viên huấn luyện trực tiếp (Active Learning & User Feedback Loop)
+    const fs = require('fs');
+    const path = require('path');
+    const dynamicSkillsPath = path.join(__dirname, '../dynamic_few_shots.json');
+    if (fs.existsSync(dynamicSkillsPath)) {
+      try {
+        const dynamicSkills = JSON.parse(fs.readFileSync(dynamicSkillsPath, 'utf8'));
+        if (Array.isArray(dynamicSkills)) {
+          for (const dSkill of dynamicSkills) {
+            if (!dSkill.question || !dSkill.sql) continue;
+            const skillId = dSkill.id || `DYNAMIC_${docIdCounter}`;
+            const dynamicSkillObj = {
+              id: skillId,
+              title: dSkill.description || dSkill.question,
+              description: dSkill.description || 'Kỹ năng do Admin phê duyệt qua Active Learning',
+              type: 'DYNAMIC_SQL',
+              sql: dSkill.sql,
+              examples: [dSkill.question],
+              allowedRoles: ['ADMIN', 'CEO', 'ADMIN_CEO', 'SALES', 'WAREHOUSE', 'ACCOUNTANT', 'DELIVERY', 'ALL'],
+              isDynamic: true
+            };
+
+            // Lưu vào lookup với các role để có thể truy vấn mọi nơi
+            this.skillLookup.set(`ADMIN_CEO_${skillId}`, { role: 'ADMIN_CEO', skill: dynamicSkillObj });
+            this.skillLookup.set(`ALL_${skillId}`, { role: 'ALL', skill: dynamicSkillObj });
+
+            docs.push({
+              id: `doc_${docIdCounter++}`,
+              text: dSkill.question,
+              metadata: {
+                role: 'ALL',
+                intentId: skillId,
+                title: dynamicSkillObj.title,
+                type: 'DYNAMIC_SQL',
+                isDynamic: true
+              }
+            });
+          }
+        }
+      } catch (err) {
+        console.warn('[VectorMatcher] Không thể nạp dynamic_few_shots.json:', err.message);
+      }
+    }
+
     // Huấn luyện mô hình Vector TF-IDF
     this.engine.fit(docs);
     this.isIndexed = true;
@@ -99,9 +143,10 @@ class VectorMatcher {
 
     // Lọc theo vai trò nếu được chỉ định
     // ĐẶC BIỆT: ADMIN và CEO là vai trò quản trị tối cao, có quyền tra cứu toàn bộ kỹ năng ERP (Sales, Kho, Kế toán, Delivery)
+    // Các kỹ năng động có role 'ALL' được truy cập bởi mọi vai trò
     const isAdminCeo = filterRole === 'ADMIN_CEO' || filterRole === 'ADMIN' || filterRole === 'CEO';
     const filterFn = (filterRole && filterRole !== 'ALL' && !isAdminCeo)
-      ? (doc) => doc.metadata.role === filterRole
+      ? (doc) => doc.metadata.role === filterRole || doc.metadata.role === 'ALL'
       : null;
 
     // Tìm kiếm top 10 câu mẫu tương đồng nhất
@@ -138,7 +183,7 @@ class VectorMatcher {
 
     // Lấy thông tin chi tiết kỹ năng từ lookup
     const lookupKey = `${bestIntent.role}_${bestIntent.intentId}`;
-    const skillInfo = this.skillLookup.get(lookupKey);
+    const skillInfo = this.skillLookup.get(lookupKey) || this.skillLookup.get(`ALL_${bestIntent.intentId}`) || this.skillLookup.get(`ADMIN_CEO_${bestIntent.intentId}`);
 
     // Kiểm tra với ngưỡng tin cậy
     const isConfident = bestIntent.score >= this.confidenceThreshold;

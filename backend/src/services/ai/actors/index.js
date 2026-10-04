@@ -358,7 +358,68 @@ const executeActorIntent = async (userPrompt, role, prisma, user = {}, params = 
   }
 
   // GIAI ĐOẠN 1: Chạy Prisma Handler và kiểm tra bảo mật RBAC
-  const execResult = await executingTrainer.execute(matchedSkill, prisma, resolvedParams, user);
+  let execResult;
+
+  // Xử lý kịch bản SQL do Quản trị viên huấn luyện trực tiếp (Active Learning & User Feedback Loop)
+  if (matchedSkill.type === 'DYNAMIC_SQL' && matchedSkill.sql) {
+    try {
+      const { isSafeSqlQuery } = require('../universalData.service');
+      const sqlToRun = matchedSkill.sql.trim();
+      if (!isSafeSqlQuery(sqlToRun)) {
+        execResult = {
+          status: 'ERROR',
+          message: 'Câu lệnh SQL huấn luyện vi phạm quy chuẩn an toàn (chỉ cho phép truy vấn SELECT đọc dữ liệu).'
+        };
+      } else {
+        const currentUserId = Number(user.id) || 0;
+        const finalSql = sqlToRun.replace(/:userId/g, currentUserId.toString());
+        const rawData = await prisma.$queryRawUnsafe(finalSql);
+        const cleanData = JSON.parse(JSON.stringify(rawData, (key, value) =>
+          typeof value === 'bigint' ? value.toString() : value
+        ));
+
+        let formattedText = `📊 **KẾT QUẢ TRUY VẤN DỮ LIỆU ĐÃ HUẤN LUYỆN (ACTIVE LEARNING)**\n\n`;
+        formattedText += `> 💡 **Kịch bản:** ${matchedSkill.title}\n\n`;
+
+        if (!cleanData || cleanData.length === 0) {
+          formattedText += `Không tìm thấy bản ghi nào phù hợp trong hệ thống.`;
+        } else if (cleanData.length === 1 && Object.keys(cleanData[0]).length <= 3) {
+          const row = cleanData[0];
+          formattedText += Object.entries(row)
+            .map(([k, v]) => `• **${k}:** ${typeof v === 'number' ? v.toLocaleString('vi-VN') : v}`)
+            .join('\n');
+        } else {
+          const keys = Object.keys(cleanData[0]).slice(0, 5);
+          formattedText += `| ${keys.join(' | ')} |\n`;
+          formattedText += `| ${keys.map(() => '---').join(' | ')} |\n`;
+          for (const row of cleanData.slice(0, 8)) {
+            formattedText += `| ${keys.map(k => (row[k] !== undefined && row[k] !== null ? (typeof row[k] === 'number' ? row[k].toLocaleString('vi-VN') : String(row[k])) : '—')).join(' | ')} |\n`;
+          }
+          if (cleanData.length > 8) {
+            formattedText += `\n*(Hiển thị 8/${cleanData.length} kết quả)*`;
+          }
+        }
+
+        execResult = {
+          status: 'SUCCESS',
+          intent: matchedSkill.id,
+          type: 'DYNAMIC_SQL',
+          title: matchedSkill.title,
+          data: cleanData,
+          text: formattedText
+        };
+      }
+    } catch (sqlErr) {
+      console.error(`[executeActorIntent] Lỗi chạy Dynamic SQL [${matchedSkill.id}]:`, sqlErr);
+      execResult = {
+        status: 'ERROR',
+        intent: matchedSkill.id,
+        message: `Lỗi khi thực thi câu truy vấn huấn luyện: ${sqlErr.message}`
+      };
+    }
+  } else {
+    execResult = await executingTrainer.execute(matchedSkill, prisma, resolvedParams, user);
+  }
 
   // GIAI ĐOẠN 4: Ghi lại lượt hội thoại vào Session Context
   conversationContext.recordTurn(sessionId, {
@@ -367,7 +428,7 @@ const executeActorIntent = async (userPrompt, role, prisma, user = {}, params = 
     intent: matchedSkill.id,
     skillId: matchedSkill.id,
     extractedParams: resolvedParams,
-    response: execResult.text,
+    response: execResult.text || execResult.message,
     status: execResult.status
   });
 

@@ -231,6 +231,17 @@ const saveDynamicSkill = async (req, res, next) => {
     skills.unshift(newSkill);
     fs.writeFileSync(DYNAMIC_SKILLS_PATH, JSON.stringify(skills, null, 2), 'utf8');
 
+    // Tự động nạp kịch bản vào Vector Engine & làm mới cache truy vấn tức thì (Active Learning Loop)
+    try {
+      const { vectorMatcher } = require('../services/ai/matcher');
+      const { queryCache } = require('../services/ai/cache');
+      vectorMatcher.buildIndex();
+      queryCache.clear();
+      console.log(`[ActiveLearning] Đã lập chỉ mục lại Vector Engine thành công với kỹ năng mới: "${newSkill.question}"`);
+    } catch (reindexErr) {
+      console.warn('[ActiveLearning] Cảnh báo re-index Vector Engine:', reindexErr.message);
+    }
+
     // Nếu tạo từ một Feedback cụ thể, đánh dấu feedback là APPROVED
     if (feedbackId) {
       await prisma.aiFeedback.updateMany({
@@ -247,7 +258,7 @@ const saveDynamicSkill = async (req, res, next) => {
     res.json({
       success: true,
       data: newSkill,
-      message: 'Đã lưu kỹ năng SQL thành công! AI Copilot sẽ tự động học mẫu truy vấn này.'
+      message: 'Đã lưu kịch bản và tự động nạp vào Vector Engine thành công! AI Copilot đã học ngay lập tức.'
     });
   } catch (err) {
     next(err);
@@ -264,7 +275,16 @@ const deleteDynamicSkill = async (req, res, next) => {
     }
     skills = skills.filter(s => s.id !== id);
     fs.writeFileSync(DYNAMIC_SKILLS_PATH, JSON.stringify(skills, null, 2), 'utf8');
-    res.json({ success: true, message: 'Đã xóa kỹ năng huấn luyện.' });
+
+    // Tự động đồng bộ lại Vector Engine & xóa cache
+    try {
+      const { vectorMatcher } = require('../services/ai/matcher');
+      const { queryCache } = require('../services/ai/cache');
+      vectorMatcher.buildIndex();
+      queryCache.clear();
+    } catch (e) {}
+
+    res.json({ success: true, message: 'Đã xóa kỹ năng huấn luyện và cập nhật bộ nhớ AI.' });
   } catch (err) {
     next(err);
   }

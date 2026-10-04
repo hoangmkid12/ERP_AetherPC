@@ -668,6 +668,14 @@ export default function SystemAdmin() {
       }
       return `SELECT SUM(total_amount) AS doanh_thu_nam_nay FROM orders WHERE status IN ('DELIVERED', 'COMPLETED') AND created_at >= date_trunc('year', now() AT TIME ZONE 'Asia/Ho_Chi_Minh');`;
     }
+    // "đơn cod" / "cod chưa nộp tiền" / "chưa thu tiền cod"
+    if (/(cod|thu hộ)/.test(lower) && /(chưa|nộp|tiền|thu)/.test(lower)) {
+      return `SELECT order_id, total_amount, payment_status, status, shipping_address FROM orders WHERE payment_method = 'COD' AND payment_status != 'PAID' ORDER BY created_at DESC LIMIT 15;`;
+    }
+    // "đơn chưa thanh toán" / "nợ tiền"
+    if (/(chưa thanh toán|chưa trả tiền|nợ)/.test(lower)) {
+      return `SELECT order_id, total_amount, payment_status, status, created_at FROM orders WHERE payment_status = 'UNPAID' ORDER BY total_amount DESC LIMIT 15;`;
+    }
     // "đơn tồn" / "đơn hàng tồn đọng" / "đơn chờ xuất kho"
     if (/đơn/.test(lower) && /(tồn|chưa giao|chờ xuất|đọng)/.test(lower)) {
       return `SELECT order_id, total_amount, status, created_at FROM orders WHERE status NOT IN ('COMPLETED', 'DELIVERED', 'CANCELLED') ORDER BY created_at DESC LIMIT 15;`;
@@ -688,15 +696,15 @@ export default function SystemAdmin() {
   };
 
   const handleOpenTrainingModal = async (item, isFeedback = false) => {
-    const questionText = isFeedback ? item.prompt : item.userPrompt;
-    const initialSql = getSmartInitialSql(questionText);
+    const questionText = isFeedback ? (item.correction?.trim() || item.prompt) : item.userPrompt;
+    const initialSql = getSmartInitialSql(questionText) || getSmartInitialSql(item.prompt);
     
     // Khởi tạo form với template ban đầu chuẩn xác tức thì
     setTrainingForm({
       feedbackId: isFeedback ? item.id : null,
       question: questionText || '',
       sql: initialSql,
-      description: `Kỹ năng huấn luyện từ câu hỏi: ${questionText?.slice(0, 100)}`,
+      description: isFeedback && item.correction ? `Huấn luyện từ phản hồi góp ý: "${item.correction}" (câu hỏi gốc: "${item.prompt}")` : `Kỹ năng huấn luyện từ câu hỏi: ${questionText?.slice(0, 100)}`,
       title: questionText ? `Quy trình & Hướng dẫn: ${questionText.slice(0, 50)}` : '',
       category: 'WARRANTY_RMA',
       content: item.correction || item.aiResponse || ''
