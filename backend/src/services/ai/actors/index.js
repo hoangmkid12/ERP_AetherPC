@@ -98,27 +98,43 @@ const matchActorSkill = (userPrompt, role, userId) => {
 const { extractParameters } = require('../extractors');
 const { matchHybridIntent } = require('../matcher');
 const { conversationContext } = require('../context');
+const { queryCache } = require('../cache');
 
 /**
- * THỰC THI TRỰC TIẾP Ý ĐỊNH BẰNG PRISMA HANDLER (KIẾN TRÚC TOÀN DIỆN GIAI ĐOẠN 1, 2, 3 & 4)
+ * THỰC THI TRỰC TIẾP Ý ĐỊNH BẰNG PRISMA HANDLER (KIẾN TRÚC TOÀN DIỆN GIAI ĐOẠN 1, 2, 3, 4 & 5)
  * Pipeline hoàn chỉnh:
+ * 0. Query Cache Hit: Phản hồi tức thì < 1ms cho các câu hỏi phổ biến (Stage 5)
  * 1. Phân tích ngữ cảnh & hồi chỉ từ các lượt trước (Stage 4)
  * 2. So khớp ý định bằng Vector Cosine & Hybrid Matcher (Stage 3)
  * 3. Tự động bóc tách thực thể & kế thừa tham số qua ngữ cảnh (Stage 2 & 4)
  * 4. Kiểm tra điều kiện cần làm rõ (Clarification Prompting)
  * 5. Kiểm tra RBAC & thực thi Prisma Handler an toàn (Stage 1)
  * 6. Lưu ngữ cảnh lượt trò chuyện vào Session Store (Stage 4)
+ * 7. Ghi nhớ kết quả vào Query Cache (Stage 5)
  * 
  * @param {string} userPrompt - Câu hỏi của người dùng
  * @param {string} role - Vai trò của người dùng (DELIVERY, WAREHOUSE, ACCOUNTANT, SALES, ADMIN_CEO)
  * @param {Object} prisma - Prisma Client instance
  * @param {Object} [user={}] - Thông tin user { id, role, fullName }
- * @param {Object} [params={}] - Các tham số đã trích xuất hoặc options { sessionId, conversationHistory }
+ * @param {Object} [params={}] - Các tham số đã trích xuất hoặc options { sessionId, conversationHistory, skipCache }
  */
 const executeActorIntent = async (userPrompt, role, prisma, user = {}, params = {}) => {
   const trainer = getTrainer(role);
   if (!trainer) {
     return { status: 'NOT_FOUND', message: `Không tìm thấy bộ huấn luyện cho vai trò ${role}` };
+  }
+
+  // GIAI ĐOẠN 5: Tối ưu hiệu năng - Kiểm tra Query Cache phản hồi < 1ms
+  // Chỉ sử dụng Cache cho các câu hỏi độc lập (không phụ thuộc hồi chỉ / ngữ cảnh phiên)
+  const isPersonalQuery = /(của tôi|của em|của mình|cá nhân tôi|cá nhân em|doanh số của tôi|nhiệm vụ của tôi)/i.test(userPrompt);
+  const anaphoraInfo = conversationContext.detectAnaphora(userPrompt);
+  const isElliptical = Boolean(conversationContext.detectEllipticalType(userPrompt));
+  const isContextDependent = anaphoraInfo.isProductAnaphora || anaphoraInfo.isOrderAnaphora || anaphoraInfo.isPoAnaphora || anaphoraInfo.isDateFollowUp || isElliptical;
+
+  const cacheKey = queryCache.generateKey(userPrompt, role, user.id, isPersonalQuery);
+  const cachedResponse = queryCache.get(cacheKey);
+  if (cachedResponse && !params.skipCache && !isContextDependent) {
+    return cachedResponse;
   }
 
   const sessionId = params.sessionId || user.id || 'default_session';
@@ -230,7 +246,7 @@ const executeActorIntent = async (userPrompt, role, prisma, user = {}, params = 
     status: execResult.status
   });
 
-  return {
+  const responseObj = {
     ...execResult,
     extractedParams: resolvedParams,
     inheritedParams: inherited,
@@ -238,6 +254,16 @@ const executeActorIntent = async (userPrompt, role, prisma, user = {}, params = 
     matchSource,
     role: trainer.role
   };
+
+  // GIAI ĐOẠN 5: Lưu kết quả vào Query Cache với TTL tối ưu
+  // Chỉ cache các câu hỏi độc lập (không phụ thuộc vào tham số kế thừa từ ngữ cảnh của phiên)
+  const hasInherited = inherited && Object.keys(inherited).length > 0;
+  if (execResult.status === 'SUCCESS' && !isContextDependent && !hasInherited) {
+    const ttl = queryCache.getTtlForSkill(matchedSkill.type, matchedSkill.id);
+    queryCache.set(cacheKey, responseObj, ttl);
+  }
+
+  return responseObj;
 };
 
 /**

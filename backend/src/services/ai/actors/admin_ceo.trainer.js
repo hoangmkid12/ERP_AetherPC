@@ -50,9 +50,9 @@ adminCeoTrainer.addSkill({
       _avg: { totalAmount: true }
     });
     return {
-      totalOrders: res._count.orderId || 0,
-      totalRevenue: Number(res._sum.totalAmount || 0),
-      avgOrderValue: Math.round(Number(res._avg.totalAmount || 0))
+      totalOrders: res._count?.orderId || 0,
+      totalRevenue: Number(res._sum?.totalAmount || 0),
+      avgOrderValue: Math.round(Number(res._avg?.totalAmount || 0))
     };
   },
   template: (data) => {
