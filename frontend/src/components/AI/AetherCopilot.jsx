@@ -113,6 +113,7 @@ export default function AetherCopilot() {
           matchSource: response.data?.matchSource || null,
           latencyMs: response.data?.latencyMs || null,
           skillId: response.data?.skillId || null,
+          followUps: response.data?.followUps || [],
           timestamp: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
         };
         setMessages(prev => [...prev, botMsg]);
@@ -605,6 +606,63 @@ export default function AetherCopilot() {
                   <div>
                     {renderFormattedText(msg.content)}
                   </div>
+
+                  {/* Proactive Follow-up Action Chips (Gợi ý F1 / F2 tiếp theo) */}
+                  {msg.followUps && msg.followUps.length > 0 && (
+                    <div style={{
+                      marginTop: '10px',
+                      paddingTop: '8px',
+                      borderTop: '1px dashed #e2e8f0'
+                    }}>
+                      <div style={{
+                        fontSize: '0.68rem',
+                        fontWeight: 700,
+                        color: '#64748b',
+                        marginBottom: '6px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}>
+                        <Sparkles size={11} style={{ color: '#0284c7' }} />
+                        <span>GỢI Ý CÂU HỎI TIẾP THEO (F1/F2):</span>
+                      </div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                        {msg.followUps.map((chip, chipIdx) => (
+                          <button
+                            key={chipIdx}
+                            onClick={() => handleSendMessage(chip)}
+                            style={{
+                              backgroundColor: '#f0f9ff',
+                              border: '1px solid #bae6fd',
+                              borderRadius: '12px',
+                              padding: '4px 10px',
+                              fontSize: '0.72rem',
+                              color: '#0369a1',
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              transition: 'all 0.15s ease',
+                              boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
+                            }}
+                            onMouseEnter={e => {
+                              e.currentTarget.style.backgroundColor = '#e0f2fe';
+                              e.currentTarget.style.borderColor = '#38bdf8';
+                              e.currentTarget.style.transform = 'translateY(-1px)';
+                            }}
+                            onMouseLeave={e => {
+                              e.currentTarget.style.backgroundColor = '#f0f9ff';
+                              e.currentTarget.style.borderColor = '#bae6fd';
+                              e.currentTarget.style.transform = 'translateY(0)';
+                            }}
+                          >
+                            <span>💡 {chip}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Citations Pills */}
                   {msg.citations && msg.citations.length > 0 && (

@@ -101,6 +101,99 @@ const { conversationContext } = require('../context');
 const { queryCache } = require('../cache');
 
 /**
+ * Tự động sinh ra 2 - 3 câu hỏi gợi ý F1 / F2 (Proactive Follow-up Chips)
+ * Giúp người dùng đào sâu hoặc mở rộng nghiệp vụ mà không cần tự nghĩ câu hỏi
+ */
+const generateFollowUpSuggestions = (skill, userPrompt = '', params = {}) => {
+  if (!skill) return [];
+
+  // Nếu skill đã có cấu hình followUps cố định
+  if (skill.followUps && Array.isArray(skill.followUps) && skill.followUps.length > 0) {
+    return skill.followUps;
+  }
+
+  const sid = (skill.id || '').toUpperCase();
+
+  // 1. Nhóm Doanh thu & Bán hàng (Revenue & Sales)
+  if (sid.includes('REVENUE') || sid.includes('SALES_SUMMARY') || sid.includes('ANNUAL_EXECUTIVE') || sid.includes('TODAY_REVENUE')) {
+    return [
+      'So với tháng trước thì tăng hay giảm bao nhiêu %?',
+      'Những đơn trên 10 triệu mà chưa thanh toán',
+      'Hôm nay có vẻ ế nhỉ, từ sáng giờ nổ được mấy đơn rồi'
+    ];
+  }
+
+  // 2. Nhóm Sản phẩm & Linh kiện phần cứng (Hardware & PC)
+  if (sid.includes('PRODUCT') || sid.includes('PRICE') || sid.includes('STOCK')) {
+    const prodName = params.productName || 'con này';
+    return [
+      `${prodName} giá bao nhiêu tiền?`,
+      `${prodName} cần nguồn bao nhiêu watt?`,
+      'Chính sách bảo hành 1 đổi 1 thế nào?'
+    ];
+  }
+
+  // 3. Nhóm Khiếu nại CSKH & Ticket
+  if (sid.includes('COMPLAINT') || sid.includes('TICKET') || sid.includes('CSKH')) {
+    if (sid.includes('RESOLVED')) {
+      return [
+        'Có bao nhiêu khiếu nại đang chờ xử lý?',
+        'Khiếu nại nào gấp nhất?',
+        'Tổng đơn hàng đổi trả trong năm nay'
+      ];
+    }
+    return [
+      'Khiếu nại nào gấp nhất?',
+      'Cho xem danh sách cụ thể',
+      'Đã xử lí được mấy cái rồi?'
+    ];
+  }
+
+  // 4. Nhóm Đổi trả & Bảo hành RMA
+  if (sid.includes('RETURN') || sid.includes('RMA') || sid.includes('WARRANTY')) {
+    return [
+      'Khiếu nại nào gấp nhất?',
+      'Có bao nhiêu khiếu nại đang chờ xử lý?',
+      'Quy trình đổi trả sản phẩm lỗi của công ty'
+    ];
+  }
+
+  // 5. Nhóm Nhân sự (HR)
+  if (sid.includes('HR') || sid.includes('HEADCOUNT') || sid.includes('STAFF')) {
+    return [
+      'Có bao nhiêu nhân viên shipper?',
+      'Thống kê tình hình nhân sự nghỉ phép',
+      'Chính sách kỷ luật nhân viên vi phạm'
+    ];
+  }
+
+  // 6. Nhóm Giao vận (Delivery / Shipper)
+  if (sid.includes('DELIVERY') || sid.includes('SHIPPER') || sid.includes('COD')) {
+    return [
+      'Đơn nào của tôi cần thu tiền cod?',
+      'Lý do mấy đơn bị boom hàng không nhận',
+      'Tháng này tôi đã giao thành công được bao nhiêu đơn?'
+    ];
+  }
+
+  // 7. Nhóm Kho vận & Lắp ráp (Warehouse)
+  if (sid.includes('WAREHOUSE') || sid.includes('ASSEMBLY') || sid.includes('LOW_STOCK')) {
+    return [
+      'Những sản phẩm nào sắp hết hàng trong kho?',
+      'Có bao nhiêu máy đang chờ ráp và kiểm tra?',
+      'Phiếu nhập hàng gần nhất đã về kho chưa?'
+    ];
+  }
+
+  // Mặc định cho các kịch bản khác
+  return [
+    'Báo cáo doanh thu bán hàng hôm nay',
+    'Card RTX 4070 còn hàng không?',
+    'Chính sách bảo mật hệ thống'
+  ];
+};
+
+/**
  * THỰC THI TRỰC TIẾP Ý ĐỊNH BẰNG PRISMA HANDLER (KIẾN TRÚC TOÀN DIỆN GIAI ĐOẠN 1, 2, 3, 4 & 5)
  * Pipeline hoàn chỉnh:
  * 0. Query Cache Hit: Phản hồi tức thì < 1ms cho các câu hỏi phổ biến (Stage 5)
@@ -278,13 +371,16 @@ const executeActorIntent = async (userPrompt, role, prisma, user = {}, params = 
     status: execResult.status
   });
 
+  const followUps = generateFollowUpSuggestions(matchedSkill, userPrompt, resolvedParams);
+
   const responseObj = {
     ...execResult,
     extractedParams: resolvedParams,
     inheritedParams: inherited,
     matchScore,
     matchSource,
-    role: executingTrainer.role
+    role: executingTrainer.role,
+    followUps
   };
 
   // GIAI ĐOẠN 5: Lưu kết quả vào Query Cache với TTL tối ưu

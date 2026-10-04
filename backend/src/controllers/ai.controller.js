@@ -334,7 +334,8 @@ const chatWithAi = async (req, res, next) => {
         isCached: Boolean(actorResult.fromCache),
         matchSource: actorResult.matchSource,
         matchScore: actorResult.matchScore,
-        skillId: actorResult.skillId || actorResult.intent
+        skillId: actorResult.skillId || actorResult.intent,
+        followUps: actorResult.followUps || []
       };
       toolCallsExecuted.push({
         tool: actorResult.skillId || actorResult.intent || 'offline_actor_handler',
@@ -898,7 +899,8 @@ Hãy trả lời chính xác dựa trên dữ liệu trên. Dùng Markdown đẹ
         isCached: offlineMetadata?.isCached || false,
         matchSource: offlineMetadata?.matchSource || null,
         matchScore: offlineMetadata?.matchScore || null,
-        skillId: offlineMetadata?.skillId || null
+        skillId: offlineMetadata?.skillId || null,
+        followUps: offlineMetadata?.followUps || []
       }
     });
   } catch (err) {
