@@ -95,14 +95,16 @@ const matchActorSkill = (userPrompt, role, userId) => {
   return trainer.match(userPrompt, userId);
 };
 
+const { extractParameters } = require('../extractors');
+
 /**
- * THỰC THI TRỰC TIẾP Ý ĐỊNH BẰNG PRISMA HANDLER (KIẾN TRÚC GIAI ĐOẠN 1)
- * Pipeline hoàn chỉnh: So khớp ý định -> Kiểm tra RBAC -> Chạy Prisma Handler -> Điền kết quả vào Template
+ * THỰC THI TRỰC TIẾP Ý ĐỊNH BẰNG PRISMA HANDLER (KIẾN TRÚC GIAI ĐOẠN 1 & 2)
+ * Pipeline hoàn chỉnh: So khớp ý định -> Trích xuất tham số (Stage 2) -> Kiểm tra RBAC -> Chạy Prisma Handler -> Điền kết quả vào Template
  * @param {string} userPrompt - Câu hỏi của người dùng
  * @param {string} role - Vai trò của người dùng (DELIVERY, WAREHOUSE, ACCOUNTANT, SALES, ADMIN_CEO)
  * @param {Object} prisma - Prisma Client instance
  * @param {Object} [user={}] - Thông tin user { id, role, fullName }
- * @param {Object} [params={}] - Các tham số đã trích xuất (tên sản phẩm, mốc thời gian...)
+ * @param {Object} [params={}] - Các tham số đã trích xuất hoặc tham số bổ sung
  */
 const executeActorIntent = async (userPrompt, role, prisma, user = {}, params = {}) => {
   const trainer = getTrainer(role);
@@ -115,9 +117,13 @@ const executeActorIntent = async (userPrompt, role, prisma, user = {}, params = 
     return null; // Không khớp ý định đã định nghĩa
   }
 
-  const execResult = await trainer.execute(matchResult.skill, prisma, params, user);
+  // GIAI ĐOẠN 2: Tự động bóc tách thực thể, ngày tháng, mã phiếu, ngân sách từ câu hỏi
+  const resolvedParams = await extractParameters(userPrompt, prisma, user, params);
+
+  const execResult = await trainer.execute(matchResult.skill, prisma, resolvedParams, user);
   return {
     ...execResult,
+    extractedParams: resolvedParams,
     matchScore: matchResult.score,
     role: trainer.role
   };
