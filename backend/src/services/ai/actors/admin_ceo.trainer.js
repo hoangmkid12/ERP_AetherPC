@@ -578,5 +578,108 @@ adminCeoTrainer.addSkill({
 3. **Trên 100.000.000 VNĐ hoặc hợp đồng thuê mặt bằng/đầu tư xe vận tải:** Phải thông qua Hội đồng Quản trị và CEO phê chuẩn bằng văn bản.`
 });
 
+// Kỹ năng 15: Thống kê yêu cầu đổi trả và bảo hành sản phẩm (RMA)
+adminCeoTrainer.addSkill({
+  id: 'RETURN_REQUESTS_SUMMARY',
+  title: 'Thống kê yêu cầu đổi trả và bảo hành sản phẩm (RMA)',
+  description: 'Tổng hợp số lượng và tiến độ xử lý các ca đổi trả, bảo hành hàng hóa',
+  type: 'PRISMA_QUERY',
+  examples: [
+    'Tổng đơn hàng đổi trả trong năm nay',
+    'tổng đơn hàng đổi trả trong năm nay',
+    'có bao nhiêu đơn đổi trả',
+    'thống kê đơn hàng đổi trả',
+    'danh sách yêu cầu đổi trả rma',
+    'tình hình đổi trả hàng năm nay',
+    'các ca bảo hành đổi trả của khách'
+  ],
+  patterns: [
+    /(đổi trả|đơn.*đổi trả|yêu cầu đổi trả|rma|trả hàng|bảo hành đổi trả)/i
+  ],
+  allowedRoles: ['ADMIN_CEO', 'ADMIN', 'WAREHOUSE', 'QC_TECH', 'CSKH'],
+  handler: async (prisma, params) => {
+    const where = params && params.startDate ? { createdAt: { gte: params.startDate } } : {};
+    return await prisma.returnRequest.findMany({
+      where,
+      select: {
+        rmaCode: true,
+        orderId: true,
+        customerName: true,
+        status: true,
+        reason: true,
+        createdAt: true
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 10
+    });
+  },
+  template: (data) => {
+    if (!data || data.length === 0) {
+      return '🎉 **Tuyệt vời! Không ghi nhận yêu cầu đổi trả hoặc bảo hành nào trong thời gian này.**';
+    }
+    let res = `🔄 **BÁO CÁO TỔNG HỢP YÊU CẦU ĐỔI TRẢ & BẢO HÀNH (RMA):**\n\n` +
+              `- Tổng số ca ghi nhận: **${data.length} trường hợp**\n\n`;
+    data.forEach((r, idx) => {
+      const dateStr = formatDateVN(r.createdAt);
+      res += `${idx + 1}. **[${r.rmaCode}]** - Đơn hàng: **#${r.orderId}**\n` +
+             `   Khách hàng: **${r.customerName || 'N/A'}** | Trạng thái: \`${r.status}\`\n` +
+             `   Lý do: *${r.reason || 'Lỗi linh kiện'}* (${dateStr})\n`;
+    });
+    return res.trim();
+  }
+});
+
+// Kỹ năng 16: Thống kê khiếu nại CSKH và ticket đã xử lý xong
+adminCeoTrainer.addSkill({
+  id: 'RESOLVED_COMPLAINTS_TICKETS',
+  title: 'Thống kê khiếu nại CSKH và ticket đã xử lý xong',
+  description: 'Báo cáo chi tiết các ticket hoặc khiếu nại khách hàng đã giải quyết thành công',
+  type: 'PRISMA_QUERY',
+  examples: [
+    'đã xử lí được mấy cái rồi',
+    'đã xử lý được mấy cái rồi',
+    'đã xử lý được bao nhiêu khiếu nại',
+    'bao nhiêu ticket đã giải quyết xong',
+    'số khiếu nại đã hoàn tất',
+    'các ticket đã xử lý xong',
+    'khiếu nại đã đóng'
+  ],
+  patterns: [
+    /(đã xử l[íy]|đã giải quyết|hoàn tất).*(ticket|khiếu nại|phàn nàn|cái|trường hợp)/i,
+    /(đã xử l[íy] được mấy cái|xử l[íy] được bao nhiêu cái)/i,
+    /(ticket|khiếu nại).*(đã xong|đã đóng|đã giải quyết|thành công)/i
+  ],
+  allowedRoles: ['ADMIN_CEO', 'ADMIN', 'CSKH'],
+  handler: async (prisma) => {
+    return await prisma.complaint.findMany({
+      where: { status: { in: ['RESOLVED', 'CLOSED'] } },
+      select: {
+        id: true,
+        orderId: true,
+        customerName: true,
+        subject: true,
+        status: true,
+        resolutionNote: true,
+        updatedAt: true
+      },
+      orderBy: { updatedAt: 'desc' },
+      take: 5
+    });
+  },
+  template: (data) => {
+    if (!data || data.length === 0) {
+      return 'ℹ️ **Hiện chưa có khiếu nại nào được đóng trạng thái HOÀN TẤT (RESOLVED / CLOSED).**';
+    }
+    let res = `✅ **TIẾN ĐỘ XỬ LÝ KHIẾU NẠI & TICKET CSKH:**\n\n` +
+              `- Số ca đã xử lý hoàn tất: **${data.length} trường hợp**\n\n`;
+    data.forEach((c, idx) => {
+      res += `${idx + 1}. **${c.customerName || 'Khách hàng'}** (Đơn #${c.orderId || 'N/A'})\n` +
+             `   Vấn đề: *${c.subject || 'Khiếu nại sản phẩm'}*\n` +
+             `   Kết quả xử lý: **${c.resolutionNote || 'Đã hướng dẫn và hỗ trợ khách thành công.'}**\n`;
+    });
+    return res.trim();
+  }
+});
+
 module.exports = adminCeoTrainer;
 

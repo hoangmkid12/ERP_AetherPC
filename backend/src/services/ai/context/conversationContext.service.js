@@ -154,6 +154,11 @@ class ConversationContextService {
       return 'RMA';
     }
 
+    // 5. Tỉnh lược về khiếu nại / Ticket CSKH
+    if (/(đã xử l[íy].*(mấy|bao nhiêu)|đã giải quyết.*(mấy|bao nhiêu)|đã xong chưa|xử l[íy] được mấy cái|còn bao nhiêu cái chưa xong)/i.test(text)) {
+      return 'COMPLAINT_TICKET';
+    }
+
     return null;
   }
 

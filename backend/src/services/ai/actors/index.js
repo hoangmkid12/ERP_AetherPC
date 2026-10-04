@@ -222,6 +222,16 @@ const executeActorIntent = async (userPrompt, role, prisma, user = {}, params = 
         matchedSkill = deliveryTrainer.getSkill('DELIVERY_TRACK_ORDER') || deliveryTrainer.getSkill('ORDER_DETAIL_LOOKUP');
         matchScore = 0.90;
         matchSource = 'ELLIPTICAL_CONTEXT';
+      } else if (ellipticalType === 'COMPLAINT_TICKET') {
+        executingTrainer = adminCeoTrainer;
+        matchedSkill = adminCeoTrainer.getSkill('RESOLVED_COMPLAINTS_TICKETS');
+        matchScore = 0.95;
+        matchSource = 'ELLIPTICAL_CONTEXT';
+      } else if (ellipticalType === 'RMA') {
+        executingTrainer = adminCeoTrainer;
+        matchedSkill = adminCeoTrainer.getSkill('RETURN_REQUESTS_SUMMARY');
+        matchScore = 0.95;
+        matchSource = 'ELLIPTICAL_CONTEXT';
       }
     }
   }
