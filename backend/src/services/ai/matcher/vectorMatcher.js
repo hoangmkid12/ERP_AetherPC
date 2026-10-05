@@ -129,7 +129,18 @@ class VectorMatcher {
       }
     }
 
-    // Huấn luyện mô hình Vector TF-IDF
+    // Nạp dữ liệu huấn luyện mở rộng tự động (Synthetic Data Augmentation cho 13 danh mục & thương hiệu)
+    try {
+      const { generateSyntheticDataset } = require('./syntheticDataGenerator');
+      const syntheticDocs = generateSyntheticDataset();
+      for (const sDoc of syntheticDocs) {
+        docs.push(sDoc);
+      }
+    } catch (synthErr) {
+      console.warn('[VectorMatcher] Không thể nạp dữ liệu Synthetic:', synthErr.message);
+    }
+
+    // Huấn luyện mô hình Vector Hybrid (BM25 + Cosine + Levenshtein)
     this.engine.fit(docs);
     this.isIndexed = true;
     return docs.length;
