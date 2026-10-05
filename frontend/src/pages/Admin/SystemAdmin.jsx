@@ -1028,10 +1028,11 @@ export default function SystemAdmin() {
       setTrainingForm(p => ({
         ...p,
         sql: cfg.sql,
-        targetRole: cfg.role || p.targetRole
+        // GIỮ NGUYÊN VAI TRÒ NẾU ADMIN ĐÃ CHỌN RIÊNG (Ví dụ: Đang chọn DELIVERY thì KHÔNG được tự ý nhảy sang role khác)
+        targetRole: (p.targetRole && p.targetRole !== 'ALL') ? p.targetRole : (cfg.role || 'ALL')
       }));
       handleExplainSql(cfg.sql, trainingForm.question);
-      handleFetchSmartTemplate(cfg.sql, trainingForm.question, cfg.role || trainingForm.targetRole);
+      handleFetchSmartTemplate(cfg.sql, trainingForm.question, (trainingForm.targetRole && trainingForm.targetRole !== 'ALL') ? trainingForm.targetRole : (cfg.role || 'ALL'));
     }
   };
 
@@ -4043,16 +4044,24 @@ export default function SystemAdmin() {
                           {/* TẦNG 3: ĐIỀU KIỆN LỌC NGHIỆP VỤ & THỜI GIAN */}
                           <div>
                             <label style={{ fontSize: '0.7rem', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '3px' }}>
-                              3️⃣ Điều Kiện Lọc Nghiệp Vụ
+                              3️⃣ Điều Kiện Lọc Nghiệp Vụ {trainingForm.targetRole !== 'ALL' && <span style={{ color: '#2563eb', fontSize: '0.68rem' }}>(Theo vai trò {trainingForm.targetRole})</span>}
                             </label>
                             <select
                               value={tier3Filter}
                               onChange={e => applyTierSelection(tier1Entity, tier2Action, e.target.value)}
                               style={{ ...inputStyle, fontSize: '0.73rem', padding: '0.35rem 0.5rem', borderColor: '#2563eb', fontWeight: 600, color: '#1e40af' }}
                             >
-                              {Object.entries(TIER_CONFIG[tier1Entity]?.actions[tier2Action]?.filters || {}).map(([k, v]) => (
-                                <option key={k} value={k}>{v.label}</option>
-                              ))}
+                              {(() => {
+                                const allFilters = Object.entries(TIER_CONFIG[tier1Entity]?.actions[tier2Action]?.filters || {});
+                                const filtered = trainingForm.targetRole && trainingForm.targetRole !== 'ALL'
+                                  ? allFilters.filter(([_, v]) => v.role === trainingForm.targetRole || v.role === 'ALL')
+                                  : allFilters;
+                                
+                                const listToRender = filtered.length > 0 ? filtered : allFilters;
+                                return listToRender.map(([k, v]) => (
+                                  <option key={k} value={k}>{v.label}</option>
+                                ));
+                              })()}
                             </select>
                           </div>
                         </div>
