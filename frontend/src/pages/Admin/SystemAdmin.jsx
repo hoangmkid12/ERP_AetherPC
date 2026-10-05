@@ -1060,11 +1060,18 @@ export default function SystemAdmin() {
             displayContent = `💰 [KẾT QUẢ TÍNH TOÁN]: ${val.toLocaleString('vi-VN')} VNĐ (${entries[0][0]})\n\n` + displayContent;
           }
         }
+        const rlvrBadge = res.data.rewardScore !== undefined
+          ? `🏆 [RLVR VERIFIED REWARD]: ${res.data.rewardScore}/100 (${res.data.grade || 'PASS'})\n` +
+            (res.data.feedback?.length ? res.data.feedback.map(f => `  • ${f}`).join('\n') + '\n\n' : '')
+          : '';
         setTestSqlResult({
           success: true,
-          preview: `✅ Truy vấn thành công (${res.data.rowCount} bản ghi trả về):\n` + displayContent
+          rewardScore: res.data.rewardScore,
+          grade: res.data.grade,
+          isDeployable: res.data.isDeployable,
+          preview: rlvrBadge + `✅ Truy vấn thành công (${res.data.rowCount} bản ghi trả về):\n` + displayContent
         });
-        notify(`Kiểm thử SQL thành công (${res.data.rowCount} bản ghi)`, 'success');
+        notify(`Kiểm thử SQL thành công (${res.data.rowCount} bản ghi) - Reward: ${res.data.rewardScore || 100}/100`, 'success');
       }
     } catch (err) {
       setTestSqlResult({
@@ -1108,11 +1115,18 @@ export default function SystemAdmin() {
                   displayContent = `💰 [KẾT QUẢ TÍNH TOÁN]: ${val.toLocaleString('vi-VN')} VNĐ (${entries[0][0]})\n\n` + displayContent;
                 }
               }
+              const rlvrBadge = testRes.data.rewardScore !== undefined
+                ? `🏆 [RLVR VERIFIED REWARD]: ${testRes.data.rewardScore}/100 (${testRes.data.grade || 'PASS'})\n` +
+                  (testRes.data.feedback?.length ? testRes.data.feedback.map(f => `  • ${f}`).join('\n') + '\n\n' : '')
+                : '';
               setTestSqlResult({
                 success: true,
-                preview: `✅ AI đã sửa và kiểm thử thành công (${testRes.data.rowCount} bản ghi):\n` + displayContent
+                rewardScore: testRes.data.rewardScore,
+                grade: testRes.data.grade,
+                isDeployable: testRes.data.isDeployable,
+                preview: rlvrBadge + `✅ AI đã sửa và kiểm thử thành công (${testRes.data.rowCount} bản ghi):\n` + displayContent
               });
-              notify('Kiểm thử SQL thành công!', 'success');
+              notify(`Kiểm thử SQL thành công! Reward: ${testRes.data.rewardScore || 100}/100`, 'success');
             }
           } catch (e2) {
             setTestSqlResult({ success: false, error: e2?.message || 'Lỗi khi kiểm thử lại.' });

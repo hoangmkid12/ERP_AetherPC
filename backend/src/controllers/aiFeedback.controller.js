@@ -299,7 +299,7 @@ const deleteDynamicSkill = async (req, res, next) => {
   }
 };
 
-// Kiểm thử câu lệnh SQL trực tiếp và trả về kết quả thời gian thực
+// Kiểm thử câu lệnh SQL trực tiếp và thẩm định phần thưởng kiểm chứng RLVR
 const executeTestSql = async (req, res, next) => {
   try {
     const { sql, question } = req.body || {};
@@ -307,27 +307,29 @@ const executeTestSql = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'Vui lòng cung cấp câu lệnh SQL để kiểm thử.' });
     }
 
-    const { isSafeSqlQuery, sanitizeAndHealSql } = require('../services/ai/universalData.service');
-    const safeSql = sanitizeAndHealSql(sql.trim());
-    if (!isSafeSqlQuery(safeSql)) {
-      return res.status(400).json({ success: false, message: 'Câu lệnh SQL không an toàn (chỉ cho phép SELECT đọc dữ liệu).' });
+    const { evaluateSqlReward } = require('../services/ai/rlvrEvaluator.service');
+    const evaluation = await evaluateSqlReward(sql.trim(), question || '', req.user);
+
+    if (evaluation.grade === 'REJECTED') {
+      return res.status(400).json({
+        success: false,
+        message: evaluation.feedback.join(' '),
+        evaluation
+      });
     }
-
-    const currentUserId = Number(req.user?.id) || 0;
-    const finalSql = safeSql.replace(/:userId/g, currentUserId.toString());
-
-    // Thực thi trực tiếp trên PostgreSQL
-    const rawData = await prisma.$queryRawUnsafe(finalSql);
-    const cleanData = JSON.parse(JSON.stringify(rawData, (key, value) =>
-      typeof value === 'bigint' ? value.toString() : value
-    ));
 
     res.json({
       success: true,
       data: {
-        rowCount: cleanData.length,
-        rows: cleanData.slice(0, 10),
-        previewSql: finalSql
+        rowCount: evaluation.rowCount,
+        rows: evaluation.previewRows,
+        previewSql: evaluation.healedSql,
+        rewardScore: evaluation.rewardScore,
+        grade: evaluation.grade,
+        isDeployable: evaluation.isDeployable,
+        breakdown: evaluation.breakdown,
+        executionTimeMs: evaluation.executionTimeMs,
+        feedback: evaluation.feedback
       }
     });
   } catch (err) {
@@ -335,7 +337,7 @@ const executeTestSql = async (req, res, next) => {
   }
 };
 
-// Gợi ý câu lệnh SQL thông minh cho câu hỏi dựa trên Gemini NL2SQL & Semantic Rules
+// Gợi ý câu lệnh SQL thông minh kèm thẩm định phần thưởng kiểm chứng RLVR
 const generateSuggestedSql = async (req, res, next) => {
   try {
     const { question } = req.body || {};
@@ -361,9 +363,32 @@ const generateSuggestedSql = async (req, res, next) => {
       }
     }
 
+    // Thẩm định bằng RLVR Evaluator Sandbox
+    const { evaluateSqlReward } = require('../services/ai/rlvrEvaluator.service');
+    const evaluation = await evaluateSqlReward(sql, question, req.user);
+
     res.json({
       success: true,
-      sql
+      sql: evaluation.healedSql || sql,
+      rewardScore: evaluation.rewardScore,
+      grade: evaluation.grade,
+      isDeployable: evaluation.isDeployable,
+      feedback: evaluation.feedback
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// API đánh giá điểm phần thưởng RLVR độc lập cho bất kỳ câu SQL
+const evaluateSqlRewardApi = async (req, res, next) => {
+  try {
+    const { sql, question } = req.body || {};
+    const { evaluateSqlReward } = require('../services/ai/rlvrEvaluator.service');
+    const evaluation = await evaluateSqlReward(sql, question, req.user);
+    res.json({
+      success: true,
+      data: evaluation
     });
   } catch (err) {
     next(err);
@@ -595,5 +620,6 @@ module.exports = {
   generateSuggestedSql,
   autoFixSql,
   explainSql,
-  generateSmartTemplate
+  generateSmartTemplate,
+  evaluateSqlRewardApi
 };

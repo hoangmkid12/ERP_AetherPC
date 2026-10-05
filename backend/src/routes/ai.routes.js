@@ -60,8 +60,12 @@ router.post('/suggest-sql', authMiddleware(['ADMIN', 'CEO']), generateSuggestedS
 
 // @route   POST /api/v1/ai/fix-sql
 // AI tự động sửa lỗi SQL dựa trên schema và thông báo lỗi database
-const { autoFixSql, explainSql, generateSmartTemplate } = require('../controllers/aiFeedback.controller');
+const { autoFixSql, explainSql, generateSmartTemplate, evaluateSqlRewardApi } = require('../controllers/aiFeedback.controller');
 router.post('/fix-sql', authMiddleware(['ADMIN', 'CEO']), autoFixSql);
+
+// @route   POST /api/v1/ai/evaluate-sql-reward
+// Thẩm định phần thưởng kiểm chứng RLVR (Verifiable Reward Evaluation) cho câu lệnh SQL
+router.post('/evaluate-sql-reward', authMiddleware(['ADMIN', 'CEO']), evaluateSqlRewardApi);
 
 // @route   POST /api/v1/ai/explain-sql
 // Dịch câu lệnh SQL sang Tiếng Việt nghiệp vụ dễ hiểu
