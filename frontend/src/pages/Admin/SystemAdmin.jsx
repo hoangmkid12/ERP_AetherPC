@@ -603,13 +603,20 @@ export default function SystemAdmin() {
   const [testingSql, setTestingSql] = useState(false);
   const [fixingSql, setFixingSql] = useState(false);
   const [testSqlResult, setTestSqlResult] = useState(null);
+  const [sqlViewMode, setSqlViewMode] = useState('VISUAL'); // 'VISUAL' | 'RAW_SQL'
+  const [sqlExplanation, setSqlExplanation] = useState('');
+  const [explainingSql, setExplainingSql] = useState(false);
 
   const [trainingForm, setTrainingForm] = useState({
     feedbackId: null,
+    targetRole: 'ALL', // 'ALL' | 'DELIVERY' | 'SALES' | 'WAREHOUSE' | 'ACCOUNTANT' | 'ADMIN'
     question: '',
     // Dành cho SQL Skill
     sql: '',
     description: '',
+    responseMode: 'AUTO', // 'AUTO' | 'CUSTOM'
+    responseTemplate: '',
+    followUps: [],
     // Dành cho Knowledge SOP
     title: '',
     category: 'WARRANTY_RMA',
@@ -699,28 +706,81 @@ export default function SystemAdmin() {
     const questionText = isFeedback ? (item.correction?.trim() || item.prompt) : item.userPrompt;
     const initialSql = getSmartInitialSql(questionText) || getSmartInitialSql(item.prompt);
     
+    const detectedRole = isFeedback && item.userRole ? item.userRole : 'ALL';
+
     // Khởi tạo form với template ban đầu chuẩn xác tức thì
     setTrainingForm({
       feedbackId: isFeedback ? item.id : null,
+      targetRole: detectedRole,
       question: questionText || '',
       sql: initialSql,
       description: isFeedback && item.correction ? `Huấn luyện từ phản hồi góp ý: "${item.correction}" (câu hỏi gốc: "${item.prompt}")` : `Kỹ năng huấn luyện từ câu hỏi: ${questionText?.slice(0, 100)}`,
+      responseMode: 'AUTO',
+      responseTemplate: '',
+      followUps: [],
       title: questionText ? `Quy trình & Hướng dẫn: ${questionText.slice(0, 50)}` : '',
       category: 'WARRANTY_RMA',
       content: item.correction || item.aiResponse || ''
     });
     setTrainingMode('SQL');
+    setSqlViewMode('VISUAL');
+    setSqlExplanation('');
     setTestSqlResult(null);
     setShowTrainingModal(true);
+
+    // Tự động phân tích câu lệnh SQL ra tiếng Việt và sinh mẫu câu trả lời
+    handleExplainSql(initialSql, questionText);
+    handleFetchSmartTemplate(initialSql, questionText, detectedRole);
 
     // Tự động gọi backend để phân tích sâu hơn hoặc bổ sung Few-Shot động
     try {
       const suggestRes = await api.post('/ai/suggest-sql', { question: questionText });
       if (suggestRes?.sql) {
         setTrainingForm(prev => ({ ...prev, sql: suggestRes.sql }));
+        handleExplainSql(suggestRes.sql, questionText);
+        handleFetchSmartTemplate(suggestRes.sql, questionText, detectedRole);
       }
     } catch (e) {
       // Đã có initialSql thông minh, giữ nguyên không bị gián đoạn
+    }
+  };
+
+  const handleExplainSql = async (sqlToExplain, qText) => {
+    const s = sqlToExplain || trainingForm.sql;
+    if (!s || !s.trim()) return;
+    setExplainingSql(true);
+    try {
+      const res = await api.post('/ai/explain-sql', {
+        sql: s,
+        question: qText || trainingForm.question,
+        role: trainingForm.targetRole
+      });
+      if (res?.explanation) {
+        setSqlExplanation(res.explanation);
+      }
+    } catch (e) {
+      // Bỏ qua lỗi âm thầm nếu offline
+    } finally {
+      setExplainingSql(false);
+    }
+  };
+
+  const handleFetchSmartTemplate = async (sqlToUse, qText, roleToUse) => {
+    try {
+      const res = await api.post('/ai/generate-template', {
+        sql: sqlToUse || trainingForm.sql,
+        question: qText || trainingForm.question,
+        role: roleToUse || trainingForm.targetRole
+      });
+      if (res?.template) {
+        setTrainingForm(p => ({
+          ...p,
+          responseTemplate: p.responseTemplate || res.template,
+          followUps: p.followUps?.length ? p.followUps : (res.followUps || [])
+        }));
+      }
+    } catch (e) {
+      // Fallback giữ nguyên
     }
   };
 
@@ -832,6 +892,9 @@ export default function SystemAdmin() {
           question: trainingForm.question,
           sql: trainingForm.sql,
           description: trainingForm.description,
+          targetRole: trainingForm.targetRole,
+          responseTemplate: trainingForm.responseMode === 'CUSTOM' ? trainingForm.responseTemplate : null,
+          followUps: trainingForm.followUps,
           feedbackId: trainingForm.feedbackId
         });
         notify('Đã huấn luyện kỹ năng SQL cho AI Copilot thành công!', 'success');
@@ -3571,57 +3634,192 @@ export default function SystemAdmin() {
                 </div>
               </div>
 
+              {/* Chọn Vai Trò Áp Dụng (Target Actor) */}
+              <div>
+                <label style={labelStyle}>Vai Trò Nhân Viên Áp Dụng (Target Actor)</label>
+                <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginTop: '0.25rem' }}>
+                  {[
+                    { id: 'ALL', label: '🌐 Tất Cả Vai Trò' },
+                    { id: 'DELIVERY', label: '🛵 Giao Hàng (Shipper)' },
+                    { id: 'SALES', label: '💼 Kinh Doanh (Sales)' },
+                    { id: 'WAREHOUSE', label: '📦 Thủ Kho / Kỹ Thuật' },
+                    { id: 'ACCOUNTANT', label: '💰 Kế Toán / Thu Ngân' },
+                    { id: 'ADMIN', label: '👔 Quản Trị / CEO' }
+                  ].map(r => (
+                    <button
+                      key={r.id}
+                      type="button"
+                      onClick={() => setTrainingForm(p => ({ ...p, targetRole: r.id }))}
+                      style={{
+                        padding: '0.35rem 0.65rem',
+                        borderRadius: '20px',
+                        border: trainingForm.targetRole === r.id ? '2px solid #2563eb' : '1px solid #cbd5e1',
+                        backgroundColor: trainingForm.targetRole === r.id ? '#dbeafe' : '#ffffff',
+                        color: trainingForm.targetRole === r.id ? '#1e40af' : '#475569',
+                        fontWeight: trainingForm.targetRole === r.id ? 700 : 500,
+                        fontSize: '0.75rem',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {r.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               {/* Câu hỏi mẫu */}
               <div>
                 <label style={labelStyle}>Câu Hỏi Mẫu Của Người Dùng <span style={{ color: '#ef4444' }}>*</span></label>
                 <input
                   type="text"
                   value={trainingForm.question}
-                  onChange={e => setTrainingForm(p => ({ ...p, question: e.target.value }))}
+                  onChange={e => {
+                    const q = e.target.value;
+                    setTrainingForm(p => ({ ...p, question: q }));
+                  }}
                   style={inputStyle}
-                  placeholder="Ví dụ: có bao nhiêu đơn đang chờ lắp ráp?"
+                  placeholder="Ví dụ: các đơn giao hàng đang tồn của tôi..."
                 />
               </div>
 
               {/* Nhánh 1: SQL Template */}
               {trainingMode === 'SQL' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                  <div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem' }}>
-                      <label style={labelStyle}>Câu Lệnh SQL Tương Ứng (PostgreSQL) <span style={{ color: '#ef4444' }}>*</span></label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                  
+                  {/* BỘ CHUYỂN ĐỔI CHẾ ĐỘ: TRỰC QUAN (NO-CODE) vs CÂU LỆNH SQL THÔ */}
+                  <div style={{ border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.85rem', backgroundColor: '#f8fafc' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#0f172a' }}>Cấu Hình Dữ Liệu Truy Vấn</span>
+                        <div style={{ display: 'flex', border: '1px solid #cbd5e1', borderRadius: '6px', overflow: 'hidden' }}>
+                          <button
+                            type="button"
+                            onClick={() => setSqlViewMode('VISUAL')}
+                            style={{
+                              border: 'none',
+                              padding: '0.2rem 0.55rem',
+                              fontSize: '0.72rem',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              backgroundColor: sqlViewMode === 'VISUAL' ? '#2563eb' : '#ffffff',
+                              color: sqlViewMode === 'VISUAL' ? '#ffffff' : '#64748b'
+                            }}
+                          >
+                            Trực Quan (Dễ Dùng)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setSqlViewMode('RAW_SQL')}
+                            style={{
+                              border: 'none',
+                              padding: '0.2rem 0.55rem',
+                              fontSize: '0.72rem',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              backgroundColor: sqlViewMode === 'RAW_SQL' ? '#2563eb' : '#ffffff',
+                              color: sqlViewMode === 'RAW_SQL' ? '#ffffff' : '#64748b'
+                            }}
+                          >
+                            Code SQL (Nâng Cao)
+                          </button>
+                        </div>
+                      </div>
+
                       <button
                         type="button"
                         onClick={handleTestSql}
                         disabled={testingSql}
-                        style={{ backgroundColor: '#10b981', color: '#ffffff', border: 'none', borderRadius: '4px', padding: '0.25rem 0.65rem', fontSize: '0.72rem', fontWeight: 700, cursor: testingSql ? 'not-allowed' : 'pointer' }}
+                        style={{ backgroundColor: '#10b981', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.3rem 0.75rem', fontSize: '0.75rem', fontWeight: 700, cursor: testingSql ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
                       >
-                        {testingSql ? 'Đang chạy test...' : '▶ Chạy Thử SQL'}
+                        {testingSql ? 'Đang chạy test...' : '▶ Chạy Thử Lấy Dữ Liệu'}
                       </button>
                     </div>
-                    <textarea
-                      rows={4}
-                      value={trainingForm.sql}
-                      onChange={e => setTrainingForm(p => ({ ...p, sql: e.target.value }))}
-                      style={{ ...inputStyle, fontFamily: 'monospace', fontSize: '0.8rem', backgroundColor: '#0f172a', color: '#38bdf8' }}
-                      placeholder="SELECT order_id, total_amount, status FROM orders WHERE status = 'CONFIRMED' LIMIT 10;"
-                    />
-                    <span style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '2px', display: 'block' }}>
-                      * Chỉ hỗ trợ câu lệnh SELECT an toàn. Kết quả sẽ được AI đọc và trả về con số thực tế tại thời điểm hỏi.
-                    </span>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginTop: '0.4rem', fontSize: '0.7rem', color: '#64748b' }}>
-                      <span style={{ fontWeight: 600, color: '#475569' }}>Cột chuẩn PostgreSQL:</span>
-                      <span style={{ backgroundColor: '#f1f5f9', border: '1px solid #e2e8f0', padding: '0.1rem 0.4rem', borderRadius: '4px', cursor: 'pointer' }} title="Bấm để chèn" onClick={() => setTrainingForm(p => ({ ...p, sql: p.sql + ' price' }))}>products.price</span>
-                      <span style={{ backgroundColor: '#f1f5f9', border: '1px solid #e2e8f0', padding: '0.1rem 0.4rem', borderRadius: '4px', cursor: 'pointer' }} title="Bấm để chèn" onClick={() => setTrainingForm(p => ({ ...p, sql: p.sql + ' stock_quantity' }))}>products.stock_quantity</span>
-                      <span style={{ backgroundColor: '#f1f5f9', border: '1px solid #e2e8f0', padding: '0.1rem 0.4rem', borderRadius: '4px', cursor: 'pointer' }} title="Bấm để chèn" onClick={() => setTrainingForm(p => ({ ...p, sql: p.sql + ' total_amount' }))}>orders.total_amount</span>
-                      <span style={{ backgroundColor: '#f1f5f9', border: '1px solid #e2e8f0', padding: '0.1rem 0.4rem', borderRadius: '4px', cursor: 'pointer' }} title="Bấm để chèn" onClick={() => setTrainingForm(p => ({ ...p, sql: p.sql + ' status' }))}>orders.status</span>
-                      <span style={{ backgroundColor: '#f1f5f9', border: '1px solid #e2e8f0', padding: '0.1rem 0.4rem', borderRadius: '4px', cursor: 'pointer' }} title="Bấm để chèn" onClick={() => setTrainingForm(p => ({ ...p, sql: p.sql + ' created_at' }))}>orders.created_at</span>
+
+                    {/* Chế độ Trực Quan: Bấm Chọn Nghiệp Vụ Nhanh (No-Code Presets) */}
+                    {sqlViewMode === 'VISUAL' && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '0.6rem' }}>
+                        <span style={{ fontSize: '0.72rem', color: '#475569', fontWeight: 600 }}>
+                          💡 Chọn nhanh mẫu nghiệp vụ thường gặp (AI sẽ tự sinh câu lệnh chuẩn cho bạn):
+                        </span>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+                          {[
+                            { label: '📦 Đơn tồn chưa giao xong', sql: `SELECT order_id, total_amount, payment_status, status, shipping_address FROM orders WHERE assigned_shipper_id = :userId AND status IN ('SHIPPED', 'OUT_FOR_DELIVERY', 'SHIPPING_FAILED') AND created_at < date_trunc('day', now() AT TIME ZONE 'Asia/Ho_Chi_Minh') ORDER BY created_at ASC;` },
+                            { label: '💵 Đơn cần thu tiền mặt COD', sql: `SELECT order_id, shipping_address, total_amount, payment_status FROM orders WHERE assigned_shipper_id = :userId AND payment_method = 'COD' AND payment_status != 'PAID' ORDER BY created_at ASC;` },
+                            { label: '📞 Đơn khách không nghe máy (Chờ gọi lại)', sql: `SELECT order_id, shipping_address, total_amount, fail_reason FROM orders WHERE assigned_shipper_id = :userId AND status = 'SHIPPING_FAILED' AND fail_reason ILIKE '%không liên lạc%' ORDER BY created_at DESC;` },
+                            { label: '💰 Doanh thu hôm nay (Toàn hệ thống)', sql: `SELECT SUM(total_amount) AS doanh_thu_hom_nay, COUNT(*) AS so_don_giao_xong FROM orders WHERE status IN ('DELIVERED', 'COMPLETED') AND created_at >= date_trunc('day', now() AT TIME ZONE 'Asia/Ho_Chi_Minh');` },
+                            { label: '📉 Linh kiện sắp hết hàng (< 5 chiếc)', sql: `SELECT product_id, name, stock_quantity, price FROM products WHERE stock_quantity <= 5 AND status = 'ACTIVE' ORDER BY stock_quantity ASC LIMIT 10;` },
+                            { label: '⚙️ Máy PC đang chờ kỹ thuật ráp', sql: `SELECT order_id, total_amount, status, created_at FROM orders WHERE status = 'PROCESSING' ORDER BY created_at ASC LIMIT 10;` }
+                          ].map((preset, pIdx) => (
+                            <button
+                              key={pIdx}
+                              type="button"
+                              onClick={() => {
+                                setTrainingForm(p => ({ ...p, sql: preset.sql }));
+                                handleExplainSql(preset.sql, trainingForm.question);
+                                handleFetchSmartTemplate(preset.sql, trainingForm.question, trainingForm.targetRole);
+                              }}
+                              style={{
+                                border: '1px solid #cbd5e1',
+                                backgroundColor: '#ffffff',
+                                borderRadius: '6px',
+                                padding: '0.25rem 0.55rem',
+                                fontSize: '0.72rem',
+                                color: '#1e293b',
+                                cursor: 'pointer',
+                                textAlign: 'left'
+                              }}
+                            >
+                              {preset.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Hộp Code SQL */}
+                    <div>
+                      <textarea
+                        rows={sqlViewMode === 'VISUAL' ? 2 : 5}
+                        value={trainingForm.sql}
+                        onChange={e => {
+                          const s = e.target.value;
+                          setTrainingForm(p => ({ ...p, sql: s }));
+                        }}
+                        style={{ ...inputStyle, fontFamily: 'monospace', fontSize: '0.8rem', backgroundColor: '#0f172a', color: '#38bdf8' }}
+                        placeholder="SELECT order_id, total_amount, status FROM orders WHERE status = 'CONFIRMED' LIMIT 10;"
+                      />
+                    </div>
+
+                    {/* HỘP DỊCH & GIẢI THÍCH Ý NGHĨA CÂU LỆNH BẰNG TIẾNG VIỆT */}
+                    <div style={{ marginTop: '0.5rem', padding: '0.65rem 0.85rem', borderRadius: '6px', backgroundColor: '#eff6ff', border: '1px solid #bfdbfe' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.2rem' }}>
+                        <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#1e40af' }}>
+                          📘 Ý Nghĩa Nghiệp Vụ (AI Dịch Ra Tiếng Việt Dễ Hiểu):
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleExplainSql(trainingForm.sql, trainingForm.question)}
+                          disabled={explainingSql}
+                          style={{ background: 'none', border: 'none', color: '#2563eb', fontSize: '0.7rem', cursor: 'pointer', textDecoration: 'underline' }}
+                        >
+                          {explainingSql ? 'Đang phân tích...' : 'Làm mới giải thích'}
+                        </button>
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: '#1e293b', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
+                        {sqlExplanation || (
+                          <span style={{ color: '#64748b' }}>
+                            Hệ thống sẽ lọc dữ liệu an toàn dựa trên câu lệnh SQL trên, chỉ đọc thông tin và không gây thay đổi cơ sở dữ liệu.
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
 
+                  {/* KẾT QUẢ KIỂM THỬ LIVE TỪ DATABASE */}
                   {testSqlResult && (
                     <div style={{ padding: '0.75rem', borderRadius: '6px', backgroundColor: testSqlResult.success ? '#f0fdf4' : '#fef2f2', border: `1px solid ${testSqlResult.success ? '#bbf7d0' : '#fecaca'}`, fontSize: '0.75rem' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: 700, color: testSqlResult.success ? '#16a34a' : '#dc2626' }}>
-                        <span>{testSqlResult.success ? '✅ Kết quả thực thi từ Database:' : '❌ Lỗi kiểm thử SQL:'}</span>
+                        <span>{testSqlResult.success ? '✅ Kết quả thực thi thành công từ Database:' : '❌ Lỗi kiểm thử SQL:'}</span>
                         {!testSqlResult.success && (
                           <button
                             type="button"
@@ -3645,11 +3843,82 @@ export default function SystemAdmin() {
                           </button>
                         )}
                       </div>
-                      <div style={{ marginTop: '0.35rem', whiteSpace: 'pre-wrap', color: '#0f172a', fontFamily: testSqlResult.success ? 'monospace' : 'inherit' }}>
+                      <div style={{ marginTop: '0.35rem', whiteSpace: 'pre-wrap', color: '#0f172a', fontFamily: testSqlResult.success ? 'monospace' : 'inherit', maxHeight: '180px', overflowY: 'auto' }}>
                         {testSqlResult.success ? testSqlResult.preview : testSqlResult.error}
                       </div>
                     </div>
                   )}
+
+                  {/* CẤU HÌNH CÂU TRẢ LỜI CHO COPILOT KHI USER HỎI LẠI (RESPONSE PRESENTATION) */}
+                  <div style={{ border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.85rem', backgroundColor: '#ffffff' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                      <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#0f172a' }}>
+                        💬 Cách AetherCopilot Trả Lời Nhân Viên (Response Presentation)
+                      </span>
+                      <div style={{ display: 'flex', gap: '0.6rem', fontSize: '0.75rem' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', cursor: 'pointer' }}>
+                          <input
+                            type="radio"
+                            name="responseMode"
+                            checked={trainingForm.responseMode === 'AUTO'}
+                            onChange={() => setTrainingForm(p => ({ ...p, responseMode: 'AUTO' }))}
+                          />
+                          <span>Tự Động Thông Minh</span>
+                        </label>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', cursor: 'pointer' }}>
+                          <input
+                            type="radio"
+                            name="responseMode"
+                            checked={trainingForm.responseMode === 'CUSTOM'}
+                            onChange={() => setTrainingForm(p => ({ ...p, responseMode: 'CUSTOM' }))}
+                          />
+                          <span>Tùy Chỉnh Lời Thoại</span>
+                        </label>
+                      </div>
+                    </div>
+
+                    {trainingForm.responseMode === 'CUSTOM' ? (
+                      <div>
+                        <textarea
+                          rows={3}
+                          value={trainingForm.responseTemplate}
+                          onChange={e => setTrainingForm(p => ({ ...p, responseTemplate: e.target.value }))}
+                          style={{ ...inputStyle, fontSize: '0.78rem' }}
+                          placeholder="Ví dụ: Chào bạn, hiện tại bạn đang có {so_don} đơn cần xử lý. Danh sách cụ thể:\n{danh_sach}"
+                        />
+                        <span style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '2px', display: 'block' }}>
+                          * Hỗ trợ chèn các thẻ biến: <code>{`{so_don}`}</code>, <code>{`{total_amount}`}</code>, <code>{`{danh_sach}`}</code>.
+                        </span>
+                      </div>
+                    ) : (
+                      <div style={{ padding: '0.6rem', backgroundColor: '#f1f5f9', borderRadius: '6px', fontSize: '0.74rem', color: '#475569' }}>
+                        🤖 <strong>Chế độ tự động:</strong> AI sẽ tự động phân tích dữ liệu trả về từ câu truy vấn (tiền tệ, danh sách đơn hàng, địa chỉ, khách hàng) để trình bày thành bảng / danh sách chuẩn nhận diện theo đúng phong cách của vai trò <strong>{trainingForm.targetRole}</strong>.
+                      </div>
+                    )}
+
+                    {/* Xem Trước Câu Trả Lời Thực Tế (Live Preview Box) */}
+                    <div style={{ marginTop: '0.65rem', border: '1px dashed #cbd5e1', borderRadius: '6px', padding: '0.65rem', backgroundColor: '#f8fafc' }}>
+                      <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#334155', marginBottom: '0.3rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                        <span>👁️ Xem trước giao diện nhân viên nhận được trong AetherCopilot:</span>
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: '#0f172a', whiteSpace: 'pre-wrap', lineHeight: 1.5, backgroundColor: '#ffffff', padding: '0.6rem', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+                        {trainingForm.responseMode === 'CUSTOM' && trainingForm.responseTemplate ? (
+                          trainingForm.responseTemplate
+                            .replace(/\{so_don\}|\{so_luong\}/g, '9')
+                            .replace(/\{total_amount\}/g, '29.271.000 ₫')
+                            .replace(/\{danh_sach\}/g, '1. Đơn #ORD-802950 - 3.724.800 ₫ (Đang giao)\n2. Đơn #ORD-689493 - 7.101.000 ₫ (Thu COD)')
+                        ) : (
+                          `📊 **KẾT QUẢ TRUY VẤN TỪ HỆ THỐNG:**\n\n` +
+                          `• Số lượng bản ghi: **9**\n` +
+                          `1. **Đơn #ORD-802950** - 3.724.800 ₫ (Thu COD)\n` +
+                          `   📍 địa chỉ 4, Phường 12, Quận Gò Vấp, TP.HCM\n` +
+                          `2. **Đơn #ORD-689493** - 7.101.000 ₫ (Thu COD)\n` +
+                          `   📍 địa chỉ 5, Phường 3, Quận Gò Vấp, TP.HCM\n\n` +
+                          `💡 *Dữ liệu đã sẵn sàng để nhân viên tra cứu tức thì.*`
+                        )}
+                      </div>
+                    </div>
+                  </div>
 
                   <div>
                     <label style={labelStyle}>Mô Tả / Ghi Chú Kỹ Năng</label>
@@ -3658,7 +3927,7 @@ export default function SystemAdmin() {
                       value={trainingForm.description}
                       onChange={e => setTrainingForm(p => ({ ...p, description: e.target.value }))}
                       style={inputStyle}
-                      placeholder="Ví dụ: Kỹ năng tra cứu các đơn lắp ráp"
+                      placeholder="Ví dụ: Kỹ năng tra cứu các đơn giao hàng đang tồn của shipper"
                     />
                   </div>
                 </div>

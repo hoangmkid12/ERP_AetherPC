@@ -60,8 +60,16 @@ router.post('/suggest-sql', authMiddleware(['ADMIN', 'CEO']), generateSuggestedS
 
 // @route   POST /api/v1/ai/fix-sql
 // AI tự động sửa lỗi SQL dựa trên schema và thông báo lỗi database
-const { autoFixSql } = require('../controllers/aiFeedback.controller');
+const { autoFixSql, explainSql, generateSmartTemplate } = require('../controllers/aiFeedback.controller');
 router.post('/fix-sql', authMiddleware(['ADMIN', 'CEO']), autoFixSql);
+
+// @route   POST /api/v1/ai/explain-sql
+// Dịch câu lệnh SQL sang Tiếng Việt nghiệp vụ dễ hiểu
+router.post('/explain-sql', authMiddleware(['ADMIN', 'CEO']), explainSql);
+
+// @route   POST /api/v1/ai/generate-template
+// Tự động sinh mẫu câu trả lời và gợi ý câu hỏi đào sâu
+router.post('/generate-template', authMiddleware(['ADMIN', 'CEO']), generateSmartTemplate);
 
 // @route   GET /api/v1/ai/audit-logs
 // Nhật ký kiểm toán gọi tool của AI (Chỉ Admin / CEO)

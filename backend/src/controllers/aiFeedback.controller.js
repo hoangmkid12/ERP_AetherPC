@@ -209,7 +209,7 @@ const getDynamicSkills = async (req, res, next) => {
 // Lưu kỹ năng huấn luyện SQL động mới
 const saveDynamicSkill = async (req, res, next) => {
   try {
-    const { question, sql, description, feedbackId } = req.body || {};
+    const { question, sql, description, feedbackId, responseTemplate, targetRole, followUps } = req.body || {};
     if (!question || !question.trim() || !sql || !sql.trim()) {
       return res.status(400).json({ success: false, message: 'Vui lòng cung cấp cả câu hỏi mẫu và câu lệnh SQL tương ứng.' });
     }
@@ -224,6 +224,9 @@ const saveDynamicSkill = async (req, res, next) => {
       question: question.trim(),
       sql: sql.trim(),
       description: description?.trim() || 'Kỹ năng do Admin huấn luyện trực tiếp',
+      responseTemplate: responseTemplate?.trim() || null,
+      targetRole: targetRole || 'ALL',
+      followUps: Array.isArray(followUps) ? followUps.filter(Boolean) : [],
       createdBy: req.user?.name || req.user?.fullName || req.user?.email || 'Admin',
       createdAt: new Date().toISOString()
     };
@@ -428,6 +431,152 @@ CHỈ TRẢ VỀ ĐÚNG 1 CÂU LỆNH SQL DUY NHẤT (không markdown, không gi
   }
 };
 
+// Dịch câu lệnh SQL sang tiếng Việt thuần túy cho Admin dễ hiểu (Explain SQL)
+const explainSql = async (req, res, next) => {
+  try {
+    const { sql, question, role } = req.body || {};
+    if (!sql || !sql.trim()) {
+      return res.status(400).json({ success: false, message: 'Thiếu câu lệnh SQL cần giải thích.' });
+    }
+
+    const cleanSql = sql.trim();
+    let explanation = '';
+
+    // Phân tích cú pháp dựa trên rule để có phản hồi siêu tốc (<1ms)
+    const lower = cleanSql.toLowerCase();
+    const isOrders = lower.includes('from orders');
+    const isProducts = lower.includes('from products');
+    const isCustomers = lower.includes('from customers');
+    const isSum = lower.includes('sum(');
+    const isCount = lower.includes('count(');
+    const hasLimit = lower.match(/limit\s+(\d+)/);
+    const limitNum = hasLimit ? hasLimit[1] : null;
+
+    let targetDesc = 'dữ liệu hệ thống';
+    if (isOrders) targetDesc = 'đơn hàng';
+    else if (isProducts) targetDesc = 'sản phẩm & tồn kho';
+    else if (isCustomers) targetDesc = 'khách hàng';
+
+    let calcDesc = 'Lấy danh sách chi tiết';
+    if (isSum) calcDesc = 'Tính tổng giá trị (Doanh thu / Tiền hàng)';
+    else if (isCount) calcDesc = 'Đếm tổng số lượng';
+
+    let filterDesc = [];
+    if (lower.includes(':userid') || lower.includes('assigned_shipper_id') || lower.includes('sold_by')) {
+      filterDesc.push('thuộc quyền quản lý của người dùng đang đăng nhập');
+    }
+    if (lower.includes('delivered') || lower.includes('completed')) {
+      filterDesc.push('đã hoàn tất thành công');
+    }
+    if (lower.includes('shipped') && !lower.includes('completed')) {
+      filterDesc.push('đang trong quá trình giao hàng');
+    }
+    if (lower.includes('not in') && lower.includes('completed')) {
+      filterDesc.push('còn tồn đọng (chưa hoàn thành)');
+    }
+    if (lower.includes('cod') || lower.includes('payment_method')) {
+      filterDesc.push('thanh toán tiền mặt khi nhận hàng (COD)');
+    }
+    if (lower.includes('stock_quantity') && (lower.includes('<') || lower.includes('= 0'))) {
+      filterDesc.push('sắp hết hoặc đã cạn hàng');
+    }
+
+    explanation = `📌 **Mục đích:** ${calcDesc} từ bảng **${targetDesc}**.\n` +
+      (filterDesc.length > 0 ? `🔍 **Điều kiện lọc:** Các bản ghi ${filterDesc.join(', ')}.\n` : '') +
+      (limitNum ? `🔢 **Giới hạn:** Hiển thị tối đa ${limitNum} kết quả gần nhất.` : '');
+
+    // Nếu có AI Client, bổ sung thêm lời giải thích văn phong mượt mà
+    let GoogleGenAI = null;
+    try {
+      GoogleGenAI = require('@google/genai').GoogleGenAI;
+    } catch (e) { }
+
+    if (GoogleGenAI && process.env.GEMINI_API_KEY) {
+      try {
+        const aiClient = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+        const prompt = `Bạn là trợ lý giải thích kỹ thuật trong hệ thống ERP. Hãy giải thích ngắn gọn bằng 2-3 câu Tiếng Việt dễ hiểu cho một Quản trị viên (người không biết code) hiểu câu lệnh SQL này đang lấy dữ liệu gì và phục vụ câu hỏi nào:
+Câu hỏi của người dùng: "${question || ''}"
+Câu lệnh SQL: "${cleanSql}"
+Không dùng thuật ngữ lập trình khó hiểu. Trả về văn bản thuần túy.`;
+
+        const aiGen = await aiClient.models.generateContent({
+          model: 'gemini-2.5-flash',
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          config: { temperature: 0.1, maxOutputTokens: 200 }
+        });
+        if (aiGen.text && aiGen.text.trim()) {
+          explanation = aiGen.text.trim();
+        }
+      } catch (e) {}
+    }
+
+    res.json({
+      success: true,
+      explanation
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// Gợi ý mẫu câu trả lời thông minh dựa trên kết quả SQL và câu hỏi
+const generateSmartTemplate = async (req, res, next) => {
+  try {
+    const { question, sql, role } = req.body || {};
+    const lower = (question || '').toLowerCase() + ' ' + (sql || '').toLowerCase();
+
+    let template = '';
+    let followUps = [];
+
+    if (/(doanh thu|doanh số|tổng tiền|tiền thu)/.test(lower)) {
+      template = `💰 **BÁO CÁO DOANH THU & DÒNG TIỀN:**\n` +
+        `• Tổng số tiền ghi nhận: **{total_amount}**\n` +
+        `• Số lượng giao dịch thành công: **{so_don} đơn**\n\n` +
+        `Chúc bạn hoàn thành tốt mục tiêu kinh doanh!`;
+      followUps = [
+        'So với tháng trước thì tăng hay giảm bao nhiêu %?',
+        'Những đơn trên 10 triệu mà chưa thanh toán',
+        'Top 5 sản phẩm bán chạy nhất'
+      ];
+    } else if (/(tồn kho|hết hàng|linh kiện|sản phẩm)/.test(lower)) {
+      template = `📦 **DANH SÁCH SẢN PHẨM & TỒN KHO THEO YÊU CẦU:**\n\n` +
+        `{danh_sach}\n\n` +
+        `💡 *Lưu ý: Hãy ưu tiên lập kế hoạch nhập hàng cho các mã tồn dưới định mức an toàn.*`;
+      followUps = [
+        'Có phiếu nhập hàng nào đang chờ duyệt không?',
+        'Những linh kiện nào tồn kho bằng 0?',
+        'Top sản phẩm tồn kho nhiều nhất'
+      ];
+    } else if (/(giao hàng|shipper|đơn tồn|chờ giao|giao xịt)/.test(lower)) {
+      template = `🛵 **TIẾN ĐỘ GIAO HÀNG PHỤ TRÁCH:**\n\n` +
+        `{danh_sach}\n\n` +
+        `💡 *Gợi ý: Hãy gọi điện xác nhận trước với khách hàng và kiểm tra an toàn hàng hóa nhé!*`;
+      followUps = [
+        'Đơn nào của tôi cần thu tiền cod?',
+        'Các đơn chờ gọi lại 24h',
+        'Tổng quan tiến độ giao hàng của tôi'
+      ];
+    } else {
+      template = `📊 **KẾT QUẢ TRUY VẤN TỪ HỆ THỐNG:**\n\n` +
+        `{danh_sach}\n\n` +
+        `Dữ liệu được cập nhật theo thời gian thực từ cơ sở dữ liệu.`;
+      followUps = [
+        'Báo cáo doanh thu bán hàng hôm nay',
+        'Card RTX 4070 còn hàng không?',
+        'Kiểm tra đơn hàng gần nhất'
+      ];
+    }
+
+    res.json({
+      success: true,
+      template,
+      followUps
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 module.exports = {
   submitAiFeedback,
   getPendingAiFeedback,
@@ -437,5 +586,7 @@ module.exports = {
   deleteDynamicSkill,
   executeTestSql,
   generateSuggestedSql,
-  autoFixSql
+  autoFixSql,
+  explainSql,
+  generateSmartTemplate
 };

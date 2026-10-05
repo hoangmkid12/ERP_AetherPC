@@ -385,25 +385,75 @@ const executeActorIntent = async (userPrompt, role, prisma, user = {}, params = 
           typeof value === 'bigint' ? value.toString() : value
         ));
 
-        let formattedText = `📊 **KẾT QUẢ TRUY VẤN DỮ LIỆU ĐÃ HUẤN LUYỆN (ACTIVE LEARNING)**\n\n`;
-        formattedText += `> 💡 **Kịch bản:** ${matchedSkill.title}\n\n`;
+        let formattedText = '';
 
-        if (!cleanData || cleanData.length === 0) {
-          formattedText += `Không tìm thấy bản ghi nào phù hợp trong hệ thống.`;
-        } else if (cleanData.length === 1 && Object.keys(cleanData[0]).length <= 3) {
-          const row = cleanData[0];
-          formattedText += Object.entries(row)
-            .map(([k, v]) => `• **${k}:** ${typeof v === 'number' ? v.toLocaleString('vi-VN') : v}`)
-            .join('\n');
-        } else {
-          const keys = Object.keys(cleanData[0]).slice(0, 5);
-          formattedText += `| ${keys.join(' | ')} |\n`;
-          formattedText += `| ${keys.map(() => '---').join(' | ')} |\n`;
-          for (const row of cleanData.slice(0, 8)) {
-            formattedText += `| ${keys.map(k => (row[k] !== undefined && row[k] !== null ? (typeof row[k] === 'number' ? row[k].toLocaleString('vi-VN') : String(row[k])) : '—')).join(' | ')} |\n`;
+        // 1. Nếu Admin có cấu hình mẫu phản hồi tùy chỉnh (Custom Response Template)
+        if (matchedSkill.responseTemplate && matchedSkill.responseTemplate.trim()) {
+          let customTpl = matchedSkill.responseTemplate;
+          // Điền các trường tổng hợp nếu có
+          if (cleanData.length > 0) {
+            const firstRow = cleanData[0];
+            Object.entries(firstRow).forEach(([k, v]) => {
+              const valStr = typeof v === 'number' ? v.toLocaleString('vi-VN') : String(v || '');
+              customTpl = customTpl.replace(new RegExp(`\\{${k}\\}`, 'gi'), valStr);
+            });
+            customTpl = customTpl.replace(/\{so_don\}|\{so_luong\}|\{tong_so\}/gi, cleanData.length.toString());
+          } else {
+            customTpl = customTpl.replace(/\{so_don\}|\{so_luong\}|\{tong_so\}/gi, '0');
           }
-          if (cleanData.length > 8) {
-            formattedText += `\n*(Hiển thị 8/${cleanData.length} kết quả)*`;
+
+          // Tạo khối danh sách chi tiết thay thế cho {danh_sach}
+          let listBlock = '';
+          if (cleanData.length === 0) {
+            listBlock = '*(Không có bản ghi nào phù hợp trong hệ thống)*';
+          } else {
+            cleanData.slice(0, 6).forEach((row, rIdx) => {
+              const mainTitle = row.order_id ? `Đơn #${row.order_id}` : (row.name || row.title || `Mục ${rIdx + 1}`);
+              const amountPart = row.total_amount ? ` - ${Number(row.total_amount).toLocaleString('vi-VN')} ₫` : (row.price ? ` - ${Number(row.price).toLocaleString('vi-VN')} ₫` : '');
+              const statusPart = row.status ? ` [Trạng thái: \`${row.status}\`]` : '';
+              const extraParts = [];
+              if (row.shipping_address) extraParts.push(`📍 ${row.shipping_address}`);
+              if (row.stock_quantity !== undefined) extraParts.push(`📦 Tồn kho: ${row.stock_quantity}`);
+
+              listBlock += `${rIdx + 1}. **${mainTitle}**${amountPart}${statusPart}\n`;
+              if (extraParts.length > 0) {
+                listBlock += `   ${extraParts.join(' | ')}\n`;
+              }
+            });
+            if (cleanData.length > 6) {
+              listBlock += `\n*(Và còn ${cleanData.length - 6} bản ghi khác)*`;
+            }
+          }
+
+          if (customTpl.includes('{danh_sach}')) {
+            customTpl = customTpl.replace(/\{danh_sach\}/gi, listBlock.trim());
+          } else if (cleanData.length > 1) {
+            customTpl += `\n\n${listBlock.trim()}`;
+          }
+
+          formattedText = customTpl.trim();
+        } else {
+          // 2. Chế độ Tự Động Định Dạng Thông Minh (Smart Auto-Formatter)
+          formattedText = `📊 **KẾT QUẢ TRUY VẤN DỮ LIỆU ĐÃ HUẤN LUYỆN (ACTIVE LEARNING)**\n\n`;
+          formattedText += `> 💡 **Kịch bản:** ${matchedSkill.title}\n\n`;
+
+          if (!cleanData || cleanData.length === 0) {
+            formattedText += `Không tìm thấy bản ghi nào phù hợp trong hệ thống.`;
+          } else if (cleanData.length === 1 && Object.keys(cleanData[0]).length <= 3) {
+            const row = cleanData[0];
+            formattedText += Object.entries(row)
+              .map(([k, v]) => `• **${k}:** ${typeof v === 'number' ? v.toLocaleString('vi-VN') : v}`)
+              .join('\n');
+          } else {
+            const keys = Object.keys(cleanData[0]).slice(0, 5);
+            formattedText += `| ${keys.join(' | ')} |\n`;
+            formattedText += `| ${keys.map(() => '---').join(' | ')} |\n`;
+            for (const row of cleanData.slice(0, 8)) {
+              formattedText += `| ${keys.map(k => (row[k] !== undefined && row[k] !== null ? (typeof row[k] === 'number' ? row[k].toLocaleString('vi-VN') : String(row[k])) : '—')).join(' | ')} |\n`;
+            }
+            if (cleanData.length > 8) {
+              formattedText += `\n*(Hiển thị 8/${cleanData.length} kết quả)*`;
+            }
           }
         }
 

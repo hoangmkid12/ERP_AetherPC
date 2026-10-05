@@ -86,7 +86,10 @@ class VectorMatcher {
         if (Array.isArray(dynamicSkills)) {
           for (const dSkill of dynamicSkills) {
             if (!dSkill.question || !dSkill.sql) continue;
-            const skillId = dSkill.id || `DYNAMIC_${docIdCounter}`;
+            const allowedRoles = dSkill.targetRole && dSkill.targetRole !== 'ALL'
+              ? [dSkill.targetRole, 'ADMIN', 'CEO', 'ADMIN_CEO', 'ALL']
+              : ['ADMIN', 'CEO', 'ADMIN_CEO', 'SALES', 'WAREHOUSE', 'ACCOUNTANT', 'DELIVERY', 'ALL'];
+
             const dynamicSkillObj = {
               id: skillId,
               title: dSkill.description || dSkill.question,
@@ -94,13 +97,19 @@ class VectorMatcher {
               type: 'DYNAMIC_SQL',
               sql: dSkill.sql,
               examples: [dSkill.question],
-              allowedRoles: ['ADMIN', 'CEO', 'ADMIN_CEO', 'SALES', 'WAREHOUSE', 'ACCOUNTANT', 'DELIVERY', 'ALL'],
+              responseTemplate: dSkill.responseTemplate || null,
+              targetRole: dSkill.targetRole || 'ALL',
+              followUps: Array.isArray(dSkill.followUps) ? dSkill.followUps : [],
+              allowedRoles,
               isDynamic: true
             };
 
             // Lưu vào lookup với các role để có thể truy vấn mọi nơi
             this.skillLookup.set(`ADMIN_CEO_${skillId}`, { role: 'ADMIN_CEO', skill: dynamicSkillObj });
             this.skillLookup.set(`ALL_${skillId}`, { role: 'ALL', skill: dynamicSkillObj });
+            if (dSkill.targetRole && dSkill.targetRole !== 'ALL') {
+              this.skillLookup.set(`${dSkill.targetRole}_${skillId}`, { role: dSkill.targetRole, skill: dynamicSkillObj });
+            }
 
             docs.push({
               id: `doc_${docIdCounter++}`,
