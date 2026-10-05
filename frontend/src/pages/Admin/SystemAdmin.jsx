@@ -607,6 +607,11 @@ export default function SystemAdmin() {
   const [sqlExplanation, setSqlExplanation] = useState('');
   const [explainingSql, setExplainingSql] = useState(false);
 
+  // 3 Tầng Lựa Chọn Trực Quan (3-Tier Visual Query Builder)
+  const [tier1Entity, setTier1Entity] = useState('orders'); // 'orders' | 'products' | 'revenue' | 'customers' | 'warehouse'
+  const [tier2Action, setTier2Action] = useState('list'); // 'list' | 'count' | 'sum'
+  const [tier3Filter, setTier3Filter] = useState('shipper_backlog');
+
   const [trainingForm, setTrainingForm] = useState({
     feedbackId: null,
     targetRole: 'ALL', // 'ALL' | 'DELIVERY' | 'SALES' | 'WAREHOUSE' | 'ACCOUNTANT' | 'ADMIN'
@@ -781,6 +786,252 @@ export default function SystemAdmin() {
       }
     } catch (e) {
       // Fallback giữ nguyên
+    }
+  };
+
+  // CẤU HÌNH MA TRẬN 3 TẦNG TRỰC QUAN (3-TIER VISUAL MATRIX)
+  const TIER_CONFIG = {
+    orders: {
+      label: '📦 Đơn Hàng (Orders)',
+      actions: {
+        list: {
+          label: '📋 Lấy danh sách chi tiết (Mã, Tiền, Khách, Trạng thái)',
+          filters: {
+            shipper_today: {
+              label: '🛵 Đơn giao của tôi hôm nay (Shipper)',
+              sql: `SELECT order_id, customer_id, total_amount, payment_method, payment_status, status, shipping_address FROM orders WHERE assigned_shipper_id = :userId AND created_at >= date_trunc('day', now() AT TIME ZONE 'Asia/Ho_Chi_Minh') ORDER BY created_at DESC;`,
+              role: 'DELIVERY'
+            },
+            shipper_backlog: {
+              label: '⏳ Đơn tồn từ hôm trước chưa giao xong (Shipper)',
+              sql: `SELECT order_id, total_amount, payment_status, status, shipping_address, created_at FROM orders WHERE assigned_shipper_id = :userId AND status IN ('SHIPPED', 'OUT_FOR_DELIVERY', 'SHIPPING_FAILED') AND created_at < date_trunc('day', now() AT TIME ZONE 'Asia/Ho_Chi_Minh') ORDER BY created_at ASC;`,
+              role: 'DELIVERY'
+            },
+            shipper_cod: {
+              label: '💵 Đơn cần thu tiền mặt COD (Chưa thanh toán)',
+              sql: `SELECT order_id, shipping_address, total_amount, payment_status FROM orders WHERE assigned_shipper_id = :userId AND payment_method = 'COD' AND payment_status != 'PAID' ORDER BY created_at ASC;`,
+              role: 'DELIVERY'
+            },
+            shipper_failed_call: {
+              label: '📞 Đơn khách không nghe máy / Chờ gọi lại 24h',
+              sql: `SELECT order_id, shipping_address, total_amount, fail_reason, updated_at FROM orders WHERE assigned_shipper_id = :userId AND status = 'SHIPPING_FAILED' ORDER BY updated_at DESC;`,
+              role: 'DELIVERY'
+            },
+            orders_unpaid: {
+              label: '⚠️ Đơn hàng nợ tiền / Chưa thanh toán (Toàn hệ thống)',
+              sql: `SELECT order_id, customer_id, total_amount, payment_status, status, created_at FROM orders WHERE payment_status = 'UNPAID' ORDER BY total_amount DESC LIMIT 15;`,
+              role: 'ACCOUNTANT'
+            },
+            orders_high_value: {
+              label: '💎 Đơn hàng giá trị cao (> 20.000.000 ₫)',
+              sql: `SELECT order_id, total_amount, status, payment_status, created_at FROM orders WHERE total_amount >= 20000000 ORDER BY total_amount DESC LIMIT 10;`,
+              role: 'ALL'
+            },
+            orders_processing: {
+              label: '⚙️ Đơn hàng đang chờ ráp máy / Xử lý',
+              sql: `SELECT order_id, total_amount, status, created_at FROM orders WHERE status = 'PROCESSING' ORDER BY created_at ASC LIMIT 15;`,
+              role: 'WAREHOUSE'
+            },
+            orders_ready_ship: {
+              label: '📦 Đơn hàng đã đóng gói xong, chờ bàn giao Shipper',
+              sql: `SELECT order_id, total_amount, shipping_address, status FROM orders WHERE status = 'READY_TO_SHIP' ORDER BY created_at ASC LIMIT 15;`,
+              role: 'WAREHOUSE'
+            },
+            orders_recent: {
+              label: '🕒 Đơn hàng mới nhất trong ngày',
+              sql: `SELECT order_id, customer_id, total_amount, status, created_at FROM orders WHERE created_at >= date_trunc('day', now() AT TIME ZONE 'Asia/Ho_Chi_Minh') ORDER BY created_at DESC LIMIT 15;`,
+              role: 'ALL'
+            }
+          }
+        },
+        count: {
+          label: '🔢 Đếm tổng số lượng đơn (COUNT)',
+          filters: {
+            count_shipper_active: {
+              label: '🛵 Số đơn tôi đang phụ trách giao (Chưa xong)',
+              sql: `SELECT COUNT(*) AS tong_so_don_dang_giao FROM orders WHERE assigned_shipper_id = :userId AND status IN ('SHIPPED', 'OUT_FOR_DELIVERY', 'SHIPPING_FAILED');`,
+              role: 'DELIVERY'
+            },
+            count_today_total: {
+              label: '📅 Tổng số đơn phát sinh trong ngày',
+              sql: `SELECT COUNT(*) AS so_don_hom_nay FROM orders WHERE created_at >= date_trunc('day', now() AT TIME ZONE 'Asia/Ho_Chi_Minh');`,
+              role: 'ALL'
+            },
+            count_delivered_today: {
+              label: '✅ Số đơn giao thành công hôm nay',
+              sql: `SELECT COUNT(*) AS so_don_giao_thanh_cong FROM orders WHERE status IN ('DELIVERED', 'COMPLETED') AND updated_at >= date_trunc('day', now() AT TIME ZONE 'Asia/Ho_Chi_Minh');`,
+              role: 'ALL'
+            },
+            count_pending_assembly: {
+              label: '⚙️ Số đơn PC đang chờ lắp ráp',
+              sql: `SELECT COUNT(*) AS so_don_cho_lap_rap FROM orders WHERE status = 'PROCESSING';`,
+              role: 'WAREHOUSE'
+            }
+          }
+        },
+        sum: {
+          label: '💰 Tính tổng giá trị tiền đơn hàng (SUM)',
+          filters: {
+            sum_cod_to_collect: {
+              label: '💵 Tổng tiền mặt COD tôi cần thu của khách',
+              sql: `SELECT SUM(total_amount) AS tong_tien_cod_can_thu FROM orders WHERE assigned_shipper_id = :userId AND payment_method = 'COD' AND payment_status != 'PAID';`,
+              role: 'DELIVERY'
+            },
+            sum_unpaid_total: {
+              label: '⚠️ Tổng công nợ đơn hàng chưa thanh toán',
+              sql: `SELECT SUM(total_amount) AS tong_no_chua_thanh_toan FROM orders WHERE payment_status = 'UNPAID';`,
+              role: 'ACCOUNTANT'
+            }
+          }
+        }
+      }
+    },
+    products: {
+      label: '🖥️ Sản Phẩm & Tồn Kho (Products)',
+      actions: {
+        list: {
+          label: '📋 Danh sách sản phẩm & linh kiện',
+          filters: {
+            low_stock: {
+              label: '📉 Linh kiện sắp cạn hàng (Tồn kho <= 5 cái)',
+              sql: `SELECT product_id, name, sku, stock_quantity, price FROM products WHERE stock_quantity <= 5 AND status = 'ACTIVE' ORDER BY stock_quantity ASC LIMIT 15;`,
+              role: 'WAREHOUSE'
+            },
+            out_of_stock: {
+              label: '🚫 Linh kiện đã hết sạch (Tồn kho = 0)',
+              sql: `SELECT product_id, name, sku, price, updated_at FROM products WHERE stock_quantity = 0 AND status = 'ACTIVE' ORDER BY updated_at DESC LIMIT 15;`,
+              role: 'WAREHOUSE'
+            },
+            top_selling: {
+              label: '🏆 Top sản phẩm có tồn kho dồi dào nhất',
+              sql: `SELECT product_id, name, sku, stock_quantity, price FROM products WHERE stock_quantity > 0 ORDER BY stock_quantity DESC LIMIT 10;`,
+              role: 'ALL'
+            },
+            high_price: {
+              label: '💎 Linh kiện cao cấp (Giá > 15.000.000 ₫)',
+              sql: `SELECT product_id, name, price, stock_quantity FROM products WHERE price >= 15000000 AND status = 'ACTIVE' ORDER BY price DESC LIMIT 10;`,
+              role: 'SALES'
+            }
+          }
+        },
+        count: {
+          label: '🔢 Đếm số lượng mã linh kiện (COUNT)',
+          filters: {
+            count_out_stock: {
+              label: '🚫 Đếm số mã hàng đã cạn kho (= 0)',
+              sql: `SELECT COUNT(*) AS so_ma_hang_het_ton FROM products WHERE stock_quantity = 0 AND status = 'ACTIVE';`,
+              role: 'WAREHOUSE'
+            },
+            count_low_stock: {
+              label: '📉 Đếm số mã hàng chạm ngưỡng cảnh báo (<= 5)',
+              sql: `SELECT COUNT(*) AS so_ma_can_nhap_them FROM products WHERE stock_quantity <= 5 AND status = 'ACTIVE';`,
+              role: 'WAREHOUSE'
+            }
+          }
+        },
+        sum: {
+          label: '💰 Tổng giá trị vốn tồn kho (SUM)',
+          filters: {
+            sum_inventory_value: {
+              label: '📦 Tổng giá trị toàn bộ hàng hóa đang tồn kho',
+              sql: `SELECT SUM(stock_quantity * price) AS tong_gia_tri_kho_hang, SUM(stock_quantity) AS tong_so_linh_kien FROM products WHERE status = 'ACTIVE';`,
+              role: 'ACCOUNTANT'
+            }
+          }
+        }
+      }
+    },
+    revenue: {
+      label: '💵 Doanh Thu & Dòng Tiền (Financial)',
+      actions: {
+        sum: {
+          label: '💰 Tính tổng doanh thu hoàn tất (SUM total_amount)',
+          filters: {
+            rev_today: {
+              label: '📅 Doanh thu hôm nay (Từ 0h đến hiện tại)',
+              sql: `SELECT SUM(total_amount) AS doanh_thu_hom_nay, COUNT(*) AS so_don_hoan_tat FROM orders WHERE status IN ('DELIVERED', 'COMPLETED') AND created_at >= date_trunc('day', now() AT TIME ZONE 'Asia/Ho_Chi_Minh');`,
+              role: 'ALL'
+            },
+            rev_yesterday: {
+              label: '⏪ Doanh thu ngày hôm qua',
+              sql: `SELECT SUM(total_amount) AS doanh_thu_hom_qua, COUNT(*) AS so_don FROM orders WHERE status IN ('DELIVERED', 'COMPLETED') AND created_at >= date_trunc('day', now() AT TIME ZONE 'Asia/Ho_Chi_Minh') - INTERVAL '1 day' AND created_at < date_trunc('day', now() AT TIME ZONE 'Asia/Ho_Chi_Minh');`,
+              role: 'ALL'
+            },
+            rev_this_month: {
+              label: '🗓️ Doanh thu tháng này (Tháng hiện tại)',
+              sql: `SELECT SUM(total_amount) AS doanh_thu_thang_nay, COUNT(*) AS so_don_thang FROM orders WHERE status IN ('DELIVERED', 'COMPLETED') AND created_at >= date_trunc('month', now() AT TIME ZONE 'Asia/Ho_Chi_Minh');`,
+              role: 'ALL'
+            },
+            rev_last_month: {
+              label: '⏮️ Doanh thu tháng trước',
+              sql: `SELECT SUM(total_amount) AS doanh_thu_thang_truoc FROM orders WHERE status IN ('DELIVERED', 'COMPLETED') AND created_at >= date_trunc('month', now() AT TIME ZONE 'Asia/Ho_Chi_Minh') - INTERVAL '1 month' AND created_at < date_trunc('month', now() AT TIME ZONE 'Asia/Ho_Chi_Minh');`,
+              role: 'ALL'
+            },
+            rev_this_year: {
+              label: '📊 Doanh thu lũy kế cả năm nay',
+              sql: `SELECT SUM(total_amount) AS doanh_thu_nam_nay, COUNT(*) AS tong_so_don FROM orders WHERE status IN ('DELIVERED', 'COMPLETED') AND created_at >= date_trunc('year', now() AT TIME ZONE 'Asia/Ho_Chi_Minh');`,
+              role: 'ADMIN'
+            }
+          }
+        },
+        list: {
+          label: '📈 Doanh thu phân tích theo chu kỳ (GROUP BY)',
+          filters: {
+            rev_by_month: {
+              label: '📊 Doanh số chia theo từng tháng trong năm',
+              sql: `SELECT to_char(created_at, 'YYYY-MM') AS thang, COUNT(*) AS so_don, SUM(total_amount) AS doanh_thu FROM orders WHERE status IN ('DELIVERED', 'COMPLETED') AND created_at >= date_trunc('year', now() AT TIME ZONE 'Asia/Ho_Chi_Minh') GROUP BY thang ORDER BY thang ASC;`,
+              role: 'ADMIN'
+            }
+          }
+        }
+      }
+    },
+    customers: {
+      label: '👥 Khách Hàng & Thành Viên (Customers)',
+      actions: {
+        list: {
+          label: '📋 Danh sách khách hàng',
+          filters: {
+            vip_customers: {
+              label: '💎 Khách hàng thân thiết / VIP (Có chi tiêu cao)',
+              sql: `SELECT customer_id, name, phone, email, total_spent FROM customers ORDER BY total_spent DESC LIMIT 10;`,
+              role: 'SALES'
+            },
+            recent_customers: {
+              label: '🆕 Khách hàng mới đăng ký gần đây',
+              sql: `SELECT customer_id, name, phone, email, created_at FROM customers ORDER BY created_at DESC LIMIT 10;`,
+              role: 'SALES'
+            }
+          }
+        },
+        count: {
+          label: '🔢 Đếm số lượng khách hàng',
+          filters: {
+            count_total_customers: {
+              label: '🌐 Tổng số khách hàng trên toàn hệ thống',
+              sql: `SELECT COUNT(*) AS tong_so_khach_hang FROM customers;`,
+              role: 'ALL'
+            }
+          }
+        }
+      }
+    }
+  };
+
+  const applyTierSelection = (entityKey, actionKey, filterKey) => {
+    setTier1Entity(entityKey);
+    setTier2Action(actionKey);
+    setTier3Filter(filterKey);
+
+    const cfg = TIER_CONFIG[entityKey]?.actions[actionKey]?.filters[filterKey];
+    if (cfg?.sql) {
+      setTrainingForm(p => ({
+        ...p,
+        sql: cfg.sql,
+        targetRole: cfg.role || p.targetRole
+      }));
+      handleExplainSql(cfg.sql, trainingForm.question);
+      handleFetchSmartTemplate(cfg.sql, trainingForm.question, cfg.role || trainingForm.targetRole);
     }
   };
 
@@ -3735,43 +3986,84 @@ export default function SystemAdmin() {
                       </button>
                     </div>
 
-                    {/* Chế độ Trực Quan: Bấm Chọn Nghiệp Vụ Nhanh (No-Code Presets) */}
+                    {/* Chế độ Trực Quan: 3 TẦNG DROPDOWN LIÊN HOÀN (3-TIER CASCADING BUILDER) */}
                     {sqlViewMode === 'VISUAL' && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '0.6rem' }}>
-                        <span style={{ fontSize: '0.72rem', color: '#475569', fontWeight: 600 }}>
-                          💡 Chọn nhanh mẫu nghiệp vụ thường gặp (AI sẽ tự sinh câu lệnh chuẩn cho bạn):
-                        </span>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
-                          {[
-                            { label: '📦 Đơn tồn chưa giao xong', sql: `SELECT order_id, total_amount, payment_status, status, shipping_address FROM orders WHERE assigned_shipper_id = :userId AND status IN ('SHIPPED', 'OUT_FOR_DELIVERY', 'SHIPPING_FAILED') AND created_at < date_trunc('day', now() AT TIME ZONE 'Asia/Ho_Chi_Minh') ORDER BY created_at ASC;` },
-                            { label: '💵 Đơn cần thu tiền mặt COD', sql: `SELECT order_id, shipping_address, total_amount, payment_status FROM orders WHERE assigned_shipper_id = :userId AND payment_method = 'COD' AND payment_status != 'PAID' ORDER BY created_at ASC;` },
-                            { label: '📞 Đơn khách không nghe máy (Chờ gọi lại)', sql: `SELECT order_id, shipping_address, total_amount, fail_reason FROM orders WHERE assigned_shipper_id = :userId AND status = 'SHIPPING_FAILED' AND fail_reason ILIKE '%không liên lạc%' ORDER BY created_at DESC;` },
-                            { label: '💰 Doanh thu hôm nay (Toàn hệ thống)', sql: `SELECT SUM(total_amount) AS doanh_thu_hom_nay, COUNT(*) AS so_don_giao_xong FROM orders WHERE status IN ('DELIVERED', 'COMPLETED') AND created_at >= date_trunc('day', now() AT TIME ZONE 'Asia/Ho_Chi_Minh');` },
-                            { label: '📉 Linh kiện sắp hết hàng (< 5 chiếc)', sql: `SELECT product_id, name, stock_quantity, price FROM products WHERE stock_quantity <= 5 AND status = 'ACTIVE' ORDER BY stock_quantity ASC LIMIT 10;` },
-                            { label: '⚙️ Máy PC đang chờ kỹ thuật ráp', sql: `SELECT order_id, total_amount, status, created_at FROM orders WHERE status = 'PROCESSING' ORDER BY created_at ASC LIMIT 10;` }
-                          ].map((preset, pIdx) => (
-                            <button
-                              key={pIdx}
-                              type="button"
-                              onClick={() => {
-                                setTrainingForm(p => ({ ...p, sql: preset.sql }));
-                                handleExplainSql(preset.sql, trainingForm.question);
-                                handleFetchSmartTemplate(preset.sql, trainingForm.question, trainingForm.targetRole);
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', marginBottom: '0.75rem', backgroundColor: '#ffffff', padding: '0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <span style={{ fontSize: '0.74rem', color: '#1e40af', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                            <span>🎯 BỘ DỰNG TRUY VẤN 3 TẦNG LIÊN HOÀN (NO-CODE BUILDER):</span>
+                          </span>
+                          <span style={{ fontSize: '0.68rem', color: '#64748b' }}>
+                            Tự động sinh SQL chuẩn 100% không sợ sai cú pháp
+                          </span>
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1.5fr', gap: '0.5rem' }}>
+                          {/* TẦNG 1: CHỦ THỂ DỮ LIỆU */}
+                          <div>
+                            <label style={{ fontSize: '0.7rem', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '3px' }}>
+                              1️⃣ Chủ Thể Dữ Liệu
+                            </label>
+                            <select
+                              value={tier1Entity}
+                              onChange={e => {
+                                const newEnt = e.target.value;
+                                const firstAct = Object.keys(TIER_CONFIG[newEnt]?.actions || {})[0] || 'list';
+                                const firstFlt = Object.keys(TIER_CONFIG[newEnt]?.actions[firstAct]?.filters || {})[0] || '';
+                                applyTierSelection(newEnt, firstAct, firstFlt);
                               }}
-                              style={{
-                                border: '1px solid #cbd5e1',
-                                backgroundColor: '#ffffff',
-                                borderRadius: '6px',
-                                padding: '0.25rem 0.55rem',
-                                fontSize: '0.72rem',
-                                color: '#1e293b',
-                                cursor: 'pointer',
-                                textAlign: 'left'
-                              }}
+                              style={{ ...inputStyle, fontSize: '0.73rem', padding: '0.35rem 0.5rem', borderColor: '#2563eb' }}
                             >
-                              {preset.label}
-                            </button>
-                          ))}
+                              {Object.entries(TIER_CONFIG).map(([k, v]) => (
+                                <option key={k} value={k}>{v.label}</option>
+                              ))}
+                            </select>
+                          </div>
+
+                          {/* TẦNG 2: MỤC TIÊU CẦN LẤY / TÍNH TOÁN */}
+                          <div>
+                            <label style={{ fontSize: '0.7rem', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '3px' }}>
+                              2️⃣ Mục Tiêu Cần Lấy
+                            </label>
+                            <select
+                              value={tier2Action}
+                              onChange={e => {
+                                const newAct = e.target.value;
+                                const firstFlt = Object.keys(TIER_CONFIG[tier1Entity]?.actions[newAct]?.filters || {})[0] || '';
+                                applyTierSelection(tier1Entity, newAct, firstFlt);
+                              }}
+                              style={{ ...inputStyle, fontSize: '0.73rem', padding: '0.35rem 0.5rem', borderColor: '#2563eb' }}
+                            >
+                              {Object.entries(TIER_CONFIG[tier1Entity]?.actions || {}).map(([k, v]) => (
+                                <option key={k} value={k}>{v.label}</option>
+                              ))}
+                            </select>
+                          </div>
+
+                          {/* TẦNG 3: ĐIỀU KIỆN LỌC NGHIỆP VỤ & THỜI GIAN */}
+                          <div>
+                            <label style={{ fontSize: '0.7rem', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '3px' }}>
+                              3️⃣ Điều Kiện Lọc Nghiệp Vụ
+                            </label>
+                            <select
+                              value={tier3Filter}
+                              onChange={e => applyTierSelection(tier1Entity, tier2Action, e.target.value)}
+                              style={{ ...inputStyle, fontSize: '0.73rem', padding: '0.35rem 0.5rem', borderColor: '#2563eb', fontWeight: 600, color: '#1e40af' }}
+                            >
+                              {Object.entries(TIER_CONFIG[tier1Entity]?.actions[tier2Action]?.filters || {}).map(([k, v]) => (
+                                <option key={k} value={k}>{v.label}</option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+
+                        {/* Thanh tóm tắt cấu hình được chọn */}
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#f1f5f9', padding: '0.35rem 0.6rem', borderRadius: '4px', fontSize: '0.7rem', color: '#475569' }}>
+                          <div>
+                            <strong style={{ color: '#0f172a' }}>Kịch bản: </strong> 
+                            {TIER_CONFIG[tier1Entity]?.label.split(' ')[0]} ➔ {TIER_CONFIG[tier1Entity]?.actions[tier2Action]?.label.split(' ')[0]} ➔ {TIER_CONFIG[tier1Entity]?.actions[tier2Action]?.filters[tier3Filter]?.label}
+                          </div>
+                          <span style={{ color: '#16a34a', fontWeight: 700, fontSize: '0.68rem' }}>● Đã tự đồng bộ SQL</span>
                         </div>
                       </div>
                     )}
