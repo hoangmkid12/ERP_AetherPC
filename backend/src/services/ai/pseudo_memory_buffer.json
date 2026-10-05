@@ -7,5 +7,14 @@
     "confidence": 0.95,
     "source": "USER_HELPFUL_FEEDBACK",
     "createdAt": "2026-10-05T07:17:47.755Z"
+  },
+  {
+    "id": "pseudo_1791185890080_62",
+    "prompt": "cho xem mấy con card 4060 ti giá ntn",
+    "intentId": "PRODUCT_PRICE_STOCK",
+    "role": "SALES",
+    "confidence": 0.95,
+    "source": "FEEDBACK_LOOP",
+    "createdAt": "2026-10-05T07:38:10.080Z"
   }
 ]

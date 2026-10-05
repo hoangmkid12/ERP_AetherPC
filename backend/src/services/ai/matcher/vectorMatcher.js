@@ -145,11 +145,23 @@ class VectorMatcher {
       const { getPseudoSamples } = require('../memory/pseudoMemoryBuffer.service');
       const pseudoSamples = getPseudoSamples();
       for (const p of pseudoSamples) {
+        // Đảm bảo kỹ năng tự học luôn liên kết với handler nghiệp vụ trong skillLookup
+        let skillRef = null;
+        for (const [k, v] of this.skillLookup.entries()) {
+          if (k.endsWith(`_${p.intentId}`) || k === p.intentId) {
+            skillRef = v;
+            break;
+          }
+        }
+        if (skillRef) {
+          this.skillLookup.set(`${p.role}_${p.intentId}`, skillRef);
+        }
+
         docs.push({
           id: p.id || `pseudo_${docIdCounter++}`,
           text: p.prompt,
           metadata: {
-            role: p.role,
+            role: skillRef ? skillRef.role : p.role,
             intentId: p.intentId,
             title: `Tri thức tự học [${p.intentId}]`,
             isPseudo: true,
@@ -224,7 +236,20 @@ class VectorMatcher {
 
     // Lấy thông tin chi tiết kỹ năng từ lookup
     const lookupKey = `${bestIntent.role}_${bestIntent.intentId}`;
-    const skillInfo = this.skillLookup.get(lookupKey) || this.skillLookup.get(`ALL_${bestIntent.intentId}`) || this.skillLookup.get(`ADMIN_CEO_${bestIntent.intentId}`);
+    let skillInfo = this.skillLookup.get(lookupKey) || this.skillLookup.get(`ALL_${bestIntent.intentId}`) || this.skillLookup.get(`ADMIN_CEO_${bestIntent.intentId}`);
+    
+    // Nếu lookup theo vai trò không thấy (ví dụ câu tự học do Admin hỏi nhưng thuộc Sales): quét tìm skill theo intentId
+    if (!skillInfo) {
+      for (const [key, val] of this.skillLookup.entries()) {
+        if (key.endsWith(`_${bestIntent.intentId}`) || key === bestIntent.intentId) {
+          skillInfo = val;
+          if (val && val.role) {
+            bestIntent.role = val.role;
+          }
+          break;
+        }
+      }
+    }
 
     // Kiểm tra với ngưỡng tin cậy
     const isConfident = bestIntent.score >= this.confidenceThreshold;

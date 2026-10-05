@@ -87,10 +87,21 @@ const submitAiFeedback = async (req, res, next) => {
         }
 
         if (matchedIntent) {
+          // Xác định chính xác role sở hữu kỹ năng trong hệ thống (vd: PRODUCT_PRICE_STOCK thuộc SALES)
+          let targetRole = 'SALES';
+          if (vectorMatcher && vectorMatcher.skillLookup) {
+            for (const [key, val] of vectorMatcher.skillLookup.entries()) {
+              if (key.endsWith(`_${matchedIntent}`) || key === matchedIntent) {
+                targetRole = val.role || targetRole;
+                break;
+              }
+            }
+          }
+
           recordPseudoSample({
             prompt: prompt.trim(),
             intentId: matchedIntent,
-            role: req.user?.role || 'SALES',
+            role: targetRole,
             confidence: 0.95,
             source: 'USER_HELPFUL_FEEDBACK'
           });
