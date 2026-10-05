@@ -42,10 +42,30 @@ salesTrainer.addSkill({
   ],
   allowedRoles: ['SALES', 'ADMIN_CEO', 'ADMIN', 'WAREHOUSE'],
   handler: async (prisma, params, _user) => {
-    const rawKw = params.productName || params.keyword || '';
+    const rawKw = (params.productName || params.keyword || '').trim();
+    if (!rawKw) {
+      return await prisma.product.findMany({
+        where: { stockQuantity: { gt: 0 }, status: 'ACTIVE' },
+        select: { productId: true, name: true, sku: true, price: true, stockQuantity: true },
+        orderBy: { stockQuantity: 'desc' },
+        take: 10
+      });
+    }
+
+    // Tách từ khóa linh hoạt: hỗ trợ cả i5-13400F lẫn i5 13400F, RM850e, RTX 4070...
+    const kwWithSpace = rawKw.replace(/-/g, ' ');
+    const kwWithHyphen = rawKw.replace(/\s+/g, '-');
+    const terms = Array.from(new Set([rawKw, kwWithSpace, kwWithHyphen].filter(t => t.length >= 2)));
+
+    const orConditions = [];
+    terms.forEach(t => {
+      orConditions.push({ name: { contains: t, mode: 'insensitive' } });
+      orConditions.push({ sku: { contains: t, mode: 'insensitive' } });
+    });
+
     return await prisma.product.findMany({
       where: {
-        ...(rawKw ? { name: { contains: rawKw, mode: 'insensitive' } } : { stockQuantity: { gt: 0 } }),
+        OR: orConditions,
         status: 'ACTIVE'
       },
       select: {

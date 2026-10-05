@@ -154,6 +154,14 @@ const resolveEntities = async (text, prisma = null) => {
     if (canonicalHardware) break;
   }
 
+  // 1.1 Trích xuất mã model phần cứng động nếu chưa có trong từ điển (VD: RM850e, RM1000e, 4300G, G502, B760M, Z790)
+  if (!canonicalHardware) {
+    const modelCodeMatch = text.match(/\b([a-z]{1,4}[-_]?\d{3,5}[a-z]{0,4}|\d{4,5}[a-z]{1,3})\b/i);
+    if (modelCodeMatch && !/^\d+$/.test(modelCodeMatch[1])) {
+      canonicalHardware = modelCodeMatch[1].trim();
+    }
+  }
+
   // 2. Nhận diện thương hiệu (Brand)
   let brandName = null;
   for (const b of KNOWN_BRANDS) {
@@ -189,13 +197,18 @@ const resolveEntities = async (text, prisma = null) => {
   if (prisma && (canonicalHardware || brandName)) {
     try {
       const searchKw = canonicalHardware || brandName;
+      const kwWithSpace = searchKw.replace(/-/g, ' ');
+      const kwWithHyphen = searchKw.replace(/\s+/g, '-');
+      const terms = Array.from(new Set([searchKw, kwWithSpace, kwWithHyphen].filter(t => t.length >= 2)));
+      const orConds = terms.map(t => ({ name: { contains: t, mode: 'insensitive' } }));
+
       const candidates = await prisma.product.findMany({
         where: {
           status: 'ACTIVE',
-          name: { contains: searchKw, mode: 'insensitive' }
+          OR: orConds
         },
         select: { productId: true, name: true, price: true, stockQuantity: true },
-        take: 5
+        take: 10
       });
 
       if (candidates && candidates.length > 0) {
