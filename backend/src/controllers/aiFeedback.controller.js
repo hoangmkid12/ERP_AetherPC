@@ -214,6 +214,12 @@ const saveDynamicSkill = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'Vui lòng cung cấp cả câu hỏi mẫu và câu lệnh SQL tương ứng.' });
     }
 
+    const { isSafeSqlQuery, sanitizeAndHealSql } = require('../services/ai/universalData.service');
+    const safeSql = sanitizeAndHealSql(sql.trim());
+    if (!isSafeSqlQuery(safeSql)) {
+      return res.status(400).json({ success: false, message: 'Câu lệnh SQL không an toàn (chỉ cho phép SELECT đọc dữ liệu).' });
+    }
+
     let skills = [];
     if (fs.existsSync(DYNAMIC_SKILLS_PATH)) {
       skills = JSON.parse(fs.readFileSync(DYNAMIC_SKILLS_PATH, 'utf8'));
@@ -222,7 +228,7 @@ const saveDynamicSkill = async (req, res, next) => {
     const newSkill = {
       id: 'SKILL-' + Date.now(),
       question: question.trim(),
-      sql: sql.trim(),
+      sql: safeSql,
       description: description?.trim() || 'Kỹ năng do Admin huấn luyện trực tiếp',
       responseTemplate: responseTemplate?.trim() || null,
       targetRole: targetRole || 'ALL',
@@ -301,13 +307,14 @@ const executeTestSql = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'Vui lòng cung cấp câu lệnh SQL để kiểm thử.' });
     }
 
-    const { isSafeSqlQuery } = require('../services/ai/universalData.service');
-    if (!isSafeSqlQuery(sql)) {
+    const { isSafeSqlQuery, sanitizeAndHealSql } = require('../services/ai/universalData.service');
+    const safeSql = sanitizeAndHealSql(sql.trim());
+    if (!isSafeSqlQuery(safeSql)) {
       return res.status(400).json({ success: false, message: 'Câu lệnh SQL không an toàn (chỉ cho phép SELECT đọc dữ liệu).' });
     }
 
     const currentUserId = Number(req.user?.id) || 0;
-    const finalSql = sql.replace(/:userId/g, currentUserId.toString());
+    const finalSql = safeSql.replace(/:userId/g, currentUserId.toString());
 
     // Thực thi trực tiếp trên PostgreSQL
     const rawData = await prisma.$queryRawUnsafe(finalSql);

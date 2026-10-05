@@ -50,6 +50,22 @@ const createMockPrisma = () => {
         }
         return null;
       },
+      findFirst: async (args) => {
+        return {
+          orderId: 'DH-1002',
+          trackingNumber: 'DH-1002',
+          status: 'SHIPPING',
+          shippingAddress: '123 Nguyễn Thị Minh Khai, Q1, TP.HCM',
+          customerName: 'Trần Văn A',
+          customerPhone: '0901234567',
+          paymentStatus: 'UNPAID',
+          totalAmount: 25000000,
+          assignedShipper: {
+            fullName: 'Nguyễn Văn Giao',
+            phone: '0988776655'
+          }
+        };
+      },
       findMany: async () => [],
       count: async () => 1,
       aggregate: async () => ({

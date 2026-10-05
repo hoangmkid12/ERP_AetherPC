@@ -285,7 +285,7 @@ const executeActorIntent = async (userPrompt, role, prisma, user = {}, params = 
       if (hybridMatch.status === 'UNCERTAIN') {
         const suggestionText = hybridMatch.suggestions && hybridMatch.suggestions.length > 0
           ? '\n\n💡 **GỢI Ý CÁC CHỦ ĐỀ LIÊN QUAN:**\n' +
-            hybridMatch.suggestions.map((s, idx) => `${idx + 1}. **${s.title}**`).join('\n')
+          hybridMatch.suggestions.map((s, idx) => `${idx + 1}. **${s.title}**`).join('\n')
           : '';
 
         return {
@@ -370,8 +370,8 @@ const executeActorIntent = async (userPrompt, role, prisma, user = {}, params = 
   // Xử lý kịch bản SQL do Quản trị viên huấn luyện trực tiếp (Active Learning & User Feedback Loop)
   if (matchedSkill.type === 'DYNAMIC_SQL' && matchedSkill.sql) {
     try {
-      const { isSafeSqlQuery } = require('../universalData.service');
-      const sqlToRun = matchedSkill.sql.trim();
+      const { isSafeSqlQuery, sanitizeAndHealSql } = require('../universalData.service');
+      const sqlToRun = sanitizeAndHealSql(matchedSkill.sql.trim());
       if (!isSafeSqlQuery(sqlToRun)) {
         execResult = {
           status: 'ERROR',

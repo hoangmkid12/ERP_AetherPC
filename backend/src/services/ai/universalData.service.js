@@ -251,6 +251,31 @@ const isSafeSqlQuery = (sql) => {
   return true;
 };
 
+/**
+ * BỘ TỰ ĐỘNG CHỮA LỖI TRUY VẤN SQL (SCHEMA HEALER & SAFE AST SANITIZER)
+ * - Tự động sửa các tên cột sai phổ biến (order_date -> created_at, order_status -> status...)
+ * - Tự động bổ sung LIMIT an toàn nếu thiếu để bảo vệ hiệu năng Database PostgreSQL
+ */
+const sanitizeAndHealSql = (sql) => {
+  if (!sql || typeof sql !== 'string') return sql;
+  let healed = sql.trim();
+
+  // 1. Tự động sửa tên trường sai phổ biến trong PostgreSQL
+  healed = healed
+    .replace(/\border_date\b/gi, 'created_at')
+    .replace(/\border_status\b/gi, 'status')
+    .replace(/\btotal_price\b/gi, 'total_amount')
+    .replace(/\bproduct_price\b/gi, 'price')
+    .replace(/\bquantity_in_stock\b/gi, 'stock_quantity');
+
+  // 2. Đảm bảo có LIMIT an toàn nếu chưa có LIMIT và không phải câu tổng hợp COUNT/SUM/AVG
+  if (!/\blimit\b/i.test(healed) && !/\b(count|sum|avg|max|min)\s*\(/i.test(healed)) {
+    healed = healed.replace(/;?\s*$/, ' LIMIT 20;');
+  }
+
+  return healed;
+};
+
 const { evaluateActorSemanticRules, getActorFewShots, getActorSystemPrompt } = require('./actors');
 
 /**
@@ -613,5 +638,6 @@ Nhiệm vụ:
 module.exports = {
   executeUniversalDataQuery,
   isSafeSqlQuery,
+  sanitizeAndHealSql,
   generateSqlFromQuestion
 };
