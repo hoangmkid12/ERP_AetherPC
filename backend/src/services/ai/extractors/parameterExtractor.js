@@ -32,6 +32,7 @@ const extractParameters = async (query, prisma = null, user = null, explicitPara
 
   // 4. Hợp nhất thành Flat Parameters object cho Prisma Handlers
   const params = {
+    query,
     // Thông tin thời gian
     startDate: dateInfo.startDate,
     endDate: dateInfo.endDate,

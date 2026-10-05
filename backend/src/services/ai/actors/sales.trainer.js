@@ -38,7 +38,7 @@ salesTrainer.addSkill({
     'sản phẩm này giá bao nhiêu và còn tồn không'
   ],
   patterns: [
-    /(giá bao nhiêu|còn hàng không|còn mấy cái|báo giá|tồn kho.*linh kiện|giá.*hiện tại)/i
+    /(giá bao nhiêu|còn hàng không|còn mấy cái|báo giá|tồn kho.*linh kiện|giá.*hiện tại|có trong kho|đang có|hiện đang bán|đang bán|trong kho)/i
   ],
   allowedRoles: ['SALES', 'ADMIN_CEO', 'ADMIN', 'WAREHOUSE'],
   handler: async (prisma, params, _user) => {
@@ -98,6 +98,136 @@ salesTrainer.addSkill({
       return `SELECT product_id, name, sku, price, stock_quantity FROM products WHERE name ILIKE '%${kw}%' AND status = 'ACTIVE' ORDER BY stock_quantity DESC LIMIT 10;`;
     }
     return `SELECT product_id, name, sku, price, stock_quantity FROM products WHERE stock_quantity > 0 AND status = 'ACTIVE' ORDER BY stock_quantity DESC LIMIT 10;`;
+  }
+});
+
+// Bảng ánh xạ 13 Danh mục sản phẩm chuẩn hóa của AetherPC ERP
+const CATEGORY_MAP = [
+  { slug: 'man-hinh', name: 'Màn Hình', patterns: [/\bmàn\s*hình\b/i, /\bman\s*hinh\b/i, /\bmonitor\b/i] },
+  { slug: 'vo-may-tinh', name: 'Vỏ Máy Tính', patterns: [/\bv[ỏõo]\s*máy\s*tính\b/i, /\bv[ỏõo]\s*case\b/i, /\bthùng\s*case\b/i, /\bcase\s*máy\s*tính\b/i, /^\s*v[ỏõo]\s*máy\s*tính\s*$/i, /\bcase\b/i, /^\s*v[ỏõo]\s*$/i] },
+  { slug: 'bo-vi-xu-ly', name: 'Bộ Vi Xử Lý (CPU)', patterns: [/\bcpu\b/i, /\bbộ\s*vi\s*xử\s*lý\b/i, /\bbo\s*vi\s*xu\s*ly\b/i, /\bchip\b/i, /\bvi\s*xử\s*lý\b/i] },
+  { slug: 'card-man-hinh', name: 'Card Màn Hình (VGA)', patterns: [/\bcard\s*màn\s*hình\b/i, /\bcard\s*đồ\s*họa\b/i, /\bvga\b/i] },
+  { slug: 'bo-mach-chu', name: 'Bo Mạch Chủ (Mainboard)', patterns: [/\bbo\s*mạch\s*chủ\b/i, /\bmainboard\b/i, /\bmain\b/i] },
+  { slug: 'nguon-may-tinh', name: 'Nguồn Máy Tính (PSU)', patterns: [/\bnguồn\s*máy\s*tính\b/i, /\bpsu\b/i, /\bbộ\s*nguồn\b/i] },
+  { slug: 'ban-phim', name: 'Bàn Phím', patterns: [/\bbàn\s*phím\b/i, /\bban\s*phim\b/i, /\bkeyboard\b/i] },
+  { slug: 'chuot-may-tinh', name: 'Chuột Máy Tính', patterns: [/\bchuột\s*máy\s*tính\b/i, /\bchuot\s*may\s*tinh\b/i, /\bchuột\b/i, /\bmouse\b/i] },
+  { slug: 'tan-nhiet', name: 'Tản Nhiệt', patterns: [/\btản\s*nhiệt\b/i, /\btan\s*nhiet\b/i, /\btản\s*nước\b/i, /\btản\s*khí\b/i, /\btản\s*aio\b/i] },
+  { slug: 'o-cung-ssd', name: 'Ổ Cứng SSD', patterns: [/\bổ\s*cứng\s*ssd\b/i, /\bssd\b/i, /\bổ\s*ssd\b/i] },
+  { slug: 'o-cung-hdd', name: 'Ổ Cứng HDD', patterns: [/\bổ\s*cứng\s*hdd\b/i, /\bhdd\b/i, /\bổ\s*hdd\b/i] },
+  { slug: 'ram-pc', name: 'RAM PC', patterns: [/\bram\s*pc\b/i, /\bram\s*máy\s*bàn\b/i, /\bram\b/i] },
+  { slug: 'ram-laptop', name: 'RAM Laptop', patterns: [/\bram\s*laptop\b/i] }
+];
+
+// Kỹ năng 1B: Tra cứu toàn bộ danh mục ngành hàng (Màn hình, Vỏ case, CPU, Chuột, Bàn phím...)
+salesTrainer.addSkill({
+  id: 'CATEGORY_PRODUCTS_LOOKUP',
+  title: 'Tra cứu danh mục linh kiện & phụ kiện máy tính',
+  description: 'Hiển thị danh sách sản phẩm theo từng nhóm ngành hàng (Màn hình, Vỏ case, CPU, RAM, Bàn phím, Chuột...)',
+  type: 'PRISMA_QUERY',
+  examples: [
+    'Màn hình máy tính có trong kho',
+    'màn hình máy tính hiện đang bán',
+    'màn hình máy tính',
+    'màn hình',
+    'CPU đang có',
+    'bộ vi xử lý hiện có',
+    'bộ vi xử lý đang bán',
+    'cpu',
+    'võ máy tính hiện đang bán',
+    'vỏ máy tính hiện đang bán',
+    'Vỏ Máy Tính',
+    'vỏ case',
+    'case máy tính',
+    'chuột máy tính trong kho',
+    'chuột máy tính',
+    'bàn phím cơ đang bán',
+    'bàn phím',
+    'danh sách bo mạch chủ',
+    'bo mạch chủ',
+    'ổ cứng ssd đang có',
+    'ổ cứng ssd',
+    'tản nhiệt máy tính',
+    'tản nhiệt',
+    'nguồn máy tính đang có',
+    'nguồn máy tính',
+    'ram pc có trong kho',
+    'danh mục sản phẩm có gì'
+  ],
+  patterns: [
+    /(màn\s*hình|v[ỏõo]\s*máy\s*tính|võ\s*máy\s*tính|v[ỏõo]\s*case|bộ\s*vi\s*xử\s*lý|cpu|chip|bo\s*mạch\s*chủ|mainboard|card\s*màn\s*hình|vga|chuột|bàn\s*phím|nguồn\s*máy\s*tính|psu|ổ\s*cứng|ssd|hdd|ram|tản\s*nhiệt).*(có trong kho|đang có|hiện đang bán|đang bán|trong kho|còn hàng|danh mục|danh sách)?/i,
+    /^\s*(màn\s*hình|v[ỏõo]\s*máy\s*tính|võ\s*máy\s*tính|v[ỏõo]\s*case|cpu|chuột\s*máy\s*tính|chuột|bàn\s*phím\s*cơ|bàn\s*phím|ram|tản\s*nhiệt|nguồn\s*máy\s*tính|bo\s*mạch\s*chủ)\s*$/i
+  ],
+  allowedRoles: ['SALES', 'ADMIN_CEO', 'ADMIN', 'WAREHOUSE'],
+  handler: async (prisma, params, _user) => {
+    const rawText = (params?.query || params?.keyword || params?.productName || '').toLowerCase();
+    
+    let matchedCat = null;
+    for (const item of CATEGORY_MAP) {
+      for (const p of item.patterns) {
+        if (p.test(rawText)) {
+          matchedCat = item;
+          break;
+        }
+      }
+      if (matchedCat) break;
+    }
+
+    if (!matchedCat) {
+      if (rawText.includes('màn')) matchedCat = CATEGORY_MAP[0];
+      else if (rawText.includes('vỏ') || rawText.includes('võ') || rawText.includes('case')) matchedCat = CATEGORY_MAP[1];
+      else if (rawText.includes('cpu') || rawText.includes('chip') || rawText.includes('xử lý')) matchedCat = CATEGORY_MAP[2];
+      else if (rawText.includes('chuột')) matchedCat = CATEGORY_MAP[7];
+      else if (rawText.includes('phím')) matchedCat = CATEGORY_MAP[6];
+      else matchedCat = CATEGORY_MAP[0];
+    }
+
+    const catRecord = await prisma.category.findFirst({
+      where: {
+        OR: [
+          { slug: { contains: matchedCat.slug, mode: 'insensitive' } },
+          { name: { contains: matchedCat.name.split(' ')[0], mode: 'insensitive' } }
+        ]
+      }
+    });
+
+    const whereClause = { status: 'ACTIVE', stockQuantity: { gt: 0 } };
+    if (catRecord) {
+      whereClause.categoryId = catRecord.id;
+    } else {
+      whereClause.name = { contains: matchedCat.name.split(' ')[0], mode: 'insensitive' };
+    }
+
+    const products = await prisma.product.findMany({
+      where: whereClause,
+      select: {
+        productId: true,
+        name: true,
+        sku: true,
+        price: true,
+        stockQuantity: true
+      },
+      orderBy: { stockQuantity: 'desc' },
+      take: 15
+    });
+
+    return {
+      categoryName: catRecord ? catRecord.name : matchedCat.name,
+      products
+    };
+  },
+  template: (data) => {
+    const { categoryName, products } = data || {};
+    if (!products || products.length === 0) {
+      return `📦 **DANH MỤC [${(categoryName || 'SẢN PHẨM').toUpperCase()}]:**\n\nHiện tại các mặt hàng thuộc nhóm này đang tạm hết hàng trong kho.`;
+    }
+
+    let res = `🖥️ **TỒN KHO CÁC SẢN PHẨM [${(categoryName || 'LINH KIỆN').toUpperCase()}] CÓ TRONG KHO (${products.length} MẶT HÀNG):**\n\n`;
+    products.forEach((p, idx) => {
+      res += `${idx + 1}. **${p.name}**\n`;
+      res += `   Số lượng tồn: **${p.stockQuantity}** chiếc | Giá bán: **${formatVND(p.price)}**\n\n`;
+    });
+
+    return res.trim();
   }
 });
 
@@ -352,6 +482,7 @@ salesTrainer.addSkill({
   type: 'PRISMA_QUERY',
   examples: [
     'tư vấn cấu hình pc tầm 15 triệu',
+    'tư vấn ráp máy tính chơi game khoảng 20 triệu',
     'build pc 15 triệu chơi game esports',
     'build pc 25 triệu chơi game',
     'dàn máy 40 triệu làm đồ họa',

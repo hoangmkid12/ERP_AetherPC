@@ -192,6 +192,15 @@ const generateFollowUpSuggestions = (skill, userPrompt = '', params = {}) => {
     ];
   }
 
+  // 8. Nhóm Danh mục Sản phẩm (Category Lookup)
+  if (sid.includes('CATEGORY') || sid.includes('PRODUCTS_LOOKUP')) {
+    return [
+      'Sản phẩm nào giá tốt nhất trong danh mục này?',
+      'Top sản phẩm còn nhiều tồn kho nhất',
+      'Chính sách bảo hành 1 đổi 1 thế nào?'
+    ];
+  }
+
   // Mặc định cho các kịch bản khác
   return [
     'Báo cáo doanh thu bán hàng hôm nay',
