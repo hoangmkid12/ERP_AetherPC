@@ -168,11 +168,18 @@ const generateFollowUpSuggestions = (skill, userPrompt = '', params = {}) => {
   }
 
   // 6. Nhóm Giao vận (Delivery / Shipper)
-  if (sid.includes('DELIVERY') || sid.includes('SHIPPER') || sid.includes('COD')) {
+  if (sid.includes('DELIVERY') || sid.includes('SHIPPER') || sid.includes('COD') || sid.includes('BACKLOG') || sid.includes('ORDER')) {
+    if (sid.includes('BACKLOG')) {
+      return [
+        'Đơn nào của tôi cần thu tiền cod?',
+        'Các đơn chờ gọi lại',
+        'Tổng quan tiến độ giao hàng của tôi'
+      ];
+    }
     return [
+      'Các đơn giao hàng đang tồn',
       'Đơn nào của tôi cần thu tiền cod?',
-      'Lý do mấy đơn bị boom hàng không nhận',
-      'Tháng này tôi đã giao thành công được bao nhiêu đơn?'
+      'Tổng quan tiến độ giao hàng của tôi'
     ];
   }
 

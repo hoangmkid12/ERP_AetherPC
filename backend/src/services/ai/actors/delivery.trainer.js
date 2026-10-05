@@ -4,7 +4,7 @@
  */
 
 const BaseActorTrainer = require('./BaseActorTrainer');
-const { getStartOfMonth, formatVND } = require('../utils/dateHelper');
+const { getStartOfDay, getEndOfDay, getStartOfMonth, formatVND } = require('../utils/dateHelper');
 
 const deliveryTrainer = new BaseActorTrainer({
   role: 'DELIVERY',
@@ -32,18 +32,18 @@ deliveryTrainer.addSkill({
     'hôm nay tôi có bao nhiêu đơn cần giao?',
     'hôm nay tôi có bao nhiêu đơn cần giao',
     'danh sách đơn của tôi hôm nay',
-    'tôi đang có những đơn nào',
+    'tôi đang có những đơn nào cần giao hôm nay',
     'đơn cần ship hôm nay',
     'hôm nay giao mấy đơn',
     'nhiệm vụ giao hàng hôm nay của tôi',
-    'xem các đơn phân công cho tôi',
+    'xem các đơn phân công cho tôi hôm nay',
     'hôm nay phải chạy những đơn nào',
     'danh sách kiện hàng cần phát trong ngày'
   ],
   patterns: [
-    /(hôm nay.*(giao|ship|đơn)|cần giao hôm nay|đang giao|đang ship|phân công.*giao|nhiệm vụ.*giao|chạy.*đơn|cần phát)/i
+    /(hôm nay.*(giao|ship|đơn)|cần giao hôm nay|đang đi giao|phân công.*hôm nay|nhiệm vụ.*hôm nay|cần phát trong ngày)/i
   ],
-  keywords: ['đơn', 'giao'],
+  keywords: ['hôm nay', 'giao'],
   allowedRoles: ['DELIVERY', 'ADMIN_CEO', 'ADMIN'],
   handler: async (prisma, params, user) => {
     const shipperId = Number(user.id || params.userId || 0);
@@ -611,24 +611,25 @@ deliveryTrainer.addSkill({
   ],
   allowedRoles: ['DELIVERY', 'SALES', 'WAREHOUSE', 'ACCOUNTANT', 'ADMIN_CEO', 'ADMIN'],
   handler: async (prisma, params) => {
-    let orderId = Number(params?.orderId || 0);
-    if (!orderId && params?.orderId) {
-      const numMatch = String(params.orderId).match(/\d+/);
-      if (numMatch) orderId = parseInt(numMatch[0], 10);
-    }
-    if (!orderId) return null;
+    let rawId = params?.orderId ? String(params.orderId).trim() : '';
+    if (!rawId) return null;
 
-    return await prisma.order.findUnique({
-      where: { orderId },
+    return await prisma.order.findFirst({
+      where: {
+        OR: [
+          { orderId: rawId },
+          { orderId: { contains: rawId, mode: 'insensitive' } }
+        ]
+      },
       select: {
         orderId: true,
-        trackingNumber: true,
-        deliveryStatus: true,
         status: true,
         shippingAddress: true,
         paymentStatus: true,
         paymentMethod: true,
         totalAmount: true,
+        failReason: true,
+        failNote: true,
         customer: { select: { name: true, phone: true } },
         assignedShipper: { select: { fullName: true, phone: true } }
       }
@@ -649,6 +650,213 @@ deliveryTrainer.addSkill({
            `- **Thanh toán:** ${payStatus} (Tổng tiền: **${formatVND(order.totalAmount)}**)\n` +
            `- **Địa chỉ nhận:** ${order.shippingAddress || 'Nội thành'}\n` +
            `- **Khách hàng:** ${order.customer?.name || 'Khách'} (📞 ${order.customer?.phone || 'Chưa có SĐT'})`;
+  }
+});
+
+// Kỹ năng 17: Tra cứu các đơn giao hàng đang tồn (Backlog Orders)
+deliveryTrainer.addSkill({
+  id: 'BACKLOG_ORDERS',
+  title: 'Tra cứu các đơn giao hàng đang tồn đọng của shipper',
+  description: 'Lọc các đơn hàng từ ngày trước chưa giao xong hoặc bị tồn ca cần xử lý',
+  type: 'PRISMA_QUERY',
+  examples: [
+    'các đơn giao hàng đang tồn',
+    'các đơn giao hàng đang tồn của tôi',
+    'đơn tồn của tôi',
+    'tôi còn tồn bao nhiêu đơn',
+    'danh sách đơn tồn cần xử lý',
+    'có bao nhiêu đơn giao hàng tồn',
+    'kiểm tra đơn tồn hôm nay',
+    'đơn tồn chưa giao xong',
+    'các đơn cũ còn tồn đọng',
+    'đơn hàng tồn của shipper'
+  ],
+  patterns: [
+    /(đơn.*(đang tồn|tồn đọng|còn tồn)|(tồn|chưa giao xong).*đơn|đơn tồn)/i
+  ],
+  keywords: ['đơn', 'tồn'],
+  allowedRoles: ['DELIVERY', 'ADMIN_CEO', 'ADMIN'],
+  handler: async (prisma, _params, user) => {
+    const shipperId = Number(user?.id || 0);
+    const startOfToday = getStartOfDay();
+
+    // Đơn tồn: Các đơn đang trong hành trình giao được phân công cho shipper nhưng tạo/gán trước ngày hôm nay
+    const orders = await prisma.order.findMany({
+      where: {
+        assignedShipperId: shipperId,
+        status: { in: ['SHIPPED', 'OUT_FOR_DELIVERY', 'ASSIGNED', 'SHIPPING_FAILED', 'RETURNING_TO_WAREHOUSE'] },
+        createdAt: { lt: startOfToday }
+      },
+      select: {
+        orderId: true,
+        shippingAddress: true,
+        customer: { select: { phone: true, name: true } },
+        totalAmount: true,
+        paymentMethod: true,
+        paymentStatus: true,
+        status: true,
+        failReason: true,
+        failNote: true,
+        createdAt: true,
+        shippedAt: true
+      },
+      orderBy: { createdAt: 'asc' }
+    });
+
+    return orders;
+  },
+  template: (orders) => {
+    if (!orders || orders.length === 0) {
+      return '🎉 **Tuyệt vời! Bạn hiện không có đơn hàng nào bị tồn đọng từ các ngày trước.** Toàn bộ đơn đang xử lý đều là đơn mới trong ngày!';
+    }
+    const totalAmount = orders.reduce((sum, o) => sum + Number(o.totalAmount || 0), 0);
+    let res = `📦 **BẠN ĐANG CÓ ${orders.length} ĐƠN GIAO HÀNG ĐANG TỒN (TỔNG GIÁ TRỊ: ${formatVND(totalAmount)}):**\n\n`;
+    orders.forEach((o, idx) => {
+      const createdDate = o.createdAt ? new Date(o.createdAt).toLocaleDateString('vi-VN') : 'Trước đó';
+      const isCod = o.paymentMethod === 'COD' && o.paymentStatus !== 'PAID';
+      const statusNote = o.status === 'SHIPPING_FAILED' ? ` (⚠️ Hẹn lại: ${o.failReason || 'Chờ gọi lại'})` : '';
+      res += `${idx + 1}. **Đơn #${o.orderId}** - ${formatVND(o.totalAmount)} [${isCod ? '💵 Thu COD' : '💳 Đã TT'}]\n`;
+      res += `   📍 ${o.shippingAddress}\n`;
+      res += `   📞 Khách: ${o.customer?.name || 'Khách'} (${o.customer?.phone || 'Chưa có SĐT'})\n`;
+      res += `   Trạng thái: \`${o.status}\`${statusNote} | Ngày tạo: ${createdDate}\n\n`;
+    });
+    res += `💡 *Gợi ý: Ưu tiên liên hệ giao trước các đơn tồn lâu ngày để tránh khách hủy đơn nhé!*`;
+    return res.trim();
+  },
+  sql: (userId) => `SELECT order_id, total_amount, payment_method, payment_status, status, shipping_address, created_at FROM orders WHERE assigned_shipper_id = ${userId || ':userId'} AND status IN ('SHIPPED', 'OUT_FOR_DELIVERY', 'ASSIGNED', 'SHIPPING_FAILED', 'RETURNING_TO_WAREHOUSE') AND created_at < date_trunc('day', now() AT TIME ZONE 'Asia/Ho_Chi_Minh') ORDER BY created_at ASC;`
+});
+
+// Kỹ năng 18: Thống kê tổng quan tiến độ giao hàng của shipper (Delivery Progress Overview)
+deliveryTrainer.addSkill({
+  id: 'DELIVERY_PROGRESS_OVERVIEW',
+  title: 'Thống kê tổng quan tiến độ giao hàng của shipper',
+  description: 'Tổng hợp số đơn Tất Cả, Hôm Nay, Mới Nhận, Đơn Tồn, Đang Đi Giao, Đã Giao, Chờ Gọi Lại...',
+  type: 'PRISMA_QUERY',
+  examples: [
+    'tiến độ giao hàng của tôi',
+    'tiến độ giao hàng của shipper',
+    'tình hình giao hàng hiện tại',
+    'báo cáo tiến độ giao hàng hôm nay',
+    'tổng quan tiến độ giao đơn của tôi',
+    'thống kê tiến độ phát hàng',
+    'xem tiến độ các đơn hàng của tôi',
+    'tổng kết tiến độ ca giao hàng'
+  ],
+  patterns: [
+    /(tiến độ giao hàng|tiến độ giao|tổng quan.*tiến độ|tình hình giao hàng|báo cáo tiến độ.*giao)/i
+  ],
+  keywords: ['tiến độ', 'giao'],
+  allowedRoles: ['DELIVERY', 'ADMIN_CEO', 'ADMIN'],
+  handler: async (prisma, _params, user) => {
+    const shipperId = Number(user?.id || 0);
+    const startOfToday = getStartOfDay();
+
+    // Lấy toàn bộ đơn đang phụ trách (active + delivered today)
+    const orders = await prisma.order.findMany({
+      where: {
+        assignedShipperId: shipperId,
+        status: { in: ['SHIPPED', 'OUT_FOR_DELIVERY', 'ASSIGNED', 'SHIPPING_FAILED', 'RETURNING_TO_WAREHOUSE', 'DELIVERED'] }
+      },
+      select: {
+        orderId: true,
+        status: true,
+        totalAmount: true,
+        paymentMethod: true,
+        paymentStatus: true,
+        failReason: true,
+        createdAt: true,
+        deliveredAt: true
+      }
+    });
+
+    const activeOrders = orders.filter(o => o.status !== 'DELIVERED');
+    const totalActive = activeOrders.length;
+    const todayOrders = activeOrders.filter(o => o.createdAt && new Date(o.createdAt) >= startOfToday);
+    const backlogOrders = activeOrders.filter(o => o.createdAt && new Date(o.createdAt) < startOfToday);
+
+    const shippingOrders = activeOrders.filter(o => o.status === 'SHIPPED' || o.status === 'OUT_FOR_DELIVERY' || o.status === 'ASSIGNED');
+    const awaitingOrders = activeOrders.filter(o => o.status === 'SHIPPING_FAILED' && (o.failReason || '').toLowerCase().includes('không'));
+    const rescheduledOrders = activeOrders.filter(o => o.status === 'SHIPPING_FAILED' && !(o.failReason || '').toLowerCase().includes('không'));
+    const returningOrders = activeOrders.filter(o => o.status === 'RETURNING_TO_WAREHOUSE');
+    const deliveredToday = orders.filter(o => o.status === 'DELIVERED' && o.deliveredAt && new Date(o.deliveredAt) >= startOfToday);
+
+    return {
+      totalActive,
+      todayCount: todayOrders.length,
+      backlogCount: backlogOrders.length,
+      shippingCount: shippingOrders.length,
+      awaitingCount: awaitingOrders.length,
+      rescheduledCount: rescheduledOrders.length,
+      returningCount: returningOrders.length,
+      deliveredTodayCount: deliveredToday.length
+    };
+  },
+  template: (data) => {
+    return `📊 **TỔNG QUAN TIẾN ĐỘ GIAO HÀNG CỦA BẠN:**\n\n` +
+           `• 📦 **Tất cả đơn đang phụ trách:** **${data.totalActive} đơn**\n` +
+           `  - 🆕 Đơn mới nhận hôm nay: **${data.todayCount} đơn**\n` +
+           `  - ⏳ **Đơn tồn từ các ngày trước:** **${data.backlogCount} đơn**\n\n` +
+           `• 🛵 **Trạng thái chi tiết:**\n` +
+           `  - 🚚 Đang đi giao: **${data.shippingCount} đơn**\n` +
+           `  - 📞 Chờ gọi lại (24h): **${data.awaitingCount} đơn**\n` +
+           `  - 🗓️ Khách hẹn lại: **${data.rescheduledCount} đơn**\n` +
+           `  - 🏢 Đang hoàn kho: **${data.returningCount} đơn**\n` +
+           `  - ✅ Đã giao thành công hôm nay: **${data.deliveredTodayCount} đơn**\n\n` +
+           `👉 Bạn có thể hỏi cụ thể: *"các đơn giao hàng đang tồn"* hoặc *"các đơn chờ gọi lại"* để xem chi tiết!`;
+  }
+});
+
+// Kỹ năng 19: Tra cứu các đơn chờ gọi lại / sự cố liên lạc
+deliveryTrainer.addSkill({
+  id: 'AWAITING_CALLBACK_ORDERS',
+  title: 'Tra cứu danh sách đơn hàng chờ gọi lại (24h) của shipper',
+  description: 'Lọc các đơn khách không nghe máy, thuê bao đang trong thời hạn 24h gọi lại',
+  type: 'PRISMA_QUERY',
+  examples: [
+    'các đơn chờ gọi lại',
+    'đơn nào của tôi đang chờ gọi lại',
+    'danh sách đơn khách không nghe máy',
+    'các đơn gọi lại 24h',
+    'đơn hẹn gọi lại'
+  ],
+  patterns: [
+    /(chờ gọi lại|gọi lại 24h|khách không nghe máy|thuê bao)/i
+  ],
+  keywords: ['gọi lại'],
+  allowedRoles: ['DELIVERY', 'ADMIN_CEO', 'ADMIN'],
+  handler: async (prisma, _params, user) => {
+    const shipperId = Number(user?.id || 0);
+    return await prisma.order.findMany({
+      where: {
+        assignedShipperId: shipperId,
+        status: 'SHIPPING_FAILED',
+        failReason: { contains: 'không liên lạc', mode: 'insensitive' }
+      },
+      select: {
+        orderId: true,
+        shippingAddress: true,
+        customer: { select: { phone: true, name: true } },
+        totalAmount: true,
+        failReason: true,
+        failNote: true,
+        createdAt: true
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+  },
+  template: (orders) => {
+    if (!orders || orders.length === 0) {
+      return '✅ Bạn hiện không có đơn nào ở trạng thái Chờ Gọi Lại.';
+    }
+    let res = `📞 **BẠN CÓ ${orders.length} ĐƠN CHỜ GỌI LẠI (KHÁCH KHÔNG LIÊN LẠC ĐƯỢC):**\n\n`;
+    orders.forEach((o, idx) => {
+      res += `${idx + 1}. **Đơn #${o.orderId}** - ${formatVND(o.totalAmount)}\n`;
+      res += `   📞 Khách: ${o.customer?.name || 'Khách'} (${o.customer?.phone || 'Chưa có SĐT'})\n`;
+      res += `   📍 Địa chỉ: ${o.shippingAddress}\n`;
+      res += `   Lý do: ${o.failReason || 'Không nghe máy'}\n\n`;
+    });
+    res += `💡 *Quy chuẩn SOP: Hãy gọi lại lần 2 cách 15-20 phút trước khi hết ca nhé!*`;
+    return res.trim();
   }
 });
 
