@@ -140,6 +140,27 @@ class VectorMatcher {
       console.warn('[VectorMatcher] Không thể nạp dữ liệu Synthetic:', synthErr.message);
     }
 
+    // Nạp các mẫu tri thức tự học (Pseudo-Labeling & Continuous Replay Memory Buffer)
+    try {
+      const { getPseudoSamples } = require('../memory/pseudoMemoryBuffer.service');
+      const pseudoSamples = getPseudoSamples();
+      for (const p of pseudoSamples) {
+        docs.push({
+          id: p.id || `pseudo_${docIdCounter++}`,
+          text: p.prompt,
+          metadata: {
+            role: p.role,
+            intentId: p.intentId,
+            title: `Tri thức tự học [${p.intentId}]`,
+            isPseudo: true,
+            confidence: p.confidence
+          }
+        });
+      }
+    } catch (pseudoErr) {
+      console.warn('[VectorMatcher] Không thể nạp Pseudo Memory:', pseudoErr.message);
+    }
+
     // Huấn luyện mô hình Vector Hybrid (BM25 + Cosine + Levenshtein)
     this.engine.fit(docs);
     this.isIndexed = true;

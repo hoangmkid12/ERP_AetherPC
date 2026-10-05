@@ -61,6 +61,45 @@ const submitAiFeedback = async (req, res, next) => {
       select: { id: true, status: true }
     });
 
+    // PSEUDO-LABELING & CONTINUOUS LEARNING:
+    // Nếu người dùng đánh giá câu trả lời là HELPFUL (👍), tự động gán nhãn và nạp vào Replay Memory Buffer
+    if (rating === 'HELPFUL') {
+      try {
+        const { recordPseudoSample } = require('../services/ai/memory/pseudoMemoryBuffer.service');
+        const { vectorMatcher } = require('../services/ai/matcher');
+
+        let matchedIntent = null;
+        if (chatLogId) {
+          const fullAudit = await prisma.aiAuditLog.findUnique({
+            where: { id: chatLogId },
+            select: { toolCalls: true }
+          });
+          if (Array.isArray(fullAudit?.toolCalls) && fullAudit.toolCalls.length > 0) {
+            matchedIntent = fullAudit.toolCalls[0].tool;
+          }
+        }
+
+        if (!matchedIntent) {
+          const matchRes = vectorMatcher.match(prompt.trim(), req.user?.role || null);
+          if (matchRes.status === 'MATCHED' && matchRes.intent) {
+            matchedIntent = matchRes.intent;
+          }
+        }
+
+        if (matchedIntent) {
+          recordPseudoSample({
+            prompt: prompt.trim(),
+            intentId: matchedIntent,
+            role: req.user?.role || 'SALES',
+            confidence: 0.95,
+            source: 'USER_HELPFUL_FEEDBACK'
+          });
+        }
+      } catch (pseudoErr) {
+        console.warn('[submitAiFeedback] Lỗi ghi nhận Pseudo-Labeling:', pseudoErr.message);
+      }
+    }
+
     res.status(201).json({
       success: true,
       data: feedback,
@@ -609,6 +648,21 @@ const generateSmartTemplate = async (req, res, next) => {
   }
 };
 
+// API lấy danh sách câu hỏi AI tự học qua phản hồi của nhân viên (Pseudo-Labeling Memory)
+const getPseudoSamplesApi = async (req, res, next) => {
+  try {
+    const { getPseudoSamples } = require('../services/ai/memory/pseudoMemoryBuffer.service');
+    const samples = getPseudoSamples();
+    res.json({
+      success: true,
+      data: samples,
+      count: samples.length
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 module.exports = {
   submitAiFeedback,
   getPendingAiFeedback,
@@ -621,5 +675,6 @@ module.exports = {
   autoFixSql,
   explainSql,
   generateSmartTemplate,
-  evaluateSqlRewardApi
+  evaluateSqlRewardApi,
+  getPseudoSamplesApi
 };

@@ -1,0 +1,11 @@
+[
+  {
+    "id": "pseudo_1791184667755_789",
+    "prompt": "con card 4070 ti super giá ra sao shop",
+    "intentId": "PRODUCT_PRICE_STOCK",
+    "role": "SALES",
+    "confidence": 0.95,
+    "source": "USER_HELPFUL_FEEDBACK",
+    "createdAt": "2026-10-05T07:17:47.755Z"
+  }
+]
