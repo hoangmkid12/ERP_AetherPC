@@ -3,6 +3,8 @@ const fs = require('fs');
 const path = require('path');
 
 const prisma = new PrismaClient();
+const { gridFor, GENERAL_EMPLOYEE, HOLIDAYS } = require('./hr-reference-data');
+const { computeAttendanceMetrics } = require('../src/services/hrPolicy');
 
 // Data file paths
 const DATA_DIR = path.join(__dirname, '..', '..', 'scraper', 'data');
@@ -16,6 +18,7 @@ async function cleanDatabase() {
   // Reverse topological order
   await prisma.payroll.deleteMany();
   await prisma.attendance.deleteMany();
+  await prisma.holiday.deleteMany();
   await prisma.leaveRequest.deleteMany();
   await prisma.assemblyLog.deleteMany();
   await prisma.workOrder.deleteMany();
@@ -408,8 +411,20 @@ async function main() {
     { id: 19, code: 'delivery_kv1', name: 'Nguyễn Văn Nam (Shipper KV1)', email: 'delivery.kv1@kltn-erp.vn', dept: 'Delivery', role: 'DELIVERY', salary: 9000000, deliveryRegion: 'HCM_KV1' },
     { id: 20, code: 'delivery_kv2', name: 'Trần Minh Khoa (Shipper KV2)', email: 'delivery.kv2@kltn-erp.vn', dept: 'Delivery', role: 'DELIVERY', salary: 9000000, deliveryRegion: 'HCM_KV2' },
     { id: 21, code: 'delivery_kv3', name: 'Lê Hoàng Phúc (Shipper KV3)', email: 'delivery.kv3@kltn-erp.vn', dept: 'Delivery', role: 'DELIVERY', salary: 9000000, deliveryRegion: 'HCM_KV3' },
-    { id: 22, code: 'delivery_kv4', name: 'Phạm Đức Thắng (Shipper KV4)', email: 'delivery.kv4@kltn-erp.vn', dept: 'Delivery', role: 'DELIVERY', salary: 9000000, deliveryRegion: 'HCM_KV4' }
+    { id: 22, code: 'delivery_kv4', name: 'Phạm Đức Thắng (Shipper KV4)', email: 'delivery.kv4@kltn-erp.vn', dept: 'Delivery', role: 'DELIVERY', salary: 9000000, deliveryRegion: 'HCM_KV4' },
+    // Tài khoản nhân viên chung (văn phòng) — chỉ có chức năng tự phục vụ: chấm công khuôn mặt,
+    // nghỉ phép, phiếu lương, hồ sơ cá nhân, tra cứu tài liệu nội bộ.
+    { id: 23, code: GENERAL_EMPLOYEE.code, name: GENERAL_EMPLOYEE.name, email: GENERAL_EMPLOYEE.email, dept: GENERAL_EMPLOYEE.dept, role: GENERAL_EMPLOYEE.role, phone: GENERAL_EMPLOYEE.phone }
   ];
+  // Lương, phụ cấp, chức danh lấy theo khung lương chuẩn (hr-reference-data.js) thay vì số tròn tùy ý.
+  const DEPENDENTS_BY_ID = { 1: 1, 4: 2, 6: 2, 8: 1, 10: 1, 15: 1, 18: 1 };
+  employeesData.forEach((emp, i) => {
+    Object.assign(emp, gridFor(emp.role));
+    emp.salary = emp.baseSalary;
+    emp.dependents = DEPENDENTS_BY_ID[emp.id] || 0;
+    // Ngày vào làm rải từ 2019 đến 2025 để có nhân viên đủ 5 năm được cộng phép thâm niên.
+    emp.hireDate = new Date(Date.UTC(2019 + (i % 7), (i * 5) % 12, 1 + (i % 20)));
+  });
   for (const emp of employeesData) {
     await prisma.employee.create({
       data: {
@@ -421,11 +436,19 @@ async function main() {
         department: emp.dept,
         role: emp.role,
         deliveryRegion: emp.deliveryRegion || null,
-        baseSalary: emp.salary,
+        phone: emp.phone || null,
+        baseSalary: emp.baseSalary,
+        responsibilityAllowance: emp.responsibilityAllowance,
+        allowance: emp.allowance,
+        jobTitle: emp.jobTitle,
+        dependents: emp.dependents,
+        hireDate: emp.hireDate,
         status: 'ACTIVE'
       }
     });
   }
+  await prisma.holiday.createMany({ data: HOLIDAYS.map(([d, name]) => ({ date: new Date(`${d}T00:00:00.000Z`), name })) });
+  await prisma.companySettings.upsert({ where: { id: 1 }, update: { hrUpgradeVersion: 1 }, create: { id: 1, hrUpgradeVersion: 1 } });
   await prisma.$executeRawUnsafe(`SELECT setval('employees_id_seq', (SELECT MAX(id) FROM employees));`);
 
   // 7. Orders & Items
@@ -710,54 +733,55 @@ async function main() {
 
   // 10. Attendances & Payrolls
   console.log('Seeding Attendances & Payrolls...');
-  const today = new Date(2026, 5, 19); // 19th June 2026
-  for (let dayOffset = 0; dayOffset < 30; dayOffset++) {
-    const curDate = new Date(today);
-    curDate.setDate(today.getDate() - dayOffset);
-    
-    // skip Sundays
-    if (curDate.getDay() === 0) continue;
-
+  // Chấm công khuôn mặt mẫu từ 01/03 đến 19/06/2026 (T2–T7, trừ ngày lễ) — giờ vào/ra ngẫu nhiên
+  // có kiểm soát (seed cố định) để bảng công có đủ các tình huống: đúng giờ, đi muộn, tăng ca, vắng.
+  let rngState = 20260619;
+  const rand = () => ((rngState = (rngState * 1103515245 + 12345) % 2147483648) / 2147483648);
+  const hhmm = (min) => `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`;
+  const shift = { workStartTime: '08:00', workEndTime: '17:30', breakMinutes: 90, lateGraceMinutes: 5 };
+  const holidaySet = new Set(HOLIDAYS.map(([d]) => d));
+  const attendanceRows = [];
+  for (let t = Date.UTC(2026, 2, 1); t <= Date.UTC(2026, 5, 19); t += 86400000) {
+    const date = new Date(t);
+    if (date.getUTCDay() === 0 || holidaySet.has(date.toISOString().slice(0, 10))) continue;
     for (const emp of employeesData) {
-      const checkIn = Math.random() > 0.9 ? '08:15' : '08:00';
-      await prisma.attendance.create({
-        data: {
-          employeeId: emp.id,
-          date: curDate,
-          checkIn,
-          checkOut: '17:30',
-          overtimeHours: 0,
-          status: 'PRESENT'
-        }
+      if (emp.role === 'EMPLOYEE' && t > Date.UTC(2026, 5, 10)) continue; // để trống vài ngày cho tài khoản demo tự chấm công
+      const r = rand();
+      if (r < 0.02) {
+        attendanceRows.push({ employeeId: emp.id, date, status: 'ABSENT', checkInMethod: 'MANUAL', note: 'Vắng không phép' });
+        continue;
+      }
+      const inMin = 7 * 60 + 40 + Math.floor(rand() * (r > 0.9 ? 45 : 22));      // 07:40 – 08:25
+      const outMin = 17 * 60 + 30 + Math.floor(rand() * (rand() > 0.85 ? 150 : 20)); // 17:30 – 20:00
+      const checkIn = hhmm(inMin);
+      const checkOut = hhmm(outMin);
+      const m = computeAttendanceMetrics({ checkIn, checkOut, settings: shift });
+      attendanceRows.push({
+        employeeId: emp.id, date, checkIn, checkOut, checkInMethod: 'FACE', checkOutMethod: 'FACE',
+        status: m.status, lateMinutes: m.lateMinutes, earlyLeaveMinutes: m.earlyLeaveMinutes,
+        workHours: m.workHours, overtimeHours: m.overtimeHours
       });
     }
   }
+  await prisma.attendance.createMany({ data: attendanceRows });
 
-  const periods = ['Tháng 03/2026', 'Tháng 04/2026', 'Tháng 05/2026'];
-  for (const prd of periods) {
-    for (const emp of employeesData) {
-      const allowance = Math.floor(emp.salary * 0.05);
-      const bonus = Math.random() > 0.7 ? Math.floor(emp.salary * 0.1) : 0;
-      const deduction = Math.floor(emp.salary * 0.02);
-      const net = emp.salary + allowance + bonus - deduction;
-
-      const [month, year] = prd.replace('Tháng ', '').split('/');
-      const dateStr = `${year}-${month}-05`;
-      await prisma.payroll.create({
-        data: {
-          employeeId: emp.id,
-          period: prd,
-          baseSalary: emp.salary,
-          allowances: allowance,
-          bonuses: bonus,
-          deductions: deduction,
-          netSalary: net,
-          status: 'PAID',
-          paidAt: new Date(dateStr)
-        }
-      });
-    }
+  // Bảng lương các kỳ đã qua được tính bằng chính service tính lương thật rồi đánh dấu đã chi trả.
+  const { loadPayrollContext, computePayslip } = require('../src/services/payrollService');
+  const seededEmployees = await prisma.employee.findMany();
+  for (const period of ['2026-03', '2026-04', '2026-05']) {
+    const ctx = await loadPayrollContext(period, seededEmployees);
+    const [y, mo] = period.split('-').map(Number);
+    await prisma.payroll.createMany({
+      data: seededEmployees.map(e => ({
+        ...computePayslip(e, ctx),
+        status: 'PAID',
+        approvedBy: 'Nguyễn Văn A (CEO)',
+        approvedAt: new Date(Date.UTC(y, mo, 3)),
+        paidAt: new Date(Date.UTC(y, mo, 5))
+      }))
+    });
   }
+  await require('../src/config/database').$disconnect();
 
   // 11. Purchase Orders & Receipts
   console.log('Seeding Purchase Orders...');

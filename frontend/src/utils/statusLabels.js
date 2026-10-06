@@ -222,10 +222,12 @@ export const LEAVE_STATUS = {
 
 // ─── Payroll.status (bảng lương) ───
 export const PAYROLL_STATUS = {
-  DRAFT: { label: 'Dự Thảo', color: '#64748b', bg: '#f1f5f9', border: '#cbd5e1' },
+  DRAFT: { label: 'Nháp - HR Đang Soạn', color: '#64748b', bg: '#f1f5f9', border: '#cbd5e1' },
   UNPAID: { label: 'Chưa Chi Trả', color: '#64748b', bg: '#f1f5f9', border: '#cbd5e1' },
   SUBMITTED_TO_CEO: { label: 'Đã Trình CEO Duyệt', color: '#b45309', bg: '#fffbeb', border: '#fde68a' },
   APPROVED_BY_CEO: { label: 'CEO Đã Duyệt - Chờ Giải Ngân', color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe' },
+  // Ban Giám Đốc trả bảng lương về cho Nhân Sự điều chỉnh (hr.routes.js reject-ceo).
+  REJECTED_BY_CEO: { label: 'Bị Trả Về - Cần Điều Chỉnh', color: '#be123c', bg: '#fff1f2', border: '#fecdd3' },
   // Bảng lương HR vừa lập — bước kế tiếp là Ban Giám Đốc duyệt (hr.routes.js approve-ceo),
   // KHÔNG phải kế toán duyệt chi như nhãn cũ.
   SUBMITTED_TO_ACCOUNTING: { label: 'Chờ Ban Giám Đốc Duyệt', color: '#b45309', bg: '#fffbeb', border: '#fde68a' },

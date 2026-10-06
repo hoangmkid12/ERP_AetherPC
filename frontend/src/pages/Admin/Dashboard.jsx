@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useSalesStore, useInventoryStore, useHRStore, useFinanceStore, useUtilityStore } from '../../stores';
 import { api } from '../../services/api';
 import { useAutoRefresh } from '../../hooks/useAutoRefresh';
-import { notify, confirm } from '../../context/NotificationContext';
+import { notify, confirm, promptText } from '../../context/NotificationContext';
 import { PO_STATUS, ORDER_STATUS, getStatusLabel, getStatusInfo } from '../../utils/statusLabels';
 import { Bar, Doughnut, Line } from 'react-chartjs-2';
 import { 
@@ -139,6 +139,7 @@ export default function Dashboard() {
   const employees = useHRStore(state => state.employees) || [];
   const payrolls = useHRStore(state => state.payrolls) || [];
   const approvePayrollByCEO = useHRStore(state => state.approvePayrollByCEO);
+  const rejectPayrollByCEO = useHRStore(state => state.rejectPayrollByCEO);
   const leaveRequests = useHRStore(state => state.leaveRequests) || [];
   const approveLeaveRequest = useHRStore(state => state.approveLeaveRequest);
   const rejectLeaveRequest = useHRStore(state => state.rejectLeaveRequest);
@@ -652,7 +653,12 @@ export default function Dashboard() {
   const grossProfit = totalRevenueVal - cogsAmount;
   const grossMarginPct = totalRevenueVal > 0 ? (grossProfit / totalRevenueVal) * 100 : 0;
   const totalInventoryAsset = inventory.reduce((sum, item) => sum + (Number(item.stock || item.stockQuantity || 0) * Number(item.price || item.unitCost || 0)), 0);
-  const totalPayrollCost = payrolls.reduce((sum, p) => sum + (Number(p.netSalary || p.totalSalary || 0) || 0), 0);
+  // Bảng lương đang hiển thị để duyệt: các phiếu đang chờ CEO, nếu không có thì kỳ gần nhất.
+  const awaitingCeoPayrolls = (payrolls || []).filter(p => p && ['SUBMITTED_TO_ACCOUNTING', 'SUBMITTED_TO_CEO'].includes(p.status));
+  const latestPayrollPeriod = (payrolls || []).map(p => p.period).sort().pop();
+  const shownPayrolls = awaitingCeoPayrolls.length ? awaitingCeoPayrolls : (payrolls || []).filter(p => p.period === latestPayrollPeriod);
+  const shownPayrollPeriod = shownPayrolls[0]?.period || '';
+  const totalPayrollCost = shownPayrolls.reduce((sum, p) => sum + (Number(p.netSalary || p.netAmount || 0) || 0), 0);
   const operatingExpense = (generalLedger || []).filter(tx => tx && tx.type === 'EXPENSE' && !tx.referenceId).reduce((sum, tx) => sum + (Number(tx.amount || 0) || 0), 0);
   const refundAmount = (generalLedger || []).filter(tx => tx && tx.type === 'REFUND').reduce((sum, tx) => sum + (Number(tx.amount || 0) || 0), 0);
   const netIncome = totalRevenueVal - cogsAmount - totalPayrollCost - operatingExpense - refundAmount;
@@ -1207,10 +1213,10 @@ export default function Dashboard() {
             <div style={{ backgroundColor: '#f0fdf4', padding: '1rem', borderRadius: '6px', border: '1px solid #bbf7d0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
               <div>
                 <strong style={{ fontSize: '0.9rem', color: '#15803d', display: 'block' }}>
-                  Bảng Lương Tháng Hiện Tại ({payrolls.length || 15} Nhân Viên)
+                  Bảng Lương {shownPayrollPeriod ? `Kỳ ${shownPayrollPeriod}` : ''} ({shownPayrolls.length} Nhân Viên)
                 </strong>
                 <span style={{ fontSize: '0.78rem', color: '#475569', marginTop: '0.2rem', display: 'block' }}>
-                  Tổng quỹ lương: <strong style={{ color: '#0f172a' }}>{formatPrice(totalPayrollCost)}</strong> (Bao gồm hoa hồng bán hàng 1% & thưởng ráp máy)
+                  Tổng thực lĩnh: <strong style={{ color: '#0f172a' }}>{formatPrice(totalPayrollCost)}</strong> (đã gồm tăng ca, hoa hồng, thưởng lắp ráp; đã trừ BHXH và thuế TNCN)
                 </span>
               </div>
 
@@ -1234,6 +1240,23 @@ export default function Dashboard() {
                     style={{ backgroundColor: '#16a34a', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.5rem 1.1rem', fontSize: '0.82rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
                   >
                     <Check size={16} /> Phê Duyệt Ngay Bảng Lương
+                  </button>
+                )}
+                {payrollAwaitingCeo && (
+                  <button
+                    onClick={async () => {
+                      const reason = await promptText('Lý do trả bảng lương về cho Nhân Sự điều chỉnh:', '');
+                      if (!reason || !reason.trim()) return;
+                      try {
+                        await rejectPayrollByCEO(reason.trim());
+                        notify('Đã trả bảng lương về cho phòng Nhân Sự.', 'info');
+                      } catch (err) {
+                        notify(`Không thể trả bảng lương về: ${err.message || 'lỗi kết nối máy chủ'}.`, 'error');
+                      }
+                    }}
+                    style={{ backgroundColor: '#ffffff', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '6px', padding: '0.5rem 1rem', fontSize: '0.82rem', fontWeight: 800, cursor: 'pointer' }}
+                  >
+                    Trả Về Điều Chỉnh
                   </button>
                 )}
               </div>

@@ -737,6 +737,24 @@ model Employee {
   phone        String?       @db.VarChar(20)
   baseSalary   Decimal       @map("base_salary") @db.Decimal(15, 2)
   status       String?       @default("ACTIVE") @db.VarChar(20)
+  // ─── Hồ sơ lao động & chế độ lương ───
+  jobTitle     String?       @map("job_title") @db.VarChar(100)
+  hireDate     DateTime?     @map("hire_date") @db.Date
+  // Phụ cấp chức vụ/trách nhiệm: tính vào lương đóng BHXH.
+  responsibilityAllowance Decimal @default(0) @map("responsibility_allowance") @db.Decimal(15, 2)
+  // Phụ cấp cố định không đóng BHXH (ăn trưa, xăng xe, điện thoại) — chia theo ngày công.
+  allowance    Decimal       @default(0) @db.Decimal(15, 2)
+  dependents   Int           @default(0) // số người phụ thuộc đã đăng ký giảm trừ gia cảnh
+  annualLeaveQuota Int       @default(12) @map("annual_leave_quota")
+  idNumber     String?       @map("id_number") @db.VarChar(20)
+  personalTaxCode String?    @map("personal_tax_code") @db.VarChar(20)
+  bankName     String?       @map("bank_name") @db.VarChar(100)
+  bankAccount  String?       @map("bank_account") @db.VarChar(30)
+  // ─── Chấm công khuôn mặt ───
+  // Vector đặc trưng 128 chiều (face-api.js) — chỉ server đọc để so khớp, không bao giờ trả về client.
+  faceDescriptor   Json?     @map("face_descriptor")
+  faceImage        String?   @map("face_image") // ảnh mẫu thu nhỏ (base64) để HR đối chiếu
+  faceRegisteredAt DateTime? @map("face_registered_at") @db.Timestamptz()
   createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz()
   updatedAt    DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
 
@@ -802,6 +820,17 @@ model Attendance {
   checkOut      String?  @map("check_out") @db.VarChar(10)
   overtimeHours Decimal? @default(0.00) @map("overtime_hours") @db.Decimal(4, 2)
   status        String?  @default("PRESENT") @db.VarChar(20)
+  // FACE (chấm bằng khuôn mặt) | MANUAL (HR nhập tay)
+  checkInMethod  String? @map("check_in_method") @db.VarChar(20)
+  checkOutMethod String? @map("check_out_method") @db.VarChar(20)
+  workHours         Decimal? @default(0.00) @map("work_hours") @db.Decimal(5, 2)
+  lateMinutes       Int      @default(0) @map("late_minutes")
+  earlyLeaveMinutes Int      @default(0) @map("early_leave_minutes")
+  faceDistance  Decimal? @map("face_distance") @db.Decimal(6, 4) // khoảng cách vector lúc vào ca, càng nhỏ càng giống
+  checkInPhoto  String?  @map("check_in_photo")  // ảnh chụp lúc vào ca (base64 thu nhỏ) — bằng chứng chấm công
+  checkOutPhoto String?  @map("check_out_photo")
+  note          String?
+  updatedBy     String?  @map("updated_by") @db.VarChar(150)
 
   employee      Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
@@ -842,9 +871,50 @@ model Payroll {
   paidAt     DateTime? @map("paid_at") @db.Timestamptz()
   createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz()
 
+  // ─── Chi tiết phiếu lương (services/payrollService.js) ───
+  // baseSalary/allowances/bonuses/deductions/netSalary ở trên giữ nguyên ý nghĩa
+  // tổng hợp cho các màn hình cũ (Kế Toán, Dashboard); các cột dưới là chi tiết.
+  contractSalary    Decimal? @map("contract_salary") @db.Decimal(15, 2)     // lương hợp đồng + phụ cấp chức vụ
+  standardDays      Decimal? @map("standard_days") @db.Decimal(5, 2)        // công chuẩn của tháng
+  workDays          Decimal? @map("work_days") @db.Decimal(5, 2)            // ngày đi làm thực tế
+  paidLeaveDays     Decimal? @map("paid_leave_days") @db.Decimal(5, 2)      // nghỉ phép có lương + nghỉ lễ
+  unpaidDays        Decimal? @map("unpaid_days") @db.Decimal(5, 2)          // vắng không phép / nghỉ không lương
+  lateMinutes       Int?     @map("late_minutes")
+  overtimeHours     Decimal? @map("overtime_hours") @db.Decimal(6, 2)
+  overtimePay       Decimal? @map("overtime_pay") @db.Decimal(15, 2)
+  commission        Decimal? @db.Decimal(15, 2)
+  assemblyBonus     Decimal? @map("assembly_bonus") @db.Decimal(15, 2)
+  otherBonus        Decimal? @default(0) @map("other_bonus") @db.Decimal(15, 2)
+  grossSalary       Decimal? @map("gross_salary") @db.Decimal(15, 2)
+  insuranceSalary   Decimal? @map("insurance_salary") @db.Decimal(15, 2)    // lương làm căn cứ đóng BH (đã áp trần)
+  employeeInsurance Decimal? @map("employee_insurance") @db.Decimal(15, 2)  // 10.5% NLĐ đóng
+  employerInsurance Decimal? @map("employer_insurance") @db.Decimal(15, 2)  // 21.5% DN đóng (chi phí DN, không trừ lương)
+  taxableIncome     Decimal? @map("taxable_income") @db.Decimal(15, 2)
+  personalIncomeTax Decimal? @map("personal_income_tax") @db.Decimal(15, 2)
+  latePenalty       Decimal? @map("late_penalty") @db.Decimal(15, 2)
+  otherDeductions   Decimal? @default(0) @map("other_deductions") @db.Decimal(15, 2)
+  note              String?
+  rejectReason      String?  @map("reject_reason")
+  approvedBy        String?  @map("approved_by") @db.VarChar(150)
+  approvedAt        DateTime? @map("approved_at") @db.Timestamptz()
+  updatedAt         DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
   employee   Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
+  @@index([period])
+  @@index([employeeId, period])
   @@map("payrolls")
+}
+
+// Ngày nghỉ lễ, Tết (Bộ luật Lao động 2019, Điều 112) — được hưởng nguyên lương,
+// đi làm ngày này tính tăng ca 300%.
+model Holiday {
+  id        Int      @id @default(autoincrement())
+  date      DateTime @unique @db.Date
+  name      String   @db.VarChar(150)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  @@map("holidays")
 }
 
 // ============================================================================
@@ -1092,14 +1162,27 @@ model CompanySettings {
   taxCode             String?  @map("tax_code") @db.VarChar(50)
   hotline             String?  @db.VarChar(30)
   address             String?
-  // Hoa hồng/thưởng dưới đây là SỐ TIỀN CỐ ĐỊNH mỗi kỳ lương, khớp đúng cách
-  // POST /hr/payrolls (hr.routes.js) đang tính — không phải % doanh thu (tính
-  // % thật cần tổng hợp doanh số riêng từng nhân viên, ngoài phạm vi hiện tại).
-  salesCommissionFlat Decimal  @default(1250000.00) @map("sales_commission_flat") @db.Decimal(15, 2)
-  assemblyBonus       Decimal  @default(750000.00) @map("assembly_bonus") @db.Decimal(15, 2)
+  // Tên cột giữ nguyên vì lý do lịch sử, nhưng giá trị là PHẦN TRĂM hoa hồng trên
+  // doanh số bán tại quầy của Nhân Viên Bán Hàng (xem prisma/fix-payroll-settings.js).
+  salesCommissionFlat Decimal  @default(1.00) @map("sales_commission_flat") @db.Decimal(15, 2)
+  assemblyBonus       Decimal  @default(150000.00) @map("assembly_bonus") @db.Decimal(15, 2) // VNĐ/bộ máy nghiệm thu
+  // Tiền phạt cố định khi tính lương cho mỗi ngày vắng không phép (ngoài việc không được tính công).
+  absencePenalty      Decimal  @default(0) @map("absence_penalty") @db.Decimal(15, 2)
   defaultVat          Decimal  @default(10.00) @map("default_vat") @db.Decimal(5, 2)
   lowStockThreshold   Int      @default(5) @map("low_stock_threshold")
   autoApproveReturns  Boolean  @default(false) @map("auto_approve_returns")
+  // ─── Chính sách chấm công & tính lương (tab "Cấu Hình Công & Lương" của HR) ───
+  workStartTime       String   @default("08:00") @map("work_start_time") @db.VarChar(5)
+  workEndTime         String   @default("17:30") @map("work_end_time") @db.VarChar(5)
+  breakMinutes        Int      @default(90) @map("break_minutes")        // nghỉ trưa, không tính giờ làm
+  lateGraceMinutes    Int      @default(5) @map("late_grace_minutes")    // đi trễ trong ngưỡng này không bị tính
+  workOnSaturday      Boolean  @default(true) @map("work_on_saturday")   // công chuẩn T2–T7 hay T2–T6
+  // false: ngày làm việc không có dữ liệu chấm công vẫn tính đủ công (giai đoạn chuyển đổi);
+  // true: chỉ ngày có chấm công / nghỉ phép được duyệt / nghỉ lễ mới được tính công.
+  attendanceStrictMode Boolean @default(false) @map("attendance_strict_mode")
+  faceMatchThreshold  Decimal  @default(0.50) @map("face_match_threshold") @db.Decimal(4, 2)
+  regionMinimumWage   Decimal  @default(5310000) @map("region_minimum_wage") @db.Decimal(15, 2) // Vùng I (NĐ 293/2025/NĐ-CP)
+  hrUpgradeVersion    Int      @default(0) @map("hr_upgrade_version")    // prisma/upgrade-hr-module.js
   updatedAt           DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
 
   @@map("company_settings")
