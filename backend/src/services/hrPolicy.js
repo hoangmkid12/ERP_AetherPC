@@ -86,25 +86,37 @@ const standardHoursPerDay = (settings) => {
 };
 
 // Tính đi muộn, về sớm, giờ làm và giờ tăng ca từ giờ vào/ra thực tế.
+const LUNCH_START = 12 * 60; // nghỉ trưa bắt đầu 12:00, kéo dài settings.breakMinutes phút
+
+/**
+ * Tính số phút đi muộn, về sớm, giờ làm thực tế và giờ tăng ca của một ngày.
+ * Mọi khoảng thời gian đều tính theo PHÚT LÀM VIỆC THỰC, tức đã loại phần trùng với giờ nghỉ trưa:
+ * vào ca 13:00 với ca 08:00 thì chỉ thiếu 240 phút làm việc (không phải 300), làm 08:00–13:00 là 4 giờ.
+ * Tổng phút muộn + về sớm không vượt quá thời lượng ca, để tiền trừ chuyên cần của một ngày không bao
+ * giờ lớn hơn tiền công của chính ngày đó (kể cả khi chấm vào ca sau giờ tan ca).
+ */
 const computeAttendanceMetrics = ({ checkIn, checkOut, settings }) => {
   const start = toMinutes(settings.workStartTime) ?? 480;
   const end = toMinutes(settings.workEndTime) ?? 1050;
   const grace = settings.lateGraceMinutes ?? 5;
   const breakMin = settings.breakMinutes ?? 90;
+  const lunchEnd = LUNCH_START + breakMin;
   const inMin = toMinutes(checkIn);
   const outMin = toMinutes(checkOut);
+  // Số phút làm việc trong khoảng [a, b), trừ phần trùng giờ nghỉ trưa.
+  const workingMinutes = (a, b) => (b <= a ? 0 : (b - a) - Math.max(0, Math.min(b, lunchEnd) - Math.max(a, LUNCH_START)));
+  const shiftMinutes = workingMinutes(start, end);
 
-  const rawLate = inMin != null ? Math.max(0, inMin - start) : 0;
+  const rawLate = inMin != null ? workingMinutes(start, Math.min(inMin, end)) : 0;
   const lateMinutes = rawLate > grace ? rawLate : 0;
-  const earlyLeaveMinutes = outMin != null ? Math.max(0, end - outMin) : 0;
+  let earlyLeaveMinutes = outMin != null && (inMin == null || outMin > inMin)
+    ? workingMinutes(Math.max(outMin, start), end) : 0;
+  earlyLeaveMinutes = Math.min(earlyLeaveMinutes, Math.max(0, shiftMinutes - lateMinutes));
 
   let workHours = 0;
   let overtimeHours = 0;
   if (inMin != null && outMin != null && outMin > inMin) {
-    // Nghỉ trưa chỉ trừ khi ca làm thực tế bao trùm khung nghỉ trưa (bắt đầu 12:00).
-    const lunchStart = 12 * 60;
-    const overlapsLunch = inMin < lunchStart && outMin > lunchStart + breakMin;
-    workHours = Math.max(0, (outMin - inMin - (overlapsLunch ? breakMin : 0)) / 60);
+    workHours = workingMinutes(inMin, outMin) / 60;
     // Tăng ca: phần làm sau giờ tan ca từ 30 phút trở lên, làm tròn xuống từng nửa giờ.
     const afterEnd = outMin - Math.max(end, inMin);
     if (afterEnd >= 30) overtimeHours = Math.floor(afterEnd / 30) * 0.5;

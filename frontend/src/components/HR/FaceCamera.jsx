@@ -1,23 +1,30 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { Camera, RefreshCw, CheckCircle2, AlertTriangle, Loader2, ScanFace, Eye, UserCheck } from 'lucide-react';
-import {
-  loadFaceModels, detectFace, createFaceTracker, createBlinkDetector, snapshot, averageDescriptors
-} from '../../utils/faceRecognition';
+import { Camera, RefreshCw, CheckCircle2, AlertTriangle, Loader2, ScanFace, ArrowLeft, ArrowRight, UserCheck } from 'lucide-react';
+import { loadFaceModels, detectFace, createFaceTracker, createHeadTurnChallenge, snapshot, averageDescriptors } from '../../utils/faceRecognition';
 
 const REGISTER_SAMPLES = 5;
-const FAST_INTERVAL = 15;   // ms nghỉ giữa hai lần quét khi chờ nháy mắt (bám mặt + điểm mốc)
-const SLOW_HINT_AFTER = 6000; // ms: chưa thấy nháy mắt thì nhắc nháy chậm, rõ hơn
+const FAST_INTERVAL = 15;      // ms nghỉ giữa hai lần quét trong lúc làm thử thách quay đầu
+const LOST_RESET_MS = 2500;    // mất khuôn mặt lâu hơn mức này thì làm lại thử thách từ đầu
 
 const STEPS = [
-  { key: 'face', label: 'Nhìn thẳng camera', icon: ScanFace },
-  { key: 'blink', label: 'Nháy mắt / quay đầu', icon: Eye },
+  { key: 'calibrating', label: 'Nhìn thẳng', icon: ScanFace },
+  { key: 'left', label: 'Quay trái', icon: ArrowLeft },
+  { key: 'right', label: 'Quay phải', icon: ArrowRight },
   { key: 'verify', label: 'Xác thực', icon: UserCheck }
 ];
+const STEP_INDEX = { calibrating: 0, left: 1, right: 2, front: 3, done: 3, verify: 3 };
+
+const HINTS = {
+  calibrating: 'Nhìn thẳng vào camera và giữ yên đầu...',
+  left: 'Từ từ QUAY ĐẦU SANG TRÁI.',
+  right: 'Tốt! Giờ QUAY ĐẦU SANG PHẢI.',
+  front: 'Tốt! Quay lại NHÌN THẲNG vào camera.'
+};
 
 /**
- * Khung camera chấm công / đăng ký khuôn mặt, có kiểm tra người thật (yêu cầu nháy mắt).
- * - mode="verify": chụp 1 mẫu sau khi nháy mắt rồi gọi onCapture({ descriptor, image }).
- * - mode="register": gom REGISTER_SAMPLES mẫu, lấy trung bình để vector ổn định hơn.
+ * Khung camera chấm công / đăng ký khuôn mặt, xác nhận người thật bằng thử thách quay đầu trái → phải.
+ * - mode="verify": chụp 1 mẫu khi đã nhìn thẳng lại rồi gọi onCapture({ descriptor, image }).
+ * - mode="register": gom REGISTER_SAMPLES mẫu khi nhìn thẳng, lấy trung bình để vector ổn định hơn.
  * onCapture trả Promise; nếu reject, thông báo lỗi hiển thị và cho thử lại.
  */
 export default function FaceCamera({ mode = 'verify', onCapture, submitLabel, compact = false }) {
@@ -26,12 +33,12 @@ export default function FaceCamera({ mode = 'verify', onCapture, submitLabel, co
   const timerRef = useRef(null);
   const stateRef = useRef(null);
   const [phase, setPhase] = useState('loading'); // loading | scanning | submitting | done | error
-  const [step, setStep] = useState('face');      // face | blink | verify
+  const [step, setStep] = useState('calibrating');
   const [hint, setHint] = useState('Đang tải mô hình nhận diện khuôn mặt...');
   const [tone, setTone] = useState('info');      // info | warn | ok | error
   const [result, setResult] = useState(null);
 
-  const freshState = () => ({ blink: createBlinkDetector(), tracker: createFaceTracker(), live: false, samples: [], busy: false, startedAt: Date.now() });
+  const freshState = () => ({ challenge: createHeadTurnChallenge(), tracker: createFaceTracker(), samples: [], busy: false, lostSince: null });
 
   const stopCamera = useCallback(() => {
     clearTimeout(timerRef.current);
@@ -66,49 +73,45 @@ export default function FaceCamera({ mode = 'verify', onCapture, submitLabel, co
     let delay = FAST_INTERVAL;
     try {
       if (video.readyState < 2) return;
-
-      if (!st.live) {
-        // Giai đoạn 1: chờ nháy mắt — bám theo khuôn mặt, chỉ đo điểm mốc mắt cho nhanh.
-        const face = await st.tracker.next(video);
-        if (face.status === 'none') { st.blink = createBlinkDetector(); setStep('face'); say('warn', 'Không thấy khuôn mặt — hãy nhìn thẳng vào camera.'); return; }
-        if (face.status === 'multiple') { st.blink = createBlinkDetector(); setStep('face'); say('warn', `Có ${face.count} người trong khung hình — chỉ một người được đứng trước camera.`); return; }
-        if (face.width < video.videoWidth * 0.2) { st.blink = createBlinkDetector(); setStep('face'); say('warn', 'Hãy đưa mặt lại gần camera hơn.'); return; }
-
-        const state = st.blink.update(face.eyes);
-        setStep('blink');
-        if (state === 'calibrating') { say('info', 'Đã thấy khuôn mặt, giữ yên một chút...'); return; }
-        if (state === 'closing') { say('info', 'Tốt, giờ mở mắt ra...'); return; }
-        if (state === 'turning') { say('info', 'Tốt, giờ quay lại nhìn thẳng camera...'); return; }
-        if (state === 'blink') {
-          st.live = true;
-          setStep('verify');
-          say('ok', 'Đã xác nhận người thật. Đang nhận diện khuôn mặt...');
-          delay = 60;
-          return;
+      const face = await st.tracker.next(video);
+      if (face.status !== 'ok') {
+        st.lostSince = st.lostSince || Date.now();
+        // Khi quay đầu mạnh, bộ phát hiện có thể mất mặt vài khung — chỉ làm lại khi mất quá lâu.
+        if (Date.now() - st.lostSince > LOST_RESET_MS && st.challenge.step !== 'calibrating') {
+          st.challenge = createHeadTurnChallenge();
+          setStep('calibrating');
         }
-        const slow = Date.now() - st.startedAt > SLOW_HINT_AFTER;
-        say('info', slow
-          ? 'Chưa nhận được — hãy QUAY NHẸ ĐẦU sang trái (hoặc phải) rồi nhìn thẳng lại, hoặc nhắm hẳn mắt nửa giây rồi mở ra.'
-          : 'Hãy NHÁY MẮT hoặc QUAY NHẸ ĐẦU sang một bên rồi nhìn thẳng lại để xác nhận người thật.');
+        if (face.status === 'multiple') { st.challenge = createHeadTurnChallenge(); setStep('calibrating'); }
+        say('warn', face.status === 'multiple'
+          ? `Có ${face.count} người trong khung hình — chỉ một người được đứng trước camera.`
+          : 'Không thấy khuôn mặt — hãy đưa mặt vào giữa khung hình.');
+        return;
+      }
+      st.lostSince = null;
+      if (face.width < video.videoWidth * 0.18) { say('warn', 'Hãy đưa mặt lại gần camera hơn.'); return; }
+
+      const current = st.challenge.update(face.yaw);
+      if (current !== 'done') {
+        setStep(current);
+        if (current === 'left' && st.challenge.wrongWay) say('warn', 'Bạn đang quay sang phải — hãy quay sang TRÁI trước.');
+        else say(current === 'calibrating' ? 'info' : 'ok', HINTS[current]);
         return;
       }
 
-      // Giai đoạn 2: đã qua kiểm tra người thật — trích vector khi mắt mở.
+      // Đã qua thử thách: lấy mẫu vector khi đang nhìn thẳng.
+      setStep('verify');
       delay = 120;
-      // Chỉ lấy mẫu khi mắt đã mở lại (đo bằng cùng cách với lúc phát hiện nháy mắt).
-      const tracked = await st.tracker.next(video);
-      if (tracked.status !== 'ok') { say('warn', 'Giữ khuôn mặt trong khung hình...'); return; }
-      if (!st.blink.isOpen(tracked.eyes)) return;
-      const face = await detectFace(video);
-      if (!face || face.multiple) { say('warn', 'Giữ khuôn mặt trong khung hình...'); return; }
+      if (!st.challenge.isFacingFront(face.yaw)) { say('info', HINTS.front); return; }
+      const full = await detectFace(video);
+      if (!full || full.multiple) { say('warn', 'Giữ khuôn mặt trong khung hình...'); return; }
       if (mode === 'register') {
-        st.samples.push(face.descriptor);
-        say('ok', `Đang lấy mẫu khuôn mặt ${st.samples.length}/${REGISTER_SAMPLES} — giữ yên, hơi xoay nhẹ đầu...`);
+        st.samples.push(full.descriptor);
+        say('ok', `Đang lấy mẫu khuôn mặt ${st.samples.length}/${REGISTER_SAMPLES} — giữ yên, nhìn thẳng...`);
         if (st.samples.length >= REGISTER_SAMPLES) {
           await finish(averageDescriptors(st.samples), snapshot(video));
         }
       } else {
-        await finish(face.descriptor, snapshot(video));
+        await finish(full.descriptor, snapshot(video));
       }
     } catch (err) {
       say('error', err.message || 'Lỗi nhận diện.');
@@ -123,7 +126,7 @@ export default function FaceCamera({ mode = 'verify', onCapture, submitLabel, co
     stateRef.current = freshState();
     setResult(null);
     setPhase('loading');
-    setStep('face');
+    setStep('calibrating');
     say('info', 'Đang chuẩn bị camera...');
     if (!navigator.mediaDevices?.getUserMedia) {
       setPhase('error');
@@ -142,7 +145,7 @@ export default function FaceCamera({ mode = 'verify', onCapture, submitLabel, co
       }
       stateRef.current = freshState();
       setPhase('scanning');
-      say('info', 'Đặt khuôn mặt vào giữa khung hình.');
+      say('info', HINTS.calibrating);
       timerRef.current = setTimeout(tick, 300);
     } catch (err) {
       stopCamera();
@@ -166,12 +169,14 @@ export default function FaceCamera({ mode = 'verify', onCapture, submitLabel, co
 
   const toneColor = { info: '#2563eb', warn: '#d97706', ok: '#16a34a', error: '#dc2626' }[tone];
   const size = compact ? 260 : 320;
-  const stepIndex = phase === 'done' ? STEPS.length : STEPS.findIndex(s => s.key === step);
+  const stepIndex = phase === 'done' ? STEPS.length : STEP_INDEX[step] ?? 0;
   const showVideo = phase === 'scanning' || phase === 'submitting';
+  // Video hiển thị lật gương nên "bên trái của người dùng" nằm ở bên trái màn hình.
+  const arrow = phase === 'scanning' && (step === 'left' ? 'left' : step === 'right' ? 'right' : null);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem', width: '100%' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap', justifyContent: 'center' }}>
         {STEPS.map((s, i) => {
           const doneStep = i < stepIndex;
           const active = i === stepIndex && phase !== 'error';
@@ -179,8 +184,8 @@ export default function FaceCamera({ mode = 'verify', onCapture, submitLabel, co
           const Icon = doneStep ? CheckCircle2 : s.icon;
           return (
             <React.Fragment key={s.key}>
-              {i > 0 && <div style={{ width: 22, height: 2, backgroundColor: doneStep || active ? '#93c5fd' : '#e2e8f0' }} />}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.85rem', fontWeight: active ? 600 : 500, color }}>
+              {i > 0 && <div style={{ width: 18, height: 2, backgroundColor: doneStep || active ? '#93c5fd' : '#e2e8f0' }} />}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.85rem', fontWeight: active ? 600 : 500, color }}>
                 <Icon size={17} /> {s.label}
               </div>
             </React.Fragment>
@@ -188,25 +193,32 @@ export default function FaceCamera({ mode = 'verify', onCapture, submitLabel, co
         })}
       </div>
 
-      <div style={{ position: 'relative', width: size, height: size, borderRadius: '50%', overflow: 'hidden', border: `4px solid ${toneColor}`, backgroundColor: '#0f172a', boxShadow: `0 0 0 8px ${toneColor}1f`, transition: 'border-color 0.2s, box-shadow 0.2s' }}>
-        <video
-          ref={videoRef}
-          muted
-          playsInline
-          style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)', display: showVideo ? 'block' : 'none' }}
-        />
-        {!showVideo && (
-          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#e2e8f0' }}>
-            {phase === 'loading' && <Loader2 size={48} style={{ animation: 'face-spin 1s linear infinite' }} />}
-            {phase === 'done' && (result?.image || result?.data?.faceImage)
-              ? <img src={result.image || result.data.faceImage} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-              : phase === 'done' ? <CheckCircle2 size={64} color="#4ade80" /> : null}
-            {phase === 'error' && <AlertTriangle size={56} color="#f87171" />}
-          </div>
-        )}
-        {phase === 'submitting' && (
-          <div style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(15,23,42,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <ScanFace size={64} color="#ffffff" />
+      <div style={{ position: 'relative', width: size, height: size }}>
+        <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', overflow: 'hidden', border: `4px solid ${toneColor}`, backgroundColor: '#0f172a', boxShadow: `0 0 0 8px ${toneColor}1f`, transition: 'border-color 0.2s, box-shadow 0.2s' }}>
+          <video
+            ref={videoRef}
+            muted
+            playsInline
+            style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)', display: showVideo ? 'block' : 'none' }}
+          />
+          {!showVideo && (
+            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#e2e8f0' }}>
+              {phase === 'loading' && <Loader2 size={48} style={{ animation: 'face-spin 1s linear infinite' }} />}
+              {phase === 'done' && (result?.image || result?.data?.faceImage)
+                ? <img src={result.image || result.data.faceImage} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                : phase === 'done' ? <CheckCircle2 size={64} color="#4ade80" /> : null}
+              {phase === 'error' && <AlertTriangle size={56} color="#f87171" />}
+            </div>
+          )}
+          {phase === 'submitting' && (
+            <div style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(15,23,42,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <ScanFace size={64} color="#ffffff" />
+            </div>
+          )}
+        </div>
+        {arrow && (
+          <div style={{ position: 'absolute', top: '50%', [arrow]: -24, transform: 'translateY(-50%)', width: 48, height: 48, borderRadius: '50%', backgroundColor: '#2563eb', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 12px rgba(37,99,235,0.4)', animation: `face-nudge-${arrow} 1s ease-in-out infinite` }}>
+            {arrow === 'left' ? <ArrowLeft size={26} /> : <ArrowRight size={26} />}
           </div>
         )}
       </div>
@@ -225,7 +237,9 @@ export default function FaceCamera({ mode = 'verify', onCapture, submitLabel, co
           {phase === 'done' ? (submitLabel || 'Chấm công lần nữa') : 'Thử lại'}
         </button>
       )}
-      <style>{'@keyframes face-spin { to { transform: rotate(360deg); } }'}</style>
+      <style>{`@keyframes face-spin { to { transform: rotate(360deg); } }
+        @keyframes face-nudge-left { 0%, 100% { margin-left: 0; } 50% { margin-left: -8px; } }
+        @keyframes face-nudge-right { 0%, 100% { margin-right: 0; } 50% { margin-right: -8px; } }`}</style>
     </div>
   );
 }

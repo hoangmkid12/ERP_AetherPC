@@ -81,16 +81,15 @@ export const detectFace = async (input) => {
 };
 
 /**
- * Bám theo khuôn mặt để đo độ mở mắt thật nhanh trong lúc chờ nháy mắt.
+ * Bám theo khuôn mặt để đo hướng đầu thật nhanh trong lúc làm thử thách quay trái/phải.
  * Bước phát hiện mặt (chậm nhất) chỉ chạy định kỳ để cập nhật vị trí và kiểm tra có người thứ hai;
- * các khung ở giữa chỉ chạy mô hình 68 điểm mốc trên vùng mặt đã cắt sẵn — nhanh gấp ~3 lần,
- * nên kể cả máy yếu vẫn quét đủ dày để bắt được cái nháy mắt.
+ * các khung ở giữa chỉ chạy mô hình 68 điểm mốc trên vùng mặt đã cắt sẵn — nhanh gấp ~3 lần.
  */
-export const createFaceTracker = ({ redetectEvery = 6 } = {}) => {
+export const createFaceTracker = ({ redetectEvery = 4 } = {}) => {
   const crop = document.createElement('canvas');
   crop.width = 192;
   crop.height = 192;
-  const ctx = crop.getContext('2d', { willReadFrequently: true });
+  const ctx = crop.getContext('2d');
   let box = null;
   let frame = 0;
   return {
@@ -108,66 +107,27 @@ export const createFaceTracker = ({ redetectEvery = 6 } = {}) => {
         if (!results || results.length === 0) { box = null; return { status: 'none' }; }
         if (results.length > 1) { box = null; return { status: 'multiple', count: results.length }; }
         const b = results[0].box;
-        // Nới vùng cắt 25% quanh khung mặt để điểm mốc không bị cụt khi người dùng hơi dịch chuyển.
-        const side = Math.max(b.width, b.height) * 1.25;
+        // Nới vùng cắt 30% quanh khung mặt để điểm mốc không bị cụt khi người dùng quay đầu.
+        const side = Math.max(b.width, b.height) * 1.3;
         box = { x: b.x + b.width / 2 - side / 2, y: b.y + b.height / 2 - side / 2, side, width: b.width };
       }
-      // Mọi khung đều đo trên cùng một kiểu vùng cắt để các số đo so sánh được với nhau.
       ctx.clearRect(0, 0, crop.width, crop.height);
       ctx.drawImage(video, box.x, box.y, box.side, box.side, 0, 0, crop.width, crop.height);
       const landmarks = await faceapi.detectFaceLandmarks(crop);
-      return { status: 'ok', width: box.width, landmarks, eyes: { ear: eyeAspectRatio(landmarks), contrast: eyeContrast(ctx, landmarks), yaw: headYaw(landmarks) } };
+      return { status: 'ok', width: box.width, yaw: headYaw(landmarks) };
     }
   };
 };
 
-// Tỉ lệ mở mắt (Eye Aspect Ratio) tính từ 6 điểm mốc quanh mỗi mắt.
-const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
-const ear = (eye) => (dist(eye[1], eye[5]) + dist(eye[2], eye[4])) / (2 * dist(eye[0], eye[3]));
-export const eyeAspectRatio = (landmarks) => {
-  if (!landmarks) return null;
-  return (ear(landmarks.getLeftEye()) + ear(landmarks.getRightEye())) / 2;
-};
-
 /**
- * Độ tương phản điểm ảnh vùng mắt (độ lệch chuẩn mức xám). Mắt mở có lòng trắng sáng và tròng đen tối
- * nên tương phản cao; khi nhắm, mí mắt màu da che kín nên vùng mắt gần như đồng màu. Thước đo này nhạy
- * hơn EAR nhiều vì mô hình 68 điểm mốc của face-api thường vẫn "đoán" mắt đang mở khi mắt đã khép.
- * Vùng đo có kích thước cố định theo bề ngang mắt, không phụ thuộc vị trí mí mắt mà mô hình dự đoán.
- */
-export const eyeContrast = (ctx, landmarks) => {
-  if (!landmarks) return null;
-  let total = 0;
-  for (const eye of [landmarks.getLeftEye(), landmarks.getRightEye()]) {
-    const cx = eye.reduce((s, p) => s + p.x, 0) / eye.length;
-    const cy = eye.reduce((s, p) => s + p.y, 0) / eye.length;
-    const w = Math.max(6, dist(eye[0], eye[3]) * 1.1);
-    const h = Math.max(4, w * 0.5);
-    const x0 = Math.max(0, Math.round(cx - w / 2));
-    const y0 = Math.max(0, Math.round(cy - h / 2));
-    const data = ctx.getImageData(x0, y0, Math.max(1, Math.round(w)), Math.max(1, Math.round(h))).data;
-    let sum = 0, sum2 = 0;
-    const n = data.length / 4;
-    for (let i = 0; i < data.length; i += 4) {
-      const g = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-      sum += g;
-      sum2 += g * g;
-    }
-    total += Math.sqrt(Math.max(0, sum2 / n - (sum / n) ** 2));
-  }
-  return total / 2;
-};
-
-/**
- * Độ quay đầu trái/phải: vị trí đầu mũi giữa hai mép mặt (điểm mốc 0 và 16 ngang tầm mắt), quy về −0,5…0,5.
- * Mặt thật quay đi thì mũi (nhô ra phía trước) lệch rõ về một bên; còn ảnh in/ảnh trên điện thoại dù bị xoay
- * nghiêng thì mọi điểm co giãn cùng tỉ lệ nên giá trị này gần như không đổi — dùng làm thử thách người thật.
+ * Độ quay đầu trái/phải: vị trí đầu mũi chiếu lên trục nối hai mép mặt (điểm mốc 0 và 16), quy về
+ * −0,5…0,5 (0 ≈ nhìn thẳng). Mặt thật quay đi thì mũi — nhô ra phía trước — lệch rõ về một bên; còn ảnh
+ * in hay ảnh trên điện thoại dù bị xoay, nghiêng thì mọi điểm co giãn cùng tỉ lệ nên giá trị gần như không đổi.
  */
 export const headYaw = (landmarks) => {
   if (!landmarks) return null;
   const jaw = landmarks.getJawOutline();
   const nose = landmarks.getNose()[3];
-  // Chiếu đầu mũi lên trục nối hai mép mặt (thay vì lấy toạ độ x) để nghiêng đầu/xoay ảnh không làm sai số đo.
   const ax = jaw[16].x - jaw[0].x;
   const ay = jaw[16].y - jaw[0].y;
   const len2 = ax * ax + ay * ay;
@@ -176,60 +136,45 @@ export const headYaw = (landmarks) => {
 };
 
 /**
- * Bộ phát hiện nháy mắt thích ứng, dùng hai thước đo độc lập: EAR (hình dạng mắt theo điểm mốc) và độ
- * tương phản vùng mắt. Không dùng ngưỡng tuyệt đối vì mắt mỗi người, kính, ánh sáng, webcam đều khác nhau;
- * thay vào đó so với mức nền khi mắt mở của chính người đó. Nháy mắt được ghi nhận khi một trong hai
- * thước đo tụt rõ rệt (EAR dưới 85% hoặc tương phản dưới 75% mức nền) rồi hồi lại gần mức nền.
- * Ngoài ra chấp nhận thử thách quay nhẹ đầu sang một bên rồi nhìn thẳng lại (xem headYaw), cho người có mắt
- * nhỏ hoặc webcam kém mà nháy mắt khó đo.
- * Ảnh in hay ảnh trên điện thoại đứng yên thì cả hai thước đo đều không đổi nên không qua được.
+ * Thử thách xác nhận người thật: nhìn thẳng → quay đầu sang TRÁI → quay sang PHẢI → nhìn thẳng lại.
+ * Độ lệch được so với tư thế nhìn thẳng của chính người dùng (đo trong vài khung đầu). Khung hình đưa vào
+ * nhận diện là ảnh gốc từ camera (chỉ phần hiển thị mới lật gương), trên đó người dùng quay sang trái của họ
+ * thì đầu mũi lệch về phía phải ảnh, tức headYaw TĂNG; quay sang phải thì headYaw GIẢM.
  */
-const CHANNELS = { ear: { drop: 0.85, recover: 0.93 }, contrast: { drop: 0.75, recover: 0.88 } };
-const YAW_TURN = 0.12;
-const YAW_BACK = 0.06;
-export const createBlinkDetector = () => {
-  const base = { ear: null, contrast: null, yaw: null };
+const TURN = 0.12;   // lệch tối thiểu so với tư thế nhìn thẳng để tính là đã quay đầu
+const FRONT = 0.06;  // lệch tối đa để tính là đang nhìn thẳng
+export const createHeadTurnChallenge = () => {
+  let base = null;
   let warmup = [];
-  let closedSince = null;
-  let turned = false;
+  let step = 'calibrating'; // calibrating | left | right | front | done
+  let wrongWay = false;
   return {
-    /** m = { ear, contrast, yaw } của khung hiện tại; trả về 'calibrating' | 'open' | 'closing' | 'turning' | 'blink'. */
-    update(m) {
-      if (!m || !Number.isFinite(m.ear) || !Number.isFinite(m.contrast)) return 'calibrating';
-      if (base.ear == null) {
-        warmup.push(m);
-        if (warmup.length < 5) return 'calibrating';
-        for (const k of [...Object.keys(CHANNELS), 'yaw']) base[k] = warmup.map(x => x[k]).sort((a, b) => a - b)[Math.floor(warmup.length / 2)];
-        warmup = [];
-      }
-      // Thử thách thay thế: quay đầu sang một bên (lệch > 0,12) rồi quay lại nhìn thẳng (lệch < 0,06).
-      if (Number.isFinite(m.yaw) && Number.isFinite(base.yaw)) {
-        const dy = Math.abs(m.yaw - base.yaw);
-        if (!turned && dy > YAW_TURN) { turned = true; return 'turning'; }
-        if (turned) {
-          if (dy < YAW_BACK) { turned = false; return 'blink'; }
-          return 'turning';
+    get step() { return step; },
+    /** true nếu khung gần nhất đang quay sai hướng so với yêu cầu (để nhắc người dùng). */
+    get wrongWay() { return wrongWay; },
+    /** Đưa vào độ quay đầu của khung hiện tại; trả về bước hiện tại sau khi cập nhật. */
+    update(yaw) {
+      if (yaw == null || !Number.isFinite(yaw)) return step;
+      if (step === 'calibrating') {
+        warmup.push(yaw);
+        if (warmup.length > 5) warmup.shift();
+        // Chỉ lấy mốc khi người dùng giữ đầu ổn định (5 khung liên tiếp lệch nhau không quá FRONT).
+        if (warmup.length === 5 && Math.max(...warmup) - Math.min(...warmup) < FRONT) {
+          base = [...warmup].sort((a, b) => a - b)[2];
+          step = 'left';
         }
+        return step;
       }
-      const ratio = (k) => (base[k] > 0 ? m[k] / base[k] : 1);
-      const isClosed = Object.keys(CHANNELS).some(k => ratio(k) < CHANNELS[k].drop);
-      const isRecovered = Object.keys(CHANNELS).every(k => ratio(k) > CHANNELS[k].recover);
-      if (closedSince == null && isClosed) { closedSince = Date.now(); return 'closing'; }
-      if (closedSince != null) {
-        if (isRecovered) { closedSince = null; return 'blink'; }
-        // Nhắm quá 2 giây thì không phải nháy mắt (cúi đầu, che camera...): đo lại mức nền.
-        if (Date.now() - closedSince > 2000) { closedSince = null; base.ear = null; base.contrast = null; base.yaw = null; return 'calibrating'; }
-        return 'closing';
-      }
-      // Mắt đang mở: cho mức nền bám theo thay đổi chậm (khoảng cách tới camera, ánh sáng tự động).
-      for (const k of Object.keys(CHANNELS)) if (ratio(k) > 0.9) base[k] = base[k] * 0.9 + m[k] * 0.1;
-      return 'open';
+      const d = yaw - base;
+      // Ở bước 'right' người dùng vẫn đang quay trái là bình thường (đang quay về), nên chỉ nhắc ở bước 'left'.
+      wrongWay = step === 'left' && d < -TURN;
+      if (step === 'left' && d > TURN) step = 'right';
+      else if (step === 'right' && d < -TURN) step = 'front';
+      else if (step === 'front' && Math.abs(d) < FRONT) step = 'done';
+      return step;
     },
-    /** Mắt đang mở rõ (để lấy mẫu vector khuôn mặt ổn định) hay không. */
-    isOpen(m) {
-      if (base.ear == null || !m) return false;
-      return m.ear >= base.ear * 0.85 && (!Number.isFinite(m.contrast) || m.contrast >= base.contrast * 0.75);
-    }
+    /** Đang nhìn thẳng (để lấy mẫu vector khuôn mặt ổn định) hay không. */
+    isFacingFront(yaw) { return base != null && Number.isFinite(yaw) && Math.abs(yaw - base) < FRONT; }
   };
 };
 
