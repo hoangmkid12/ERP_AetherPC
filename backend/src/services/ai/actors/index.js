@@ -18,6 +18,7 @@ const warehouseTrainer = require('./warehouse.trainer');
 const accountantTrainer = require('./accountant.trainer');
 const salesTrainer = require('./sales.trainer');
 const adminCeoTrainer = require('./admin_ceo.trainer');
+const qcTrainer = require('./qc.trainer');
 
 /**
  * Bảng ánh xạ Trainer theo chuẩn hóa vai trò
@@ -36,7 +37,8 @@ const TRAINERS = {
 const normalizeActorRole = (role) => {
   const r = (role || '').toUpperCase();
   if (r === 'DELIVERY' || r.includes('SHIPPER')) return 'DELIVERY';
-  if (r.includes('WAREHOUSE') || r.includes('KHO') || r.includes('QC') || r.includes('TECH') || r.includes('ASSEMBLY')) return 'WAREHOUSE';
+  if (r === 'QC' || r === 'QA' || r.includes('QUALITY_CONTROL')) return 'QC';
+  if (r.includes('WAREHOUSE') || r.includes('KHO') || r.includes('TECH') || r.includes('ASSEMBLY')) return 'WAREHOUSE';
   if (r.includes('ACCOUNT') || r.includes('KETOAN') || r.includes('CASHIER')) return 'ACCOUNTANT';
   if (r.includes('SALES') || r.includes('BANHANG')) return 'SALES';
   if (r.includes('ADMIN') || r === 'CEO' || r.includes('MANAGER') || r.includes('DIRECTOR')) return 'ADMIN_CEO';

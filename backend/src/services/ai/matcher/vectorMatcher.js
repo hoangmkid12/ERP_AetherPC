@@ -13,6 +13,7 @@ const salesTrainer = require('../actors/sales.trainer');
 const adminCeoTrainer = require('../actors/admin_ceo.trainer');
 const warehouseTrainer = require('../actors/warehouse.trainer');
 const deliveryTrainer = require('../actors/delivery.trainer');
+const qcTrainer = require('../actors/qc.trainer');
 
 const TRAINERS = {
   ACCOUNTANT: accountantTrainer,

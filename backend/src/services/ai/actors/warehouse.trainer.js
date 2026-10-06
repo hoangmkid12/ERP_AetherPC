@@ -549,10 +549,10 @@ warehouseTrainer.addSkill({
   },
   template: (data) => {
     return `💎 **ĐỊNH GIÁ TÀI SẢN LINH KIỆN TỒN KHO AETHERPC:**\n\n` +
-           `- Số mã sản phẩm có tồn: **${data.productCount} danh mục**\n` +
-           `- Tổng số lượng linh kiện vật lý: **${data.totalUnits.toLocaleString('vi-VN')} chiếc**\n` +
-           `- 💰 **TỔNG GIÁ TRỊ TÀI SẢN KHO: ${formatVND(data.totalValue)}**\n\n` +
-           `Kho hàng đang được bảo hiểm rủi ro cháy nổ và kiểm kê định kỳ 30 ngày/lần.`;
+      `- Số mã sản phẩm có tồn: **${data.productCount} danh mục**\n` +
+      `- Tổng số lượng linh kiện vật lý: **${data.totalUnits.toLocaleString('vi-VN')} chiếc**\n` +
+      `- 💰 **TỔNG GIÁ TRỊ TÀI SẢN KHO: ${formatVND(data.totalValue)}**\n\n` +
+      `Kho hàng đang được bảo hiểm rủi ro cháy nổ và kiểm kê định kỳ 30 ngày/lần.`;
   }
 });
 

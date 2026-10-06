@@ -9,8 +9,8 @@ dist/
 build/
 
 # Local environment variables and secrets — NEVER commit these
-backend/.env
-frontend/.env
+# backend/.env
+# frontend/.env
 .env
 .env.local
 .env.development.local
