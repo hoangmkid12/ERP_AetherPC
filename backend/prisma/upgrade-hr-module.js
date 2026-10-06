@@ -64,16 +64,23 @@ async function run() {
     }
 
     if (version < 2) {
+      // Kỳ lương cũ có thể lưu dạng "Tháng 05/2026" thay vì "2026-05": quy về YYYY-MM trước khi so.
+      const toPeriod = (v) => {
+        const iso = /^(\d{4})-(\d{2})$/.exec(v || '');
+        if (iso) return v;
+        const vn = /(\d{1,2})\/(\d{4})/.exec(v || '');
+        return vn ? `${vn[2]}-${vn[1].padStart(2, '0')}` : v;
+      };
       const locked = new Set((await prisma.payroll.findMany({
         where: { status: { in: ['APPROVED_BY_CEO', 'PAID'] } }, select: { period: true }, distinct: ['period']
-      })).map(p => p.period));
+      })).map(p => toPeriod(p.period)));
       const records = await prisma.attendance.findMany({ where: { checkIn: { not: null } } });
       let fixed = 0;
       for (const r of records) {
         if (locked.has(r.date.toISOString().slice(0, 7))) continue;
         if (r.status !== 'PRESENT' && r.status !== 'LATE') continue;
         const m = computeAttendanceMetrics({ checkIn: r.checkIn, checkOut: r.checkOut, settings });
-        const changed = m.lateMinutes !== r.lateMinutes || m.earlyLeaveMinutes !== r.earlyLeaveMinutes
+        const changed = m.lateMinutes !== (r.lateMinutes || 0) || m.earlyLeaveMinutes !== (r.earlyLeaveMinutes || 0)
           || Number(r.workHours || 0) !== m.workHours || Number(r.overtimeHours || 0) !== m.overtimeHours || m.status !== r.status;
         if (!changed) continue;
         await prisma.attendance.update({
