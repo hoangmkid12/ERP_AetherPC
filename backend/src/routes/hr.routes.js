@@ -222,6 +222,8 @@ router.get('/me/attendance/today', authMiddleware(STAFF_ROLES), ah(async (req, r
 // POST /hr/me/attendance/check – chấm công bằng khuôn mặt. Lần đầu trong ngày là vào ca,
 // các lần sau là ra ca (lấy lần ra ca muộn nhất). So khớp khuôn mặt thực hiện ở server
 // với vector đã đăng ký — client không thể tự khẳng định "đã khớp".
+const MIN_CHECKOUT_GAP_MINUTES = 1;
+
 router.post('/me/attendance/check', authMiddleware(STAFF_ROLES), ah(async (req, res) => {
   const id = parseInt(req.user.id);
   const { descriptor, image } = req.body;
@@ -260,10 +262,11 @@ router.post('/me/attendance/check', authMiddleware(STAFF_ROLES), ah(async (req, 
       : await prisma.attendance.create({ data: { employeeId: id, date: today, ...data } });
     action = 'CHECK_IN';
   } else {
-    // Chống bấm 2 lần liên tiếp: ra ca phải cách vào ca ít nhất 5 phút.
+    // Chống bấm 2 lần liên tiếp: ra ca phải cách vào ca ít nhất 1 phút. Trả lỗi rõ ràng thay vì
+    // "thành công" để người dùng biết lần chấm này KHÔNG được ghi nhận là ra ca.
     const sinceIn = P.toMinutes(now) - P.toMinutes(existing.checkIn);
-    if (sinceIn < 5) {
-      return res.json({ success: true, action: 'ALREADY_CHECKED_IN', message: `Bạn đã chấm công vào ca lúc ${existing.checkIn}.`, data: serializeAttendance(existing) });
+    if (sinceIn < MIN_CHECKOUT_GAP_MINUTES) {
+      throw httpError(409, `Bạn vừa chấm vào ca lúc ${existing.checkIn}. Chấm ra ca sau ít nhất ${MIN_CHECKOUT_GAP_MINUTES} phút kể từ giờ vào ca.`);
     }
     const m = P.computeAttendanceMetrics({ checkIn: existing.checkIn, checkOut: now, settings });
     record = await prisma.attendance.update({

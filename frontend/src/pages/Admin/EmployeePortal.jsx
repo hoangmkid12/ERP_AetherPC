@@ -269,22 +269,23 @@ function CheckInTab({ today, profile, onDone }) {
   const [last, setLast] = useState(null);
   const hasFace = today?.hasFace;
   const rec = last || today?.record;
+  const nextAction = rec?.checkIn ? 'OUT' : 'IN';
 
   if (!today) return <div style={card}>Đang tải...</div>;
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1rem', alignItems: 'start' }}>
       <div style={{ ...card, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-        <h3 style={{ fontSize: '1.05rem', fontWeight: 700, margin: '0 0 0.25rem' }}>{hasFace ? 'Chấm công bằng khuôn mặt' : 'Đăng ký khuôn mặt lần đầu'}</h3>
+        <h3 style={{ fontSize: '1.05rem', fontWeight: 700, margin: '0 0 0.25rem' }}>{!hasFace ? 'Đăng ký khuôn mặt lần đầu' : nextAction === 'OUT' ? 'Chấm công RA CA' : 'Chấm công VÀO CA'}</h3>
         <p style={{ fontSize: '0.85rem', color: '#64748b', margin: '0 0 1rem', textAlign: 'center' }}>
           {hasFace
-            ? (rec?.checkIn && !rec?.checkOut ? 'Lần chấm này sẽ ghi nhận GIỜ RA CA.' : rec?.checkOut ? 'Bạn đã ra ca; chấm lại sẽ cập nhật giờ ra ca muộn nhất.' : 'Lần chấm này sẽ ghi nhận GIỜ VÀO CA.')
+            ? (rec?.checkOut ? `Bạn đã ra ca lúc ${rec.checkOut}; chấm lại sẽ cập nhật giờ ra ca muộn nhất.` : rec?.checkIn ? `Bạn đã vào ca lúc ${rec.checkIn}. Lần chấm này sẽ ghi nhận GIỜ RA CA.` : 'Lần chấm này sẽ ghi nhận GIỜ VÀO CA.')
             : 'Hệ thống sẽ lấy 5 mẫu khuôn mặt của bạn. Chỉ cần làm một lần; muốn đăng ký lại phải liên hệ phòng Nhân Sự.'}
         </p>
         {hasFace ? (
           <FaceCamera
             mode="verify"
-            submitLabel="Chấm công lần nữa"
+            submitLabel={nextAction === 'OUT' ? 'Chấm công ra ca' : 'Chấm công lại'}
             onCapture={async ({ descriptor, image }) => {
               const res = await api.post('/hr/me/attendance/check', { descriptor, image });
               setLast(res.data);
@@ -334,7 +335,8 @@ function CheckInTab({ today, profile, onDone }) {
             <li>Ca làm việc {today.shift.start} – {today.shift.end}, nghỉ trưa {today.shift.breakMinutes} phút.</li>
             <li>Vào ca muộn quá {today.shift.lateGraceMinutes} phút bị tính đi muộn và trừ lương theo số phút thực tế.</li>
             <li>Làm sau giờ tan ca từ 30 phút trở lên được ghi nhận tăng ca (150% ngày thường, 200% ngày nghỉ, 300% ngày lễ).</li>
-            <li>Hệ thống yêu cầu nháy mắt hoặc quay nhẹ đầu rồi nhìn thẳng lại để xác nhận người thật; ảnh chụp lúc chấm công được lưu làm bằng chứng.</li>
+            <li>Để xác nhận người thật, hệ thống yêu cầu quay đầu sang trái, sang phải rồi nhìn thẳng lại; ảnh chụp lúc chấm công được lưu làm bằng chứng.</li>
+            <li>Lần chấm đầu tiên trong ngày là giờ vào ca; các lần sau (cách giờ vào ca ít nhất 1 phút) cập nhật giờ ra ca.</li>
             <li>Quên chấm công hoặc chấm sai: liên hệ phòng Nhân Sự để điều chỉnh.</li>
           </ul>
         </div>

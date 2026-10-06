@@ -96,6 +96,18 @@ const loadPayrollContext = async (period, employees) => {
 };
 
 /**
+ * Số giờ tính tăng ca khi đi làm vào ngày nghỉ hằng tuần / ngày lễ.
+ * - Có đủ giờ vào và giờ ra: lấy giờ làm thực tế.
+ * - Chỉ có giờ vào (quên chấm ra): chưa đủ căn cứ trả tăng ca 200–300%, tính 0 giờ cho tới khi phòng
+ *   nhân sự nhập bổ sung giờ ra.
+ * - Phòng nhân sự đánh dấu có mặt mà không nhập giờ: coi như làm đủ một ngày công chuẩn.
+ */
+const offDayHours = (rec, settings) => {
+  if (rec.checkIn && !rec.checkOut) return 0;
+  return num(rec.workHours) || (rec.checkIn ? 0 : P.standardHoursPerDay(settings));
+};
+
+/**
  * Tính phiếu lương của 1 nhân viên trong kỳ. Hàm thuần (không truy vấn DB) để kiểm thử được.
  * adjustments: { otherBonus, otherDeductions, note } do HR nhập tay trước khi trình duyệt.
  */
@@ -125,7 +137,7 @@ const computePayslip = (emp, ctx, adjustments = {}) => {
 
     if (!scheduled) {
       // Đi làm vào ngày nghỉ hằng tuần: toàn bộ giờ làm là tăng ca.
-      if (worked) ot[holiday ? 'HOLIDAY' : 'REST_DAY'] += num(rec.workHours) || P.standardHoursPerDay(settings);
+      if (worked) ot[holiday ? 'HOLIDAY' : 'REST_DAY'] += offDayHours(rec, settings);
       continue;
     }
     standardDays += 1;
@@ -134,7 +146,7 @@ const computePayslip = (emp, ctx, adjustments = {}) => {
 
     if (holiday) {
       paidLeaveDays += 1; // nghỉ lễ hưởng nguyên lương
-      if (worked) ot.HOLIDAY += num(rec.workHours) || P.standardHoursPerDay(settings);
+      if (worked) ot.HOLIDAY += offDayHours(rec, settings);
       continue;
     }
     if (worked) {

@@ -2,13 +2,17 @@
 //  1. Tạo tài khoản nhân viên chung "nhanvien" nếu chưa có.
 //  2. Lần đầu (hrUpgradeVersion < 1): cân đối lương theo khung SALARY_GRID cho nhân viên chưa được
 //     HR cấu hình phụ cấp, bổ sung chức danh còn trống.
-//  3. Nạp danh sách ngày lễ nếu bảng còn trống.
+//  3. hrUpgradeVersion < 2: tính lại số phút muộn/về sớm, giờ làm, giờ tăng ca của các bản ghi chấm công
+//     theo công thức mới (trừ phần trùng nghỉ trưa, giới hạn trong thời lượng ca). Bỏ qua những tháng đã có
+//     bảng lương được duyệt hoặc đã chi để không làm lệch chứng từ đã chốt.
+//  4. Nạp danh sách ngày lễ nếu bảng còn trống.
 const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcryptjs');
 const { GENERAL_EMPLOYEE, HOLIDAYS, gridFor } = require('./hr-reference-data');
+const { computeAttendanceMetrics } = require('../src/services/hrPolicy');
 
 const prisma = new PrismaClient();
-const UPGRADE_VERSION = 1;
+const UPGRADE_VERSION = 2;
 
 async function run() {
   try {
@@ -36,7 +40,8 @@ async function run() {
       console.log('Đã tạo tài khoản nhân viên chung: nhanvien / 123456');
     }
 
-    if ((settings.hrUpgradeVersion || 0) < UPGRADE_VERSION) {
+    const version = settings.hrUpgradeVersion || 0;
+    if (version < 1) {
       const employees = await prisma.employee.findMany();
       let rebalanced = 0;
       for (const e of employees) {
@@ -54,8 +59,38 @@ async function run() {
         // ngày nhận việc thật, và tính lương sẽ coi mọi ngày trước đó là chưa đi làm. HR tự cập nhật.
         if (Object.keys(data).length) await prisma.employee.update({ where: { id: e.id }, data });
       }
+      await prisma.companySettings.update({ where: { id: 1 }, data: { hrUpgradeVersion: 1 } });
+      console.log(`Nâng cấp nhân sự v1: cân đối lương cho ${rebalanced}/${employees.length} nhân viên.`);
+    }
+
+    if (version < 2) {
+      // Kỳ lương cũ có thể lưu dạng "Tháng 05/2026" thay vì "2026-05": quy về YYYY-MM trước khi so.
+      const toPeriod = (v) => {
+        const iso = /^(\d{4})-(\d{2})$/.exec(v || '');
+        if (iso) return v;
+        const vn = /(\d{1,2})\/(\d{4})/.exec(v || '');
+        return vn ? `${vn[2]}-${vn[1].padStart(2, '0')}` : v;
+      };
+      const locked = new Set((await prisma.payroll.findMany({
+        where: { status: { in: ['APPROVED_BY_CEO', 'PAID'] } }, select: { period: true }, distinct: ['period']
+      })).map(p => toPeriod(p.period)));
+      const records = await prisma.attendance.findMany({ where: { checkIn: { not: null } } });
+      let fixed = 0;
+      for (const r of records) {
+        if (locked.has(r.date.toISOString().slice(0, 7))) continue;
+        if (r.status !== 'PRESENT' && r.status !== 'LATE') continue;
+        const m = computeAttendanceMetrics({ checkIn: r.checkIn, checkOut: r.checkOut, settings });
+        const changed = m.lateMinutes !== (r.lateMinutes || 0) || m.earlyLeaveMinutes !== (r.earlyLeaveMinutes || 0)
+          || Number(r.workHours || 0) !== m.workHours || Number(r.overtimeHours || 0) !== m.overtimeHours || m.status !== r.status;
+        if (!changed) continue;
+        await prisma.attendance.update({
+          where: { id: r.id },
+          data: { lateMinutes: m.lateMinutes, earlyLeaveMinutes: m.earlyLeaveMinutes, workHours: m.workHours, overtimeHours: m.overtimeHours, status: m.status }
+        });
+        fixed += 1;
+      }
       await prisma.companySettings.update({ where: { id: 1 }, data: { hrUpgradeVersion: UPGRADE_VERSION } });
-      console.log(`Nâng cấp nhân sự v${UPGRADE_VERSION}: cân đối lương cho ${rebalanced}/${employees.length} nhân viên.`);
+      console.log(`Nâng cấp nhân sự v2: tính lại ${fixed}/${records.length} bản ghi chấm công theo công thức mới.`);
     }
 
     if ((await prisma.holiday.count()) === 0) {
