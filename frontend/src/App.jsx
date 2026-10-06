@@ -45,7 +45,7 @@ const HRManager = lazy(() => import('./pages/Admin/HRManager'));
 const Accountant = lazy(() => import('./pages/Admin/Accountant'));
 const Purchasing = lazy(() => import('./pages/Admin/Purchasing'));
 const SystemAdmin = lazy(() => import('./pages/Admin/SystemAdmin'));
-const MyPayroll = lazy(() => import('./pages/Admin/MyPayroll'));
+const EmployeePortal = lazy(() => import('./pages/Admin/EmployeePortal'));
 const SupplierPortal = lazy(() => import('./pages/SupplierPortal'));
 const CustomerService = lazy(() => import('./pages/Admin/CustomerService'));
 const Delivery = lazy(() => import('./pages/Admin/Delivery'));
@@ -90,7 +90,7 @@ const AdminLayout = () => {
   }
 
   // Verify that they are indeed an employee (including HR, Accounting, QA/QC actors)
-  const isEmployee = ['CEO', 'SALES', 'SALES_MANAGER', 'WAREHOUSE', 'WAREHOUSE_MANAGER', 'ASSEMBLY', 'HR', 'ACCOUNTANT', 'PURCHASING', 'ADMIN', 'CSKH', 'DELIVERY', 'QC', 'QA', 'QUALITY_CONTROL'].includes(user?.role);
+  const isEmployee = ['CEO', 'SALES', 'SALES_MANAGER', 'WAREHOUSE', 'WAREHOUSE_MANAGER', 'ASSEMBLY', 'HR', 'ACCOUNTANT', 'PURCHASING', 'ADMIN', 'CSKH', 'DELIVERY', 'QC', 'QA', 'QUALITY_CONTROL', 'EMPLOYEE'].includes(user?.role);
   if (!isEmployee) {
     return <Navigate to="/" replace />;
   }
@@ -249,6 +249,9 @@ const AdminIndexRedirect = () => {
       return <Navigate to="/admin/cskh" replace />;
     case 'DELIVERY':
       return <Navigate to="/admin/delivery" replace />;
+    // Tài khoản nhân viên chung chỉ có chức năng tự phục vụ.
+    case 'EMPLOYEE':
+      return <Navigate to="/admin/me" replace />;
     default:
       return <Navigate to="/" replace />;
   }
@@ -416,12 +419,12 @@ export default function App() {
                     </ProtectedRoute>
                   } />
 
-                  {/* Cổng tự tra cứu phiếu lương — mở cho MỌI nhân viên (không
-                      theo ma trận RBAC module như các trang trên), vì đây là
-                      dữ liệu cá nhân của chính người xem, không phải một
-                      nghiệp vụ theo phòng ban. AdminLayout đã tự kiểm tra
-                      isEmployee ở tầng ngoài. */}
-                  <Route path="my-payroll" element={<MyPayroll />} />
+                  {/* Cổng Nhân Viên (tự phục vụ: chấm công khuôn mặt, nghỉ phép,
+                      phiếu lương, hồ sơ) — mở cho MỌI nhân viên, không theo ma
+                      trận RBAC module, vì đây là dữ liệu cá nhân của chính
+                      người xem. AdminLayout đã kiểm tra isEmployee ở tầng ngoài. */}
+                  <Route path="me" element={<EmployeePortal />} />
+                  <Route path="my-payroll" element={<Navigate to="/admin/me?tab=payslip" replace />} />
 
                 </Route>
 

@@ -141,9 +141,11 @@ export default function Sidebar({ isOpen = false, onClose }) {
   const hrSubItems = [
     { tab: 'overview', label: 'Tổng Quan Nhân Sự' },
     { tab: 'attendance', label: 'Chấm Công Hàng Ngày' },
+    { tab: 'timesheet', label: 'Bảng Công Tháng' },
     { tab: 'employees', label: 'Hồ Sơ Nhân Viên' },
     { tab: 'leaves', label: 'Quản Lý Nghỉ Phép', badgeKey: 'pendingLeaveApproval' },
-    { tab: 'payroll', label: 'Bảng Lương & Trình CEO' }
+    { tab: 'payroll', label: 'Tính Lương & Trình Duyệt' },
+    { tab: 'settings', label: 'Cấu Hình Công & Lương' }
   ];
 
   const accountingSubItems = [
@@ -205,7 +207,8 @@ export default function Sidebar({ isOpen = false, onClose }) {
     'REFUNDED', 'COMPLETED', 'REJECTED', 'RETURNED_TO_CUSTOMER'
   ].includes(r.status)).length;
   const pendingQuotedPOs = (purchaseOrders || []).filter(p => p && p.status === 'QUOTED_PENDING_CEO').length;
-  const pendingPayrollApproval = (payrolls && payrolls.length > 0 && payrolls[0]?.status === 'SUBMITTED_TO_CEO') ? 1 : 0;
+  // Bảng lương HR đã trình, đang chờ Ban Giám Đốc duyệt (backend ghi SUBMITTED_TO_ACCOUNTING).
+  const pendingPayrollApproval = (payrolls || []).some(p => p && ['SUBMITTED_TO_ACCOUNTING', 'SUBMITTED_TO_CEO'].includes(p.status)) ? 1 : 0;
   const pendingLeaveApproval = (leaveRequests || []).filter(l => l && (l.status === 'PENDING_CEO' || l.status === 'PENDING')).length;
   const pendingCeoApprovals = pendingQuotedPOs + pendingPayrollApproval + pendingLeaveApproval;
   const pendingQaCount = (purchaseOrders || []).filter(p => p && ['CONFIRMED_BY_SUPPLIER', 'PO', 'APPROVED', 'PENDING_QA', 'SHIPPED', 'DELIVERED'].includes(p.status)).length;
@@ -231,6 +234,7 @@ export default function Sidebar({ isOpen = false, onClose }) {
       case 'ACCOUNTANT': return 'Kế Toán Trưởng';
       case 'CSKH': return 'Chăm Sóc Khách Hàng';
       case 'DELIVERY': return 'Nhân Viên Giao Hàng';
+      case 'EMPLOYEE': return 'Nhân Viên Văn Phòng';
       default: return user?.username ? user.username.toUpperCase() : 'Tài Khoản ERP';
     }
   };
@@ -249,6 +253,7 @@ export default function Sidebar({ isOpen = false, onClose }) {
       case 'ACCOUNTANT': return 'Kế Toán Tài Chính';
       case 'CSKH': return 'Chăm Sóc Khách Hàng';
       case 'DELIVERY': return 'Nhân Viên Giao Hàng';
+      case 'EMPLOYEE': return 'Nhân Viên (Văn Phòng)';
       default: return user?.role || 'Nhân Sự';
     }
   };
@@ -330,6 +335,14 @@ export default function Sidebar({ isOpen = false, onClose }) {
       label: 'Quản Trị Hệ Thống & Phân Quyền',
       icon: <Settings size={18} />,
       visible: canRead('system') || isAdmin
+    },
+    {
+      // Tự phục vụ cho mọi nhân viên: chấm công khuôn mặt, nghỉ phép, phiếu lương, hồ sơ.
+      id: 'me',
+      path: '/admin/me',
+      label: 'Thông Tin Cá Nhân',
+      icon: <User size={18} />,
+      visible: true
     }
   ];
 
@@ -341,7 +354,7 @@ export default function Sidebar({ isOpen = false, onClose }) {
     // 1. BAN GIÁM ĐỐC (CEO): Chỉ nhận nhiệm vụ phê duyệt cấp cao & báo cáo tổng quan
     if (['CEO', 'ADMIN'].includes(role)) {
       // Phê duyệt bảng lương nhân sự toàn công ty
-      const submittedPayrolls = (payrolls || []).filter(p => p.status === 'SUBMITTED_TO_CEO');
+      const submittedPayrolls = (payrolls || []).filter(p => ['SUBMITTED_TO_ACCOUNTING', 'SUBMITTED_TO_CEO'].includes(p.status));
       if (submittedPayrolls.length > 0) {
         const totalFund = submittedPayrolls.reduce((sum, p) => sum + (Number(p.netSalary) || 0), 0);
         list.push({

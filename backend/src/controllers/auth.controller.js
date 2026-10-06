@@ -238,6 +238,12 @@ const loginEmployee = async (req, res, next) => {
       return res.status(401).json({ success: false, message: 'Tài khoản hoặc mật khẩu không chính xác.' });
     }
 
+    // Nhân viên đã nghỉ việc (HR vô hiệu hóa) không được đăng nhập nữa.
+    if (!isSupplier && user.status === 'INACTIVE') {
+      logAudit({ req, action: 'LOGIN', module: 'Bảo Mật', status: 'FAILED', note: 'Tài khoản đã ngừng hoạt động', actorOverride: { id: user.id, name: loginIdentifier, role } });
+      return res.status(403).json({ success: false, message: 'Tài khoản đã ngừng hoạt động. Vui lòng liên hệ phòng Nhân Sự.' });
+    }
+
     if (isSupplier) {
       // `name` here is the supplier's real company name — without it, every audit-trail
       // "changedBy" for a supplier action (RFQ status history, GRN confirmation, etc.)

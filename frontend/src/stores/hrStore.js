@@ -513,13 +513,24 @@ export const useHRStore = create((set, get) => ({
   },
 
   /**
-   * Lập bảng lương kỳ mới — server tự tính lương cho toàn bộ nhân viên ACTIVE
-   * theo đúng công thức đã hiển thị ở tab "Bảng Lương" (hoa hồng SALES, thưởng
-   * ASSEMBLY, khấu trừ cố định) — không còn gửi nguyên mảng tính sẵn ở client.
+   * Tính lương kỳ (tạo phiếu nháp) rồi trình Ban Giám Đốc duyệt — server tự tính toàn bộ
+   * (services/payrollService.js). Màn hình HR dùng PayrollPanel để rà soát phiếu nháp
+   * trước khi trình; hàm này giữ cho các nơi gọi cũ muốn làm cả 2 bước một lần.
    */
   submitPayrolls: async (period) => {
     const res = await api.post('/hr/payrolls', { period });
     if (!res?.success) throw new Error(res?.message || 'Không thể lập bảng lương.');
+    await api.post('/hr/payrolls/submit', { period });
+    await get().getPayrolls();
+    return res.data;
+  },
+
+  /**
+   * Ban Giám Đốc trả bảng lương đang chờ duyệt về cho Nhân Sự điều chỉnh (bắt buộc lý do).
+   */
+  rejectPayrollByCEO: async (reason, period) => {
+    const res = await api.patch('/hr/payrolls/reject-ceo', { reason, ...(period ? { period } : {}) });
+    if (!res?.success) throw new Error(res?.message || 'Không thể trả bảng lương về.');
     await get().getPayrolls();
     return res.data;
   },

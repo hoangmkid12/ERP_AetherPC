@@ -22,6 +22,7 @@ const DEMO_ACCOUNTS = [
   { role: 'accounting', label: 'Kế Toán Tài Chính' },
   { role: 'cskh', label: 'Chăm Sóc Khách Hàng' },
   { role: 'delivery', label: 'Giao Vận (Shipper)' },
+  { role: 'nhanvien', label: 'Nhân Viên (Tài Khoản Chung)' },
   { role: 'customer', label: 'Khách Hàng Website' }
 ];
 
