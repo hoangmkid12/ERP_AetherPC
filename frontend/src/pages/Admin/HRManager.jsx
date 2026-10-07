@@ -11,8 +11,10 @@ import AttendancePanel from './hr/AttendancePanel';
 import TimesheetPanel from './hr/TimesheetPanel';
 import PayrollPanel from './hr/PayrollPanel';
 import HrSettingsPanel from './hr/HrSettingsPanel';
+import DepartmentPanel from './hr/DepartmentPanel';
 import EmployeeFormModal from './hr/EmployeeFormModal';
 import FaceAdminModal from './hr/FaceAdminModal';
+import DateRangeFilter, { isDateInRange } from '../../components/Common/DateRangeFilter';
 import { 
   Users, UserPlus, CheckCircle, Clock, XCircle, DollarSign, CalendarCheck, 
   Key, Eye, EyeOff, Search, FileEdit, Award, Sparkles, Check, X, Calendar, 
@@ -96,7 +98,11 @@ export default function HRManager() {
     endDate: '',
     reason: ''
   });
-  const [submittingLeaveModal, setSubmittingLeaveModal] = useState(false);
+  // Leave filter states
+  const [leaveSearch, setLeaveSearch] = useState('');
+  const [leaveStatusFilter, setLeaveStatusFilter] = useState('ALL');
+  const [leaveStartDate, setLeaveStartDate] = useState('');
+  const [leaveEndDate, setLeaveEndDate] = useState('');
 
   useEffect(() => {
     if (activeTab === 'leaves' && typeof getLeaveRequests === 'function') {
@@ -218,6 +224,23 @@ export default function HRManager() {
   const presentCount = attendanceForSelectedDate.present;
   const lateCount = attendanceForSelectedDate.late;
   const absentCount = attendanceForSelectedDate.absent;
+
+  // Filtered leave requests for Tab 'leaves'
+  const filteredLeaveRequests = useMemo(() => {
+    return leaveRequests.filter(lv => {
+      const empName = (lv.employee?.fullName || '').toLowerCase();
+      const reason = (lv.reason || '').toLowerCase();
+      const type = (lv.type || '').toLowerCase();
+      const q = leaveSearch.toLowerCase().trim();
+      const matchSearch = !q || empName.includes(q) || reason.includes(q) || type.includes(q);
+
+      const status = ['APPROVED', 'REJECTED'].includes(lv.status) ? lv.status : 'PENDING';
+      const matchStatus = leaveStatusFilter === 'ALL' || status === leaveStatusFilter || lv.status === leaveStatusFilter;
+
+      const matchDate = isDateInRange(lv.startDate || lv.createdAt, leaveStartDate, leaveEndDate);
+      return matchSearch && matchStatus && matchDate;
+    });
+  }, [leaveRequests, leaveSearch, leaveStatusFilter, leaveStartDate, leaveEndDate]);
   
   const attendanceRate = totalEmployees > 0
     ? Math.round(((presentCount + lateCount) / totalEmployees) * 100)
@@ -301,6 +324,7 @@ export default function HRManager() {
         <div>
           <h2 style={{ fontSize: '1.35rem', fontWeight: 800, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <Users size={24} style={{ color: '#2563eb' }} />
+            {activeTab === 'departments' && 'Quản Lý Phòng Ban & Chấm Công Cấp Dưới'}
             {activeTab === 'overview' && 'Tổng Quan Nhân Sự Toàn Doanh Nghiệp'}
             {activeTab === 'attendance' && 'Chấm Công & Giám Sát Chuyên Cần Hàng Ngày'}
             {activeTab === 'employees' && 'Hồ Sơ Nhân Sự & Hợp Đồng Lao Động'}
@@ -341,6 +365,7 @@ export default function HRManager() {
       {/* ================= BAR CHUYỂN TAB ĐIỀU HƯỚNG NHÂN SỰ ================= */}
       <div style={{ display: 'flex', gap: '0.5rem', borderBottom: '2px solid #e2e8f0', marginBottom: '1.25rem', paddingBottom: '0.65rem', overflowX: 'auto', flexWrap: 'wrap' }}>
         {[
+          { key: 'departments', label: 'Quản Lý Phòng Ban', icon: Building },
           { key: 'timesheet', label: 'Bảng Chấm Công (Ma Trận)', icon: Calendar },
           { key: 'attendance', label: 'Chấm Công Hàng Ngày', icon: Clock },
           { key: 'employees', label: 'Hồ Sơ Nhân Sự', icon: Users },
@@ -516,6 +541,11 @@ export default function HRManager() {
 
         </div>
       )}
+
+      {/* ========================================================================= */}
+      {/* TAB: DEPARTMENTS (QUẢN LÝ PHÒNG BAN & CHẤM CÔNG CẤP DƯỚI) */}
+      {/* ========================================================================= */}
+      {activeTab === 'departments' && <DepartmentPanel />}
 
       {/* ========================================================================= */}
       {/* TAB 2: ATTENDANCE & TIMESHEET (BẢNG CÔNG MA TRẬN) */}
@@ -701,6 +731,50 @@ export default function HRManager() {
             </button>
           </div>
 
+          {/* Filter Toolbar for Leaves */}
+          <div style={{
+            backgroundColor: '#ffffff',
+            padding: '1rem',
+            borderRadius: '8px',
+            border: '1px solid #cbd5e1',
+            marginBottom: '1.25rem',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '0.75rem'
+          }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(200px, 2fr) minmax(180px, 1.2fr)', gap: '0.75rem', alignItems: 'center' }}>
+              <input
+                type="text"
+                placeholder="Tìm nhân viên, lý do xin nghỉ, loại phép..."
+                value={leaveSearch}
+                onChange={e => setLeaveSearch(e.target.value)}
+                style={{ width: '100%', height: '38px', padding: '0 0.85rem', fontSize: '0.82rem', border: '1px solid #cbd5e1', borderRadius: '6px', boxSizing: 'border-box' }}
+              />
+
+              <select
+                value={leaveStatusFilter}
+                onChange={e => setLeaveStatusFilter(e.target.value)}
+                style={{ width: '100%', height: '38px', padding: '0 0.65rem', fontSize: '0.82rem', border: '1px solid #cbd5e1', borderRadius: '6px', color: '#0f172a', boxSizing: 'border-box', backgroundColor: '#ffffff', cursor: 'pointer' }}
+              >
+                <option value="ALL">Tất cả trạng thái ({leaveRequests.length})</option>
+                <option value="PENDING">Chờ phê duyệt</option>
+                <option value="APPROVED">Đã phê duyệt</option>
+                <option value="REJECTED">Đã từ chối</option>
+              </select>
+            </div>
+
+            <DateRangeFilter
+              startDate={leaveStartDate}
+              endDate={leaveEndDate}
+              onChange={({ startDate, endDate }) => {
+                setLeaveStartDate(startDate);
+                setLeaveEndDate(endDate);
+              }}
+              label="Lọc theo ngày bắt đầu nghỉ phép"
+              compact
+            />
+          </div>
+
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
               <thead>
@@ -714,7 +788,14 @@ export default function HRManager() {
                 </tr>
               </thead>
               <tbody>
-                {leaveRequests.map((lv, lIdx) => (
+                {filteredLeaveRequests.length === 0 ? (
+                  <tr>
+                    <td colSpan="6" style={{ textAlign: 'center', padding: '2.5rem', color: '#94a3b8' }}>
+                      Không tìm thấy đơn xin nghỉ phép nào phù hợp.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredLeaveRequests.map((lv, lIdx) => (
                   <tr key={lv.id || lIdx} style={{ borderBottom: '1px solid #f1f5f9' }}>
                     <td style={{ padding: '0.65rem 0.85rem', fontWeight: 700, color: '#0f172a' }}>{lv.employee?.fullName || `Nhân viên #${lv.employeeId ?? lv.id}`}</td>
                     <td style={{ padding: '0.65rem 0.85rem', color: '#2563eb', fontWeight: 600 }}>{lv.type || 'Phép Năm'}</td>
@@ -767,24 +848,9 @@ export default function HRManager() {
                       )}
                     </td>
                   </tr>
-                ))}
-                {leaveRequests.length === 0 && (
-                  <tr>
-                    <td colSpan={6} style={{ padding: '3.5rem 1rem', textAlign: 'center', color: '#94a3b8' }}>
-                      <CalendarCheck size={38} style={{ margin: '0 auto 0.6rem', display: 'block', opacity: 0.35 }} />
-                      <div style={{ fontWeight: 700, fontSize: '0.92rem', color: '#64748b' }}>Hiện chưa có đơn xin nghỉ phép nào</div>
-                      <div style={{ fontSize: '0.78rem', marginTop: '0.25rem' }}>Các đơn xin nghỉ phép của cán bộ nhân sự gửi lên sẽ xuất hiện tại đây để HR/CEO xét duyệt.</div>
-                      <button
-                        type="button"
-                        onClick={() => setShowCreateLeaveModal(true)}
-                        style={{ marginTop: '0.85rem', backgroundColor: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', borderRadius: '6px', padding: '0.45rem 1.1rem', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}
-                      >
-                        + Tạo Đơn Xin Nghỉ Mới
-                      </button>
-                    </td>
-                  </tr>
-                )}
-              </tbody>
+                ))
+              )}
+            </tbody>
             </table>
           </div>
         </div>

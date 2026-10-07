@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { formatCurrencyInWords } from '../../utils/numberToWords';
 import { printDocument } from '../../utils/printDocument';
-import SupplierConfirmationModal from '../../components/SupplierConfirmationModal';
+import DateRangeFilter from '../../components/Common/DateRangeFilter';
 
 const CAT_ALIASES = {
   CPU: ['CPU', 'VI XỬ LÝ', 'CHIP', 'BỘ VI XỬ LÝ'],
@@ -136,6 +136,8 @@ export default function Purchasing() {
   const [productStockStatusFilter, setProductStockStatusFilter] = useState('ALL');
   const [productPage, setProductPage] = useState(1);
   const ITEMS_PER_PAGE = 25;
+  const [reportStartDate, setReportStartDate] = useState('');
+  const [reportEndDate, setReportEndDate] = useState('');
   
   // Purchase Requests (PR) State — Yêu Cầu Mua Hàng Nội Bộ từ Kho
   const [purchaseRequests, setPurchaseRequests] = useState([]);
@@ -3036,7 +3038,10 @@ export default function Purchasing() {
         // khi tạo ra 1 PO thật riêng — tính cả 2 sẽ đếm trùng cùng 1 khoản chi).
         // Trước đây dùng thẳng `orders` khiến "Tổng Chi Phí Đã Mua" tính luôn
         // cả đơn nháp/đã hủy/RFQ đã đóng, thổi phồng số liệu báo cáo.
-        const reportOrders = orders.filter(po => ISSUED_PO_STATUSES.includes(po.status));
+        const reportOrders = orders.filter(po =>
+          ISSUED_PO_STATUSES.includes(po.status) &&
+          isDateInRange(po.createdAt || po.orderDate || po.date, reportStartDate, reportEndDate)
+        );
 
         // 1. Calculate spending breakdown by Category
         const catSpendMap = {};
@@ -3103,6 +3108,18 @@ export default function Purchasing() {
                 Phân tích định lượng chi phí mua sắm theo đối tác cung ứng, phân bổ danh mục và hiệu suất thực hiện
               </p>
             </div>
+
+            {/* Bộ lọc khoảng thời gian báo cáo mua hàng */}
+            <DateRangeFilter
+              startDate={reportStartDate}
+              endDate={reportEndDate}
+              onChange={({ startDate, endDate }) => {
+                setReportStartDate(startDate);
+                setReportEndDate(endDate);
+              }}
+              label="Thời gian phân tích mua sắm"
+              style={{ marginBottom: '1.25rem' }}
+            />
 
             {/* KPI Cards Overview for Reports */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1.25rem' }}>

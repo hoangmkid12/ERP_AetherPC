@@ -29,6 +29,7 @@ import {
 } from 'lucide-react';
 import { printDocument } from '../../utils/printDocument';
 import SupplierConfirmationModal from '../../components/SupplierConfirmationModal';
+import DateRangeFilter, { isDateInRange } from '../../components/Common/DateRangeFilter';
 
 // Register ChartJS modules
 ChartJS.register(
@@ -86,6 +87,14 @@ export default function QualityControl() {
   const [rmaFilter, setRmaFilter] = useState('ALL');
   const [rmaSourceFilter, setRmaSourceFilter] = useState('ALL'); // ALL | FAILED_DELIVERY | CUSTOMER_RMA
   const [logFilter, setLogFilter] = useState('ALL');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [reportStartDate, setReportStartDate] = useState('');
+  const [reportEndDate, setReportEndDate] = useState('');
+  const [rmaStartDate, setRmaStartDate] = useState('');
+  const [rmaEndDate, setRmaEndDate] = useState('');
+  const [overviewStartDate, setOverviewStartDate] = useState('');
+  const [overviewEndDate, setOverviewEndDate] = useState('');
 
   // Modal State for QA Inbound Inspection (PO)
   const [selectedPO, setSelectedPO] = useState(null);
@@ -445,7 +454,11 @@ export default function QualityControl() {
   // from the same qaLogs used by the Logs tab, restricted to real supplier
   // inbound inspections (INBOUND_PO) since customer RMA logs aren't about
   // supplier quality.
-  const inboundQaLogs = qaLogs.filter(log => (log.type === 'INBOUND_PO' || !log.type) && log.supplierName);
+  const inboundQaLogs = qaLogs.filter(log =>
+    (log.type === 'INBOUND_PO' || !log.type) &&
+    log.supplierName &&
+    isDateInRange(log.date || log.createdAt, reportStartDate, reportEndDate)
+  );
 
   const getSupplierRating = (passRate) => {
     if (passRate >= 98) return { label: 'Xuất Sắc', color: '#16a34a', bg: '#f0fdf4', border: '#bbf7d0' };
@@ -1272,6 +1285,35 @@ export default function QualityControl() {
               </div>
             </div>
 
+            {/* Date filter inputs like Dashboard.jsx */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', backgroundColor: '#f8fafc', padding: '0.25rem 0.6rem', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+                <Calendar size={14} style={{ color: '#64748b' }} />
+                <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>Từ:</span>
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  style={{ padding: '0.25rem 0.45rem', fontSize: '0.8rem', border: '1px solid #cbd5e1', borderRadius: '4px', color: '#1e293b', backgroundColor: '#ffffff' }}
+                />
+                <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>đến:</span>
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  style={{ padding: '0.25rem 0.45rem', fontSize: '0.8rem', border: '1px solid #cbd5e1', borderRadius: '4px', color: '#1e293b', backgroundColor: '#ffffff' }}
+                />
+                {(startDate || endDate) && (
+                  <button
+                    onClick={() => { setStartDate(''); setEndDate(''); }}
+                    style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', fontWeight: 700, color: '#dc2626', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '4px', cursor: 'pointer' }}
+                  >
+                    Xóa lọc ngày
+                  </button>
+                )}
+              </div>
+            </div>
+
             <div style={{ display: 'flex', gap: '0.35rem' }}>
               {[
                 { key: 'ALL', label: 'Tất cả' },
@@ -1317,9 +1359,11 @@ export default function QualityControl() {
                   .filter(po => {
                     const matchesSearch = !searchTerm || (po.poNumber || '').toLowerCase().includes(searchTerm.toLowerCase()) || (po.supplier?.name || po.supplierCode || '').toLowerCase().includes(searchTerm.toLowerCase());
                     const qaStatus = getPoQaStatus(po);
-                    if (statusFilter === 'PENDING') return matchesSearch && qaStatus === 'PENDING';
-                    if (statusFilter === 'PASSED') return matchesSearch && qaStatus === 'PASSED';
-                    return matchesSearch;
+                    let matchesStatus = true;
+                    if (statusFilter === 'PENDING') matchesStatus = qaStatus === 'PENDING';
+                    if (statusFilter === 'PASSED') matchesStatus = qaStatus === 'PASSED';
+                    const matchesDate = isDateInRange(po.createdAt || po.date || po.orderDate, startDate, endDate);
+                    return matchesSearch && matchesStatus && matchesDate;
                   })
                   .map(po => {
                     const totalQty = po.items?.reduce((s, i) => s + (parseInt(i.quantity) || 1), 0) || po.quantity || 1;
@@ -1974,6 +2018,18 @@ export default function QualityControl() {
             </div>
           </div>
 
+          <DateRangeFilter
+            startDate={reportStartDate}
+            endDate={reportEndDate}
+            onChange={({ startDate, endDate }) => {
+              setReportStartDate(startDate);
+              setReportEndDate(endDate);
+            }}
+            label="Lọc biên bản theo ngày"
+            compact
+            style={{ marginBottom: '1rem' }}
+          />
+
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
               <thead>
@@ -1995,6 +2051,7 @@ export default function QualityControl() {
                     if (logFilter === 'CUSTOMER_RMA') return log.type === 'CUSTOMER_RMA';
                     return true;
                   })
+                  .filter(log => isDateInRange(log.date || log.createdAt, reportStartDate, reportEndDate))
                   .map((log, idx) => {
                     const isRma = log.type === 'CUSTOMER_RMA';
                     return (
@@ -2080,6 +2137,17 @@ export default function QualityControl() {
 
       {activeTab === 'reports' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          {/* Bộ lọc thời gian báo cáo QC */}
+          <DateRangeFilter
+            startDate={reportStartDate}
+            endDate={reportEndDate}
+            onChange={({ startDate, endDate }) => {
+              setReportStartDate(startDate);
+              setReportEndDate(endDate);
+            }}
+            label="Thời gian đánh giá NCC & chất lượng"
+          />
+
           {/* Summary KPIs */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
             {[

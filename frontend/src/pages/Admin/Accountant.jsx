@@ -27,6 +27,7 @@ import {
   Legend 
 } from 'chart.js';
 import { printDocument } from '../../utils/printDocument';
+import DateRangeFilter, { isDateInRange } from '../../components/Common/DateRangeFilter';
 
 ChartJS.register(
   CategoryScale, 
@@ -79,6 +80,10 @@ export default function Accountant() {
   const [codSearch, setCodSearch] = useState('');
   const [loadingCod, setLoadingCod] = useState(false);
   const [settlingShipperId, setSettlingShipperId] = useState(null);
+  const [reportStartDate, setReportStartDate] = useState('');
+  const [reportEndDate, setReportEndDate] = useState('');
+  const [ledgerStartDate, setLedgerStartDate] = useState('');
+  const [ledgerEndDate, setLedgerEndDate] = useState('');
 
   const loadCodSettlement = async (silent = false) => {
     if (!silent) setLoadingCod(true);
@@ -307,6 +312,45 @@ export default function Accountant() {
   const totalExpense = cogsAmount + payrollExpensePaid + operatingExpense + refundAmount;
 
   const netProfit = totalRevenue - totalExpense;
+
+  // Tính toán P&L theo bộ lọc thời gian riêng cho Báo Cáo
+  const pnlRevenue = useMemo(() => {
+    return (orders || [])
+      .filter(o => o && !['CANCELLED', 'FAILED_DELIVERY'].includes(o.status))
+      .filter(o => isDateInRange(o.createdAt || o.date, reportStartDate, reportEndDate))
+      .reduce((sum, o) => sum + (Number(o.totalAmount) || 0), 0);
+  }, [orders, reportStartDate, reportEndDate]);
+
+  const pnlCogs = useMemo(() => {
+    return (ledger || [])
+      .filter(tx => tx && tx.type === 'EXPENSE' && typeof tx.referenceId === 'string' && tx.referenceId.startsWith('COGS-'))
+      .filter(tx => isDateInRange(tx.date || tx.createdAt, reportStartDate, reportEndDate))
+      .reduce((sum, tx) => sum + (Number(tx.amount || 0) || 0), 0);
+  }, [ledger, reportStartDate, reportEndDate]);
+
+  const pnlPayroll = useMemo(() => {
+    return (payrolls || [])
+      .filter(p => p && p.status === 'PAID')
+      .filter(p => isDateInRange(p.disbursedAt || p.createdAt || p.period, reportStartDate, reportEndDate))
+      .reduce((sum, p) => sum + (Number(p.netSalary || 0) || 0), 0);
+  }, [payrolls, reportStartDate, reportEndDate]);
+
+  const pnlOperating = useMemo(() => {
+    return (ledger || [])
+      .filter(tx => tx && tx.type === 'EXPENSE' && !tx.referenceId)
+      .filter(tx => isDateInRange(tx.date || tx.createdAt, reportStartDate, reportEndDate))
+      .reduce((sum, tx) => sum + (Number(tx.amount || 0) || 0), 0);
+  }, [ledger, reportStartDate, reportEndDate]);
+
+  const pnlRefund = useMemo(() => {
+    return (ledger || [])
+      .filter(tx => tx && tx.type === 'REFUND')
+      .filter(tx => isDateInRange(tx.date || tx.createdAt, reportStartDate, reportEndDate))
+      .reduce((sum, tx) => sum + (Number(tx.amount || 0) || 0), 0);
+  }, [ledger, reportStartDate, reportEndDate]);
+
+  const pnlTotalExpense = pnlCogs + pnlPayroll + pnlOperating + pnlRefund;
+  const pnlNetProfit = pnlRevenue - pnlTotalExpense;
   // Không có module vốn chủ sở hữu/số dư đầu kỳ thật trong hệ thống — không bịa
   // "vốn góp ban đầu". Số dư lũy kế chỉ phản ánh đúng lợi nhuận ròng tích lũy.
   const cashBalance = netProfit;
@@ -405,9 +449,10 @@ export default function Accountant() {
       } else if (typeFilter === 'REFUND') {
         matchType = tx.type === 'REFUND' || tx.referenceId?.startsWith('REFUND-') || tx.description?.toLowerCase().includes('hoàn tiền');
       }
-      return matchSearch && matchType;
+      let matchDate = isDateInRange(tx.date || tx.createdAt, ledgerStartDate, ledgerEndDate);
+      return matchSearch && matchType && matchDate;
     });
-  }, [ledger, search, typeFilter]);
+  }, [ledger, search, typeFilter, ledgerStartDate, ledgerEndDate]);
 
   const [submittingManualEntry, setSubmittingManualEntry] = useState(false);
   const handleAddManualEntry = async () => {
@@ -1318,6 +1363,18 @@ export default function Accountant() {
             </div>
           </div>
 
+          <DateRangeFilter
+            startDate={ledgerStartDate}
+            endDate={ledgerEndDate}
+            onChange={({ startDate, endDate }) => {
+              setLedgerStartDate(startDate);
+              setLedgerEndDate(endDate);
+            }}
+            label="Lọc sổ cái theo ngày"
+            compact
+            style={{ marginBottom: '1rem' }}
+          />
+
           <div style={{ overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
               <thead>
@@ -1949,6 +2006,17 @@ export default function Accountant() {
       {activeTab === 'reports' && (
         <div data-print-doc="reports" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
           
+          {/* Bộ lọc khoảng thời gian Báo Cáo P&L & VAT */}
+          <DateRangeFilter
+            startDate={reportStartDate}
+            endDate={reportEndDate}
+            onChange={({ startDate, endDate }) => {
+              setReportStartDate(startDate);
+              setReportEndDate(endDate);
+            }}
+            label="Thời gian tính toán P&L & VAT"
+          />
+
           {/* P&L Statement Card */}
           <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem' }}>
             <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
@@ -1956,38 +2024,38 @@ export default function Accountant() {
               <span>Báo Cáo Kết Quả Hoạt Động Kinh Doanh</span>
             </h3>
             <p style={{ color: '#64748b', fontSize: '0.78rem', marginBottom: '1.25rem' }}>
-              Kỳ tính toán: Tháng {today.getMonth() + 1}/{today.getFullYear()}
+              Kỳ tính toán: {reportStartDate || reportEndDate ? `${reportStartDate || 'Trước'} → ${reportEndDate || 'Hiện tại'}` : `Toàn bộ dữ liệu tài chính tích lũy`}
             </p>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', fontSize: '0.85rem' }}>
               <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'baseline', gap: '0.5rem', padding: '0.75rem', backgroundColor: '#f0fdf4', borderRadius: '6px', border: '1px solid #bbf7d0' }}>
                 <strong style={{ color: '#16a34a', flex: '1 1 260px', minWidth: 0 }}>1. DOANH THU THUẦN TỪ BÁN HÀNG & DỊCH VỤ:</strong>
-                <strong style={{ color: '#16a34a', fontSize: '1rem', whiteSpace: 'nowrap' }}>{fmt(totalRevenue)}</strong>
+                <strong style={{ color: '#16a34a', fontSize: '1rem', whiteSpace: 'nowrap' }}>{fmt(pnlRevenue)}</strong>
               </div>
 
               <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'baseline', gap: '0.5rem', padding: '0.75rem', backgroundColor: '#fef2f2', borderRadius: '6px', border: '1px solid #fecaca' }}>
                 <strong style={{ color: '#dc2626', flex: '1 1 260px', minWidth: 0 }}>2. GIÁ VỐN HÀNG BÁN:</strong>
-                <strong style={{ color: '#dc2626', fontSize: '1rem', whiteSpace: 'nowrap' }}>- {fmt(cogsAmount)}</strong>
+                <strong style={{ color: '#dc2626', fontSize: '1rem', whiteSpace: 'nowrap' }}>- {fmt(pnlCogs)}</strong>
               </div>
 
               <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'baseline', gap: '0.5rem', padding: '0.75rem', backgroundColor: '#fef2f2', borderRadius: '6px', border: '1px solid #fecaca' }}>
                 <strong style={{ color: '#dc2626', flex: '1 1 260px', minWidth: 0 }}>3. CHI PHÍ LƯƠNG NHÂN VIÊN & HOA HỒNG:</strong>
-                <strong style={{ color: '#dc2626', fontSize: '1rem', whiteSpace: 'nowrap' }}>- {fmt(payrollExpensePaid)}</strong>
+                <strong style={{ color: '#dc2626', fontSize: '1rem', whiteSpace: 'nowrap' }}>- {fmt(pnlPayroll)}</strong>
               </div>
 
               <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'baseline', gap: '0.5rem', padding: '0.75rem', backgroundColor: '#fef2f2', borderRadius: '6px', border: '1px solid #fecaca' }}>
                 <strong style={{ color: '#dc2626', flex: '1 1 260px', minWidth: 0 }}>4. CHI PHÍ VẬN HÀNH (Phiếu Chi Thủ Công):</strong>
-                <strong style={{ color: '#dc2626', fontSize: '1rem', whiteSpace: 'nowrap' }}>- {fmt(operatingExpense)}</strong>
+                <strong style={{ color: '#dc2626', fontSize: '1rem', whiteSpace: 'nowrap' }}>- {fmt(pnlOperating)}</strong>
               </div>
 
               <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'baseline', gap: '0.5rem', padding: '0.75rem', backgroundColor: '#fef2f2', borderRadius: '6px', border: '1px solid #fecaca' }}>
                 <strong style={{ color: '#dc2626', flex: '1 1 260px', minWidth: 0 }}>5. CHI HOÀN TIỀN KHÁCH HÀNG:</strong>
-                <strong style={{ color: '#dc2626', fontSize: '1rem', whiteSpace: 'nowrap' }}>- {fmt(refundAmount)}</strong>
+                <strong style={{ color: '#dc2626', fontSize: '1rem', whiteSpace: 'nowrap' }}>- {fmt(pnlRefund)}</strong>
               </div>
 
               <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'baseline', gap: '0.5rem', padding: '1rem', backgroundColor: '#eff6ff', borderRadius: '8px', border: '2px solid #3b82f6', marginTop: '0.5rem' }}>
                 <strong style={{ color: '#1d4ed8', fontSize: '1.05rem', flex: '1 1 260px', minWidth: 0 }}>6. LỢI NHUẬN RÒNG TRƯỚC THUẾ:</strong>
-                <strong style={{ color: '#1d4ed8', fontSize: '1.15rem', whiteSpace: 'nowrap' }}>{fmt(netProfit)}</strong>
+                <strong style={{ color: '#1d4ed8', fontSize: '1.15rem', whiteSpace: 'nowrap' }}>{fmt(pnlNetProfit)}</strong>
               </div>
             </div>
           </div>
@@ -2001,13 +2069,13 @@ export default function Accountant() {
               <div style={{ padding: '0.85rem', backgroundColor: '#f8fafc', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
                 <strong style={{ fontSize: '0.85rem', color: '#0f172a' }}>Thuế VAT Đầu Ra (Bán Hàng 10%):</strong>
                 <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#16a34a', marginTop: '0.35rem' }}>
-                  {fmt(Math.round(totalRevenue * 0.1))}
+                  {fmt(Math.round(pnlRevenue * 0.1))}
                 </div>
               </div>
               <div style={{ padding: '0.85rem', backgroundColor: '#f8fafc', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
                 <strong style={{ fontSize: '0.85rem', color: '#0f172a' }}>Thuế VAT Đầu Vào Được Khấu Trừ:</strong>
                 <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#dc2626', marginTop: '0.35rem' }}>
-                  {fmt(Math.round(totalExpense * 0.1))}
+                  {fmt(Math.round(pnlTotalExpense * 0.1))}
                 </div>
               </div>
             </div>

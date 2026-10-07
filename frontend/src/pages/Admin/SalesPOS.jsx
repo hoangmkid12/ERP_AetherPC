@@ -8,6 +8,7 @@ import { useNotification, notify } from '../../context/NotificationContext';
 import { api } from '../../services/api';
 import { ORDER_STATUS, getStatusInfo, CUSTOMER_TIER, getStatusLabel } from '../../utils/statusLabels';
 import ActorNotificationBar from '../../components/ActorNotificationBar';
+import DateRangeFilter from '../../components/Common/DateRangeFilter';
 import { 
   Search, ShoppingCart, Plus, Minus, Trash2, Printer, FileText,
   BarChart2, DollarSign, Users, Award, ClipboardList, TrendingUp, Truck, X, Check,
@@ -149,6 +150,8 @@ export default function SalesPOS() {
   const [orderStatusFilter, setOrderStatusFilter] = useState('ALL');
   const [orderStartDate, setOrderStartDate] = useState('');
   const [orderEndDate, setOrderEndDate] = useState('');
+  const [salesReportStartDate, setSalesReportStartDate] = useState('');
+  const [salesReportEndDate, setSalesReportEndDate] = useState('');
   const [selectedDetailOrder, setSelectedDetailOrder] = useState(null);
   // Track which orderId is currently being confirmed (loading guard)
   const [updatingOrderId, setUpdatingOrderId] = useState(null);
@@ -1240,51 +1243,52 @@ export default function SalesPOS() {
           {/* Orders Filter Toolbar */}
           <div style={{
             backgroundColor: '#ffffff',
-            padding: '0.85rem 1rem',
+            padding: '1rem',
             borderRadius: '8px',
             border: '1px solid #cbd5e1',
             marginBottom: '1.25rem',
-            display: 'grid',
-            gridTemplateColumns: 'minmax(200px, 2fr) minmax(180px, 1.3fr) minmax(140px, 1fr) minmax(140px, 1fr)',
-            gap: '0.75rem',
-            alignItems: 'center'
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '0.75rem'
           }}>
-            <input
-              type="text"
-              placeholder="Tìm theo mã đơn, khách hàng, số điện thoại..."
-              value={orderSearch}
-              onChange={(e) => setOrderSearch(e.target.value)}
-              style={{ width: '100%', height: '38px', padding: '0 0.85rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px', boxSizing: 'border-box' }}
-            />
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'minmax(200px, 2fr) minmax(180px, 1.3fr)',
+              gap: '0.75rem',
+              alignItems: 'center'
+            }}>
+              <input
+                type="text"
+                placeholder="Tìm theo mã đơn, khách hàng, số điện thoại..."
+                value={orderSearch}
+                onChange={(e) => setOrderSearch(e.target.value)}
+                style={{ width: '100%', height: '38px', padding: '0 0.85rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px', boxSizing: 'border-box' }}
+              />
 
-            <select
-              value={orderStatusFilter}
-              onChange={(e) => setOrderStatusFilter(e.target.value)}
-              style={{ width: '100%', height: '38px', padding: '0 0.65rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px', color: '#0f172a', boxSizing: 'border-box', backgroundColor: '#ffffff', cursor: 'pointer' }}
-            >
-              <option value="ALL">Tất cả trạng thái ({orders.length})</option>
-              <option value="PENDING">Chờ xác nhận</option>
-              <option value="CONFIRMED">Đã xác nhận (Chờ xuất kho)</option>
-              <option value="READY_TO_SHIP">Đã đóng gói (Chờ giao)</option>
-              <option value="SHIPPED">Đang vận chuyển</option>
-              <option value="DELIVERED">Đã giao hoàn tất</option>
-              <option value="CANCELLED">Đã hủy</option>
-            </select>
+              <select
+                value={orderStatusFilter}
+                onChange={(e) => setOrderStatusFilter(e.target.value)}
+                style={{ width: '100%', height: '38px', padding: '0 0.65rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px', color: '#0f172a', boxSizing: 'border-box', backgroundColor: '#ffffff', cursor: 'pointer' }}
+              >
+                <option value="ALL">Tất cả trạng thái ({orders.length})</option>
+                <option value="PENDING">Chờ xác nhận</option>
+                <option value="CONFIRMED">Đã xác nhận (Chờ xuất kho)</option>
+                <option value="READY_TO_SHIP">Đã đóng gói (Chờ giao)</option>
+                <option value="SHIPPED">Đang vận chuyển</option>
+                <option value="DELIVERED">Đã giao hoàn tất</option>
+                <option value="CANCELLED">Đã hủy</option>
+              </select>
+            </div>
 
-            <input
-              type="date"
-              value={orderStartDate}
-              onChange={(e) => setOrderStartDate(e.target.value)}
-              title="Từ ngày"
-              style={{ width: '100%', height: '38px', padding: '0 0.5rem', fontSize: '0.8rem', border: '1px solid #cbd5e1', borderRadius: '6px', boxSizing: 'border-box', backgroundColor: '#ffffff' }}
-            />
-
-            <input
-              type="date"
-              value={orderEndDate}
-              onChange={(e) => setOrderEndDate(e.target.value)}
-              title="Đến ngày"
-              style={{ width: '100%', height: '38px', padding: '0 0.5rem', fontSize: '0.8rem', border: '1px solid #cbd5e1', borderRadius: '6px', boxSizing: 'border-box', backgroundColor: '#ffffff' }}
+            <DateRangeFilter
+              startDate={orderStartDate}
+              endDate={orderEndDate}
+              onChange={({ startDate, endDate }) => {
+                setOrderStartDate(startDate);
+                setOrderEndDate(endDate);
+              }}
+              label="Lọc theo ngày đặt hàng"
+              compact
             />
           </div>
 
@@ -1950,9 +1954,19 @@ export default function SalesPOS() {
       {/* TAB 6: REPORTS (BÁO CÁO DOANH THU BÁN HÀNG) */}
       {/* ========================================================================= */}
       {activeTab === 'reports' && (() => {
+        const reportOrders = orders.filter(o =>
+          o &&
+          isDateInRange(o.date || o.createdAt, salesReportStartDate, salesReportEndDate)
+        );
+        const reportTotalRevenue = reportOrders
+          .filter(o => o.status !== 'CANCELLED')
+          .reduce((sum, o) => sum + (parseFloat(o.totalAmount || o.total) || 0), 0);
+        const reportCompletedCount = reportOrders
+          .filter(o => ['DELIVERED', 'DONE', 'COMPLETED'].includes(o.status)).length;
+
         // Calculate Category Revenue breakdown
         const catRevMap = {};
-        orders.forEach(o => {
+        reportOrders.forEach(o => {
           if (o.status !== 'CANCELLED') {
             (o.items || []).forEach(item => {
               const prod = effectiveCatalog.find(p => String(p.productId || p.id) === String(item.productId || item.id)) || {};
@@ -1969,7 +1983,7 @@ export default function SalesPOS() {
 
         // Top 5 Best Selling Items
         const itemSalesMap = {};
-        orders.forEach(o => {
+        reportOrders.forEach(o => {
           if (o.status !== 'CANCELLED') {
             (o.items || []).forEach(item => {
               const prod = effectiveCatalog.find(p => String(p.productId || p.id) === String(item.productId || item.id || item.name))
@@ -2002,6 +2016,18 @@ export default function SalesPOS() {
 
         return (
           <div>
+            {/* Bộ lọc thời gian báo cáo */}
+            <DateRangeFilter
+              startDate={salesReportStartDate}
+              endDate={salesReportEndDate}
+              onChange={({ startDate, endDate }) => {
+                setSalesReportStartDate(startDate);
+                setSalesReportEndDate(endDate);
+              }}
+              label="Thời gian phân tích doanh thu"
+              style={{ marginBottom: '1.25rem' }}
+            />
+
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem', marginBottom: '1.25rem' }}>
               
               {/* Category Sales Share */}
@@ -2016,7 +2042,7 @@ export default function SalesPOS() {
                   {catRevEntries.map((cat, idx) => {
                     const colors = ['#2563eb', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#64748b'];
                     const color = colors[idx % colors.length];
-                    const pct = totalRevenue > 0 ? Math.round((cat.rev / totalRevenue) * 100) : 0;
+                    const pct = reportTotalRevenue > 0 ? Math.round((cat.rev / reportTotalRevenue) * 100) : 0;
                     return (
                       <div key={idx} style={{ paddingBottom: '0.5rem', borderBottom: '1px solid #f1f5f9' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', marginBottom: '0.3rem' }}>
@@ -2039,12 +2065,12 @@ export default function SalesPOS() {
                 </h3>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                   <div style={{ backgroundColor: '#f8fafc', padding: '1rem', borderRadius: '6px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
-                    <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#2563eb' }}>{orders.length}</div>
+                    <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#2563eb' }}>{reportOrders.length}</div>
                     <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700, marginTop: '0.2rem' }}>Tổng Số Đơn Bán</div>
                   </div>
                   <div style={{ backgroundColor: '#f8fafc', padding: '1rem', borderRadius: '6px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
                     <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#16a34a' }}>
-                      {orders.length > 0 ? `${Math.round((completedCount / orders.length) * 100)}%` : '100%'}
+                      {reportOrders.length > 0 ? `${Math.round((reportCompletedCount / reportOrders.length) * 100)}%` : '100%'}
                     </div>
                     <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700, marginTop: '0.2rem' }}>Tỷ Lệ Giao Thành Công</div>
                   </div>
