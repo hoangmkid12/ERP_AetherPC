@@ -13,18 +13,26 @@ export const AuthProvider = ({ children }) => {
   // Restore session from the backend's HTTP-Only authToken cookie on load.
   useEffect(() => {
     let active = true;
+    // Chỉ coi là hết phiên khi máy chủ trả 401/403. Lỗi tạm thời (máy chủ bận, 5xx, mất mạng) thì thử lại,
+    // tránh đẩy người dùng về trang đăng nhập và để lại màn hình trắng.
     const restoreSession = async () => {
-      try {
-        const response = await api.get('/auth/me');
-        if (active && response && response.user) {
-          setUser(response.user);
-          initializeAllStores().catch(() => {});
+      for (let attempt = 0; attempt < 5 && active; attempt++) {
+        try {
+          const response = await api.get('/auth/me');
+          if (active && response && response.user) {
+            setUser(response.user);
+            initializeAllStores().catch(() => {});
+          }
+          break;
+        } catch (e) {
+          if (e?.status === 401 || e?.status === 403 || e?.status === 404 || attempt === 4) {
+            if (active) setUser(null);
+            break;
+          }
+          await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
         }
-      } catch (e) {
-        if (active) setUser(null);
-      } finally {
-        if (active) setLoading(false);
       }
+      if (active) setLoading(false);
     };
     restoreSession();
     return () => { active = false; };

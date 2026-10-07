@@ -21,8 +21,9 @@ const PERKS = [
 const EMPLOYEE_HOME = {
   CEO: '/admin/dashboard', SALES: '/admin/sales', SALES_MANAGER: '/admin/sales', WAREHOUSE: '/admin/warehouse',
   WAREHOUSE_MANAGER: '/admin/warehouse', ASSEMBLY: '/admin/assembly', HR: '/admin/hr', ACCOUNTANT: '/admin/accounting',
-  PURCHASING: '/admin/purchasing', QC: '/admin/quality-control', QA: '/admin/quality-control', ADMIN: '/admin/system',
-  CSKH: '/admin/cskh', DELIVERY: '/admin/delivery', SUPPLIER: '/supplier/portal',
+  PURCHASING: '/admin/purchasing', QC: '/admin/quality-control', QA: '/admin/quality-control',
+  QUALITY_CONTROL: '/admin/quality-control', ADMIN: '/admin/system', CSKH: '/admin/cskh', DELIVERY: '/admin/delivery',
+  EMPLOYEE: '/admin/me', SUPPLIER: '/supplier/portal',
 };
 
 function PasswordInput({ id, value, onChange, placeholder, minLength }) {
