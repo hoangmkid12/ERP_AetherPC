@@ -1,0 +1,186 @@
+{
+ "seq": [
+  {
+   "name": "Danh sách sản phẩm (24/trang)",
+   "method": "GET",
+   "path": "/products",
+   "n": 100,
+   "p50": 15.5,
+   "p95": 23.6,
+   "max": 25.6,
+   "kb": 73.8,
+   "errors": 0
+  },
+  {
+   "name": "Tìm kiếm sản phẩm theo tên",
+   "method": "GET",
+   "path": "/products",
+   "n": 100,
+   "p50": 15.6,
+   "p95": 22.4,
+   "max": 24.4,
+   "kb": 57.6,
+   "errors": 0
+  },
+  {
+   "name": "Chi tiết sản phẩm",
+   "method": "GET",
+   "path": "/products/:id",
+   "n": 100,
+   "p50": 15.3,
+   "p95": 17.2,
+   "max": 17.9,
+   "kb": 5,
+   "errors": 0
+  },
+  {
+   "name": "Danh sách đơn hàng (nhân viên)",
+   "method": "GET",
+   "path": "/orders",
+   "n": 100,
+   "p50": 720.4,
+   "p95": 781.3,
+   "max": 894.9,
+   "kb": 7810.4,
+   "errors": 0
+  },
+  {
+   "name": "Danh sách tồn kho",
+   "method": "GET",
+   "path": "/warehouse/inventory",
+   "n": 100,
+   "p50": 349.6,
+   "p95": 384.6,
+   "max": 465,
+   "kb": 4543.8,
+   "errors": 0
+  },
+  {
+   "name": "Danh sách đơn mua hàng",
+   "method": "GET",
+   "path": "/purchasing/orders",
+   "n": 100,
+   "p50": 15.5,
+   "p95": 22.4,
+   "max": 26,
+   "kb": 33.3,
+   "errors": 0
+  },
+  {
+   "name": "Sổ cái kế toán",
+   "method": "GET",
+   "path": "/ledger",
+   "n": 100,
+   "p50": 63.3,
+   "p95": 77.9,
+   "max": 92.4,
+   "kb": 925.8,
+   "errors": 0
+  },
+  {
+   "name": "Bảng lương theo kỳ",
+   "method": "GET",
+   "path": "/hr/payrolls",
+   "n": 100,
+   "p50": 15.3,
+   "p95": 17.1,
+   "max": 25.2,
+   "kb": 23.5,
+   "errors": 0
+  },
+  {
+   "name": "Đăng nhập nhân viên (băm bcrypt)",
+   "method": "POST",
+   "path": "/auth/employee/login",
+   "n": 30,
+   "p50": 116.8,
+   "p95": 135.3,
+   "max": 135.4,
+   "kb": 0.5,
+   "errors": 0
+  },
+  {
+   "name": "Tạo đơn bán tại quầy (ghi, giao dịch)",
+   "method": "POST",
+   "path": "/orders/pos",
+   "n": 50,
+   "p50": 52.1,
+   "p95": 68.4,
+   "max": 76.3,
+   "kb": 3.3,
+   "errors": 0
+  }
+ ],
+ "conc": [
+  {
+   "name": "Danh sách sản phẩm",
+   "conc": 10,
+   "total": 1000,
+   "rps": 254,
+   "p50": 37.4,
+   "p95": 51,
+   "max": 178.8,
+   "errors": 0
+  },
+  {
+   "name": "Danh sách sản phẩm",
+   "conc": 50,
+   "total": 1000,
+   "rps": 315.9,
+   "p50": 153.4,
+   "p95": 196.8,
+   "max": 332.6,
+   "errors": 0
+  },
+  {
+   "name": "Danh sách đơn hàng (nhân viên)",
+   "conc": 20,
+   "total": 200,
+   "rps": 3.1,
+   "p50": 6431.4,
+   "p95": 8129.6,
+   "max": 9154,
+   "errors": 0
+  },
+  {
+   "name": "Tạo đơn bán tại quầy",
+   "conc": 20,
+   "total": 200,
+   "rps": 26.2,
+   "p50": 508.7,
+   "p95": 1889.3,
+   "max": 4071.9,
+   "errors": 3
+  }
+ ],
+ "race": [
+  {
+   "round": 1,
+   "requests": 20,
+   "ok": 5,
+   "rejected": 15,
+   "codes": "201/409",
+   "stockAfter": 0,
+   "sold": 5
+  },
+  {
+   "round": 2,
+   "requests": 20,
+   "ok": 5,
+   "rejected": 15,
+   "codes": "201/409",
+   "stockAfter": 0,
+   "sold": 5
+  },
+  {
+   "round": 3,
+   "requests": 20,
+   "ok": 5,
+   "rejected": 15,
+   "codes": "409/201",
+   "stockAfter": 0,
+   "sold": 5
+  }
+ ],
+ "at": "2026-10-07T06:00:07.659Z"
+}

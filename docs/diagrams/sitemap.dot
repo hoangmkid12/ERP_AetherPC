@@ -2,15 +2,15 @@
 digraph Sitemap {
   charset="UTF-8";
   graph [rankdir=LR, splines=ortho, nodesep=0.18, ranksep=0.55, fontname="Arial", bgcolor=white];
-  node [shape=box, style="rounded,filled", fillcolor="#ffffff", color="#334155", fontname="Arial", fontsize=11, margin="0.12,0.06"];
-  edge [color="#64748b", arrowsize=0.6];
+  node [shape=box, style="rounded,filled", fillcolor="#ffffff", color="#000000", fontname="Arial", fontsize=11, margin="0.12,0.06"];
+  edge [color="#000000", arrowsize=0.6];
 
-  root [label="AetherPC ERP", fillcolor="#1e3a8a", fontcolor="white", fontsize=13];
+  root [label="AetherPC ERP", fillcolor="#ffffff", fontcolor="black", fontsize=13];
 
-  store [label="Cửa hàng trực tuyến", fillcolor="#dbeafe"];
-  login [label="Đăng nhập / Đăng ký", fillcolor="#dbeafe"];
-  admin [label="Trang quản trị nghiệp vụ", fillcolor="#dcfce7"];
-  supplier [label="Cổng nhà cung cấp", fillcolor="#fef3c7"];
+  store [label="Cửa hàng trực tuyến", fillcolor="#ffffff"];
+  login [label="Đăng nhập / Đăng ký", fillcolor="#ffffff"];
+  admin [label="Trang quản trị nghiệp vụ", fillcolor="#ffffff"];
+  supplier [label="Cổng nhà cung cấp", fillcolor="#ffffff"];
   root -> {store login admin supplier};
 
   s1 [label="Trang chủ"]; s2 [label="Danh mục, chi tiết sản phẩm"]; s3 [label="Tự cấu hình máy tính"];
@@ -29,7 +29,7 @@ digraph Sitemap {
   a8 [label="Chăm sóc khách hàng\n(chat, khiếu nại, đổi trả)"];
   a9 [label="Nhân sự\n(hồ sơ, chấm công, bảng công,\nnghỉ phép, tính lương, cấu hình)"];
   a10 [label="Quản trị hệ thống\n(tài khoản, phân quyền, nhật ký, sao lưu)"];
-  a11 [label="Cổng nhân viên\n(chấm công khuôn mặt, nghỉ phép,\nphiếu lương, hồ sơ, tài liệu)", fillcolor="#e0e7ff"];
+  a11 [label="Cổng nhân viên\n(chấm công khuôn mặt, nghỉ phép,\nphiếu lương, hồ sơ, tài liệu)", fillcolor="#ffffff"];
   admin -> {a0 a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11};
 
   p1 [label="Yêu cầu báo giá"]; p2 [label="Đơn mua hàng cần xác nhận"];

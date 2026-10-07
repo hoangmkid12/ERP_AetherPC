@@ -188,6 +188,7 @@ digraph UseCaseAetherPC {
     uc_ttncc     [label="Thanh Toán\nNhà Cung Cấp"];
     uc_hoantien  [label="Giải Ngân Hoàn\nTiền Khách Hàng"];
     uc_luong     [label="Giải Ngân\nLương Nhân Viên"];
+    uc_doisoat   [label="Đối Soát Tiền\nThu Hộ"];
     // Nhân Viên Nhân Sự (4)
     uc_hosonv    [label="Quản Lý Hồ Sơ\nNhân Viên"];
     uc_chamcong  [label="Chấm Công\nHàng Ngày"];
@@ -210,7 +211,7 @@ digraph UseCaseAetherPC {
       uc_xuatkho; uc_kiemke; uc_danhmucsp; uc_lappr; uc_duyetpr;
       uc_nhanlenh; uc_tiendo;
       uc_giaohang; uc_thuhoi;
-      uc_socai; uc_ttncc; uc_hoantien; uc_luong;
+      uc_socai; uc_ttncc; uc_doisoat; uc_hoantien; uc_luong;
       uc_hosonv; uc_chamcong; uc_lapluong; uc_nghiphep;
       uc_qltk; uc_nhatky; uc_backup;
       uc_duyetpo; uc_duyetluong; uc_dashboard;
@@ -219,7 +220,7 @@ digraph UseCaseAetherPC {
       -> uc_xuatkho -> uc_kiemke -> uc_lappr -> uc_danhmucsp -> uc_duyetpr
       -> uc_nhanlenh -> uc_tiendo
       -> uc_giaohang -> uc_thuhoi
-      -> uc_socai -> uc_ttncc -> uc_hoantien -> uc_luong
+      -> uc_socai -> uc_ttncc -> uc_doisoat -> uc_hoantien -> uc_luong
       -> uc_hosonv -> uc_chamcong -> uc_lapluong -> uc_nghiphep
       -> uc_qltk -> uc_nhatky -> uc_backup
       -> uc_duyetpo -> uc_duyetluong -> uc_dashboard [style=invis];
@@ -315,7 +316,7 @@ digraph UseCaseAetherPC {
   uc_xuatkho -> a9; uc_danhmucsp -> a10; uc_duyetpr -> a10;
   uc_nhanlenh -> a11; uc_tiendo -> a11;
   uc_giaohang -> a12; uc_thuhoi -> a12;
-  uc_socai -> a13; uc_ttncc -> a13; uc_hoantien -> a13; uc_luong -> a13;
+  uc_socai -> a13; uc_ttncc -> a13; uc_doisoat -> a13; uc_hoantien -> a13; uc_luong -> a13;
   uc_hosonv -> a14; uc_chamcong -> a14; uc_lapluong -> a14; uc_nghiphep -> a14;
   uc_qltk -> a15; uc_nhatky -> a15; uc_backup -> a15;
   uc_duyetpo -> a16; uc_duyetluong -> a16; uc_dashboard -> a16;
