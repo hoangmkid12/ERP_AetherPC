@@ -1,7 +1,12 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { ArrowRight, Users, Target, Heart, Zap, User, Compass, ShieldCheck, RotateCcw, Truck, CreditCard } from 'lucide-react';
+import {
+  ArrowRight, Users, Target, Heart, Zap, Compass, ShieldCheck, RotateCcw, Truck, CreditCard,
+  ChevronRight, Wrench, PackageCheck, Headphones, MapPin, Phone, Mail
+} from 'lucide-react';
 import BrandLogo from '../../components/BrandLogo';
+import useCatalog from '../../components/Storefront/useCatalog';
+import { SF_CATEGORIES, SHOP } from '../../components/Storefront/catalog';
 
 const TEAM = [
   { name: 'Nguyễn Văn Anh', role: 'CEO & Founder', years: '12 năm kinh nghiệm' },
@@ -13,22 +18,28 @@ const TEAM = [
 ];
 
 const VALUES = [
-  { icon: <Target size={28} />, title: 'Chính Trực', desc: 'Cam kết 100% hàng chính hãng, rõ ràng nguồn gốc xuất xứ, không bán hàng nhái hay hàng cũ.', color: '#6366f1' },
-  { icon: <Users size={28} />, title: 'Khách Hàng Là Trên Hết', desc: 'Mỗi quyết định đều lấy trải nghiệm khách hàng làm trung tâm, từ tư vấn đến sau bán hàng.', color: '#10b981' },
-  { icon: <Zap size={28} />, title: 'Đổi Mới Liên Tục', desc: 'Luôn cập nhật sản phẩm mới nhất, ứng dụng công nghệ hiện đại vào quy trình vận hành.', color: '#f59e0b' },
-  { icon: <Heart size={28} />, title: 'Đam Mê Công Nghệ', desc: 'Đội ngũ là những người thực sự yêu thích và đam mê linh kiện máy tính, gaming và công nghệ.', color: '#ef4444' },
+  { icon: Target, title: 'Chính trực', desc: 'Cam kết 100% hàng chính hãng, rõ ràng nguồn gốc xuất xứ, không bán hàng nhái hay hàng cũ.' },
+  { icon: Users, title: 'Khách hàng là trên hết', desc: 'Mỗi quyết định đều lấy trải nghiệm khách hàng làm trung tâm, từ tư vấn đến sau bán hàng.' },
+  { icon: Zap, title: 'Đổi mới liên tục', desc: 'Luôn cập nhật sản phẩm mới, ứng dụng công nghệ hiện đại vào quy trình vận hành.' },
+  { icon: Heart, title: 'Đam mê công nghệ', desc: 'Đội ngũ thực sự yêu thích linh kiện máy tính, gaming và công nghệ.' },
+];
+
+const SERVICES = [
+  { icon: PackageCheck, title: 'Linh kiện & gaming gear', desc: 'CPU, VGA, mainboard, RAM, SSD, nguồn, tản nhiệt, màn hình và chuột gaming chính hãng.' },
+  { icon: Wrench, title: 'Lắp ráp PC theo cấu hình', desc: 'Chọn linh kiện với công cụ Build PC, kỹ thuật viên lắp ráp, kiểm tra và niêm phong trước khi giao.' },
+  { icon: Headphones, title: 'Tư vấn & hậu mãi', desc: 'Chat trực tuyến với CSKH, tiếp nhận đổi trả và bảo hành theo số Serial của từng linh kiện.' },
 ];
 
 const TIMELINE = [
-  { year: '2014', title: 'Thành Lập AetherPC', desc: 'Cửa hàng đầu tiên tại Quận 3, TP.HCM với đội ngũ 3 người và kho hàng nhỏ.' },
-  { year: '2016', title: 'Mở Rộng Kho Vận', desc: 'Chuyển sang địa điểm mới tại Quận 7, tăng diện tích showroom gấp 5 lần.' },
-  { year: '2018', title: 'Ra Mắt Website Bán Hàng Online', desc: 'Bước vào thương mại điện tử, phục vụ khách hàng toàn quốc qua giao hàng nhanh.' },
-  { year: '2020', title: 'Đối Tác Chính Hãng Intel & AMD', desc: 'Trở thành đại lý ủy quyền chính thức của Intel và AMD tại Việt Nam.' },
-  { year: '2023', title: 'Ra Mắt Hệ Thống ERP Nội Bộ', desc: 'Ứng dụng hệ thống quản lý doanh nghiệp thông minh, tối ưu toàn bộ quy trình.' },
-  { year: '2026', title: 'AetherPC 2.0', desc: 'Nâng cấp toàn diện nền tảng TMĐT với AI tư vấn cấu hình thông minh.' },
+  { year: '2014', title: 'Thành lập AetherPC', desc: 'Cửa hàng đầu tiên tại Quận 3, TP.HCM với đội ngũ 3 người.' },
+  { year: '2016', title: 'Mở rộng kho vận', desc: 'Chuyển về Quận 7, tăng diện tích showroom gấp 5 lần.' },
+  { year: '2018', title: 'Bán hàng trực tuyến', desc: 'Ra mắt website, phục vụ khách hàng toàn quốc.' },
+  { year: '2020', title: 'Đối tác Intel & AMD', desc: 'Trở thành đại lý ủy quyền chính thức tại Việt Nam.' },
+  { year: '2023', title: 'Hệ thống ERP nội bộ', desc: 'Số hóa toàn bộ mua hàng, kho, bán hàng, nhân sự.' },
+  { year: '2026', title: 'AetherPC 2.0', desc: 'Nâng cấp nền tảng TMĐT với trợ lý tư vấn cấu hình.' },
 ];
 
-const PARTNERS = ['Intel', 'AMD', 'NVIDIA', 'ASUS', 'MSI', 'Gigabyte', 'Corsair', 'Kingston', 'Samsung', 'Seagate', 'NZXT', 'Deepcool'];
+const PARTNERS = ['Intel', 'AMD', 'ASUS', 'MSI', 'Gigabyte', 'Corsair', 'Kingston', 'Samsung', 'NZXT', 'Deepcool'];
 
 // Chính sách mô tả đúng cách hệ thống đang vận hành (giỏ hàng, đổi trả, giao hàng)
 const POLICIES = [
@@ -54,234 +65,170 @@ const POLICIES = [
   ] },
 ];
 
+function Head({ title, accent, sub }) {
+  return (
+    <div className="sf-section-head">
+      <div>
+        <h2 className="sf-section-title">{title} {accent && <span className="accent">{accent}</span>}</h2>
+        {sub && <p className="sf-section-sub">{sub}</p>}
+      </div>
+    </div>
+  );
+}
+
 export default function About() {
   const { hash } = useLocation();
+  const { products } = useCatalog();
   useEffect(() => {
     if (!hash) return;
     const el = document.getElementById(hash.slice(1));
     if (el) setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
   }, [hash]);
 
+  const brandCount = useMemo(() => new Set(products.map(p => p.brand).filter(b => b && b !== 'Khác')).size, [products]);
+  const firstOf = (cat) => products.find(p => p.category === cat && p.image);
+
   return (
-    <div style={{ paddingBottom: '4rem' }}>
-      {/* Hero */}
-      <div style={{
-        position: 'relative', height: '460px', overflow: 'hidden', marginBottom: '4rem',
-      }}>
-        <img src="/about_team.png" alt="Đội ngũ AetherPC" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-        <div style={{
-          position: 'absolute', inset: 0,
-          background: 'linear-gradient(90deg, rgba(6,8,15,0.94) 0%, rgba(6,8,15,0.86) 45%, rgba(6,8,15,0.55) 100%)',
-          display: 'flex', alignItems: 'center',
-        }}>
-          <div className="container">
-            <span className="badge badge-info" style={{ marginBottom: '1.25rem', fontSize: '0.8rem', padding: '0.4rem 1rem' }}>
-              Về Chúng Tôi
-            </span>
-            <h1 style={{
-              fontSize: 'clamp(2rem, 4vw, 3rem)', fontWeight: 900,
-              fontFamily: 'var(--font-title)', lineHeight: 1.2,
-              marginBottom: '1.25rem', maxWidth: '620px', color: '#fff',
-              textShadow: '0 2px 16px rgba(0,0,0,0.55)',
-            }}>
-              Hơn 10 Năm Đồng Hành Cùng <span className="gradient-text">Công Nghệ Việt</span>
-            </h1>
-            <p style={{ color: 'rgba(255,255,255,0.85)', fontSize: '1.05rem', maxWidth: '520px', lineHeight: 1.7, marginBottom: '2rem', textShadow: '0 1px 8px rgba(0,0,0,0.5)' }}>
-              AetherPC là hệ thống cửa hàng linh kiện máy tính chính hãng, được tin tưởng bởi hơn 50.000 khách hàng trên toàn quốc.
-            </p>
-            <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-              <Link to="/products" className="btn btn-primary" style={{ padding: '0.75rem 1.75rem' }}>
-                Xem Sản Phẩm <ArrowRight size={15} />
+    <div className="sf-container">
+      <nav className="sf-breadcrumb"><Link to="/">Trang chủ</Link><span>/</span><span className="cur">Giới thiệu</span></nav>
+
+      <section className="sf-intro">
+        <div>
+          <span className="kicker">Về AetherPC</span>
+          <h1>Hơn 10 năm đồng hành cùng <em>người dùng PC Việt</em></h1>
+          <p>AetherPC là cửa hàng linh kiện máy tính và gaming gear chính hãng, kèm dịch vụ lắp ráp PC theo cấu hình riêng. Mọi khâu từ nhập hàng, kiểm định, lắp ráp đến giao hàng đều được quản lý trên một hệ thống thống nhất.</p>
+          <div className="sf-intro-actions">
+            <Link to="/products" className="sf-btn sf-btn-primary sf-btn-lg">Xem sản phẩm <ArrowRight size={16} /></Link>
+            <a href="#chinh-sach" className="sf-btn sf-btn-lg" style={{ background: 'rgba(255,255,255,.12)', color: '#fff' }}>Chính sách mua hàng</a>
+          </div>
+        </div>
+        <div className="sf-intro-stats">
+          <div><b>2014</b><span>Năm thành lập</span></div>
+          <div><b>50.000+</b><span>Khách hàng đã phục vụ</span></div>
+          <div><b>{products.length ? products.length.toLocaleString('vi-VN') : '—'}</b><span>Sản phẩm đang kinh doanh</span></div>
+          <div><b>{brandCount || '—'}</b><span>Thương hiệu phân phối</span></div>
+        </div>
+      </section>
+
+      <section className="sf-section sf-cards-2">
+        <div className="sf-info-card">
+          <span className="ic"><Target size={22} /></span>
+          <h3>Sứ mệnh</h3>
+          <p>Đưa công nghệ máy tính đến gần hơn với mọi người Việt Nam. AetherPC cam kết cung cấp linh kiện chính hãng với giá cạnh tranh, kèm tư vấn chuyên sâu giúp khách hàng đưa ra quyết định mua sắm tốt nhất.</p>
+        </div>
+        <div className="sf-info-card">
+          <span className="ic"><Compass size={22} /></span>
+          <h3>Tầm nhìn</h3>
+          <p>Trở thành nền tảng TMĐT linh kiện máy tính hàng đầu Việt Nam vào năm 2030, với hệ sinh thái hoàn chỉnh từ bán lẻ, tư vấn cấu hình, dịch vụ lắp ráp đến bảo hành sau bán hàng.</p>
+        </div>
+      </section>
+
+      <section className="sf-section sf-section-box">
+        <Head title="Chúng tôi" accent="làm gì" sub="Ba mảng dịch vụ chính của AetherPC" />
+        <div className="sf-cards-3">
+          {SERVICES.map(s => (
+            <div key={s.title} className="sf-info-card" style={{ boxShadow: 'none', border: '1px solid var(--sf-border)' }}>
+              <span className="ic"><s.icon size={22} /></span>
+              <h3>{s.title}</h3>
+              <p>{s.desc}</p>
+            </div>
+          ))}
+        </div>
+        <div className="sf-catgrid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(104px, 1fr))', marginTop: 16 }}>
+          {SF_CATEGORIES.map(c => {
+            const p = firstOf(c.key);
+            return (
+              <Link key={c.key} to={`/products?category=${c.key}`}>
+                {p ? <img src={p.image} alt="" /> : <span className="ic" style={{ background: c.tint, color: c.color }}><c.icon size={24} /></span>}
+                <span>{c.label}</span>
               </Link>
-              <Link to="/careers" className="btn btn-secondary" style={{ padding: '0.75rem 1.75rem' }}>
-                Tuyển Dụng
-              </Link>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Stats */}
-      <section className="container" style={{ marginBottom: '5rem' }}>
-        <div className="card-glass" style={{ borderRadius: 'var(--radius-2xl)', overflow: 'hidden' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))' }}>
-            {[
-              { num: '2014', label: 'Năm Thành Lập' },
-              { num: '50.000+', label: 'Khách Hàng Tin Dùng' },
-              { num: '5.000+', label: 'SKU Sản Phẩm' },
-              { num: '10+', label: 'Năm Kinh Nghiệm' },
-              { num: '99%', label: 'Tỉ Lệ Hài Lòng' },
-            ].map((s, i) => (
-              <div key={s.label} style={{
-                textAlign: 'center', padding: '2rem 1rem',
-                borderRight: i < 4 ? '1px solid var(--border-glass)' : 'none',
-              }}>
-                <div className="stat-number">{s.num}</div>
-                <div className="stat-label">{s.label}</div>
-              </div>
-            ))}
-          </div>
+            );
+          })}
         </div>
       </section>
 
-      {/* Mission & Vision */}
-      <section className="container" style={{ marginBottom: '5rem' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
-          <div className="card-glass" style={{ padding: '2.5rem' }}>
-            <div style={{ display: 'flex', marginBottom: '1.25rem', color: 'var(--success)' }}>
-              <Target size={40} />
-            </div>
-            <h2 style={{ fontSize: '1.35rem', fontWeight: 700, marginBottom: '1rem' }}>Sứ Mệnh</h2>
-            <p style={{ color: 'var(--text-secondary)', lineHeight: 1.8, fontSize: '0.9375rem' }}>
-              Đưa công nghệ máy tính đến gần hơn với mọi người Việt Nam. AetherPC cam kết cung cấp linh kiện chính hãng với giá cạnh tranh, kèm tư vấn chuyên sâu giúp khách hàng đưa ra quyết định mua sắm tốt nhất.
-            </p>
-          </div>
-          <div className="card-glass" style={{ padding: '2.5rem' }}>
-            <div style={{ display: 'flex', marginBottom: '1.25rem', color: 'var(--primary)' }}>
-              <Compass size={40} />
-            </div>
-            <h2 style={{ fontSize: '1.35rem', fontWeight: 700, marginBottom: '1rem' }}>Tầm Nhìn</h2>
-            <p style={{ color: 'var(--text-secondary)', lineHeight: 1.8, fontSize: '0.9375rem' }}>
-              Trở thành nền tảng TMĐT linh kiện máy tính số một Việt Nam vào năm 2030, với hệ sinh thái hoàn chỉnh từ bán lẻ, tư vấn AI, dịch vụ lắp ráp đến bảo hành sau bán hàng.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* Core Values */}
-      <section style={{
-        background: 'linear-gradient(135deg, rgba(99,102,241,0.05), rgba(14,165,233,0.05))',
-        borderTop: '1px solid var(--border-glass)', borderBottom: '1px solid var(--border-glass)',
-        padding: '4rem 0', marginBottom: '5rem',
-      }}>
-        <div className="container">
-          <div style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
-            <h2 className="section-title">Giá Trị <span className="gradient-text">Cốt Lõi</span></h2>
-            <p className="section-subtitle">Những nguyên tắc định hướng mọi hoạt động của AetherPC</p>
-          </div>
-          <div className="usp-grid">
-            {VALUES.map((v) => (
-              <div key={v.title} className="usp-card">
-                <div className="usp-icon" style={{ background: `${v.color}18`, color: v.color }}>
-                  {v.icon}
-                </div>
-                <h3 className="usp-title">{v.title}</h3>
-                <p className="usp-desc">{v.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Timeline */}
-      <section className="container" style={{ marginBottom: '5rem' }}>
-        <div style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
-          <h2 className="section-title">Hành Trình <span className="gradient-text">Phát Triển</span></h2>
-          <p className="section-subtitle">Từ cửa hàng nhỏ đến hệ thống TMĐT hàng đầu</p>
-        </div>
-        <div style={{ maxWidth: '700px', margin: '0 auto' }}>
-          <div className="timeline">
-            {TIMELINE.map((item) => (
-              <div key={item.year} className="timeline-item">
-                <div className="timeline-dot" />
-                <div style={{
-                  background: 'var(--bg-glass)', border: '1px solid var(--border-glass)',
-                  borderRadius: 'var(--radius-lg)', padding: '1.25rem 1.5rem',
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
-                    <span style={{
-                      background: 'var(--primary)', color: '#fff',
-                      padding: '0.2rem 0.625rem', borderRadius: '99px',
-                      fontSize: '0.8125rem', fontWeight: 700, fontFamily: 'var(--font-title)',
-                    }}>{item.year}</span>
-                    <h3 style={{ fontSize: '1rem', fontWeight: 700 }}>{item.title}</h3>
-                  </div>
-                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', lineHeight: 1.6 }}>{item.desc}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Team */}
-      <section className="container" style={{ marginBottom: '5rem' }}>
-        <div style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
-          <h2 className="section-title">Đội Ngũ <span className="gradient-text">Chuyên Nghiệp</span></h2>
-          <p className="section-subtitle">Con người là tài sản quý giá nhất của AetherPC</p>
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1.25rem' }}>
-          {TEAM.map((member) => (
-            <div key={member.name} className="card-glass" style={{ textAlign: 'center', padding: '2rem 1.25rem' }}>
-              <div style={{
-                width: '72px', height: '72px', borderRadius: '50%',
-                background: 'rgba(37, 99, 235, 0.1)',
-                border: '2px solid rgba(37, 99, 235, 0.25)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                margin: '0 auto 1rem',
-                color: 'var(--primary)'
-              }}>
-                <User size={28} />
-              </div>
-              <h3 style={{ fontSize: '0.9375rem', fontWeight: 700, marginBottom: '0.375rem' }}>{member.name}</h3>
-              <p style={{ fontSize: '0.8rem', color: 'var(--primary)', fontWeight: 600, marginBottom: '0.375rem' }}>{member.role}</p>
-              <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{member.years}</p>
+      <section className="sf-section">
+        <Head title="Giá trị" accent="cốt lõi" sub="Những nguyên tắc định hướng mọi hoạt động của AetherPC" />
+        <div className="sf-cards-4">
+          {VALUES.map(v => (
+            <div key={v.title} className="sf-info-card">
+              <span className="ic"><v.icon size={22} /></span>
+              <h3>{v.title}</h3>
+              <p>{v.desc}</p>
             </div>
           ))}
         </div>
       </section>
 
-      {/* Partners */}
-      <section style={{ borderTop: '1px solid var(--border-glass)', padding: '3rem 0', marginBottom: '2rem' }}>
-        <div className="container">
-          <p style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8125rem', marginBottom: '1.5rem', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 600 }}>
-            Thương Hiệu Phân Phối Chính Hãng
-          </p>
-          <div className="brand-logo-grid">
-            {PARTNERS.map((brand) => (
-              <div key={brand} className="brand-logo-item">
-                <BrandLogo name={brand} height={20} />
-              </div>
-            ))}
-          </div>
+      <section className="sf-section sf-section-box">
+        <Head title="Hành trình" accent="phát triển" />
+        <div className="sf-steps" style={{ '--n': TIMELINE.length }}>
+          {TIMELINE.map((t, i) => (
+            <div key={t.year} className={`sf-step${i === TIMELINE.length - 1 ? ' is-last' : ''}`}>
+              <div className="dot">{t.year.slice(2)}</div>
+              <b>{t.year} · {t.title}</b>
+              <span>{t.desc}</span>
+            </div>
+          ))}
         </div>
       </section>
 
-      {/* Chính sách */}
-      <section id="chinh-sach" className="container" style={{ marginBottom: '3rem', scrollMarginTop: '90px' }}>
-        <h2 style={{ fontSize: '1.75rem', fontWeight: 800, marginBottom: '1.25rem', textAlign: 'center' }}>
-          Chính Sách <span className="gradient-text">Mua Hàng</span>
-        </h2>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
+      <section className="sf-section">
+        <Head title="Đội ngũ" accent="AetherPC" sub="Những người phụ trách từng mảng vận hành" />
+        <div className="sf-team">
+          {TEAM.map(m => {
+            const parts = m.name.split(' ');
+            const initials = (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+            return (
+              <div key={m.name} className="sf-member">
+                <div className="sf-avatar">{initials}</div>
+                <b>{m.name}</b>
+                <span className="role">{m.role}</span>
+                <span className="exp">{m.years}</span>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      <section id="chinh-sach" className="sf-section" style={{ scrollMarginTop: 130 }}>
+        <Head title="Chính sách" accent="mua hàng" sub="Áp dụng cho mọi đơn hàng đặt trên website và tại cửa hàng" />
+        <div className="sf-cards-2">
           {POLICIES.map(p => (
-            <div key={p.id} id={p.id} className="sf-box" style={{ padding: '1.25rem 1.4rem', scrollMarginTop: '90px' }}>
-              <h3 style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '1.05rem', fontWeight: 800, margin: '0 0 0.75rem' }}>
-                <p.icon size={20} color="var(--sf-primary)" /> {p.title}
-              </h3>
-              <ul style={{ margin: 0, paddingLeft: '1.1rem', display: 'flex', flexDirection: 'column', gap: 6, fontSize: '0.9rem', color: 'var(--text-secondary)', lineHeight: 1.55 }}>
-                {p.items.map(t => <li key={t}>{t}</li>)}
-              </ul>
+            <div key={p.id} id={p.id} className="sf-info-card" style={{ scrollMarginTop: 130 }}>
+              <h3 style={{ display: 'flex', alignItems: 'center', gap: 10 }}><span className="ic" style={{ margin: 0, width: 36, height: 36 }}><p.icon size={18} /></span>{p.title}</h3>
+              <ul style={{ marginTop: 10 }}>{p.items.map(t => <li key={t}>{t}</li>)}</ul>
             </div>
           ))}
         </div>
       </section>
 
-      {/* CTA */}
-      <section className="container">
-        <div className="card-glass" style={{
-          padding: '3rem 2rem', textAlign: 'center',
-          background: 'linear-gradient(135deg, rgba(99,102,241,0.08) 0%, rgba(14,165,233,0.08) 100%)',
-          borderColor: 'rgba(99,102,241,0.2)',
-        }}>
-          <h2 style={{ fontSize: '1.75rem', fontWeight: 800, marginBottom: '0.875rem' }}>
-            Bạn Muốn Cùng Phát Triển Với AetherPC?
-          </h2>
-          <p style={{ color: 'var(--text-secondary)', marginBottom: '1.75rem', fontSize: '0.9375rem' }}>
-            Chúng tôi luôn tìm kiếm những tài năng đam mê công nghệ để cùng nhau xây dựng tương lai.
-          </p>
-          <Link to="/careers" className="btn btn-primary" style={{ padding: '0.875rem 2rem', fontSize: '1rem' }}>
-            Xem Vị Trí Tuyển Dụng <ArrowRight size={16} />
-          </Link>
+      <section className="sf-section sf-section-box">
+        <Head title="Thương hiệu" accent="phân phối chính hãng" />
+        <div className="sf-brands">
+          {PARTNERS.slice(0, 8).map(b => (
+            <Link key={b} to={`/products?brand=${encodeURIComponent(b)}`} title={`Sản phẩm ${b}`} style={{ color: '#374151' }}>
+              <BrandLogo name={b} height={22} />
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      <section className="sf-section sf-cards-2">
+        <div className="sf-info-card">
+          <h3>Liên hệ</h3>
+          <ul style={{ listStyle: 'none', padding: 0, marginTop: 10, gap: 10 }}>
+            <li style={{ display: 'flex', gap: 8 }}><MapPin size={16} color="var(--sf-primary)" /> {SHOP.address}</li>
+            <li style={{ display: 'flex', gap: 8 }}><Phone size={16} color="var(--sf-primary)" /> Mua hàng: {SHOP.hotlineSales} · Bảo hành: {SHOP.hotline}</li>
+            <li style={{ display: 'flex', gap: 8 }}><Mail size={16} color="var(--sf-primary)" /> {SHOP.email}</li>
+          </ul>
+        </div>
+        <div className="sf-info-card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+          <h3>Cùng phát triển với AetherPC</h3>
+          <p>Chúng tôi đang tìm những người đam mê công nghệ cho các vị trí bán hàng, kỹ thuật, kho vận và marketing.</p>
+          <div style={{ marginTop: 14 }}>
+            <Link to="/careers" className="sf-btn sf-btn-primary">Xem vị trí tuyển dụng <ChevronRight size={16} /></Link>
+          </div>
         </div>
       </section>
     </div>
