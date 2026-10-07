@@ -33,7 +33,7 @@ export default function LoadingScreen({
             position: 'absolute',
             inset: '-6px',
             borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(37,99,235,0.35) 0%, rgba(37,99,235,0) 70%)',
+            background: 'radial-gradient(circle, rgba(220,38,38,0.3) 0%, rgba(220,38,38,0) 70%)',
             animation: 'pulseGlow 2.4s ease-in-out infinite'
           }}
         />
@@ -45,8 +45,8 @@ export default function LoadingScreen({
             inset: 0,
             borderRadius: '50%',
             border: '2.5px solid transparent',
-            borderTopColor: '#2563eb',
-            borderRightColor: '#60a5fa',
+            borderTopColor: '#dc2626',
+            borderRightColor: '#f87171',
             animation: 'spin 1.1s cubic-bezier(0.55, 0.15, 0.45, 0.85) infinite'
           }}
         />
@@ -57,8 +57,8 @@ export default function LoadingScreen({
             position: 'absolute',
             inset: '6px',
             borderRadius: '50%',
-            border: '2px dashed rgba(37,99,235,0.25)',
-            borderBottomColor: '#2563eb',
+            border: '2px dashed rgba(220,38,38,0.25)',
+            borderBottomColor: '#ef4444',
             animation: 'spin 2.2s linear infinite reverse'
           }}
         />
@@ -69,16 +69,21 @@ export default function LoadingScreen({
             width: '52px',
             height: '52px',
             borderRadius: '16px',
-            background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+            background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 50%, #991b1b 100%)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            color: '#ffffff',
-            boxShadow: '0 6px 18px rgba(37, 99, 235, 0.4)',
-            zIndex: 2
+            boxShadow: '0 6px 18px rgba(220, 38, 38, 0.4)',
+            zIndex: 2,
+            padding: '6px',
+            boxSizing: 'border-box'
           }}
         >
-          <ShieldAlert size={26} strokeWidth={2.2} />
+          <img 
+            src="/favicon.svg?v=red" 
+            alt="AetherPC Logo" 
+            style={{ width: '34px', height: '34px', display: 'block' }} 
+          />
         </div>
       </div>
 
@@ -87,7 +92,7 @@ export default function LoadingScreen({
         <span style={{ fontSize: '1.05rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', fontFamily: 'var(--font-title, inherit)' }}>
           AETHER PC
         </span>
-        <span style={{ fontSize: '0.68rem', fontWeight: 800, background: '#eff6ff', color: '#2563eb', padding: '1px 6px', borderRadius: '4px', border: '1px solid #bfdbfe' }}>
+        <span style={{ fontSize: '0.68rem', fontWeight: 800, background: '#fef2f2', color: '#dc2626', padding: '1px 6px', borderRadius: '4px', border: '1px solid #fecaca' }}>
           ERP
         </span>
       </div>
@@ -123,8 +128,8 @@ export default function LoadingScreen({
             bottom: 0,
             width: '45%',
             borderRadius: '999px',
-            background: 'linear-gradient(90deg, #2563eb 0%, #60a5fa 50%, #2563eb 100%)',
-            boxShadow: '0 0 8px rgba(37,99,235,0.5)',
+            background: 'linear-gradient(90deg, #dc2626 0%, #f87171 50%, #dc2626 100%)',
+            boxShadow: '0 0 8px rgba(220,38,38,0.5)',
             animation: 'shimmerLoading 1.4s ease-in-out infinite'
           }}
         />

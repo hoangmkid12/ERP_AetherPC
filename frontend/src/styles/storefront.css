@@ -177,7 +177,7 @@
 
 /* Thanh điều hướng phụ */
 .sf-subnav { background: #fff; border-bottom: 1px solid var(--sf-border); }
-.sf-subnav-inner { display: flex; align-items: center; gap: 4px; height: 44px; overflow-x: auto; scrollbar-width: none; }
+.sf-subnav-inner { display: flex; align-items: center; justify-content: center; gap: 8px; height: 44px; overflow-x: auto; scrollbar-width: none; }
 .sf-subnav-inner::-webkit-scrollbar { display: none; }
 .sf-subnav a {
   display: inline-flex; align-items: center; gap: 6px; padding: 0 12px; height: 44px; font-size: 13.5px; font-weight: 500;
@@ -669,21 +669,18 @@
 .sf-auth-bar .back:hover { background: rgba(0, 0, 0, .28); }
 .sf-auth-wrap { flex: 1; display: flex; align-items: center; justify-content: center; padding: 32px 16px 40px; }
 .sf-auth-card { width: 100%; max-width: 980px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); background: #fff; border-radius: 16px; overflow: hidden; box-shadow: 0 20px 50px rgba(17, 24, 39, .12); }
-.sf-auth-side { position: relative; color: #fff; padding: 36px 34px; display: flex; flex-direction: column; overflow: hidden;
-  background: radial-gradient(500px 260px at 100% 0%, rgba(255, 122, 69, .45), transparent 60%), linear-gradient(150deg, #d70018 0%, #a3000f 55%, #5c0009 100%); }
-.sf-auth-side h2 { color: #fff; font-size: 26px; font-weight: 900; line-height: 1.2; letter-spacing: -.02em; margin: 18px 0 8px; }
-.sf-auth-side > p { color: rgba(255, 255, 255, .85); font-size: 14px; line-height: 1.6; margin: 0 0 22px; }
-.sf-auth-perks { display: flex; flex-direction: column; gap: 14px; }
-.sf-auth-perk { display: flex; gap: 12px; align-items: flex-start; }
-.sf-auth-perk .ic { width: 38px; height: 38px; border-radius: 10px; background: rgba(255, 255, 255, .16); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-.sf-auth-perk b { display: block; font-size: 14px; margin-bottom: 2px; }
-.sf-auth-perk span { font-size: 12.5px; color: rgba(255, 255, 255, .8); line-height: 1.5; }
-.sf-auth-imgs { display: flex; gap: 10px; margin-top: auto; padding-top: 26px; }
-.sf-auth-imgs span { width: 68px; height: 68px; border-radius: 12px; background: #fff; padding: 6px; box-shadow: 0 8px 18px rgba(0, 0, 0, .25); }
-.sf-auth-imgs img { width: 100%; height: 100%; object-fit: contain; }
-.sf-auth-form { padding: 34px 38px; display: flex; flex-direction: column; justify-content: center; }
-.sf-auth-form h1 { font-size: 26px; font-weight: 900; letter-spacing: -.02em; margin: 0 0 4px; color: var(--sf-text); }
-.sf-auth-form .sub { font-size: 14px; color: var(--sf-muted); margin: 0 0 20px; }
+.sf-auth-side { position: relative; color: #1e293b; padding: 44px 38px; display: flex; flex-direction: column; justify-content: center; overflow: hidden;
+  background: #f8fafc; border-right: 1px solid #e2e8f0; }
+.sf-auth-side h2 { color: #0f172a; font-size: 25px; font-weight: 800; line-height: 1.35; letter-spacing: -.02em; margin: 14px 0 10px; }
+.sf-auth-side > p { color: #64748b; font-size: 15px; line-height: 1.6; margin: 0 0 28px; }
+.sf-auth-perks { display: flex; flex-direction: column; gap: 18px; }
+.sf-auth-perk { display: flex; gap: 14px; align-items: flex-start; }
+.sf-auth-perk .ic { width: 42px; height: 42px; border-radius: 12px; background: #fff; color: var(--sf-primary); border: 1.5px solid #e2e8f0; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 2px 6px rgba(0,0,0,0.03); }
+.sf-auth-perk b { display: block; font-size: 15px; font-weight: 700; color: #1e293b; margin-bottom: 4px; }
+.sf-auth-perk span { font-size: 13.5px; color: #64748b; line-height: 1.55; }
+.sf-auth-form { padding: 44px 44px; display: flex; flex-direction: column; justify-content: center; }
+.sf-auth-form h1 { font-size: 26px; font-weight: 800; letter-spacing: -.02em; margin: 0 0 6px; color: var(--sf-text); }
+.sf-auth-form .sub { font-size: 14.5px; color: var(--sf-muted); margin: 0 0 24px; }
 .sf-auth-tabs { display: grid; grid-template-columns: 1fr 1fr; border-bottom: 1px solid var(--sf-border); margin-bottom: 20px; }
 .sf-auth-tabs button { height: 44px; border: none; background: none; font-size: 15px; font-weight: 700; color: var(--sf-muted); cursor: pointer; border-bottom: 3px solid transparent; margin-bottom: -1px; }
 .sf-auth-tabs button.is-on { color: var(--sf-primary); border-bottom-color: var(--sf-primary); }

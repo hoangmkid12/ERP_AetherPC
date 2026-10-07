@@ -127,22 +127,17 @@ export default function Login() {
       <div className="sf-auth-wrap">
         <div className="sf-auth-card">
           <aside className="sf-auth-side">
-            <span style={{ fontSize: 12, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: '#ffe08a' }}>Thành viên AetherPC</span>
-            <h2>{isRegister ? 'Tạo tài khoản, nhận ưu đãi thành viên' : 'Chào mừng bạn quay lại'}</h2>
-            <p>Một tài khoản để mua linh kiện, build PC, theo dõi đơn hàng và gửi yêu cầu đổi trả.</p>
+            <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color: '#dc2626', background: '#fee2e2', padding: '3px 10px', borderRadius: '6px', width: 'fit-content' }}>Thành viên AetherPC</span>
+            <h2>{isRegister ? 'Đăng ký nhận ưu đãi' : 'Chào mừng quay lại'}</h2>
+            <p>Trải nghiệm mua sắm linh kiện, tự build PC và nhận chính sách bảo hành chính hãng.</p>
             <div className="sf-auth-perks">
               {PERKS.map(pk => (
                 <div key={pk.title} className="sf-auth-perk">
-                  <span className="ic"><pk.icon size={19} /></span>
+                  <span className="ic"><pk.icon size={20} /></span>
                   <div><b>{pk.title}</b><span>{pk.desc}</span></div>
                 </div>
               ))}
             </div>
-            {showcase.length > 0 && (
-              <div className="sf-auth-imgs">
-                {showcase.map(p => <span key={p.id} title={p.name}><img src={p.image} alt="" /></span>)}
-              </div>
-            )}
           </aside>
 
           <div className="sf-auth-form">

@@ -733,7 +733,7 @@ export default function Header() {
             ) : (
               <Link to="/login" className="sf-hitem sf-hitem-login">
                 <UserIcon size={22} />
-                <span className="sf-htext">Đăng nhập<b>Đăng ký</b></span>
+                <span className="sf-htext" style={{ fontWeight: 700, fontSize: '13.5px' }}>Đăng nhập</span>
               </Link>
             )}
 
@@ -758,7 +758,6 @@ export default function Header() {
               {item.icon}{item.label}
             </Link>
           ))}
-          <span className="sf-subnav-note"><Gift size={14} /> Tích điểm mọi đơn hàng</span>
         </div>
       </nav>
 

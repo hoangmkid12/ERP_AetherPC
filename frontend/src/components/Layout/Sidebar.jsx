@@ -697,14 +697,11 @@ export default function Sidebar({ isOpen = false, onClose }) {
         backgroundColor: '#ffffff'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
-          <div style={{
-            width: '36px', height: '36px', borderRadius: '10px',
-            background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)', display: 'flex',
-            alignItems: 'center', justifyContent: 'center', color: '#fff',
-            boxShadow: '0 4px 10px rgba(37,99,235,0.3)'
-          }}>
-            <ShieldAlert size={20} />
-          </div>
+          <img 
+            src="/favicon.svg?v=red" 
+            alt="AetherPC ERP" 
+            style={{ width: '36px', height: '36px', borderRadius: '10px', boxShadow: '0 4px 10px rgba(220,38,38,0.25)' }} 
+          />
           <div>
             <h1 style={{ fontSize: '0.98rem', fontWeight: 800, margin: 0, color: '#0f172a', letterSpacing: '-0.02em' }}>
               AetherPC ERP
