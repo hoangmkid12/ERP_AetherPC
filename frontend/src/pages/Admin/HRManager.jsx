@@ -80,8 +80,8 @@ export default function HRManager() {
   const { isCEO, user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // Active Tab from URL (?tab=overview|attendance|employees|leaves|payroll)
-  const activeTab = searchParams.get('tab') || 'overview';
+  // Active Tab from URL (?tab=timesheet|attendance|employees|leaves|payroll|overview)
+  const activeTab = searchParams.get('tab') || 'timesheet';
   const setTab = (tKey) => {
     setSearchParams({ tab: tKey });
     setSearch('');
@@ -338,6 +338,47 @@ export default function HRManager() {
 
       </div>
 
+      {/* ================= BAR CHUYỂN TAB ĐIỀU HƯỚNG NHÂN SỰ ================= */}
+      <div style={{ display: 'flex', gap: '0.5rem', borderBottom: '2px solid #e2e8f0', marginBottom: '1.25rem', paddingBottom: '0.65rem', overflowX: 'auto', flexWrap: 'wrap' }}>
+        {[
+          { key: 'timesheet', label: 'Bảng Chấm Công (Ma Trận)', icon: Calendar },
+          { key: 'attendance', label: 'Chấm Công Hàng Ngày', icon: Clock },
+          { key: 'employees', label: 'Hồ Sơ Nhân Sự', icon: Users },
+          { key: 'leaves', label: 'Quản Lý Nghỉ Phép', icon: CalendarCheck },
+          { key: 'payroll', label: 'Bảng Lương & Phê Duyệt', icon: DollarSign },
+          { key: 'overview', label: 'Tổng Quan & KPI', icon: TrendingUp },
+          { key: 'settings', label: 'Cấu Hình Công & Lương', icon: FileEdit }
+        ].map(t => {
+          const isActive = activeTab === t.key;
+          const Icon = t.icon;
+          return (
+            <button
+              key={t.key}
+              type="button"
+              onClick={() => setTab(t.key)}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.45rem',
+                padding: '0.5rem 1rem',
+                borderRadius: '8px',
+                border: isActive ? 'none' : '1px solid #cbd5e1',
+                backgroundColor: isActive ? '#0284c7' : '#ffffff',
+                color: isActive ? '#ffffff' : '#475569',
+                fontSize: '0.82rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                boxShadow: isActive ? '0 2px 4px rgba(2, 132, 199, 0.25)' : 'none',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              <Icon size={15} />
+              <span>{t.label}</span>
+            </button>
+          );
+        })}
+      </div>
+
       {/* ========================================================================= */}
       {/* TAB 1: OVERVIEW (TỔNG QUAN NHÂN SỰ) */}
       {/* ========================================================================= */}
@@ -477,13 +518,9 @@ export default function HRManager() {
       )}
 
       {/* ========================================================================= */}
-      {/* TAB 2: ATTENDANCE (CHẤM CÔNG HÀNG NGÀY) */}
+      {/* TAB 2: ATTENDANCE & TIMESHEET (BẢNG CÔNG MA TRẬN) */}
       {/* ========================================================================= */}
-      {activeTab === 'attendance' && (
-        <AttendancePanel employees={employees} onChanged={() => useHRStore.getState().getAttendanceLogs?.().catch(() => {})} />
-      )}
-
-      {activeTab === 'timesheet' && <TimesheetPanel />}
+      {(activeTab === 'attendance' || activeTab === 'timesheet') && <TimesheetPanel />}
 
       {activeTab === 'settings' && <HrSettingsPanel />}
 
