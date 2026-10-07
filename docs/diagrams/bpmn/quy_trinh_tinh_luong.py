@@ -66,7 +66,7 @@ NV, HT, HR, BGD, KT = (lane_y[n] for n in LANES)
 event(16, NV, 'Bắt Đầu\nNgày Làm Việc')
 task(38, NV, 'Chấm Công Bằng\nKhuôn Mặt\n(Vào Ca / Ra Ca)')
 # ── Hệ Thống ──
-task(38, HT, 'So Khớp Khuôn Mặt\nVới Mẫu Đã Đăng Ký\n(Kiểm Tra Nháy Mắt)')
+task(38, HT, 'So Khớp Khuôn Mặt\nVới Mẫu Đã Đăng Ký\n(Thử Thách Quay Đầu)')
 gateway(60, HT, 'Khớp?', label_pos='below')
 task(84, HT, 'Ghi Giờ Vào / Ra,\nTính Đi Muộn, Giờ Làm,\nTăng Ca', w=24)
 # ── Nhân Sự ──
