@@ -466,7 +466,15 @@
 .sf-pd-body { display: grid; grid-template-columns: minmax(0, 1fr) 400px; gap: 16px; margin-top: 16px; align-items: start; }
 .sf-pd-panel { padding: 18px 20px; }
 .sf-pd-panel h2 { font-size: 18px; font-weight: 800; margin: 0 0 14px; }
-.sf-desc { font-size: 14.5px; line-height: 1.75; color: var(--sf-text-2); white-space: pre-line; }
+.sf-desc { font-size: 15px; line-height: 1.8; color: #374151; max-width: 78ch; }
+.sf-desc p { margin: 0 0 14px; text-align: justify; text-justify: inter-word; }
+.sf-desc .sf-desc-title { font-size: 18px; font-weight: 800; color: var(--sf-text); line-height: 1.4; margin: 0 0 12px; }
+.sf-desc .sf-desc-h { font-size: 16px; font-weight: 700; color: var(--sf-text); margin: 22px 0 8px; padding-left: 10px; border-left: 3px solid var(--sf-primary); line-height: 1.4; }
+.sf-desc .sf-desc-lead { font-size: 15px; color: var(--sf-text-2); }
+.sf-desc-points { list-style: none; margin: 0 0 14px; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 8px; }
+.sf-desc-points li { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border-radius: 8px; background: #f8fafc; border: 1px solid var(--sf-border); }
+.sf-desc-points li span { font-size: 12.5px; color: var(--sf-muted); }
+.sf-desc-points li b { font-size: 14px; color: var(--sf-text); font-weight: 600; line-height: 1.45; }
 .sf-desc.is-clamped { max-height: 420px; overflow: hidden; position: relative; }
 .sf-desc.is-clamped::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 90px; background: linear-gradient(transparent, #fff); }
 .sf-spec-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }

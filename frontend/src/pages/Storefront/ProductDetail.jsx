@@ -10,6 +10,7 @@ import { notify } from '../../context/NotificationContext';
 import { api, normalizeProduct } from '../../services/api';
 import ProductCard, { ProductCarousel } from '../../components/Storefront/ProductCard';
 import { categoryLabel, discountOf, fmtVnd, isInStock, PLACEHOLDER_IMG, SHOP } from '../../components/Storefront/catalog';
+import { formatDescription, proseLength, fallbackOverview } from '../../components/Storefront/describe';
 
 const SPEC_LABEL_MAP = {
   socket: 'Socket', cores: 'Số nhân', threads: 'Số luồng', tdp: 'Điện năng tiêu thụ (TDP)', ram_slot: 'Số khe RAM',
@@ -23,100 +24,6 @@ function specLabel(key) {
   if (SPEC_LABEL_MAP[k]) return SPEC_LABEL_MAP[k];
   const t = String(key).replace(/_/g, ' ');
   return t.charAt(0).toUpperCase() + t.slice(1);
-}
-
-// Format mô tả sản phẩm: lọc bỏ rác cào thô, phân tách thông số kỹ thuật và bài viết đánh giá chuyên nghiệp
-function cleanDescription(text, name = '') {
-  if (!text) return [];
-  let t = String(text)
-    .replace(/https?:\/\/[^\s]+/gi, '')
-    .replace(/GEARVN|GearVN|Gearvn/g, 'AetherPC')
-    .replace(/⭐[^⭐]*⭐/g, '')
-    .replace(/Đã hết hàng[^\n#]*/gi, '')
-    .replace(/Tham khảo các sản phẩm[^\n#]*/gi, '')
-    .trim();
-
-  // Bỏ phần rác 'Thông tin chung', 'Nhà sản xuất', 'Tình trạng', 'Bảo hành' ở đầu nếu có
-  t = t.replace(/^[-–\s]*(Thông tin (chung|sản phẩm)|Nhà sản xuất|Hãng sản xuất|Tình trạng|Bảo hành)\s*:?[^.]*?(\d+\s*(tháng|năm)|New\s*100%|Mới)[^#\n.]*/gi, '');
-  t = t.replace(/^[-–\s]*(Thông tin (chung|sản phẩm)|Nhà sản xuất|Hãng sản xuất|Tình trạng|Bảo hành)\s*:?[^#\n]*/gi, '');
-  t = t.trim();
-
-  // Tách 'Đánh giá chi tiết' và 'THÔNG SỐ KĨ THUẬT' thành các block riêng
-  t = t.replace(/(Đánh giá chi tiết[^\n:]*:?)/gi, '## $1 ##');
-  t = t.replace(/(THÔNG SỐ K[ĨI] THUẬT\s*:?)/gi, '## $1 ##');
-
-  const rawBlocks = t.split(/##\s*/).map(x => x.trim()).filter(Boolean);
-  const result = [];
-
-  const SPEC_KEYS = [
-    'GPU', 'Graphics Bus', 'Memory size', 'Memory type', 'Core clock', 'Memory clock',
-    'Output', 'Maximum Digital Resolution', 'Memory Interface', 'Memory Bandwidth', 'CUDA Cores',
-    'HDCP support', 'DirectX', 'OpenGL', 'Card Dimensions', 'Graphics Card Power', 'Package contents',
-    'System Requirements', 'Base clock', 'Boost clock', 'Thương hiệu', 'Model Name', 'Model',
-    'Kích cỡ', 'Kích thước', 'Kích thước', 'Giao tiếp', 'Giao thức', 'Dung lượng', 'NAND',
-    'Truyền dữ liệu', 'Tiêu thụ điện năng', 'Nhiệt độ bảo quản', 'Nhiệt độ hoạt động', 'Trọng lượng',
-    'Khối lượng', 'Tuổi thọ quạt', 'Tuổi thọ', 'Tổng số byte', 'Độ rung', 'Hỗ trợ Socket', 'Hỗ trợ Socket',
-    'Chất liệu', 'Tốc độ quạt', 'Lưu lượng gió', 'Độ ồn', 'Kích thước quạt', 'Màu sắc', 'Màu sắc',
-    'Bảo hành', 'Điện áp', 'Socket', 'Chipset', 'Chuẩn Bus', 'Độ phân giải', 'Series', 'Cổng xuất hình',
-    'Số nhân', 'Số luồng', 'Bộ nhớ đệm', 'Xung cơ bản', 'TDP', 'Số khe RAM', 'Loại RAM'
-  ];
-
-  for (const block of rawBlocks) {
-    if (!block || block.length < 5) continue;
-
-    // Lọc bỏ block rác chỉ chứa thông tin bảo hành / tình trạng
-    if (/^(Thông tin (chung|sản phẩm)|Hãng sản xuất|Nhà sản xuất|Tình trạng|Bảo hành)/i.test(block) && block.length < 150 && !block.includes('Đánh giá') && !block.includes('sản phẩm')) {
-      continue;
-    }
-
-    // Nếu block là tiêu đề đánh giá
-    if (/^Đánh giá chi tiết/i.test(block)) {
-      continue;
-    }
-
-    // Kiểm tra xem block có chứa danh sách thông số dính liền không
-    const matchedKeys = SPEC_KEYS.filter(k => block.includes(k));
-    if (matchedKeys.length >= 2) {
-      // Tách các thông số thành danh sách nhãn - giá trị
-      const sortedKeys = [...matchedKeys].sort((a, b) => b.length - a.length);
-      const splitRegex = new RegExp(`(${sortedKeys.map(k => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})[:\\s]+`, 'g');
-      const parts = block.replace(/^THÔNG SỐ K[ĨI] THUẬT\s*:?\s*/i, '').split(splitRegex).map(s => s.trim()).filter(Boolean);
-      
-      const items = [];
-      for (let i = 0; i < parts.length; i += 2) {
-        if (parts[i] && parts[i + 1]) {
-          // Làm sạch giá trị thông số
-          let val = parts[i + 1].replace(/[:\s]+$/, '').trim();
-          if (val.length > 0 && val.length < 250) {
-            items.push({ label: parts[i], val });
-          }
-        }
-      }
-      if (items.length > 0) {
-        result.push({ head: 'Thông số chi tiết sản phẩm', items });
-        continue;
-      }
-    }
-
-    // Nếu block là bài viết đánh giá hoặc giới thiệu (đoạn văn có dấu câu)
-    const cleanParagraph = block.replace(/^(Đánh giá chi tiết[^\n.]*\.?\s*)/i, '').trim();
-    if (cleanParagraph) {
-      // Tách thành các đoạn văn mạch lạc nếu quá dài
-      const sentences = cleanParagraph.split(/(?<=[.!?])\s+/);
-      if (sentences.length > 4) {
-        // Gom 3-4 câu thành 1 đoạn văn dễ đọc
-        const paragraphs = [];
-        for (let i = 0; i < sentences.length; i += 3) {
-          paragraphs.push(sentences.slice(i, i + 3).join(' '));
-        }
-        result.push({ head: 'Đánh giá & Tính năng nổi bật', paragraphs });
-      } else {
-        result.push({ head: 'Đánh giá & Tính năng nổi bật', body: cleanParagraph });
-      }
-    }
-  }
-
-  return result;
 }
 
 function Stars({ value, size = 14, onChange }) {
@@ -179,7 +86,7 @@ export default function ProductDetail() {
     if (!product) return [];
     return [...new Set([product.image, ...(product.imageUrls || [])].filter(Boolean))];
   }, [product]);
-  const desc = useMemo(() => cleanDescription(product?.descriptionText, product?.name), [product]);
+  const desc = useMemo(() => formatDescription(product?.descriptionText, product?.name), [product]);
 
   if (loading) return (
     <div className="sf-container" style={{ padding: '80px 0', textAlign: 'center', color: 'var(--sf-muted)' }}>
@@ -341,42 +248,40 @@ export default function ProductDetail() {
       <div className="sf-pd-body">
         <div className="sf-box sf-pd-panel">
           <h2>Mô tả sản phẩm</h2>
-          {desc.length > 0 ? (
-            <>
-              <div className={`sf-desc${descOpen ? '' : ' is-clamped'}`}>
-                {desc.map((d, i) => (
-                  <div key={i} style={{ marginBottom: 20 }}>
-                    {d.head && <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--sf-text)', margin: '0 0 10px', display: 'flex', alignItems: 'center', gap: 6 }}>{d.head}</h3>}
-                    {d.items ? (
-                      <div style={{
-                        display: 'grid',
-                        gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-                        gap: '8px 16px',
-                        background: '#f8fafc',
-                        padding: '14px 16px',
-                        borderRadius: '10px',
-                        border: '1px solid #e2e8f0'
-                      }}>
-                        {d.items.map((it, idx) => (
-                          <div key={idx} style={{ display: 'flex', fontSize: '13.5px', lineHeight: 1.5, gap: 6 }}>
-                            <span style={{ color: '#64748b', fontWeight: 600, minWidth: 100 }}>{it.label}:</span>
-                            <span style={{ color: '#0f172a', fontWeight: 500, flex: 1 }}>{it.val}</span>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p style={{ margin: 0, lineHeight: 1.7, color: '#334155', fontSize: '14px' }}>{d.body}</p>
-                    )}
+          {(() => {
+            const prose = proseLength(desc);
+            const long = prose > 900;
+            const overview = prose < 200
+              ? fallbackOverview(product, { warranty: warrantyText, specEntries, specLabel })
+              : null;
+            return (
+              <>
+                <div className={`sf-desc${long && !descOpen ? ' is-clamped' : ''}`}>
+                  {overview && (
+                    <>
+                      <p className="sf-desc-lead">{overview.intro}</p>
+                      {overview.highlights.length > 0 && (
+                        <>
+                          <h3 className="sf-desc-h">Điểm nổi bật</h3>
+                          <ul className="sf-desc-points">
+                            {overview.highlights.map(([k, v]) => <li key={k}><span>{k}</span><b>{v}</b></li>)}
+                          </ul>
+                        </>
+                      )}
+                    </>
+                  )}
+                  {desc.map((d, i) => d.type === 'h'
+                    ? <h3 key={i} className={i === 0 ? 'sf-desc-title' : 'sf-desc-h'}>{d.text}</h3>
+                    : <p key={i}>{d.text}</p>)}
+                </div>
+                {long && (
+                  <div style={{ textAlign: 'center', marginTop: 12 }}>
+                    <button type="button" className="sf-btn sf-btn-outline" onClick={() => setDescOpen(o => !o)}>{descOpen ? 'Thu gọn' : 'Xem thêm nội dung'}</button>
                   </div>
-                ))}
-              </div>
-              <div style={{ textAlign: 'center', marginTop: 12 }}>
-                <button type="button" className="sf-btn sf-btn-outline" onClick={() => setDescOpen(o => !o)}>{descOpen ? 'Thu gọn' : 'Xem thêm nội dung'}</button>
-              </div>
-            </>
-          ) : (
-            <p className="sf-desc">{product.name} chính hãng {product.brand}, phân phối bởi AetherPC với đầy đủ hóa đơn và bảo hành {warrantyText}.</p>
-          )}
+                )}
+              </>
+            );
+          })()}
         </div>
 
         <div className="sf-box sf-pd-panel" style={{ position: 'sticky', top: 84 }}>
