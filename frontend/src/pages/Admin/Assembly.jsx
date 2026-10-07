@@ -174,6 +174,21 @@ export default function Assembly() {
   });
   const completedToday = jobs.filter(j => j.status === 'COMPLETED' && (j.date === todayStr || j.updatedAt?.includes(todayStr)));
   const totalCompleted = jobs.filter(j => j.status === 'COMPLETED');
+  // Chỉ số thật từ lệnh lắp ráp: thời gian từ lúc tạo lệnh đến lúc nghiệm thu, và tỷ lệ lệnh kết thúc bằng nghiệm thu
+  // (máy chủ chỉ cho nghiệm thu khi đủ 4 mục kiểm thử và đủ Serial). Chưa có dữ liệu thì hiện "—".
+  const durationsMin = totalCompleted
+    .map(j => (j.completedAt && j.createdAt) ? (new Date(j.completedAt) - new Date(j.createdAt)) / 60000 : NaN)
+    .filter(m => Number.isFinite(m) && m >= 0);
+  const avgCompletionLabel = (() => {
+    if (!durationsMin.length) return '—';
+    const m = durationsMin.reduce((a, b) => a + b, 0) / durationsMin.length;
+    if (m < 60) return `${Math.max(1, Math.round(m))} phút`;
+    if (m < 60 * 48) return `${(m / 60).toFixed(1).replace('.', ',')} giờ`;
+    return `${(m / 1440).toFixed(1).replace('.', ',')} ngày`;
+  })();
+  const cancelledJobs = jobs.filter(j => j.status === 'CANCELLED');
+  const finishedCount = totalCompleted.length + cancelledJobs.length;
+  const acceptanceRateLabel = finishedCount ? `${Math.round((totalCompleted.length / finishedCount) * 100)}%` : '—';
 
   // Filtered jobs list for Tab 'jobs'
   const filteredJobsList = useMemo(() => {
@@ -432,13 +447,13 @@ export default function Assembly() {
             </div>
 
             <div style={{ backgroundColor: '#ffffff', padding: '1rem 0.75rem', borderRadius: '10px', border: '1px solid #e3e8ef', boxShadow: '0 1px 2px rgba(15,23,42,0.04)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '92px' }}>
-              <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#10b981' }}>100%</div>
-              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', marginTop: '0.25rem' }}>Tỷ Lệ Đạt Chuẩn QA</div>
+              <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#10b981' }}>{acceptanceRateLabel}</div>
+              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', marginTop: '0.25rem' }}>Tỷ Lệ Nghiệm Thu Thành Công</div>
             </div>
 
             <div style={{ backgroundColor: '#ffffff', padding: '1rem 0.75rem', borderRadius: '10px', border: '1px solid #e3e8ef', boxShadow: '0 1px 2px rgba(15,23,42,0.04)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '92px' }}>
-              <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#8b5cf6' }}>45 Phút</div>
-              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', marginTop: '0.25rem' }}>Thời Gian Lắp TB</div>
+              <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#8b5cf6' }}>{avgCompletionLabel}</div>
+              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', marginTop: '0.25rem' }}>Thời Gian Hoàn Thành TB</div>
             </div>
           </div>
 
@@ -976,12 +991,12 @@ export default function Assembly() {
               </h3>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div style={{ backgroundColor: '#f8fafc', padding: '1rem', borderRadius: '6px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
-                  <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#16a34a' }}>100%</div>
-                  <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 700, marginTop: '0.2rem' }}>Tỷ Lệ Đạt Stress Test Lần 1</div>
+                  <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#16a34a' }}>{acceptanceRateLabel}</div>
+                  <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 700, marginTop: '0.2rem' }}>Tỷ Lệ Nghiệm Thu Thành Công</div>
                 </div>
                 <div style={{ backgroundColor: '#f8fafc', padding: '1rem', borderRadius: '6px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
-                  <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#2563eb' }}>45 Phút</div>
-                  <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 700, marginTop: '0.2rem' }}>Thời Gian Lắp + Test TB</div>
+                  <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#2563eb' }}>{avgCompletionLabel}</div>
+                  <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 700, marginTop: '0.2rem' }}>Thời Gian Hoàn Thành TB</div>
                 </div>
                 <div style={{ backgroundColor: '#f8fafc', padding: '1rem', borderRadius: '6px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
                   <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#0f172a' }}>{jobs.length}</div>

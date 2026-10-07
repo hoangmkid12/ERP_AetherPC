@@ -87,6 +87,8 @@ class VectorMatcher {
         if (Array.isArray(dynamicSkills)) {
           for (const dSkill of dynamicSkills) {
             if (!dSkill.question || !dSkill.sql) continue;
+            // Mã kỹ năng do aiFeedback.controller ghi (SKILL-<thời điểm>); bản ghi cũ thiếu id thì sinh mã ổn định theo câu hỏi
+            const skillId = dSkill.id || `SKILL-${Buffer.from(dSkill.question).toString('base64').replace(/[^A-Za-z0-9]/g, '').slice(0, 16)}`;
             const allowedRoles = dSkill.targetRole && dSkill.targetRole !== 'ALL'
               ? [dSkill.targetRole, 'ADMIN', 'CEO', 'ADMIN_CEO', 'ALL']
               : ['ADMIN', 'CEO', 'ADMIN_CEO', 'SALES', 'WAREHOUSE', 'ACCOUNTANT', 'DELIVERY', 'ALL'];

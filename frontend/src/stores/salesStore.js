@@ -972,7 +972,7 @@ export const useSalesStore = create((set, get) => ({
   getAverageOrderValue: () => {
     const orders = get().orders;
     if (orders.length === 0) return 0;
-    return getTotalSalesAmount() / orders.length;
+    return get().getTotalSalesAmount() / orders.length;
   },
 
   /**

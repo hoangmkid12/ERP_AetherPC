@@ -582,7 +582,8 @@ export default function SalesPOS() {
         const term = orderSearch.toLowerCase().trim();
         const matchSearch = !term || cust.includes(term) || phone.includes(term) || id.includes(term);
 
-        const matchStatus = orderStatusFilter === 'ALL' || o.status === orderStatusFilter;
+        const matchStatus = orderStatusFilter === 'ALL'
+          || (orderStatusFilter === 'NEED_ACTION' ? ['PENDING', 'WAITING_PAYMENT'].includes(o.status) : o.status === orderStatusFilter);
         const matchDate = isDateInRange(o.date || o.createdAt, orderStartDate, orderEndDate);
         return matchSearch && matchStatus && matchDate;
       })
@@ -766,7 +767,7 @@ export default function SalesPOS() {
 
           <button
             onClick={() => {
-              setOrderStatusFilter('ALL');
+              setOrderStatusFilter('NEED_ACTION'); // đúng nhóm đơn được đếm trên nút
               setTab('orders');
             }}
             style={{
@@ -1271,7 +1272,10 @@ export default function SalesPOS() {
                 style={{ width: '100%', height: '38px', padding: '0 0.65rem', fontSize: '0.83rem', border: '1px solid #e3e8ef', borderRadius: '6px', color: '#0f172a', boxSizing: 'border-box', backgroundColor: '#ffffff', cursor: 'pointer' }}
               >
                 <option value="ALL">Tất cả trạng thái ({orders.length})</option>
+                <option value="NEED_ACTION">Cần xử lý ({pendingConfirmationCount})</option>
                 <option value="PENDING">Chờ xác nhận</option>
+                <option value="WAITING_PAYMENT">Chờ thanh toán</option>
+                <option value="PROCESSING">Đang chuẩn bị hàng</option>
                 <option value="CONFIRMED">Đã xác nhận (Chờ xuất kho)</option>
                 <option value="READY_TO_SHIP">Đã đóng gói (Chờ giao)</option>
                 <option value="SHIPPED">Đang vận chuyển</option>
@@ -2070,7 +2074,7 @@ export default function SalesPOS() {
                   </div>
                   <div style={{ backgroundColor: '#f8fafc', padding: '1rem', borderRadius: '6px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
                     <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#16a34a' }}>
-                      {reportOrders.length > 0 ? `${Math.round((reportCompletedCount / reportOrders.length) * 100)}%` : '100%'}
+                      {reportOrders.length > 0 ? `${Math.round((reportCompletedCount / reportOrders.length) * 100)}%` : '—'}
                     </div>
                     <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 700, marginTop: '0.2rem' }}>Tỷ Lệ Giao Thành Công</div>
                   </div>

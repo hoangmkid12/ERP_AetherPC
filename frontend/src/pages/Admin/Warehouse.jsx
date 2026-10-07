@@ -1729,7 +1729,7 @@ function ReceiptDetailModal({ selectedReceipt, onClose, purchaseOrders = [], onR
     ? effectivePo.items
     : (selectedReceipt.items?.length > 0
         ? selectedReceipt.items
-        : [{ name: 'Intel Core i9-14900K (Linh kiện mẫu)', quantity: 10, unitCost: 14500000 }]);
+        : []); // không chèn dòng hàng mẫu khi chứng từ chưa có chi tiết
 
   const itemsList = rawItemsList.map(item => {
     const originalQty = parseInt(item.quantity || item.qty) || 1;
@@ -2192,15 +2192,9 @@ function WarehouseQcCertificateModal({ target, onClose, purchaseOrders = [] }) {
     || relatedPO?.supplier?.name 
     || relatedPO?.supplierName 
     || receipt.supplierName 
-    || 'Công ty TNHH Gigabyte Việt Nam';
+    || 'Chưa xác định nhà cung cấp';
 
-  const fallbackName = supplierName.includes('Gigabyte')
-    ? 'Màn hình GIGABYTE M27QA 27" IPS 2K 180Hz chuyên game'
-    : supplierName.includes('AMD')
-      ? 'CPU AMD Ryzen 7 7800X3D Box Chính Hãng'
-      : supplierName.includes('Intel')
-        ? 'CPU Intel Core i9-14900K Box'
-        : 'Linh Kiện Máy Tính Cao Cấp';
+  const fallbackName = 'Hàng hóa theo đơn mua'; // không đoán tên sản phẩm theo nhà cung cấp
 
   const productName = qaLog?.productName 
     || relatedPO?.productName 
@@ -2859,6 +2853,10 @@ export default function Warehouse() {
   };
 
   const { user, isCEO, isWarehouseManager, isWarehouse, isAdmin } = useAuth();
+  // Khớp phân quyền đọc ở backend (warehouse.routes.js, purchase.routes.js): vai trò chỉ được xem tồn kho
+  // (vd. Quản lý bán hàng) không gọi các API bị từ chối, tránh 403 làm hỏng cả lượt tải dữ liệu.
+  const canReadReceipts = ['WAREHOUSE', 'WAREHOUSE_MANAGER', 'QC', 'QA', 'QUALITY_CONTROL', 'PURCHASING', 'ACCOUNTANT', 'CEO', 'ADMIN'].includes(user?.role);
+  const canReadSuppliers = ['PURCHASING', 'WAREHOUSE_MANAGER', 'CEO', 'ADMIN'].includes(user?.role);
   const { can, canDo, canCreate, canEdit, canDelete, canApprove } = usePermission();
   const isManager = canDo('warehouse_dispatch_shipper') || canApprove('warehouse') || isCEO || isAdmin;
   const canPackScan = canDo('warehouse_pack_scan') || isWarehouse || isAdmin;
@@ -3326,7 +3324,7 @@ export default function Warehouse() {
       let apiReceipts = [];
       try {
         const [receiptsRes, movementsRes] = await Promise.all([
-          api.get('/warehouse/receipts'),
+          canReadReceipts ? api.get('/warehouse/receipts') : Promise.resolve({ success: true, data: [] }),
           api.get('/warehouse/stock-movements?limit=50')
         ]);
         if (receiptsRes?.success) apiReceipts = receiptsRes.data || [];
@@ -3458,6 +3456,7 @@ export default function Warehouse() {
   const [realSuppliers, setRealSuppliers] = useState([]);
   useEffect(() => {
     (async () => {
+      if (!canReadSuppliers) return;
       try {
         const res = await api.get('/purchasing/suppliers');
         if (res?.success && Array.isArray(res.data)) {
@@ -3586,7 +3585,7 @@ export default function Warehouse() {
       const intakeDoc = {
         receiptNumber: receipt.receiptNumber || `GRN-${poNum}`,
         poNumber: poNum,
-        supplierName: effectivePo?.supplier?.name || effectivePo?.supplierName || receipt.supplierName || 'Công ty TNHH Gigabyte Việt Nam',
+        supplierName: effectivePo?.supplier?.name || effectivePo?.supplierName || receipt.supplierName || 'Chưa xác định nhà cung cấp',
         warehouseStaff: cleanStaffName(user?.fullname),
         qaInspector: qaLog?.inspector || 'Đặng Văn Kiểm (QA/QC)',
         intakeDate: new Date().toLocaleString('vi-VN'),
@@ -5025,7 +5024,7 @@ export default function Warehouse() {
                                 setViewingIntakeSuccessDoc({
                                   receiptNumber: r.receiptNumber || `GRN-${poNum}`,
                                   poNumber: poNum,
-                                  supplierName: poObj.supplier?.name || poObj.supplierName || r.supplierName || 'Công ty TNHH Gigabyte Việt Nam',
+                                  supplierName: poObj.supplier?.name || poObj.supplierName || r.supplierName || 'Chưa xác định nhà cung cấp',
                                   warehouseStaff: cleanStaffName(user?.fullname),
                                   qaInspector: rQaLog?.inspector || 'Đặng Văn Kiểm (QA/QC)',
                                   intakeDate: new Date().toLocaleString('vi-VN'),
@@ -7310,7 +7309,7 @@ export default function Warehouse() {
             setViewingIntakeSuccessDoc({
               receiptNumber: receipt.receiptNumber || `GRN-${poNum}`,
               poNumber: poNum,
-              supplierName: po?.supplier?.name || po?.supplierName || receipt.supplierName || 'Công ty TNHH Gigabyte Việt Nam',
+              supplierName: po?.supplier?.name || po?.supplierName || receipt.supplierName || 'Chưa xác định nhà cung cấp',
               warehouseStaff: cleanStaffName(user?.fullname),
               qaInspector: qaLog?.inspector || 'Đặng Văn Kiểm (QA/QC)',
               intakeDate: new Date().toLocaleString('vi-VN'),
@@ -7698,7 +7697,7 @@ export default function Warehouse() {
                   <div>Khách yêu cầu: <strong style={{ color: '#dc2626' }}>{backorderRfqData.neededQty || 1} cái</strong></div>
                   <div>Tồn kho hiện tại: <strong style={{ color: Number(backorderRfqData.currentStock || 0) === 0 ? '#dc2626' : '#15803d' }}>{backorderRfqData.currentStock || 0} cái</strong></div>
                   <div>Đơn giá vốn ước tính: <strong style={{ color: '#0f172a' }}>{safeFormatPrice(backorderRfqData.unitPrice || 0)}</strong></div>
-                  <div>Tổng trị giá đề xuất: <strong style={{ color: '#16a34a' }}>{safeFormatPrice((Number(backorderRfqData.suggestedQty) || 5) * (Number(backorderRfqData.unitPrice) || 1500000))}</strong></div>
+                  <div>Tổng trị giá đề xuất: <strong style={{ color: '#16a34a' }}>{safeFormatPrice((Number(backorderRfqData.suggestedQty) || 0) * (Number(backorderRfqData.unitPrice) || 0))}</strong></div>
                 </div>
               </div>
 

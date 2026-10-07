@@ -103,6 +103,7 @@ export default function HRManager() {
   const [leaveStatusFilter, setLeaveStatusFilter] = useState('ALL');
   const [leaveStartDate, setLeaveStartDate] = useState('');
   const [leaveEndDate, setLeaveEndDate] = useState('');
+  const [submittingLeaveModal, setSubmittingLeaveModal] = useState(false);
 
   useEffect(() => {
     if (activeTab === 'leaves' && typeof getLeaveRequests === 'function') {

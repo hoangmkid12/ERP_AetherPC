@@ -80,6 +80,7 @@ const isDateInRange = (dateVal, startDate, endDate) => {
 
 export default function Purchasing() {
   const location = useLocation();
+  const navigate = useNavigate();
   const rawTab = new URLSearchParams(location.search).get('tab') || 'overview';
   const activeTab = rawTab === 'catalog' ? 'products' : rawTab;
   
@@ -1230,6 +1231,22 @@ export default function Purchasing() {
   const ISSUED_PO_STATUSES = ['PO', 'SENT', 'CONFIRMED_BY_SUPPLIER', 'PENDING_QA', 'QA_PASSED', 'QA_PARTIAL', 'RECEIVED', 'DONE', 'COMPLETED'];
   const poConfirmedCount = orders.filter(po => ISSUED_PO_STATUSES.includes(po.status)).length;
   const pendingReceiptCount = orders.filter(po => ['PO', 'SENT', 'CONFIRMED_BY_SUPPLIER', 'PENDING_QA', 'QA_PASSED', 'QA_PARTIAL'].includes(po.status)).length;
+  // Tỷ lệ giao đúng hạn thật: trong các đơn có hạn giao và đã có hàng về (mốc đầu tiên sang kiểm định/nhập kho),
+  // hàng về không trễ hơn hết ngày hạn giao. Chưa có đơn đủ dữ liệu thì hiện "—".
+  const ARRIVAL_STATUSES = ['PENDING_QA', 'QA_PASSED', 'QA_PARTIAL', 'QA_REJECTED', 'RECEIVED', 'DONE'];
+  const onTimeStats = orders.reduce((acc, po) => {
+    if (!po.expectedDeliveryDate) return acc;
+    const arrival = (po.statusHistory || [])
+      .filter(h => ARRIVAL_STATUSES.includes(h.toStatus || h.status))
+      .map(h => new Date(h.changedAt || h.createdAt || h.timestamp))
+      .filter(d => !isNaN(d))
+      .sort((x, y) => x - y)[0];
+    if (!arrival) return acc;
+    const deadline = new Date(po.expectedDeliveryDate); deadline.setHours(23, 59, 59, 999);
+    acc.total += 1; if (arrival <= deadline) acc.onTime += 1;
+    return acc;
+  }, { total: 0, onTime: 0 });
+  const onTimeRateLabel = onTimeStats.total ? `${Math.round((onTimeStats.onTime / onTimeStats.total) * 100)}%` : '—';
   const totalSpent = orders
     .filter(po => ISSUED_PO_STATUSES.includes(po.status))
     .reduce((sum, po) => sum + parseFloat(po.totalAmount || 0), 0);
@@ -1514,7 +1531,7 @@ export default function Purchasing() {
             </div>
 
             <div style={{ backgroundColor: '#ffffff', padding: '1rem', borderRadius: '8px', border: '1px solid #e3e8ef', textAlign: 'center' }}>
-              <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#16a34a' }}>100%</div>
+              <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#16a34a' }}>{onTimeRateLabel}</div>
               <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#64748b', marginTop: '0.2rem' }}>Giao Hàng Đúng Hạn</div>
             </div>
           </div>

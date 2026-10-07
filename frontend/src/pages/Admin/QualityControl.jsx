@@ -252,8 +252,10 @@ export default function QualityControl() {
   const fetchData = async (silent = false) => {
     if (!silent) setLoading(true);
     let list = [];
+    // Chỉ vai trò được backend cho đọc đơn mua hàng mới gọi API (vai trò khác chỉ xem tab thẩm định đổi trả).
+    const canReadPOs = ['QC', 'QA', 'QUALITY_CONTROL', 'PURCHASING', 'WAREHOUSE_MANAGER', 'ACCOUNTANT', 'CEO', 'ADMIN'].includes(user?.role);
     try {
-      const res = await api.get('/purchasing/orders');
+      const res = canReadPOs ? await api.get('/purchasing/orders') : null;
       if (res && res.success) {
         list = res.data || [];
       }
@@ -606,7 +608,7 @@ export default function QualityControl() {
     setSubmitting(true);
 
     const poItems = selectedPO.items || [];
-    const primaryName = poItems[0]?.product?.name || poItems[0]?.productName || poItems[0]?.name || selectedPO.productName || selectedPO.name || (selectedPO.supplier?.name?.includes('Gigabyte') ? 'Màn hình GIGABYTE M27QA 27" IPS 2K 180Hz chuyên game' : '');
+    const primaryName = poItems[0]?.product?.name || poItems[0]?.productName || poItems[0]?.name || selectedPO.productName || selectedPO.name || '';
 
     const logEntry = {
       id: `QA-${Date.now().toString().slice(-4)}`,
@@ -1452,7 +1454,7 @@ export default function QualityControl() {
                                     String(l.id) === String(po.id)
                                   );
                                   const poItems = po.items || [];
-                                  const primaryName = poItems[0]?.product?.name || poItems[0]?.productName || poItems[0]?.name || po.productName || po.name || (po.supplier?.name?.includes('Gigabyte') ? 'Màn hình GIGABYTE M27QA 27" IPS 2K 180Hz chuyên game' : '');
+                                  const primaryName = poItems[0]?.product?.name || poItems[0]?.productName || poItems[0]?.name || po.productName || po.name || '';
                                   if (log) {
                                     setViewingLog({
                                       ...log,
@@ -2285,18 +2287,23 @@ export default function QualityControl() {
             <form onSubmit={handleSubmitQaInspection}>
               {/* 1. Itemized Product Table */}
               {(() => {
+                // Chỉ dùng chi tiết hàng thật của đơn mua; không tự điền tên/giá sản phẩm khi thiếu dữ liệu.
                 const poItems = (selectedPO.items && selectedPO.items.length > 0)
-                  ? selectedPO.items.map(it => ({
-                      name: it.name || it.productName || it.product?.name || (selectedPO.supplier?.name?.includes('AMD') ? 'CPU AMD Ryzen 7 7800X3D Box Chính Hãng' : selectedPO.supplier?.name?.includes('Intel') ? 'CPU Intel Core i9-14900K Box' : selectedPO.supplier?.name?.includes('Anh Ngọc') ? 'VGA MSI GeForce RTX 4060 Ti Ventus 8GB' : 'Linh Kiện Máy Tính'),
-                      quantity: Number(it.quantity) || 1,
-                      unitCost: Number(it.unitCost || it.unitPrice || it.price || (selectedPO.totalAmount ? Number(selectedPO.totalAmount) / (Number(it.quantity) || 1) : 4750000)),
-                      totalCost: Number(it.totalCost || it.total || (Number(it.quantity || 1) * Number(it.unitCost || it.unitPrice || it.price || 4750000)))
-                    }))
+                  ? selectedPO.items.map(it => {
+                      const quantity = Number(it.quantity) || 0;
+                      const unitCost = Number(it.unitCost || it.unitPrice || it.price || 0);
+                      return {
+                        name: it.name || it.productName || it.product?.name || 'Sản phẩm theo đơn mua',
+                        quantity,
+                        unitCost,
+                        totalCost: Number(it.totalCost || it.total || 0) || quantity * unitCost
+                      };
+                    })
                   : [{
-                      name: selectedPO.productName || selectedPO.name || (selectedPO.supplier?.name?.includes('AMD') ? 'CPU AMD Ryzen 7 7800X3D Box Chính Hãng' : selectedPO.supplier?.name?.includes('Anh Ngọc') ? 'VGA MSI GeForce RTX 4060 Ti Ventus 8GB' : 'Bộ Vi Xử Lý & Linh Kiện PC'),
-                      quantity: Number(selectedPO.quantity) || 50,
-                      unitCost: (Number(selectedPO.totalAmount) || 47500000) / (Number(selectedPO.quantity) || 50),
-                      totalCost: Number(selectedPO.totalAmount) || 47500000
+                      name: selectedPO.productName || selectedPO.name || `Hàng hóa theo đơn ${selectedPO.poNumber || selectedPO.id || ''}`.trim(),
+                      quantity: Number(selectedPO.quantity) || 0,
+                      unitCost: Number(selectedPO.quantity) ? (Number(selectedPO.totalAmount) || 0) / Number(selectedPO.quantity) : 0,
+                      totalCost: Number(selectedPO.totalAmount) || 0
                     }];
 
                 const totalItemsQty = poItems.reduce((s, i) => s + i.quantity, 0);
@@ -3196,15 +3203,7 @@ export default function QualityControl() {
             ? relatedPO.items
             : [];
 
-        const fallbackName = viewingLog.supplierName?.includes('Gigabyte')
-          ? 'Màn hình GIGABYTE M27QA 27" IPS 2K 180Hz chuyên game'
-          : viewingLog.supplierName?.includes('AMD')
-            ? 'CPU AMD Ryzen 7 7800X3D Box Chính Hãng'
-            : viewingLog.supplierName?.includes('Intel')
-              ? 'CPU Intel Core i9-14900K Box'
-              : viewingLog.supplierName?.includes('Anh Ngọc')
-                ? 'VGA MSI GeForce RTX 4060 Ti Ventus 8GB'
-                : 'Linh Kiện Máy Tính Cao Cấp';
+        const fallbackName = 'Hàng hóa theo đơn mua'; // không đoán tên sản phẩm theo nhà cung cấp
 
         const resolvedProductName = viewingLog.productName 
           || relatedPO?.productName 

@@ -156,6 +156,7 @@ export default function Dashboard() {
   const updatePurchaseOrderStatus = useFinanceStore(state => state.updatePurchaseOrderStatus);
   const generalLedger = useFinanceStore(state => state.ledger) || [];
   const assemblyJobs = useUtilityStore(state => state.assemblyJobs) || [];
+  const sendSystemNotification = useUtilityStore(state => state.sendSystemNotification);
 
   // Active Tab from URL (?tab=overview|approvals|financials|kpi|supplychain)
   const activeTab = searchParams.get('tab') || 'overview';
@@ -684,6 +685,36 @@ export default function Dashboard() {
   const readyToShipCount = filteredOrders.filter(o => o.status === 'READY_TO_SHIP').length;
   const assemblingJobsCount = filteredAssemblyJobs.filter(j => j.status === 'ASSEMBLING').length;
   const completedJobsCount = filteredAssemblyJobs.filter(j => j.status === 'COMPLETED').length;
+
+  // Hiệu suất kỹ thuật viên lấy từ lệnh lắp ráp thật đã nghiệm thu trong kỳ (người nghiệm thu = completedBy);
+  // thưởng = số lệnh × đơn giá thưởng lắp ráp trong cấu hình nhân sự (cùng công thức với bảng lương).
+  const [assemblyBonusRate, setAssemblyBonusRate] = useState(null);
+  useEffect(() => {
+    api.get('/hr/settings')
+      .then(res => { const v = Number(res?.data?.assemblyBonus); if (Number.isFinite(v)) setAssemblyBonusRate(v); })
+      .catch(() => {});
+  }, []);
+  const technicianStats = useMemo(() => {
+    const map = new Map();
+    filteredAssemblyJobs.filter(j => j.status === 'COMPLETED').forEach(j => {
+      const name = (j.completedBy || '').trim() || 'Chưa ghi nhận người nghiệm thu';
+      const cur = map.get(name) || { name, completed: 0, minutes: [] };
+      cur.completed += 1;
+      if (j.completedAt && j.createdAt) {
+        const m = (new Date(j.completedAt) - new Date(j.createdAt)) / 60000;
+        if (Number.isFinite(m) && m >= 0) cur.minutes.push(m);
+      }
+      map.set(name, cur);
+    });
+    return [...map.values()].sort((x, y) => y.completed - x.completed);
+  }, [filteredAssemblyJobs]);
+  const fmtDuration = (mins) => {
+    if (!mins.length) return '—';
+    const m = mins.reduce((a, b) => a + b, 0) / mins.length;
+    if (m < 60) return `${Math.max(1, Math.round(m))} phút`;
+    if (m < 60 * 48) return `${(m / 60).toFixed(1).replace('.', ',')} giờ`;
+    return `${(m / 1440).toFixed(1).replace('.', ',')} ngày`;
+  };
 
   // Pending Approvals Count for CEO
   const pendingQuotedPOsCount = filteredQuotedOrders.length;
@@ -1611,24 +1642,24 @@ export default function Dashboard() {
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              {[
-                { name: 'Phạm Văn D', role: 'Kỹ thuật viên Trưởng', completed: completedJobsCount || 8, bonus: (completedJobsCount || 8) * 150000, qaRate: '100%' },
-                { name: 'Trần Văn Hoàng', role: 'Kỹ thuật viên Ráp PC', completed: 5, bonus: 750000, qaRate: '100%' }
-              ].map((tech, tIdx) => (
-                <div key={tIdx} style={{ padding: '0.85rem', borderRadius: '6px', border: '1px solid #e2e8f0', backgroundColor: '#ffffff' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
-                    <div>
-                      <strong style={{ fontSize: '0.85rem', color: '#0f172a' }}>{tech.name}</strong>
-                      <span style={{ fontSize: '0.77rem', color: '#64748b', marginLeft: '0.4rem' }}>({getRoleName(tech.role)})</span>
-                    </div>
-                    <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#16a34a' }}>
-                      Thưởng ráp máy: {formatPrice(tech.bonus)}
-                    </span>
+              {technicianStats.length === 0 && (
+                <div style={{ padding: '1rem', textAlign: 'center', fontSize: '0.82rem', color: '#64748b', border: '1px dashed #e2e8f0', borderRadius: '6px' }}>
+                  Chưa có lệnh lắp ráp được nghiệm thu trong kỳ đã chọn.
+                </div>
+              )}
+              {technicianStats.map((tech) => (
+                <div key={tech.name} style={{ padding: '0.85rem', borderRadius: '6px', border: '1px solid #e2e8f0', backgroundColor: '#ffffff' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    <strong style={{ fontSize: '0.85rem', color: '#0f172a' }}>{tech.name}</strong>
+                    {assemblyBonusRate !== null && (
+                      <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#16a34a' }}>
+                        Thưởng lắp ráp: {formatPrice(tech.completed * assemblyBonusRate)}
+                      </span>
+                    )}
                   </div>
-
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: '#475569' }}>
-                    <span>Số máy ráp hoàn chỉnh: <strong>{tech.completed} bộ PC</strong></span>
-                    <span>Tỷ lệ Pass QA: <strong style={{ color: '#16a34a' }}>{tech.qaRate}</strong></span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: '#475569', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    <span>Số máy đã nghiệm thu: <strong>{tech.completed} bộ PC</strong></span>
+                    <span>Thời gian hoàn thành TB: <strong>{fmtDuration(tech.minutes)}</strong></span>
                   </div>
                 </div>
               ))}
@@ -2152,18 +2183,17 @@ export default function Dashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {(payrolls.length > 0 ? payrolls : [
-                    { empId: 1, name: 'Trần Thị B', role: 'Nhân Viên Bán Hàng', base: 8500000, bonus: 1850000, netSalary: 10350000 },
-                    { empId: 2, name: 'Phạm Văn D', role: 'Kỹ Thuật Lắp Ráp', base: 9000000, bonus: 1200000, netSalary: 10200000 },
-                    { empId: 3, name: 'Lê Văn C', role: 'Quản Lý Kho', base: 9500000, bonus: 500000, netSalary: 10000000 }
-                  ]).map((p, pIdx) => (
+                  {payrolls.length === 0 && (
+                    <tr><td colSpan={5} style={{ padding: '1rem', textAlign: 'center', color: '#64748b' }}>Chưa có bảng lương trong kỳ.</td></tr>
+                  )}
+                  {payrolls.map((p, pIdx) => (
                     <tr key={pIdx} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                      <td style={{ padding: '0.5rem', fontWeight: 700, color: '#2563eb' }}>NV-{p.empId || pIdx + 1}</td>
-                      <td style={{ padding: '0.5rem', fontWeight: 600, color: '#0f172a' }}>{p.employeeName || p.name}</td>
+                      <td style={{ padding: '0.5rem', fontWeight: 700, color: '#2563eb' }}>{p.employee?.employeeCode || (p.employeeId ? `NV-${p.employeeId}` : '—')}</td>
+                      <td style={{ padding: '0.5rem', fontWeight: 600, color: '#0f172a' }}>{p.employeeName || p.employee?.fullName || p.name || '—'}</td>
                       <td style={{ padding: '0.5rem', color: '#64748b' }}>{getRoleName(p.role) || 'Nhân viên'}</td>
-                      <td style={{ padding: '0.5rem', textAlign: 'right' }}>{formatPrice(p.baseSalary || p.base || 8500000)}</td>
-                      <td style={{ padding: '0.5rem', textAlign: 'right', color: '#16a34a', fontWeight: 700 }}>+{formatPrice(p.bonus || p.commission || 1000000)}</td>
-                      <td style={{ padding: '0.5rem', textAlign: 'right', fontWeight: 800, color: '#0f172a' }}>{formatPrice(p.netSalary || 9500000)}</td>
+                      <td style={{ padding: '0.5rem', textAlign: 'right' }}>{formatPrice(Number(p.baseSalary ?? p.base ?? 0) || 0)}</td>
+                      <td style={{ padding: '0.5rem', textAlign: 'right', color: '#16a34a', fontWeight: 700 }}>+{formatPrice((Number(p.commission) || 0) + (Number(p.assemblyBonus) || 0) + (Number(p.otherBonus) || 0) + (Number(p.bonus) || 0))}</td>
+                      <td style={{ padding: '0.5rem', textAlign: 'right', fontWeight: 800, color: '#0f172a' }}>{formatPrice(Number(p.netSalary) || 0)}</td>
                     </tr>
                   ))}
                 </tbody>

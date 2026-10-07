@@ -61,8 +61,6 @@ export default function Accountant() {
   const addLedgerEntry = useFinanceStore(state => state.addLedgerEntry);
   const disbursePayroll = useFinanceStore(state => state.disbursePayroll);
   const disburseAllPayrolls = useFinanceStore(state => state.disburseAllPayrolls);
-  const employees = useHRStore(state => state.employees) || [];
-  const getEmployees = useHRStore(state => state.getEmployees);
   const payrolls = useHRStore(state => state.payrolls) || [];
   const getPayrolls = useHRStore(state => state.getPayrolls);
   const returnRequests = useSalesStore(state => state.returnRequests) || [];
@@ -192,7 +190,6 @@ export default function Accountant() {
     if (typeof getOrders === 'function') getOrders().catch(() => {});
     if (typeof getReturnRequests === 'function') getReturnRequests().catch(() => {});
     if (typeof getPayrolls === 'function') getPayrolls().catch(() => {});
-    if (typeof getEmployees === 'function') getEmployees().catch(() => {});
     loadCodSettlement();
     loadActiveBankAccounts();
   }, []);
@@ -273,9 +270,10 @@ export default function Accountant() {
   //    PAYROLL-{id} entries: 45 of the seeded demo payrolls were inserted
   //    directly as PAID by prisma/seed.js without a matching LedgerEntry, so
   //    a ledger-only sum would silently drop that real historical cost.)
-  const payrollReadyFund = payrolls.length > 0
-    ? payrolls.filter(p => p.status === 'APPROVED_BY_CEO').reduce((sum, p) => sum + (Number(p.netSalary || 0) || 0), 0)
-    : employees.reduce((s, e) => s + (Number(e.salary || e.baseSalary || 8500000) || 8500000), 0);
+  // Chỉ tính bảng lương thật đã được duyệt — không ước lượng từ lương cơ bản khi chưa có bảng lương.
+  const payrollReadyFund = payrolls
+    .filter(p => p.status === 'APPROVED_BY_CEO')
+    .reduce((sum, p) => sum + (Number(p.netSalary || 0) || 0), 0);
 
   const payrollExpensePaid = payrolls
     .filter(p => p && p.status === 'PAID')
@@ -1666,7 +1664,7 @@ export default function Accountant() {
                 <div style={{ fontSize: '1.45rem', fontWeight: 900, color: '#2563eb', marginTop: '0.35rem' }}>
                   {totalPendingOrders + codHistory.length > 0
                     ? `${Math.round((codHistory.length / (totalPendingOrders + codHistory.length)) * 100)}%`
-                    : '100%'}
+                    : '—'}
                 </div>
                 <div style={{ fontSize: '0.79rem', color: '#64748b', marginTop: '0.2rem' }}>
                   {codHistory.length} / {totalPendingOrders + codHistory.length} đơn COD đã thanh toán
