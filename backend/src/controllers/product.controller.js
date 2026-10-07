@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const prisma = require('../config/database');
+const { deductInventory, restockInventory } = require('../services/stockSync');
 const { UPLOAD_DIR } = require('../middlewares/upload.middleware');
 
 // multipart/form-data (used when the Add/Edit Product form includes an image file)
@@ -566,18 +567,33 @@ const updateProduct = async (req, res, next) => {
     const coverFile = req.files?.image?.[0];
     const galleryFiles = req.files?.images || [];
 
-    const updated = await prisma.product.update({
-      where: { productId: target.productId },
-      data: {
-        ...(name && { name }),
-        ...(targetPrice !== undefined && !isNaN(targetPrice) && { price: targetPrice }),
-        ...(qty !== undefined && !isNaN(qty) && { stockQuantity: qty }),
-        ...(available !== undefined && { available: parseBoolField(available) }),
-        ...(targetDesc && { descriptionText: targetDesc }),
-        ...(coverFile && { primaryImage: `/api/uploads/products/${coverFile.filename}` }),
-        ...(supplierCode !== undefined && String(supplierCode).trim() !== '' && { defaultSupplierCode: String(supplierCode).trim() })
-      },
-      include: { defaultSupplier: { select: { code: true, name: true } } }
+    // Sửa số lượng tồn ở form sản phẩm phải đi kèm thay đổi bằng nhau trên tồn kho vật lý
+    // (trang Kho đọc bảng inventory) — trước đây chỉ ghi Product.stockQuantity nên hai trang lệch nhau.
+    const updated = await prisma.$transaction(async (tx) => {
+      const u = await tx.product.update({
+        where: { productId: target.productId },
+        data: {
+          ...(name && { name }),
+          ...(targetPrice !== undefined && !isNaN(targetPrice) && { price: targetPrice }),
+          ...(qty !== undefined && !isNaN(qty) && { stockQuantity: qty }),
+          ...(available !== undefined && { available: parseBoolField(available) }),
+          ...(targetDesc && { descriptionText: targetDesc }),
+          ...(coverFile && { primaryImage: `/api/uploads/products/${coverFile.filename}` }),
+          ...(supplierCode !== undefined && String(supplierCode).trim() !== '' && { defaultSupplierCode: String(supplierCode).trim() })
+        },
+        include: { defaultSupplier: { select: { code: true, name: true } } }
+      });
+      if (qty !== undefined && !isNaN(qty) && qty !== target.stockQuantity) {
+        const delta = qty - target.stockQuantity;
+        const opts = {
+          referenceId: `ADJ-${target.productId}`.slice(0, 50),
+          note: `Điều chỉnh tồn kho khi sửa sản phẩm (${target.stockQuantity} → ${qty})`,
+          createdBy: req.user?.username || req.user?.name || null
+        };
+        if (delta > 0) await restockInventory(tx, target.productId, delta, opts);
+        else await deductInventory(tx, target.productId, -delta, opts);
+      }
+      return u;
     });
 
     // Best-effort cleanup of the replaced cover photo — only ever a file this endpoint
