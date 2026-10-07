@@ -1,6 +1,6 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import { api } from '../services/api';
-import { initializeAllStores } from '../stores';
+import { initializeAllStores, setStoreUser } from '../stores';
 
 const AuthContext = createContext(null);
 
@@ -21,12 +21,12 @@ export const AuthProvider = ({ children }) => {
           const response = await api.get('/auth/me');
           if (active && response && response.user) {
             setUser(response.user);
-            initializeAllStores().catch(() => {});
+            initializeAllStores(response.user).catch(() => {});
           }
           break;
         } catch (e) {
           if (e?.status === 401 || e?.status === 403 || e?.status === 404 || attempt === 4) {
-            if (active) setUser(null);
+            if (active) { setUser(null); setStoreUser(null); }
             break;
           }
           await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
@@ -40,7 +40,7 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     // api.js dispatches this when a session cookie is missing/expired.
-    const handleAuthChange = () => setUser(null);
+    const handleAuthChange = () => { setUser(null); setStoreUser(null); };
     window.addEventListener('auth-change', handleAuthChange);
     return () => window.removeEventListener('auth-change', handleAuthChange);
   }, []);
@@ -108,7 +108,7 @@ export const AuthProvider = ({ children }) => {
         : { ...response.user, role: response.user.role || 'CUSTOMER' };
 
       setUser(userObj);
-      initializeAllStores().catch(() => {});
+      initializeAllStores(userObj).catch(() => {});
       setLoading(false);
       return userObj;
     } catch (error) {
@@ -126,6 +126,7 @@ export const AuthProvider = ({ children }) => {
       }
       const userObj = { ...response.user, role: 'CUSTOMER' };
       setUser(userObj);
+      initializeAllStores(userObj).catch(() => {});
       setLoading(false);
       return userObj;
     } catch (error) {
@@ -157,6 +158,7 @@ export const AuthProvider = ({ children }) => {
 
   const logout = () => {
     setUser(null);
+    setStoreUser(null); // xoá dữ liệu ERP của phiên vừa đăng xuất khỏi bộ nhớ và localStorage
     // Fire-and-forget: clear the HTTP-Only cookie server-side. The UI has
     // already logged the user out locally regardless of this call's outcome.
     api.post('/auth/logout').catch(() => {});

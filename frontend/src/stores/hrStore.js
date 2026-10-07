@@ -100,17 +100,8 @@ export const useHRStore = create((set, get) => ({
     try {
       set({ error: null });
       let employees = [];
-      try {
-        const data = await api.get('/hr/employees');
-        employees = Array.isArray(data) ? data : (data?.data || []);
-      } catch (_) {
-        try {
-          const data = await api.get('/employees');
-          employees = Array.isArray(data) ? data : (data?.data || []);
-        } catch (e) {
-          console.warn('Backend getEmployees offline, using local cache:', e.message);
-        }
-      }
+      const data = await api.get('/hr/employees');
+      employees = Array.isArray(data) ? data : (data?.data || []);
 
       // Server returns real column names (fullName/baseSalary, no username —
       // just email) — the rest of this store's `employees` shape (and every
@@ -150,12 +141,7 @@ export const useHRStore = create((set, get) => ({
       // Route thật là /hr/attendance (hr.routes.js) — /attendance trần trước
       // đây luôn 404 vì app.js không mount router nào ở gốc /api/v1/attendance,
       // khiến lịch sử chấm công không bao giờ tải lại được sau khi refresh.
-      let data;
-      try {
-        data = await api.get('/hr/attendance');
-      } catch (_) {
-        data = await api.get('/attendance');
-      }
+      const data = await api.get('/hr/attendance');
       const attendanceLogs = Array.isArray(data) ? data : (data?.data || []);
       
       set({ attendanceLogs });
@@ -175,7 +161,7 @@ export const useHRStore = create((set, get) => ({
   /**
    * Fetch all leave requests from API
    */
-  getLeaveRequests: async () => {
+  getLeaveRequests: async ({ all = true } = {}) => {
     try {
       set({ error: null });
       let leaveRequests = [];
@@ -184,18 +170,15 @@ export const useHRStore = create((set, get) => ({
       // only returns the logged-in user's OWN requests and 403s for those roles' own
       // employeeId lookups being irrelevant here. Try the privileged endpoint first
       // and fall back to the self-service one for roles that get a 403 from it.
+      // HR/CEO/ADMIN đọc toàn bộ đơn; các vai trò khác chỉ đọc đơn của chính mình.
+      let data;
       try {
-        const data = await api.get('/hr/leaves/all');
-        leaveRequests = Array.isArray(data) ? data : (data?.data || []);
-      } catch (_) {
-        try {
-          const data = await api.get('/hr/leaves');
-          leaveRequests = Array.isArray(data) ? data : (data?.data || []);
-        } catch (__) {
-          const data = await api.get('/leaves');
-          leaveRequests = Array.isArray(data) ? data : (data?.data || []);
-        }
+        data = await api.get(all ? '/hr/leaves/all' : '/hr/leaves');
+      } catch (e) {
+        if (!all || e?.status !== 403) throw e;
+        data = await api.get('/hr/leaves'); // vai trò không có quyền xem toàn bộ → chỉ đơn của mình
       }
+      leaveRequests = Array.isArray(data) ? data : (data?.data || []);
       
       set({ leaveRequests });
       try {
@@ -221,12 +204,7 @@ export const useHRStore = create((set, get) => ({
       // HRManager (Bảng Lương) hiện toàn dữ liệu giả tính ở client, và tab
       // Giải Ngân của Kế Toán (Accountant.jsx dùng chung store này) luôn nhận
       // mảng rỗng dù bảng lương thật đã tồn tại trong DB.
-      let data;
-      try {
-        data = await api.get('/hr/payrolls');
-      } catch (_) {
-        data = await api.get('/payrolls');
-      }
+      const data = await api.get('/hr/payrolls');
       const payrolls = Array.isArray(data) ? data : (data?.data || []);
       
       set({ payrolls });
