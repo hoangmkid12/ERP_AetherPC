@@ -1935,7 +1935,7 @@ export default function Accountant() {
                   <th style={{ padding: '0.65rem 0.85rem' }}>Nhân Viên</th>
                   <th style={{ padding: '0.65rem 0.85rem' }}>Chức Danh</th>
                   <th style={{ padding: '0.65rem 0.85rem', textAlign: 'right' }}>Lương Cứng</th>
-                  <th style={{ padding: '0.65rem 0.85rem', textAlign: 'right' }}>Thưởng / Phạt</th>
+                  <th style={{ padding: '0.65rem 0.85rem', textAlign: 'right' }} title="Thưởng trừ các khoản khấu trừ: bảo hiểm bắt buộc, thuế TNCN, phạt đi muộn">Thưởng − Khấu trừ</th>
                   <th style={{ padding: '0.65rem 0.85rem', textAlign: 'right' }}>Thực Nhận</th>
                   <th style={{ padding: '0.65rem 0.85rem' }}>Trạng Thái</th>
                   <th style={{ padding: '0.65rem 0.85rem', textAlign: 'center' }}>Thao Tác</th>

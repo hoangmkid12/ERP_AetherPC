@@ -649,7 +649,13 @@ export default function Dashboard() {
   // no invented multipliers or hardcoded fallbacks. CANCELLED/FAILED_DELIVERY orders never count as revenue.
   const revenueOrders = filteredOrders.filter(o => !['CANCELLED', 'FAILED_DELIVERY'].includes(o.status));
   const totalRevenueVal = revenueOrders.reduce((sum, item) => sum + (Number(item.totalAmount) || 0), 0);
-  const cogsAmount = purchaseOrders.flatMap(po => po.bills || []).reduce((sum, bill) => sum + (Number(bill.amountTotal || 0) || 0), 0);
+  // Giá vốn hàng bán = các bút toán COGS do backend ghi khi đơn thực sự xuất kho (giá bình quân gia quyền),
+  // cùng cách tính với trang Kế toán. Không dùng tổng hóa đơn NCC — đó là tiền MUA hàng trong kỳ, không phải
+  // giá vốn của phần hàng đã BÁN (trước đây làm hai báo cáo cho hai con số giá vốn khác nhau).
+  const cogsAmount = (generalLedger || [])
+    .filter(tx => tx && tx.type === 'EXPENSE' && typeof tx.referenceId === 'string' && tx.referenceId.startsWith('COGS-'))
+    .filter(tx => isDateInFilter(tx.date || tx.createdAt, dateFilterPeriod, customStartDate, customEndDate))
+    .reduce((sum, tx) => sum + (Number(tx.amount || 0) || 0), 0);
   const grossProfit = totalRevenueVal - cogsAmount;
   const grossMarginPct = totalRevenueVal > 0 ? (grossProfit / totalRevenueVal) * 100 : 0;
   const totalInventoryAsset = inventory.reduce((sum, item) => sum + (Number(item.stock || item.stockQuantity || 0) * Number(item.price || item.unitCost || 0)), 0);
@@ -661,7 +667,9 @@ export default function Dashboard() {
   const totalPayrollCost = shownPayrolls.reduce((sum, p) => sum + (Number(p.netSalary || p.netAmount || 0) || 0), 0);
   const operatingExpense = (generalLedger || []).filter(tx => tx && tx.type === 'EXPENSE' && !tx.referenceId).reduce((sum, tx) => sum + (Number(tx.amount || 0) || 0), 0);
   const refundAmount = (generalLedger || []).filter(tx => tx && tx.type === 'REFUND').reduce((sum, tx) => sum + (Number(tx.amount || 0) || 0), 0);
-  const netIncome = totalRevenueVal - cogsAmount - totalPayrollCost - operatingExpense - refundAmount;
+  // Chi phí lương trong P&L = lương đã thực chi (phiếu PAID), cùng cách tính với trang Kế toán.
+  const payrollExpensePaid = (payrolls || []).filter(p => p && p.status === 'PAID').reduce((sum, p) => sum + (Number(p.netSalary || 0) || 0), 0);
+  const netIncome = totalRevenueVal - cogsAmount - payrollExpensePaid - operatingExpense - refundAmount;
 
   const lowStockCount = inventory.filter(item => Number(item.stock || item.stockQuantity || 0) <= Number(item.threshold || 5)).length;
   const readyToShipCount = filteredOrders.filter(o => o.status === 'READY_TO_SHIP').length;
@@ -1371,7 +1379,7 @@ export default function Dashboard() {
 
               <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'baseline', gap: '0.4rem', paddingBottom: '0.4rem', borderBottom: '1px solid #f1f5f9' }}>
                 <span style={{ color: '#64748b', flex: '1 1 220px', minWidth: 0 }}>(-) Chi Phí Lương & Thưởng Nhân Sự:</span>
-                <span style={{ color: '#64748b', whiteSpace: 'nowrap' }}>{formatPrice(totalPayrollCost)}</span>
+                <span style={{ color: '#64748b', whiteSpace: 'nowrap' }}>{formatPrice(payrollExpensePaid)}</span>
               </div>
 
               <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'baseline', gap: '0.4rem', paddingBottom: '0.4rem', borderBottom: '1px solid #f1f5f9' }}>

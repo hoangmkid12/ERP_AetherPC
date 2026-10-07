@@ -46,6 +46,19 @@ const adjustLoyaltyForOrder = async (tx, customerId, totalAmount, direction) => 
 /**
  * 1. KHÁCH HÀNG TẠO ĐƠN HÀNG MỚI (Storefront Checkout - M_KHDH)
  */
+// Mã đơn ORD-YYMMDD-XXXX chỉ có 9.000 giá trị mỗi ngày nên có thể trùng (bài toán ngày sinh: ~100 đơn/ngày
+// đã có xác suất trùng ~40%). Khi trùng khóa chính order_id, chạy lại cả giao dịch để sinh mã mới thay vì báo lỗi.
+async function withOrderIdRetry(run, fixedId, attempts = 6) {
+  for (let i = 1; ; i++) {
+    try {
+      return await run();
+    } catch (err) {
+      const dupOrderId = err && err.code === 'P2002' && String(err.meta?.target || '').includes('order_id');
+      if (!dupOrderId || fixedId || i >= attempts) throw err;
+    }
+  }
+}
+
 const createOrder = async (req, res, next) => {
   try {
     const customerId = req.user.id; // Lấy từ authMiddleware JWT
@@ -62,7 +75,7 @@ const createOrder = async (req, res, next) => {
     }
 
     // Thực hiện giao dịch cơ sở dữ liệu (Database Transaction)
-    const order = await prisma.$transaction(async (tx) => {
+    const order = await withOrderIdRetry(() => prisma.$transaction(async (tx) => {
       let subtotal = 0;
       let discount = 0;
       const orderItemsData = [];
@@ -310,7 +323,7 @@ const createOrder = async (req, res, next) => {
       });
 
       return newOrder;
-    });
+    }), req.body.orderId);
 
     // Gửi email xác nhận đơn hàng cho khách hàng
     const customer = await prisma.customer.findUnique({ where: { customerId: req.user.id } });
