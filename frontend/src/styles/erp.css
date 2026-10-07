@@ -75,13 +75,26 @@
 .erp-root table:not(.erp-compact) td small,
 .erp-root table:not(.erp-compact) td .muted { font-size: 12px; }
 
-/* Ô thao tác (có nút): nút nằm trên một hàng, bảng rộng thì cuộn ngang thay vì bóp cột */
-.erp-root table:not(.erp-compact) td:has(button) { white-space: nowrap; }
-.erp-root table:not(.erp-compact) td:has(button) > div { flex-wrap: nowrap !important; }
-/* Cột mã (cột đầu) không bẻ dòng: NV-24, #ORD-..., PO-... */
-.erp-root table:not(.erp-compact) > tbody > tr > td:first-child { white-space: nowrap; }
-/* Ô chứa tên/mô tả dài có độ rộng tối thiểu để không bị bóp thành nhiều dòng */
-.erp-root table:not(.erp-compact) > tbody > tr > td { min-width: 72px; }
+/* Cột thao tác (cột cuối có nút): nút nằm trên một hàng */
+.erp-root table:not(.erp-compact) > tbody > tr > td:last-child:has(button) { white-space: nowrap; }
+.erp-root table:not(.erp-compact) > tbody > tr > td:last-child:has(button) > div { flex-wrap: nowrap !important; }
+/* Cột đầu (thường là mã/tên) có độ rộng tối thiểu để mã như NV-24 không bị bẻ dòng */
+.erp-root table:not(.erp-compact) > tbody > tr > td:first-child { min-width: 96px; }
+/* Ô dữ liệu dài được xuống dòng trong ô thay vì tràn sang ô bên cạnh */
+.erp-root table:not(.erp-compact) > tbody > tr > td { overflow-wrap: break-word; }
+/* Cột tự giãn theo nội dung (một số bảng cũ đặt table-layout: fixed + % cố định làm tiêu đề tràn cột)
+   và hiện đủ nội dung: ô cắt chữ bằng "…" được xuống dòng thay vì cắt bớt */
+.erp-root table:not(.erp-compact) { table-layout: auto !important; }
+.erp-root table:not(.erp-compact) td[style*='text-overflow'],
+.erp-root table:not(.erp-compact) td [style*='text-overflow'] {
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  max-width: none !important;
+}
+
+/* Bảng rộng hơn khung: khung chứa cuộn ngang thay vì cắt hoặc tràn nội dung */
+.erp-root div:has(> table:not(.erp-compact)) { overflow-x: auto; }
 
 /* ---------- Ô nhập, chọn: cùng chiều cao, bo góc, viền, vòng focus ---------- */
 .erp-root input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='color']),
@@ -119,7 +132,6 @@
 .erp-root ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 8px; }
 .erp-root ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 .erp-root ::-webkit-scrollbar-track { background: transparent; }
-.erp-root .admin-sidebar-drawer ::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.3); }
 
-/* Sidebar tối: liên kết rê chuột */
-.erp-root .admin-sidebar-drawer nav a:hover { color: #ffffff !important; background-color: rgba(148, 163, 184, 0.1); }
+/* Sidebar: liên kết rê chuột */
+.erp-root .admin-sidebar-drawer nav a:hover { background-color: #f1f5f9; color: #0f172a !important; }

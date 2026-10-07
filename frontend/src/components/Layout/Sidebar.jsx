@@ -673,8 +673,8 @@ export default function Sidebar({ isOpen = false, onClose }) {
     <>
     <aside className={`admin-sidebar-drawer ${isOpen ? 'open' : ''}`} style={{
       width: '264px',
-      background: 'linear-gradient(180deg, #0f172a 0%, #111b31 100%)',
-      borderRight: '1px solid #1e293b',
+      background: '#ffffff',
+      borderRight: '1px solid #e3e8ef',
       display: 'flex',
       flexDirection: 'column',
       minHeight: '100vh',
@@ -683,13 +683,13 @@ export default function Sidebar({ isOpen = false, onClose }) {
       top: 0,
       zIndex: 1000,
       flexShrink: 0,
-      boxShadow: '4px 0 24px rgba(15,23,42,0.18)',
+      boxShadow: '2px 0 12px rgba(15,23,42,0.04)',
       overflowX: 'hidden'
     }}>
       {/* Header Brand & Notification Bell */}
       <div style={{
         padding: '1.1rem 1.1rem',
-        borderBottom: '1px solid rgba(148,163,184,0.14)',
+        borderBottom: '1px solid #eef1f5',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
@@ -703,10 +703,10 @@ export default function Sidebar({ isOpen = false, onClose }) {
             style={{ width: '36px', height: '36px', borderRadius: '10px', boxShadow: '0 4px 10px rgba(220,38,38,0.25)' }} 
           />
           <div>
-            <h1 style={{ fontSize: '1rem', fontWeight: 800, margin: 0, color: '#f8fafc', letterSpacing: '-0.01em' }}>
+            <h1 style={{ fontSize: '1rem', fontWeight: 800, margin: 0, color: '#0f172a', letterSpacing: '-0.01em' }}>
               AetherPC ERP
             </h1>
-            <p style={{ fontSize: '0.79rem', color: '#94a3b8', margin: 0, fontWeight: 500 }}>
+            <p style={{ fontSize: '0.79rem', color: '#64748b', margin: 0, fontWeight: 500 }}>
               Quản trị doanh nghiệp
             </p>
           </div>
@@ -717,8 +717,8 @@ export default function Sidebar({ isOpen = false, onClose }) {
           <button
             onClick={() => setShowNotifDrawer(!showNotifDrawer)}
             style={{
-              position: 'relative', background: 'rgba(148,163,184,0.12)', border: '1px solid rgba(148,163,184,0.2)',
-              color: notifications.filter(n => !dismissedNotifIds.includes(n.id)).length > 0 ? '#fbbf24' : '#cbd5e1',
+              position: 'relative', background: '#f8fafc', border: '1px solid #e3e8ef',
+              color: notifications.filter(n => !dismissedNotifIds.includes(n.id)).length > 0 ? '#d97706' : '#64748b',
               borderRadius: '9px', width: '34px', height: '34px',
               display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
               transition: 'all 0.2s'
@@ -791,12 +791,12 @@ export default function Sidebar({ isOpen = false, onClose }) {
                       gap: '0.75rem',
                       padding: '0.62rem 0.85rem',
                       borderRadius: '8px',
-                      color: isTabMatch ? '#ffffff' : '#cbd5e1',
-                      background: isTabMatch ? 'rgba(148,163,184,0.16)' : 'transparent',
+                      color: isTabMatch ? '#b91c1c' : '#334155',
+                      background: isTabMatch ? '#fef2f2' : 'transparent',
                       fontWeight: isTabMatch ? 700 : 500,
                       fontSize: '0.875rem',
                       lineHeight: 1.35,
-                      boxShadow: isTabMatch ? 'inset 3px 0 0 #ef4444' : 'none',
+                      boxShadow: isTabMatch ? 'inset 3px 0 0 #dc2626' : 'none',
                       transition: 'all 0.15s ease'
                     };
                   }}
@@ -830,9 +830,9 @@ export default function Sidebar({ isOpen = false, onClose }) {
                             borderRadius: '0 6px 6px 0',
                             fontSize: '0.8rem',
                             fontWeight: isSubActive ? 700 : 500,
-                            color: isSubActive ? '#ffffff' : '#94a3b8',
-                            backgroundColor: isSubActive ? 'rgba(148,163,184,0.12)' : 'transparent',
-                            borderLeft: isSubActive ? '2px solid #ef4444' : '2px solid rgba(148,163,184,0.18)',
+                            color: isSubActive ? '#b91c1c' : '#64748b',
+                            backgroundColor: isSubActive ? '#fef2f2' : 'transparent',
+                            borderLeft: isSubActive ? '2px solid #dc2626' : '2px solid #e8edf3',
                             transition: 'all 0.15s ease'
                           }}
                         >
@@ -894,9 +894,9 @@ export default function Sidebar({ isOpen = false, onClose }) {
                             borderRadius: '0 6px 6px 0',
                             fontSize: '0.8rem',
                             fontWeight: isSubActive ? 700 : 500,
-                            color: isSubActive ? '#ffffff' : '#94a3b8',
-                            backgroundColor: isSubActive ? 'rgba(148,163,184,0.12)' : 'transparent',
-                            borderLeft: isSubActive ? '2px solid #ef4444' : '2px solid rgba(148,163,184,0.18)',
+                            color: isSubActive ? '#b91c1c' : '#64748b',
+                            backgroundColor: isSubActive ? '#fef2f2' : 'transparent',
+                            borderLeft: isSubActive ? '2px solid #dc2626' : '2px solid #e8edf3',
                             transition: 'all 0.15s ease'
                           }}
                         >
@@ -952,9 +952,9 @@ export default function Sidebar({ isOpen = false, onClose }) {
                             borderRadius: '0 6px 6px 0',
                             fontSize: '0.8rem',
                             fontWeight: isSubActive ? 700 : 500,
-                            color: isSubActive ? '#ffffff' : '#94a3b8',
-                            backgroundColor: isSubActive ? 'rgba(148,163,184,0.12)' : 'transparent',
-                            borderLeft: isSubActive ? '2px solid #ef4444' : '2px solid rgba(148,163,184,0.18)',
+                            color: isSubActive ? '#b91c1c' : '#64748b',
+                            backgroundColor: isSubActive ? '#fef2f2' : 'transparent',
+                            borderLeft: isSubActive ? '2px solid #dc2626' : '2px solid #e8edf3',
                             transition: 'all 0.15s ease'
                           }}
                         >
@@ -1026,9 +1026,9 @@ export default function Sidebar({ isOpen = false, onClose }) {
                             borderRadius: '0 6px 6px 0',
                             fontSize: '0.8rem',
                             fontWeight: isSubActive ? 700 : 500,
-                            color: isSubActive ? '#ffffff' : '#94a3b8',
-                            backgroundColor: isSubActive ? 'rgba(148,163,184,0.12)' : 'transparent',
-                            borderLeft: isSubActive ? '2px solid #ef4444' : '2px solid rgba(148,163,184,0.18)',
+                            color: isSubActive ? '#b91c1c' : '#64748b',
+                            backgroundColor: isSubActive ? '#fef2f2' : 'transparent',
+                            borderLeft: isSubActive ? '2px solid #dc2626' : '2px solid #e8edf3',
                             transition: 'all 0.15s ease'
                           }}
                         >
@@ -1081,9 +1081,9 @@ export default function Sidebar({ isOpen = false, onClose }) {
                             borderRadius: '0 6px 6px 0',
                             fontSize: '0.8rem',
                             fontWeight: isSubActive ? 700 : 500,
-                            color: isSubActive ? '#ffffff' : '#94a3b8',
-                            backgroundColor: isSubActive ? 'rgba(148,163,184,0.12)' : 'transparent',
-                            borderLeft: isSubActive ? '2px solid #ef4444' : '2px solid rgba(148,163,184,0.18)',
+                            color: isSubActive ? '#b91c1c' : '#64748b',
+                            backgroundColor: isSubActive ? '#fef2f2' : 'transparent',
+                            borderLeft: isSubActive ? '2px solid #dc2626' : '2px solid #e8edf3',
                             transition: 'all 0.15s ease'
                           }}
                         >
@@ -1142,9 +1142,9 @@ export default function Sidebar({ isOpen = false, onClose }) {
                             borderRadius: '0 6px 6px 0',
                             fontSize: '0.8rem',
                             fontWeight: isSubActive ? 700 : 500,
-                            color: isSubActive ? '#ffffff' : '#94a3b8',
-                            backgroundColor: isSubActive ? 'rgba(148,163,184,0.12)' : 'transparent',
-                            borderLeft: isSubActive ? '2px solid #ef4444' : '2px solid rgba(148,163,184,0.18)',
+                            color: isSubActive ? '#b91c1c' : '#64748b',
+                            backgroundColor: isSubActive ? '#fef2f2' : 'transparent',
+                            borderLeft: isSubActive ? '2px solid #dc2626' : '2px solid #e8edf3',
                             transition: 'all 0.15s ease'
                           }}
                         >
@@ -1196,9 +1196,9 @@ export default function Sidebar({ isOpen = false, onClose }) {
                             borderRadius: '0 6px 6px 0',
                             fontSize: '0.8rem',
                             fontWeight: isSubActive ? 700 : 500,
-                            color: isSubActive ? '#ffffff' : '#94a3b8',
-                            backgroundColor: isSubActive ? 'rgba(148,163,184,0.12)' : 'transparent',
-                            borderLeft: isSubActive ? '2px solid #ef4444' : '2px solid rgba(148,163,184,0.18)',
+                            color: isSubActive ? '#b91c1c' : '#64748b',
+                            backgroundColor: isSubActive ? '#fef2f2' : 'transparent',
+                            borderLeft: isSubActive ? '2px solid #dc2626' : '2px solid #e8edf3',
                             transition: 'all 0.15s ease'
                           }}
                         >
@@ -1242,9 +1242,9 @@ export default function Sidebar({ isOpen = false, onClose }) {
                             borderRadius: '0 6px 6px 0',
                             fontSize: '0.8rem',
                             fontWeight: isSubActive ? 700 : 500,
-                            color: isSubActive ? '#ffffff' : '#94a3b8',
-                            backgroundColor: isSubActive ? 'rgba(148,163,184,0.12)' : 'transparent',
-                            borderLeft: isSubActive ? '2px solid #ef4444' : '2px solid rgba(148,163,184,0.18)',
+                            color: isSubActive ? '#b91c1c' : '#64748b',
+                            backgroundColor: isSubActive ? '#fef2f2' : 'transparent',
+                            borderLeft: isSubActive ? '2px solid #dc2626' : '2px solid #e8edf3',
                             transition: 'all 0.15s ease'
                           }}
                         >
@@ -1291,9 +1291,9 @@ export default function Sidebar({ isOpen = false, onClose }) {
                             borderRadius: '0 6px 6px 0',
                             fontSize: '0.8rem',
                             fontWeight: isSubActive ? 700 : 500,
-                            color: isSubActive ? '#ffffff' : '#94a3b8',
-                            backgroundColor: isSubActive ? 'rgba(148,163,184,0.12)' : 'transparent',
-                            borderLeft: isSubActive ? '2px solid #ef4444' : '2px solid rgba(148,163,184,0.18)',
+                            color: isSubActive ? '#b91c1c' : '#64748b',
+                            backgroundColor: isSubActive ? '#fef2f2' : 'transparent',
+                            borderLeft: isSubActive ? '2px solid #dc2626' : '2px solid #e8edf3',
                             transition: 'all 0.15s ease'
                           }}
                         >
@@ -1333,9 +1333,9 @@ export default function Sidebar({ isOpen = false, onClose }) {
                             borderRadius: '0 6px 6px 0',
                             fontSize: '0.8rem',
                             fontWeight: isSubActive ? 700 : 500,
-                            color: isSubActive ? '#ffffff' : '#94a3b8',
-                            backgroundColor: isSubActive ? 'rgba(148,163,184,0.12)' : 'transparent',
-                            borderLeft: isSubActive ? '2px solid #ef4444' : '2px solid rgba(148,163,184,0.18)',
+                            color: isSubActive ? '#b91c1c' : '#64748b',
+                            backgroundColor: isSubActive ? '#fef2f2' : 'transparent',
+                            borderLeft: isSubActive ? '2px solid #dc2626' : '2px solid #e8edf3',
                             transition: 'all 0.15s ease'
                           }}
                         >
@@ -1366,9 +1366,9 @@ export default function Sidebar({ isOpen = false, onClose }) {
                             borderRadius: '0 6px 6px 0',
                             fontSize: '0.8rem',
                             fontWeight: isSubActive ? 700 : 500,
-                            color: isSubActive ? '#ffffff' : '#94a3b8',
-                            backgroundColor: isSubActive ? 'rgba(148,163,184,0.12)' : 'transparent',
-                            borderLeft: isSubActive ? '2px solid #ef4444' : '2px solid rgba(148,163,184,0.18)',
+                            color: isSubActive ? '#b91c1c' : '#64748b',
+                            backgroundColor: isSubActive ? '#fef2f2' : 'transparent',
+                            borderLeft: isSubActive ? '2px solid #dc2626' : '2px solid #e8edf3',
                             transition: 'all 0.15s ease'
                           }}
                         >
@@ -1386,11 +1386,11 @@ export default function Sidebar({ isOpen = false, onClose }) {
       {/* User Status / Bottom Actions Card */}
       <div className="admin-sidebar-footer" style={{
         padding: '1rem',
-        borderTop: '1px solid rgba(148,163,184,0.14)',
+        borderTop: '1px solid #eef1f5',
         display: 'flex',
         flexDirection: 'column',
         gap: '0.75rem',
-        backgroundColor: 'rgba(2,6,23,0.25)'
+        backgroundColor: '#f8fafc'
       }}>
         {/* User Card */}
         <div style={{
@@ -1398,9 +1398,9 @@ export default function Sidebar({ isOpen = false, onClose }) {
           alignItems: 'center',
           gap: '0.75rem',
           padding: '0.5rem 0.65rem',
-          backgroundColor: 'rgba(148,163,184,0.1)',
+          backgroundColor: '#ffffff',
           borderRadius: '10px',
-          border: '1px solid rgba(148,163,184,0.16)'
+          border: '1px solid #e3e8ef'
         }}>
           <div style={{
             width: '36px',
@@ -1418,7 +1418,7 @@ export default function Sidebar({ isOpen = false, onClose }) {
             <p style={{
               fontSize: '0.85rem',
               fontWeight: 700,
-              color: '#f8fafc',
+              color: '#0f172a',
               whiteSpace: 'nowrap',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
@@ -1429,7 +1429,7 @@ export default function Sidebar({ isOpen = false, onClose }) {
             </p>
             <p style={{
               fontSize: '0.8rem',
-              color: '#94a3b8',
+              color: '#64748b',
               margin: 0,
               lineHeight: 1.3,
               fontWeight: 500
@@ -1453,9 +1453,9 @@ export default function Sidebar({ isOpen = false, onClose }) {
               fontSize: '0.78rem',
               fontWeight: 700,
               borderRadius: '8px',
-              backgroundColor: 'rgba(148,163,184,0.12)',
-              border: '1px solid rgba(148,163,184,0.22)',
-              color: '#e2e8f0',
+              backgroundColor: '#ffffff',
+              border: '1px solid #e3e8ef',
+              color: '#334155',
               cursor: 'pointer'
             }}
             title="Về Cửa Hàng Trang Chủ"
@@ -1475,9 +1475,9 @@ export default function Sidebar({ isOpen = false, onClose }) {
               fontSize: '0.78rem',
               fontWeight: 700,
               borderRadius: '8px',
-              backgroundColor: 'rgba(239,68,68,0.14)',
-              border: '1px solid rgba(239,68,68,0.35)',
-              color: '#fca5a5',
+              backgroundColor: '#fef2f2',
+              border: '1px solid #fecaca',
+              color: '#dc2626',
               cursor: 'pointer'
             }}
             title="Đăng xuất khỏi hệ thống"
