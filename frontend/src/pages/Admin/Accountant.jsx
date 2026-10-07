@@ -719,7 +719,7 @@ export default function Accountant() {
   };
 
   return (
-    <div style={{ backgroundColor: '#f8fafc', minHeight: '100vh', padding: '1.5rem 2rem', maxWidth: '1400px', margin: '0 auto', fontFamily: 'Inter, sans-serif' }}>
+    <div style={{ backgroundColor: '#f8fafc', minHeight: '100vh', padding: '1.5rem 2rem', maxWidth: '1400px', margin: '0 auto', fontFamily: 'inherit' }}>
       
       {/* ========================================================================= */}
       {/* 1. TOP HEADER */}
@@ -750,7 +750,7 @@ export default function Accountant() {
               style={{
                 backgroundColor: '#ffffff',
                 color: '#334155',
-                border: '1px solid #cbd5e1',
+                border: '1px solid #e3e8ef',
                 borderRadius: '6px',
                 padding: '0.45rem 0.85rem',
                 fontSize: '0.8rem',
@@ -792,7 +792,7 @@ export default function Accountant() {
             style={{
               backgroundColor: '#ffffff',
               color: '#0f172a',
-              border: '1px solid #cbd5e1',
+              border: '1px solid #e3e8ef',
               borderRadius: '6px',
               padding: '0.45rem 1rem',
               fontSize: '0.8rem',
@@ -835,7 +835,7 @@ export default function Accountant() {
                 fontSize: '0.82rem',
                 fontWeight: 700,
                 cursor: 'pointer',
-                border: isActive ? '1px solid #2563eb' : '1px solid #cbd5e1',
+                border: isActive ? '1px solid #2563eb' : '1px solid #e3e8ef',
                 backgroundColor: isActive ? '#2563eb' : '#ffffff',
                 color: isActive ? '#ffffff' : '#334155',
                 whiteSpace: 'nowrap',
@@ -847,7 +847,7 @@ export default function Accountant() {
                 <span style={{
                   padding: '1px 6px',
                   borderRadius: '10px',
-                  fontSize: '0.7rem',
+                  fontSize: '0.75rem',
                   fontWeight: 800,
                   backgroundColor: isActive ? '#ffffff' : (tabItem.key === 'refunds' ? '#dc2626' : '#d97706'),
                   color: isActive ? '#2563eb' : '#ffffff'
@@ -867,33 +867,33 @@ export default function Accountant() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
           {/* Summary KPIs */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
-            <div style={{ backgroundColor: '#ffffff', padding: '1.1rem', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
-              <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>
+            <div style={{ backgroundColor: '#ffffff', padding: '1.1rem', borderRadius: '8px', border: '1px solid #e3e8ef' }}>
+              <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>
                 Hồ Sơ Chờ Giải Ngân Hoàn Tiền
               </div>
               <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#dc2626', marginTop: '0.25rem' }}>
                 {pendingRefunds.length} hồ sơ <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#64748b' }}>({fmt(pendingRefundTotal)})</span>
               </div>
-              <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '0.2rem' }}>
+              <div style={{ fontSize: '0.79rem', color: '#64748b', marginTop: '0.2rem' }}>
                 Hàng đã về kho & QC kiểm định, chờ Kế toán chuyển khoản
               </div>
             </div>
 
-            <div style={{ backgroundColor: '#ffffff', padding: '1.1rem', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
-              <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>
+            <div style={{ backgroundColor: '#ffffff', padding: '1.1rem', borderRadius: '8px', border: '1px solid #e3e8ef' }}>
+              <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>
                 Đã Hoàn Tiền & Ghi Sổ Cái
               </div>
               <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#16a34a', marginTop: '0.25rem' }}>
                 {completedRefunds.length} hồ sơ <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#64748b' }}>({fmt(completedRefundTotal)})</span>
               </div>
-              <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '0.2rem' }}>
+              <div style={{ fontSize: '0.79rem', color: '#64748b', marginTop: '0.2rem' }}>
                 Đã giải ngân đầy đủ cho khách và hoàn tất hạch toán
               </div>
             </div>
           </div>
 
           {/* Table of Refund Requests */}
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem' }}>
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1.25rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
               <div>
                 <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
@@ -922,7 +922,7 @@ export default function Accountant() {
                           padding: '0.35rem 0.75rem',
                           borderRadius: '6px',
                           border: 'none',
-                          fontSize: '0.75rem',
+                          fontSize: '0.8rem',
                           fontWeight: 700,
                           cursor: 'pointer',
                           backgroundColor: isSel ? '#ffffff' : 'transparent',
@@ -947,7 +947,7 @@ export default function Accountant() {
                       width: '100%',
                       padding: '0.38rem 0.75rem',
                       borderRadius: '6px',
-                      border: '1px solid #cbd5e1',
+                      border: '1px solid #e3e8ef',
                       fontSize: '0.78rem',
                       outline: 'none'
                     }}
@@ -1004,27 +1004,27 @@ export default function Accountant() {
                         <tr key={ret.id || rIdx} style={{ borderBottom: '1px solid #f1f5f9' }}>
                           <td style={{ padding: '0.65rem 0.85rem', fontWeight: 800, color: '#7c3aed' }}>
                             <div>{formatRmaCode(ret, rIdx + 1)}</div>
-                            <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>Đơn: #{ret.orderId}</span>
+                            <span style={{ fontSize: '0.77rem', color: '#64748b', fontWeight: 600 }}>Đơn: #{ret.orderId}</span>
                           </td>
                           <td style={{ padding: '0.65rem 0.85rem' }}>
                             <strong style={{ color: '#0f172a', display: 'block' }}>{ret.customerName}</strong>
-                            <span style={{ fontSize: '0.74rem', color: '#64748b' }}>{ret.phone || 'N/A'}</span>
+                            <span style={{ fontSize: '0.79rem', color: '#64748b' }}>{ret.phone || 'N/A'}</span>
                           </td>
                           <td style={{ padding: '0.65rem 0.85rem' }}>
                             <div style={{ fontWeight: 700, color: '#0f172a' }}>{ret.bankName || 'MB Bank'}</div>
                             <div style={{ fontSize: '0.78rem', color: '#2563eb', fontWeight: 800, fontFamily: 'monospace' }}>{ret.bankAccountNo || 'Chưa cung cấp STK'}</div>
-                            <div style={{ fontSize: '0.72rem', color: '#64748b', textTransform: 'uppercase' }}>{ret.bankAccountName || ret.customerName}</div>
+                            <div style={{ fontSize: '0.77rem', color: '#64748b', textTransform: 'uppercase' }}>{ret.bankAccountName || ret.customerName}</div>
                           </td>
                           <td style={{ padding: '0.65rem 0.85rem', textAlign: 'right', fontWeight: 800, color: '#16a34a', fontSize: '0.95rem' }}>
                             {fmt(refundAmount)}
                           </td>
                           <td style={{ padding: '0.65rem 0.85rem' }}>
                             {isRefunded ? (
-                              <span style={{ backgroundColor: '#f0fdf4', color: '#15803d', border: '1px solid #86efac', padding: '3px 8px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 800 }}>
+                              <span style={{ backgroundColor: '#f0fdf4', color: '#15803d', border: '1px solid #86efac', padding: '3px 8px', borderRadius: '4px', fontSize: '0.77rem', fontWeight: 800 }}>
                                 ĐÃ HOÀN TIỀN
                               </span>
                             ) : (
-                              <span style={{ backgroundColor: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca', padding: '3px 8px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 800 }}>
+                              <span style={{ backgroundColor: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca', padding: '3px 8px', borderRadius: '4px', fontSize: '0.77rem', fontWeight: 800 }}>
                                 CHỜ GIẢI NGÂN
                               </span>
                             )}
@@ -1040,7 +1040,7 @@ export default function Accountant() {
                                   border: '1px solid #ddd6fe',
                                   borderRadius: '6px',
                                   padding: '0.35rem 0.65rem',
-                                  fontSize: '0.74rem',
+                                  fontSize: '0.79rem',
                                   fontWeight: 700,
                                   cursor: 'pointer'
                                 }}
@@ -1056,7 +1056,7 @@ export default function Accountant() {
                                   border: '1px solid #bfdbfe',
                                   borderRadius: '6px',
                                   padding: '0.35rem 0.65rem',
-                                  fontSize: '0.74rem',
+                                  fontSize: '0.79rem',
                                   fontWeight: 700,
                                   cursor: 'pointer'
                                 }}
@@ -1078,7 +1078,7 @@ export default function Accountant() {
                                     border: 'none',
                                     borderRadius: '6px',
                                     padding: '0.35rem 0.75rem',
-                                    fontSize: '0.74rem',
+                                    fontSize: '0.79rem',
                                     fontWeight: 800,
                                     cursor: 'pointer'
                                   }}
@@ -1095,7 +1095,7 @@ export default function Accountant() {
                                     border: '1px solid #86efac',
                                     borderRadius: '6px',
                                     padding: '0.35rem 0.65rem',
-                                    fontSize: '0.74rem',
+                                    fontSize: '0.79rem',
                                     fontWeight: 800,
                                     cursor: 'pointer'
                                   }}
@@ -1130,7 +1130,7 @@ export default function Accountant() {
                 style={{
                   backgroundColor: '#ffffff',
                   borderRadius: '10px',
-                  border: '1px solid #cbd5e1',
+                  border: '1px solid #e3e8ef',
                   padding: '1.1rem 1.25rem',
                   display: 'flex',
                   flexDirection: 'column',
@@ -1141,7 +1141,7 @@ export default function Accountant() {
                 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
+                  <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
                     {st.label}
                   </span>
                   <div style={{ width: '36px', height: '36px', borderRadius: '8px', backgroundColor: st.bg, color: st.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -1153,7 +1153,7 @@ export default function Accountant() {
                   <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {st.value}
                   </div>
-                  <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.15rem' }}>
+                  <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.15rem' }}>
                     {st.change}
                   </div>
                 </div>
@@ -1163,7 +1163,7 @@ export default function Accountant() {
 
           {/* Charts Row */}
           <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.8fr', gap: '1.25rem', marginBottom: '1.25rem' }}>
-            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem', height: '320px', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1.25rem', height: '320px', display: 'flex', flexDirection: 'column' }}>
               <h3 style={{ fontSize: '0.92rem', fontWeight: 800, color: '#0f172a', margin: '0 0 1rem 0' }}>
                 Cơ Cấu Dòng Tiền Thu & Chi
               </h3>
@@ -1179,7 +1179,7 @@ export default function Accountant() {
               </div>
             </div>
 
-            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem', height: '320px', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1.25rem', height: '320px', display: 'flex', flexDirection: 'column' }}>
               <h3 style={{ fontSize: '0.92rem', fontWeight: 800, color: '#0f172a', margin: '0 0 1rem 0' }}>
                 Biến Động Doanh Thu & Chi Phí Theo Tháng
               </h3>
@@ -1202,7 +1202,7 @@ export default function Accountant() {
 
           {/* Quick Hub: Unpaid POs, Pending Payroll & P&L Card */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1.25rem' }}>
-            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem' }}>
+            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1.25rem' }}>
               <h3 style={{ fontSize: '0.9rem', fontWeight: 800, color: '#0f172a', margin: '0 0 0.85rem 0' }}>
                 Đơn Mua Hàng Cần Thanh Toán
               </h3>
@@ -1211,11 +1211,11 @@ export default function Accountant() {
                   <div key={po.id || pIdx} style={{ padding: '0.55rem 0.75rem', borderRadius: '6px', border: '1px solid #e2e8f0', backgroundColor: '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
                       <strong style={{ fontSize: '0.8rem', color: '#0f172a' }}>{po.poNumber || `PO-${po.id}`}</strong>
-                      <span style={{ fontSize: '0.7rem', color: '#64748b', display: 'block' }}>{fmt((getPoBill(po)?.amountDue) ?? po.totalAmount)}</span>
+                      <span style={{ fontSize: '0.75rem', color: '#64748b', display: 'block' }}>{fmt((getPoBill(po)?.amountDue) ?? po.totalAmount)}</span>
                     </div>
                     <button
                       onClick={() => setTab('po_payments')}
-                      style={{ backgroundColor: '#f59e0b', color: '#ffffff', border: 'none', borderRadius: '4px', padding: '0.25rem 0.55rem', fontSize: '0.7rem', fontWeight: 800, cursor: 'pointer' }}
+                      style={{ backgroundColor: '#f59e0b', color: '#ffffff', border: 'none', borderRadius: '4px', padding: '0.25rem 0.55rem', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer' }}
                     >
                       Chi Trả
                     </button>
@@ -1224,7 +1224,7 @@ export default function Accountant() {
               </div>
             </div>
 
-            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem' }}>
+            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1.25rem' }}>
               <h3 style={{ fontSize: '0.9rem', fontWeight: 800, color: '#0f172a', margin: '0 0 0.85rem 0' }}>
                 Bảng Lương Chờ Chi Trả
               </h3>
@@ -1235,14 +1235,14 @@ export default function Accountant() {
                 </div>
                 <button
                   onClick={() => setTab('payroll_disbursement')}
-                  style={{ backgroundColor: '#16a34a', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.45rem', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer' }}
+                  style={{ backgroundColor: '#16a34a', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.45rem', fontSize: '0.8rem', fontWeight: 800, cursor: 'pointer' }}
                 >
                   Giải Ngân Bảng Lương
                 </button>
               </div>
             </div>
 
-            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem' }}>
+            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1.25rem' }}>
               <h3 style={{ fontSize: '0.9rem', fontWeight: 800, color: '#0f172a', margin: '0 0 0.85rem 0' }}>
                 Báo Cáo Tài Chính P&L
               </h3>
@@ -1253,7 +1253,7 @@ export default function Accountant() {
                 </div>
                 <button
                   onClick={() => setTab('reports')}
-                  style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.45rem', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer' }}
+                  style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.45rem', fontSize: '0.8rem', fontWeight: 800, cursor: 'pointer' }}
                 >
                   Xem Báo Cáo P&L & VAT →
                 </button>
@@ -1264,14 +1264,14 @@ export default function Accountant() {
           {/* ========================================================================= */}
           {/* TÀI KHOẢN NGÂN HÀNG DOANH NGHIỆP (TRA CỨU & NGUỒN TIỀN - SOD) */}
           {/* ========================================================================= */}
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem', marginTop: '1.25rem' }}>
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1.25rem', marginTop: '1.25rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
               <div>
                 <h3 style={{ fontSize: '0.92rem', fontWeight: 800, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                   <Building2 size={18} style={{ color: '#2563eb' }} />
                   <span>Tài Khoản Doanh Nghiệp Nhận & Chi Tiền (Chế Độ Tra Cứu)</span>
                 </h3>
-                <p style={{ fontSize: '0.75rem', color: '#64748b', margin: '0.2rem 0 0' }}>
+                <p style={{ fontSize: '0.8rem', color: '#64748b', margin: '0.2rem 0 0' }}>
                   Theo chính sách Phân nhiệm Kiểm soát nội bộ (SoD), việc Thêm/Sửa/Xóa tài khoản và cấu hình VietQR thu tiền chỉ được thực hiện bởi Ban Giám Đốc (CEO) & Quản Trị Hệ Thống (ADMIN).
                 </p>
               </div>
@@ -1300,22 +1300,22 @@ export default function Accountant() {
                         <div style={{ fontFamily: 'monospace', fontWeight: 800, color: '#2563eb', fontSize: '1.05rem', marginTop: '0.25rem', letterSpacing: '0.04em' }}>
                           {b.accountNumber}
                         </div>
-                        <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#334155', marginTop: '0.2rem' }}>
+                        <div style={{ fontSize: '0.8rem', fontWeight: 600, color: '#334155', marginTop: '0.2rem' }}>
                           {b.accountHolder}
                         </div>
                         {b.branch && (
-                          <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '0.15rem' }}>
+                          <div style={{ fontSize: '0.77rem', color: '#64748b', marginTop: '0.15rem' }}>
                             CN: {b.branch}
                           </div>
                         )}
                         {b.purpose && (
-                          <div style={{ fontSize: '0.7rem', color: '#475569', marginTop: '0.2rem', fontStyle: 'italic' }}>
+                          <div style={{ fontSize: '0.75rem', color: '#475569', marginTop: '0.2rem', fontStyle: 'italic' }}>
                             {b.purpose}
                           </div>
                         )}
                       </div>
                       {b.isDefaultQr && (
-                        <span style={{ backgroundColor: '#2563eb', color: '#ffffff', fontSize: '0.68rem', fontWeight: 800, padding: '3px 7px', borderRadius: '4px' }}>
+                        <span style={{ backgroundColor: '#2563eb', color: '#ffffff', fontSize: '0.74rem', fontWeight: 800, padding: '3px 7px', borderRadius: '4px' }}>
                           ★ VietQR Mặc Định
                         </span>
                       )}
@@ -1333,7 +1333,7 @@ export default function Accountant() {
       {/* TAB 2: LEDGER (SỔ CÁI DÒNG TIỀN) */}
       {/* ========================================================================= */}
       {activeTab === 'ledger' && (
-        <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem' }}>
+        <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1.25rem' }}>
           
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1.25rem' }}>
             <div style={{ position: 'relative', width: '320px' }}>
@@ -1342,7 +1342,7 @@ export default function Accountant() {
                 placeholder="Tìm giao dịch, mã đơn, nội dung thu chi..."
                 value={search}
                 onChange={e => setSearch(e.target.value)}
-                style={{ width: '100%', padding: '0.45rem 0.65rem 0.45rem 2rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem' }}
+                style={{ width: '100%', padding: '0.45rem 0.65rem 0.45rem 2rem', borderRadius: '6px', border: '1px solid #e3e8ef', fontSize: '0.82rem' }}
               />
               <Search size={15} style={{ position: 'absolute', left: '0.6rem', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
             </div>
@@ -1352,7 +1352,7 @@ export default function Accountant() {
               <select
                 value={typeFilter}
                 onChange={e => setTypeFilter(e.target.value)}
-                style={{ padding: '0.4rem 0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.78rem', color: '#0f172a' }}
+                style={{ padding: '0.4rem 0.65rem', borderRadius: '6px', border: '1px solid #e3e8ef', fontSize: '0.78rem', color: '#0f172a' }}
               >
                 <option value="ALL">Tất cả bút toán</option>
                 <option value="INCOME">Thu tiền (+) (Bán hàng, Khác)</option>
@@ -1430,7 +1430,7 @@ export default function Accountant() {
                           <span style={{
                             padding: '3px 8px',
                             borderRadius: '4px',
-                            fontSize: '0.7rem',
+                            fontSize: '0.75rem',
                             fontWeight: 800,
                             display: 'inline-block',
                             backgroundColor: isIncome ? '#f0fdf4' : isRefund ? '#fff7ed' : '#fef2f2',
@@ -1439,7 +1439,7 @@ export default function Accountant() {
                           }}>
                             {isIncome ? '▲ Thu Tiền' : isRefund ? '▼ Hoàn Tiền' : '▼ Chi Tiền'}
                           </span>
-                          <div style={{ marginTop: '0.25rem', fontSize: '0.68rem', color: '#64748b' }}>
+                          <div style={{ marginTop: '0.25rem', fontSize: '0.74rem', color: '#64748b' }}>
                             {tx.channel === 'CASH' ? (
                               <span style={{ backgroundColor: '#f1f5f9', padding: '2px 6px', borderRadius: '3px', fontWeight: 600 }}>💵 Tiền mặt</span>
                             ) : tx.bankAccount ? (
@@ -1466,7 +1466,7 @@ export default function Accountant() {
                               border: '1px solid #bfdbfe',
                               borderRadius: '6px',
                               padding: '0.3rem 0.65rem',
-                              fontSize: '0.74rem',
+                              fontSize: '0.79rem',
                               fontWeight: 700,
                               cursor: 'pointer',
                               display: 'inline-flex',
@@ -1496,7 +1496,7 @@ export default function Accountant() {
       {/* TAB 3: PO PAYMENTS (THANH TOÁN ĐƠN MUA HÀNG) */}
       {/* ========================================================================= */}
       {activeTab === 'po_payments' && (
-        <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem' }}>
+        <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1.25rem' }}>
           <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
             <ShoppingBag size={18} style={{ color: '#f59e0b' }} />
             <span>Danh Sách Đơn Mua Hàng Cần Thanh Toán Cho Nhà Cung Cấp</span>
@@ -1530,23 +1530,23 @@ export default function Accountant() {
                       <td style={{ padding: '0.65rem 0.85rem', fontWeight: 700, color: '#2563eb' }}>{po.poNumber || `PO-${po.id}`}</td>
                       <td style={{ padding: '0.65rem 0.85rem', fontWeight: 700, color: '#0f172a' }}>{po.supplier?.name || po.supplierCode || 'Chưa rõ NCC'}</td>
                       <td style={{ padding: '0.65rem 0.85rem' }}>
-                        <span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 700, backgroundColor: poStatusInfo.bg, color: poStatusInfo.color, border: `1px solid ${poStatusInfo.border}` }}>
+                        <span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 700, backgroundColor: poStatusInfo.bg, color: poStatusInfo.color, border: `1px solid ${poStatusInfo.border}` }}>
                           {poStatusInfo.label}
                         </span>
                       </td>
                       <td style={{ padding: '0.65rem 0.85rem', textAlign: 'right', fontWeight: 800, color: '#0f172a' }}>
                         {fmt(displayAmount)}
                         {bill && Number(bill.amountTotal) !== Number(po.totalAmount) && (
-                          <div style={{ fontSize: '0.68rem', color: '#b45309', fontWeight: 600 }}>Đã điều chỉnh theo QC (gốc {fmt(po.totalAmount)})</div>
+                          <div style={{ fontSize: '0.74rem', color: '#b45309', fontWeight: 600 }}>Đã điều chỉnh theo QC (gốc {fmt(po.totalAmount)})</div>
                         )}
                       </td>
                       <td style={{ padding: '0.65rem 0.85rem' }}>
                         {billStatusInfo ? (
-                          <span style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 800, backgroundColor: billStatusInfo.bg, color: billStatusInfo.color, border: `1px solid ${billStatusInfo.border}` }}>
+                          <span style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 800, backgroundColor: billStatusInfo.bg, color: billStatusInfo.color, border: `1px solid ${billStatusInfo.border}` }}>
                             {billStatusInfo.label}{bill.amountDue > 0 ? ` — Còn nợ ${fmt(bill.amountDue)}` : ''}
                           </span>
                         ) : (
-                          <span style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 800, backgroundColor: '#f1f5f9', color: '#64748b' }}>
+                          <span style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 800, backgroundColor: '#f1f5f9', color: '#64748b' }}>
                             Chưa Lập Hóa Đơn
                           </span>
                         )}
@@ -1556,7 +1556,7 @@ export default function Accountant() {
                           <button
                             onClick={() => handleCreateBill(po)}
                             disabled={isBusy}
-                            style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '4px', padding: '0.35rem 0.75rem', fontSize: '0.75rem', fontWeight: 800, cursor: isBusy ? 'default' : 'pointer', opacity: isBusy ? 0.6 : 1 }}
+                            style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '4px', padding: '0.35rem 0.75rem', fontSize: '0.8rem', fontWeight: 800, cursor: isBusy ? 'default' : 'pointer', opacity: isBusy ? 0.6 : 1 }}
                           >
                             {isBusy ? 'Đang xử lý...' : 'Lập Hóa Đơn'}
                           </button>
@@ -1564,12 +1564,12 @@ export default function Accountant() {
                           <button
                             onClick={() => handleRegisterPayment(po)}
                             disabled={isBusy}
-                            style={{ backgroundColor: '#16a34a', color: '#ffffff', border: 'none', borderRadius: '4px', padding: '0.35rem 0.75rem', fontSize: '0.75rem', fontWeight: 800, cursor: isBusy ? 'default' : 'pointer', opacity: isBusy ? 0.6 : 1 }}
+                            style={{ backgroundColor: '#16a34a', color: '#ffffff', border: 'none', borderRadius: '4px', padding: '0.35rem 0.75rem', fontSize: '0.8rem', fontWeight: 800, cursor: isBusy ? 'default' : 'pointer', opacity: isBusy ? 0.6 : 1 }}
                           >
                             {isBusy ? 'Đang xử lý...' : 'Chi Trả Ngay'}
                           </button>
                         ) : (
-                          <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Hoàn tất</span>
+                          <span style={{ fontSize: '0.8rem', color: '#64748b' }}>Hoàn tất</span>
                         )}
                       </td>
                     </tr>
@@ -1620,9 +1620,9 @@ export default function Accountant() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
             {/* 3 Overview KPI Cards */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
-              <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1rem 1.25rem' }}>
+              <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1rem 1.25rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#b45309', textTransform: 'uppercase' }}>
+                  <span style={{ fontSize: '0.79rem', fontWeight: 800, color: '#b45309', textTransform: 'uppercase' }}>
                     Tiền Mặt COD Đang Chờ Thu
                   </span>
                   <div style={{ width: '30px', height: '30px', borderRadius: '6px', backgroundColor: '#fef3c7', color: '#d97706', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -1632,14 +1632,14 @@ export default function Accountant() {
                 <div style={{ fontSize: '1.45rem', fontWeight: 900, color: '#b45309', marginTop: '0.35rem' }}>
                   {fmt(totalPendingAmount)}
                 </div>
-                <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '0.2rem' }}>
+                <div style={{ fontSize: '0.79rem', color: '#64748b', marginTop: '0.2rem' }}>
                   {totalPendingOrders} đơn hàng đang giữ bởi {codGroups.length} shipper
                 </div>
               </div>
 
-              <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1rem 1.25rem' }}>
+              <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1rem 1.25rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#15803d', textTransform: 'uppercase' }}>
+                  <span style={{ fontSize: '0.79rem', fontWeight: 800, color: '#15803d', textTransform: 'uppercase' }}>
                     Đã Thu Hồi Nhập Quỹ (30 Ngày)
                   </span>
                   <div style={{ width: '30px', height: '30px', borderRadius: '6px', backgroundColor: '#dcfce7', color: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -1649,14 +1649,14 @@ export default function Accountant() {
                 <div style={{ fontSize: '1.45rem', fontWeight: 900, color: '#16a34a', marginTop: '0.35rem' }}>
                   {fmt(totalSettledAmount)}
                 </div>
-                <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '0.2rem' }}>
+                <div style={{ fontSize: '0.79rem', color: '#64748b', marginTop: '0.2rem' }}>
                   Đã đối soát & hạch toán vào sổ cái công ty
                 </div>
               </div>
 
-              <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1rem 1.25rem' }}>
+              <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1rem 1.25rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#2563eb', textTransform: 'uppercase' }}>
+                  <span style={{ fontSize: '0.79rem', fontWeight: 800, color: '#2563eb', textTransform: 'uppercase' }}>
                     Tỷ Lệ Hoàn Tất Đối Soát
                   </span>
                   <div style={{ width: '30px', height: '30px', borderRadius: '6px', backgroundColor: '#dbeafe', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -1668,14 +1668,14 @@ export default function Accountant() {
                     ? `${Math.round((codHistory.length / (totalPendingOrders + codHistory.length)) * 100)}%`
                     : '100%'}
                 </div>
-                <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '0.2rem' }}>
+                <div style={{ fontSize: '0.79rem', color: '#64748b', marginTop: '0.2rem' }}>
                   {codHistory.length} / {totalPendingOrders + codHistory.length} đơn COD đã thanh toán
                 </div>
               </div>
             </div>
 
             {/* Main Content Box */}
-            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem' }}>
+            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1.25rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
                 {/* Sub-Tabs: PENDING vs HISTORY */}
                 <div style={{ display: 'inline-flex', backgroundColor: '#f1f5f9', padding: '3px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
@@ -1729,7 +1729,7 @@ export default function Accountant() {
                         width: '100%',
                         padding: '0.38rem 0.75rem',
                         borderRadius: '6px',
-                        border: '1px solid #cbd5e1',
+                        border: '1px solid #e3e8ef',
                         fontSize: '0.78rem',
                         outline: 'none'
                       }}
@@ -1762,7 +1762,7 @@ export default function Accountant() {
                       style={{
                         backgroundColor: '#ffffff',
                         color: '#0f172a',
-                        border: '1px solid #cbd5e1',
+                        border: '1px solid #e3e8ef',
                         borderRadius: '6px',
                         padding: '0.38rem 0.75rem',
                         fontSize: '0.78rem',
@@ -1781,7 +1781,7 @@ export default function Accountant() {
                   <button
                     onClick={loadCodSettlement}
                     disabled={loadingCod}
-                    style={{ backgroundColor: '#ffffff', color: '#334155', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.38rem 0.75rem', fontSize: '0.78rem', fontWeight: 600, cursor: loadingCod ? 'default' : 'pointer', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+                    style={{ backgroundColor: '#ffffff', color: '#334155', border: '1px solid #e3e8ef', borderRadius: '6px', padding: '0.38rem 0.75rem', fontSize: '0.78rem', fontWeight: 600, cursor: loadingCod ? 'default' : 'pointer', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
                   >
                     <RefreshCw size={13} style={{ animation: loadingCod ? 'spin 1s linear infinite' : 'none' }} />
                     <span>Làm Mới</span>
@@ -1808,12 +1808,12 @@ export default function Accountant() {
                               <Truck size={18} style={{ color: '#d97706' }} />
                               <div>
                                 <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.92rem' }}>{group.shipperName}</div>
-                                <div style={{ fontSize: '0.74rem', color: '#b45309' }}>{group.orders.length} đơn COD tiền mặt chưa nộp</div>
+                                <div style={{ fontSize: '0.79rem', color: '#b45309' }}>{group.orders.length} đơn COD tiền mặt chưa nộp</div>
                               </div>
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                               <div style={{ textAlign: 'right' }}>
-                                <div style={{ fontSize: '0.72rem', color: '#92400e' }}>Tổng tiền mặt đang giữ</div>
+                                <div style={{ fontSize: '0.77rem', color: '#92400e' }}>Tổng tiền mặt đang giữ</div>
                                 <div style={{ fontWeight: 900, color: '#b45309', fontSize: '1.1rem' }}>{fmt(group.totalAmount)}</div>
                               </div>
                               <button
@@ -1828,7 +1828,7 @@ export default function Accountant() {
                           </div>
                           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
                             <thead>
-                              <tr style={{ textAlign: 'left', color: '#64748b', fontSize: '0.72rem', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+                              <tr style={{ textAlign: 'left', color: '#64748b', fontSize: '0.77rem', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
                                 <th style={{ padding: '0.5rem 1rem' }}>Mã Đơn</th>
                                 <th style={{ padding: '0.5rem 1rem' }}>Khách Hàng & SĐT</th>
                                 <th style={{ padding: '0.5rem 1rem' }}>Địa Chỉ Giao</th>
@@ -1842,10 +1842,10 @@ export default function Accountant() {
                                   <td style={{ padding: '0.55rem 1rem', fontWeight: 700, color: '#2563eb' }}>#{o.orderId}</td>
                                   <td style={{ padding: '0.55rem 1rem', color: '#0f172a' }}>
                                     <div>{o.customerName || 'Khách hàng'}</div>
-                                    {o.customerPhone && <span style={{ fontSize: '0.7rem', color: '#64748b' }}>{o.customerPhone}</span>}
+                                    {o.customerPhone && <span style={{ fontSize: '0.75rem', color: '#64748b' }}>{o.customerPhone}</span>}
                                   </td>
-                                  <td style={{ padding: '0.55rem 1rem', color: '#64748b', fontSize: '0.75rem' }}>{o.shippingAddress}</td>
-                                  <td style={{ padding: '0.55rem 1rem', color: '#64748b', fontSize: '0.75rem' }}>{o.deliveredAt ? new Date(o.deliveredAt).toLocaleDateString('vi-VN') : '-'}</td>
+                                  <td style={{ padding: '0.55rem 1rem', color: '#64748b', fontSize: '0.8rem' }}>{o.shippingAddress}</td>
+                                  <td style={{ padding: '0.55rem 1rem', color: '#64748b', fontSize: '0.8rem' }}>{o.deliveredAt ? new Date(o.deliveredAt).toLocaleDateString('vi-VN') : '-'}</td>
                                   <td style={{ padding: '0.55rem 1rem', textAlign: 'right', fontWeight: 800, color: '#0f172a' }}>{fmt(o.amount)}</td>
                                 </tr>
                               ))}
@@ -1866,7 +1866,7 @@ export default function Accountant() {
                   ) : (
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
                       <thead>
-                        <tr style={{ textAlign: 'left', color: '#64748b', fontSize: '0.72rem', backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
+                        <tr style={{ textAlign: 'left', color: '#64748b', fontSize: '0.77rem', backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
                           <th style={{ padding: '0.65rem 0.85rem' }}>Mã Đơn</th>
                           <th style={{ padding: '0.65rem 0.85rem' }}>Shipper Bàn Giao</th>
                           <th style={{ padding: '0.65rem 0.85rem' }}>Khách Hàng</th>
@@ -1883,12 +1883,12 @@ export default function Accountant() {
                             <td style={{ padding: '0.65rem 0.85rem', fontWeight: 700, color: '#0f172a' }}>{h.shipperName}</td>
                             <td style={{ padding: '0.65rem 0.85rem', color: '#475569' }}>{h.customerName || 'Khách hàng'}</td>
                             <td style={{ padding: '0.65rem 0.85rem', textAlign: 'right', fontWeight: 800, color: '#16a34a' }}>{fmt(h.amount)}</td>
-                            <td style={{ padding: '0.65rem 0.85rem', color: '#64748b', fontSize: '0.75rem' }}>
+                            <td style={{ padding: '0.65rem 0.85rem', color: '#64748b', fontSize: '0.8rem' }}>
                               {h.settledAt ? new Date(h.settledAt).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' }) : '-'}
                             </td>
                             <td style={{ padding: '0.65rem 0.85rem', color: '#0f172a', fontWeight: 600 }}>{h.settledBy || 'Kế toán viên'}</td>
                             <td style={{ padding: '0.65rem 0.85rem', textAlign: 'center' }}>
-                              <span style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '0.68rem', fontWeight: 800, backgroundColor: '#dcfce7', color: '#15803d', border: '1px solid #86efac' }}>
+                              <span style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '0.74rem', fontWeight: 800, backgroundColor: '#dcfce7', color: '#15803d', border: '1px solid #86efac' }}>
                                 ĐÃ NHẬP QUỸ
                               </span>
                             </td>
@@ -1908,7 +1908,7 @@ export default function Accountant() {
       {/* TAB 4: PAYROLL DISBURSEMENT (CHI TRẢ BẢNG LƯƠNG) */}
       {/* ========================================================================= */}
       {activeTab === 'payroll_disbursement' && (
-        <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem' }}>
+        <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1.25rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
             <div>
               <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
@@ -1958,12 +1958,12 @@ export default function Accountant() {
                       <td style={{ padding: '0.65rem 0.85rem', textAlign: 'right', color: '#475569' }}>{fmt(p.salary)}</td>
                       <td style={{ padding: '0.65rem 0.85rem', textAlign: 'right', color: netAdjust >= 0 ? '#16a34a' : '#dc2626' }}>{netAdjust >= 0 ? '+' : ''}{fmt(netAdjust)}</td>
                       <td style={{ padding: '0.65rem 0.85rem', textAlign: 'right', fontWeight: 800, color: '#0f172a' }}>{fmt(p.netAmount)}</td>
-                      <td style={{ padding: '0.65rem 0.85rem', fontSize: '0.72rem', color: isPaid ? '#16a34a' : isReady ? '#2563eb' : '#b45309' }}>
+                      <td style={{ padding: '0.65rem 0.85rem', fontSize: '0.77rem', color: isPaid ? '#16a34a' : isReady ? '#2563eb' : '#b45309' }}>
                         {isPaid ? 'Đã Chi Trả' : isReady ? 'Sẵn Sàng Chi Trả' : getStatusLabel(PAYROLL_STATUS, p.status)}
                       </td>
                       <td style={{ padding: '0.65rem 0.85rem', textAlign: 'center' }}>
                         {isPaid ? (
-                          <span style={{ fontSize: '0.72rem', color: '#64748b' }}>Hoàn tất</span>
+                          <span style={{ fontSize: '0.77rem', color: '#64748b' }}>Hoàn tất</span>
                         ) : (
                           <button
                             disabled={!isReady || isBusy}
@@ -1978,7 +1978,7 @@ export default function Accountant() {
                               }
                             }}
                             title={!isReady ? 'Cần CEO duyệt trước khi chi trả' : undefined}
-                            style={{ backgroundColor: (!isReady || isBusy) ? '#9ca3af' : '#2563eb', color: '#ffffff', border: 'none', borderRadius: '4px', padding: '0.3rem 0.65rem', fontSize: '0.72rem', fontWeight: 700, cursor: (!isReady || isBusy) ? 'default' : 'pointer' }}
+                            style={{ backgroundColor: (!isReady || isBusy) ? '#9ca3af' : '#2563eb', color: '#ffffff', border: 'none', borderRadius: '4px', padding: '0.3rem 0.65rem', fontSize: '0.77rem', fontWeight: 700, cursor: (!isReady || isBusy) ? 'default' : 'pointer' }}
                           >
                             {isBusy ? 'Đang xử lý...' : 'Chi Lương'}
                           </button>
@@ -2018,7 +2018,7 @@ export default function Accountant() {
           />
 
           {/* P&L Statement Card */}
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem' }}>
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1.25rem' }}>
             <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
               <FileText size={18} style={{ color: '#2563eb' }} />
               <span>Báo Cáo Kết Quả Hoạt Động Kinh Doanh</span>
@@ -2061,7 +2061,7 @@ export default function Accountant() {
           </div>
 
           {/* VAT Tax Ledger */}
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem' }}>
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1.25rem' }}>
             <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', marginBottom: '0.5rem' }}>
               Bảng Kê Thuế Giá Trị Gia Tăng (VAT 10%)
             </h3>
@@ -2087,7 +2087,7 @@ export default function Accountant() {
       {/* ================= MODAL: THÊM BÚT TOÁN THỦ CÔNG ================= */}
       {showManualModal && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(6px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', width: '100%', maxWidth: '480px', padding: '1.75rem', maxHeight: '90vh', overflowY: 'auto' }}>
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e3e8ef', width: '100%', maxWidth: '480px', padding: '1.75rem', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
               <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>Thêm Phiếu Thu / Chi Thủ Công</h3>
               <button onClick={() => setShowManualModal(false)} style={{ background: '#f1f5f9', border: 'none', padding: '0.4rem', borderRadius: '6px', cursor: 'pointer' }}><X size={18} /></button>
@@ -2099,7 +2099,7 @@ export default function Accountant() {
                 <select
                   value={manualForm.type}
                   onChange={e => setManualForm(p => ({ ...p, type: e.target.value }))}
-                  style={{ width: '100%', padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
+                  style={{ width: '100%', padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid #e3e8ef', boxSizing: 'border-box' }}
                 >
                   <option value="EXPENSE">Phiếu Chi (-)</option>
                   <option value="INCOME">Phiếu Thu (+)</option>
@@ -2113,7 +2113,7 @@ export default function Accountant() {
                   placeholder="Ví dụ: 1500000"
                   value={manualForm.amount}
                   onChange={e => setManualForm(p => ({ ...p, amount: e.target.value }))}
-                  style={{ width: '100%', padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
+                  style={{ width: '100%', padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid #e3e8ef', boxSizing: 'border-box' }}
                 />
               </div>
 
@@ -2122,7 +2122,7 @@ export default function Accountant() {
                 <select
                   value={manualForm.category}
                   onChange={e => setManualForm(p => ({ ...p, category: e.target.value }))}
-                  style={{ width: '100%', padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
+                  style={{ width: '100%', padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid #e3e8ef', boxSizing: 'border-box' }}
                 >
                   <option value="Vận hành văn phòng">Vận hành văn phòng</option>
                   <option value="Điện nước Internet">Điện nước Internet</option>
@@ -2137,7 +2137,7 @@ export default function Accountant() {
                 <select
                   value={manualForm.channel}
                   onChange={e => setManualForm(p => ({ ...p, channel: e.target.value }))}
-                  style={{ width: '100%', padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
+                  style={{ width: '100%', padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid #e3e8ef', boxSizing: 'border-box' }}
                 >
                   <option value="BANK">Tài Khoản Ngân Hàng (Chuyển khoản)</option>
                   <option value="CASH">Tiền Mặt (Quỹ tiền mặt tại két)</option>
@@ -2152,7 +2152,7 @@ export default function Accountant() {
                   <select
                     value={manualForm.bankAccountId}
                     onChange={e => setManualForm(p => ({ ...p, bankAccountId: e.target.value }))}
-                    style={{ width: '100%', padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
+                    style={{ width: '100%', padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid #e3e8ef', boxSizing: 'border-box' }}
                   >
                     {activeBankAccounts.map(b => (
                       <option key={b.id} value={b.id}>
@@ -2170,7 +2170,7 @@ export default function Accountant() {
                   placeholder="Ví dụ: Thanh toán tiền điện tháng 8"
                   value={manualForm.description}
                   onChange={e => setManualForm(p => ({ ...p, description: e.target.value }))}
-                  style={{ width: '100%', padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
+                  style={{ width: '100%', padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid #e3e8ef', boxSizing: 'border-box' }}
                 />
               </div>
 
@@ -2178,7 +2178,7 @@ export default function Accountant() {
                 <button
                   type="button"
                   onClick={() => setShowManualModal(false)}
-                  style={{ backgroundColor: '#ffffff', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.45rem 1rem', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}
+                  style={{ backgroundColor: '#ffffff', color: '#475569', border: '1px solid #e3e8ef', borderRadius: '6px', padding: '0.45rem 1rem', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}
                 >
                   Hủy
                 </button>
@@ -2200,12 +2200,12 @@ export default function Accountant() {
       {/* ================= MODAL: XEM CHỨNG TỪ SỔ CÁI ================= */}
       {viewingTxDetail && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(6px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-          <div data-print-doc style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', width: '100%', maxWidth: '560px', padding: '1.75rem', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)' }}>
+          <div data-print-doc style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e3e8ef', width: '100%', maxWidth: '560px', padding: '1.75rem', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)' }}>
             
             {/* Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #e2e8f0', paddingBottom: '0.85rem', marginBottom: '1.25rem' }}>
               <div>
-                <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                <div style={{ fontSize: '0.77rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                   CÔNG TY TNHH CÔNG NGHỆ AETHERPC • PHÒNG TÀI CHÍNH KẾ TOÁN
                 </div>
                 <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#0f172a', margin: '0.2rem 0 0' }}>
@@ -2247,7 +2247,7 @@ export default function Accountant() {
                     alignItems: 'center'
                   }}>
                     <div>
-                      <div style={{ fontSize: '0.72rem', fontWeight: 800, color: isIncome ? '#15803d' : isRefund ? '#c2410c' : '#991b1b', textTransform: 'uppercase' }}>
+                      <div style={{ fontSize: '0.77rem', fontWeight: 800, color: isIncome ? '#15803d' : isRefund ? '#c2410c' : '#991b1b', textTransform: 'uppercase' }}>
                         {isIncome ? 'Số Tiền Thực Thu (+)' : isRefund ? 'Số Tiền Hoàn Trả (-)' : 'Số Tiền Thực Chi (-)'}
                       </div>
                       <div style={{ fontSize: '1.4rem', fontWeight: 900, color: textColor, marginTop: '0.15rem' }}>
@@ -2257,7 +2257,7 @@ export default function Accountant() {
                     <span style={{
                       padding: '4px 10px',
                       borderRadius: '6px',
-                      fontSize: '0.75rem',
+                      fontSize: '0.8rem',
                       fontWeight: 800,
                       backgroundColor: '#ffffff',
                       border: `1px solid ${bannerBorder}`,
@@ -2280,31 +2280,31 @@ export default function Accountant() {
                 border: '1px solid #e2e8f0'
               }}>
                 <div>
-                  <span style={{ color: '#64748b', display: 'block', fontSize: '0.75rem' }}>Mã tham chiếu nghiệp vụ:</span>
+                  <span style={{ color: '#64748b', display: 'block', fontSize: '0.8rem' }}>Mã tham chiếu nghiệp vụ:</span>
                   <code style={{ color: '#2563eb', fontWeight: 800, fontSize: '0.85rem' }}>{viewingTxDetail.referenceId || 'N/A'}</code>
                 </div>
                 <div>
-                  <span style={{ color: '#64748b', display: 'block', fontSize: '0.75rem' }}>Thời gian hạch toán:</span>
+                  <span style={{ color: '#64748b', display: 'block', fontSize: '0.8rem' }}>Thời gian hạch toán:</span>
                   <strong style={{ color: '#0f172a' }}>{formatLedgerDate(viewingTxDetail.date || viewingTxDetail.createdAt)}</strong>
                 </div>
                 <div style={{ gridColumn: '1 / -1' }}>
-                  <span style={{ color: '#64748b', display: 'block', fontSize: '0.75rem' }}>Diễn giải nội dung thu / chi:</span>
+                  <span style={{ color: '#64748b', display: 'block', fontSize: '0.8rem' }}>Diễn giải nội dung thu / chi:</span>
                   <div style={{ color: '#0f172a', fontWeight: 600, marginTop: '0.25rem', lineHeight: '1.45', backgroundColor: '#ffffff', padding: '0.5rem 0.75rem', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
                     {viewingTxDetail.description || 'Giao dịch thu chi kế toán'}
                   </div>
                 </div>
                 <div>
-                  <span style={{ color: '#64748b', display: 'block', fontSize: '0.75rem' }}>Người lập biểu:</span>
+                  <span style={{ color: '#64748b', display: 'block', fontSize: '0.8rem' }}>Người lập biểu:</span>
                   <strong style={{ color: '#0f172a' }}>Kế Toán Viên (AetherPC Accounting)</strong>
                 </div>
                 <div>
-                  <span style={{ color: '#64748b', display: 'block', fontSize: '0.75rem' }}>Trạng thái ghi sổ:</span>
+                  <span style={{ color: '#64748b', display: 'block', fontSize: '0.8rem' }}>Trạng thái ghi sổ:</span>
                   <span style={{ color: '#16a34a', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
                     <CheckCircle size={14} /> Đã Hạch Toán Sổ Cái
                   </span>
                 </div>
                 {viewingTxDetail.id && viewingTxDetail.id.length > 12 && (
-                  <div style={{ gridColumn: '1 / -1', borderTop: '1px dashed #cbd5e1', paddingTop: '0.5rem', fontSize: '0.72rem', color: '#94a3b8' }}>
+                  <div style={{ gridColumn: '1 / -1', borderTop: '1px dashed #cbd5e1', paddingTop: '0.5rem', fontSize: '0.77rem', color: '#94a3b8' }}>
                     Mã định danh hệ thống (UUID): <span style={{ fontFamily: 'monospace' }}>{viewingTxDetail.id}</span>
                   </div>
                 )}
@@ -2318,7 +2318,7 @@ export default function Accountant() {
                   style={{
                     backgroundColor: '#ffffff',
                     color: '#0f172a',
-                    border: '1px solid #cbd5e1',
+                    border: '1px solid #e3e8ef',
                     borderRadius: '6px',
                     padding: '0.45rem 0.85rem',
                     fontSize: '0.78rem',
@@ -2359,16 +2359,16 @@ export default function Accountant() {
       {/* ================= MODAL: XEM & IN PHIẾU ĐỀ NGHỊ CHI HOÀN TIỀN ================= */}
       {viewingRefundVoucher && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(6px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-          <div data-print-doc style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', width: '100%', maxWidth: '600px', padding: '1.75rem', maxHeight: '90vh', overflowY: 'auto' }}>
+          <div data-print-doc style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e3e8ef', width: '100%', maxWidth: '600px', padding: '1.75rem', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #e2e8f0', paddingBottom: '0.85rem', marginBottom: '1.25rem' }}>
               <div>
-                <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>
+                <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>
                   CÔNG TY TNHH CÔNG NGHỆ AETHERPC • PHÒNG KẾ TOÁN
                 </div>
                 <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#0f172a', margin: '0.2rem 0 0' }}>
                   PHIẾU ĐỀ NGHỊ CHI HOÀN TIỀN
                 </h3>
-                <div style={{ fontSize: '0.75rem', color: '#2563eb', fontWeight: 700, marginTop: '2px' }}>
+                <div style={{ fontSize: '0.8rem', color: '#2563eb', fontWeight: 700, marginTop: '2px' }}>
                   Số phiếu: {formatRmaCode(viewingRefundVoucher)} (Đơn: #{viewingRefundVoucher.orderId})
                 </div>
               </div>
@@ -2385,17 +2385,17 @@ export default function Accountant() {
 
               {/* Bank Transfer Details */}
               <div style={{ padding: '0.85rem', backgroundColor: '#f0fdf4', border: '1px solid #86efac', borderRadius: '8px' }}>
-                <div style={{ fontSize: '0.76rem', color: '#15803d', fontWeight: 800, textTransform: 'uppercase' }}>
+                <div style={{ fontSize: '0.8rem', color: '#15803d', fontWeight: 800, textTransform: 'uppercase' }}>
                   Thông Tin Thụ Hưởng Giải Ngân Chuyển Khoản (Napas247)
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.4rem', flexWrap: 'wrap', gap: '0.4rem' }}>
                   <div>
                     <div style={{ fontSize: '0.82rem', color: '#0f172a', fontWeight: 700 }}>{viewingRefundVoucher.bankName || 'MB Bank'}</div>
                     <div style={{ fontSize: '0.95rem', color: '#2563eb', fontWeight: 800, fontFamily: 'monospace' }}>{viewingRefundVoucher.bankAccountNo || 'Chưa có STK'}</div>
-                    <div style={{ fontSize: '0.74rem', color: '#64748b', textTransform: 'uppercase' }}>{viewingRefundVoucher.bankAccountName || viewingRefundVoucher.customerName}</div>
+                    <div style={{ fontSize: '0.79rem', color: '#64748b', textTransform: 'uppercase' }}>{viewingRefundVoucher.bankAccountName || viewingRefundVoucher.customerName}</div>
                   </div>
                   <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: '0.72rem', color: '#64748b' }}>Số tiền hoàn 100%:</div>
+                    <div style={{ fontSize: '0.77rem', color: '#64748b' }}>Số tiền hoàn 100%:</div>
                     <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#16a34a' }}>
                       {fmt(parseFloat(viewingRefundVoucher.refundAmount || viewingRefundVoucher.totalAmount || 0))}
                     </div>
@@ -2404,7 +2404,7 @@ export default function Accountant() {
               </div>
 
               {/* Department Verification Checkmarks */}
-              <div style={{ padding: '0.65rem 0.85rem', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '0.75rem', color: '#334155' }}>
+              <div style={{ padding: '0.65rem 0.85rem', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '0.8rem', color: '#334155' }}>
                 <div style={{ fontWeight: 700, color: '#0f172a', marginBottom: '0.3rem' }}>Xác Nhận Trách Nhiệm Các Bộ Phận:</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
                   <div><strong>Shipper:</strong> Đã tiếp nhận và bàn giao kiện hàng nguyên vẹn về kho.</div>
@@ -2418,7 +2418,7 @@ export default function Accountant() {
                 <button
                   type="button"
                   onClick={(e) => printDocument(e.currentTarget.closest('[data-print-doc]'), { title: 'Chứng từ kế toán' })}
-                  style={{ backgroundColor: '#ffffff', color: '#0f172a', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.45rem 0.85rem', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+                  style={{ backgroundColor: '#ffffff', color: '#0f172a', border: '1px solid #e3e8ef', borderRadius: '6px', padding: '0.45rem 0.85rem', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
                 >
                   <Printer size={15} /> In Phiếu Chi
                 </button>
@@ -2462,7 +2462,7 @@ export default function Accountant() {
       {/* ================= MODAL: VIETQR NAPAS247 HOÀN TIỀN ================= */}
       {qrModalItem && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(6px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', width: '100%', maxWidth: '440px', padding: '1.5rem', maxHeight: '90vh', overflowY: 'auto', textAlign: 'center' }}>
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e3e8ef', width: '100%', maxWidth: '440px', padding: '1.5rem', maxHeight: '90vh', overflowY: 'auto', textAlign: 'center' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
               <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>Mã VietQR 24/7 Hoàn Tiền</h3>
               <button onClick={() => setQrModalItem(null)} style={{ background: '#f1f5f9', border: 'none', padding: '0.4rem', borderRadius: '6px', cursor: 'pointer' }}><X size={18} /></button>
@@ -2503,7 +2503,7 @@ export default function Accountant() {
                     <button
                       type="button"
                       onClick={() => setQrModalItem(null)}
-                      style={{ flex: 1, backgroundColor: '#ffffff', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.45rem', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}
+                      style={{ flex: 1, backgroundColor: '#ffffff', color: '#475569', border: '1px solid #e3e8ef', borderRadius: '6px', padding: '0.45rem', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}
                     >
                       Đóng
                     </button>
@@ -2531,7 +2531,7 @@ export default function Accountant() {
       {/* ================= MODAL: XÁC NHẬN GIẢI NGÂN HOÀN TIỀN & GHI SỔ CÁI ================= */}
       {refundModalItem && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(6px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', width: '100%', maxWidth: '500px', padding: '1.5rem', maxHeight: '90vh', overflowY: 'auto' }}>
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e3e8ef', width: '100%', maxWidth: '500px', padding: '1.5rem', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.75rem' }}>
               <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>Xác Nhận Đã Hoàn Tiền Khách Hàng</h3>
               <button onClick={() => setRefundModalItem(null)} style={{ background: '#f1f5f9', border: 'none', padding: '0.4rem', borderRadius: '6px', cursor: 'pointer' }}><X size={18} /></button>
@@ -2543,10 +2543,10 @@ export default function Accountant() {
                 <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#16a34a', marginTop: '0.2rem' }}>
                   {fmt(parseFloat(refundModalItem.refundAmount || refundModalItem.totalAmount || 0))}
                 </div>
-                <div style={{ fontSize: '0.75rem', color: '#475569', marginTop: '0.25rem' }}>
+                <div style={{ fontSize: '0.8rem', color: '#475569', marginTop: '0.25rem' }}>
                   Khách: <strong>{refundModalItem.customerName}</strong> ({refundModalItem.phone})
                 </div>
-                <div style={{ fontSize: '0.75rem', color: '#475569' }}>
+                <div style={{ fontSize: '0.8rem', color: '#475569' }}>
                   Tài khoản: <strong>{refundModalItem.bankAccountNo}</strong> - {refundModalItem.bankName} ({refundModalItem.bankAccountName || refundModalItem.customerName})
                 </div>
               </div>
@@ -2559,7 +2559,7 @@ export default function Accountant() {
                 <select
                   value={sourceAccount}
                   onChange={e => setSourceAccount(e.target.value)}
-                  style={{ width: '100%', padding: '0.5rem 0.75rem', borderRadius: '6px', border: '1px solid #cbd5e1', backgroundColor: '#ffffff', fontWeight: 600, color: '#334155' }}
+                  style={{ width: '100%', padding: '0.5rem 0.75rem', borderRadius: '6px', border: '1px solid #e3e8ef', backgroundColor: '#ffffff', fontWeight: 600, color: '#334155' }}
                 >
                   <option value="VCB_9988776655">Vietcombank - 9988776655 (CTY TNHH CÔNG NGHỆ AETHERPC)</option>
                   <option value="MB_8888999922">MB Bank - 8888999922 (CTY TNHH CÔNG NGHỆ AETHERPC)</option>
@@ -2578,7 +2578,7 @@ export default function Accountant() {
                   placeholder="VD: FT26082400912..."
                   value={refundTxnCode}
                   onChange={e => setRefundTxnCode(e.target.value)}
-                  style={{ width: '100%', padding: '0.5rem 0.75rem', borderRadius: '6px', border: '1px solid #cbd5e1', boxSizing: 'border-box', fontWeight: 700, color: '#2563eb' }}
+                  style={{ width: '100%', padding: '0.5rem 0.75rem', borderRadius: '6px', border: '1px solid #e3e8ef', boxSizing: 'border-box', fontWeight: 700, color: '#2563eb' }}
                 />
               </div>
 
@@ -2593,7 +2593,7 @@ export default function Accountant() {
                     onClick={() => {
                       setRefundProofPhoto('https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=600&auto=format&fit=crop&q=80');
                     }}
-                    style={{ background: 'none', border: 'none', color: '#2563eb', fontSize: '0.74rem', fontWeight: 700, cursor: 'pointer', padding: 0 }}
+                    style={{ background: 'none', border: 'none', color: '#2563eb', fontSize: '0.79rem', fontWeight: 700, cursor: 'pointer', padding: 0 }}
                   >
                     Dùng Biên Lai Mẫu
                   </button>
@@ -2609,14 +2609,14 @@ export default function Accountant() {
                       reader.readAsDataURL(file);
                     }
                   }}
-                  style={{ fontSize: '0.75rem' }}
+                  style={{ fontSize: '0.8rem' }}
                 />
                 {refundProofPhoto && (
                   <div style={{ marginTop: '0.4rem', position: 'relative', display: 'inline-block' }}>
                     <img
                       src={refundProofPhoto}
                       alt="Proof"
-                      style={{ width: '110px', height: '70px', objectFit: 'cover', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                      style={{ width: '110px', height: '70px', objectFit: 'cover', borderRadius: '6px', border: '1px solid #e3e8ef' }}
                     />
                     <button
                       type="button"
@@ -2639,7 +2639,7 @@ export default function Accountant() {
                   placeholder="VD: Đã chuyển khoản hoàn tiền 100% qua Napas247"
                   value={refundNote}
                   onChange={e => setRefundNote(e.target.value)}
-                  style={{ width: '100%', padding: '0.5rem 0.75rem', borderRadius: '6px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
+                  style={{ width: '100%', padding: '0.5rem 0.75rem', borderRadius: '6px', border: '1px solid #e3e8ef', boxSizing: 'border-box' }}
                 />
               </div>
 
@@ -2647,7 +2647,7 @@ export default function Accountant() {
                 <button
                   type="button"
                   onClick={() => setRefundModalItem(null)}
-                  style={{ backgroundColor: '#ffffff', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.5rem 1rem', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}
+                  style={{ backgroundColor: '#ffffff', color: '#475569', border: '1px solid #e3e8ef', borderRadius: '6px', padding: '0.5rem 1rem', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}
                 >
                   Hủy bỏ
                 </button>
@@ -2667,13 +2667,13 @@ export default function Accountant() {
       {/* ================= MODAL: XEM MINH CHỨNG GIẢI NGÂN HOÀN TIỀN ================= */}
       {viewingRefundProof && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(6px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', width: '100%', maxWidth: '520px', padding: '1.75rem', maxHeight: '90vh', overflowY: 'auto' }}>
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e3e8ef', width: '100%', maxWidth: '520px', padding: '1.75rem', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.75rem' }}>
               <div>
                 <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
                   Minh Chứng Chuyển Tiền Hoàn Đơn Hàng
                 </h3>
-                <div style={{ fontSize: '0.75rem', color: '#16a34a', fontWeight: 700, marginTop: '2px' }}>
+                <div style={{ fontSize: '0.8rem', color: '#16a34a', fontWeight: 700, marginTop: '2px' }}>
                   Đã xác thực giải ngân qua Napas247 & Ghi sổ cái
                 </div>
               </div>
@@ -2686,9 +2686,9 @@ export default function Accountant() {
                 <img
                   src={viewingRefundProof.refundProofPhoto || 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=600&auto=format&fit=crop&q=80'}
                   alt="Biên Lai Chuyển Tiền"
-                  style={{ width: '100%', maxHeight: '220px', objectFit: 'contain', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                  style={{ width: '100%', maxHeight: '220px', objectFit: 'contain', borderRadius: '6px', border: '1px solid #e3e8ef' }}
                 />
-                <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '0.35rem' }}>
+                <div style={{ fontSize: '0.77rem', color: '#64748b', marginTop: '0.35rem' }}>
                   Ảnh chụp Ủy nhiệm chi / Biên lai chuyển khoản ngân hàng
                 </div>
               </div>

@@ -1,0 +1,125 @@
+/* ==========================================================================
+   AetherPC ERP — hệ thống giao diện chung cho mọi phân hệ quản trị (/admin)
+   Font Be Vietnam Pro (thiết kế cho tiếng Việt), nền xám nhạt, thẻ trắng viền mềm,
+   màu thao tác chính xanh dương, màu trạng thái giữ đúng ý nghĩa.
+   Các trang quản trị dùng nhiều style viết thẳng trong thẻ, nên một số quy tắc dưới đây
+   dùng !important để chuẩn hóa kích thước bảng, ô nhập và cỡ chữ cho đồng nhất.
+   ========================================================================== */
+
+.erp-root {
+  --erp-font: 'Be Vietnam Pro', 'Inter', -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+  --erp-bg: #f3f5f9;
+  --erp-surface: #ffffff;
+  --erp-border: #e3e8ef;
+  --erp-border-strong: #cfd8e3;
+  --erp-text: #0f172a;
+  --erp-text-2: #475569;
+  --erp-muted: #64748b;
+  --erp-primary: #2563eb;
+  --erp-primary-dark: #1d4ed8;
+  --erp-primary-soft: #eff6ff;
+  --erp-brand: #dc2626;
+  --erp-radius: 10px;
+
+  /* Biến dùng chung của index.css → đổi theo ERP */
+  --font-main: var(--erp-font);
+  --font-sans: var(--erp-font);
+  --font-title: var(--erp-font);
+  --bg-app: var(--erp-bg);
+  --border-glass: var(--erp-border);
+
+  font-family: var(--erp-font);
+  color: var(--erp-text);
+  background: var(--erp-bg);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Khung nội dung: căn giữa, lề đều hai bên */
+.erp-root .admin-main-content,
+.erp-root main {
+  background: var(--erp-bg);
+}
+
+.erp-root h1, .erp-root h2, .erp-root h3, .erp-root h4 {
+  letter-spacing: -0.01em;
+}
+
+/* ---------- Bảng: cùng cỡ chữ, khoảng đệm, tiêu đề cột ---------- */
+.erp-root table:not(.erp-compact) {
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+.erp-root table:not(.erp-compact) > thead > tr > th {
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  color: #64748b !important;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 10px 12px !important;
+  background: #f8fafc;
+  border-bottom: 1px solid var(--erp-border) !important;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+.erp-root table:not(.erp-compact) > tbody > tr > td {
+  font-size: 13.5px !important;
+  padding: 10px 12px !important;
+  vertical-align: middle;
+  border-bottom: 1px solid #edf1f6;
+  line-height: 1.45;
+}
+.erp-root table:not(.erp-compact) > tbody > tr:last-child > td { border-bottom: none; }
+.erp-root table:not(.erp-compact) > tbody > tr:hover > td { background-color: #f8fafc; }
+.erp-root table:not(.erp-compact) td small,
+.erp-root table:not(.erp-compact) td .muted { font-size: 12px; }
+
+/* Ô thao tác (có nút): nút nằm trên một hàng, bảng rộng thì cuộn ngang thay vì bóp cột */
+.erp-root table:not(.erp-compact) td:has(button) { white-space: nowrap; }
+.erp-root table:not(.erp-compact) td:has(button) > div { flex-wrap: nowrap !important; }
+/* Cột mã (cột đầu) không bẻ dòng: NV-24, #ORD-..., PO-... */
+.erp-root table:not(.erp-compact) > tbody > tr > td:first-child { white-space: nowrap; }
+/* Ô chứa tên/mô tả dài có độ rộng tối thiểu để không bị bóp thành nhiều dòng */
+.erp-root table:not(.erp-compact) > tbody > tr > td { min-width: 72px; }
+
+/* ---------- Ô nhập, chọn: cùng chiều cao, bo góc, viền, vòng focus ---------- */
+.erp-root input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='color']),
+.erp-root select {
+  min-height: 38px;
+  font-size: 13.5px !important;
+  border-radius: 8px !important;
+  border-color: var(--erp-border-strong);
+  color: var(--erp-text);
+}
+.erp-root textarea {
+  font-size: 13.5px !important;
+  border-radius: 8px !important;
+  line-height: 1.5;
+}
+.erp-root input:focus, .erp-root select:focus, .erp-root textarea:focus {
+  outline: none;
+  border-color: var(--erp-primary) !important;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15) !important;
+}
+.erp-root input::placeholder, .erp-root textarea::placeholder { color: #94a3b8; }
+.erp-root input[type='checkbox'], .erp-root input[type='radio'] { accent-color: var(--erp-primary); width: 16px; height: 16px; }
+
+/* ---------- Nút ---------- */
+.erp-root button { font-family: var(--erp-font); transition: background-color .15s, border-color .15s, color .15s, box-shadow .15s; }
+.erp-root button:not(:disabled) { cursor: pointer; }
+.erp-root button:disabled { opacity: 0.55; cursor: not-allowed; }
+.erp-root button:focus-visible { outline: 2px solid rgba(37, 99, 235, 0.45); outline-offset: 2px; }
+
+/* Số liệu dạng tiền/mã dễ đọc, căn đều */
+.erp-root [style*='monospace'] { font-family: 'JetBrains Mono', ui-monospace, Consolas, monospace !important; font-size: 0.92em; }
+
+/* ---------- Thanh cuộn mảnh ---------- */
+.erp-root ::-webkit-scrollbar { width: 8px; height: 8px; }
+.erp-root ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 8px; }
+.erp-root ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+.erp-root ::-webkit-scrollbar-track { background: transparent; }
+.erp-root .admin-sidebar-drawer ::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.3); }
+
+/* Sidebar tối: liên kết rê chuột */
+.erp-root .admin-sidebar-drawer nav a:hover { color: #ffffff !important; background-color: rgba(148, 163, 184, 0.1); }

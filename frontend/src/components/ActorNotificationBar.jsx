@@ -287,7 +287,7 @@ export default function ActorNotificationBar() {
   return (
     <div style={{
       marginBottom: '1.5rem', borderRadius: '12px',
-      backgroundColor: '#ffffff', border: '1px solid #cbd5e1', boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+      backgroundColor: '#ffffff', border: '1px solid #e3e8ef', boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
       overflow: 'hidden'
     }}>
       {/* ── Header luôn hiển thị ── */}
@@ -305,7 +305,7 @@ export default function ActorNotificationBar() {
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1, minWidth: 0 }}>
           <div style={{
             width: '38px', height: '38px', borderRadius: '10px', backgroundColor: '#f1f5f9',
-            border: '1px solid #cbd5e1', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+            border: '1px solid #e3e8ef', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
           }}>
             <Icon size={18} style={{ color: accent }} />
           </div>
@@ -315,7 +315,7 @@ export default function ActorNotificationBar() {
               {pending.length > 0 && (
                 <span style={{
                   backgroundColor: '#fef3c7', color: '#b45309', padding: '2px 8px', borderRadius: '10px',
-                  fontSize: '0.7rem', fontWeight: 700, border: '1px solid #fde68a', flexShrink: 0
+                  fontSize: '0.75rem', fontWeight: 700, border: '1px solid #fde68a', flexShrink: 0
                 }}>
                   {total} việc cần làm
                 </span>
@@ -347,7 +347,7 @@ export default function ActorNotificationBar() {
                 background: 'none', border: '1px solid #e2e8f0', borderRadius: '8px',
                 padding: '0.35rem 0.6rem', cursor: 'pointer', color: '#64748b',
                 display: 'flex', alignItems: 'center', gap: '0.25rem',
-                fontSize: '0.72rem', fontWeight: 600,
+                fontSize: '0.77rem', fontWeight: 600,
                 transition: 'background 0.15s'
               }}
             >
@@ -366,7 +366,7 @@ export default function ActorNotificationBar() {
       {/* ── Danh sách task — chỉ hiện khi expanded ── */}
       {expanded && pending.length > 0 && (
         <div style={{ borderTop: '1px solid #f1f5f9', padding: '0 1.25rem 0.85rem' }}>
-          <p style={{ fontSize: '0.75rem', color: '#64748b', margin: '0.6rem 0 0.5rem' }}>
+          <p style={{ fontSize: '0.8rem', color: '#64748b', margin: '0.6rem 0 0.5rem' }}>
             Các việc đang chờ bạn xử lý ở bước hiện tại của quy trình:
           </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
@@ -379,7 +379,7 @@ export default function ActorNotificationBar() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem', color: '#334155' }}>
                   <strong style={{
                     minWidth: '26px', textAlign: 'center', padding: '1px 6px', borderRadius: '6px',
-                    backgroundColor: t.urgent ? '#d97706' : '#2563eb', color: '#ffffff', fontSize: '0.75rem'
+                    backgroundColor: t.urgent ? '#d97706' : '#2563eb', color: '#ffffff', fontSize: '0.8rem'
                   }}>
                     {t.count}
                   </strong>
@@ -388,7 +388,7 @@ export default function ActorNotificationBar() {
                 <button
                   onClick={() => navigate(t.path)}
                   style={{
-                    fontSize: '0.75rem', padding: '0.3rem 0.75rem', borderRadius: '6px', display: 'flex',
+                    fontSize: '0.8rem', padding: '0.3rem 0.75rem', borderRadius: '6px', display: 'flex',
                     alignItems: 'center', gap: '0.3rem', fontWeight: 700, color: '#ffffff',
                     backgroundColor: t.urgent ? '#d97706' : '#2563eb', border: 'none', cursor: 'pointer'
                   }}

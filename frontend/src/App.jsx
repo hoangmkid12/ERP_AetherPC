@@ -1,5 +1,7 @@
 import React, { useState, useEffect, Suspense, lazy } from 'react';
 import './styles/storefront.css';
+import './styles/erp.css';
+import './utils/chartTheme';
 import { BrowserRouter as Router, Routes, Route, Navigate, Outlet, useLocation, Link } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
@@ -109,7 +111,7 @@ const AdminLayout = () => {
   }
 
   return (
-    <div className="admin-layout-container" style={{ display: 'flex', minHeight: '100vh', backgroundColor: 'var(--bg-app)' }}>
+    <div className="admin-layout-container erp-root" style={{ display: 'flex', minHeight: '100vh', backgroundColor: 'var(--bg-app)' }}>
       {/* Top Mobile Bar for Admin ERP on screens <= 1024px */}
       <header
         className="admin-mobile-topbar"

@@ -123,7 +123,7 @@ export default function ReturnRequestModal({ show, onClose, order }) {
               <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '2px' }}>Khách hàng: {order.customerName} ({order.phone})</div>
             </div>
             <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Số tiền hoàn dự kiến:</div>
+              <div style={{ fontSize: '0.8rem', color: '#64748b' }}>Số tiền hoàn dự kiến:</div>
               <div style={{ fontWeight: 800, color: '#16a34a', fontSize: '1.05rem' }}>{new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(order.totalAmount || order.total || 0)}</div>
             </div>
           </div>
@@ -139,7 +139,7 @@ export default function ReturnRequestModal({ show, onClose, order }) {
                 />
                 <div>
                   <div style={{ fontWeight: 800, color: '#15803d', fontSize: '0.85rem' }}>Trả hàng & Hoàn tiền 100%</div>
-                  <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '2px' }}>Kế toán chuyển khoản hoàn đủ tiền cho bạn.</div>
+                  <div style={{ fontSize: '0.77rem', color: '#64748b', marginTop: '2px' }}>Kế toán chuyển khoản hoàn đủ tiền cho bạn.</div>
                 </div>
               </label>
 
@@ -151,7 +151,7 @@ export default function ReturnRequestModal({ show, onClose, order }) {
                 />
                 <div>
                   <div style={{ fontWeight: 800, color: '#1d4ed8', fontSize: '0.85rem' }}>Đổi sản phẩm mới</div>
-                  <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '2px' }}>Kho sẽ xuất linh kiện mới 100% đổi lại.</div>
+                  <div style={{ fontSize: '0.77rem', color: '#64748b', marginTop: '2px' }}>Kho sẽ xuất linh kiện mới 100% đổi lại.</div>
                 </div>
               </label>
             </div>
@@ -216,7 +216,7 @@ export default function ReturnRequestModal({ show, onClose, order }) {
             <label style={{ display: 'block', fontWeight: 700, marginBottom: '0.35rem', color: '#334155', fontSize: '0.85rem' }}>Lý do hoàn trả *</label>
             <select 
               value={reason} onChange={e => setReason(e.target.value)}
-              style={{ width: '100%', padding: '0.5rem 0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.85rem', backgroundColor: '#ffffff' }}
+              style={{ width: '100%', padding: '0.5rem 0.65rem', borderRadius: '6px', border: '1px solid #e3e8ef', fontSize: '0.85rem', backgroundColor: '#ffffff' }}
             >
               <option value="Lỗi do Nhà sản xuất">Lỗi phần cứng do Nhà sản xuất (Không lên nguồn, lỗi chip, sập nguồn...)</option>
               <option value="Giao sai linh kiện / Sai mã">Giao sai model linh kiện so với đơn đặt</option>
@@ -232,7 +232,7 @@ export default function ReturnRequestModal({ show, onClose, order }) {
               value={description} onChange={e => setDescription(e.target.value)}
               placeholder="Vui lòng mô tả chi tiết lỗi phát sinh để Kỹ thuật viên QC thẩm định nhanh chóng..."
               rows={2}
-              style={{ width: '100%', padding: '0.5rem 0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem', resize: 'vertical', boxSizing: 'border-box' }}
+              style={{ width: '100%', padding: '0.5rem 0.65rem', borderRadius: '6px', border: '1px solid #e3e8ef', fontSize: '0.82rem', resize: 'vertical', boxSizing: 'border-box' }}
             />
           </div>
 
@@ -245,9 +245,9 @@ export default function ReturnRequestModal({ show, onClose, order }) {
                 type="text" 
                 value={evidenceUrl} onChange={e => setEvidenceUrl(e.target.value)}
                 placeholder="Dán link ảnh hoặc tải ảnh trực tiếp bên cạnh..."
-                style={{ flex: 1, padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem' }}
+                style={{ flex: 1, padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid #e3e8ef', fontSize: '0.82rem' }}
               />
-              <label style={{ padding: '0.45rem 0.85rem', backgroundColor: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.78rem', fontWeight: 700, color: '#334155', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+              <label style={{ padding: '0.45rem 0.85rem', backgroundColor: '#f1f5f9', border: '1px solid #e3e8ef', borderRadius: '6px', fontSize: '0.78rem', fontWeight: 700, color: '#334155', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
                 <Upload size={14} /> Tải Ảnh
                 <input type="file" accept="image/*" onChange={handleFileUpload} style={{ display: 'none' }} />
               </label>
@@ -258,13 +258,13 @@ export default function ReturnRequestModal({ show, onClose, order }) {
                   <img src={evidenceUrl} alt="Minh chứng lỗi" style={{ width: '52px', height: '52px', objectFit: 'cover', borderRadius: '6px', border: '1.5px solid #86efac' }} />
                   <div>
                     <span style={{ fontSize: '0.78rem', color: '#15803d', fontWeight: 700, display: 'block' }}>✓ Đã tải ảnh minh chứng</span>
-                    <span style={{ fontSize: '0.7rem', color: '#64748b' }}>CSKH và Kỹ thuật QC sẽ xem ảnh này khi thẩm định</span>
+                    <span style={{ fontSize: '0.75rem', color: '#64748b' }}>CSKH và Kỹ thuật QC sẽ xem ảnh này khi thẩm định</span>
                   </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => setEvidenceUrl('')}
-                  style={{ background: '#ffffff', border: '1px solid #fca5a5', borderRadius: '6px', padding: '4px 8px', fontSize: '0.72rem', color: '#dc2626', fontWeight: 700, cursor: 'pointer' }}
+                  style={{ background: '#ffffff', border: '1px solid #fca5a5', borderRadius: '6px', padding: '4px 8px', fontSize: '0.77rem', color: '#dc2626', fontWeight: 700, cursor: 'pointer' }}
                 >
                   Gỡ ảnh
                 </button>
@@ -279,7 +279,7 @@ export default function ReturnRequestModal({ show, onClose, order }) {
           )}
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem', borderTop: '1px solid #f1f5f9', paddingTop: '0.85rem' }}>
-            <button type="button" onClick={onClose} style={{ padding: '0.55rem 1.25rem', backgroundColor: '#fff', border: '1px solid #cbd5e1', borderRadius: '6px', fontWeight: 700, fontSize: '0.82rem', cursor: 'pointer', color: '#475569' }}>
+            <button type="button" onClick={onClose} style={{ padding: '0.55rem 1.25rem', backgroundColor: '#fff', border: '1px solid #e3e8ef', borderRadius: '6px', fontWeight: 700, fontSize: '0.82rem', cursor: 'pointer', color: '#475569' }}>
               Đóng
             </button>
             <button type="submit" disabled={isSubmitting} style={{ padding: '0.55rem 1.5rem', backgroundColor: '#2563eb', color: '#fff', border: 'none', borderRadius: '6px', fontWeight: 800, fontSize: '0.82rem', cursor: isSubmitting ? 'not-allowed' : 'pointer', opacity: isSubmitting ? 0.7 : 1 }}>

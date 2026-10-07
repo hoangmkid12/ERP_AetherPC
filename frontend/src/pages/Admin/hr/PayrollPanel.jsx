@@ -77,7 +77,7 @@ export default function PayrollPanel() {
 
   const stat = (t, v, c = '#0f172a') => (
     <div style={{ border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.65rem 0.8rem', backgroundColor: '#f8fafc' }}>
-      <div style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 700 }}>{t}</div>
+      <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700 }}>{t}</div>
       <div style={{ fontSize: '1rem', fontWeight: 900, color: c }}>{fmtMoney(v)}đ</div>
     </div>
   );
@@ -128,7 +128,7 @@ export default function PayrollPanel() {
                 <tr key={r.id}>
                   <td style={td}>
                     <div style={{ fontWeight: 700 }}>{r.empName}</div>
-                    <div style={{ fontSize: '0.7rem', color: '#64748b' }}>{r.employee?.jobTitle || getRoleName(r.employee?.role)}</div>
+                    <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{r.employee?.jobTitle || getRoleName(r.employee?.role)}</div>
                   </td>
                   <td style={{ ...td, textAlign: 'right' }}>{r.standardDays != null ? `${Number(r.workDays) + Number(r.paidLeaveDays)}/${r.standardDays}` : '—'}</td>
                   <td style={{ ...td, textAlign: 'right', color: '#16a34a', fontWeight: 700 }}>{fmtMoney(r.grossSalary ?? (r.baseSalary + r.allowances + r.bonuses))}</td>
@@ -136,7 +136,7 @@ export default function PayrollPanel() {
                   <td style={{ ...td, textAlign: 'right' }}>{r.personalIncomeTax != null ? fmtMoney(r.personalIncomeTax) : '—'}</td>
                   <td style={{ ...td, textAlign: 'right', color: '#dc2626' }}>{fmtMoney((Number(r.latePenalty) || 0) + (Number(r.otherDeductions) || 0))}</td>
                   <td style={{ ...td, textAlign: 'right', fontWeight: 900 }}>{fmtMoney(r.netAmount)}</td>
-                  <td style={{ ...td, textAlign: 'center' }}><span style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 800, backgroundColor: st.bg, color: st.color }}>{getStatusLabel(PAYROLL_STATUS, r.status)}</span></td>
+                  <td style={{ ...td, textAlign: 'center' }}><span style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 800, backgroundColor: st.bg, color: st.color }}>{getStatusLabel(PAYROLL_STATUS, r.status)}</span></td>
                   <td style={{ ...td, textAlign: 'center' }}>
                     <div style={{ display: 'flex', gap: '0.25rem', justifyContent: 'center' }}>
                       <button type="button" onClick={() => setViewing(r)} style={smallBtn('#2563eb', '#bfdbfe')}><Eye size={12} /> Phiếu</button>
@@ -155,7 +155,7 @@ export default function PayrollPanel() {
         </table>
       </div>
 
-      <div style={{ marginTop: '0.85rem', fontSize: '0.72rem', color: '#64748b', lineHeight: 1.55 }}>
+      <div style={{ marginTop: '0.85rem', fontSize: '0.77rem', color: '#64748b', lineHeight: 1.55 }}>
         Công thức: Lương theo công = (lương cơ bản + phụ cấp chức vụ) × (ngày đi làm + phép/lễ) / công chuẩn · Tăng ca 150%/200%/300% ·
         BH NLĐ 10,5% (trần 20 × lương cơ sở) · Thuế TNCN lũy tiến sau giảm trừ gia cảnh · Khấu trừ chuyên cần theo số phút đi muộn/về sớm.
       </div>

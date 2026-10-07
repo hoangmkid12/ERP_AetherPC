@@ -8,7 +8,7 @@ import { getDefaultDateFilter, getDateFilterLabel } from './deliveryHelpers';
 const PAGE_SIZE = 25;
 
 const selectStyle = { width: '100%', padding: '0.55rem 0.65rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-glass)', fontSize: '0.8rem', backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)', fontWeight: 600, boxSizing: 'border-box' };
-const labelStyle = { display: 'block', fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.25rem' };
+const labelStyle = { display: 'block', fontSize: '0.77rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.25rem' };
 
 export default function HistoryTab({
   orders, fmt, getOrderTimeClassification, onOpenDetail, actions,
@@ -59,7 +59,7 @@ export default function HistoryTab({
       </div>
 
       {/* Date Filter Indicator Bar with Quick Reset Buttons */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.4rem 0.6rem', backgroundColor: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)', marginBottom: '0.65rem', border: '1px solid var(--border-glass)', fontSize: '0.74rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.4rem 0.6rem', backgroundColor: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)', marginBottom: '0.65rem', border: '1px solid var(--border-glass)', fontSize: '0.79rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: 'var(--text-secondary)' }}>
           <Calendar size={13} style={{ color: 'var(--primary)' }} />
           <span>Thời gian: <strong style={{ color: 'var(--text-primary)' }}>{getDateFilterLabel(orderDateFilter)}</strong></span>
@@ -69,7 +69,7 @@ export default function HistoryTab({
             <button
               type="button"
               onClick={() => setOrderDateFilter && setOrderDateFilter(prev => ({ ...prev, period: 'ALL' }))}
-              style={{ background: 'none', border: 'none', color: 'var(--primary)', fontWeight: 700, fontSize: '0.72rem', cursor: 'pointer', textDecoration: 'underline' }}
+              style={{ background: 'none', border: 'none', color: 'var(--primary)', fontWeight: 700, fontSize: '0.77rem', cursor: 'pointer', textDecoration: 'underline' }}
             >
               Xem tất cả
             </button>
@@ -78,7 +78,7 @@ export default function HistoryTab({
             <button
               type="button"
               onClick={() => setOrderDateFilter && setOrderDateFilter(getDefaultDateFilter())}
-              style={{ background: 'none', border: 'none', color: 'var(--success)', fontWeight: 700, fontSize: '0.72rem', cursor: 'pointer', textDecoration: 'underline' }}
+              style={{ background: 'none', border: 'none', color: 'var(--success)', fontWeight: 700, fontSize: '0.77rem', cursor: 'pointer', textDecoration: 'underline' }}
             >
               Hôm nay
             </button>
@@ -88,8 +88,8 @@ export default function HistoryTab({
 
       <div className="delivery-card" style={{ marginBottom: '0.85rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
-          <div style={{ fontSize: '0.76rem', color: 'var(--text-secondary)' }}>Tổng COD thu hộ ({getDateFilterLabel(orderDateFilter)})</div>
-          <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>Cần nộp Kế toán • {orders.filter(o => o.status === 'DELIVERED').length} đơn hoàn tất</div>
+          <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Tổng COD thu hộ ({getDateFilterLabel(orderDateFilter)})</div>
+          <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>Cần nộp Kế toán • {orders.filter(o => o.status === 'DELIVERED').length} đơn hoàn tất</div>
         </div>
         <strong style={{ fontSize: '1rem', color: 'var(--success)' }}>{fmt(periodCodCollected)}</strong>
       </div>

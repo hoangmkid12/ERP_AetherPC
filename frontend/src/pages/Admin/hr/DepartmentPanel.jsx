@@ -620,7 +620,7 @@ export default function DepartmentPanel() {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', fontFamily: 'Inter, sans-serif' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', fontFamily: 'inherit' }}>
 
       {/* ========================================================================= */}
       {/* 1. HEADER CHÍNH CỦA MỤC QUẢN LÝ PHÒNG BAN (GIỐNG HÌNH CHỤP) */}
@@ -859,7 +859,7 @@ export default function DepartmentPanel() {
                     width: '100%',
                     padding: '0.45rem 0.75rem 0.45rem 2.2rem',
                     borderRadius: '8px',
-                    border: '1px solid #cbd5e1',
+                    border: '1px solid #e3e8ef',
                     fontSize: '0.82rem',
                     color: '#0f172a',
                     outline: 'none',
@@ -881,7 +881,7 @@ export default function DepartmentPanel() {
                     style={{
                       padding: '0.4rem 0.65rem',
                       borderRadius: '6px',
-                      border: '1px solid #cbd5e1',
+                      border: '1px solid #e3e8ef',
                       fontSize: '0.8rem',
                       color: '#0f172a'
                     }}
@@ -892,7 +892,7 @@ export default function DepartmentPanel() {
                     style={{
                       padding: '0.4rem 0.65rem',
                       borderRadius: '6px',
-                      border: '1px solid #cbd5e1',
+                      border: '1px solid #e3e8ef',
                       fontSize: '0.8rem',
                       color: '#0f172a',
                       backgroundColor: '#ffffff'
@@ -936,7 +936,7 @@ export default function DepartmentPanel() {
                   height: '34px',
                   backgroundColor: '#f8fafc',
                   color: '#0284c7',
-                  border: '1px solid #cbd5e1',
+                  border: '1px solid #e3e8ef',
                   borderRadius: '6px',
                   display: 'flex',
                   alignItems: 'center',
@@ -959,28 +959,28 @@ export default function DepartmentPanel() {
               {/* Thẻ KPI chuyên cần nhanh của phòng ban hôm nay */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.75rem' }}>
                 <div style={{ backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', padding: '0.65rem 0.85rem' }}>
-                  <div style={{ fontSize: '0.72rem', color: '#16a34a', fontWeight: 700 }}>CÓ MẶT</div>
+                  <div style={{ fontSize: '0.77rem', color: '#16a34a', fontWeight: 700 }}>CÓ MẶT</div>
                   <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#15803d', marginTop: '0.2rem' }}>
-                    {attendanceStats.present} <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>/ {attendanceStats.total}</span>
+                    {attendanceStats.present} <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>/ {attendanceStats.total}</span>
                   </div>
                 </div>
 
                 <div style={{ backgroundColor: '#fffbeb', border: '1px solid #fef3c7', borderRadius: '8px', padding: '0.65rem 0.85rem' }}>
-                  <div style={{ fontSize: '0.72rem', color: '#d97706', fontWeight: 700 }}>ĐI MUỘN</div>
+                  <div style={{ fontSize: '0.77rem', color: '#d97706', fontWeight: 700 }}>ĐI MUỘN</div>
                   <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#b45309', marginTop: '0.2rem' }}>
                     {attendanceStats.late}
                   </div>
                 </div>
 
                 <div style={{ backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', padding: '0.65rem 0.85rem' }}>
-                  <div style={{ fontSize: '0.72rem', color: '#dc2626', fontWeight: 700 }}>VẮNG MẶT</div>
+                  <div style={{ fontSize: '0.77rem', color: '#dc2626', fontWeight: 700 }}>VẮNG MẶT</div>
                   <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#b91c1c', marginTop: '0.2rem' }}>
                     {attendanceStats.absent}
                   </div>
                 </div>
 
                 <div style={{ backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '8px', padding: '0.65rem 0.85rem' }}>
-                  <div style={{ fontSize: '0.72rem', color: '#2563eb', fontWeight: 700 }}>TỶ LỆ CHUYÊN CẦN</div>
+                  <div style={{ fontSize: '0.77rem', color: '#2563eb', fontWeight: 700 }}>TỶ LỆ CHUYÊN CẦN</div>
                   <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#1d4ed8', marginTop: '0.2rem' }}>
                     {attendanceStats.rate}%
                   </div>
@@ -1018,7 +1018,7 @@ export default function DepartmentPanel() {
                               <div style={{ fontWeight: 700, color: '#0f172a' }}>
                                 {item.emp.fullname || item.emp.fullName}
                               </div>
-                              <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '2px' }}>
+                              <div style={{ fontSize: '0.77rem', color: '#64748b', marginTop: '2px' }}>
                                 {item.emp.employeeCode || `EMP-${item.emp.id}`} · {getRoleName(item.emp.role)}
                               </div>
                             </td>
@@ -1029,13 +1029,13 @@ export default function DepartmentPanel() {
                                   {item.checkIn}
                                 </span>
                                 {item.method === 'FACE' && (
-                                  <span style={{ fontSize: '0.68rem', backgroundColor: '#e0f2fe', color: '#0284c7', padding: '1px 4px', borderRadius: '4px', fontWeight: 700 }}>
+                                  <span style={{ fontSize: '0.74rem', backgroundColor: '#e0f2fe', color: '#0284c7', padding: '1px 4px', borderRadius: '4px', fontWeight: 700 }}>
                                     Khuôn mặt
                                   </span>
                                 )}
                               </div>
                               {isLate && (
-                                <div style={{ fontSize: '0.7rem', color: '#d97706', fontWeight: 600 }}>
+                                <div style={{ fontSize: '0.75rem', color: '#d97706', fontWeight: 600 }}>
                                   Trễ {item.lateMinutes || 15}p
                                 </div>
                               )}
@@ -1052,7 +1052,7 @@ export default function DepartmentPanel() {
                                 {item.workHours > 0 ? `${item.workHours}h` : '---'}
                               </span>
                               {item.overtimeHours > 0 && (
-                                <div style={{ fontSize: '0.7rem', color: '#16a34a', fontWeight: 600 }}>
+                                <div style={{ fontSize: '0.75rem', color: '#16a34a', fontWeight: 600 }}>
                                   OT: +{item.overtimeHours}h
                                 </div>
                               )}
@@ -1062,7 +1062,7 @@ export default function DepartmentPanel() {
                               <span style={{
                                 padding: '3px 8px',
                                 borderRadius: '12px',
-                                fontSize: '0.72rem',
+                                fontSize: '0.77rem',
                                 fontWeight: 800,
                                 backgroundColor: statusObj.bg,
                                 color: statusObj.color
@@ -1083,7 +1083,7 @@ export default function DepartmentPanel() {
                                       border: '1px solid #bfdbfe',
                                       borderRadius: '4px',
                                       padding: '0.25rem 0.5rem',
-                                      fontSize: '0.72rem',
+                                      fontSize: '0.77rem',
                                       fontWeight: 600,
                                       cursor: 'pointer',
                                       display: 'inline-flex',
@@ -1112,10 +1112,10 @@ export default function DepartmentPanel() {
                                   style={{
                                     backgroundColor: '#f8fafc',
                                     color: '#475569',
-                                    border: '1px solid #cbd5e1',
+                                    border: '1px solid #e3e8ef',
                                     borderRadius: '4px',
                                     padding: '0.25rem 0.5rem',
-                                    fontSize: '0.72rem',
+                                    fontSize: '0.77rem',
                                     fontWeight: 600,
                                     cursor: 'pointer',
                                     display: 'inline-flex',
@@ -1166,7 +1166,7 @@ export default function DepartmentPanel() {
                       <tr key={emp.id || eIdx} style={{ borderBottom: '1px solid #f1f5f9' }}>
                         <td style={{ padding: '0.65rem 0.85rem' }}>
                           <div style={{ fontWeight: 700, color: '#0f172a' }}>{emp.fullname || emp.fullName}</div>
-                          <div style={{ fontSize: '0.72rem', color: '#64748b' }}>{emp.employeeCode || `EMP-${emp.id}`}</div>
+                          <div style={{ fontSize: '0.77rem', color: '#64748b' }}>{emp.employeeCode || `EMP-${emp.id}`}</div>
                         </td>
                         <td style={{ padding: '0.65rem 0.85rem', fontWeight: 600, color: '#2563eb' }}>
                           {emp.jobTitle || getRoleName(emp.role)}
@@ -1174,7 +1174,7 @@ export default function DepartmentPanel() {
                         <td style={{ padding: '0.65rem 0.85rem', color: '#475569' }}>
                           {emp.department || selectedDept.name}
                         </td>
-                        <td style={{ padding: '0.65rem 0.85rem', fontSize: '0.75rem', color: '#64748b' }}>
+                        <td style={{ padding: '0.65rem 0.85rem', fontSize: '0.8rem', color: '#64748b' }}>
                           <div>{emp.email || `${emp.username}@aetherpc.com`}</div>
                           <div>{emp.phone || 'Chưa cập nhật SĐT'}</div>
                         </td>
@@ -1182,7 +1182,7 @@ export default function DepartmentPanel() {
                           <span style={{
                             padding: '2px 8px',
                             borderRadius: '10px',
-                            fontSize: '0.7rem',
+                            fontSize: '0.75rem',
                             fontWeight: 800,
                             backgroundColor: emp.status === 'ACTIVE' ? '#dcfce7' : '#fee2e2',
                             color: emp.status === 'ACTIVE' ? '#16a34a' : '#ef4444'
@@ -1226,7 +1226,7 @@ export default function DepartmentPanel() {
                             <Building size={16} style={{ color: '#0284c7' }} />
                             <span>{sub.name}</span>
                           </div>
-                          <div style={{ fontSize: '0.72rem', color: '#64748b', marginLeft: '1.5rem', marginTop: '2px' }}>
+                          <div style={{ fontSize: '0.77rem', color: '#64748b', marginLeft: '1.5rem', marginTop: '2px' }}>
                             Trưởng bộ phận: {sub.leader}
                           </div>
                         </td>
@@ -1245,7 +1245,7 @@ export default function DepartmentPanel() {
                               border: 'none',
                               borderRadius: '6px',
                               padding: '0.35rem 0.75rem',
-                              fontSize: '0.75rem',
+                              fontSize: '0.8rem',
                               fontWeight: 700,
                               cursor: 'pointer'
                             }}
@@ -1322,7 +1322,7 @@ export default function DepartmentPanel() {
                   boxShadow: '0 4px 6px rgba(2, 132, 199, 0.25)'
                 }}>
                   <div>CÔNG TY CỔ PHẦN AETHERPC ERP</div>
-                  <div style={{ fontSize: '0.75rem', fontWeight: 500, opacity: 0.9 }}>Tổng nhân sự: {employees?.length || 0} cán bộ nhân viên</div>
+                  <div style={{ fontSize: '0.8rem', fontWeight: 500, opacity: 0.9 }}>Tổng nhân sự: {employees?.length || 0} cán bộ nhân viên</div>
                 </div>
 
                 <div style={{ width: '2px', height: '24px', backgroundColor: '#cbd5e1' }} />
@@ -1338,7 +1338,7 @@ export default function DepartmentPanel() {
                       }}
                       style={{
                         backgroundColor: '#ffffff',
-                        border: selectedDeptId === rootNode.id ? '2px solid #0284c7' : '1px solid #cbd5e1',
+                        border: selectedDeptId === rootNode.id ? '2px solid #0284c7' : '1px solid #e3e8ef',
                         borderRadius: '8px',
                         padding: '0.75rem 1.1rem',
                         minWidth: '220px',
@@ -1348,8 +1348,8 @@ export default function DepartmentPanel() {
                       }}
                     >
                       <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.85rem' }}>{rootNode.name}</div>
-                      <div style={{ fontSize: '0.75rem', color: '#2563eb', marginTop: '2px', fontWeight: 600 }}>{rootNode.leader}</div>
-                      <div style={{ fontSize: '0.72rem', color: '#64748b' }}>{rootNode.roleDesc}</div>
+                      <div style={{ fontSize: '0.8rem', color: '#2563eb', marginTop: '2px', fontWeight: 600 }}>{rootNode.leader}</div>
+                      <div style={{ fontSize: '0.77rem', color: '#64748b' }}>{rootNode.roleDesc}</div>
                     </div>
                   ))}
                 </div>
@@ -1432,7 +1432,7 @@ export default function DepartmentPanel() {
                 <select
                   value={manualForm.status}
                   onChange={(e) => setManualForm(p => ({ ...p, status: e.target.value }))}
-                  style={{ width: '100%', padding: '0.45rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem' }}
+                  style={{ width: '100%', padding: '0.45rem', borderRadius: '6px', border: '1px solid #e3e8ef', fontSize: '0.82rem' }}
                 >
                   <option value="PRESENT">Có Mặt (Đủ công)</option>
                   <option value="LATE">Đi Muộn</option>
@@ -1449,7 +1449,7 @@ export default function DepartmentPanel() {
                     type="time"
                     value={manualForm.checkIn}
                     onChange={(e) => setManualForm(p => ({ ...p, checkIn: e.target.value }))}
-                    style={{ width: '100%', padding: '0.45rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem', boxSizing: 'border-box' }}
+                    style={{ width: '100%', padding: '0.45rem', borderRadius: '6px', border: '1px solid #e3e8ef', fontSize: '0.82rem', boxSizing: 'border-box' }}
                   />
                 </div>
 
@@ -1461,7 +1461,7 @@ export default function DepartmentPanel() {
                     type="time"
                     value={manualForm.checkOut}
                     onChange={(e) => setManualForm(p => ({ ...p, checkOut: e.target.value }))}
-                    style={{ width: '100%', padding: '0.45rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem', boxSizing: 'border-box' }}
+                    style={{ width: '100%', padding: '0.45rem', borderRadius: '6px', border: '1px solid #e3e8ef', fontSize: '0.82rem', boxSizing: 'border-box' }}
                   />
                 </div>
               </div>
@@ -1477,7 +1477,7 @@ export default function DepartmentPanel() {
                   max="12"
                   value={manualForm.overtimeHours}
                   onChange={(e) => setManualForm(p => ({ ...p, overtimeHours: e.target.value }))}
-                  style={{ width: '100%', padding: '0.45rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem', boxSizing: 'border-box' }}
+                  style={{ width: '100%', padding: '0.45rem', borderRadius: '6px', border: '1px solid #e3e8ef', fontSize: '0.82rem', boxSizing: 'border-box' }}
                 />
               </div>
 
@@ -1490,7 +1490,7 @@ export default function DepartmentPanel() {
                   placeholder="Lý do điều chỉnh (đi công tác, giải trình quên check-in...)"
                   value={manualForm.note}
                   onChange={(e) => setManualForm(p => ({ ...p, note: e.target.value }))}
-                  style={{ width: '100%', padding: '0.45rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem', boxSizing: 'border-box' }}
+                  style={{ width: '100%', padding: '0.45rem', borderRadius: '6px', border: '1px solid #e3e8ef', fontSize: '0.82rem', boxSizing: 'border-box' }}
                 />
               </div>
 
@@ -1498,7 +1498,7 @@ export default function DepartmentPanel() {
                 <button
                   type="button"
                   onClick={() => setManualModalEmp(null)}
-                  style={{ padding: '0.45rem 0.95rem', borderRadius: '6px', border: '1px solid #cbd5e1', backgroundColor: '#ffffff', color: '#475569', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}
+                  style={{ padding: '0.45rem 0.95rem', borderRadius: '6px', border: '1px solid #e3e8ef', backgroundColor: '#ffffff', color: '#475569', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}
                 >
                   Hủy
                 </button>
@@ -1558,7 +1558,7 @@ export default function DepartmentPanel() {
             <div style={{ padding: '1.25rem', display: 'flex', gap: '1rem', justifyContent: 'center' }}>
               {photoModalData.checkInPhoto && (
                 <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', marginBottom: '0.35rem' }}>Ảnh Vào Ca</div>
+                  <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: '0.35rem' }}>Ảnh Vào Ca</div>
                   <img
                     src={photoModalData.checkInPhoto}
                     alt="Check-in Photo"
@@ -1569,7 +1569,7 @@ export default function DepartmentPanel() {
 
               {photoModalData.registeredFace && (
                 <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', marginBottom: '0.35rem' }}>Ảnh Đăng Ký Gốc</div>
+                  <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: '0.35rem' }}>Ảnh Đăng Ký Gốc</div>
                   <img
                     src={photoModalData.registeredFace}
                     alt="Registered Face"
@@ -1644,7 +1644,7 @@ export default function DepartmentPanel() {
                   value={deptFormData.name}
                   onChange={(e) => setDeptFormData(p => ({ ...p, name: e.target.value }))}
                   required
-                  style={{ width: '100%', padding: '0.45rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem', boxSizing: 'border-box' }}
+                  style={{ width: '100%', padding: '0.45rem', borderRadius: '6px', border: '1px solid #e3e8ef', fontSize: '0.82rem', boxSizing: 'border-box' }}
                 />
               </div>
 
@@ -1658,7 +1658,7 @@ export default function DepartmentPanel() {
                     placeholder="KT-BH"
                     value={deptFormData.code}
                     onChange={(e) => setDeptFormData(p => ({ ...p, code: e.target.value }))}
-                    style={{ width: '100%', padding: '0.45rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem', boxSizing: 'border-box' }}
+                    style={{ width: '100%', padding: '0.45rem', borderRadius: '6px', border: '1px solid #e3e8ef', fontSize: '0.82rem', boxSizing: 'border-box' }}
                   />
                 </div>
 
@@ -1671,7 +1671,7 @@ export default function DepartmentPanel() {
                     placeholder="Nguyễn Văn A"
                     value={deptFormData.leader}
                     onChange={(e) => setDeptFormData(p => ({ ...p, leader: e.target.value }))}
-                    style={{ width: '100%', padding: '0.45rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem', boxSizing: 'border-box' }}
+                    style={{ width: '100%', padding: '0.45rem', borderRadius: '6px', border: '1px solid #e3e8ef', fontSize: '0.82rem', boxSizing: 'border-box' }}
                   />
                 </div>
               </div>
@@ -1685,7 +1685,7 @@ export default function DepartmentPanel() {
                   placeholder="Tiếp nhận thẩm định và xử lý bảo hành RMA"
                   value={deptFormData.roleDesc}
                   onChange={(e) => setDeptFormData(p => ({ ...p, roleDesc: e.target.value }))}
-                  style={{ width: '100%', padding: '0.45rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem', boxSizing: 'border-box' }}
+                  style={{ width: '100%', padding: '0.45rem', borderRadius: '6px', border: '1px solid #e3e8ef', fontSize: '0.82rem', boxSizing: 'border-box' }}
                 />
               </div>
 
@@ -1693,7 +1693,7 @@ export default function DepartmentPanel() {
                 <button
                   type="button"
                   onClick={() => setShowDeptModal(false)}
-                  style={{ padding: '0.45rem 0.95rem', borderRadius: '6px', border: '1px solid #cbd5e1', backgroundColor: '#ffffff', color: '#475569', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}
+                  style={{ padding: '0.45rem 0.95rem', borderRadius: '6px', border: '1px solid #e3e8ef', backgroundColor: '#ffffff', color: '#475569', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}
                 >
                   Hủy
                 </button>

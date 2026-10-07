@@ -25,25 +25,98 @@ function specLabel(key) {
   return t.charAt(0).toUpperCase() + t.slice(1);
 }
 
-// Mô tả gốc được thu thập từ nhà phân phối: bỏ phần "Thông tin chung" (chính sách của nơi khác)
-// và thay tên cửa hàng cũ để nội dung khớp với AetherPC; tách theo tiêu đề "##".
+// Format mô tả sản phẩm: lọc bỏ rác cào thô, phân tách thông số kỹ thuật và bài viết đánh giá chuyên nghiệp
 function cleanDescription(text, name = '') {
   if (!text) return [];
-  let t = String(text).replace(/GEARVN|GearVN|Gearvn/g, 'AetherPC');
-  const firstHeading = t.indexOf('##');
-  if (/^Thông tin chung/i.test(t) && firstHeading > -1) t = t.slice(firstHeading);
-  return t.split(/##\s*/).map(x => x.trim()).filter(Boolean).map(block => {
-    // "Đánh giá chi tiết <tên sản phẩm> <nội dung>" → tách tiêu đề ngay sau tên sản phẩm
-    const at = name ? block.indexOf(name) : -1;
-    if (at > -1 && at < 80) {
-      const cut = at + name.length;
-      return { head: block.slice(0, cut).trim(), body: block.slice(cut).trim() };
+  let t = String(text)
+    .replace(/https?:\/\/[^\s]+/gi, '')
+    .replace(/GEARVN|GearVN|Gearvn/g, 'AetherPC')
+    .replace(/⭐[^⭐]*⭐/g, '')
+    .replace(/Đã hết hàng[^\n#]*/gi, '')
+    .replace(/Tham khảo các sản phẩm[^\n#]*/gi, '')
+    .trim();
+
+  // Bỏ phần rác 'Thông tin chung', 'Nhà sản xuất', 'Tình trạng', 'Bảo hành' ở đầu nếu có
+  t = t.replace(/^[-–\s]*(Thông tin (chung|sản phẩm)|Nhà sản xuất|Hãng sản xuất|Tình trạng|Bảo hành)\s*:?[^.]*?(\d+\s*(tháng|năm)|New\s*100%|Mới)[^#\n.]*/gi, '');
+  t = t.replace(/^[-–\s]*(Thông tin (chung|sản phẩm)|Nhà sản xuất|Hãng sản xuất|Tình trạng|Bảo hành)\s*:?[^#\n]*/gi, '');
+  t = t.trim();
+
+  // Tách 'Đánh giá chi tiết' và 'THÔNG SỐ KĨ THUẬT' thành các block riêng
+  t = t.replace(/(Đánh giá chi tiết[^\n:]*:?)/gi, '## $1 ##');
+  t = t.replace(/(THÔNG SỐ K[ĨI] THUẬT\s*:?)/gi, '## $1 ##');
+
+  const rawBlocks = t.split(/##\s*/).map(x => x.trim()).filter(Boolean);
+  const result = [];
+
+  const SPEC_KEYS = [
+    'GPU', 'Graphics Bus', 'Memory size', 'Memory type', 'Core clock', 'Memory clock',
+    'Output', 'Maximum Digital Resolution', 'Memory Interface', 'Memory Bandwidth', 'CUDA Cores',
+    'HDCP support', 'DirectX', 'OpenGL', 'Card Dimensions', 'Graphics Card Power', 'Package contents',
+    'System Requirements', 'Base clock', 'Boost clock', 'Thương hiệu', 'Model Name', 'Model',
+    'Kích cỡ', 'Kích thước', 'Kích thước', 'Giao tiếp', 'Giao thức', 'Dung lượng', 'NAND',
+    'Truyền dữ liệu', 'Tiêu thụ điện năng', 'Nhiệt độ bảo quản', 'Nhiệt độ hoạt động', 'Trọng lượng',
+    'Khối lượng', 'Tuổi thọ quạt', 'Tuổi thọ', 'Tổng số byte', 'Độ rung', 'Hỗ trợ Socket', 'Hỗ trợ Socket',
+    'Chất liệu', 'Tốc độ quạt', 'Lưu lượng gió', 'Độ ồn', 'Kích thước quạt', 'Màu sắc', 'Màu sắc',
+    'Bảo hành', 'Điện áp', 'Socket', 'Chipset', 'Chuẩn Bus', 'Độ phân giải', 'Series', 'Cổng xuất hình',
+    'Số nhân', 'Số luồng', 'Bộ nhớ đệm', 'Xung cơ bản', 'TDP', 'Số khe RAM', 'Loại RAM'
+  ];
+
+  for (const block of rawBlocks) {
+    if (!block || block.length < 5) continue;
+
+    // Lọc bỏ block rác chỉ chứa thông tin bảo hành / tình trạng
+    if (/^(Thông tin (chung|sản phẩm)|Hãng sản xuất|Nhà sản xuất|Tình trạng|Bảo hành)/i.test(block) && block.length < 150 && !block.includes('Đánh giá') && !block.includes('sản phẩm')) {
+      continue;
     }
-    const sentences = block.split(/(?<=[.!?])\s+/);
-    // Dòng đầu của mỗi khối là tiêu đề nếu ngắn
-    const head = sentences[0] && sentences[0].length < 120 && !/[.!?]$/.test(sentences[0]) ? sentences.shift() : null;
-    return { head, body: sentences.join(' ') };
-  });
+
+    // Nếu block là tiêu đề đánh giá
+    if (/^Đánh giá chi tiết/i.test(block)) {
+      continue;
+    }
+
+    // Kiểm tra xem block có chứa danh sách thông số dính liền không
+    const matchedKeys = SPEC_KEYS.filter(k => block.includes(k));
+    if (matchedKeys.length >= 2) {
+      // Tách các thông số thành danh sách nhãn - giá trị
+      const sortedKeys = [...matchedKeys].sort((a, b) => b.length - a.length);
+      const splitRegex = new RegExp(`(${sortedKeys.map(k => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})[:\\s]+`, 'g');
+      const parts = block.replace(/^THÔNG SỐ K[ĨI] THUẬT\s*:?\s*/i, '').split(splitRegex).map(s => s.trim()).filter(Boolean);
+      
+      const items = [];
+      for (let i = 0; i < parts.length; i += 2) {
+        if (parts[i] && parts[i + 1]) {
+          // Làm sạch giá trị thông số
+          let val = parts[i + 1].replace(/[:\s]+$/, '').trim();
+          if (val.length > 0 && val.length < 250) {
+            items.push({ label: parts[i], val });
+          }
+        }
+      }
+      if (items.length > 0) {
+        result.push({ head: 'Thông số chi tiết sản phẩm', items });
+        continue;
+      }
+    }
+
+    // Nếu block là bài viết đánh giá hoặc giới thiệu (đoạn văn có dấu câu)
+    const cleanParagraph = block.replace(/^(Đánh giá chi tiết[^\n.]*\.?\s*)/i, '').trim();
+    if (cleanParagraph) {
+      // Tách thành các đoạn văn mạch lạc nếu quá dài
+      const sentences = cleanParagraph.split(/(?<=[.!?])\s+/);
+      if (sentences.length > 4) {
+        // Gom 3-4 câu thành 1 đoạn văn dễ đọc
+        const paragraphs = [];
+        for (let i = 0; i < sentences.length; i += 3) {
+          paragraphs.push(sentences.slice(i, i + 3).join(' '));
+        }
+        result.push({ head: 'Đánh giá & Tính năng nổi bật', paragraphs });
+      } else {
+        result.push({ head: 'Đánh giá & Tính năng nổi bật', body: cleanParagraph });
+      }
+    }
+  }
+
+  return result;
 }
 
 function Stars({ value, size = 14, onChange }) {
@@ -272,13 +345,32 @@ export default function ProductDetail() {
             <>
               <div className={`sf-desc${descOpen ? '' : ' is-clamped'}`}>
                 {desc.map((d, i) => (
-                  <div key={i} style={{ marginBottom: 14 }}>
-                    {d.head && <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--sf-text)', margin: '0 0 6px' }}>{d.head}</h3>}
-                    <p style={{ margin: 0 }}>{d.body}</p>
+                  <div key={i} style={{ marginBottom: 20 }}>
+                    {d.head && <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--sf-text)', margin: '0 0 10px', display: 'flex', alignItems: 'center', gap: 6 }}>{d.head}</h3>}
+                    {d.items ? (
+                      <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                        gap: '8px 16px',
+                        background: '#f8fafc',
+                        padding: '14px 16px',
+                        borderRadius: '10px',
+                        border: '1px solid #e2e8f0'
+                      }}>
+                        {d.items.map((it, idx) => (
+                          <div key={idx} style={{ display: 'flex', fontSize: '13.5px', lineHeight: 1.5, gap: 6 }}>
+                            <span style={{ color: '#64748b', fontWeight: 600, minWidth: 100 }}>{it.label}:</span>
+                            <span style={{ color: '#0f172a', fontWeight: 500, flex: 1 }}>{it.val}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p style={{ margin: 0, lineHeight: 1.7, color: '#334155', fontSize: '14px' }}>{d.body}</p>
+                    )}
                   </div>
                 ))}
               </div>
-              <div style={{ textAlign: 'center', marginTop: 8 }}>
+              <div style={{ textAlign: 'center', marginTop: 12 }}>
                 <button type="button" className="sf-btn sf-btn-outline" onClick={() => setDescOpen(o => !o)}>{descOpen ? 'Thu gọn' : 'Xem thêm nội dung'}</button>
               </div>
             </>

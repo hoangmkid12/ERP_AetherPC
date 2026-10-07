@@ -72,7 +72,7 @@ export default function SearchableSelect({
           width: '100%',
           padding: '0.65rem 2.2rem 0.65rem 0.85rem',
           borderRadius: '8px',
-          border: isOpen ? '1.5px solid #2563eb' : '1px solid #cbd5e1',
+          border: isOpen ? '1.5px solid #2563eb' : '1px solid #e3e8ef',
           fontSize: '0.88rem',
           color: value ? '#0f172a' : '#94a3b8',
           backgroundColor: disabled || loading ? '#f8fafc' : '#ffffff',
@@ -136,7 +136,7 @@ export default function SearchableSelect({
             zIndex: 999999,
             backgroundColor: '#ffffff',
             borderRadius: '10px',
-            border: '1px solid #cbd5e1',
+            border: '1px solid #e3e8ef',
             boxShadow: '0 12px 28px rgba(15, 23, 42, 0.15)',
             padding: '0.45rem',
             maxHeight: '260px',
@@ -158,7 +158,7 @@ export default function SearchableSelect({
                 width: '100%',
                 padding: '0.5rem 0.65rem 0.5rem 2.1rem',
                 borderRadius: '6px',
-                border: '1px solid #cbd5e1',
+                border: '1px solid #e3e8ef',
                 fontSize: '0.82rem',
                 outline: 'none',
                 boxSizing: 'border-box'
@@ -209,7 +209,7 @@ export default function SearchableSelect({
                     }}
                   >
                     <span>{optName}</span>
-                    {isSelected && <span style={{ color: '#2563eb', fontSize: '0.75rem' }}>✓</span>}
+                    {isSelected && <span style={{ color: '#2563eb', fontSize: '0.8rem' }}>✓</span>}
                   </div>
                 );
               })

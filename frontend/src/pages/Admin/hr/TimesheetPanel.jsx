@@ -438,7 +438,7 @@ export default function TimesheetPanel({ defaultView }) {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', fontFamily: 'Inter, sans-serif' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', fontFamily: 'inherit' }}>
       
       {/* ========================================================================= */}
       {/* TIÊU ĐỀ BẢNG CHẤM CÔNG & NÚT CHUYỂN ĐỔI (QUẢN LÝ / CHẤM CÔNG CỦA TÔI) */}
@@ -468,7 +468,7 @@ export default function TimesheetPanel({ defaultView }) {
               style={{
                 padding: '0.45rem 1rem',
                 borderRadius: '6px',
-                border: activeView === 'manage' ? '1px solid #cbd5e1' : 'none',
+                border: activeView === 'manage' ? '1px solid #e3e8ef' : 'none',
                 backgroundColor: activeView === 'manage' ? '#ffffff' : 'transparent',
                 color: activeView === 'manage' ? '#0f172a' : '#64748b',
                 fontSize: '0.82rem',
@@ -486,7 +486,7 @@ export default function TimesheetPanel({ defaultView }) {
               style={{
                 padding: '0.45rem 1rem',
                 borderRadius: '6px',
-                border: activeView === 'my' ? '1px solid #cbd5e1' : 'none',
+                border: activeView === 'my' ? '1px solid #e3e8ef' : 'none',
                 backgroundColor: activeView === 'my' ? '#ffffff' : 'transparent',
                 color: activeView === 'my' ? '#0f172a' : '#64748b',
                 fontSize: '0.82rem',
@@ -601,7 +601,7 @@ export default function TimesheetPanel({ defaultView }) {
                 <LogIn size={18} />
               </div>
               <div>
-                <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Giờ vào ca</div>
+                <div style={{ fontSize: '0.8rem', color: '#64748b' }}>Giờ vào ca</div>
                 <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a' }}>{todayRecord.checkIn}</div>
               </div>
             </div>
@@ -630,7 +630,7 @@ export default function TimesheetPanel({ defaultView }) {
                 <LogOut size={18} />
               </div>
               <div>
-                <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Giờ ra ca</div>
+                <div style={{ fontSize: '0.8rem', color: '#64748b' }}>Giờ ra ca</div>
                 <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a' }}>{todayRecord.checkOut}</div>
               </div>
             </div>
@@ -659,7 +659,7 @@ export default function TimesheetPanel({ defaultView }) {
                 <Hourglass size={18} />
               </div>
               <div>
-                <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Tổng giờ làm</div>
+                <div style={{ fontSize: '0.8rem', color: '#64748b' }}>Tổng giờ làm</div>
                 <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a' }}>{todayRecord.workHours}</div>
               </div>
             </div>
@@ -708,7 +708,7 @@ export default function TimesheetPanel({ defaultView }) {
                   gap: '0.3rem',
                   padding: '0.35rem 0.85rem',
                   borderRadius: '5px',
-                  border: personalViewMode === 'calendar' ? '1px solid #cbd5e1' : 'none',
+                  border: personalViewMode === 'calendar' ? '1px solid #e3e8ef' : 'none',
                   backgroundColor: personalViewMode === 'calendar' ? '#ffffff' : 'transparent',
                   color: personalViewMode === 'calendar' ? '#0f172a' : '#64748b',
                   fontSize: '0.8rem',
@@ -728,7 +728,7 @@ export default function TimesheetPanel({ defaultView }) {
                   gap: '0.3rem',
                   padding: '0.35rem 0.85rem',
                   borderRadius: '5px',
-                  border: personalViewMode === 'list' ? '1px solid #cbd5e1' : 'none',
+                  border: personalViewMode === 'list' ? '1px solid #e3e8ef' : 'none',
                   backgroundColor: personalViewMode === 'list' ? '#ffffff' : 'transparent',
                   color: personalViewMode === 'list' ? '#0f172a' : '#64748b',
                   fontSize: '0.8rem',
@@ -761,7 +761,7 @@ export default function TimesheetPanel({ defaultView }) {
                 style={{
                   padding: '0.35rem',
                   borderRadius: '6px',
-                  border: '1px solid #cbd5e1',
+                  border: '1px solid #e3e8ef',
                   backgroundColor: '#ffffff',
                   cursor: 'pointer',
                   color: '#475569',
@@ -779,7 +779,7 @@ export default function TimesheetPanel({ defaultView }) {
                 style={{
                   padding: '0.4rem 0.65rem',
                   borderRadius: '6px',
-                  border: '1px solid #cbd5e1',
+                  border: '1px solid #e3e8ef',
                   fontSize: '0.82rem',
                   fontWeight: 600,
                   color: '#0f172a',
@@ -797,7 +797,7 @@ export default function TimesheetPanel({ defaultView }) {
                 style={{
                   padding: '0.4rem 0.65rem',
                   borderRadius: '6px',
-                  border: '1px solid #cbd5e1',
+                  border: '1px solid #e3e8ef',
                   fontSize: '0.82rem',
                   fontWeight: 600,
                   color: '#0f172a',
@@ -815,7 +815,7 @@ export default function TimesheetPanel({ defaultView }) {
                 style={{
                   padding: '0.35rem',
                   borderRadius: '6px',
-                  border: '1px solid #cbd5e1',
+                  border: '1px solid #e3e8ef',
                   backgroundColor: '#ffffff',
                   cursor: 'pointer',
                   color: '#475569',
@@ -907,7 +907,7 @@ export default function TimesheetPanel({ defaultView }) {
                     >
                       {/* Số ngày ở góc trên */}
                       <div style={{
-                        fontSize: '0.75rem',
+                        fontSize: '0.8rem',
                         fontWeight: cell.isCurrentMonth ? 700 : 500,
                         color: !cell.isCurrentMonth ? '#cbd5e1' : cell.isWeekend ? '#94a3b8' : '#334155'
                       }}>
@@ -918,7 +918,7 @@ export default function TimesheetPanel({ defaultView }) {
                       <div style={{ textAlign: 'center', margin: 'auto 0' }}>
                         {cell.isCurrentMonth && (
                           hasLog ? (
-                            <div style={{ fontSize: '0.72rem', fontWeight: 700, lineHeight: 1.25 }}>
+                            <div style={{ fontSize: '0.77rem', fontWeight: 700, lineHeight: 1.25 }}>
                               <div style={{ color: isLate ? '#d97706' : '#16a34a' }}>
                                 {log.checkIn}
                               </div>
@@ -926,7 +926,7 @@ export default function TimesheetPanel({ defaultView }) {
                                 {log.checkOut || '--'}
                               </div>
                               {hasOT && (
-                                <span style={{ fontSize: '0.62rem', backgroundColor: '#f3e8ff', color: '#7e22ce', padding: '1px 4px', borderRadius: '4px', fontWeight: 800 }}>
+                                <span style={{ fontSize: '0.7rem', backgroundColor: '#f3e8ff', color: '#7e22ce', padding: '1px 4px', borderRadius: '4px', fontWeight: 800 }}>
                                   +{log.overtimeHours}h OT
                                 </span>
                               )}
@@ -988,7 +988,7 @@ export default function TimesheetPanel({ defaultView }) {
                           <span style={{
                             padding: '2px 8px',
                             borderRadius: '10px',
-                            fontSize: '0.72rem',
+                            fontSize: '0.77rem',
                             fontWeight: 800,
                             backgroundColor: r.status === 'PRESENT' ? '#f0fdf4' : r.status === 'LATE' ? '#fffbeb' : '#fef2f2',
                             color: r.status === 'PRESENT' ? '#16a34a' : r.status === 'LATE' ? '#d97706' : '#dc2626'
@@ -1039,7 +1039,7 @@ export default function TimesheetPanel({ defaultView }) {
                     width: '100%',
                     padding: '0.45rem 0.65rem 0.45rem 2rem',
                     borderRadius: '6px',
-                    border: '1px solid #cbd5e1',
+                    border: '1px solid #e3e8ef',
                     fontSize: '0.82rem',
                     outline: 'none',
                     boxSizing: 'border-box'
@@ -1056,7 +1056,7 @@ export default function TimesheetPanel({ defaultView }) {
                   style={{
                     padding: '0.45rem 0.65rem',
                     borderRadius: '6px',
-                    border: '1px solid #cbd5e1',
+                    border: '1px solid #e3e8ef',
                     fontSize: '0.82rem',
                     color: '#0f172a',
                     backgroundColor: '#ffffff',
@@ -1079,7 +1079,7 @@ export default function TimesheetPanel({ defaultView }) {
                   style={{
                     padding: '0.4rem 0.65rem',
                     borderRadius: '6px',
-                    border: '1px solid #cbd5e1',
+                    border: '1px solid #e3e8ef',
                     fontSize: '0.82rem',
                     color: '#0f172a',
                     outline: 'none'
@@ -1093,7 +1093,7 @@ export default function TimesheetPanel({ defaultView }) {
                   style={{
                     padding: '0.4rem 0.65rem',
                     borderRadius: '6px',
-                    border: '1px solid #cbd5e1',
+                    border: '1px solid #e3e8ef',
                     fontSize: '0.82rem',
                     color: '#0f172a',
                     outline: 'none'
@@ -1114,7 +1114,7 @@ export default function TimesheetPanel({ defaultView }) {
                   gap: '0.35rem',
                   backgroundColor: '#ffffff',
                   color: '#334155',
-                  border: '1px solid #cbd5e1',
+                  border: '1px solid #e3e8ef',
                   borderRadius: '6px',
                   padding: '0.45rem 0.85rem',
                   fontSize: '0.8rem',
@@ -1135,7 +1135,7 @@ export default function TimesheetPanel({ defaultView }) {
                   gap: '0.35rem',
                   backgroundColor: '#ffffff',
                   color: '#334155',
-                  border: '1px solid #cbd5e1',
+                  border: '1px solid #e3e8ef',
                   borderRadius: '6px',
                   padding: '0.45rem 0.85rem',
                   fontSize: '0.8rem',
@@ -1157,7 +1157,7 @@ export default function TimesheetPanel({ defaultView }) {
                   gap: '0.35rem',
                   backgroundColor: '#ffffff',
                   color: '#334155',
-                  border: '1px solid #cbd5e1',
+                  border: '1px solid #e3e8ef',
                   borderRadius: '6px',
                   padding: '0.45rem 0.85rem',
                   fontSize: '0.8rem',
@@ -1180,7 +1180,7 @@ export default function TimesheetPanel({ defaultView }) {
             overflow: 'hidden'
           }}>
             <div style={{ overflowX: 'auto', maxHeight: '720px' }}>
-              <table style={{
+              <table className="erp-compact" style={{
                 width: '100%',
                 borderCollapse: 'collapse',
                 fontSize: '0.8rem',
@@ -1230,7 +1230,7 @@ export default function TimesheetPanel({ defaultView }) {
                           }}
                         >
                           <div style={{
-                            fontSize: '0.72rem',
+                            fontSize: '0.77rem',
                             fontWeight: 800,
                             color: isRed ? '#ef4444' : '#475569',
                             marginBottom: '2px'
@@ -1238,7 +1238,7 @@ export default function TimesheetPanel({ defaultView }) {
                             {d.dayOfWeekName}
                           </div>
                           <div style={{
-                            fontSize: '0.72rem',
+                            fontSize: '0.77rem',
                             fontWeight: 600,
                             color: isRed ? '#ef4444' : '#64748b'
                           }}>
@@ -1309,7 +1309,7 @@ export default function TimesheetPanel({ defaultView }) {
                                   {emp.fullName || emp.fullname}
                                 </div>
                                 <div style={{
-                                  fontSize: '0.7rem',
+                                  fontSize: '0.75rem',
                                   color: '#64748b',
                                   whiteSpace: 'nowrap',
                                   textOverflow: 'ellipsis',
@@ -1330,7 +1330,7 @@ export default function TimesheetPanel({ defaultView }) {
                             zIndex: 10,
                             backgroundColor: isEven ? '#ffffff' : '#fafafa',
                             borderRight: '1px solid #e2e8f0',
-                            fontSize: '0.75rem',
+                            fontSize: '0.8rem',
                             fontWeight: 700,
                             color: '#334155',
                             lineHeight: 1.4
@@ -1354,7 +1354,7 @@ export default function TimesheetPanel({ defaultView }) {
                                     textAlign: 'center',
                                     borderRight: '1px solid #f1f5f9',
                                     backgroundColor: isRed ? '#fffdf5' : undefined,
-                                    fontSize: '0.72rem',
+                                    fontSize: '0.77rem',
                                     fontWeight: 700,
                                     lineHeight: 1.3
                                   }}
@@ -1377,7 +1377,7 @@ export default function TimesheetPanel({ defaultView }) {
 
                             if (holidaySet.has(d.isoDate)) {
                               return (
-                                <td key={d.isoDate} style={{ padding: '0.45rem 0.25rem', textAlign: 'center', borderRight: '1px solid #f1f5f9', backgroundColor: '#fef2f2', color: '#ef4444', fontSize: '0.72rem', fontWeight: 800 }}>
+                                <td key={d.isoDate} style={{ padding: '0.45rem 0.25rem', textAlign: 'center', borderRight: '1px solid #f1f5f9', backgroundColor: '#fef2f2', color: '#ef4444', fontSize: '0.77rem', fontWeight: 800 }}>
                                   Lễ
                                 </td>
                               );
@@ -1427,7 +1427,7 @@ export default function TimesheetPanel({ defaultView }) {
           <div style={{
             backgroundColor: '#ffffff',
             borderRadius: '12px',
-            border: '1px solid #cbd5e1',
+            border: '1px solid #e3e8ef',
             padding: '1.5rem',
             width: '100%',
             maxWidth: '520px',
@@ -1459,7 +1459,7 @@ export default function TimesheetPanel({ defaultView }) {
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                <div style={{ width: '40px', textAlign: 'center', fontSize: '0.72rem', fontWeight: 700, color: '#0f172a', lineHeight: 1.2 }}>
+                <div style={{ width: '40px', textAlign: 'center', fontSize: '0.77rem', fontWeight: 700, color: '#0f172a', lineHeight: 1.2 }}>
                   <div>08:00</div>
                   <div>18:00</div>
                 </div>
@@ -1467,7 +1467,7 @@ export default function TimesheetPanel({ defaultView }) {
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                <div style={{ width: '40px', textAlign: 'center', fontSize: '0.72rem', fontWeight: 700, color: '#d97706', lineHeight: 1.2 }}>
+                <div style={{ width: '40px', textAlign: 'center', fontSize: '0.77rem', fontWeight: 700, color: '#d97706', lineHeight: 1.2 }}>
                   <div>16:40</div>
                   <div>16:41</div>
                 </div>
@@ -1490,7 +1490,7 @@ export default function TimesheetPanel({ defaultView }) {
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                <span style={{ width: '40px', height: '28px', backgroundColor: '#f1f5f9', border: '1px solid #cbd5e1', color: '#0f172a', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.7rem' }}>D / H</span>
+                <span style={{ width: '40px', height: '28px', backgroundColor: '#f1f5f9', border: '1px solid #e3e8ef', color: '#0f172a', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.75rem' }}>D / H</span>
                 <div><strong>D:</strong> Tổng ngày công tích lũy · <strong>H:</strong> Tổng giờ làm việc thực tế.</div>
               </div>
             </div>
@@ -1535,7 +1535,7 @@ export default function TimesheetPanel({ defaultView }) {
           <div style={{
             backgroundColor: '#ffffff',
             borderRadius: '16px',
-            border: '1px solid #cbd5e1',
+            border: '1px solid #e3e8ef',
             padding: '1.5rem',
             width: '100%',
             maxWidth: '560px',

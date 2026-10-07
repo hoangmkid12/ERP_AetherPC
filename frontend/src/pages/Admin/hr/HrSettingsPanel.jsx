@@ -60,7 +60,7 @@ export default function HrSettingsPanel() {
     <h3 style={{ fontSize: '0.92rem', fontWeight: 800, margin: '0 0 0.85rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}><Icon size={17} style={{ color }} /> {title}</h3>
   );
   const grid = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.75rem' };
-  const hint = { fontSize: '0.7rem', color: '#94a3b8', marginTop: '0.2rem' };
+  const hint = { fontSize: '0.75rem', color: '#94a3b8', marginTop: '0.2rem' };
   const policy = s.policy;
 
   return (
@@ -86,7 +86,7 @@ export default function HrSettingsPanel() {
             <input type="checkbox" checked={s.attendanceStrictMode} onChange={set('attendanceStrictMode')} /> Chấm công nghiêm ngặt (ngày không có dữ liệu = vắng)
           </label>
         </div>
-        <div style={{ fontSize: '0.75rem', color: '#475569', marginTop: '0.6rem' }}>
+        <div style={{ fontSize: '0.8rem', color: '#475569', marginTop: '0.6rem' }}>
           Số giờ làm chuẩn mỗi ngày theo cấu hình hiện tại: <strong>{s.standardHoursPerDay}h</strong>.
         </div>
       </div>

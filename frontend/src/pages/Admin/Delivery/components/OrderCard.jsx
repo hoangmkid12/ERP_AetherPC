@@ -53,7 +53,7 @@ export default function OrderCard({ order: ord, variant, fmt, getOrderTimeClassi
           {isOrderRedelivery(ord) && (
             <span style={{
               display: 'inline-flex', alignItems: 'center', gap: '3px',
-              padding: '2px 7px', borderRadius: '4px', fontSize: '0.66rem', fontWeight: 800,
+              padding: '2px 7px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 800,
               backgroundColor: 'rgba(234, 88, 12, 0.12)', color: '#ea580c', border: '1px solid rgba(234, 88, 12, 0.3)'
             }}>
               <RotateCcw size={10} />
@@ -62,7 +62,7 @@ export default function OrderCard({ order: ord, variant, fmt, getOrderTimeClassi
           )}
         </div>
         <span style={{
-          padding: '2px 8px', borderRadius: '4px', fontSize: '0.68rem', fontWeight: 800,
+          padding: '2px 8px', borderRadius: '4px', fontSize: '0.74rem', fontWeight: 800,
           backgroundColor: statusBadge.bg, color: statusBadge.color, whiteSpace: 'nowrap'
         }}>
           {statusBadge.text}
@@ -70,7 +70,7 @@ export default function OrderCard({ order: ord, variant, fmt, getOrderTimeClassi
       </div>
 
       {timeInfo.isNew && !isDelivered && (
-        <div style={{ fontSize: '0.68rem', color: '#ea580c', fontWeight: 800, marginBottom: '0.35rem' }}>
+        <div style={{ fontSize: '0.74rem', color: '#ea580c', fontWeight: 800, marginBottom: '0.35rem' }}>
           MỚI BÀN GIAO
         </div>
       )}
@@ -80,7 +80,7 @@ export default function OrderCard({ order: ord, variant, fmt, getOrderTimeClassi
         <div style={{
           display: 'flex', alignItems: 'center', gap: '0.35rem',
           padding: '0.28rem 0.55rem', borderRadius: 'var(--radius-sm)',
-          marginBottom: '0.45rem', fontSize: '0.72rem', fontWeight: 800,
+          marginBottom: '0.45rem', fontSize: '0.77rem', fontWeight: 800,
           backgroundColor: appointment.isLate
             ? 'rgba(220, 38, 38, 0.12)'
             : appointment.isUpcoming
@@ -116,7 +116,7 @@ export default function OrderCard({ order: ord, variant, fmt, getOrderTimeClassi
         <MapPin size={12} style={{ flexShrink: 0, color: 'var(--text-muted)', marginTop: '2px' }} />
         <span>{ord.shippingAddress || 'TP. Hồ Chí Minh'}</span>
         <span style={{
-          flexShrink: 0, padding: '1px 5px', borderRadius: '3px', fontSize: '0.65rem', fontWeight: 700,
+          flexShrink: 0, padding: '1px 5px', borderRadius: '3px', fontSize: '0.72rem', fontWeight: 700,
           backgroundColor: isHCM ? 'rgba(22,163,74,0.1)' : 'rgba(124,58,237,0.1)',
           color: isHCM ? 'var(--success)' : '#7c3aed'
         }}>
@@ -124,7 +124,7 @@ export default function OrderCard({ order: ord, variant, fmt, getOrderTimeClassi
         </span>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '0.55rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.77rem', color: 'var(--text-muted)', marginBottom: '0.55rem' }}>
         <Clock size={12} />
         <span>
           {isDelivered 
@@ -146,7 +146,7 @@ export default function OrderCard({ order: ord, variant, fmt, getOrderTimeClassi
           : (isPrepaid ? 'rgba(37,99,235,0.08)' : 'rgba(22,163,74,0.08)')
       }}>
         <span style={{
-          fontSize: '0.7rem', fontWeight: 700,
+          fontSize: '0.75rem', fontWeight: 700,
           color: isDelivered
             ? (ord.actualPaymentMethod === 'CASH' ? '#15803d' : '#2563eb')
             : (isPrepaid ? 'var(--primary)' : 'var(--success)')
@@ -207,7 +207,7 @@ export default function OrderCard({ order: ord, variant, fmt, getOrderTimeClassi
                 type="button"
                 className="delivery-tap-target"
                 onClick={() => onOpenDetail && onOpenDetail(ord)}
-                style={{ flex: 1, backgroundColor: 'rgba(22,163,74,0.1)', color: 'var(--success)', border: 'none', borderRadius: 'var(--radius-md)', padding: '0.55rem', fontSize: '0.76rem', fontWeight: 800, cursor: 'pointer' }}
+                style={{ flex: 1, backgroundColor: 'rgba(22,163,74,0.1)', color: 'var(--success)', border: 'none', borderRadius: 'var(--radius-md)', padding: '0.55rem', fontSize: '0.8rem', fontWeight: 800, cursor: 'pointer' }}
               >
                 Xem Chi Tiết & Ảnh POD
               </button>
@@ -216,7 +216,7 @@ export default function OrderCard({ order: ord, variant, fmt, getOrderTimeClassi
                 className="delivery-tap-target"
                 onClick={() => actions.onRedeliver && actions.onRedeliver(orderId)}
                 title="Nếu giao nhầm hoặc cần chụp lại POD"
-                style={{ backgroundColor: 'transparent', color: 'var(--text-muted)', border: '1px solid var(--border-glass)', borderRadius: 'var(--radius-md)', padding: '0.55rem 0.7rem', fontSize: '0.74rem', fontWeight: 600, cursor: 'pointer' }}
+                style={{ backgroundColor: 'transparent', color: 'var(--text-muted)', border: '1px solid var(--border-glass)', borderRadius: 'var(--radius-md)', padding: '0.55rem 0.7rem', fontSize: '0.79rem', fontWeight: 600, cursor: 'pointer' }}
               >
                 Giao Lại
               </button>
@@ -227,7 +227,7 @@ export default function OrderCard({ order: ord, variant, fmt, getOrderTimeClassi
                 type="button"
                 className="delivery-tap-target"
                 onClick={() => actions.onResume && actions.onResume(orderId)}
-                style={{ flex: 1.2, backgroundColor: 'var(--success)', color: '#fff', border: 'none', borderRadius: 'var(--radius-md)', padding: '0.55rem', fontSize: '0.76rem', fontWeight: 800, cursor: 'pointer' }}
+                style={{ flex: 1.2, backgroundColor: 'var(--success)', color: '#fff', border: 'none', borderRadius: 'var(--radius-md)', padding: '0.55rem', fontSize: '0.8rem', fontWeight: 800, cursor: 'pointer' }}
               >
                 Khách Đã Gọi Lại
               </button>
@@ -235,7 +235,7 @@ export default function OrderCard({ order: ord, variant, fmt, getOrderTimeClassi
                 type="button"
                 className="delivery-tap-target"
                 onClick={() => actions.onForceReturn && actions.onForceReturn(ord)}
-                style={{ flex: 0.8, backgroundColor: 'transparent', color: 'var(--danger)', border: '1px solid var(--danger)', borderRadius: 'var(--radius-md)', padding: '0.55rem', fontSize: '0.76rem', fontWeight: 700, cursor: 'pointer' }}
+                style={{ flex: 0.8, backgroundColor: 'transparent', color: 'var(--danger)', border: '1px solid var(--danger)', borderRadius: 'var(--radius-md)', padding: '0.55rem', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}
               >
                 Hoàn Kho
               </button>
@@ -246,7 +246,7 @@ export default function OrderCard({ order: ord, variant, fmt, getOrderTimeClassi
                 type="button"
                 className="delivery-tap-target"
                 onClick={() => actions.onResume && actions.onResume(orderId)}
-                style={{ flex: 1.2, backgroundColor: '#7c3aed', color: '#fff', border: 'none', borderRadius: 'var(--radius-md)', padding: '0.55rem', fontSize: '0.76rem', fontWeight: 800, cursor: 'pointer' }}
+                style={{ flex: 1.2, backgroundColor: '#7c3aed', color: '#fff', border: 'none', borderRadius: 'var(--radius-md)', padding: '0.55rem', fontSize: '0.8rem', fontWeight: 800, cursor: 'pointer' }}
               >
                 Giao Tiếp Theo Hẹn
               </button>
@@ -254,7 +254,7 @@ export default function OrderCard({ order: ord, variant, fmt, getOrderTimeClassi
                 type="button"
                 className="delivery-tap-target"
                 onClick={() => actions.onForceReturn && actions.onForceReturn(ord)}
-                style={{ flex: 0.8, backgroundColor: 'transparent', color: 'var(--danger)', border: '1px solid var(--danger)', borderRadius: 'var(--radius-md)', padding: '0.55rem', fontSize: '0.76rem', fontWeight: 700, cursor: 'pointer' }}
+                style={{ flex: 0.8, backgroundColor: 'transparent', color: 'var(--danger)', border: '1px solid var(--danger)', borderRadius: 'var(--radius-md)', padding: '0.55rem', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}
               >
                 Hoàn Kho
               </button>
@@ -265,7 +265,7 @@ export default function OrderCard({ order: ord, variant, fmt, getOrderTimeClassi
                 type="button"
                 className="delivery-tap-target"
                 onClick={() => actions.onForceReturn && actions.onForceReturn(ord)}
-                style={{ flex: 1.2, backgroundColor: 'var(--danger)', color: '#fff', border: 'none', borderRadius: 'var(--radius-md)', padding: '0.55rem', fontSize: '0.76rem', fontWeight: 800, cursor: 'pointer' }}
+                style={{ flex: 1.2, backgroundColor: 'var(--danger)', color: '#fff', border: 'none', borderRadius: 'var(--radius-md)', padding: '0.55rem', fontSize: '0.8rem', fontWeight: 800, cursor: 'pointer' }}
               >
                 Xác Nhận Hoàn Kho
               </button>
@@ -273,7 +273,7 @@ export default function OrderCard({ order: ord, variant, fmt, getOrderTimeClassi
                 type="button"
                 className="delivery-tap-target"
                 onClick={() => actions.onEscalate && actions.onEscalate(orderId)}
-                style={{ flex: 0.9, backgroundColor: 'rgba(37,99,235,0.1)', color: 'var(--primary)', border: 'none', borderRadius: 'var(--radius-md)', padding: '0.55rem', fontSize: '0.74rem', fontWeight: 700, cursor: 'pointer' }}
+                style={{ flex: 0.9, backgroundColor: 'rgba(37,99,235,0.1)', color: 'var(--primary)', border: 'none', borderRadius: 'var(--radius-md)', padding: '0.55rem', fontSize: '0.79rem', fontWeight: 700, cursor: 'pointer' }}
               >
                 Báo CSKH
               </button>
@@ -283,7 +283,7 @@ export default function OrderCard({ order: ord, variant, fmt, getOrderTimeClassi
               type="button"
               className="delivery-tap-target"
               onClick={() => actions.onResume && actions.onResume(orderId)}
-              style={{ flex: 1, backgroundColor: 'transparent', color: 'var(--primary)', border: '1px solid var(--primary)', borderRadius: 'var(--radius-md)', padding: '0.55rem', fontSize: '0.76rem', fontWeight: 700, cursor: 'pointer' }}
+              style={{ flex: 1, backgroundColor: 'transparent', color: 'var(--primary)', border: '1px solid var(--primary)', borderRadius: 'var(--radius-md)', padding: '0.55rem', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}
             >
               Khách Đổi Ý → Tiếp Tục Giao
             </button>

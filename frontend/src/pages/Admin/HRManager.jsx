@@ -315,7 +315,7 @@ export default function HRManager() {
   }, [employees, search, roleFilter]);
 
   return (
-    <div style={{ backgroundColor: '#f8fafc', minHeight: '100vh', padding: '1.5rem 2rem', maxWidth: '1400px', margin: '0 auto', fontFamily: 'Inter, sans-serif' }}>
+    <div style={{ backgroundColor: '#f8fafc', minHeight: '100vh', padding: '1.5rem 2rem', maxWidth: '1400px', margin: '0 auto', fontFamily: 'inherit' }}>
       
       {/* ========================================================================= */}
       {/* 1. TOP HEADER */}
@@ -387,7 +387,7 @@ export default function HRManager() {
                 gap: '0.45rem',
                 padding: '0.5rem 1rem',
                 borderRadius: '8px',
-                border: isActive ? 'none' : '1px solid #cbd5e1',
+                border: isActive ? 'none' : '1px solid #e3e8ef',
                 backgroundColor: isActive ? '#0284c7' : '#ffffff',
                 color: isActive ? '#ffffff' : '#475569',
                 fontSize: '0.82rem',
@@ -418,7 +418,7 @@ export default function HRManager() {
                 style={{
                   backgroundColor: '#ffffff',
                   borderRadius: '10px',
-                  border: '1px solid #cbd5e1',
+                  border: '1px solid #e3e8ef',
                   padding: '1.1rem 1.25rem',
                   display: 'flex',
                   flexDirection: 'column',
@@ -429,7 +429,7 @@ export default function HRManager() {
                 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
+                  <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
                     {st.label}
                   </span>
                   <div style={{ width: '36px', height: '36px', borderRadius: '8px', backgroundColor: st.bg, color: st.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -441,7 +441,7 @@ export default function HRManager() {
                   <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {st.value}
                   </div>
-                  <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.15rem' }}>
+                  <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.15rem' }}>
                     {st.change}
                   </div>
                 </div>
@@ -451,7 +451,7 @@ export default function HRManager() {
 
           {/* Charts Row */}
           <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.8fr', gap: '1.25rem', marginBottom: '1.25rem' }}>
-            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem', height: '320px', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1.25rem', height: '320px', display: 'flex', flexDirection: 'column' }}>
               <h3 style={{ fontSize: '0.92rem', fontWeight: 800, color: '#0f172a', margin: '0 0 1rem 0' }}>
                 Phân Bổ Nhân Sự Theo Phòng Ban
               </h3>
@@ -467,7 +467,7 @@ export default function HRManager() {
               </div>
             </div>
 
-            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem', height: '320px', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1.25rem', height: '320px', display: 'flex', flexDirection: 'column' }}>
               <h3 style={{ fontSize: '0.92rem', fontWeight: 800, color: '#0f172a', margin: '0 0 1rem 0' }}>
                 Hiệu Suất Chuyên Cần Trong Tuần
               </h3>
@@ -490,7 +490,7 @@ export default function HRManager() {
 
           {/* Quick Hub: Pending Leaves & Recent Attendance */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
-            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem' }}>
+            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1.25rem' }}>
               <h3 style={{ fontSize: '0.9rem', fontWeight: 800, color: '#0f172a', margin: '0 0 0.85rem 0' }}>
                 Đơn Xin Nghỉ Phép Cần Duyệt Gấp
               </h3>
@@ -499,11 +499,11 @@ export default function HRManager() {
                   <div key={l.id || lIdx} style={{ padding: '0.65rem 0.85rem', borderRadius: '6px', border: '1px solid #e2e8f0', backgroundColor: '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
                       <strong style={{ fontSize: '0.82rem', color: '#0f172a' }}>{l.employee?.fullName || `Nhân viên #${l.employeeId ?? l.id}`}</strong>
-                      <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block' }}>Lý do: {l.reason || 'Nghỉ ốm'} (Từ {l.startDate ? new Date(l.startDate).toLocaleDateString('vi-VN') : '---'})</span>
+                      <span style={{ fontSize: '0.77rem', color: '#64748b', display: 'block' }}>Lý do: {l.reason || 'Nghỉ ốm'} (Từ {l.startDate ? new Date(l.startDate).toLocaleDateString('vi-VN') : '---'})</span>
                     </div>
                     <button
                       onClick={() => setTab('leaves')}
-                      style={{ backgroundColor: '#8b5cf6', color: '#ffffff', border: 'none', borderRadius: '4px', padding: '0.35rem 0.75rem', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}
+                      style={{ backgroundColor: '#8b5cf6', color: '#ffffff', border: 'none', borderRadius: '4px', padding: '0.35rem 0.75rem', fontSize: '0.77rem', fontWeight: 700, cursor: 'pointer' }}
                     >
                       Duyệt Đơn
                     </button>
@@ -512,7 +512,7 @@ export default function HRManager() {
               </div>
             </div>
 
-            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem' }}>
+            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1.25rem' }}>
               <h3 style={{ fontSize: '0.9rem', fontWeight: 800, color: '#0f172a', margin: '0 0 0.85rem 0' }}>
                 Tổng Hợp Quỹ Lương
               </h3>
@@ -558,7 +558,7 @@ export default function HRManager() {
       {/* TAB 3: EMPLOYEES (HỒ SƠ NHÂN VIÊN) */}
       {/* ========================================================================= */}
       {activeTab === 'employees' && (
-        <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem' }}>
+        <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1.25rem' }}>
           
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1.25rem' }}>
             <div style={{ position: 'relative', width: '320px' }}>
@@ -567,7 +567,7 @@ export default function HRManager() {
                 placeholder="Tìm nhân viên theo tên, username, chức vụ..."
                 value={search}
                 onChange={e => setSearch(e.target.value)}
-                style={{ width: '100%', padding: '0.45rem 0.65rem 0.45rem 2rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem' }}
+                style={{ width: '100%', padding: '0.45rem 0.65rem 0.45rem 2rem', borderRadius: '6px', border: '1px solid #e3e8ef', fontSize: '0.82rem' }}
               />
               <Search size={15} style={{ position: 'absolute', left: '0.6rem', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
             </div>
@@ -577,7 +577,7 @@ export default function HRManager() {
               <select
                 value={roleFilter}
                 onChange={e => setRoleFilter(e.target.value)}
-                style={{ padding: '0.4rem 0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.78rem', color: '#0f172a' }}
+                style={{ padding: '0.4rem 0.65rem', borderRadius: '6px', border: '1px solid #e3e8ef', fontSize: '0.78rem', color: '#0f172a' }}
               >
                 <option value="ALL">Tất cả chức danh</option>
                 {Object.keys(ROLE_COLORS).map(r => <option key={r} value={r}>{r}</option>)}
@@ -586,11 +586,11 @@ export default function HRManager() {
           </div>
 
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+            <table style={{ width: '100%', minWidth: '1180px', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
               <thead>
                 <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569' }}>
                   <th style={{ padding: '0.65rem 0.85rem' }}>Mã NV</th>
-                  <th style={{ padding: '0.65rem 0.85rem' }}>Họ và Tên</th>
+                  <th style={{ padding: '0.65rem 0.85rem', minWidth: '190px' }}>Họ và Tên</th>
                   <th style={{ padding: '0.65rem 0.85rem' }}>Đăng nhập</th>
                   <th style={{ padding: '0.65rem 0.85rem' }}>Chức Danh</th>
                   <th style={{ padding: '0.65rem 0.85rem' }}>Phòng Ban</th>
@@ -605,8 +605,8 @@ export default function HRManager() {
                     <td style={{ padding: '0.65rem 0.85rem', fontWeight: 700, color: '#64748b' }}>{emp.employeeCode || `NV-${emp.id}`}</td>
                     <td style={{ padding: '0.65rem 0.85rem', fontWeight: 700, color: emp.status === 'INACTIVE' ? '#94a3b8' : '#0f172a' }}>
                       {emp.fullname}
-                      {emp.status === 'INACTIVE' && <span style={{ marginLeft: '0.35rem', fontSize: '0.65rem', color: '#dc2626', fontWeight: 800 }}>ĐÃ NGHỈ</span>}
-                      {emp.jobTitle && <div style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 500 }}>{emp.jobTitle}</div>}
+                      {emp.status === 'INACTIVE' && <span style={{ marginLeft: '0.35rem', fontSize: '0.72rem', color: '#dc2626', fontWeight: 800 }}>ĐÃ NGHỈ</span>}
+                      {emp.jobTitle && <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 500 }}>{emp.jobTitle}</div>}
                     </td>
                     <td style={{ padding: '0.65rem 0.85rem' }}>
                       <code style={{ fontSize: '0.78rem', color: '#2563eb', backgroundColor: '#eff6ff', padding: '2px 6px', borderRadius: '4px' }}>
@@ -615,14 +615,14 @@ export default function HRManager() {
                     </td>
                     <td style={{ padding: '0.65rem 0.85rem' }}>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', alignItems: 'flex-start' }}>
-                        <span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 800, backgroundColor: `${ROLE_COLORS[emp.role] || '#6366f1'}15`, color: ROLE_COLORS[emp.role] || '#6366f1' }}>
+                        <span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 800, backgroundColor: `${ROLE_COLORS[emp.role] || '#6366f1'}15`, color: ROLE_COLORS[emp.role] || '#6366f1' }}>
                           {getRoleName(emp.role)}
                         </span>
                         {emp.role === 'DELIVERY' && emp.deliveryRegion && (
                           <span style={{
                             padding: '1px 6px',
                             borderRadius: '4px',
-                            fontSize: '0.65rem',
+                            fontSize: '0.72rem',
                             fontWeight: 700,
                             backgroundColor: '#eff6ff',
                             color: '#1d4ed8',
@@ -637,14 +637,14 @@ export default function HRManager() {
                     <td style={{ padding: '0.65rem 0.85rem', textAlign: 'right', fontWeight: 700, color: '#0f172a' }}>
                       {fmt(emp.salary || emp.baseSalary)}
                       {(Number(emp.responsibilityAllowance) > 0 || Number(emp.allowance) > 0) && (
-                        <div style={{ fontSize: '0.7rem', color: '#16a34a', fontWeight: 600 }}>+ {fmt(Number(emp.responsibilityAllowance || 0) + Number(emp.allowance || 0))} PC</div>
+                        <div style={{ fontSize: '0.75rem', color: '#16a34a', fontWeight: 600 }}>+ {fmt(Number(emp.responsibilityAllowance || 0) + Number(emp.allowance || 0))} PC</div>
                       )}
                     </td>
                     <td style={{ padding: '0.65rem 0.85rem', textAlign: 'center' }}>
                       <button
                         onClick={() => setFaceEmp(emp)}
                         title={emp.hasFace ? 'Đã đăng ký khuôn mặt — bấm để xem/đặt lại' : 'Chưa đăng ký — bấm để đăng ký hộ'}
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', backgroundColor: emp.hasFace ? '#f0fdf4' : '#fffbeb', color: emp.hasFace ? '#16a34a' : '#d97706', border: `1px solid ${emp.hasFace ? '#bbf7d0' : '#fde68a'}`, borderRadius: '12px', padding: '0.2rem 0.55rem', fontSize: '0.7rem', fontWeight: 800, cursor: 'pointer' }}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', backgroundColor: emp.hasFace ? '#f0fdf4' : '#fffbeb', color: emp.hasFace ? '#16a34a' : '#d97706', border: `1px solid ${emp.hasFace ? '#bbf7d0' : '#fde68a'}`, borderRadius: '12px', padding: '0.2rem 0.55rem', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer' }}
                       >
                         <ScanFace size={12} /> {emp.hasFace ? 'Đã đăng ký' : 'Chưa có'}
                       </button>
@@ -653,20 +653,20 @@ export default function HRManager() {
                       <div style={{ display: 'flex', justifyContent: 'center', gap: '0.3rem', flexWrap: 'wrap' }}>
                         <button
                           onClick={() => setViewingEmpDetail(emp)}
-                          style={{ backgroundColor: '#ffffff', color: '#2563eb', border: '1px solid #bfdbfe', borderRadius: '4px', padding: '0.3rem 0.5rem', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}
+                          style={{ backgroundColor: '#ffffff', color: '#2563eb', border: '1px solid #bfdbfe', borderRadius: '4px', padding: '0.3rem 0.5rem', fontSize: '0.77rem', fontWeight: 700, cursor: 'pointer' }}
                         >
                           Hồ Sơ
                         </button>
                         <button
                           onClick={() => { setShowAddEmpModal(false); setEditingEmp(emp); }}
-                          style={{ backgroundColor: '#ffffff', color: '#d97706', border: '1px solid #fde68a', borderRadius: '4px', padding: '0.3rem 0.5rem', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}
+                          style={{ backgroundColor: '#ffffff', color: '#d97706', border: '1px solid #fde68a', borderRadius: '4px', padding: '0.3rem 0.5rem', fontSize: '0.77rem', fontWeight: 700, cursor: 'pointer' }}
                         >
                           Sửa
                         </button>
                         <button
                           onClick={() => handleResetPassword(emp)}
                           title="Đặt lại mật khẩu về mặc định (123456)"
-                          style={{ backgroundColor: '#ffffff', color: '#7c3aed', border: '1px solid #ddd6fe', borderRadius: '4px', padding: '0.3rem 0.5rem', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}
+                          style={{ backgroundColor: '#ffffff', color: '#7c3aed', border: '1px solid #ddd6fe', borderRadius: '4px', padding: '0.3rem 0.5rem', fontSize: '0.77rem', fontWeight: 700, cursor: 'pointer' }}
                         >
                           Reset MK
                         </button>
@@ -677,7 +677,7 @@ export default function HRManager() {
                             backgroundColor: '#ffffff',
                             color: emp.status === 'INACTIVE' ? '#16a34a' : '#dc2626',
                             border: `1px solid ${emp.status === 'INACTIVE' ? '#bbf7d0' : '#fecaca'}`,
-                            borderRadius: '4px', padding: '0.3rem 0.5rem', fontSize: '0.72rem', fontWeight: 700,
+                            borderRadius: '4px', padding: '0.3rem 0.5rem', fontSize: '0.77rem', fontWeight: 700,
                             cursor: togglingStatusId === emp.id ? 'default' : 'pointer'
                           }}
                         >
@@ -698,7 +698,7 @@ export default function HRManager() {
       {/* TAB 4: LEAVES (QUẢN LÝ NGHỈ PHÉP) */}
       {/* ========================================================================= */}
       {activeTab === 'leaves' && (
-        <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem' }}>
+        <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1.25rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
             <div>
               <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
@@ -736,7 +736,7 @@ export default function HRManager() {
             backgroundColor: '#ffffff',
             padding: '1rem',
             borderRadius: '8px',
-            border: '1px solid #cbd5e1',
+            border: '1px solid #e3e8ef',
             marginBottom: '1.25rem',
             display: 'flex',
             flexDirection: 'column',
@@ -748,13 +748,13 @@ export default function HRManager() {
                 placeholder="Tìm nhân viên, lý do xin nghỉ, loại phép..."
                 value={leaveSearch}
                 onChange={e => setLeaveSearch(e.target.value)}
-                style={{ width: '100%', height: '38px', padding: '0 0.85rem', fontSize: '0.82rem', border: '1px solid #cbd5e1', borderRadius: '6px', boxSizing: 'border-box' }}
+                style={{ width: '100%', height: '38px', padding: '0 0.85rem', fontSize: '0.82rem', border: '1px solid #e3e8ef', borderRadius: '6px', boxSizing: 'border-box' }}
               />
 
               <select
                 value={leaveStatusFilter}
                 onChange={e => setLeaveStatusFilter(e.target.value)}
-                style={{ width: '100%', height: '38px', padding: '0 0.65rem', fontSize: '0.82rem', border: '1px solid #cbd5e1', borderRadius: '6px', color: '#0f172a', boxSizing: 'border-box', backgroundColor: '#ffffff', cursor: 'pointer' }}
+                style={{ width: '100%', height: '38px', padding: '0 0.65rem', fontSize: '0.82rem', border: '1px solid #e3e8ef', borderRadius: '6px', color: '#0f172a', boxSizing: 'border-box', backgroundColor: '#ffffff', cursor: 'pointer' }}
               >
                 <option value="ALL">Tất cả trạng thái ({leaveRequests.length})</option>
                 <option value="PENDING">Chờ phê duyệt</option>
@@ -801,7 +801,7 @@ export default function HRManager() {
                     <td style={{ padding: '0.65rem 0.85rem', color: '#2563eb', fontWeight: 600 }}>{lv.type || 'Phép Năm'}</td>
                     <td style={{ padding: '0.65rem 0.85rem', color: '#475569' }}>
                       {lv.startDate ? new Date(lv.startDate).toLocaleDateString('vi-VN', { timeZone: 'UTC' }) : '---'} → {lv.endDate ? new Date(lv.endDate).toLocaleDateString('vi-VN', { timeZone: 'UTC' }) : '---'}
-                      {lv.days != null && <div style={{ fontSize: '0.7rem', color: '#2563eb', fontWeight: 700 }}>{lv.days} ngày làm việc</div>}
+                      {lv.days != null && <div style={{ fontSize: '0.75rem', color: '#2563eb', fontWeight: 700 }}>{lv.days} ngày làm việc</div>}
                     </td>
                     <td style={{ padding: '0.65rem 0.85rem', color: '#64748b' }}>"{lv.reason || 'Có việc gia đình'}"</td>
                     <td style={{ padding: '0.65rem 0.85rem' }}>
@@ -809,7 +809,7 @@ export default function HRManager() {
                       <span style={{
                         padding: '2px 8px',
                         borderRadius: '10px',
-                        fontSize: '0.7rem',
+                        fontSize: '0.75rem',
                         fontWeight: 800,
                         backgroundColor: getStatusInfo(LEAVE_STATUS, ['APPROVED', 'REJECTED'].includes(lv.status) ? lv.status : 'PENDING').bg,
                         color: getStatusInfo(LEAVE_STATUS, ['APPROVED', 'REJECTED'].includes(lv.status) ? lv.status : 'PENDING').color
@@ -826,7 +826,7 @@ export default function HRManager() {
                                 .then(() => notify('Đã duyệt đơn xin nghỉ phép.', 'success'))
                                 .catch(err => notify(err.message || 'Không thể duyệt đơn nghỉ phép.', 'error'));
                             }}
-                            style={{ backgroundColor: '#16a34a', color: '#ffffff', border: 'none', borderRadius: '4px', padding: '0.3rem 0.65rem', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer' }}
+                            style={{ backgroundColor: '#16a34a', color: '#ffffff', border: 'none', borderRadius: '4px', padding: '0.3rem 0.65rem', fontSize: '0.77rem', fontWeight: 800, cursor: 'pointer' }}
                           >
                             ✓ Duyệt
                           </button>
@@ -838,13 +838,13 @@ export default function HRManager() {
                                 .then(() => notify('✕ Đã từ chối đơn nghỉ phép.', 'info'))
                                 .catch(err => notify(err.message || 'Không thể từ chối đơn nghỉ phép.', 'error'));
                             }}
-                            style={{ backgroundColor: '#ef4444', color: '#ffffff', border: 'none', borderRadius: '4px', padding: '0.3rem 0.65rem', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}
+                            style={{ backgroundColor: '#ef4444', color: '#ffffff', border: 'none', borderRadius: '4px', padding: '0.3rem 0.65rem', fontSize: '0.77rem', fontWeight: 700, cursor: 'pointer' }}
                           >
                             ✕ Từ Chối
                           </button>
                         </div>
                       ) : (
-                        <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Đã xử lý</span>
+                        <span style={{ fontSize: '0.8rem', color: '#64748b' }}>Đã xử lý</span>
                       )}
                     </td>
                   </tr>
@@ -875,7 +875,7 @@ export default function HRManager() {
       {/* ================= MODAL: XEM HỒ SƠ CHI TIẾT ================= */}
       {viewingEmpDetail && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(6px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', width: '100%', maxWidth: '520px', padding: '1.75rem', maxHeight: '90vh', overflowY: 'auto' }}>
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e3e8ef', width: '100%', maxWidth: '520px', padding: '1.75rem', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.75rem' }}>
               <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>Hồ Sơ Nhân Sự #{viewingEmpDetail.id}</h3>
               <button onClick={() => setViewingEmpDetail(null)} style={{ background: '#f1f5f9', border: 'none', padding: '0.4rem', borderRadius: '6px', cursor: 'pointer' }}><X size={18} /></button>
@@ -915,7 +915,7 @@ export default function HRManager() {
       {/* ================= MODAL: TẠO ĐƠN XIN NGHỈ PHÉP ================= */}
       {showCreateLeaveModal && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.5)', backdropFilter: 'blur(4px)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', padding: '1.5rem', width: '100%', maxWidth: '480px', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' }}>
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e3e8ef', padding: '1.5rem', width: '100%', maxWidth: '480px', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.75rem' }}>
               <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                 <CalendarCheck size={20} style={{ color: '#8b5cf6' }} />
@@ -929,7 +929,7 @@ export default function HRManager() {
                 <select
                   value={leaveModalForm.employeeId}
                   onChange={e => setLeaveModalForm({ ...leaveModalForm, employeeId: e.target.value })}
-                  style={{ width: '100%', padding: '0.55rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.82rem', backgroundColor: '#fff' }}
+                  style={{ width: '100%', padding: '0.55rem', border: '1px solid #e3e8ef', borderRadius: '6px', fontSize: '0.82rem', backgroundColor: '#fff' }}
                 >
                   <option value="">-- Chính tôi ({user?.fullname || user?.username || 'HR'}) --</option>
                   {employees.filter(e => e.status === 'ACTIVE').map(emp => (
@@ -942,7 +942,7 @@ export default function HRManager() {
                 <select
                   value={leaveModalForm.type}
                   onChange={e => setLeaveModalForm({ ...leaveModalForm, type: e.target.value })}
-                  style={{ width: '100%', padding: '0.55rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.82rem', backgroundColor: '#fff' }}
+                  style={{ width: '100%', padding: '0.55rem', border: '1px solid #e3e8ef', borderRadius: '6px', fontSize: '0.82rem', backgroundColor: '#fff' }}
                 >
                   <option value="Phép Năm">Nghỉ Phép Năm</option>
                   <option value="Nghỉ Ốm">Nghỉ Ốm / Điều Trị Y Tế</option>
@@ -959,7 +959,7 @@ export default function HRManager() {
                     required
                     value={leaveModalForm.startDate}
                     onChange={e => setLeaveModalForm({ ...leaveModalForm, startDate: e.target.value })}
-                    style={{ width: '100%', padding: '0.55rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.82rem', boxSizing: 'border-box' }}
+                    style={{ width: '100%', padding: '0.55rem', border: '1px solid #e3e8ef', borderRadius: '6px', fontSize: '0.82rem', boxSizing: 'border-box' }}
                   />
                 </div>
                 <div>
@@ -969,7 +969,7 @@ export default function HRManager() {
                     required
                     value={leaveModalForm.endDate}
                     onChange={e => setLeaveModalForm({ ...leaveModalForm, endDate: e.target.value })}
-                    style={{ width: '100%', padding: '0.55rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.82rem', boxSizing: 'border-box' }}
+                    style={{ width: '100%', padding: '0.55rem', border: '1px solid #e3e8ef', borderRadius: '6px', fontSize: '0.82rem', boxSizing: 'border-box' }}
                   />
                 </div>
               </div>
@@ -980,14 +980,14 @@ export default function HRManager() {
                   placeholder="Nhập lý do cụ thể..."
                   value={leaveModalForm.reason}
                   onChange={e => setLeaveModalForm({ ...leaveModalForm, reason: e.target.value })}
-                  style={{ width: '100%', padding: '0.55rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.82rem', boxSizing: 'border-box', resize: 'vertical' }}
+                  style={{ width: '100%', padding: '0.55rem', border: '1px solid #e3e8ef', borderRadius: '6px', fontSize: '0.82rem', boxSizing: 'border-box', resize: 'vertical' }}
                 />
               </div>
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.5rem' }}>
                 <button
                   type="button"
                   onClick={() => setShowCreateLeaveModal(false)}
-                  style={{ padding: '0.5rem 1rem', border: '1px solid #cbd5e1', backgroundColor: '#fff', borderRadius: '6px', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer', color: '#64748b' }}
+                  style={{ padding: '0.5rem 1rem', border: '1px solid #e3e8ef', backgroundColor: '#fff', borderRadius: '6px', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer', color: '#64748b' }}
                 >
                   Hủy
                 </button>

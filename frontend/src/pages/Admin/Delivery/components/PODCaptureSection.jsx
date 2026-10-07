@@ -395,7 +395,7 @@ export default function PODCaptureSection({ order, user, fmt, onConfirm, onRejec
               <div style={{
                 position: 'absolute', bottom: '10px', left: '10px',
                 backgroundColor: 'rgba(15, 23, 42, 0.85)', color: '#fff',
-                padding: '4px 10px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 800,
+                padding: '4px 10px', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 800,
                 display: 'flex', alignItems: 'center', gap: '0.4rem',
                 border: '1px solid rgba(34, 197, 94, 0.6)'
               }}>
@@ -414,7 +414,7 @@ export default function PODCaptureSection({ order, user, fmt, onConfirm, onRejec
               <button
                 type="button"
                 onClick={startCamera}
-                style={{ marginTop: '0.6rem', padding: '0.4rem 0.85rem', fontSize: '0.75rem', fontWeight: 700, backgroundColor: 'var(--primary)', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                style={{ marginTop: '0.6rem', padding: '0.4rem 0.85rem', fontSize: '0.8rem', fontWeight: 700, backgroundColor: 'var(--primary)', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
               >
                 Thử Mở Lại Camera
               </button>
@@ -465,13 +465,13 @@ export default function PODCaptureSection({ order, user, fmt, onConfirm, onRejec
       {proofPhoto ? (
         <div style={{ position: 'relative', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
           <img src={proofPhoto} alt="POD Captured" style={{ width: '100%', height: '160px', objectFit: 'cover', display: 'block' }} />
-          <span style={{ position: 'absolute', top: '8px', right: '8px', backgroundColor: 'rgba(22,163,74,0.9)', color: '#fff', padding: '3px 8px', borderRadius: '4px', fontSize: '0.68rem', fontWeight: 800 }}>
+          <span style={{ position: 'absolute', top: '8px', right: '8px', backgroundColor: 'rgba(22,163,74,0.9)', color: '#fff', padding: '3px 8px', borderRadius: '4px', fontSize: '0.74rem', fontWeight: 800 }}>
             ẢNH HỢP LỆ (POD)
           </span>
           <button
             type="button"
             onClick={retakePhoto}
-            style={{ position: 'absolute', bottom: '8px', right: '8px', backgroundColor: 'rgba(15,23,42,0.75)', color: '#fff', border: 'none', borderRadius: '4px', padding: '0.35rem 0.6rem', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+            style={{ position: 'absolute', bottom: '8px', right: '8px', backgroundColor: 'rgba(15,23,42,0.75)', color: '#fff', border: 'none', borderRadius: '4px', padding: '0.35rem 0.6rem', fontSize: '0.77rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
           >
             <RefreshCw size={13} /> Chụp Lại
           </button>
@@ -500,7 +500,7 @@ export default function PODCaptureSection({ order, user, fmt, onConfirm, onRejec
             <div style={{ fontWeight: 800, fontSize: '0.82rem', color: 'var(--primary)' }}>
               Đã Thanh Toán 100% Online / Chuyển Khoản Trước
             </div>
-            <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '0.1rem' }}>
+            <div style={{ fontSize: '0.77rem', color: 'var(--text-secondary)', marginTop: '0.1rem' }}>
               Tiền COD thu hộ: 0 đ. Chỉ cần kiểm tra người nhận.
             </div>
           </div>
@@ -522,7 +522,7 @@ export default function PODCaptureSection({ order, user, fmt, onConfirm, onRejec
                 border: actualPaymentMethod === 'CASH' ? '2px solid var(--success)' : '1px solid var(--border-glass)',
                 backgroundColor: actualPaymentMethod === 'CASH' ? 'rgba(22,163,74,0.12)' : 'var(--bg-primary)',
                 color: actualPaymentMethod === 'CASH' ? 'var(--success)' : 'var(--text-secondary)',
-                fontWeight: 750, fontSize: '0.72rem', cursor: 'pointer', textAlign: 'center'
+                fontWeight: 750, fontSize: '0.77rem', cursor: 'pointer', textAlign: 'center'
               }}
             >
               💵 Tiền Mặt
@@ -536,7 +536,7 @@ export default function PODCaptureSection({ order, user, fmt, onConfirm, onRejec
                 border: actualPaymentMethod === 'BANK_TRANSFER' ? '2px solid var(--primary)' : '1px solid var(--border-glass)',
                 backgroundColor: actualPaymentMethod === 'BANK_TRANSFER' ? 'rgba(37,99,235,0.12)' : 'var(--bg-primary)',
                 color: actualPaymentMethod === 'BANK_TRANSFER' ? 'var(--primary)' : 'var(--text-secondary)',
-                fontWeight: 750, fontSize: '0.72rem', cursor: 'pointer', textAlign: 'center'
+                fontWeight: 750, fontSize: '0.77rem', cursor: 'pointer', textAlign: 'center'
               }}
             >
               📱 Quét QR/CK
@@ -550,7 +550,7 @@ export default function PODCaptureSection({ order, user, fmt, onConfirm, onRejec
                 border: actualPaymentMethod === 'SPLIT' ? '2px solid #f59e0b' : '1px solid var(--border-glass)',
                 backgroundColor: actualPaymentMethod === 'SPLIT' ? 'rgba(245,158,11,0.12)' : 'var(--bg-primary)',
                 color: actualPaymentMethod === 'SPLIT' ? '#b45309' : 'var(--text-secondary)',
-                fontWeight: 750, fontSize: '0.72rem', cursor: 'pointer', textAlign: 'center'
+                fontWeight: 750, fontSize: '0.77rem', cursor: 'pointer', textAlign: 'center'
               }}
             >
               🔀 Kết Hợp
@@ -559,21 +559,21 @@ export default function PODCaptureSection({ order, user, fmt, onConfirm, onRejec
 
           {/* CASH: xác nhận đơn giản */}
           {actualPaymentMethod === 'CASH' && (
-            <div style={{ fontSize: '0.74rem', color: 'var(--success)', fontWeight: 600, padding: '0.4rem 0.6rem', backgroundColor: 'rgba(22,163,74,0.06)', borderRadius: '6px' }}>
+            <div style={{ fontSize: '0.79rem', color: 'var(--success)', fontWeight: 600, padding: '0.4rem 0.6rem', backgroundColor: 'rgba(22,163,74,0.06)', borderRadius: '6px' }}>
               ✅ Xác nhận thu đủ <strong>{fmt(codAmount)}</strong> tiền mặt từ khách.
-              <br /><span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>Tiền sẽ được Kế Toán đối soát COD với bạn sau khi giao.</span>
+              <br /><span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>Tiền sẽ được Kế Toán đối soát COD với bạn sau khi giao.</span>
             </div>
           )}
 
           {/* SPLIT: nhập tiền mặt + chuyển khoản */}
           {actualPaymentMethod === 'SPLIT' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              <div style={{ fontSize: '0.72rem', color: '#b45309', fontWeight: 700 }}>
+              <div style={{ fontSize: '0.77rem', color: '#b45309', fontWeight: 700 }}>
                 🔀 Thanh toán kết hợp — nhập số tiền từng hình thức:
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, color: 'var(--success)', marginBottom: '0.15rem' }}>💵 Tiền mặt (đ)</label>
+                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: 'var(--success)', marginBottom: '0.15rem' }}>💵 Tiền mặt (đ)</label>
                   <input
                     type="number"
                     inputMode="numeric"
@@ -584,7 +584,7 @@ export default function PODCaptureSection({ order, user, fmt, onConfirm, onRejec
                   />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, color: 'var(--primary)', marginBottom: '0.15rem' }}>📱 Chuyển khoản (đ)</label>
+                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: 'var(--primary)', marginBottom: '0.15rem' }}>📱 Chuyển khoản (đ)</label>
                   <input
                     type="number"
                     inputMode="numeric"
@@ -597,7 +597,7 @@ export default function PODCaptureSection({ order, user, fmt, onConfirm, onRejec
               </div>
               {/* Hiển thị tổng & validation */}
               <div style={{
-                fontSize: '0.72rem', fontWeight: 700, padding: '0.35rem 0.5rem', borderRadius: '6px',
+                fontSize: '0.77rem', fontWeight: 700, padding: '0.35rem 0.5rem', borderRadius: '6px',
                 backgroundColor: splitOk ? 'rgba(22,163,74,0.08)' : 'rgba(239,68,68,0.08)',
                 color: splitOk ? 'var(--success)' : 'var(--danger)'
               }}>
@@ -607,7 +607,7 @@ export default function PODCaptureSection({ order, user, fmt, onConfirm, onRejec
                     : `⚠️ Tổng: ${fmt(cashAmt + bankAmt)} — Cần đủ ${fmt(codAmount)} (thiếu/dư ${fmt(Math.abs(cashAmt + bankAmt - codAmount))})`
                 ) : `Nhập số tiền mặt + chuyển khoản để tổng = ${fmt(codAmount)}`}
               </div>
-              <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
+              <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
                 💡 Tiền mặt: Kế Toán sẽ đối soát với bạn sau giao. Chuyển khoản: ghi nhận ngay.
               </div>
             </div>
@@ -628,7 +628,7 @@ export default function PODCaptureSection({ order, user, fmt, onConfirm, onRejec
             return (
               <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
                 <img src={qrUrlDynamic} alt="VietQR Payment" style={{ width: '110px', height: 'auto', borderRadius: '6px', backgroundColor: '#fff', padding: '0.3rem', flexShrink: 0 }} />
-                <div style={{ fontSize: '0.74rem', color: 'var(--text-primary)', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                <div style={{ fontSize: '0.79rem', color: 'var(--text-primary)', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                   <div style={{ fontWeight: 700, color: 'var(--primary)' }}>{companyBank.bankName || companyBank.bankCode} — {bankAccNo}</div>
                   <div style={{ fontWeight: 600 }}>{bankHolder}</div>
                   <div style={{ color: 'var(--danger)', fontWeight: 800 }}>{fmt(qrAmt)}</div>
@@ -639,7 +639,7 @@ export default function PODCaptureSection({ order, user, fmt, onConfirm, onRejec
           })()}
 
           <div>
-            <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: 'var(--primary)', marginBottom: '0.2rem' }}>
+            <label style={{ display: 'block', fontSize: '0.77rem', fontWeight: 700, color: 'var(--primary)', marginBottom: '0.2rem' }}>
               Mã Giao Dịch Ngân Hàng: <span style={{ color: 'var(--danger)' }}>*</span>
             </label>
             <input
@@ -651,7 +651,7 @@ export default function PODCaptureSection({ order, user, fmt, onConfirm, onRejec
             />
           </div>
           <div>
-            <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: 'var(--primary)', marginBottom: '0.2rem' }}>
+            <label style={{ display: 'block', fontSize: '0.77rem', fontWeight: 700, color: 'var(--primary)', marginBottom: '0.2rem' }}>
               Biên Lai Chuyển Khoản (Nếu có):
             </label>
             <input
@@ -665,7 +665,7 @@ export default function PODCaptureSection({ order, user, fmt, onConfirm, onRejec
                   reader.readAsDataURL(file);
                 }
               }}
-              style={{ width: '100%', fontSize: '0.74rem', color: 'var(--text-secondary)' }}
+              style={{ width: '100%', fontSize: '0.79rem', color: 'var(--text-secondary)' }}
             />
           </div>
         </div>
@@ -742,12 +742,12 @@ export default function PODCaptureSection({ order, user, fmt, onConfirm, onRejec
             }
           />
           {!isPrepaid && (actualPaymentMethod === 'BANK_TRANSFER' || actualPaymentMethod === 'SPLIT') && !bankRefCode.trim() && (
-            <div style={{ fontSize: '0.72rem', color: 'var(--danger)', fontWeight: 600, marginTop: '0.3rem', textAlign: 'center' }}>
+            <div style={{ fontSize: '0.77rem', color: 'var(--danger)', fontWeight: 600, marginTop: '0.3rem', textAlign: 'center' }}>
               ⚠️ Cần nhập Mã Giao Dịch Ngân Hàng trước khi xác nhận.
             </div>
           )}
           {actualPaymentMethod === 'SPLIT' && bankRefCode.trim() && !splitOk && (
-            <div style={{ fontSize: '0.72rem', color: 'var(--danger)', fontWeight: 600, marginTop: '0.3rem', textAlign: 'center' }}>
+            <div style={{ fontSize: '0.77rem', color: 'var(--danger)', fontWeight: 600, marginTop: '0.3rem', textAlign: 'center' }}>
               ⚠️ Tổng tiền mặt + chuyển khoản chưa khớp với giá trị đơn.
             </div>
           )}

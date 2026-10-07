@@ -312,7 +312,7 @@ export default function Assembly() {
   };
 
   return (
-    <div style={{ backgroundColor: '#f8fafc', minHeight: '100vh', padding: '1.5rem 2rem', maxWidth: '1400px', margin: '0 auto', fontFamily: 'Inter, sans-serif' }}>
+    <div style={{ backgroundColor: '#f8fafc', minHeight: '100vh', padding: '1.5rem 2rem', maxWidth: '1400px', margin: '0 auto', fontFamily: 'inherit' }}>
       
       {/* ========================================================================= */}
       {/* 1. TOP HEADER & ASSEMBLY TASK CENTER BANNER */}
@@ -332,7 +332,7 @@ export default function Assembly() {
       {/* Assembly Task Center Banner */}
       <div style={{
         backgroundColor: '#ffffff',
-        border: '1px solid #cbd5e1',
+        border: '1px solid #e3e8ef',
         borderRadius: '8px',
         padding: '1rem 1.25rem',
         marginBottom: '1.25rem',
@@ -366,7 +366,7 @@ export default function Assembly() {
                   backgroundColor: '#fef3c7',
                   color: '#b45309',
                   border: '1px solid #fde68a',
-                  fontSize: '0.72rem',
+                  fontSize: '0.77rem',
                   fontWeight: 700,
                   padding: '2px 8px',
                   borderRadius: '12px'
@@ -410,40 +410,40 @@ export default function Assembly() {
       {activeTab === 'overview' && (
         <div>
           {/* 6 Odoo KPI Cards */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(175px, 1fr))', gap: '0.85rem', marginBottom: '1.25rem' }}>
-            <div style={{ backgroundColor: '#fffbeb', padding: '0.85rem 0.65rem', borderRadius: '8px', border: '1px solid #fde68a', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '85px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.85rem', marginBottom: '1.25rem' }}>
+            <div style={{ backgroundColor: '#ffffff', padding: '1rem 0.75rem', borderRadius: '10px', border: '1px solid #e3e8ef', boxShadow: '0 1px 2px rgba(15,23,42,0.04)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '92px' }}>
               <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#d97706' }}>{pendingJobs.length}</div>
-              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#b45309', marginTop: '0.25rem' }}>Chờ Tiếp Nhận</div>
+              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', marginTop: '0.25rem' }}>Chờ Tiếp Nhận</div>
             </div>
 
-            <div style={{ backgroundColor: '#eff6ff', padding: '0.85rem 0.65rem', borderRadius: '8px', border: '1px solid #bfdbfe', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '85px' }}>
+            <div style={{ backgroundColor: '#ffffff', padding: '1rem 0.75rem', borderRadius: '10px', border: '1px solid #e3e8ef', boxShadow: '0 1px 2px rgba(15,23,42,0.04)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '92px' }}>
               <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#2563eb' }}>{assemblingJobs.length}</div>
-              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#2563eb', marginTop: '0.25rem' }}>Đang Lắp Ráp & Test</div>
+              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', marginTop: '0.25rem' }}>Đang Lắp Ráp & Test</div>
             </div>
 
-            <div style={{ backgroundColor: '#f0fdf4', padding: '0.85rem 0.65rem', borderRadius: '8px', border: '1px solid #bbf7d0', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '85px' }}>
+            <div style={{ backgroundColor: '#ffffff', padding: '1rem 0.75rem', borderRadius: '10px', border: '1px solid #e3e8ef', boxShadow: '0 1px 2px rgba(15,23,42,0.04)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '92px' }}>
               <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#16a34a' }}>{completedToday.length}</div>
-              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#16a34a', marginTop: '0.25rem' }}>Hoàn Thành Hôm Nay</div>
+              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', marginTop: '0.25rem' }}>Hoàn Thành Hôm Nay</div>
             </div>
 
-            <div style={{ backgroundColor: '#ffffff', padding: '0.85rem 0.65rem', borderRadius: '8px', border: '1px solid #cbd5e1', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '85px' }}>
+            <div style={{ backgroundColor: '#ffffff', padding: '1rem 0.75rem', borderRadius: '10px', border: '1px solid #e3e8ef', boxShadow: '0 1px 2px rgba(15,23,42,0.04)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '92px' }}>
               <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#0f172a' }}>{totalCompleted.length}</div>
-              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', marginTop: '0.25rem' }}>Tổng Máy Đã Xuất Xưởng</div>
+              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', marginTop: '0.25rem' }}>Tổng Máy Đã Xuất Xưởng</div>
             </div>
 
-            <div style={{ backgroundColor: '#ffffff', padding: '0.85rem 0.65rem', borderRadius: '8px', border: '1px solid #cbd5e1', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '85px' }}>
+            <div style={{ backgroundColor: '#ffffff', padding: '1rem 0.75rem', borderRadius: '10px', border: '1px solid #e3e8ef', boxShadow: '0 1px 2px rgba(15,23,42,0.04)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '92px' }}>
               <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#10b981' }}>100%</div>
-              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', marginTop: '0.25rem' }}>Tỷ Lệ Đạt Chuẩn QA</div>
+              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', marginTop: '0.25rem' }}>Tỷ Lệ Đạt Chuẩn QA</div>
             </div>
 
-            <div style={{ backgroundColor: '#ffffff', padding: '0.85rem 0.65rem', borderRadius: '8px', border: '1px solid #cbd5e1', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '85px' }}>
+            <div style={{ backgroundColor: '#ffffff', padding: '1rem 0.75rem', borderRadius: '10px', border: '1px solid #e3e8ef', boxShadow: '0 1px 2px rgba(15,23,42,0.04)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '92px' }}>
               <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#8b5cf6' }}>45 Phút</div>
-              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', marginTop: '0.25rem' }}>Thời Gian Lắp TB</div>
+              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', marginTop: '0.25rem' }}>Thời Gian Lắp TB</div>
             </div>
           </div>
 
           {/* Ongoing Jobs Queue */}
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem' }}>
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1.25rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
               <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
                 Tiến Độ Các Lệnh Lắp Ráp Hiện Tại
@@ -482,7 +482,7 @@ export default function Assembly() {
                         <strong style={{ fontSize: '0.85rem', color: '#2563eb' }}>#{job.id}</strong>
                         <span style={{ fontSize: '0.8rem', color: '#0f172a', fontWeight: 700 }}>— {job.customer || 'Khách hàng'}</span>
                       </div>
-                      <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block', marginTop: '0.15rem' }}>
+                      <span style={{ fontSize: '0.77rem', color: '#64748b', display: 'block', marginTop: '0.15rem' }}>
                         Đơn gốc: {job.orderId} | Ngày tạo: {job.date} | Linh kiện: {job.components?.length || 0} món
                       </span>
                     </div>
@@ -491,7 +491,7 @@ export default function Assembly() {
                       <span style={{
                         display: 'inline-block',
                         padding: '0.2rem 0.65rem',
-                        fontSize: '0.72rem',
+                        fontSize: '0.77rem',
                         fontWeight: 700,
                         color: badge.color,
                         backgroundColor: badge.bg,
@@ -501,7 +501,7 @@ export default function Assembly() {
                       }}>
                         {badge.text}
                       </span>
-                      <div style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 600 }}>
+                      <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>
                         QA Test: {checkedCount}/4 tiêu chuẩn
                       </div>
                     </div>
@@ -520,7 +520,7 @@ export default function Assembly() {
         <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.8fr', gap: '1.25rem', alignItems: 'start' }}>
           
           {/* Left Column: Jobs List */}
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem' }}>
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1.25rem' }}>
             
             {/* Filter toolbar */}
             <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '0.65rem', marginBottom: '1rem' }}>
@@ -529,13 +529,13 @@ export default function Assembly() {
                 placeholder="Tìm mã lệnh, khách hàng..."
                 value={jobSearch}
                 onChange={(e) => setJobSearch(e.target.value)}
-                style={{ width: '100%', height: '36px', padding: '0 0.75rem', fontSize: '0.8rem', border: '1px solid #cbd5e1', borderRadius: '6px', boxSizing: 'border-box' }}
+                style={{ width: '100%', height: '36px', padding: '0 0.75rem', fontSize: '0.8rem', border: '1px solid #e3e8ef', borderRadius: '6px', boxSizing: 'border-box' }}
               />
 
               <select
                 value={jobStatusFilter}
                 onChange={(e) => setJobStatusFilter(e.target.value)}
-                style={{ width: '100%', height: '36px', padding: '0 0.5rem', fontSize: '0.8rem', border: '1px solid #cbd5e1', borderRadius: '6px', boxSizing: 'border-box', backgroundColor: '#ffffff' }}
+                style={{ width: '100%', height: '36px', padding: '0 0.5rem', fontSize: '0.8rem', border: '1px solid #e3e8ef', borderRadius: '6px', boxSizing: 'border-box', backgroundColor: '#ffffff' }}
               >
                 <option value="ALL">Tất cả ({jobs.length})</option>
                 <option value="PENDING">Chờ tiếp nhận</option>
@@ -562,7 +562,7 @@ export default function Assembly() {
                       style={{
                         padding: '0.85rem',
                         borderRadius: '8px',
-                        border: isSelected ? '2px solid #2563eb' : '1px solid #cbd5e1',
+                        border: isSelected ? '2px solid #2563eb' : '1px solid #e3e8ef',
                         backgroundColor: isSelected ? '#eff6ff' : '#ffffff',
                         cursor: 'pointer',
                         transition: 'all 0.15s ease'
@@ -578,7 +578,7 @@ export default function Assembly() {
                         <span style={{
                           padding: '2px 7px',
                           borderRadius: '10px',
-                          fontSize: '0.68rem',
+                          fontSize: '0.74rem',
                           fontWeight: 700,
                           backgroundColor: badge.bg,
                           color: badge.color,
@@ -588,7 +588,7 @@ export default function Assembly() {
                         </span>
                       </div>
 
-                      <div style={{ fontSize: '0.72rem', color: '#64748b', display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #f1f5f9', paddingTop: '0.35rem', marginTop: '0.35rem' }}>
+                      <div style={{ fontSize: '0.77rem', color: '#64748b', display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #f1f5f9', paddingTop: '0.35rem', marginTop: '0.35rem' }}>
                         <span>Đơn: {job.orderId}</span>
                         <span>{job.date}</span>
                       </div>
@@ -601,7 +601,7 @@ export default function Assembly() {
 
           {/* Right Column: Active Job Workbench */}
           {activeJob ? (
-            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.5rem' }}>
+            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1.5rem' }}>
               
               {/* Job Header & Actions */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid #e2e8f0', paddingBottom: '1rem', marginBottom: '1.25rem' }}>
@@ -613,7 +613,7 @@ export default function Assembly() {
                     <span style={{
                       padding: '2px 8px',
                       borderRadius: '12px',
-                      fontSize: '0.72rem',
+                      fontSize: '0.77rem',
                       fontWeight: 700,
                       backgroundColor: getJobStatusBadge(activeJob.status).bg,
                       color: getJobStatusBadge(activeJob.status).color,
@@ -691,7 +691,7 @@ export default function Assembly() {
                         border: '1px solid #bfdbfe',
                         borderRadius: '4px',
                         padding: '0.3rem 0.65rem',
-                        fontSize: '0.75rem',
+                        fontSize: '0.8rem',
                         fontWeight: 700,
                         cursor: 'pointer',
                         display: 'flex',
@@ -705,7 +705,7 @@ export default function Assembly() {
                   )}
                 </div>
 
-                <div style={{ border: '1px solid #cbd5e1', borderRadius: '8px', overflow: 'hidden' }}>
+                <div style={{ border: '1px solid #e3e8ef', borderRadius: '8px', overflow: 'hidden' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
                     <thead>
                       <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569' }}>
@@ -786,7 +786,7 @@ export default function Assembly() {
                         border: '1px solid #bbf7d0',
                         borderRadius: '4px',
                         padding: '0.3rem 0.65rem',
-                        fontSize: '0.75rem',
+                        fontSize: '0.8rem',
                         fontWeight: 700,
                         cursor: 'pointer',
                         display: 'flex',
@@ -850,7 +850,7 @@ export default function Assembly() {
 
             </div>
           ) : (
-            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '3rem', textAlign: 'center', color: '#94a3b8' }}>
+            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '3rem', textAlign: 'center', color: '#94a3b8' }}>
               Chưa chọn lệnh lắp ráp nào.
             </div>
           )}
@@ -872,7 +872,7 @@ export default function Assembly() {
             </p>
           </div>
 
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', overflow: 'hidden' }}>
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', overflow: 'hidden' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.83rem' }}>
               <thead>
                 <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569' }}>
@@ -910,7 +910,7 @@ export default function Assembly() {
                         {job.date}
                       </td>
                       <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
-                        <span style={{ backgroundColor: '#f0fdf4', color: '#16a34a', border: '1px solid #bbf7d0', padding: '2px 8px', borderRadius: '10px', fontSize: '0.72rem', fontWeight: 700 }}>
+                        <span style={{ backgroundColor: '#f0fdf4', color: '#16a34a', border: '1px solid #bbf7d0', padding: '2px 8px', borderRadius: '10px', fontSize: '0.77rem', fontWeight: 700 }}>
                           Pass (Full 100%)
                         </span>
                       </td>
@@ -918,7 +918,7 @@ export default function Assembly() {
                         Đã Dán Tem
                       </td>
                       <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
-                        <span style={{ backgroundColor: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', padding: '2px 8px', borderRadius: '10px', fontSize: '0.72rem', fontWeight: 700 }}>
+                        <span style={{ backgroundColor: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', padding: '2px 8px', borderRadius: '10px', fontSize: '0.77rem', fontWeight: 700 }}>
                           Đã Bàn Giao Kho
                         </span>
                       </td>
@@ -946,7 +946,7 @@ export default function Assembly() {
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
-            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem' }}>
+            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1.25rem' }}>
               <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', marginBottom: '1rem' }}>
                 Phân Bổ Phân Khúc Máy Build
               </h3>
@@ -970,26 +970,26 @@ export default function Assembly() {
               </div>
             </div>
 
-            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem' }}>
+            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1.25rem' }}>
               <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', marginBottom: '1rem' }}>
                 Chỉ Số Chất Lượng Xưởng Lắp Ráp
               </h3>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div style={{ backgroundColor: '#f8fafc', padding: '1rem', borderRadius: '6px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
                   <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#16a34a' }}>100%</div>
-                  <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700, marginTop: '0.2rem' }}>Tỷ Lệ Đạt Stress Test Lần 1</div>
+                  <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 700, marginTop: '0.2rem' }}>Tỷ Lệ Đạt Stress Test Lần 1</div>
                 </div>
                 <div style={{ backgroundColor: '#f8fafc', padding: '1rem', borderRadius: '6px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
                   <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#2563eb' }}>45 Phút</div>
-                  <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700, marginTop: '0.2rem' }}>Thời Gian Lắp + Test TB</div>
+                  <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 700, marginTop: '0.2rem' }}>Thời Gian Lắp + Test TB</div>
                 </div>
                 <div style={{ backgroundColor: '#f8fafc', padding: '1rem', borderRadius: '6px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
                   <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#0f172a' }}>{jobs.length}</div>
-                  <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700, marginTop: '0.2rem' }}>Tổng Lệnh Lắp Ráp</div>
+                  <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 700, marginTop: '0.2rem' }}>Tổng Lệnh Lắp Ráp</div>
                 </div>
                 <div style={{ backgroundColor: '#f8fafc', padding: '1rem', borderRadius: '6px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
                   <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#d97706' }}>0%</div>
-                  <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700, marginTop: '0.2rem' }}>Tỷ Lệ Hỏng Hóc Lắp Ráp</div>
+                  <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 700, marginTop: '0.2rem' }}>Tỷ Lệ Hỏng Hóc Lắp Ráp</div>
                 </div>
               </div>
             </div>
@@ -1000,7 +1000,7 @@ export default function Assembly() {
       {/* ================= MODAL TẠO LỆNH LẮP RÁP THỦ CÔNG TỐI ƯU ================= */}
       {showCreateModal && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(6px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '1.5rem' }}>
-          <div style={{ width: '100%', maxWidth: '780px', maxHeight: '90vh', overflowY: 'auto', padding: '2rem', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
+          <div style={{ width: '100%', maxWidth: '780px', maxHeight: '90vh', overflowY: 'auto', padding: '2rem', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e3e8ef', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
             
             {/* Modal Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
@@ -1013,7 +1013,7 @@ export default function Assembly() {
                   <p style={{ fontSize: '0.8rem', color: '#64748b', margin: '0.15rem 0 0' }}>Khởi tạo phiếu yêu cầu kỹ thuật ráp bộ máy PC mới</p>
                 </div>
               </div>
-              <button onClick={() => setShowCreateModal(false)} style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#475569', cursor: 'pointer', padding: '0.4rem', borderRadius: '6px' }}>
+              <button onClick={() => setShowCreateModal(false)} style={{ background: '#f1f5f9', border: '1px solid #e3e8ef', color: '#475569', cursor: 'pointer', padding: '0.4rem', borderRadius: '6px' }}>
                 <X size={18} />
               </button>
             </div>
@@ -1029,7 +1029,7 @@ export default function Assembly() {
                     placeholder="ORD-xxxxxx (hoặc để trống)..."
                     value={newJobOrderId}
                     onChange={(e) => setNewJobOrderId(e.target.value)}
-                    style={{ width: '100%', height: '36px', padding: '0 0.75rem', fontSize: '0.82rem', border: '1px solid #cbd5e1', borderRadius: '6px', boxSizing: 'border-box' }}
+                    style={{ width: '100%', height: '36px', padding: '0 0.75rem', fontSize: '0.82rem', border: '1px solid #e3e8ef', borderRadius: '6px', boxSizing: 'border-box' }}
                   />
                 </div>
 
@@ -1043,7 +1043,7 @@ export default function Assembly() {
                     placeholder="Tên khách hàng / PC Trưng bày..."
                     value={newJobCustomer}
                     onChange={(e) => setNewJobCustomer(e.target.value)}
-                    style={{ width: '100%', height: '36px', padding: '0 0.75rem', fontSize: '0.82rem', border: '1px solid #cbd5e1', borderRadius: '6px', boxSizing: 'border-box' }}
+                    style={{ width: '100%', height: '36px', padding: '0 0.75rem', fontSize: '0.82rem', border: '1px solid #e3e8ef', borderRadius: '6px', boxSizing: 'border-box' }}
                   />
                 </div>
               </div>
@@ -1053,7 +1053,7 @@ export default function Assembly() {
                   <label style={{ fontSize: '0.82rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
                     Danh Sách Linh Kiện Lắp Ráp:
                   </label>
-                  <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                  <span style={{ fontSize: '0.77rem', color: '#64748b' }}>
                     Nhập chữ để tìm kiếm và chọn linh kiện gợi ý từ kho
                   </span>
                 </div>
@@ -1073,7 +1073,7 @@ export default function Assembly() {
 
                     return (
                       <div key={idx} style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: '0.65rem', alignItems: 'center', backgroundColor: '#f8fafc', padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid #e2e8f0', position: 'relative' }}>
-                        <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#2563eb' }}>
+                        <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#2563eb' }}>
                           {comp.category}:
                         </span>
 
@@ -1097,7 +1097,7 @@ export default function Assembly() {
                               height: '34px',
                               padding: '0 0.65rem',
                               fontSize: '0.8rem',
-                              border: '1px solid #cbd5e1',
+                              border: '1px solid #e3e8ef',
                               borderRadius: '4px',
                               backgroundColor: '#ffffff',
                               boxSizing: 'border-box'
@@ -1114,7 +1114,7 @@ export default function Assembly() {
                               marginTop: '4px',
                               backgroundColor: '#ffffff',
                               borderRadius: '6px',
-                              border: '1px solid #cbd5e1',
+                              border: '1px solid #e3e8ef',
                               boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.15)',
                               maxHeight: '180px',
                               overflowY: 'auto',
@@ -1145,13 +1145,13 @@ export default function Assembly() {
                                 >
                                   <div>
                                     <strong style={{ color: '#0f172a', display: 'block' }}>{p.name}</strong>
-                                    {p.sku && <span style={{ fontSize: '0.68rem', color: '#64748b' }}>SKU: {p.sku}</span>}
+                                    {p.sku && <span style={{ fontSize: '0.74rem', color: '#64748b' }}>SKU: {p.sku}</span>}
                                   </div>
                                   <div style={{ textAlign: 'right', flexShrink: 0, paddingLeft: '0.5rem' }}>
-                                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#16a34a', display: 'block' }}>
+                                    <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#16a34a', display: 'block' }}>
                                       {formatCurrency(p.price)}
                                     </span>
-                                    <span style={{ fontSize: '0.68rem', color: '#64748b' }}>
+                                    <span style={{ fontSize: '0.74rem', color: '#64748b' }}>
                                       Tồn: {p.stock !== undefined ? p.stock : (p.stockQuantity || 10)} chiếc
                                     </span>
                                   </div>
@@ -1170,7 +1170,7 @@ export default function Assembly() {
                 <button
                   type="button"
                   onClick={() => setShowCreateModal(false)}
-                  style={{ backgroundColor: '#ffffff', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.5rem 1.1rem', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
+                  style={{ backgroundColor: '#ffffff', color: '#475569', border: '1px solid #e3e8ef', borderRadius: '6px', padding: '0.5rem 1.1rem', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
                 >
                   Hủy
                 </button>
@@ -1189,7 +1189,7 @@ export default function Assembly() {
       {/* ================= MODAL XEM CHI TIẾT BIÊN BẢN NGHIỆM THU QA ================= */}
       {selectedQADetailJob && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(6px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '1.5rem' }}>
-          <div data-print-doc style={{ width: '100%', maxWidth: '850px', maxHeight: '90vh', overflowY: 'auto', padding: '2rem', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
+          <div data-print-doc style={{ width: '100%', maxWidth: '850px', maxHeight: '90vh', overflowY: 'auto', padding: '2rem', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e3e8ef', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
             
             {/* Modal Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid #e2e8f0', paddingBottom: '1.25rem', marginBottom: '1.25rem' }}>
@@ -1202,7 +1202,7 @@ export default function Assembly() {
                     <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
                       Phiếu Nghiệm Thu Kỹ Thuật & Bảo Hành #{selectedQADetailJob.id}
                     </h3>
-                    <span style={{ backgroundColor: '#f0fdf4', color: '#16a34a', border: '1px solid #bbf7d0', padding: '2px 8px', borderRadius: '10px', fontSize: '0.72rem', fontWeight: 700 }}>
+                    <span style={{ backgroundColor: '#f0fdf4', color: '#16a34a', border: '1px solid #bbf7d0', padding: '2px 8px', borderRadius: '10px', fontSize: '0.77rem', fontWeight: 700 }}>
                       Pass 100% Xuất Xưởng
                     </span>
                   </div>
@@ -1211,7 +1211,7 @@ export default function Assembly() {
                   </p>
                 </div>
               </div>
-              <button onClick={() => setSelectedQADetailJob(null)} style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#475569', cursor: 'pointer', padding: '0.4rem', borderRadius: '6px' }}>
+              <button onClick={() => setSelectedQADetailJob(null)} style={{ background: '#f1f5f9', border: '1px solid #e3e8ef', color: '#475569', cursor: 'pointer', padding: '0.4rem', borderRadius: '6px' }}>
                 <X size={18} />
               </button>
             </div>
@@ -1219,19 +1219,19 @@ export default function Assembly() {
             {/* General Info Cards */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.75rem', marginBottom: '1.25rem', backgroundColor: '#f8fafc', padding: '1rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
               <div>
-                <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 700, display: 'block' }}>MÃ ĐƠN HÀNG:</span>
+                <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700, display: 'block' }}>MÃ ĐƠN HÀNG:</span>
                 <strong style={{ fontSize: '0.85rem', color: '#2563eb' }}>#{selectedQADetailJob.orderId}</strong>
               </div>
               <div>
-                <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 700, display: 'block' }}>KHÁCH HÀNG:</span>
+                <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700, display: 'block' }}>KHÁCH HÀNG:</span>
                 <strong style={{ fontSize: '0.85rem', color: '#0f172a' }}>{selectedQADetailJob.customer}</strong>
               </div>
               <div>
-                <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 700, display: 'block' }}>NGÀY NGHIỆM THU:</span>
+                <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700, display: 'block' }}>NGÀY NGHIỆM THU:</span>
                 <strong style={{ fontSize: '0.85rem', color: '#0f172a' }}>{selectedQADetailJob.date}</strong>
               </div>
               <div>
-                <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 700, display: 'block' }}>BÀN GIAO:</span>
+                <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700, display: 'block' }}>BÀN GIAO:</span>
                 <strong style={{ fontSize: '0.85rem', color: '#16a34a' }}>Kho Sẵn Sàng Xuất</strong>
               </div>
             </div>
@@ -1243,7 +1243,7 @@ export default function Assembly() {
                 <span>1. Danh Sách Linh Kiện & Mã Serial Number (S/N) Bảo Hành</span>
               </h4>
 
-              <div style={{ border: '1px solid #cbd5e1', borderRadius: '8px', overflow: 'hidden' }}>
+              <div style={{ border: '1px solid #e3e8ef', borderRadius: '8px', overflow: 'hidden' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
                   <thead>
                     <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569' }}>
@@ -1265,11 +1265,11 @@ export default function Assembly() {
                             {comp.name}
                           </td>
                           <td style={{ padding: '0.6rem 0.85rem' }}>
-                            <span style={{ backgroundColor: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0', padding: '2px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 700, fontFamily: 'monospace' }}>
+                            <span style={{ backgroundColor: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0', padding: '2px 8px', borderRadius: '4px', fontSize: '0.8rem', fontWeight: 700, fontFamily: 'monospace' }}>
                               {sn}
                             </span>
                           </td>
-                          <td style={{ padding: '0.6rem 0.85rem', textAlign: 'center', color: '#64748b', fontSize: '0.75rem' }}>
+                          <td style={{ padding: '0.6rem 0.85rem', textAlign: 'center', color: '#64748b', fontSize: '0.8rem' }}>
                             36 Tháng
                           </td>
                         </tr>
@@ -1297,9 +1297,9 @@ export default function Assembly() {
                   <div key={tIdx} style={{ backgroundColor: '#f0fdf4', padding: '0.65rem 0.85rem', borderRadius: '6px', border: '1px solid #bbf7d0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
                       <strong style={{ fontSize: '0.78rem', color: '#15803d', display: 'block' }}>{test.title}</strong>
-                      <span style={{ fontSize: '0.7rem', color: '#475569' }}>{test.note}</span>
+                      <span style={{ fontSize: '0.75rem', color: '#475569' }}>{test.note}</span>
                     </div>
-                    <span style={{ backgroundColor: '#16a34a', color: '#ffffff', fontSize: '0.68rem', fontWeight: 800, padding: '2px 6px', borderRadius: '4px', flexShrink: 0 }}>
+                    <span style={{ backgroundColor: '#16a34a', color: '#ffffff', fontSize: '0.74rem', fontWeight: 800, padding: '2px 6px', borderRadius: '4px', flexShrink: 0 }}>
                       {test.result}
                     </span>
                   </div>

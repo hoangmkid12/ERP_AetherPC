@@ -34,7 +34,7 @@ export default function RejectAssignmentSheet({ order, onConfirm, onClose }) {
             <h3 style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--danger)', margin: 0 }}>
               Từ Chối Đơn #{order.orderId || order.id}
             </h3>
-            <span style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>Đơn sẽ quay lại chờ Kho phân công cho shipper khác</span>
+            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Đơn sẽ quay lại chờ Kho phân công cho shipper khác</span>
           </div>
           <button type="button" onClick={onClose} className="delivery-icon-btn"><X size={16} /></button>
         </div>

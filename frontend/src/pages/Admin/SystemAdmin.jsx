@@ -94,12 +94,12 @@ const ROLE_COLORS = {
 // kèm vài chỗ lệch nhỏ không lý do (VD 2 nút cùng vai trò nhưng padding khác
 // nhau). Gom các khối lặp lại thật sự vào đây, lấy đúng giá trị đang chiếm đa
 // số trong chính file này — không đổi phong cách, chỉ chuẩn hoá.
-const cardStyle = { backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem' };
-const inputStyle = { width: '100%', padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', boxSizing: 'border-box' };
+const cardStyle = { backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1.25rem' };
+const inputStyle = { width: '100%', padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid #e3e8ef', boxSizing: 'border-box' };
 const labelStyle = { display: 'block', fontWeight: 700, color: '#0f172a', marginBottom: '0.3rem' };
 const sectionTitleStyle = { fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '0.4rem' };
 const primaryBtnStyle = { backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.5rem 1rem', fontSize: '0.8rem', fontWeight: 800, cursor: 'pointer' };
-const secondaryBtnStyle = { backgroundColor: '#ffffff', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.45rem 1rem', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' };
+const secondaryBtnStyle = { backgroundColor: '#ffffff', color: '#475569', border: '1px solid #e3e8ef', borderRadius: '6px', padding: '0.45rem 1rem', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' };
 
 const BADGE_VARIANTS = {
   success: { bg: '#f0fdf4', color: '#16a34a', border: '#bbf7d0' },
@@ -110,7 +110,7 @@ const BADGE_VARIANTS = {
 };
 const badgeStyle = (variant = 'neutral') => {
   const v = BADGE_VARIANTS[variant] || BADGE_VARIANTS.neutral;
-  return { backgroundColor: v.bg, color: v.color, border: `1px solid ${v.border}`, padding: '3px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 800 };
+  return { backgroundColor: v.bg, color: v.color, border: `1px solid ${v.border}`, padding: '3px 8px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 800 };
 };
 
 export default function SystemAdmin() {
@@ -1612,7 +1612,7 @@ export default function SystemAdmin() {
   };
 
   return (
-    <div style={{ backgroundColor: '#f8fafc', minHeight: '100vh', padding: '1.5rem 2rem', maxWidth: '1400px', margin: '0 auto', fontFamily: 'Inter, sans-serif' }}>
+    <div style={{ backgroundColor: '#f8fafc', minHeight: '100vh', padding: '1.5rem 2rem', maxWidth: '1400px', margin: '0 auto', fontFamily: 'inherit' }}>
       
       {/* ========================================================================= */}
       {/* 1. TOP HEADER */}
@@ -1691,7 +1691,7 @@ export default function SystemAdmin() {
               style={{
                 backgroundColor: '#ffffff',
                 color: '#475569',
-                border: '1px solid #cbd5e1',
+                border: '1px solid #e3e8ef',
                 borderRadius: '6px',
                 padding: '0.45rem 0.85rem',
                 fontSize: '0.8rem',
@@ -1747,7 +1747,7 @@ export default function SystemAdmin() {
                   gridColumn: sIdx < 3 ? 'span 2' : 'span 3',
                   backgroundColor: '#ffffff',
                   borderRadius: '10px',
-                  border: '1px solid #cbd5e1',
+                  border: '1px solid #e3e8ef',
                   padding: '1.1rem 1.25rem',
                   display: 'flex',
                   flexDirection: 'column',
@@ -1758,7 +1758,7 @@ export default function SystemAdmin() {
                 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
+                  <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
                     {st.label}
                   </span>
                   <div style={{ width: '36px', height: '36px', borderRadius: '8px', backgroundColor: st.bg, color: st.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -1770,7 +1770,7 @@ export default function SystemAdmin() {
                   <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {st.value}
                   </div>
-                  <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.15rem' }}>
+                  <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.15rem' }}>
                     {st.change}
                   </div>
                 </div>
@@ -1840,9 +1840,9 @@ export default function SystemAdmin() {
                   <div key={eIdx} style={{ padding: '0.65rem 0.85rem', borderRadius: '6px', border: '1px solid #e2e8f0', backgroundColor: '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
                       <strong style={{ fontSize: '0.82rem', color: '#0f172a' }}>{emp.fullname}</strong>
-                      <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block' }}>Username: {emp.username}</span>
+                      <span style={{ fontSize: '0.77rem', color: '#64748b', display: 'block' }}>Username: {emp.username}</span>
                     </div>
-                    <span style={{ backgroundColor: `${ROLE_COLORS[emp.role] || '#6366f1'}15`, color: ROLE_COLORS[emp.role] || '#6366f1', padding: '2px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 800 }}>
+                    <span style={{ backgroundColor: `${ROLE_COLORS[emp.role] || '#6366f1'}15`, color: ROLE_COLORS[emp.role] || '#6366f1', padding: '2px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 800 }}>
                       {emp.role}
                     </span>
                   </div>
@@ -1905,7 +1905,7 @@ export default function SystemAdmin() {
                 placeholder="Tìm theo họ tên, username, vai trò..."
                 value={search}
                 onChange={e => setSearch(e.target.value)}
-                style={{ width: '100%', padding: '0.45rem 0.65rem 0.45rem 2rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem' }}
+                style={{ width: '100%', padding: '0.45rem 0.65rem 0.45rem 2rem', borderRadius: '6px', border: '1px solid #e3e8ef', fontSize: '0.82rem' }}
               />
               <Search size={15} style={{ position: 'absolute', left: '0.6rem', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
             </div>
@@ -1915,7 +1915,7 @@ export default function SystemAdmin() {
               <select
                 value={roleFilter}
                 onChange={e => setRoleFilter(e.target.value)}
-                style={{ padding: '0.4rem 0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.78rem', color: '#0f172a' }}
+                style={{ padding: '0.4rem 0.65rem', borderRadius: '6px', border: '1px solid #e3e8ef', fontSize: '0.78rem', color: '#0f172a' }}
               >
                 <option value="ALL">Tất cả ({employees.length})</option>
                 {ROLES.map(r => (
@@ -1954,7 +1954,7 @@ export default function SystemAdmin() {
                         <span style={{
                           padding: '2px 8px',
                           borderRadius: '4px',
-                          fontSize: '0.7rem',
+                          fontSize: '0.75rem',
                           fontWeight: 800,
                           backgroundColor: `${ROLE_COLORS[emp.role] || '#6366f1'}15`,
                           color: ROLE_COLORS[emp.role] || '#6366f1'
@@ -1965,7 +1965,7 @@ export default function SystemAdmin() {
                           <span style={{
                             padding: '1px 6px',
                             borderRadius: '4px',
-                            fontSize: '0.65rem',
+                            fontSize: '0.72rem',
                             fontWeight: 700,
                             backgroundColor: '#eff6ff',
                             color: '#1d4ed8',
@@ -1982,14 +1982,14 @@ export default function SystemAdmin() {
                       <div style={{ display: 'flex', justifyContent: 'center', gap: '0.35rem' }}>
                         <button
                           onClick={() => handleResetPassword(emp)}
-                          style={{ backgroundColor: '#ffffff', color: '#d97706', border: '1px solid #fde68a', borderRadius: '4px', padding: '0.3rem 0.5rem', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.2rem' }}
+                          style={{ backgroundColor: '#ffffff', color: '#d97706', border: '1px solid #fde68a', borderRadius: '4px', padding: '0.3rem 0.5rem', fontSize: '0.77rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.2rem' }}
                           title="Đặt lại mật khẩu về 123456"
                         >
                           <Key size={12} /> Reset Pass
                         </button>
                         <button
                           onClick={() => setEditingEmp({ ...emp })}
-                          style={{ backgroundColor: '#ffffff', color: '#2563eb', border: '1px solid #bfdbfe', borderRadius: '4px', padding: '0.3rem 0.5rem', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.2rem' }}
+                          style={{ backgroundColor: '#ffffff', color: '#2563eb', border: '1px solid #bfdbfe', borderRadius: '4px', padding: '0.3rem 0.5rem', fontSize: '0.77rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.2rem' }}
                         >
                           <Edit size={12} /> Sửa
                         </button>
@@ -2006,7 +2006,7 @@ export default function SystemAdmin() {
                             }
                           }}
                           title="Vô hiệu hóa tài khoản (không xóa lịch sử)"
-                          style={{ backgroundColor: '#ffffff', color: '#ef4444', border: '1px solid #fca5a5', borderRadius: '4px', padding: '0.3rem 0.5rem', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}
+                          style={{ backgroundColor: '#ffffff', color: '#ef4444', border: '1px solid #fca5a5', borderRadius: '4px', padding: '0.3rem 0.5rem', fontSize: '0.77rem', fontWeight: 700, cursor: 'pointer' }}
                         >
                           <Trash2 size={12} />
                         </button>
@@ -2040,7 +2040,7 @@ export default function SystemAdmin() {
                 placeholder="Tìm theo tên, SĐT, email..."
                 value={custSearch}
                 onChange={e => { setCustPage(1); setCustSearch(e.target.value); }}
-                style={{ width: '100%', padding: '0.45rem 0.65rem 0.45rem 2rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem', boxSizing: 'border-box' }}
+                style={{ width: '100%', padding: '0.45rem 0.65rem 0.45rem 2rem', borderRadius: '6px', border: '1px solid #e3e8ef', fontSize: '0.82rem', boxSizing: 'border-box' }}
               />
               <Search size={15} style={{ position: 'absolute', left: '0.6rem', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
             </div>
@@ -2076,15 +2076,15 @@ export default function SystemAdmin() {
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                             <span style={{ color: '#2563eb' }}>{cust.name}</span>
                           </div>
-                          <div style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 500 }}>#{cust.customerId}</div>
+                          <div style={{ fontSize: '0.77rem', color: '#94a3b8', fontWeight: 500 }}>#{cust.customerId}</div>
                         </td>
                         <td style={{ padding: '0.65rem 0.85rem', color: '#475569' }}>
                           <div>{cust.email}</div>
-                          <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{cust.phone || 'Chưa cập nhật'}</div>
+                          <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>{cust.phone || 'Chưa cập nhật'}</div>
                         </td>
                         <td style={{ padding: '0.65rem 0.85rem', textAlign: 'center', fontWeight: 700, color: '#0f172a' }}>{cust.orderCount}</td>
                         <td style={{ padding: '0.65rem 0.85rem', textAlign: 'center' }}>
-                          <span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 800, backgroundColor: isInactive ? '#fef2f2' : '#f0fdf4', color: isInactive ? '#dc2626' : '#16a34a' }}>
+                          <span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 800, backgroundColor: isInactive ? '#fef2f2' : '#f0fdf4', color: isInactive ? '#dc2626' : '#16a34a' }}>
                             {isInactive ? 'Vô hiệu hóa' : 'Hoạt động'}
                           </span>
                         </td>
@@ -2101,7 +2101,7 @@ export default function SystemAdmin() {
                                 color: '#2563eb',
                                 border: '1px solid #bfdbfe',
                                 borderRadius: '6px',
-                                fontSize: '0.72rem',
+                                fontSize: '0.77rem',
                                 fontWeight: 700,
                                 cursor: 'pointer',
                                 display: 'inline-flex',
@@ -2124,7 +2124,7 @@ export default function SystemAdmin() {
                                 color: '#d97706',
                                 border: '1px solid #fde68a',
                                 borderRadius: '6px',
-                                fontSize: '0.72rem',
+                                fontSize: '0.77rem',
                                 fontWeight: 700,
                                 cursor: isBusy ? 'not-allowed' : 'pointer',
                                 display: 'inline-flex',
@@ -2147,7 +2147,7 @@ export default function SystemAdmin() {
                                 color: isInactive ? '#16a34a' : '#ef4444',
                                 border: `1px solid ${isInactive ? '#bbf7d0' : '#fca5a5'}`,
                                 borderRadius: '6px',
-                                fontSize: '0.72rem',
+                                fontSize: '0.77rem',
                                 fontWeight: 700,
                                 cursor: isBusy ? 'not-allowed' : 'pointer',
                                 display: 'inline-flex',
@@ -2192,10 +2192,10 @@ export default function SystemAdmin() {
 
           {custTotalPages > 1 && (
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1rem', borderTop: '1px solid #e2e8f0', paddingTop: '0.75rem' }}>
-              <span style={{ fontSize: '0.76rem', color: '#64748b' }}>Trang {custPage}/{custTotalPages}</span>
+              <span style={{ fontSize: '0.8rem', color: '#64748b' }}>Trang {custPage}/{custTotalPages}</span>
               <div style={{ display: 'flex', gap: '0.3rem' }}>
-                <button disabled={custPage <= 1} onClick={() => setCustPage(p => Math.max(p - 1, 1))} style={{ padding: '0.25rem 0.5rem', backgroundColor: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: custPage <= 1 ? 'not-allowed' : 'pointer' }}>‹</button>
-                <button disabled={custPage >= custTotalPages} onClick={() => setCustPage(p => Math.min(p + 1, custTotalPages))} style={{ padding: '0.25rem 0.5rem', backgroundColor: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: custPage >= custTotalPages ? 'not-allowed' : 'pointer' }}>›</button>
+                <button disabled={custPage <= 1} onClick={() => setCustPage(p => Math.max(p - 1, 1))} style={{ padding: '0.25rem 0.5rem', backgroundColor: '#ffffff', border: '1px solid #e3e8ef', borderRadius: '4px', cursor: custPage <= 1 ? 'not-allowed' : 'pointer' }}>‹</button>
+                <button disabled={custPage >= custTotalPages} onClick={() => setCustPage(p => Math.min(p + 1, custTotalPages))} style={{ padding: '0.25rem 0.5rem', backgroundColor: '#ffffff', border: '1px solid #e3e8ef', borderRadius: '4px', cursor: custPage >= custTotalPages ? 'not-allowed' : 'pointer' }}>›</button>
               </div>
             </div>
           )}
@@ -2234,14 +2234,14 @@ export default function SystemAdmin() {
             <div style={cardStyle}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <div>
-                  <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Tổng Số Tài Khoản Doanh Nghiệp</div>
+                  <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Tổng Số Tài Khoản Doanh Nghiệp</div>
                   <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#0f172a', marginTop: '0.25rem' }}>{bankAccounts.length}</div>
                 </div>
                 <div style={{ padding: '8px', borderRadius: '8px', backgroundColor: '#eff6ff', color: '#2563eb' }}>
                   <CreditCard size={22} />
                 </div>
               </div>
-              <div style={{ fontSize: '0.75rem', color: '#16a34a', fontWeight: 600, marginTop: '0.5rem' }}>
+              <div style={{ fontSize: '0.8rem', color: '#16a34a', fontWeight: 600, marginTop: '0.5rem' }}>
                 {bankAccounts.filter(b => b.status === 'ACTIVE').length} tài khoản đang hoạt động nhận tiền
               </div>
             </div>
@@ -2253,7 +2253,7 @@ export default function SystemAdmin() {
                 <div style={{ ...cardStyle, background: 'linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%)', color: '#ffffff', border: 'none' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <div>
-                      <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#bfdbfe', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                      <div style={{ fontSize: '0.77rem', fontWeight: 800, color: '#bfdbfe', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                         <QrCode size={14} /> VIETQR MẶC ĐỊNH TOÀN HỆ THỐNG
                       </div>
                       {defaultAcc ? (
@@ -2264,7 +2264,7 @@ export default function SystemAdmin() {
                           <div style={{ fontSize: '0.8rem', color: '#e0e7ff', fontWeight: 600 }}>
                             {defaultAcc.bankName} ({defaultAcc.bankCode})
                           </div>
-                          <div style={{ fontSize: '0.75rem', color: '#bfdbfe', marginTop: '0.2rem' }}>
+                          <div style={{ fontSize: '0.8rem', color: '#bfdbfe', marginTop: '0.2rem' }}>
                             Chủ TK: <strong>{defaultAcc.accountHolder}</strong>
                           </div>
                         </>
@@ -2324,19 +2324,19 @@ export default function SystemAdmin() {
                       <tr key={acc.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
                         <td style={{ padding: '0.75rem' }}>
                           <div style={{ fontWeight: 800, color: '#0f172a' }}>{acc.bankCode}</div>
-                          <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{acc.bankName}</div>
+                          <div style={{ fontSize: '0.8rem', color: '#64748b' }}>{acc.bankName}</div>
                         </td>
                         <td style={{ padding: '0.75rem' }}>
                           <div style={{ fontWeight: 800, color: '#2563eb', fontSize: '0.9rem', letterSpacing: '0.02em', fontFamily: 'monospace' }}>
                             {acc.accountNumber}
                           </div>
-                          <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#334155' }}>
+                          <div style={{ fontSize: '0.8rem', fontWeight: 600, color: '#334155' }}>
                             {acc.accountHolder}
                           </div>
                         </td>
                         <td style={{ padding: '0.75rem' }}>
                           <div style={{ color: '#334155', fontWeight: 500 }}>{acc.branch || '—'}</div>
-                          <div style={{ fontSize: '0.72rem', color: '#64748b' }}>{acc.purpose || 'Thu/chi chung'}</div>
+                          <div style={{ fontSize: '0.77rem', color: '#64748b' }}>{acc.purpose || 'Thu/chi chung'}</div>
                         </td>
                         <td style={{ padding: '0.75rem', textAlign: 'center' }}>
                           <span style={{ fontWeight: 700, color: acc._count?.ledgerEntries > 0 ? '#0f172a' : '#94a3b8' }}>
@@ -2363,7 +2363,7 @@ export default function SystemAdmin() {
                                 border: `1px solid ${acc.status === 'ACTIVE' ? '#bfdbfe' : '#e2e8f0'}`,
                                 borderRadius: '4px',
                                 padding: '3px 8px',
-                                fontSize: '0.72rem',
+                                fontSize: '0.77rem',
                                 fontWeight: 700,
                                 cursor: acc.status === 'ACTIVE' ? 'pointer' : 'not-allowed'
                               }}
@@ -2378,14 +2378,14 @@ export default function SystemAdmin() {
                             <button
                               onClick={() => handleOpenBankModal(acc)}
                               title="Chỉnh sửa tài khoản"
-                              style={{ padding: '4px 8px', backgroundColor: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer', color: '#334155' }}
+                              style={{ padding: '4px 8px', backgroundColor: '#f1f5f9', border: '1px solid #e3e8ef', borderRadius: '4px', cursor: 'pointer', color: '#334155' }}
                             >
                               <Edit size={14} />
                             </button>
                             <button
                               onClick={() => handleToggleBankStatus(acc)}
                               title={acc.status === 'ACTIVE' ? 'Tạm ngưng tài khoản' : 'Kích hoạt tài khoản'}
-                              style={{ padding: '4px 8px', backgroundColor: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer', color: acc.status === 'ACTIVE' ? '#d97706' : '#16a34a' }}
+                              style={{ padding: '4px 8px', backgroundColor: '#f8fafc', border: '1px solid #e3e8ef', borderRadius: '4px', cursor: 'pointer', color: acc.status === 'ACTIVE' ? '#d97706' : '#16a34a' }}
                             >
                               {acc.status === 'ACTIVE' ? <UserX size={14} /> : <UserCheck size={14} />}
                             </button>
@@ -2485,7 +2485,7 @@ export default function SystemAdmin() {
                     style={{
                       display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
                       padding: '0.55rem 1rem', borderRadius: '6px',
-                      border: isActive ? '1.5px solid #2563eb' : '1px solid #cbd5e1',
+                      border: isActive ? '1.5px solid #2563eb' : '1px solid #e3e8ef',
                       backgroundColor: isActive ? '#eff6ff' : '#ffffff',
                       color: isActive ? '#1d4ed8' : '#475569',
                       fontSize: '0.82rem', fontWeight: isActive ? 700 : 600, cursor: 'pointer'
@@ -2510,7 +2510,7 @@ export default function SystemAdmin() {
                   <p style={{ margin: '0.3rem 0 0', fontSize: '0.78rem', color: '#64748b' }}>
                     So sánh nhanh mức độ truy cập của mọi vai trò trên từng phân hệ nghiệp vụ. Bấm vào một ô để mở chỉnh sửa chi tiết cho vai trò đó.
                   </p>
-                  <div style={{ display: 'flex', gap: '1rem', marginTop: '0.65rem', fontSize: '0.72rem', color: '#64748b', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', gap: '1rem', marginTop: '0.65rem', fontSize: '0.77rem', color: '#64748b', flexWrap: 'wrap' }}>
                     <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}><span style={{ width: '12px', height: '12px', borderRadius: '3px', backgroundColor: '#16a34a', display: 'inline-block' }} /> Toàn quyền</span>
                     <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}><span style={{ width: '12px', height: '12px', borderRadius: '3px', backgroundColor: '#fbbf24', display: 'inline-block' }} /> Một phần</span>
                     <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}><span style={{ width: '12px', height: '12px', borderRadius: '3px', backgroundColor: '#e2e8f0', display: 'inline-block' }} /> Không có quyền</span>
@@ -2518,7 +2518,7 @@ export default function SystemAdmin() {
                 </div>
 
                 <div style={{ overflowX: 'auto' }}>
-                  <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: '0.74rem' }}>
+                  <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: '0.79rem' }}>
                     <thead>
                       <tr>
                         <th style={{ position: 'sticky', left: 0, zIndex: 2, backgroundColor: '#f8fafc', padding: '0.6rem 0.85rem', textAlign: 'left', borderBottom: '2px solid #e2e8f0', borderRight: '1px solid #e2e8f0', minWidth: '170px', color: '#475569' }}>
@@ -2540,7 +2540,7 @@ export default function SystemAdmin() {
                           <tr key={mod.id} style={{ backgroundColor: rowBg }}>
                             <td style={{ position: 'sticky', left: 0, zIndex: 1, backgroundColor: rowBg, padding: '0.55rem 0.85rem', borderRight: '1px solid #e2e8f0', borderBottom: '1px solid #f1f5f9', fontWeight: 700, color: '#0f172a' }}>
                               {mod.name}
-                              <div style={{ fontSize: '0.66rem', color: '#94a3b8', fontWeight: 500 }}>{modOps.length} tác vụ</div>
+                              <div style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 500 }}>{modOps.length} tác vụ</div>
                             </td>
                             {ERP_ROLES.map(r => {
                               const isAdmin = r.code === 'ADMIN';
@@ -2558,7 +2558,7 @@ export default function SystemAdmin() {
                                 >
                                   <div style={{
                                     margin: '0 auto', minWidth: '36px', height: '22px', borderRadius: '5px',
-                                    backgroundColor: bg, color: textColor, fontSize: '0.68rem', fontWeight: 800,
+                                    backgroundColor: bg, color: textColor, fontSize: '0.74rem', fontWeight: 800,
                                     display: 'flex', alignItems: 'center', justifyContent: 'center'
                                   }}>
                                     {enabledCount}/{modOps.length}
@@ -2579,7 +2579,7 @@ export default function SystemAdmin() {
             {rbacView === 'editor' && (
               <>
                 {/* 1. Header Toolbar */}
-                <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+                <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
                   <div>
                     <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
                       Bảng Phân Quyền Theo Nghiệp Vụ Thực Tế
@@ -2592,7 +2592,7 @@ export default function SystemAdmin() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                     {hasUnsavedChanges && (
                       <span style={{
-                        fontSize: '0.74rem',
+                        fontSize: '0.79rem',
                         fontWeight: 700,
                         color: '#b45309',
                         backgroundColor: '#fef3c7',
@@ -2636,7 +2636,7 @@ export default function SystemAdmin() {
                 </div>
 
                 {/* 2. Role Selector Ribbon */}
-                <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1rem 1.25rem' }}>
+                <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1rem 1.25rem' }}>
                   <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#64748b', marginBottom: '0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span>Chọn vai trò cần thiết lập quyền thao tác:</span>
                     <span style={{ color: '#2563eb' }}>Đang chọn: <strong>{currentRoleObj.name}</strong></span>
@@ -2653,7 +2653,7 @@ export default function SystemAdmin() {
                             height: '36px',
                             padding: '0 0.9rem',
                             borderRadius: '6px',
-                            border: isSelected ? '1.5px solid #2563eb' : '1px solid #cbd5e1',
+                            border: isSelected ? '1.5px solid #2563eb' : '1px solid #e3e8ef',
                             backgroundColor: isSelected ? '#eff6ff' : '#ffffff',
                             color: isSelected ? '#1d4ed8' : '#334155',
                             fontSize: '0.8rem',
@@ -2705,21 +2705,21 @@ export default function SystemAdmin() {
                         <button
                           type="button"
                           onClick={() => handleBatchSetRoleOperations(selectedRbacRole, 'ENABLE_ALL')}
-                          style={{ padding: '0.35rem 0.65rem', fontSize: '0.74rem', fontWeight: 700, backgroundColor: '#ffffff', color: '#2563eb', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer' }}
+                          style={{ padding: '0.35rem 0.65rem', fontSize: '0.79rem', fontWeight: 700, backgroundColor: '#ffffff', color: '#2563eb', border: '1px solid #e3e8ef', borderRadius: '4px', cursor: 'pointer' }}
                         >
                           Bật Tất Cả Phân Hệ
                         </button>
                         <button
                           type="button"
                           onClick={() => handleBatchSetRoleOperations(selectedRbacRole, 'CLEAR_ALL')}
-                          style={{ padding: '0.35rem 0.65rem', fontSize: '0.74rem', fontWeight: 700, backgroundColor: '#ffffff', color: '#dc2626', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer' }}
+                          style={{ padding: '0.35rem 0.65rem', fontSize: '0.79rem', fontWeight: 700, backgroundColor: '#ffffff', color: '#dc2626', border: '1px solid #e3e8ef', borderRadius: '4px', cursor: 'pointer' }}
                         >
                           Tắt Tất Cả
                         </button>
                         <button
                           type="button"
                           onClick={() => handleBatchSetRoleOperations(selectedRbacRole, 'RESET_DEFAULT')}
-                          style={{ padding: '0.35rem 0.65rem', fontSize: '0.74rem', fontWeight: 700, backgroundColor: '#ffffff', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer' }}
+                          style={{ padding: '0.35rem 0.65rem', fontSize: '0.79rem', fontWeight: 700, backgroundColor: '#ffffff', color: '#475569', border: '1px solid #e3e8ef', borderRadius: '4px', cursor: 'pointer' }}
                         >
                           Mặc Định Vai Trò
                         </button>
@@ -2740,7 +2740,7 @@ export default function SystemAdmin() {
                           backgroundColor: 'transparent',
                           border: 'none',
                           color: '#2563eb',
-                          fontSize: '0.75rem',
+                          fontSize: '0.8rem',
                           fontWeight: 600,
                           cursor: 'pointer'
                         }}
@@ -2756,7 +2756,7 @@ export default function SystemAdmin() {
                       value={rbacSearchQuery}
                       onChange={e => setRbacSearchQuery(e.target.value)}
                       placeholder="Tìm tác vụ theo tên hoặc mô tả (VD: chiết khấu, seal, kệ...)"
-                      style={{ width: '100%', padding: '0.5rem 0.75rem 0.5rem 2.1rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.8rem', boxSizing: 'border-box' }}
+                      style={{ width: '100%', padding: '0.5rem 0.75rem 0.5rem 2.1rem', borderRadius: '6px', border: '1px solid #e3e8ef', fontSize: '0.8rem', boxSizing: 'border-box' }}
                     />
                   </div>
 
@@ -2808,14 +2808,14 @@ export default function SystemAdmin() {
                               />
                               <div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                  <span style={{ fontSize: '0.72rem', fontWeight: 700, padding: '2px 6px', borderRadius: '4px', backgroundColor: isModuleActive ? '#dbeafe' : '#e2e8f0', color: isModuleActive ? '#1e40af' : '#475569' }}>
+                                  <span style={{ fontSize: '0.77rem', fontWeight: 700, padding: '2px 6px', borderRadius: '4px', backgroundColor: isModuleActive ? '#dbeafe' : '#e2e8f0', color: isModuleActive ? '#1e40af' : '#475569' }}>
                                     {mod.category}
                                   </span>
                                   <span style={{ fontWeight: 800, fontSize: '0.92rem', color: isModuleActive ? '#0f172a' : '#64748b' }}>
                                     {mod.name}
                                   </span>
                                 </div>
-                                <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '0.15rem' }}>
+                                <div style={{ fontSize: '0.79rem', color: '#64748b', marginTop: '0.15rem' }}>
                                   {mod.desc}
                                 </div>
                               </div>
@@ -2823,13 +2823,13 @@ export default function SystemAdmin() {
 
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
                               <span style={{
-                                fontSize: '0.72rem',
+                                fontSize: '0.77rem',
                                 fontWeight: 700,
                                 padding: '3px 8px',
                                 borderRadius: '4px',
                                 backgroundColor: isModuleActive ? '#dcfce7' : '#f1f5f9',
                                 color: isModuleActive ? '#15803d' : '#64748b',
-                                border: isModuleActive ? '1px solid #bbf7d0' : '1px solid #cbd5e1'
+                                border: isModuleActive ? '1px solid #bbf7d0' : '1px solid #e3e8ef'
                               }}>
                                 {isModuleActive ? 'Đang kích hoạt phân hệ' : 'Đã tắt phân hệ'}
                               </span>
@@ -2840,10 +2840,10 @@ export default function SystemAdmin() {
                                   onClick={() => handleSetAllForModuleOps(selectedRbacRole, mod.id, !isAllModActive)}
                                   style={{
                                     padding: '0.25rem 0.65rem',
-                                    fontSize: '0.72rem',
+                                    fontSize: '0.77rem',
                                     fontWeight: 600,
                                     borderRadius: '4px',
-                                    border: '1px solid #cbd5e1',
+                                    border: '1px solid #e3e8ef',
                                     backgroundColor: '#ffffff',
                                     color: isAllModActive ? '#dc2626' : '#2563eb',
                                     cursor: 'pointer'
@@ -2896,7 +2896,7 @@ export default function SystemAdmin() {
                                               title="Backend thực sự chặn API theo đúng thiết lập này (không chỉ ẩn nút trên giao diện)"
                                               style={{
                                                 display: 'inline-flex', alignItems: 'center', gap: '3px',
-                                                fontSize: '0.66rem', fontWeight: 800, padding: '1px 6px', borderRadius: '999px',
+                                                fontSize: '0.72rem', fontWeight: 800, padding: '1px 6px', borderRadius: '999px',
                                                 backgroundColor: '#fef3c7', color: '#92400e', border: '1px solid #fde68a'
                                               }}
                                             >
@@ -2904,7 +2904,7 @@ export default function SystemAdmin() {
                                             </span>
                                           )}
                                         </div>
-                                        <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '0.15rem' }}>
+                                        <div style={{ fontSize: '0.79rem', color: '#64748b', marginTop: '0.15rem' }}>
                                           {op.desc}
                                         </div>
                                       </div>
@@ -2912,7 +2912,7 @@ export default function SystemAdmin() {
 
                                     <div>
                                       <span style={{
-                                        fontSize: '0.72rem',
+                                        fontSize: '0.77rem',
                                         fontWeight: 700,
                                         padding: '3px 8px',
                                         borderRadius: '4px',
@@ -2927,7 +2927,7 @@ export default function SystemAdmin() {
                               })}
                             </div>
                           ) : (
-                            <div style={{ padding: '0.75rem 1.15rem', color: '#94a3b8', fontSize: '0.75rem', fontStyle: 'italic', backgroundColor: '#fafafa' }}>
+                            <div style={{ padding: '0.75rem 1.15rem', color: '#94a3b8', fontSize: '0.8rem', fontStyle: 'italic', backgroundColor: '#fafafa' }}>
                               Phân hệ này đang bị tắt đối với vai trò {currentRoleObj.name}. Hãy tích vào ô vuông ở thanh tiêu đề để kích hoạt và phân quyền chi tiết.
                             </div>
                           )}
@@ -3018,7 +3018,7 @@ export default function SystemAdmin() {
                   maxWidth: '540px',
                   width: '100%',
                   boxShadow: '0 20px 40px rgba(0, 0, 0, 0.25)',
-                  border: '1px solid #cbd5e1',
+                  border: '1px solid #e3e8ef',
                   overflow: 'hidden'
                 }}>
                   {/* Modal Header */}
@@ -3080,7 +3080,7 @@ export default function SystemAdmin() {
                         fontWeight: 600,
                         color: '#475569',
                         backgroundColor: '#ffffff',
-                        border: '1px solid #cbd5e1',
+                        border: '1px solid #e3e8ef',
                         borderRadius: '6px',
                         cursor: 'pointer'
                       }}
@@ -3128,7 +3128,7 @@ export default function SystemAdmin() {
               <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#0f172a', marginTop: '0.4rem' }}>
                 {knowledgeDocs.length}
               </div>
-              <div style={{ fontSize: '0.72rem', color: '#16a34a', fontWeight: 600, marginTop: '0.2rem' }}>
+              <div style={{ fontSize: '0.77rem', color: '#16a34a', fontWeight: 600, marginTop: '0.2rem' }}>
                 {knowledgeDocs.filter(d => d.status === 'PUBLISHED' || d.isActive === true).length} tài liệu đang có hiệu lực
               </div>
             </div>
@@ -3141,7 +3141,7 @@ export default function SystemAdmin() {
               <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#0f172a', marginTop: '0.4rem' }}>
                 {knowledgeDocs.filter(d => ['POLICY', 'PROCEDURE', 'GENERAL'].includes(d.category)).length}
               </div>
-              <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '0.2rem' }}>
+              <div style={{ fontSize: '0.77rem', color: '#64748b', marginTop: '0.2rem' }}>
                 Bảo hành, đổi trả, đối soát COD
               </div>
             </div>
@@ -3154,7 +3154,7 @@ export default function SystemAdmin() {
               <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#0f172a', marginTop: '0.4rem' }}>
                 {knowledgeDocs.filter(d => ['SALES_GUIDE', 'TECH_SPEC', 'FINANCE', 'HR_POLICY'].includes(d.category)).length}
               </div>
-              <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '0.2rem' }}>
+              <div style={{ fontSize: '0.77rem', color: '#64748b', marginTop: '0.2rem' }}>
                 Chiết khấu VIP, Benchmark QA, SoD
               </div>
             </div>
@@ -3168,7 +3168,7 @@ export default function SystemAdmin() {
                 <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#10b981' }} />
                 <span style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0f172a' }}>Live RAG DB</span>
               </div>
-              <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '0.2rem' }}>
+              <div style={{ fontSize: '0.77rem', color: '#64748b', marginTop: '0.2rem' }}>
                 Cập nhật tức thì không cần train lại
               </div>
             </div>
@@ -3194,10 +3194,10 @@ export default function SystemAdmin() {
                     style={{
                       padding: '0.35rem 0.75rem',
                       borderRadius: '20px',
-                      fontSize: '0.75rem',
+                      fontSize: '0.8rem',
                       fontWeight: 700,
                       cursor: 'pointer',
-                      border: knowledgeCategory === cat.key ? '1px solid #2563eb' : '1px solid #cbd5e1',
+                      border: knowledgeCategory === cat.key ? '1px solid #2563eb' : '1px solid #e3e8ef',
                       backgroundColor: knowledgeCategory === cat.key ? '#eff6ff' : '#ffffff',
                       color: knowledgeCategory === cat.key ? '#2563eb' : '#475569',
                       transition: 'all 0.15s ease'
@@ -3319,10 +3319,10 @@ export default function SystemAdmin() {
                               <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.82rem', marginBottom: '2px' }}>
                                 {doc.title}
                               </div>
-                              <div style={{ fontSize: '0.68rem', color: '#64748b', fontFamily: 'monospace' }}>
+                              <div style={{ fontSize: '0.74rem', color: '#64748b', fontFamily: 'monospace' }}>
                                 Mã: {doc.slug}
                               </div>
-                              <div style={{ fontSize: '0.65rem', color: '#94a3b8', marginTop: '3px' }}>
+                              <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '3px' }}>
                                 Lượt xem: {doc.viewCount || 0}
                               </div>
                             </td>
@@ -3333,7 +3333,7 @@ export default function SystemAdmin() {
                                 display: 'inline-block',
                                 padding: '2px 8px',
                                 borderRadius: '10px',
-                                fontSize: '0.68rem',
+                                fontSize: '0.74rem',
                                 fontWeight: 800,
                                 backgroundColor: `${catColor}15`,
                                 color: catColor,
@@ -3345,7 +3345,7 @@ export default function SystemAdmin() {
 
                             {/* Tóm tắt & tags */}
                             <td style={{ padding: '0.75rem 0.6rem', verticalAlign: 'top' }}>
-                              <div style={{ fontSize: '0.75rem', color: '#334155', lineHeight: 1.4, marginBottom: '4px' }}>
+                              <div style={{ fontSize: '0.8rem', color: '#334155', lineHeight: 1.4, marginBottom: '4px' }}>
                                 {doc.summary || 'Chưa có tóm tắt.'}
                               </div>
                               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
@@ -3355,14 +3355,14 @@ export default function SystemAdmin() {
                                     color: '#475569',
                                     padding: '1px 6px',
                                     borderRadius: '4px',
-                                    fontSize: '0.65rem',
+                                    fontSize: '0.72rem',
                                     border: '1px solid #e2e8f0'
                                   }}>
                                     #{t}
                                   </span>
                                 ))}
                                 {(doc.tags || []).length > 5 && (
-                                  <span style={{ fontSize: '0.65rem', color: '#94a3b8' }}>
+                                  <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>
                                     +{(doc.tags || []).length - 5}
                                   </span>
                                 )}
@@ -3378,7 +3378,7 @@ export default function SystemAdmin() {
                                     color: '#1e40af',
                                     padding: '2px 5px',
                                     borderRadius: '4px',
-                                    fontSize: '0.65rem',
+                                    fontSize: '0.72rem',
                                     fontWeight: 700,
                                     border: '1px solid #bfdbfe'
                                   }}>
@@ -3397,7 +3397,7 @@ export default function SystemAdmin() {
                                     display: 'inline-block',
                                     padding: '2px 8px',
                                     borderRadius: '10px',
-                                    fontSize: '0.68rem',
+                                    fontSize: '0.74rem',
                                     fontWeight: 800,
                                     backgroundColor: isPublished ? '#f0fdf4' : '#fef2f2',
                                     color: isPublished ? '#16a34a' : '#dc2626',
@@ -3417,7 +3417,7 @@ export default function SystemAdmin() {
                                   title="Xem nội dung chi tiết"
                                   style={{
                                     background: 'none',
-                                    border: '1px solid #cbd5e1',
+                                    border: '1px solid #e3e8ef',
                                     borderRadius: '4px',
                                     padding: '4px 6px',
                                     cursor: 'pointer',
@@ -3431,7 +3431,7 @@ export default function SystemAdmin() {
                                   title="Chỉnh sửa tài liệu"
                                   style={{
                                     background: 'none',
-                                    border: '1px solid #cbd5e1',
+                                    border: '1px solid #e3e8ef',
                                     borderRadius: '4px',
                                     padding: '4px 6px',
                                     cursor: 'pointer',
@@ -3445,7 +3445,7 @@ export default function SystemAdmin() {
                                   title="Xóa tài liệu"
                                   style={{
                                     background: 'none',
-                                    border: '1px solid #cbd5e1',
+                                    border: '1px solid #e3e8ef',
                                     borderRadius: '4px',
                                     padding: '4px 6px',
                                     cursor: 'pointer',
@@ -3480,9 +3480,9 @@ export default function SystemAdmin() {
                 <AlertCircle size={24} />
               </div>
               <div>
-                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b' }}>PHẢN HỒI CẦN CẢI THIỆN</div>
+                <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b' }}>PHẢN HỒI CẦN CẢI THIỆN</div>
                 <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#0f172a' }}>{aiPendingFeedback.length}</div>
-                <div style={{ fontSize: '0.7rem', color: '#ef4444', fontWeight: 600 }}>Người dùng bấm "Chưa đúng"</div>
+                <div style={{ fontSize: '0.75rem', color: '#ef4444', fontWeight: 600 }}>Người dùng bấm "Chưa đúng"</div>
               </div>
             </div>
 
@@ -3491,9 +3491,9 @@ export default function SystemAdmin() {
                 <Sparkles size={24} />
               </div>
               <div>
-                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b' }}>KỸ NĂNG SQL ĐÃ HUẤN LUYỆN</div>
+                <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b' }}>KỸ NĂNG SQL ĐÃ HUẤN LUYỆN</div>
                 <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#0f172a' }}>{aiDynamicSkills.length}</div>
-                <div style={{ fontSize: '0.7rem', color: '#2563eb', fontWeight: 600 }}>Cập nhật số liệu tự động</div>
+                <div style={{ fontSize: '0.75rem', color: '#2563eb', fontWeight: 600 }}>Cập nhật số liệu tự động</div>
               </div>
             </div>
 
@@ -3502,9 +3502,9 @@ export default function SystemAdmin() {
                 <Activity size={24} />
               </div>
               <div>
-                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b' }}>TỔNG CÂU HỎI ĐÃ GHI NHẬN</div>
+                <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b' }}>TỔNG CÂU HỎI ĐÃ GHI NHẬN</div>
                 <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#0f172a' }}>{aiAuditLogs.length}</div>
-                <div style={{ fontSize: '0.7rem', color: '#10b981', fontWeight: 600 }}>Nhật ký hội thoại AI Copilot</div>
+                <div style={{ fontSize: '0.75rem', color: '#10b981', fontWeight: 600 }}>Nhật ký hội thoại AI Copilot</div>
               </div>
             </div>
 
@@ -3513,9 +3513,9 @@ export default function SystemAdmin() {
                 <ShieldCheck size={24} />
               </div>
               <div>
-                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b' }}>HIỆU NĂNG QUERY CACHE</div>
+                <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b' }}>HIỆU NĂNG QUERY CACHE</div>
                 <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#0f172a' }}>{aiStats?.cache?.hitRate != null ? `${aiStats.cache.hitRate}%` : '85.4%'}</div>
-                <div style={{ fontSize: '0.7rem', color: '#06b6d4', fontWeight: 600 }}>Độ trễ TB: {aiStats?.recentAvgLatencyMs != null ? `${aiStats.recentAvgLatencyMs}ms` : '< 25ms'}</div>
+                <div style={{ fontSize: '0.75rem', color: '#06b6d4', fontWeight: 600 }}>Độ trễ TB: {aiStats?.recentAvgLatencyMs != null ? `${aiStats.recentAvgLatencyMs}ms` : '< 25ms'}</div>
               </div>
             </div>
           </div>
@@ -3527,7 +3527,7 @@ export default function SystemAdmin() {
               style={{
                 backgroundColor: aiTrainingSubTab === 'feedbacks' ? '#2563eb' : '#ffffff',
                 color: aiTrainingSubTab === 'feedbacks' ? '#ffffff' : '#64748b',
-                border: '1px solid #cbd5e1',
+                border: '1px solid #e3e8ef',
                 borderRadius: '6px',
                 padding: '0.45rem 1rem',
                 fontSize: '0.8rem',
@@ -3546,7 +3546,7 @@ export default function SystemAdmin() {
               style={{
                 backgroundColor: aiTrainingSubTab === 'audit_logs' ? '#2563eb' : '#ffffff',
                 color: aiTrainingSubTab === 'audit_logs' ? '#ffffff' : '#64748b',
-                border: '1px solid #cbd5e1',
+                border: '1px solid #e3e8ef',
                 borderRadius: '6px',
                 padding: '0.45rem 1rem',
                 fontSize: '0.8rem',
@@ -3565,7 +3565,7 @@ export default function SystemAdmin() {
               style={{
                 backgroundColor: aiTrainingSubTab === 'sql_skills' ? '#2563eb' : '#ffffff',
                 color: aiTrainingSubTab === 'sql_skills' ? '#ffffff' : '#64748b',
-                border: '1px solid #cbd5e1',
+                border: '1px solid #e3e8ef',
                 borderRadius: '6px',
                 padding: '0.45rem 1rem',
                 fontSize: '0.8rem',
@@ -3587,7 +3587,7 @@ export default function SystemAdmin() {
                 <h3 style={sectionTitleStyle}>
                   <span>Danh Sách Câu Hỏi Người Dùng Đánh Giá "Chưa Đúng"</span>
                 </h3>
-                <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Admin duyệt và huấn luyện lại câu trả lời chuẩn xác cho AI</span>
+                <span style={{ fontSize: '0.8rem', color: '#64748b' }}>Admin duyệt và huấn luyện lại câu trả lời chuẩn xác cho AI</span>
               </div>
 
               {aiPendingFeedback.length === 0 ? (
@@ -3613,10 +3613,10 @@ export default function SystemAdmin() {
                         <tr key={fb.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
                           <td style={{ padding: '0.65rem 0.85rem', verticalAlign: 'top', width: '160px' }}>
                             <div style={{ fontWeight: 700, color: '#0f172a' }}>{fb.userName || 'Người dùng'}</div>
-                            <span style={{ backgroundColor: '#f1f5f9', color: '#475569', padding: '2px 6px', borderRadius: '4px', fontSize: '0.68rem', fontWeight: 700 }}>
+                            <span style={{ backgroundColor: '#f1f5f9', color: '#475569', padding: '2px 6px', borderRadius: '4px', fontSize: '0.74rem', fontWeight: 700 }}>
                               {fb.userRole || 'USER'}
                             </span>
-                            <div style={{ fontSize: '0.68rem', color: '#94a3b8', marginTop: '3px' }}>
+                            <div style={{ fontSize: '0.74rem', color: '#94a3b8', marginTop: '3px' }}>
                               {new Date(fb.createdAt).toLocaleDateString('vi-VN')}
                             </div>
                           </td>
@@ -3624,7 +3624,7 @@ export default function SystemAdmin() {
                             "{fb.prompt}"
                           </td>
                           <td style={{ padding: '0.65rem 0.85rem', verticalAlign: 'top', color: '#64748b', maxWidth: '300px' }}>
-                            <div style={{ maxHeight: '70px', overflowY: 'auto', whiteSpace: 'pre-wrap', fontSize: '0.75rem', backgroundColor: '#f8fafc', padding: '6px', borderRadius: '4px', border: '1px solid #e2e8f0' }}>
+                            <div style={{ maxHeight: '70px', overflowY: 'auto', whiteSpace: 'pre-wrap', fontSize: '0.8rem', backgroundColor: '#f8fafc', padding: '6px', borderRadius: '4px', border: '1px solid #e2e8f0' }}>
                               {fb.response}
                             </div>
                           </td>
@@ -3640,7 +3640,7 @@ export default function SystemAdmin() {
                                 border: 'none',
                                 borderRadius: '6px',
                                 padding: '0.4rem 0.75rem',
-                                fontSize: '0.75rem',
+                                fontSize: '0.8rem',
                                 fontWeight: 700,
                                 cursor: 'pointer',
                                 display: 'inline-flex',
@@ -3668,7 +3668,7 @@ export default function SystemAdmin() {
                 <h3 style={sectionTitleStyle}>
                   <span>Lịch Sử Tương Tác Của Người Dùng Với AetherCopilot</span>
                 </h3>
-                <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Admin có thể chọn bất kỳ câu hỏi nào để thêm vào mẫu huấn luyện</span>
+                <span style={{ fontSize: '0.8rem', color: '#64748b' }}>Admin có thể chọn bất kỳ câu hỏi nào để thêm vào mẫu huấn luyện</span>
               </div>
 
               <div style={{ overflowX: 'auto' }}>
@@ -3685,12 +3685,12 @@ export default function SystemAdmin() {
                   <tbody>
                     {aiAuditLogs.map(log => (
                       <tr key={log.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ padding: '0.65rem 0.85rem', verticalAlign: 'top', color: '#64748b', fontSize: '0.72rem', width: '120px' }}>
+                        <td style={{ padding: '0.65rem 0.85rem', verticalAlign: 'top', color: '#64748b', fontSize: '0.77rem', width: '120px' }}>
                           {new Date(log.createdAt).toLocaleString('vi-VN')}
                         </td>
                         <td style={{ padding: '0.65rem 0.85rem', verticalAlign: 'top', width: '160px' }}>
                           <div style={{ fontWeight: 700, color: '#0f172a' }}>{log.userName || log.userEmail}</div>
-                          <span style={{ backgroundColor: '#eff6ff', color: '#1e40af', padding: '1px 5px', borderRadius: '4px', fontSize: '0.68rem', fontWeight: 700 }}>
+                          <span style={{ backgroundColor: '#eff6ff', color: '#1e40af', padding: '1px 5px', borderRadius: '4px', fontSize: '0.74rem', fontWeight: 700 }}>
                             {log.userRole}
                           </span>
                         </td>
@@ -3698,7 +3698,7 @@ export default function SystemAdmin() {
                           "{log.userPrompt}"
                         </td>
                         <td style={{ padding: '0.65rem 0.85rem', verticalAlign: 'top', color: '#64748b', maxWidth: '350px' }}>
-                          <div style={{ maxHeight: '60px', overflowY: 'auto', whiteSpace: 'pre-wrap', fontSize: '0.72rem' }}>
+                          <div style={{ maxHeight: '60px', overflowY: 'auto', whiteSpace: 'pre-wrap', fontSize: '0.77rem' }}>
                             {log.aiResponse}
                           </div>
                         </td>
@@ -3711,7 +3711,7 @@ export default function SystemAdmin() {
                               border: '1px solid #bfdbfe',
                               borderRadius: '4px',
                               padding: '0.35rem 0.65rem',
-                              fontSize: '0.72rem',
+                              fontSize: '0.77rem',
                               fontWeight: 700,
                               cursor: 'pointer'
                             }}
@@ -3735,7 +3735,7 @@ export default function SystemAdmin() {
                   <h3 style={sectionTitleStyle}>
                     <span>Kỹ Năng Truy Vấn SQL Động (Dynamic Few-Shots)</span>
                   </h3>
-                  <p style={{ margin: '3px 0 0', fontSize: '0.75rem', color: '#64748b' }}>
+                  <p style={{ margin: '3px 0 0', fontSize: '0.8rem', color: '#64748b' }}>
                     Các câu SQL mẫu do Admin dạy. Khi có dữ liệu mới phát sinh trong Database, AI sẽ tự động chạy câu lệnh này để tính ra con số mới nhất!
                   </p>
                 </div>
@@ -3770,7 +3770,7 @@ export default function SystemAdmin() {
                     <div key={skill.id} style={{ border: '1px solid #e2e8f0', borderRadius: '8px', padding: '1rem', backgroundColor: '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem' }}>
                       <div style={{ flex: 1 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <span style={{ backgroundColor: '#dbeafe', color: '#1e40af', padding: '2px 6px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 800 }}>
+                          <span style={{ backgroundColor: '#dbeafe', color: '#1e40af', padding: '2px 6px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 800 }}>
                             CÂU HỎI MẪU
                           </span>
                           <span style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.88rem' }}>
@@ -3780,7 +3780,7 @@ export default function SystemAdmin() {
                         <div style={{ marginTop: '0.5rem', backgroundColor: '#0f172a', color: '#38bdf8', padding: '0.65rem 0.85rem', borderRadius: '6px', fontFamily: 'monospace', fontSize: '0.78rem', overflowX: 'auto' }}>
                           {skill.sql}
                         </div>
-                        <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '0.4rem', display: 'flex', gap: '1rem' }}>
+                        <div style={{ fontSize: '0.77rem', color: '#64748b', marginTop: '0.4rem', display: 'flex', gap: '1rem' }}>
                           <span>📝 {skill.description}</span>
                           <span>👤 Tạo bởi: {skill.createdBy}</span>
                           <span>🕒 {new Date(skill.createdAt).toLocaleDateString('vi-VN')}</span>
@@ -3877,7 +3877,7 @@ export default function SystemAdmin() {
                     }}
                   >
                     <div style={{ fontWeight: 800, color: '#1e40af', fontSize: '0.85rem' }}>📊 Dữ Liệu Động (Live Business Data)</div>
-                    <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '2px' }}>
+                    <div style={{ fontSize: '0.77rem', color: '#64748b', marginTop: '2px' }}>
                       Doanh thu, đơn hàng, tồn kho, công nợ... Số liệu sẽ tự động tính mới mỗi khi Database thay đổi.
                     </div>
                   </div>
@@ -3893,7 +3893,7 @@ export default function SystemAdmin() {
                     }}
                   >
                     <div style={{ fontWeight: 800, color: '#1e40af', fontSize: '0.85rem' }}>📖 Tri Thức Văn Bản (SOP / Chính Sách)</div>
-                    <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '2px' }}>
+                    <div style={{ fontSize: '0.77rem', color: '#64748b', marginTop: '2px' }}>
                       Quy định bảo hành, đổi trả, quy chuẩn đóng gói, quy chế lương thưởng... AI sẽ trích xuất văn bản.
                     </div>
                   </div>
@@ -3919,11 +3919,11 @@ export default function SystemAdmin() {
                       style={{
                         padding: '0.35rem 0.65rem',
                         borderRadius: '20px',
-                        border: trainingForm.targetRole === r.id ? '2px solid #2563eb' : '1px solid #cbd5e1',
+                        border: trainingForm.targetRole === r.id ? '2px solid #2563eb' : '1px solid #e3e8ef',
                         backgroundColor: trainingForm.targetRole === r.id ? '#dbeafe' : '#ffffff',
                         color: trainingForm.targetRole === r.id ? '#1e40af' : '#475569',
                         fontWeight: trainingForm.targetRole === r.id ? 700 : 500,
-                        fontSize: '0.75rem',
+                        fontSize: '0.8rem',
                         cursor: 'pointer'
                       }}
                     >
@@ -3957,14 +3957,14 @@ export default function SystemAdmin() {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#0f172a' }}>Cấu Hình Dữ Liệu Truy Vấn</span>
-                        <div style={{ display: 'flex', border: '1px solid #cbd5e1', borderRadius: '6px', overflow: 'hidden' }}>
+                        <div style={{ display: 'flex', border: '1px solid #e3e8ef', borderRadius: '6px', overflow: 'hidden' }}>
                           <button
                             type="button"
                             onClick={() => setSqlViewMode('VISUAL')}
                             style={{
                               border: 'none',
                               padding: '0.2rem 0.55rem',
-                              fontSize: '0.72rem',
+                              fontSize: '0.77rem',
                               fontWeight: 700,
                               cursor: 'pointer',
                               backgroundColor: sqlViewMode === 'VISUAL' ? '#2563eb' : '#ffffff',
@@ -3979,7 +3979,7 @@ export default function SystemAdmin() {
                             style={{
                               border: 'none',
                               padding: '0.2rem 0.55rem',
-                              fontSize: '0.72rem',
+                              fontSize: '0.77rem',
                               fontWeight: 700,
                               cursor: 'pointer',
                               backgroundColor: sqlViewMode === 'RAW_SQL' ? '#2563eb' : '#ffffff',
@@ -3995,7 +3995,7 @@ export default function SystemAdmin() {
                         type="button"
                         onClick={handleTestSql}
                         disabled={testingSql}
-                        style={{ backgroundColor: '#10b981', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.3rem 0.75rem', fontSize: '0.75rem', fontWeight: 700, cursor: testingSql ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+                        style={{ backgroundColor: '#10b981', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.3rem 0.75rem', fontSize: '0.8rem', fontWeight: 700, cursor: testingSql ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
                       >
                         {testingSql ? 'Đang chạy test...' : '▶ Chạy Thử Lấy Dữ Liệu'}
                       </button>
@@ -4003,12 +4003,12 @@ export default function SystemAdmin() {
 
                     {/* Chế độ Trực Quan: 3 TẦNG DROPDOWN LIÊN HOÀN (3-TIER CASCADING BUILDER) */}
                     {sqlViewMode === 'VISUAL' && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', marginBottom: '0.75rem', backgroundColor: '#ffffff', padding: '0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', marginBottom: '0.75rem', backgroundColor: '#ffffff', padding: '0.75rem', borderRadius: '8px', border: '1px solid #e3e8ef' }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                          <span style={{ fontSize: '0.74rem', color: '#1e40af', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                          <span style={{ fontSize: '0.79rem', color: '#1e40af', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
                             <span>🎯 BỘ DỰNG TRUY VẤN 3 TẦNG LIÊN HOÀN (NO-CODE BUILDER):</span>
                           </span>
-                          <span style={{ fontSize: '0.68rem', color: '#64748b' }}>
+                          <span style={{ fontSize: '0.74rem', color: '#64748b' }}>
                             Tự động sinh SQL chuẩn 100% không sợ sai cú pháp
                           </span>
                         </div>
@@ -4016,7 +4016,7 @@ export default function SystemAdmin() {
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1.5fr', gap: '0.5rem' }}>
                           {/* TẦNG 1: CHỦ THỂ DỮ LIỆU */}
                           <div>
-                            <label style={{ fontSize: '0.7rem', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '3px' }}>
+                            <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '3px' }}>
                               1️⃣ Chủ Thể Dữ Liệu
                             </label>
                             <select
@@ -4027,7 +4027,7 @@ export default function SystemAdmin() {
                                 const firstFlt = Object.keys(TIER_CONFIG[newEnt]?.actions[firstAct]?.filters || {})[0] || '';
                                 applyTierSelection(newEnt, firstAct, firstFlt);
                               }}
-                              style={{ ...inputStyle, fontSize: '0.73rem', padding: '0.35rem 0.5rem', borderColor: '#2563eb' }}
+                              style={{ ...inputStyle, fontSize: '0.78rem', padding: '0.35rem 0.5rem', borderColor: '#2563eb' }}
                             >
                               {Object.entries(TIER_CONFIG).map(([k, v]) => (
                                 <option key={k} value={k}>{v.label}</option>
@@ -4037,7 +4037,7 @@ export default function SystemAdmin() {
 
                           {/* TẦNG 2: MỤC TIÊU CẦN LẤY / TÍNH TOÁN */}
                           <div>
-                            <label style={{ fontSize: '0.7rem', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '3px' }}>
+                            <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '3px' }}>
                               2️⃣ Mục Tiêu Cần Lấy
                             </label>
                             <select
@@ -4047,7 +4047,7 @@ export default function SystemAdmin() {
                                 const firstFlt = Object.keys(TIER_CONFIG[tier1Entity]?.actions[newAct]?.filters || {})[0] || '';
                                 applyTierSelection(tier1Entity, newAct, firstFlt);
                               }}
-                              style={{ ...inputStyle, fontSize: '0.73rem', padding: '0.35rem 0.5rem', borderColor: '#2563eb' }}
+                              style={{ ...inputStyle, fontSize: '0.78rem', padding: '0.35rem 0.5rem', borderColor: '#2563eb' }}
                             >
                               {Object.entries(TIER_CONFIG[tier1Entity]?.actions || {}).map(([k, v]) => (
                                 <option key={k} value={k}>{v.label}</option>
@@ -4057,13 +4057,13 @@ export default function SystemAdmin() {
 
                           {/* TẦNG 3: ĐIỀU KIỆN LỌC NGHIỆP VỤ & THỜI GIAN */}
                           <div>
-                            <label style={{ fontSize: '0.7rem', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '3px' }}>
-                              3️⃣ Điều Kiện Lọc Nghiệp Vụ {trainingForm.targetRole !== 'ALL' && <span style={{ color: '#2563eb', fontSize: '0.68rem' }}>(Theo vai trò {trainingForm.targetRole})</span>}
+                            <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '3px' }}>
+                              3️⃣ Điều Kiện Lọc Nghiệp Vụ {trainingForm.targetRole !== 'ALL' && <span style={{ color: '#2563eb', fontSize: '0.74rem' }}>(Theo vai trò {trainingForm.targetRole})</span>}
                             </label>
                             <select
                               value={tier3Filter}
                               onChange={e => applyTierSelection(tier1Entity, tier2Action, e.target.value)}
-                              style={{ ...inputStyle, fontSize: '0.73rem', padding: '0.35rem 0.5rem', borderColor: '#2563eb', fontWeight: 600, color: '#1e40af' }}
+                              style={{ ...inputStyle, fontSize: '0.78rem', padding: '0.35rem 0.5rem', borderColor: '#2563eb', fontWeight: 600, color: '#1e40af' }}
                             >
                               {(() => {
                                 const allFilters = Object.entries(TIER_CONFIG[tier1Entity]?.actions[tier2Action]?.filters || {});
@@ -4081,12 +4081,12 @@ export default function SystemAdmin() {
                         </div>
 
                         {/* Thanh tóm tắt cấu hình được chọn */}
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#f1f5f9', padding: '0.35rem 0.6rem', borderRadius: '4px', fontSize: '0.7rem', color: '#475569' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#f1f5f9', padding: '0.35rem 0.6rem', borderRadius: '4px', fontSize: '0.75rem', color: '#475569' }}>
                           <div>
                             <strong style={{ color: '#0f172a' }}>Kịch bản: </strong> 
                             {TIER_CONFIG[tier1Entity]?.label.split(' ')[0]} ➔ {TIER_CONFIG[tier1Entity]?.actions[tier2Action]?.label.split(' ')[0]} ➔ {TIER_CONFIG[tier1Entity]?.actions[tier2Action]?.filters[tier3Filter]?.label}
                           </div>
-                          <span style={{ color: '#16a34a', fontWeight: 700, fontSize: '0.68rem' }}>● Đã tự đồng bộ SQL</span>
+                          <span style={{ color: '#16a34a', fontWeight: 700, fontSize: '0.74rem' }}>● Đã tự đồng bộ SQL</span>
                         </div>
                       </div>
                     )}
@@ -4108,19 +4108,19 @@ export default function SystemAdmin() {
                     {/* HỘP DỊCH & GIẢI THÍCH Ý NGHĨA CÂU LỆNH BẰNG TIẾNG VIỆT */}
                     <div style={{ marginTop: '0.5rem', padding: '0.65rem 0.85rem', borderRadius: '6px', backgroundColor: '#eff6ff', border: '1px solid #bfdbfe' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.2rem' }}>
-                        <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#1e40af' }}>
+                        <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#1e40af' }}>
                           📘 Ý Nghĩa Nghiệp Vụ (AI Dịch Ra Tiếng Việt Dễ Hiểu):
                         </span>
                         <button
                           type="button"
                           onClick={() => handleExplainSql(trainingForm.sql, trainingForm.question)}
                           disabled={explainingSql}
-                          style={{ background: 'none', border: 'none', color: '#2563eb', fontSize: '0.7rem', cursor: 'pointer', textDecoration: 'underline' }}
+                          style={{ background: 'none', border: 'none', color: '#2563eb', fontSize: '0.75rem', cursor: 'pointer', textDecoration: 'underline' }}
                         >
                           {explainingSql ? 'Đang phân tích...' : 'Làm mới giải thích'}
                         </button>
                       </div>
-                      <div style={{ fontSize: '0.75rem', color: '#1e293b', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
+                      <div style={{ fontSize: '0.8rem', color: '#1e293b', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
                         {sqlExplanation || (
                           <span style={{ color: '#64748b' }}>
                             Hệ thống sẽ lọc dữ liệu an toàn dựa trên câu lệnh SQL trên, chỉ đọc thông tin và không gây thay đổi cơ sở dữ liệu.
@@ -4132,7 +4132,7 @@ export default function SystemAdmin() {
 
                   {/* KẾT QUẢ KIỂM THỬ LIVE TỪ DATABASE */}
                   {testSqlResult && (
-                    <div style={{ padding: '0.75rem', borderRadius: '6px', backgroundColor: testSqlResult.success ? '#f0fdf4' : '#fef2f2', border: `1px solid ${testSqlResult.success ? '#bbf7d0' : '#fecaca'}`, fontSize: '0.75rem' }}>
+                    <div style={{ padding: '0.75rem', borderRadius: '6px', backgroundColor: testSqlResult.success ? '#f0fdf4' : '#fef2f2', border: `1px solid ${testSqlResult.success ? '#bbf7d0' : '#fecaca'}`, fontSize: '0.8rem' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: 700, color: testSqlResult.success ? '#16a34a' : '#dc2626' }}>
                         <span>{testSqlResult.success ? '✅ Kết quả thực thi thành công từ Database:' : '❌ Lỗi kiểm thử SQL:'}</span>
                         {!testSqlResult.success && (
@@ -4146,7 +4146,7 @@ export default function SystemAdmin() {
                               border: 'none',
                               borderRadius: '4px',
                               padding: '0.25rem 0.65rem',
-                              fontSize: '0.72rem',
+                              fontSize: '0.77rem',
                               fontWeight: 700,
                               cursor: fixingSql ? 'wait' : 'pointer',
                               display: 'flex',
@@ -4170,7 +4170,7 @@ export default function SystemAdmin() {
                       <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#0f172a' }}>
                         💬 Cách AetherCopilot Trả Lời Nhân Viên (Response Presentation)
                       </span>
-                      <div style={{ display: 'flex', gap: '0.6rem', fontSize: '0.75rem' }}>
+                      <div style={{ display: 'flex', gap: '0.6rem', fontSize: '0.8rem' }}>
                         <label style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', cursor: 'pointer' }}>
                           <input
                             type="radio"
@@ -4201,22 +4201,22 @@ export default function SystemAdmin() {
                           style={{ ...inputStyle, fontSize: '0.78rem' }}
                           placeholder="Ví dụ: Chào bạn, hiện tại bạn đang có {so_don} đơn cần xử lý. Danh sách cụ thể:\n{danh_sach}"
                         />
-                        <span style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '2px', display: 'block' }}>
+                        <span style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '2px', display: 'block' }}>
                           * Hỗ trợ chèn các thẻ biến: <code>{`{so_don}`}</code>, <code>{`{total_amount}`}</code>, <code>{`{danh_sach}`}</code>.
                         </span>
                       </div>
                     ) : (
-                      <div style={{ padding: '0.6rem', backgroundColor: '#f1f5f9', borderRadius: '6px', fontSize: '0.74rem', color: '#475569' }}>
+                      <div style={{ padding: '0.6rem', backgroundColor: '#f1f5f9', borderRadius: '6px', fontSize: '0.79rem', color: '#475569' }}>
                         🤖 <strong>Chế độ tự động:</strong> AI sẽ tự động phân tích dữ liệu trả về từ câu truy vấn (tiền tệ, danh sách đơn hàng, địa chỉ, khách hàng) để trình bày thành bảng / danh sách chuẩn nhận diện theo đúng phong cách của vai trò <strong>{trainingForm.targetRole}</strong>.
                       </div>
                     )}
 
                     {/* Xem Trước Câu Trả Lời Thực Tế (Live Preview Box) */}
                     <div style={{ marginTop: '0.65rem', border: '1px dashed #cbd5e1', borderRadius: '6px', padding: '0.65rem', backgroundColor: '#f8fafc' }}>
-                      <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#334155', marginBottom: '0.3rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                      <div style={{ fontSize: '0.77rem', fontWeight: 700, color: '#334155', marginBottom: '0.3rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
                         <span>👁️ Xem trước giao diện nhân viên nhận được trong AetherCopilot:</span>
                       </div>
-                      <div style={{ fontSize: '0.75rem', color: '#0f172a', whiteSpace: 'pre-wrap', lineHeight: 1.5, backgroundColor: '#ffffff', padding: '0.6rem', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+                      <div style={{ fontSize: '0.8rem', color: '#0f172a', whiteSpace: 'pre-wrap', lineHeight: 1.5, backgroundColor: '#ffffff', padding: '0.6rem', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
                         {trainingForm.responseMode === 'CUSTOM' && trainingForm.responseTemplate ? (
                           trainingForm.responseTemplate
                             .replace(/\{so_don\}|\{so_luong\}/g, '9')
@@ -4326,7 +4326,7 @@ export default function SystemAdmin() {
               <Activity size={18} style={{ color: '#2563eb' }} />
               <span>Nhật Ký Thao Tác & Giám Sát An Ninh Hệ Thống</span>
             </h3>
-            <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
+            <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
               Hiển thị {auditLogs.length} sự kiện gần nhất
             </span>
           </div>
@@ -4467,7 +4467,7 @@ export default function SystemAdmin() {
                     onChange={e => setCompanyConfig(p => ({ ...p, salesCommissionFlat: Number(e.target.value) }))}
                     style={inputStyle}
                   />
-                  <p style={{ margin: '0.3rem 0 0', fontSize: '0.72rem', color: '#94a3b8' }}>
+                  <p style={{ margin: '0.3rem 0 0', fontSize: '0.77rem', color: '#94a3b8' }}>
                     Tính trên tổng giá trị đơn hàng POS nhân viên Sales trực tiếp bán trong kỳ.
                   </p>
                 </div>
@@ -4546,11 +4546,11 @@ export default function SystemAdmin() {
       {/* ================= MODAL: THÊM NHÂN VIÊN MỚI ================= */}
       {showAdd && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(6px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', width: '100%', maxWidth: '480px', padding: '1.75rem', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e3e8ef', width: '100%', maxWidth: '480px', padding: '1.75rem', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
             
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
               <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>Tạo Tài Khoản Nhân Viên Mới</h3>
-              <button onClick={() => setShowAdd(false)} style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#475569', cursor: 'pointer', padding: '0.4rem', borderRadius: '6px' }}>
+              <button onClick={() => setShowAdd(false)} style={{ background: '#f1f5f9', border: '1px solid #e3e8ef', color: '#475569', cursor: 'pointer', padding: '0.4rem', borderRadius: '6px' }}>
                 <X size={18} />
               </button>
             </div>
@@ -4642,7 +4642,7 @@ export default function SystemAdmin() {
                         <option key={reg.code} value={reg.code}>{reg.name}</option>
                       ))}
                     </select>
-                    <p style={{ margin: '0.35rem 0 0', fontSize: '0.72rem', color: '#3b82f6' }}>
+                    <p style={{ margin: '0.35rem 0 0', fontSize: '0.77rem', color: '#3b82f6' }}>
                       Shipper sẽ chỉ thấy và nhận các đơn hàng thuộc khu vực này tại cổng Giao Hàng.
                     </p>
                   </div>
@@ -4689,11 +4689,11 @@ export default function SystemAdmin() {
       {/* ================= MODAL: CHỈNH SỬA NHÂN VIÊN ================= */}
       {editingEmp && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(6px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', width: '100%', maxWidth: '480px', padding: '1.75rem', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e3e8ef', width: '100%', maxWidth: '480px', padding: '1.75rem', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
             
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
               <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>Chỉnh Sửa Tài Khoản #{editingEmp.id}</h3>
-              <button onClick={() => setEditingEmp(null)} style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#475569', cursor: 'pointer', padding: '0.4rem', borderRadius: '6px' }}>
+              <button onClick={() => setEditingEmp(null)} style={{ background: '#f1f5f9', border: '1px solid #e3e8ef', color: '#475569', cursor: 'pointer', padding: '0.4rem', borderRadius: '6px' }}>
                 <X size={18} />
               </button>
             </div>
@@ -4769,7 +4769,7 @@ export default function SystemAdmin() {
               <div style={{ backgroundColor: '#f8fafc', padding: '0.65rem 0.75rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                 <label style={{ display: 'block', fontWeight: 700, color: '#64748b', marginBottom: '0.3rem' }}>Lương cơ bản (VNĐ)</label>
                 <div style={{ fontWeight: 700, color: '#0f172a' }}>{fmt(editingEmp.salary)} ₫</div>
-                <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '0.25rem' }}>Chỉnh sửa tại phân hệ Nhân Sự (Hồ Sơ Nhân Sự).</div>
+                <div style={{ fontSize: '0.77rem', color: '#94a3b8', marginTop: '0.25rem' }}>Chỉnh sửa tại phân hệ Nhân Sự (Hồ Sơ Nhân Sự).</div>
               </div>
 
               <div style={{ display: 'flex', gap: '0.6rem', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
@@ -4819,7 +4819,7 @@ export default function SystemAdmin() {
       {/* ================= MODAL: CHI TIẾT & QUẢN LÝ TÀI KHOẢN KHÁCH HÀNG ================= */}
       {selectedCust && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(6px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', width: '100%', maxWidth: '640px', padding: '1.75rem', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)' }}>
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e3e8ef', width: '100%', maxWidth: '640px', padding: '1.75rem', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)' }}>
             
             {/* Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.25rem', borderBottom: '1px solid #f1f5f9', paddingBottom: '0.75rem' }}>
@@ -4828,10 +4828,10 @@ export default function SystemAdmin() {
                   <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
                     {custDetail?.name || selectedCust.name}
                   </h3>
-                  <span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 800, backgroundColor: (custDetail?.status || selectedCust.status) === 'INACTIVE' ? '#fef2f2' : '#f0fdf4', color: (custDetail?.status || selectedCust.status) === 'INACTIVE' ? '#dc2626' : '#16a34a' }}>
+                  <span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 800, backgroundColor: (custDetail?.status || selectedCust.status) === 'INACTIVE' ? '#fef2f2' : '#f0fdf4', color: (custDetail?.status || selectedCust.status) === 'INACTIVE' ? '#dc2626' : '#16a34a' }}>
                     {(custDetail?.status || selectedCust.status) === 'INACTIVE' ? 'Vô hiệu hóa' : 'Đang hoạt động'}
                   </span>
-                  <span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 800, backgroundColor: '#f5f3ff', color: '#7c3aed', border: '1px solid #ddd6fe' }}>
+                  <span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 800, backgroundColor: '#f5f3ff', color: '#7c3aed', border: '1px solid #ddd6fe' }}>
                     Hạng: {custDetail?.tier || selectedCust.tier || 'BRONZE'}
                   </span>
                 </div>
@@ -4840,7 +4840,7 @@ export default function SystemAdmin() {
                   {custDetail?.username && <span> • Username: <strong>{custDetail.username}</strong></span>}
                 </div>
               </div>
-              <button onClick={handleCloseCustDetail} style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#475569', cursor: 'pointer', padding: '0.4rem', borderRadius: '6px' }}>
+              <button onClick={handleCloseCustDetail} style={{ background: '#f1f5f9', border: '1px solid #e3e8ef', color: '#475569', cursor: 'pointer', padding: '0.4rem', borderRadius: '6px' }}>
                 <X size={18} />
               </button>
             </div>
@@ -4856,19 +4856,19 @@ export default function SystemAdmin() {
                 {/* 4 Thẻ KPI */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.65rem' }}>
                   <div style={{ padding: '0.65rem 0.75rem', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
-                    <div style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 600 }}>Đơn Hàng</div>
+                    <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>Đơn Hàng</div>
                     <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', marginTop: '0.15rem' }}>{custDetail?.orderCount ?? selectedCust.orderCount ?? 0}</div>
                   </div>
                   <div style={{ padding: '0.65rem 0.75rem', backgroundColor: '#f0fdf4', borderRadius: '8px', border: '1px solid #bbf7d0', textAlign: 'center' }}>
-                    <div style={{ fontSize: '0.7rem', color: '#16a34a', fontWeight: 600 }}>Tổng Chi Tiêu</div>
+                    <div style={{ fontSize: '0.75rem', color: '#16a34a', fontWeight: 600 }}>Tổng Chi Tiêu</div>
                     <div style={{ fontSize: '1rem', fontWeight: 800, color: '#15803d', marginTop: '0.15rem' }}>{fmt(custDetail?.totalSpent || 0)} ₫</div>
                   </div>
                   <div style={{ padding: '0.65rem 0.75rem', backgroundColor: '#fffbeb', borderRadius: '8px', border: '1px solid #fde68a', textAlign: 'center' }}>
-                    <div style={{ fontSize: '0.7rem', color: '#d97706', fontWeight: 600 }}>Điểm Thưởng</div>
+                    <div style={{ fontSize: '0.75rem', color: '#d97706', fontWeight: 600 }}>Điểm Thưởng</div>
                     <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#b45309', marginTop: '0.15rem' }}>{custDetail?.loyaltyPoints ?? 0}</div>
                   </div>
                   <div style={{ padding: '0.65rem 0.75rem', backgroundColor: '#eff6ff', borderRadius: '8px', border: '1px solid #bfdbfe', textAlign: 'center' }}>
-                    <div style={{ fontSize: '0.7rem', color: '#2563eb', fontWeight: 600 }}>Ngày Đăng Ký</div>
+                    <div style={{ fontSize: '0.75rem', color: '#2563eb', fontWeight: 600 }}>Ngày Đăng Ký</div>
                     <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#1d4ed8', marginTop: '0.25rem' }}>
                       {custDetail?.createdAt ? new Date(custDetail.createdAt).toLocaleDateString('vi-VN') : '—'}
                     </div>
@@ -5038,7 +5038,7 @@ export default function SystemAdmin() {
                                 <strong>{addr.recipientName}</strong> ({addr.recipientPhone}) — {addr.addressLine}, {addr.ward ? `${addr.ward}, ` : ''}{addr.district ? `${addr.district}, ` : ''}{addr.city}
                               </div>
                               {addr.isDefault && (
-                                <span style={{ padding: '1px 6px', borderRadius: '4px', fontSize: '0.65rem', fontWeight: 800, backgroundColor: '#eff6ff', color: '#2563eb' }}>Mặc định</span>
+                                <span style={{ padding: '1px 6px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 800, backgroundColor: '#eff6ff', color: '#2563eb' }}>Mặc định</span>
                               )}
                             </div>
                           ))}
@@ -5054,7 +5054,7 @@ export default function SystemAdmin() {
                             Đơn Hàng Gần Đây ({custDetail.orders.length})
                           </h4>
                           <span 
-                            style={{ fontSize: '0.75rem', color: '#2563eb', fontWeight: 700, cursor: 'pointer' }}
+                            style={{ fontSize: '0.8rem', color: '#2563eb', fontWeight: 700, cursor: 'pointer' }}
                             onClick={() => {
                               handleCloseCustDetail();
                               navigate(`/admin/sales?tab=orders&search=${encodeURIComponent(custDetail.customerId)}`);
@@ -5063,7 +5063,7 @@ export default function SystemAdmin() {
                             Xem tất cả đơn →
                           </span>
                         </div>
-                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.76rem' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
                           <thead>
                             <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', textAlign: 'left', color: '#64748b' }}>
                               <th style={{ padding: '0.4rem 0.5rem' }}>Mã Đơn</th>
@@ -5078,7 +5078,7 @@ export default function SystemAdmin() {
                                 <td style={{ padding: '0.4rem 0.5rem', fontWeight: 700, color: '#2563eb' }}>{o.orderId}</td>
                                 <td style={{ padding: '0.4rem 0.5rem', color: '#64748b' }}>{new Date(o.createdAt).toLocaleDateString('vi-VN')}</td>
                                 <td style={{ padding: '0.4rem 0.5rem', textAlign: 'center' }}>
-                                  <span style={{ padding: '2px 6px', borderRadius: '4px', fontSize: '0.68rem', fontWeight: 700, backgroundColor: '#f1f5f9', color: '#475569' }}>
+                                  <span style={{ padding: '2px 6px', borderRadius: '4px', fontSize: '0.74rem', fontWeight: 700, backgroundColor: '#f1f5f9', color: '#475569' }}>
                                     {getStatusLabel(ORDER_STATUS, o.status)}
                                   </span>
                                 </td>
@@ -5302,7 +5302,7 @@ export default function SystemAdmin() {
                   <span style={badgeStyle('info')}>
                     {viewingKnowledgeDoc.category}
                   </span>
-                  <span style={{ fontSize: '0.75rem', color: '#64748b', fontFamily: 'monospace' }}>
+                  <span style={{ fontSize: '0.8rem', color: '#64748b', fontFamily: 'monospace' }}>
                     Mã SOP: <strong>{viewingKnowledgeDoc.slug}</strong>
                   </span>
                   <span style={badgeStyle(viewingKnowledgeDoc.isActive ? 'success' : 'danger')}>
@@ -5354,10 +5354,10 @@ export default function SystemAdmin() {
               {/* Metadata */}
               <div style={{ marginTop: '1.25rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', borderTop: '1px solid #e2e8f0', paddingTop: '1rem' }}>
                 <div>
-                  <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', marginBottom: '6px' }}>Từ Khóa Tags:</div>
+                  <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', marginBottom: '6px' }}>Từ Khóa Tags:</div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
                     {(viewingKnowledgeDoc.tags || []).map((t, idx) => (
-                      <span key={idx} style={{ backgroundColor: '#f1f5f9', color: '#475569', padding: '2px 8px', borderRadius: '4px', fontSize: '0.7rem', border: '1px solid #e2e8f0' }}>
+                      <span key={idx} style={{ backgroundColor: '#f1f5f9', color: '#475569', padding: '2px 8px', borderRadius: '4px', fontSize: '0.75rem', border: '1px solid #e2e8f0' }}>
                         #{t}
                       </span>
                     ))}
@@ -5365,10 +5365,10 @@ export default function SystemAdmin() {
                 </div>
 
                 <div>
-                  <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', marginBottom: '6px' }}>Vai Trò Được Phép Truy Cập (RBAC):</div>
+                  <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', marginBottom: '6px' }}>Vai Trò Được Phép Truy Cập (RBAC):</div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
                     {(viewingKnowledgeDoc.allowedRoles || []).map((role, idx) => (
-                      <span key={idx} style={{ backgroundColor: '#eff6ff', color: '#1e40af', padding: '2px 7px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 700, border: '1px solid #bfdbfe' }}>
+                      <span key={idx} style={{ backgroundColor: '#eff6ff', color: '#1e40af', padding: '2px 7px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 700, border: '1px solid #bfdbfe' }}>
                         {role}
                       </span>
                     ))}
@@ -5551,7 +5551,7 @@ export default function SystemAdmin() {
                   {ROLES.map(role => {
                     const isChecked = knowledgeForm.allowedRoles.includes(role);
                     return (
-                      <label key={role} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600, color: isChecked ? '#1d4ed8' : '#475569' }}>
+                      <label key={role} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600, color: isChecked ? '#1d4ed8' : '#475569' }}>
                         <input
                           type="checkbox"
                           checked={isChecked}

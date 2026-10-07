@@ -63,12 +63,12 @@ export default function NextOrderPromptModal({
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             marginBottom: '0.6rem'
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.74rem', fontWeight: 800, color: '#2563eb' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.79rem', fontWeight: 800, color: '#2563eb' }}>
               <Sparkles size={14} />
               <span>ĐƠN TIẾP THEO THEO LỘ TRÌNH</span>
             </div>
             <span style={{
-              fontSize: '0.68rem', fontWeight: 700, padding: '2px 8px',
+              fontSize: '0.74rem', fontWeight: 700, padding: '2px 8px',
               borderRadius: '999px', backgroundColor: 'rgba(37,99,235,0.1)', color: '#2563eb'
             }}>
               Còn {remainingCount} đơn
@@ -92,12 +92,12 @@ export default function NextOrderPromptModal({
             </div>
 
             {phone && (
-              <div style={{ fontSize: '0.74rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+              <div style={{ fontSize: '0.79rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
                 <Phone size={12} /> {phone}
               </div>
             )}
 
-            <div style={{ fontSize: '0.75rem', color: '#475569', display: 'flex', alignItems: 'flex-start', gap: '0.35rem', lineHeight: 1.3 }}>
+            <div style={{ fontSize: '0.8rem', color: '#475569', display: 'flex', alignItems: 'flex-start', gap: '0.35rem', lineHeight: 1.3 }}>
               <MapPin size={13} style={{ color: '#ef4444', flexShrink: 0, marginTop: '2px' }} />
               <span>{address}</span>
             </div>

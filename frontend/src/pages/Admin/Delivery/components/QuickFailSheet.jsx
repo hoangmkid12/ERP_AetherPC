@@ -39,7 +39,7 @@ export default function QuickFailSheet({ order, onConfirm, onOpenFullFail, onClo
             <h3 style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--danger)', margin: 0 }}>
               Không Giao Được #{order.orderId || order.id}
             </h3>
-            <span style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>Lần {attemptCount} / 3 — chọn lý do để xử lý ngay</span>
+            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Lần {attemptCount} / 3 — chọn lý do để xử lý ngay</span>
           </div>
           <button type="button" onClick={onClose} className="delivery-icon-btn"><X size={16} /></button>
         </div>
@@ -67,7 +67,7 @@ export default function QuickFailSheet({ order, onConfirm, onOpenFullFail, onClo
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontWeight: 800, fontSize: '0.85rem', color }}>{label}</div>
-                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.1rem' }}>{desc}</div>
+                <div style={{ fontSize: '0.77rem', color: 'var(--text-muted)', marginTop: '0.1rem' }}>{desc}</div>
               </div>
               <ChevronRight size={16} color={color} />
             </button>

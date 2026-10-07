@@ -262,7 +262,7 @@ export default function Sidebar({ isOpen = false, onClose }) {
     {
       id: 'dashboard',
       path: '/admin/dashboard',
-      label: 'Trang Tổng Quan',
+      label: 'Tổng Quan Điều Hành',
       icon: <BarChart2 size={18} />,
       visible: canRead('dashboard') || isCEO
     },
@@ -276,35 +276,35 @@ export default function Sidebar({ isOpen = false, onClose }) {
     {
       id: 'warehouse',
       path: '/admin/warehouse',
-      label: 'Quản Lý Kho & Tồn Kho',
+      label: 'Kho & Tồn Kho',
       icon: <Database size={18} />,
       visible: canRead('warehouse')
     },
     {
       id: 'purchasing',
       path: '/admin/purchasing',
-      label: 'Quản Lý Mua Hàng (RFQ/PO)',
+      label: 'Mua Hàng (RFQ/PO)',
       icon: <ShoppingCart size={18} />,
       visible: canRead('purchasing')
     },
     {
       id: 'quality-control',
       path: '/admin/quality-control',
-      label: 'Kiểm Định Chất Lượng (QA/QC)',
+      label: 'Kiểm Định QA/QC',
       icon: <ShieldAlert size={18} />,
       visible: canRead('quality-control')
     },
     {
       id: 'assembly',
       path: '/admin/assembly',
-      label: 'Quản Lý Lắp Ráp PC',
+      label: 'Lắp Ráp PC',
       icon: <Wrench size={18} />,
       visible: canRead('assembly')
     },
     {
       id: 'hr',
       path: '/admin/hr',
-      label: 'Quản Trị Nhân Sự (HRM)',
+      label: 'Nhân Sự (HRM)',
       icon: <Users size={18} />,
       visible: canRead('hr')
     },
@@ -318,21 +318,21 @@ export default function Sidebar({ isOpen = false, onClose }) {
     {
       id: 'cskh',
       path: '/admin/cskh',
-      label: 'Chăm Sóc Khách Hàng (CSKH)',
+      label: 'Chăm Sóc Khách Hàng',
       icon: <HeadphonesIcon size={18} />,
       visible: canRead('cskh')
     },
     {
       id: 'delivery',
       path: '/admin/delivery',
-      label: 'Quản Lý & Điều Phối Giao Hàng',
+      label: 'Giao Vận & Điều Phối',
       icon: <Truck size={18} />,
       visible: canRead('delivery')
     },
     {
       id: 'system',
       path: '/admin/system',
-      label: 'Quản Trị Hệ Thống & Phân Quyền',
+      label: 'Hệ Thống & Phân Quyền',
       icon: <Settings size={18} />,
       visible: canRead('system') || isAdmin
     },
@@ -672,9 +672,9 @@ export default function Sidebar({ isOpen = false, onClose }) {
   return (
     <>
     <aside className={`admin-sidebar-drawer ${isOpen ? 'open' : ''}`} style={{
-      width: '260px',
-      backgroundColor: '#ffffff',
-      borderRight: '1px solid #e2e8f0',
+      width: '264px',
+      background: 'linear-gradient(180deg, #0f172a 0%, #111b31 100%)',
+      borderRight: '1px solid #1e293b',
       display: 'flex',
       flexDirection: 'column',
       minHeight: '100vh',
@@ -683,18 +683,18 @@ export default function Sidebar({ isOpen = false, onClose }) {
       top: 0,
       zIndex: 1000,
       flexShrink: 0,
-      boxShadow: '4px 0 16px rgba(15,23,42,0.03)',
+      boxShadow: '4px 0 24px rgba(15,23,42,0.18)',
       overflowX: 'hidden'
     }}>
       {/* Header Brand & Notification Bell */}
       <div style={{
-        padding: '1.25rem 1.25rem',
-        borderBottom: '1px solid #e2e8f0',
+        padding: '1.1rem 1.1rem',
+        borderBottom: '1px solid rgba(148,163,184,0.14)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
         position: 'relative',
-        backgroundColor: '#ffffff'
+        backgroundColor: 'transparent'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
           <img 
@@ -703,11 +703,11 @@ export default function Sidebar({ isOpen = false, onClose }) {
             style={{ width: '36px', height: '36px', borderRadius: '10px', boxShadow: '0 4px 10px rgba(220,38,38,0.25)' }} 
           />
           <div>
-            <h1 style={{ fontSize: '0.98rem', fontWeight: 800, margin: 0, color: '#0f172a', letterSpacing: '-0.02em' }}>
+            <h1 style={{ fontSize: '1rem', fontWeight: 800, margin: 0, color: '#f8fafc', letterSpacing: '-0.01em' }}>
               AetherPC ERP
             </h1>
-            <p style={{ fontSize: '0.7rem', color: '#64748b', margin: 0, fontWeight: 500 }}>
-              Hệ thống Doanh Nghiệp
+            <p style={{ fontSize: '0.79rem', color: '#94a3b8', margin: 0, fontWeight: 500 }}>
+              Quản trị doanh nghiệp
             </p>
           </div>
         </div>
@@ -717,8 +717,8 @@ export default function Sidebar({ isOpen = false, onClose }) {
           <button
             onClick={() => setShowNotifDrawer(!showNotifDrawer)}
             style={{
-              position: 'relative', background: '#f8fafc', border: '1px solid #cbd5e1',
-              color: notifications.filter(n => !dismissedNotifIds.includes(n.id)).length > 0 ? '#d97706' : '#64748b',
+              position: 'relative', background: 'rgba(148,163,184,0.12)', border: '1px solid rgba(148,163,184,0.2)',
+              color: notifications.filter(n => !dismissedNotifIds.includes(n.id)).length > 0 ? '#fbbf24' : '#cbd5e1',
               borderRadius: '9px', width: '34px', height: '34px',
               display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
               transition: 'all 0.2s'
@@ -730,7 +730,7 @@ export default function Sidebar({ isOpen = false, onClose }) {
               <span style={{
                 position: 'absolute', top: '-5px', right: '-5px',
                 backgroundColor: '#dc2626', color: '#fff',
-                borderRadius: '10px', padding: '1px 6px', fontSize: '0.65rem', fontWeight: 800,
+                borderRadius: '10px', padding: '1px 6px', fontSize: '0.72rem', fontWeight: 800,
                 boxShadow: '0 0 8px rgba(220,38,38,0.5)'
               }}>
                 {notifications.filter(n => !dismissedNotifIds.includes(n.id)).length}
@@ -763,10 +763,10 @@ export default function Sidebar({ isOpen = false, onClose }) {
       {/* Nav Menu */}
       <nav style={{
         flex: 1,
-        padding: '1.25rem 0.85rem',
+        padding: '0.9rem 0.75rem',
         display: 'flex',
         flexDirection: 'column',
-        gap: '0.4rem',
+        gap: '0.2rem',
         overflowY: 'auto'
       }}>
         {navItems
@@ -788,14 +788,15 @@ export default function Sidebar({ isOpen = false, onClose }) {
                     return {
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '0.85rem',
-                      padding: '0.7rem 1rem',
-                      borderRadius: '10px',
-                      color: isTabMatch ? '#ffffff' : '#334155',
-                      background: isTabMatch ? 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)' : 'transparent',
-                      fontWeight: isTabMatch ? 700 : 600,
-                      fontSize: '0.88rem',
-                      boxShadow: isTabMatch ? '0 4px 12px rgba(37, 99, 235, 0.28)' : 'none',
+                      gap: '0.75rem',
+                      padding: '0.62rem 0.85rem',
+                      borderRadius: '8px',
+                      color: isTabMatch ? '#ffffff' : '#cbd5e1',
+                      background: isTabMatch ? 'rgba(148,163,184,0.16)' : 'transparent',
+                      fontWeight: isTabMatch ? 700 : 500,
+                      fontSize: '0.875rem',
+                      lineHeight: 1.35,
+                      boxShadow: isTabMatch ? 'inset 3px 0 0 #ef4444' : 'none',
                       transition: 'all 0.15s ease'
                     };
                   }}
@@ -825,13 +826,13 @@ export default function Sidebar({ isOpen = false, onClose }) {
                             alignItems: 'center',
                             justifyContent: 'space-between',
                             gap: '0.75rem',
-                            padding: '0.5rem 0.75rem',
-                            borderRadius: '6px',
-                            fontSize: '0.78rem',
+                            padding: '0.45rem 0.75rem',
+                            borderRadius: '0 6px 6px 0',
+                            fontSize: '0.8rem',
                             fontWeight: isSubActive ? 700 : 500,
-                            color: isSubActive ? '#2563eb' : '#475569',
-                            backgroundColor: isSubActive ? '#eff6ff' : 'transparent',
-                            borderLeft: isSubActive ? '3px solid #2563eb' : '3px solid transparent',
+                            color: isSubActive ? '#ffffff' : '#94a3b8',
+                            backgroundColor: isSubActive ? 'rgba(148,163,184,0.12)' : 'transparent',
+                            borderLeft: isSubActive ? '2px solid #ef4444' : '2px solid rgba(148,163,184,0.18)',
                             transition: 'all 0.15s ease'
                           }}
                         >
@@ -840,7 +841,7 @@ export default function Sidebar({ isOpen = false, onClose }) {
                             <span style={{
                               backgroundColor: '#ef4444',
                               color: '#ffffff',
-                              fontSize: '0.68rem',
+                              fontSize: '0.74rem',
                               fontWeight: 800,
                               padding: '2px 8px',
                               borderRadius: '10px',
@@ -889,13 +890,13 @@ export default function Sidebar({ isOpen = false, onClose }) {
                             alignItems: 'center',
                             justifyContent: 'space-between',
                             gap: '0.75rem',
-                            padding: '0.5rem 0.75rem',
-                            borderRadius: '6px',
-                            fontSize: '0.78rem',
+                            padding: '0.45rem 0.75rem',
+                            borderRadius: '0 6px 6px 0',
+                            fontSize: '0.8rem',
                             fontWeight: isSubActive ? 700 : 500,
-                            color: isSubActive ? '#2563eb' : '#475569',
-                            backgroundColor: isSubActive ? '#eff6ff' : 'transparent',
-                            borderLeft: isSubActive ? '3px solid #2563eb' : '3px solid transparent',
+                            color: isSubActive ? '#ffffff' : '#94a3b8',
+                            backgroundColor: isSubActive ? 'rgba(148,163,184,0.12)' : 'transparent',
+                            borderLeft: isSubActive ? '2px solid #ef4444' : '2px solid rgba(148,163,184,0.18)',
                             transition: 'all 0.15s ease'
                           }}
                         >
@@ -904,7 +905,7 @@ export default function Sidebar({ isOpen = false, onClose }) {
                             <span style={{
                               backgroundColor: '#ef4444',
                               color: '#ffffff',
-                              fontSize: '0.68rem',
+                              fontSize: '0.74rem',
                               fontWeight: 800,
                               padding: '2px 8px',
                               borderRadius: '10px',
@@ -947,13 +948,13 @@ export default function Sidebar({ isOpen = false, onClose }) {
                             alignItems: 'center',
                             justifyContent: 'space-between',
                             gap: '0.75rem',
-                            padding: '0.5rem 0.75rem',
-                            borderRadius: '6px',
-                            fontSize: '0.78rem',
+                            padding: '0.45rem 0.75rem',
+                            borderRadius: '0 6px 6px 0',
+                            fontSize: '0.8rem',
                             fontWeight: isSubActive ? 700 : 500,
-                            color: isSubActive ? '#2563eb' : '#475569',
-                            backgroundColor: isSubActive ? '#eff6ff' : 'transparent',
-                            borderLeft: isSubActive ? '3px solid #2563eb' : '3px solid transparent',
+                            color: isSubActive ? '#ffffff' : '#94a3b8',
+                            backgroundColor: isSubActive ? 'rgba(148,163,184,0.12)' : 'transparent',
+                            borderLeft: isSubActive ? '2px solid #ef4444' : '2px solid rgba(148,163,184,0.18)',
                             transition: 'all 0.15s ease'
                           }}
                         >
@@ -962,7 +963,7 @@ export default function Sidebar({ isOpen = false, onClose }) {
                             <span style={{
                               backgroundColor: '#ef4444',
                               color: '#ffffff',
-                              fontSize: '0.68rem',
+                              fontSize: '0.74rem',
                               fontWeight: 800,
                               padding: '2px 8px',
                               borderRadius: '10px',
@@ -1021,13 +1022,13 @@ export default function Sidebar({ isOpen = false, onClose }) {
                             alignItems: 'center',
                             justifyContent: 'space-between',
                             gap: '0.75rem',
-                            padding: '0.5rem 0.75rem',
-                            borderRadius: '6px',
-                            fontSize: '0.78rem',
+                            padding: '0.45rem 0.75rem',
+                            borderRadius: '0 6px 6px 0',
+                            fontSize: '0.8rem',
                             fontWeight: isSubActive ? 700 : 500,
-                            color: isSubActive ? '#2563eb' : '#475569',
-                            backgroundColor: isSubActive ? '#eff6ff' : 'transparent',
-                            borderLeft: isSubActive ? '3px solid #2563eb' : '3px solid transparent',
+                            color: isSubActive ? '#ffffff' : '#94a3b8',
+                            backgroundColor: isSubActive ? 'rgba(148,163,184,0.12)' : 'transparent',
+                            borderLeft: isSubActive ? '2px solid #ef4444' : '2px solid rgba(148,163,184,0.18)',
                             transition: 'all 0.15s ease'
                           }}
                         >
@@ -1036,7 +1037,7 @@ export default function Sidebar({ isOpen = false, onClose }) {
                             <span style={{
                               backgroundColor: sub.badgeKey === 'quotedPoCount' ? '#f59e0b' : '#3b82f6',
                               color: '#ffffff',
-                              fontSize: '0.68rem',
+                              fontSize: '0.74rem',
                               fontWeight: 800,
                               padding: '2px 8px',
                               borderRadius: '10px',
@@ -1076,13 +1077,13 @@ export default function Sidebar({ isOpen = false, onClose }) {
                             alignItems: 'center',
                             justifyContent: 'space-between',
                             gap: '0.75rem',
-                            padding: '0.5rem 0.75rem',
-                            borderRadius: '6px',
-                            fontSize: '0.78rem',
+                            padding: '0.45rem 0.75rem',
+                            borderRadius: '0 6px 6px 0',
+                            fontSize: '0.8rem',
                             fontWeight: isSubActive ? 700 : 500,
-                            color: isSubActive ? '#2563eb' : '#475569',
-                            backgroundColor: isSubActive ? '#eff6ff' : 'transparent',
-                            borderLeft: isSubActive ? '3px solid #2563eb' : '3px solid transparent',
+                            color: isSubActive ? '#ffffff' : '#94a3b8',
+                            backgroundColor: isSubActive ? 'rgba(148,163,184,0.12)' : 'transparent',
+                            borderLeft: isSubActive ? '2px solid #ef4444' : '2px solid rgba(148,163,184,0.18)',
                             transition: 'all 0.15s ease'
                           }}
                         >
@@ -1091,7 +1092,7 @@ export default function Sidebar({ isOpen = false, onClose }) {
                             <span style={{
                               backgroundColor: sub.badgeKey === 'pendingQaCount' ? '#f59e0b' : '#ef4444',
                               color: '#ffffff',
-                              fontSize: '0.68rem',
+                              fontSize: '0.74rem',
                               fontWeight: 800,
                               padding: '2px 8px',
                               borderRadius: '10px',
@@ -1137,13 +1138,13 @@ export default function Sidebar({ isOpen = false, onClose }) {
                             alignItems: 'center',
                             justifyContent: 'space-between',
                             gap: '0.75rem',
-                            padding: '0.5rem 0.75rem',
-                            borderRadius: '6px',
-                            fontSize: '0.78rem',
+                            padding: '0.45rem 0.75rem',
+                            borderRadius: '0 6px 6px 0',
+                            fontSize: '0.8rem',
                             fontWeight: isSubActive ? 700 : 500,
-                            color: isSubActive ? '#2563eb' : '#475569',
-                            backgroundColor: isSubActive ? '#eff6ff' : 'transparent',
-                            borderLeft: isSubActive ? '3px solid #2563eb' : '3px solid transparent',
+                            color: isSubActive ? '#ffffff' : '#94a3b8',
+                            backgroundColor: isSubActive ? 'rgba(148,163,184,0.12)' : 'transparent',
+                            borderLeft: isSubActive ? '2px solid #ef4444' : '2px solid rgba(148,163,184,0.18)',
                             transition: 'all 0.15s ease'
                           }}
                         >
@@ -1152,7 +1153,7 @@ export default function Sidebar({ isOpen = false, onClose }) {
                             <span style={{
                               backgroundColor: '#f59e0b',
                               color: '#ffffff',
-                              fontSize: '0.68rem',
+                              fontSize: '0.74rem',
                               fontWeight: 800,
                               padding: '2px 8px',
                               borderRadius: '10px',
@@ -1191,20 +1192,20 @@ export default function Sidebar({ isOpen = false, onClose }) {
                             alignItems: 'center',
                             justifyContent: 'space-between',
                             gap: '0.75rem',
-                            padding: '0.5rem 0.75rem',
-                            borderRadius: '6px',
-                            fontSize: '0.78rem',
+                            padding: '0.45rem 0.75rem',
+                            borderRadius: '0 6px 6px 0',
+                            fontSize: '0.8rem',
                             fontWeight: isSubActive ? 700 : 500,
-                            color: isSubActive ? '#2563eb' : '#475569',
-                            backgroundColor: isSubActive ? '#eff6ff' : 'transparent',
-                            borderLeft: isSubActive ? '3px solid #2563eb' : '3px solid transparent',
+                            color: isSubActive ? '#ffffff' : '#94a3b8',
+                            backgroundColor: isSubActive ? 'rgba(148,163,184,0.12)' : 'transparent',
+                            borderLeft: isSubActive ? '2px solid #ef4444' : '2px solid rgba(148,163,184,0.18)',
                             transition: 'all 0.15s ease'
                           }}
                         >
                           <span style={{ flex: 1 }}>{sub.label}</span>
                           {badgeVal > 0 && (
                             <span style={{
-                              backgroundColor: '#ef4444', color: '#ffffff', fontSize: '0.68rem', fontWeight: 800,
+                              backgroundColor: '#ef4444', color: '#ffffff', fontSize: '0.74rem', fontWeight: 800,
                               padding: '2px 8px', borderRadius: '10px', lineHeight: '1', marginLeft: 'auto',
                               flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center'
                             }}>
@@ -1237,20 +1238,20 @@ export default function Sidebar({ isOpen = false, onClose }) {
                             alignItems: 'center',
                             justifyContent: 'space-between',
                             gap: '0.75rem',
-                            padding: '0.5rem 0.75rem',
-                            borderRadius: '6px',
-                            fontSize: '0.78rem',
+                            padding: '0.45rem 0.75rem',
+                            borderRadius: '0 6px 6px 0',
+                            fontSize: '0.8rem',
                             fontWeight: isSubActive ? 700 : 500,
-                            color: isSubActive ? '#2563eb' : '#475569',
-                            backgroundColor: isSubActive ? '#eff6ff' : 'transparent',
-                            borderLeft: isSubActive ? '3px solid #2563eb' : '3px solid transparent',
+                            color: isSubActive ? '#ffffff' : '#94a3b8',
+                            backgroundColor: isSubActive ? 'rgba(148,163,184,0.12)' : 'transparent',
+                            borderLeft: isSubActive ? '2px solid #ef4444' : '2px solid rgba(148,163,184,0.18)',
                             transition: 'all 0.15s ease'
                           }}
                         >
                           <span style={{ flex: 1 }}>{sub.label}</span>
                           {badgeVal > 0 && (
                             <span style={{
-                              backgroundColor: '#ef4444', color: '#ffffff', fontSize: '0.68rem', fontWeight: 800,
+                              backgroundColor: '#ef4444', color: '#ffffff', fontSize: '0.74rem', fontWeight: 800,
                               padding: '2px 8px', borderRadius: '10px', lineHeight: '1', marginLeft: 'auto',
                               flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center'
                             }}>
@@ -1286,20 +1287,20 @@ export default function Sidebar({ isOpen = false, onClose }) {
                             alignItems: 'center',
                             justifyContent: 'space-between',
                             gap: '0.75rem',
-                            padding: '0.5rem 0.75rem',
-                            borderRadius: '6px',
-                            fontSize: '0.78rem',
+                            padding: '0.45rem 0.75rem',
+                            borderRadius: '0 6px 6px 0',
+                            fontSize: '0.8rem',
                             fontWeight: isSubActive ? 700 : 500,
-                            color: isSubActive ? '#2563eb' : '#475569',
-                            backgroundColor: isSubActive ? '#eff6ff' : 'transparent',
-                            borderLeft: isSubActive ? '3px solid #2563eb' : '3px solid transparent',
+                            color: isSubActive ? '#ffffff' : '#94a3b8',
+                            backgroundColor: isSubActive ? 'rgba(148,163,184,0.12)' : 'transparent',
+                            borderLeft: isSubActive ? '2px solid #ef4444' : '2px solid rgba(148,163,184,0.18)',
                             transition: 'all 0.15s ease'
                           }}
                         >
                           <span style={{ flex: 1 }}>{sub.label}</span>
                           {badgeVal > 0 && (
                             <span style={{
-                              backgroundColor: '#ef4444', color: '#ffffff', fontSize: '0.68rem', fontWeight: 800,
+                              backgroundColor: '#ef4444', color: '#ffffff', fontSize: '0.74rem', fontWeight: 800,
                               padding: '2px 8px', borderRadius: '10px', lineHeight: '1', marginLeft: 'auto',
                               flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center'
                             }}>
@@ -1328,13 +1329,13 @@ export default function Sidebar({ isOpen = false, onClose }) {
                             alignItems: 'center',
                             justifyContent: 'space-between',
                             gap: '0.75rem',
-                            padding: '0.5rem 0.75rem',
-                            borderRadius: '6px',
-                            fontSize: '0.78rem',
+                            padding: '0.45rem 0.75rem',
+                            borderRadius: '0 6px 6px 0',
+                            fontSize: '0.8rem',
                             fontWeight: isSubActive ? 700 : 500,
-                            color: isSubActive ? '#2563eb' : '#475569',
-                            backgroundColor: isSubActive ? '#eff6ff' : 'transparent',
-                            borderLeft: isSubActive ? '3px solid #2563eb' : '3px solid transparent',
+                            color: isSubActive ? '#ffffff' : '#94a3b8',
+                            backgroundColor: isSubActive ? 'rgba(148,163,184,0.12)' : 'transparent',
+                            borderLeft: isSubActive ? '2px solid #ef4444' : '2px solid rgba(148,163,184,0.18)',
                             transition: 'all 0.15s ease'
                           }}
                         >
@@ -1361,13 +1362,13 @@ export default function Sidebar({ isOpen = false, onClose }) {
                             alignItems: 'center',
                             justifyContent: 'space-between',
                             gap: '0.75rem',
-                            padding: '0.5rem 0.75rem',
-                            borderRadius: '6px',
-                            fontSize: '0.78rem',
+                            padding: '0.45rem 0.75rem',
+                            borderRadius: '0 6px 6px 0',
+                            fontSize: '0.8rem',
                             fontWeight: isSubActive ? 700 : 500,
-                            color: isSubActive ? '#2563eb' : '#475569',
-                            backgroundColor: isSubActive ? '#eff6ff' : 'transparent',
-                            borderLeft: isSubActive ? '3px solid #2563eb' : '3px solid transparent',
+                            color: isSubActive ? '#ffffff' : '#94a3b8',
+                            backgroundColor: isSubActive ? 'rgba(148,163,184,0.12)' : 'transparent',
+                            borderLeft: isSubActive ? '2px solid #ef4444' : '2px solid rgba(148,163,184,0.18)',
                             transition: 'all 0.15s ease'
                           }}
                         >
@@ -1385,11 +1386,11 @@ export default function Sidebar({ isOpen = false, onClose }) {
       {/* User Status / Bottom Actions Card */}
       <div className="admin-sidebar-footer" style={{
         padding: '1rem',
-        borderTop: '1px solid #e2e8f0',
+        borderTop: '1px solid rgba(148,163,184,0.14)',
         display: 'flex',
         flexDirection: 'column',
         gap: '0.75rem',
-        backgroundColor: '#f8fafc'
+        backgroundColor: 'rgba(2,6,23,0.25)'
       }}>
         {/* User Card */}
         <div style={{
@@ -1397,29 +1398,27 @@ export default function Sidebar({ isOpen = false, onClose }) {
           alignItems: 'center',
           gap: '0.75rem',
           padding: '0.5rem 0.65rem',
-          backgroundColor: '#ffffff',
+          backgroundColor: 'rgba(148,163,184,0.1)',
           borderRadius: '10px',
-          border: '1px solid #e2e8f0',
-          boxShadow: '0 2px 6px rgba(15,23,42,0.03)'
+          border: '1px solid rgba(148,163,184,0.16)'
         }}>
           <div style={{
             width: '36px',
             height: '36px',
             borderRadius: '50%',
-            backgroundColor: '#eff6ff',
+            background: 'linear-gradient(135deg, #ef4444, #b91c1c)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            border: '1px solid #bfdbfe',
             flexShrink: 0
           }}>
-            <User size={18} style={{ color: '#2563eb' }} />
+            <User size={18} style={{ color: '#ffffff' }} />
           </div>
           <div style={{ overflow: 'hidden', flex: 1 }}>
             <p style={{
               fontSize: '0.85rem',
-              fontWeight: 800,
-              color: '#0f172a',
+              fontWeight: 700,
+              color: '#f8fafc',
               whiteSpace: 'nowrap',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
@@ -1429,11 +1428,11 @@ export default function Sidebar({ isOpen = false, onClose }) {
               {getUserDisplayName()}
             </p>
             <p style={{
-              fontSize: '0.72rem',
-              color: '#64748b',
+              fontSize: '0.8rem',
+              color: '#94a3b8',
               margin: 0,
               lineHeight: 1.3,
-              fontWeight: 600
+              fontWeight: 500
             }}>
               {getRoleDisplayName()}
             </p>
@@ -1454,9 +1453,9 @@ export default function Sidebar({ isOpen = false, onClose }) {
               fontSize: '0.78rem',
               fontWeight: 700,
               borderRadius: '8px',
-              backgroundColor: '#ffffff',
-              border: '1px solid #cbd5e1',
-              color: '#334155',
+              backgroundColor: 'rgba(148,163,184,0.12)',
+              border: '1px solid rgba(148,163,184,0.22)',
+              color: '#e2e8f0',
               cursor: 'pointer'
             }}
             title="Về Cửa Hàng Trang Chủ"
@@ -1476,9 +1475,9 @@ export default function Sidebar({ isOpen = false, onClose }) {
               fontSize: '0.78rem',
               fontWeight: 700,
               borderRadius: '8px',
-              backgroundColor: '#fef2f2',
-              border: '1px solid #fecaca',
-              color: '#dc2626',
+              backgroundColor: 'rgba(239,68,68,0.14)',
+              border: '1px solid rgba(239,68,68,0.35)',
+              color: '#fca5a5',
               cursor: 'pointer'
             }}
             title="Đăng xuất khỏi hệ thống"
@@ -1550,7 +1549,7 @@ export default function Sidebar({ isOpen = false, onClose }) {
                 <strong style={{ fontSize: '0.9rem', color: '#0f172a', fontWeight: 800 }}>THÔNG BÁO & NHIỆM VỤ</strong>
                 <span style={{
                   backgroundColor: '#dc2626', color: '#ffffff',
-                  padding: '1px 7px', borderRadius: '10px', fontSize: '0.72rem', fontWeight: 800
+                  padding: '1px 7px', borderRadius: '10px', fontSize: '0.77rem', fontWeight: 800
                 }}>
                   {activeNotifs.length}
                 </span>
@@ -1566,7 +1565,7 @@ export default function Sidebar({ isOpen = false, onClose }) {
                     }}
                     style={{
                       background: 'none', border: 'none', color: '#2563eb',
-                      fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', padding: '0.2rem 0.4rem'
+                      fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', padding: '0.2rem 0.4rem'
                     }}
                   >
                     Đã đọc tất cả
@@ -1579,8 +1578,8 @@ export default function Sidebar({ isOpen = false, onClose }) {
                     setShowNotifDrawer(false);
                   }}
                   style={{
-                    background: '#ffffff', border: '1px solid #cbd5e1', color: '#64748b',
-                    borderRadius: '6px', padding: '0.2rem 0.55rem', fontSize: '0.75rem',
+                    background: '#ffffff', border: '1px solid #e3e8ef', color: '#64748b',
+                    borderRadius: '6px', padding: '0.2rem 0.55rem', fontSize: '0.8rem',
                     fontWeight: 700, cursor: 'pointer'
                   }}
                   title="Đóng thông báo"
@@ -1606,7 +1605,7 @@ export default function Sidebar({ isOpen = false, onClose }) {
                   border: notifFilter === 'ALL' ? '1px solid #2563eb' : '1px solid #e2e8f0',
                   backgroundColor: notifFilter === 'ALL' ? '#eff6ff' : '#ffffff',
                   color: notifFilter === 'ALL' ? '#2563eb' : '#64748b',
-                  fontSize: '0.75rem', fontWeight: notifFilter === 'ALL' ? 800 : 600,
+                  fontSize: '0.8rem', fontWeight: notifFilter === 'ALL' ? 800 : 600,
                   cursor: 'pointer'
                 }}
               >
@@ -1624,7 +1623,7 @@ export default function Sidebar({ isOpen = false, onClose }) {
                   border: notifFilter === 'URGENT' ? '1px solid #dc2626' : '1px solid #e2e8f0',
                   backgroundColor: notifFilter === 'URGENT' ? '#fef2f2' : '#ffffff',
                   color: notifFilter === 'URGENT' ? '#dc2626' : '#64748b',
-                  fontSize: '0.75rem', fontWeight: notifFilter === 'URGENT' ? 800 : 600,
+                  fontSize: '0.8rem', fontWeight: notifFilter === 'URGENT' ? 800 : 600,
                   cursor: 'pointer'
                 }}
               >
@@ -1642,7 +1641,7 @@ export default function Sidebar({ isOpen = false, onClose }) {
                   border: notifFilter === 'WARNING' ? '1px solid #d97706' : '1px solid #e2e8f0',
                   backgroundColor: notifFilter === 'WARNING' ? '#fffbeb' : '#ffffff',
                   color: notifFilter === 'WARNING' ? '#d97706' : '#64748b',
-                  fontSize: '0.75rem', fontWeight: notifFilter === 'WARNING' ? 800 : 600,
+                  fontSize: '0.8rem', fontWeight: notifFilter === 'WARNING' ? 800 : 600,
                   cursor: 'pointer'
                 }}
               >
@@ -1655,7 +1654,7 @@ export default function Sidebar({ isOpen = false, onClose }) {
               {filteredList.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '3rem 1rem', color: '#64748b', fontSize: '0.85rem' }}>
                   <p style={{ margin: '0 0 0.35rem', fontWeight: 800, color: '#0f172a' }}>Không có thông báo nào trong mục này</p>
-                  <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Tất cả nhiệm vụ phòng ban đã được xử lý hoàn tất.</span>
+                  <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Tất cả nhiệm vụ phòng ban đã được xử lý hoàn tất.</span>
                 </div>
               ) : (
                 filteredList.map(n => (
@@ -1676,13 +1675,13 @@ export default function Sidebar({ isOpen = false, onClose }) {
                     {/* Meta Header */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span style={{
-                        fontSize: '0.68rem', fontWeight: 800, padding: '2px 7px', borderRadius: '4px',
+                        fontSize: '0.74rem', fontWeight: 800, padding: '2px 7px', borderRadius: '4px',
                         backgroundColor: `${n.badgeColor || '#2563eb'}15`, color: n.badgeColor || '#2563eb',
                         border: `1px solid ${n.badgeColor || '#2563eb'}30`, textTransform: 'uppercase'
                       }}>
                         {n.badge}
                       </span>
-                      <span style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 500 }}>{n.time}</span>
+                      <span style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 500 }}>{n.time}</span>
                     </div>
 
                     {/* Title */}
@@ -1705,7 +1704,7 @@ export default function Sidebar({ isOpen = false, onClose }) {
                         }}
                         style={{
                           background: 'none', border: 'none', color: '#94a3b8',
-                          fontSize: '0.72rem', fontWeight: 600, cursor: 'pointer'
+                          fontSize: '0.77rem', fontWeight: 600, cursor: 'pointer'
                         }}
                       >
                         Bỏ qua
@@ -1723,7 +1722,7 @@ export default function Sidebar({ isOpen = false, onClose }) {
                           border: 'none',
                           borderRadius: '6px',
                           padding: '0.35rem 0.75rem',
-                          fontSize: '0.74rem',
+                          fontSize: '0.79rem',
                           fontWeight: 800,
                           cursor: 'pointer'
                         }}
@@ -1747,7 +1746,7 @@ export default function Sidebar({ isOpen = false, onClose }) {
         onClick={() => setShowLeaveModal(false)}
       >
         <div
-          style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', width: '100%', maxWidth: '480px', padding: '1.5rem', maxHeight: '85vh', overflowY: 'auto' }}
+          style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e3e8ef', width: '100%', maxWidth: '480px', padding: '1.5rem', maxHeight: '85vh', overflowY: 'auto' }}
           onClick={e => e.stopPropagation()}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
@@ -1761,11 +1760,11 @@ export default function Sidebar({ isOpen = false, onClose }) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', fontSize: '0.82rem', marginBottom: '1.25rem', padding: '0.85rem', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
               <div>
-                <label style={{ display: 'block', fontWeight: 700, color: '#0f172a', marginBottom: '0.25rem', fontSize: '0.75rem' }}>Loại nghỉ phép</label>
+                <label style={{ display: 'block', fontWeight: 700, color: '#0f172a', marginBottom: '0.25rem', fontSize: '0.8rem' }}>Loại nghỉ phép</label>
                 <select
                   value={leaveForm.type}
                   onChange={e => setLeaveForm(p => ({ ...p, type: e.target.value }))}
-                  style={{ width: '100%', padding: '0.4rem 0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1', boxSizing: 'border-box', fontSize: '0.8rem' }}
+                  style={{ width: '100%', padding: '0.4rem 0.5rem', borderRadius: '6px', border: '1px solid #e3e8ef', boxSizing: 'border-box', fontSize: '0.8rem' }}
                 >
                   <option value="Phép Năm">Phép Năm</option>
                   <option value="Nghỉ Ốm">Nghỉ Ốm</option>
@@ -1775,17 +1774,17 @@ export default function Sidebar({ isOpen = false, onClose }) {
               </div>
               <div />
               <div>
-                <label style={{ display: 'block', fontWeight: 700, color: '#0f172a', marginBottom: '0.25rem', fontSize: '0.75rem' }}>Từ ngày</label>
-                <input type="date" value={leaveForm.startDate} onChange={e => setLeaveForm(p => ({ ...p, startDate: e.target.value }))} style={{ width: '100%', padding: '0.4rem 0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1', boxSizing: 'border-box', fontSize: '0.8rem' }} />
+                <label style={{ display: 'block', fontWeight: 700, color: '#0f172a', marginBottom: '0.25rem', fontSize: '0.8rem' }}>Từ ngày</label>
+                <input type="date" value={leaveForm.startDate} onChange={e => setLeaveForm(p => ({ ...p, startDate: e.target.value }))} style={{ width: '100%', padding: '0.4rem 0.5rem', borderRadius: '6px', border: '1px solid #e3e8ef', boxSizing: 'border-box', fontSize: '0.8rem' }} />
               </div>
               <div>
-                <label style={{ display: 'block', fontWeight: 700, color: '#0f172a', marginBottom: '0.25rem', fontSize: '0.75rem' }}>Đến ngày</label>
-                <input type="date" value={leaveForm.endDate} onChange={e => setLeaveForm(p => ({ ...p, endDate: e.target.value }))} style={{ width: '100%', padding: '0.4rem 0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1', boxSizing: 'border-box', fontSize: '0.8rem' }} />
+                <label style={{ display: 'block', fontWeight: 700, color: '#0f172a', marginBottom: '0.25rem', fontSize: '0.8rem' }}>Đến ngày</label>
+                <input type="date" value={leaveForm.endDate} onChange={e => setLeaveForm(p => ({ ...p, endDate: e.target.value }))} style={{ width: '100%', padding: '0.4rem 0.5rem', borderRadius: '6px', border: '1px solid #e3e8ef', boxSizing: 'border-box', fontSize: '0.8rem' }} />
               </div>
             </div>
             <div>
-              <label style={{ display: 'block', fontWeight: 700, color: '#0f172a', marginBottom: '0.25rem', fontSize: '0.75rem' }}>Lý do</label>
-              <input type="text" placeholder="VD: Về quê giỗ tổ" value={leaveForm.reason} onChange={e => setLeaveForm(p => ({ ...p, reason: e.target.value }))} style={{ width: '100%', padding: '0.4rem 0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1', boxSizing: 'border-box', fontSize: '0.8rem' }} />
+              <label style={{ display: 'block', fontWeight: 700, color: '#0f172a', marginBottom: '0.25rem', fontSize: '0.8rem' }}>Lý do</label>
+              <input type="text" placeholder="VD: Về quê giỗ tổ" value={leaveForm.reason} onChange={e => setLeaveForm(p => ({ ...p, reason: e.target.value }))} style={{ width: '100%', padding: '0.4rem 0.5rem', borderRadius: '6px', border: '1px solid #e3e8ef', boxSizing: 'border-box', fontSize: '0.8rem' }} />
             </div>
             <button
               onClick={handleSubmitLeaveRequest}
@@ -1808,7 +1807,7 @@ export default function Sidebar({ isOpen = false, onClose }) {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <strong style={{ color: '#0f172a' }}>{lv.type || 'Phép Năm'}</strong>
                     <span style={{
-                      padding: '2px 8px', borderRadius: '10px', fontSize: '0.68rem', fontWeight: 800,
+                      padding: '2px 8px', borderRadius: '10px', fontSize: '0.74rem', fontWeight: 800,
                       backgroundColor: getStatusInfo(LEAVE_STATUS, ['APPROVED', 'REJECTED'].includes(lv.status) ? lv.status : 'PENDING').bg,
                       color: getStatusInfo(LEAVE_STATUS, ['APPROVED', 'REJECTED'].includes(lv.status) ? lv.status : 'PENDING').color
                     }}>

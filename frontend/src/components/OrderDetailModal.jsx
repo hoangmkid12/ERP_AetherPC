@@ -110,7 +110,7 @@ export default function OrderDetailModal({ order, onClose }) {
               title="Đóng chi tiết"
               style={{
                 backgroundColor: '#ffffff',
-                border: '1px solid #cbd5e1',
+                border: '1px solid #e3e8ef',
                 color: '#475569',
                 cursor: 'pointer',
                 width: '34px',
@@ -276,7 +276,7 @@ export default function OrderDetailModal({ order, onClose }) {
                     Biên Bản Giao Hàng & Minh Chứng Ký Nhận Thực Tế (POD)
                   </h4>
                 </div>
-                <span style={{ fontSize: '0.75rem', fontWeight: 800, backgroundColor: '#dcfce7', color: '#15803d', padding: '2px 8px', borderRadius: '6px', border: '1px solid #86efac' }}>
+                <span style={{ fontSize: '0.8rem', fontWeight: 800, backgroundColor: '#dcfce7', color: '#15803d', padding: '2px 8px', borderRadius: '6px', border: '1px solid #86efac' }}>
                   ĐÃ GIAO THÀNH CÔNG
                 </span>
               </div>
@@ -324,7 +324,7 @@ export default function OrderDetailModal({ order, onClose }) {
                 <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginTop: '0.4rem', paddingTop: '0.6rem', borderTop: '1px dashed #bbf7d0' }}>
                   {order.proofPhoto && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-                      <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#15803d' }}>Ảnh chụp ký nhận POD:</span>
+                      <span style={{ fontSize: '0.79rem', fontWeight: 700, color: '#15803d' }}>Ảnh chụp ký nhận POD:</span>
                       <img
                         src={order.proofPhoto}
                         alt="Minh chứng POD"
@@ -335,7 +335,7 @@ export default function OrderDetailModal({ order, onClose }) {
 
                   {order.paymentProofPhoto && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-                      <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#2563eb' }}>Biên lai chuyển khoản:</span>
+                      <span style={{ fontSize: '0.79rem', fontWeight: 700, color: '#2563eb' }}>Biên lai chuyển khoản:</span>
                       <img
                         src={order.paymentProofPhoto}
                         alt="Biên lai chuyển khoản"
@@ -370,7 +370,7 @@ export default function OrderDetailModal({ order, onClose }) {
             <div style={{ border: '1px solid #e2e8f0', borderRadius: '10px', overflow: 'hidden' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
                 <thead>
-                  <tr style={{ backgroundColor: '#f1f5f9', color: '#475569', fontWeight: 800, textTransform: 'uppercase', fontSize: '0.73rem', letterSpacing: '0.6px' }}>
+                  <tr style={{ backgroundColor: '#f1f5f9', color: '#475569', fontWeight: 800, textTransform: 'uppercase', fontSize: '0.78rem', letterSpacing: '0.6px' }}>
                     <th style={{ padding: '0.75rem 1rem', textAlign: 'left' }}>Sản Phẩm</th>
                     <th style={{ padding: '0.75rem 0.5rem', textAlign: 'center', width: '65px' }}>SL</th>
                     <th style={{ padding: '0.75rem 1rem', textAlign: 'right', width: '130px' }}>Đơn Giá</th>
@@ -404,7 +404,7 @@ export default function OrderDetailModal({ order, onClose }) {
                             <div style={{ fontWeight: 700, fontSize: '0.875rem', lineHeight: '1.4', color: '#0f172a' }}>
                               {it.name || it.productName || `Mã sản phẩm #${it.productId}`}
                             </div>
-                            {it.sku && <span style={{ fontSize: '0.72rem', color: '#64748b', backgroundColor: '#f1f5f9', padding: '1px 6px', borderRadius: '4px', marginTop: '3px', display: 'inline-block' }}>SKU: {it.sku}</span>}
+                            {it.sku && <span style={{ fontSize: '0.77rem', color: '#64748b', backgroundColor: '#f1f5f9', padding: '1px 6px', borderRadius: '4px', marginTop: '3px', display: 'inline-block' }}>SKU: {it.sku}</span>}
                           </td>
                           <td style={{ padding: '0.85rem 0.5rem', textAlign: 'center', fontWeight: 800, color: '#334155' }}>
                             <span style={{ backgroundColor: '#f1f5f9', padding: '3px 8px', borderRadius: '12px', fontSize: '0.8rem' }}>x{qty}</span>

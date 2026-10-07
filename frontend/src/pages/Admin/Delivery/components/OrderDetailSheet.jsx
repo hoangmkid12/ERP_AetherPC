@@ -33,7 +33,7 @@ export default function OrderDetailSheet({ order: ord, onClose, fmt, actions = {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.85rem 1rem', background: 'var(--bg-primary)', borderBottom: '1px solid var(--border-glass)', flexShrink: 0 }}>
           <div>
             <strong style={{ fontSize: '0.95rem', color: 'var(--text-primary)' }}>Đơn Hàng #{orderId}</strong>
-            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Chi tiết & minh chứng giao hàng</div>
+            <div style={{ fontSize: '0.77rem', color: 'var(--text-muted)' }}>Chi tiết & minh chứng giao hàng</div>
           </div>
           <button type="button" onClick={onClose} className="delivery-icon-btn"><X size={18} /></button>
         </div>
@@ -41,7 +41,7 @@ export default function OrderDetailSheet({ order: ord, onClose, fmt, actions = {
         {/* Body */}
         <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '1rem' }}>
           <span style={{
-            display: 'inline-block', padding: '3px 10px', borderRadius: '999px', fontSize: '0.72rem', fontWeight: 800,
+            display: 'inline-block', padding: '3px 10px', borderRadius: '999px', fontSize: '0.77rem', fontWeight: 800,
             backgroundColor: `${statusInfo.color}20`, color: statusInfo.color, marginBottom: '0.85rem'
           }}>
             {getStatusLabel(ORDER_STATUS, ord.status)}
@@ -134,7 +134,7 @@ export default function OrderDetailSheet({ order: ord, onClose, fmt, actions = {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontWeight: 800 }}>
                   <Banknote size={16} /> Đã thu đủ: {formatMoney(codAmount)} tiền mặt
                 </div>
-                <div style={{ fontSize: '0.74rem', color: '#166534', marginTop: '3px', lineHeight: 1.4 }}>
+                <div style={{ fontSize: '0.79rem', color: '#166534', marginTop: '3px', lineHeight: 1.4 }}>
                   Shipper đang giữ <strong>{formatMoney(codAmount)}</strong> tiền mặt COD từ đơn này. Hãy đối soát và nộp lại cho Kế toán / Thu ngân khi hết ca làm việc.
                 </div>
               </div>
@@ -154,7 +154,7 @@ export default function OrderDetailSheet({ order: ord, onClose, fmt, actions = {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontWeight: 800 }}>
                   <ShieldCheck size={16} /> Đã chuyển khoản: {formatMoney(codAmount)} (VietQR)
                 </div>
-                <div style={{ fontSize: '0.74rem', color: '#1e40af', marginTop: '3px', lineHeight: 1.4 }}>
+                <div style={{ fontSize: '0.79rem', color: '#1e40af', marginTop: '3px', lineHeight: 1.4 }}>
                   Mã giao dịch: <strong>{ord.bankRefCode || 'Đã ghi nhận'}</strong> (Tiền đã vào thẳng tài khoản công ty, Shipper không giữ tiền mặt).
                 </div>
               </div>
@@ -175,7 +175,7 @@ export default function OrderDetailSheet({ order: ord, onClose, fmt, actions = {
                 {ord.receiverNote || 'Không có ghi chú.'}
               </div>
               {ord.deliveredAt && (
-                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.35rem' }}>
+                <div style={{ fontSize: '0.77rem', color: 'var(--text-muted)', marginTop: '0.35rem' }}>
                   Giao lúc: {new Date(ord.deliveredAt).toLocaleString('vi-VN')}
                 </div>
               )}
@@ -191,7 +191,7 @@ export default function OrderDetailSheet({ order: ord, onClose, fmt, actions = {
                 {ord.failReason || 'Không rõ lý do'}
               </div>
               {ord.failNote && <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Ghi chú: {ord.failNote}</div>}
-              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.35rem' }}>
+              <div style={{ fontSize: '0.77rem', color: 'var(--text-muted)', marginTop: '0.35rem' }}>
                 Lần giao thất bại: {ord.deliveryAttempts || 1}/3
               </div>
             </div>

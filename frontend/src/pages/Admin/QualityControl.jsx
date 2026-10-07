@@ -985,7 +985,7 @@ export default function QualityControl() {
   };
 
   return (
-    <div style={{ backgroundColor: '#f8fafc', minHeight: '100vh', padding: '1.5rem 2rem', maxWidth: '1400px', margin: '0 auto', fontFamily: 'Inter, sans-serif' }}>
+    <div style={{ backgroundColor: '#f8fafc', minHeight: '100vh', padding: '1.5rem 2rem', maxWidth: '1400px', margin: '0 auto', fontFamily: 'inherit' }}>
       
       {/* ========================================================================= */}
       {/* 1. TOP HEADER */}
@@ -1061,7 +1061,7 @@ export default function QualityControl() {
                 <strong style={{ fontSize: '0.9rem', color: '#92400e' }}>
                   Có {pendingQaPOs.length} Lô Hàng PO Vừa Giao Tới Đang Chờ Nghiệm Thu QA/QC
                 </strong>
-                <span style={{ backgroundColor: '#ef4444', color: '#ffffff', fontSize: '0.68rem', fontWeight: 800, padding: '2px 7px', borderRadius: '10px' }}>
+                <span style={{ backgroundColor: '#ef4444', color: '#ffffff', fontSize: '0.74rem', fontWeight: 800, padding: '2px 7px', borderRadius: '10px' }}>
                   Cần xử lý
                 </span>
               </div>
@@ -1134,7 +1134,7 @@ export default function QualityControl() {
                 style={{
                   backgroundColor: '#ffffff',
                   borderRadius: '10px',
-                  border: '1px solid #cbd5e1',
+                  border: '1px solid #e3e8ef',
                   padding: '1.1rem 1.25rem',
                   display: 'flex',
                   flexDirection: 'column',
@@ -1145,7 +1145,7 @@ export default function QualityControl() {
                 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
+                  <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
                     {st.label}
                   </span>
                   <div style={{ width: '36px', height: '36px', borderRadius: '8px', backgroundColor: st.bg, color: st.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -1157,7 +1157,7 @@ export default function QualityControl() {
                   <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {st.value}
                   </div>
-                  <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.15rem' }}>
+                  <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.15rem' }}>
                     {st.change}
                   </div>
                 </div>
@@ -1168,7 +1168,7 @@ export default function QualityControl() {
           {/* Charts Row */}
           <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.8fr', gap: '1.25rem', marginBottom: '1.25rem' }}>
             {/* Defect Categories Chart */}
-            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem', height: '320px', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1.25rem', height: '320px', display: 'flex', flexDirection: 'column' }}>
               <h3 style={{ fontSize: '0.92rem', fontWeight: 800, color: '#0f172a', margin: '0 0 1rem 0' }}>
                 Phân Loại Các Dạng Lỗi Linh Kiện
               </h3>
@@ -1185,7 +1185,7 @@ export default function QualityControl() {
             </div>
 
             {/* Weekly Pass Rate Chart */}
-            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem', height: '320px', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1.25rem', height: '320px', display: 'flex', flexDirection: 'column' }}>
               <h3 style={{ fontSize: '0.92rem', fontWeight: 800, color: '#0f172a', margin: '0 0 1rem 0' }}>
                 Khối Lượng Linh Kiện Đạt Chuẩn vs Lỗi Theo Tuần
               </h3>
@@ -1207,12 +1207,12 @@ export default function QualityControl() {
           </div>
 
           {/* Quick Actions & Recent Inspections Preview */}
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem' }}>
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1.25rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.85rem' }}>
               <h3 style={{ fontSize: '0.9rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
                 Biên Bản Kiểm Định Gần Đây Nhất
               </h3>
-              <button onClick={() => setTab('logs')} style={{ background: 'none', border: 'none', color: '#2563eb', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer' }}>
+              <button onClick={() => setTab('logs')} style={{ background: 'none', border: 'none', color: '#2563eb', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}>
                 Xem toàn bộ nhật ký →
               </button>
             </div>
@@ -1248,7 +1248,7 @@ export default function QualityControl() {
                               border: `1px solid ${isLogPassed ? '#bbf7d0' : isLogRejected ? '#fecaca' : '#fed7aa'}`,
                               padding: '2px 8px',
                               borderRadius: '10px',
-                              fontSize: '0.7rem',
+                              fontSize: '0.75rem',
                               fontWeight: 700
                             }}>
                               {isLogPassed ? 'CHO NHẬP KHO 100%' : isLogRejected ? 'HOÀN TRẢ NCC' : 'NHẬP 1 PHẦN'}
@@ -1270,7 +1270,7 @@ export default function QualityControl() {
       {/* TAB 2: INBOUND (KIỂM ĐỊNH HÀNG NHẬP NCC) */}
       {/* ========================================================================= */}
       {activeTab === 'inbound' && (
-        <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem' }}>
+        <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1.25rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1.25rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1, maxWidth: '350px' }}>
               <div style={{ position: 'relative', width: '100%' }}>
@@ -1279,7 +1279,7 @@ export default function QualityControl() {
                   placeholder="Tìm theo mã PO, tên nhà cung cấp..."
                   value={searchTerm}
                   onChange={e => setSearchTerm(e.target.value)}
-                  style={{ width: '100%', padding: '0.45rem 0.65rem 0.45rem 2rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem' }}
+                  style={{ width: '100%', padding: '0.45rem 0.65rem 0.45rem 2rem', borderRadius: '6px', border: '1px solid #e3e8ef', fontSize: '0.82rem' }}
                 />
                 <Search size={15} style={{ position: 'absolute', left: '0.6rem', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
               </div>
@@ -1294,19 +1294,19 @@ export default function QualityControl() {
                   type="date"
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
-                  style={{ padding: '0.25rem 0.45rem', fontSize: '0.8rem', border: '1px solid #cbd5e1', borderRadius: '4px', color: '#1e293b', backgroundColor: '#ffffff' }}
+                  style={{ padding: '0.25rem 0.45rem', fontSize: '0.8rem', border: '1px solid #e3e8ef', borderRadius: '4px', color: '#1e293b', backgroundColor: '#ffffff' }}
                 />
                 <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>đến:</span>
                 <input
                   type="date"
                   value={endDate}
                   onChange={(e) => setEndDate(e.target.value)}
-                  style={{ padding: '0.25rem 0.45rem', fontSize: '0.8rem', border: '1px solid #cbd5e1', borderRadius: '4px', color: '#1e293b', backgroundColor: '#ffffff' }}
+                  style={{ padding: '0.25rem 0.45rem', fontSize: '0.8rem', border: '1px solid #e3e8ef', borderRadius: '4px', color: '#1e293b', backgroundColor: '#ffffff' }}
                 />
                 {(startDate || endDate) && (
                   <button
                     onClick={() => { setStartDate(''); setEndDate(''); }}
-                    style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', fontWeight: 700, color: '#dc2626', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '4px', cursor: 'pointer' }}
+                    style={{ padding: '0.25rem 0.5rem', fontSize: '0.8rem', fontWeight: 700, color: '#dc2626', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '4px', cursor: 'pointer' }}
                   >
                     Xóa lọc ngày
                   </button>
@@ -1326,7 +1326,7 @@ export default function QualityControl() {
                   style={{
                     padding: '0.35rem 0.75rem',
                     borderRadius: '6px',
-                    border: statusFilter === f.key ? '1px solid #2563eb' : '1px solid #cbd5e1',
+                    border: statusFilter === f.key ? '1px solid #2563eb' : '1px solid #e3e8ef',
                     backgroundColor: statusFilter === f.key ? '#2563eb' : '#ffffff',
                     color: statusFilter === f.key ? '#ffffff' : '#475569',
                     fontSize: '0.78rem',
@@ -1400,7 +1400,7 @@ export default function QualityControl() {
                             border: `1px solid ${isPending ? '#fde68a' : isPassed ? '#bbf7d0' : isRejected ? '#fecaca' : '#fed7aa'}`,
                             padding: '2px 8px',
                             borderRadius: '10px',
-                            fontSize: '0.72rem',
+                            fontSize: '0.77rem',
                             fontWeight: 700
                           }}>
                             {isPending ? 'CHỜ NGHIỆM THU' : isPassed ? 'CHO NHẬP KHO 100%' : isRejected ? 'TỪ CHỐI QC' : 'NHẬP 1 PHẦN'}
@@ -1418,7 +1418,7 @@ export default function QualityControl() {
                                     border: 'none',
                                     borderRadius: '4px',
                                     padding: '0 0.5rem',
-                                    fontSize: '0.74rem',
+                                    fontSize: '0.79rem',
                                     fontWeight: 700,
                                     cursor: 'pointer',
                                     display: 'inline-flex',
@@ -1436,7 +1436,7 @@ export default function QualityControl() {
                                 </button>
                               ) : (
                                 <div style={{ width: '115px', minWidth: '115px', display: 'inline-flex', justifyContent: 'center' }}>
-                                  <span style={{ fontSize: '0.7rem', color: '#b45309', fontWeight: 600, backgroundColor: '#fef3c7', padding: '0.2rem 0.4rem', borderRadius: '4px', border: '1px solid #fde68a', whiteSpace: 'nowrap' }}>
+                                  <span style={{ fontSize: '0.75rem', color: '#b45309', fontWeight: 600, backgroundColor: '#fef3c7', padding: '0.2rem 0.4rem', borderRadius: '4px', border: '1px solid #fde68a', whiteSpace: 'nowrap' }}>
                                     Chờ QA/QC
                                   </span>
                                 </div>
@@ -1495,7 +1495,7 @@ export default function QualityControl() {
                                   border: '1px solid #bfdbfe',
                                   borderRadius: '4px',
                                   padding: '0 0.5rem',
-                                  fontSize: '0.74rem',
+                                  fontSize: '0.79rem',
                                   fontWeight: 700,
                                   cursor: 'pointer',
                                   display: 'inline-flex',
@@ -1522,7 +1522,7 @@ export default function QualityControl() {
                                 border: '1px solid #86efac',
                                 borderRadius: '4px',
                                 padding: '0 0.4rem',
-                                fontSize: '0.74rem',
+                                fontSize: '0.79rem',
                                 fontWeight: 700,
                                 cursor: 'pointer',
                                 display: 'inline-flex',
@@ -1603,7 +1603,7 @@ export default function QualityControl() {
         const countAll = failedDeliveries.length + allReturns.length;
 
         return (
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem' }}>
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1.25rem' }}>
             
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1.25rem' }}>
               <div>
@@ -1631,7 +1631,7 @@ export default function QualityControl() {
                     style={{
                       padding: '0.35rem 0.75rem',
                       borderRadius: '6px',
-                      border: rmaFilter === f.key ? '1px solid #8b5cf6' : '1px solid #cbd5e1',
+                      border: rmaFilter === f.key ? '1px solid #8b5cf6' : '1px solid #e3e8ef',
                       backgroundColor: rmaFilter === f.key ? '#8b5cf6' : '#ffffff',
                       color: rmaFilter === f.key ? '#ffffff' : '#475569',
                       fontSize: '0.78rem',
@@ -1652,7 +1652,7 @@ export default function QualityControl() {
                 style={{
                   padding: '0.45rem 0.9rem',
                   borderRadius: '6px',
-                  border: rmaSourceFilter === 'ALL' ? '1.5px solid #2563eb' : '1px solid #cbd5e1',
+                  border: rmaSourceFilter === 'ALL' ? '1.5px solid #2563eb' : '1px solid #e3e8ef',
                   backgroundColor: rmaSourceFilter === 'ALL' ? '#eff6ff' : '#ffffff',
                   color: rmaSourceFilter === 'ALL' ? '#2563eb' : '#475569',
                   fontSize: '0.8rem',
@@ -1664,7 +1664,7 @@ export default function QualityControl() {
                 }}
               >
                 <span>Tất Cả Nguồn Hàng Trả Về</span>
-                <span style={{ backgroundColor: rmaSourceFilter === 'ALL' ? '#2563eb' : '#f1f5f9', color: rmaSourceFilter === 'ALL' ? '#ffffff' : '#64748b', padding: '1px 6px', borderRadius: '10px', fontSize: '0.7rem' }}>
+                <span style={{ backgroundColor: rmaSourceFilter === 'ALL' ? '#2563eb' : '#f1f5f9', color: rmaSourceFilter === 'ALL' ? '#ffffff' : '#64748b', padding: '1px 6px', borderRadius: '10px', fontSize: '0.75rem' }}>
                   {filteredFailed.length + filteredRma.length}
                 </span>
               </button>
@@ -1674,7 +1674,7 @@ export default function QualityControl() {
                 style={{
                   padding: '0.45rem 0.9rem',
                   borderRadius: '6px',
-                  border: rmaSourceFilter === 'FAILED_DELIVERY' ? '1.5px solid #ea580c' : '1px solid #cbd5e1',
+                  border: rmaSourceFilter === 'FAILED_DELIVERY' ? '1.5px solid #ea580c' : '1px solid #e3e8ef',
                   backgroundColor: rmaSourceFilter === 'FAILED_DELIVERY' ? '#fff7ed' : '#ffffff',
                   color: rmaSourceFilter === 'FAILED_DELIVERY' ? '#ea580c' : '#475569',
                   fontSize: '0.8rem',
@@ -1686,7 +1686,7 @@ export default function QualityControl() {
                 }}
               >
                 <span>Hàng Bom / Giao Thất Bại Hoàn Về</span>
-                <span style={{ backgroundColor: rmaSourceFilter === 'FAILED_DELIVERY' ? '#ea580c' : '#f1f5f9', color: rmaSourceFilter === 'FAILED_DELIVERY' ? '#ffffff' : '#64748b', padding: '1px 6px', borderRadius: '10px', fontSize: '0.7rem' }}>
+                <span style={{ backgroundColor: rmaSourceFilter === 'FAILED_DELIVERY' ? '#ea580c' : '#f1f5f9', color: rmaSourceFilter === 'FAILED_DELIVERY' ? '#ffffff' : '#64748b', padding: '1px 6px', borderRadius: '10px', fontSize: '0.75rem' }}>
                   {filteredFailed.length}
                 </span>
               </button>
@@ -1696,7 +1696,7 @@ export default function QualityControl() {
                 style={{
                   padding: '0.45rem 0.9rem',
                   borderRadius: '6px',
-                  border: rmaSourceFilter === 'CUSTOMER_RMA' ? '1.5px solid #8b5cf6' : '1px solid #cbd5e1',
+                  border: rmaSourceFilter === 'CUSTOMER_RMA' ? '1.5px solid #8b5cf6' : '1px solid #e3e8ef',
                   backgroundColor: rmaSourceFilter === 'CUSTOMER_RMA' ? '#f5f3ff' : '#ffffff',
                   color: rmaSourceFilter === 'CUSTOMER_RMA' ? '#8b5cf6' : '#475569',
                   fontSize: '0.8rem',
@@ -1708,7 +1708,7 @@ export default function QualityControl() {
                 }}
               >
                 <span>Khách Hàng Yêu Cầu Đổi Trả RMA</span>
-                <span style={{ backgroundColor: rmaSourceFilter === 'CUSTOMER_RMA' ? '#8b5cf6' : '#f1f5f9', color: rmaSourceFilter === 'CUSTOMER_RMA' ? '#ffffff' : '#64748b', padding: '1px 6px', borderRadius: '10px', fontSize: '0.7rem' }}>
+                <span style={{ backgroundColor: rmaSourceFilter === 'CUSTOMER_RMA' ? '#8b5cf6' : '#f1f5f9', color: rmaSourceFilter === 'CUSTOMER_RMA' ? '#ffffff' : '#64748b', padding: '1px 6px', borderRadius: '10px', fontSize: '0.75rem' }}>
                   {filteredRma.length}
                 </span>
               </button>
@@ -1756,7 +1756,7 @@ export default function QualityControl() {
                           <span style={{
                             padding: '2px 8px',
                             borderRadius: '4px',
-                            fontSize: '0.68rem',
+                            fontSize: '0.74rem',
                             fontWeight: 800,
                             backgroundColor: '#ffedd5',
                             color: '#c2410c',
@@ -1767,7 +1767,7 @@ export default function QualityControl() {
                           <span style={{
                             padding: '2px 8px',
                             borderRadius: '4px',
-                            fontSize: '0.68rem',
+                            fontSize: '0.74rem',
                             fontWeight: 800,
                             backgroundColor: '#fef3c7',
                             color: '#92400e',
@@ -1781,7 +1781,7 @@ export default function QualityControl() {
                           <strong>Linh kiện trong kiện:</strong> {itemNames}
                         </div>
 
-                        <div style={{ fontSize: '0.76rem', color: '#475569', display: 'flex', flexWrap: 'wrap', gap: '0.85rem' }}>
+                        <div style={{ fontSize: '0.8rem', color: '#475569', display: 'flex', flexWrap: 'wrap', gap: '0.85rem' }}>
                           <span>Khách hàng: <strong>{ord.customerName}</strong> ({ord.phone})</span>
                           <span>Địa chỉ: {ord.shippingAddress || 'TP.HCM'}</span>
                           <span style={{ color: '#dc2626', fontWeight: 700 }}>
@@ -1813,7 +1813,7 @@ export default function QualityControl() {
                             <ShieldCheck size={14} /> Thẩm Định Tem & Nhập Kho
                           </button>
                         ) : (
-                          <span style={{ fontSize: '0.74rem', color: '#15803d', fontWeight: 600, backgroundColor: '#f0fdf4', padding: '0.35rem 0.65rem', borderRadius: '4px', border: '1px solid #bbf7d0' }}>
+                          <span style={{ fontSize: '0.79rem', color: '#15803d', fontWeight: 600, backgroundColor: '#f0fdf4', padding: '0.35rem 0.65rem', borderRadius: '4px', border: '1px solid #bbf7d0' }}>
                             Chờ QA/QC kiểm tra tem
                           </span>
                         )}
@@ -1825,7 +1825,7 @@ export default function QualityControl() {
                           style={{
                             backgroundColor: '#ffffff',
                             color: '#475569',
-                            border: '1px solid #cbd5e1',
+                            border: '1px solid #e3e8ef',
                             borderRadius: '6px',
                             padding: '0.45rem 0.6rem',
                             cursor: 'pointer',
@@ -1881,11 +1881,11 @@ export default function QualityControl() {
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', flex: 1, minWidth: '280px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                           <span style={{ fontSize: '0.88rem', fontWeight: 800, color: '#8b5cf6' }}>{rma.id}</span>
-                          <span style={{ fontSize: '0.75rem', color: '#64748b' }}>• Đơn: <strong>#{rma.orderId || 'N/A'}</strong></span>
+                          <span style={{ fontSize: '0.8rem', color: '#64748b' }}>• Đơn: <strong>#{rma.orderId || 'N/A'}</strong></span>
                           <span style={{
                             padding: '2px 8px',
                             borderRadius: '4px',
-                            fontSize: '0.68rem',
+                            fontSize: '0.74rem',
                             fontWeight: 800,
                             backgroundColor: '#ede9fe',
                             color: '#6d28d9',
@@ -1896,7 +1896,7 @@ export default function QualityControl() {
                           <span style={{
                             padding: '2px 8px',
                             borderRadius: '10px',
-                            fontSize: '0.68rem',
+                            fontSize: '0.74rem',
                             fontWeight: 800,
                             backgroundColor: isPending ? '#fffbeb' : isPassed ? '#dcfce7' : isVendor ? '#ffedd5' : '#fee2e2',
                             color: isPending ? '#b45309' : isPassed ? '#15803d' : isVendor ? '#c2410c' : '#dc2626',
@@ -1910,10 +1910,10 @@ export default function QualityControl() {
                           <span style={{ fontWeight: 700, color: '#0f172a' }}>
                             {productName}
                           </span>
-                          <span style={{ fontSize: '0.72rem', backgroundColor: '#e2e8f0', color: '#334155', padding: '1px 5px', borderRadius: '4px', fontFamily: 'monospace', fontWeight: 700 }}>
+                          <span style={{ fontSize: '0.77rem', backgroundColor: '#e2e8f0', color: '#334155', padding: '1px 5px', borderRadius: '4px', fontFamily: 'monospace', fontWeight: 700 }}>
                             {serialNum}
                           </span>
-                          <span style={{ color: '#64748b', fontSize: '0.76rem' }}>
+                          <span style={{ color: '#64748b', fontSize: '0.8rem' }}>
                             • KH: <strong>{rma.customerName || 'Khách lẻ'}</strong> ({rma.phone || 'N/A'})
                           </span>
                         </div>
@@ -1943,7 +1943,7 @@ export default function QualityControl() {
                               <ShieldCheck size={14} /> Thẩm Định
                             </button>
                           ) : (
-                            <span style={{ fontSize: '0.74rem', color: '#6d28d9', fontWeight: 600, backgroundColor: '#f5f3ff', padding: '0.35rem 0.65rem', borderRadius: '4px', border: '1px solid #ddd6fe' }}>
+                            <span style={{ fontSize: '0.79rem', color: '#6d28d9', fontWeight: 600, backgroundColor: '#f5f3ff', padding: '0.35rem 0.65rem', borderRadius: '4px', border: '1px solid #ddd6fe' }}>
                               Chờ QA/QC thẩm định
                             </span>
                           )
@@ -1956,7 +1956,7 @@ export default function QualityControl() {
                           style={{
                             backgroundColor: '#ffffff',
                             color: '#475569',
-                            border: '1px solid #cbd5e1',
+                            border: '1px solid #e3e8ef',
                             borderRadius: '6px',
                             padding: '0.35rem 0.55rem',
                             cursor: 'pointer',
@@ -1984,7 +1984,7 @@ export default function QualityControl() {
       {/* TAB 4: LOGS (NHẬT KÝ & BIÊN BẢN QA) */}
       {/* ========================================================================= */}
       {activeTab === 'logs' && (
-        <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem' }}>
+        <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1.25rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1.25rem' }}>
             <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
               <FileText size={18} style={{ color: '#2563eb' }} />
@@ -2004,7 +2004,7 @@ export default function QualityControl() {
                   style={{
                     padding: '0.35rem 0.75rem',
                     borderRadius: '6px',
-                    border: logFilter === f.key ? '1px solid #2563eb' : '1px solid #cbd5e1',
+                    border: logFilter === f.key ? '1px solid #2563eb' : '1px solid #e3e8ef',
                     backgroundColor: logFilter === f.key ? '#2563eb' : '#ffffff',
                     color: logFilter === f.key ? '#ffffff' : '#475569',
                     fontSize: '0.78rem',
@@ -2089,7 +2089,7 @@ export default function QualityControl() {
                             display: 'inline-block',
                             padding: '3px 8px',
                             borderRadius: '6px',
-                            fontSize: '0.7rem',
+                            fontSize: '0.75rem',
                             fontWeight: 700,
                             whiteSpace: 'nowrap',
                             backgroundColor: isRma ? '#f5f3ff' : '#eff6ff',
@@ -2156,13 +2156,13 @@ export default function QualityControl() {
               { label: 'Tỷ Lệ Đạt Chuẩn Bình Quân', value: `${supplierReportSummary.avgPassRate}%`, icon: <Award size={20} />, color: '#16a34a', bg: '#f0fdf4' },
               { label: 'NCC Cần Xem Xét (< 75%)', value: supplierReportSummary.needsReviewCount, icon: <AlertTriangle size={20} />, color: '#dc2626', bg: '#fef2f2' }
             ].map((st, sIdx) => (
-              <div key={sIdx} style={{ backgroundColor: '#ffffff', borderRadius: '10px', border: '1px solid #cbd5e1', padding: '1.1rem 1.25rem', display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+              <div key={sIdx} style={{ backgroundColor: '#ffffff', borderRadius: '10px', border: '1px solid #e3e8ef', padding: '1.1rem 1.25rem', display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
                 <div style={{ width: '42px', height: '42px', borderRadius: '10px', backgroundColor: st.bg, color: st.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                   {st.icon}
                 </div>
                 <div>
                   <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0f172a', lineHeight: 1.1 }}>{st.value}</div>
-                  <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', marginTop: '0.2rem' }}>{st.label}</div>
+                  <div style={{ fontSize: '0.77rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', marginTop: '0.2rem' }}>{st.label}</div>
                 </div>
               </div>
             ))}
@@ -2170,7 +2170,7 @@ export default function QualityControl() {
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.6fr', gap: '1.25rem', alignItems: 'start' }}>
             {/* Defect distribution — real counts from logged inspections */}
-            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem', height: '340px', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1.25rem', height: '340px', display: 'flex', flexDirection: 'column' }}>
               <h3 style={{ fontSize: '0.92rem', fontWeight: 800, color: '#0f172a', margin: '0 0 1rem 0' }}>
                 Phân Bố Dạng Lỗi (Hàng Nhập NCC)
               </h3>
@@ -2187,7 +2187,7 @@ export default function QualityControl() {
             </div>
 
             {/* Supplier Scorecard */}
-            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem' }}>
+            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1.25rem' }}>
               <h3 style={{ fontSize: '0.92rem', fontWeight: 800, color: '#0f172a', margin: '0 0 0.25rem 0', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                 <Award size={16} style={{ color: '#2563eb' }} /> Bảng Xếp Hạng Chất Lượng Nhà Cung Cấp
               </h3>
@@ -2217,7 +2217,7 @@ export default function QualityControl() {
                         <tr key={s.supplierName} style={{ borderBottom: '1px solid #f1f5f9' }}>
                           <td style={{ padding: '0.65rem 0.7rem', fontWeight: 700, color: '#0f172a' }}>
                             {s.supplierName}
-                            <div style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 500 }}>
+                            <div style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 500 }}>
                               {s.rejectAllCount > 0 && `${s.rejectAllCount} lô bị hoàn trả toàn bộ`}
                               {s.rejectAllCount > 0 && s.partialCount > 0 && ' • '}
                               {s.partialCount > 0 && `${s.partialCount} lô nghiệm thu một phần`}
@@ -2232,13 +2232,13 @@ export default function QualityControl() {
                           <td style={{ padding: '0.65rem 0.7rem', textAlign: 'center', fontWeight: 800, color: s.rating.color, whiteSpace: 'nowrap' }}>
                             {s.passRate}%
                           </td>
-                          <td style={{ padding: '0.65rem 0.7rem', color: '#475569', fontSize: '0.76rem' }}>
+                          <td style={{ padding: '0.65rem 0.7rem', color: '#475569', fontSize: '0.8rem' }}>
                             {s.topDefect}
                           </td>
                           <td style={{ padding: '0.65rem 0.7rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
                             <span style={{
                               display: 'inline-block', padding: '2px 9px', borderRadius: '10px',
-                              fontSize: '0.7rem', fontWeight: 800,
+                              fontSize: '0.75rem', fontWeight: 800,
                               backgroundColor: s.rating.bg, color: s.rating.color, border: `1px solid ${s.rating.border}`
                             }}>
                               {s.rating.label}
@@ -2260,7 +2260,7 @@ export default function QualityControl() {
       {/* ========================================================================= */}
       {selectedPO && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.55)', backdropFilter: 'blur(6px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '1.5rem' }}>
-          <div style={{ width: '100%', maxWidth: '780px', maxHeight: '92vh', overflowY: 'auto', padding: '1.75rem', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', boxShadow: '0 20px 30px -5px rgba(0, 0, 0, 0.15)' }}>
+          <div style={{ width: '100%', maxWidth: '780px', maxHeight: '92vh', overflowY: 'auto', padding: '1.75rem', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e3e8ef', boxShadow: '0 20px 30px -5px rgba(0, 0, 0, 0.15)' }}>
             
             {/* Modal Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.85rem' }}>
@@ -2277,7 +2277,7 @@ export default function QualityControl() {
                   </span>
                 </div>
               </div>
-              <button onClick={() => setSelectedPO(null)} style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#475569', cursor: 'pointer', padding: '0.4rem', borderRadius: '6px' }}>
+              <button onClick={() => setSelectedPO(null)} style={{ background: '#f1f5f9', border: '1px solid #e3e8ef', color: '#475569', cursor: 'pointer', padding: '0.4rem', borderRadius: '6px' }}>
                 <X size={18} />
               </button>
             </div>
@@ -2309,7 +2309,7 @@ export default function QualityControl() {
                     
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
                       <thead>
-                        <tr style={{ borderBottom: '1px solid #cbd5e1', textAlign: 'left', color: '#64748b' }}>
+                        <tr style={{ borderBottom: '1px solid #e3e8ef', textAlign: 'left', color: '#64748b' }}>
                           <th style={{ padding: '0.35rem 0' }}>Tên Linh Kiện</th>
                           <th style={{ padding: '0.35rem 0.5rem', textAlign: 'center' }}>Số Lượng</th>
                           <th style={{ padding: '0.35rem 0.5rem', textAlign: 'right' }}>Đơn Giá</th>
@@ -2336,7 +2336,7 @@ export default function QualityControl() {
                       </tbody>
                     </table>
 
-                    <div style={{ marginTop: '0.6rem', paddingTop: '0.5rem', borderTop: '1px solid #cbd5e1', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem' }}>
+                    <div style={{ marginTop: '0.6rem', paddingTop: '0.5rem', borderTop: '1px solid #e3e8ef', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem' }}>
                       <span>Tổng số lượng đặt mua: <strong style={{ color: '#0f172a' }}>{totalItemsQty} SP</strong></span>
                       <span>Tổng trị giá đơn PO: <strong style={{ color: '#16a34a', fontSize: '0.95rem' }}>{formatPrice(selectedPO.totalAmount)}</strong></span>
                     </div>
@@ -2438,7 +2438,7 @@ export default function QualityControl() {
                             setFailedQty(0);
                             setInspectionDecision('ACCEPT_ALL');
                           }}
-                          style={{ padding: '2px 8px', fontSize: '0.7rem', fontWeight: 700, backgroundColor: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0', borderRadius: '4px', cursor: 'pointer' }}
+                          style={{ padding: '2px 8px', fontSize: '0.75rem', fontWeight: 700, backgroundColor: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0', borderRadius: '4px', cursor: 'pointer' }}
                         >
                           100% Đạt Chuẩn
                         </button>
@@ -2451,7 +2451,7 @@ export default function QualityControl() {
                             setInspectionDecision('ACCEPT_PARTIAL');
                             setDefectCategory('PACKAGE_DAMAGED');
                           }}
-                          style={{ padding: '2px 8px', fontSize: '0.7rem', fontWeight: 700, backgroundColor: '#fff7ed', color: '#c2410c', border: '1px solid #fed7aa', borderRadius: '4px', cursor: 'pointer' }}
+                          style={{ padding: '2px 8px', fontSize: '0.75rem', fontWeight: 700, backgroundColor: '#fff7ed', color: '#c2410c', border: '1px solid #fed7aa', borderRadius: '4px', cursor: 'pointer' }}
                         >
                           Phát Hiện Lỗi (Nhập 1 phần)
                         </button>
@@ -2460,7 +2460,7 @@ export default function QualityControl() {
 
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                       <div>
-                        <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#15803d', display: 'block', marginBottom: '0.25rem' }}>
+                        <label style={{ fontSize: '0.8rem', fontWeight: 700, color: '#15803d', display: 'block', marginBottom: '0.25rem' }}>
                           Số Lượng ĐẠT TIÊU CHUẨN:
                         </label>
                         <input
@@ -2474,7 +2474,7 @@ export default function QualityControl() {
                       </div>
 
                       <div>
-                        <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#dc2626', display: 'block', marginBottom: '0.25rem' }}>
+                        <label style={{ fontSize: '0.8rem', fontWeight: 700, color: '#dc2626', display: 'block', marginBottom: '0.25rem' }}>
                           Số Lượng LỖI / HƯ HỎNG:
                         </label>
                         <input
@@ -2515,7 +2515,7 @@ export default function QualityControl() {
                             style={{
                               padding: '0.75rem 0.5rem',
                               borderRadius: '8px',
-                              border: active ? `2px solid ${d.color}` : '1px solid #cbd5e1',
+                              border: active ? `2px solid ${d.color}` : '1px solid #e3e8ef',
                               backgroundColor: active ? d.bg : '#ffffff',
                               color: active ? d.color : '#334155',
                               cursor: 'pointer',
@@ -2523,7 +2523,7 @@ export default function QualityControl() {
                             }}
                           >
                             <div style={{ fontWeight: 800, fontSize: '0.78rem' }}>{d.label}</div>
-                            <div style={{ fontSize: '0.68rem', color: '#64748b', marginTop: '0.15rem' }}>{d.desc}</div>
+                            <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '0.15rem' }}>{d.desc}</div>
                           </button>
                         );
                       })}
@@ -2562,7 +2562,7 @@ export default function QualityControl() {
                   value={qcNotes}
                   onChange={e => setQcNotes(e.target.value)}
                   placeholder="Ghi chú kết luận kỹ thuật, yêu cầu đổi hàng hoặc lưu ý cho bộ phận Kho khi nhập..."
-                  style={{ width: '100%', padding: '0.55rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem', boxSizing: 'border-box' }}
+                  style={{ width: '100%', padding: '0.55rem', borderRadius: '6px', border: '1px solid #e3e8ef', fontSize: '0.82rem', boxSizing: 'border-box' }}
                 />
               </div>
 
@@ -2580,7 +2580,7 @@ export default function QualityControl() {
                 <button
                   type="button"
                   onClick={() => setSelectedPO(null)}
-                  style={{ backgroundColor: '#ffffff', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.55rem 1.15rem', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
+                  style={{ backgroundColor: '#ffffff', color: '#475569', border: '1px solid #e3e8ef', borderRadius: '6px', padding: '0.55rem 1.15rem', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
                 >
                   Hủy Bỏ
                 </button>
@@ -2610,7 +2610,7 @@ export default function QualityControl() {
 
         return (
           <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.55)', backdropFilter: 'blur(6px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '1.5rem' }}>
-            <div style={{ width: '100%', maxWidth: '740px', maxHeight: '92vh', overflowY: 'auto', padding: '1.75rem', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
+            <div style={{ width: '100%', maxWidth: '740px', maxHeight: '92vh', overflowY: 'auto', padding: '1.75rem', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e3e8ef', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
               
               {/* Modal Header */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid #f1f5f9', paddingBottom: '0.75rem' }}>
@@ -2620,10 +2620,10 @@ export default function QualityControl() {
                     <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
                       Thẩm Định & Nghiệm Thu Kỹ Thuật RMA: {selectedRMA.id}
                     </h3>
-                    <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Đơn hàng gốc: <strong>#{selectedRMA.orderId || 'N/A'}</strong> • Khách hàng: <strong>{selectedRMA.customerName}</strong> ({selectedRMA.phone})</span>
+                    <span style={{ fontSize: '0.8rem', color: '#64748b' }}>Đơn hàng gốc: <strong>#{selectedRMA.orderId || 'N/A'}</strong> • Khách hàng: <strong>{selectedRMA.customerName}</strong> ({selectedRMA.phone})</span>
                   </div>
                 </div>
-                <button onClick={() => setSelectedRMA(null)} style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#475569', cursor: 'pointer', padding: '0.4rem', borderRadius: '6px' }}>
+                <button onClick={() => setSelectedRMA(null)} style={{ background: '#f1f5f9', border: '1px solid #e3e8ef', color: '#475569', cursor: 'pointer', padding: '0.4rem', borderRadius: '6px' }}>
                   <X size={18} />
                 </button>
               </div>
@@ -2657,21 +2657,21 @@ export default function QualityControl() {
                   {/* Serial Verification Input */}
                   <div style={{ marginBottom: '0.85rem' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
-                      <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569' }}>
+                      <label style={{ fontSize: '0.8rem', fontWeight: 700, color: '#475569' }}>
                         Mã Serial thực tế đọc được trên linh kiện (Quét Barcode / Nhập mã): *
                       </label>
                       {isSerialMatched && (
-                        <span style={{ padding: '2px 8px', borderRadius: '12px', fontSize: '0.72rem', fontWeight: 800, backgroundColor: '#dcfce7', color: '#15803d', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                        <span style={{ padding: '2px 8px', borderRadius: '12px', fontSize: '0.77rem', fontWeight: 800, backgroundColor: '#dcfce7', color: '#15803d', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
                           <Check size={12} /> Khớp Serial Gốc
                         </span>
                       )}
                       {isSerialMismatch && (
-                        <span style={{ padding: '2px 8px', borderRadius: '12px', fontSize: '0.72rem', fontWeight: 800, backgroundColor: '#fee2e2', color: '#dc2626', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                        <span style={{ padding: '2px 8px', borderRadius: '12px', fontSize: '0.77rem', fontWeight: 800, backgroundColor: '#fee2e2', color: '#dc2626', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
                           <X size={12} /> Sai Mã Serial
                         </span>
                       )}
                       {isSerialEmpty && (
-                        <span style={{ padding: '2px 8px', borderRadius: '12px', fontSize: '0.72rem', fontWeight: 700, backgroundColor: '#fef3c7', color: '#b45309' }}>
+                        <span style={{ padding: '2px 8px', borderRadius: '12px', fontSize: '0.77rem', fontWeight: 700, backgroundColor: '#fef3c7', color: '#b45309' }}>
                           Chưa nhập mã Serial
                         </span>
                       )}
@@ -2687,7 +2687,7 @@ export default function QualityControl() {
                           width: '100%',
                           padding: '0.45rem 0.65rem',
                           borderRadius: '6px',
-                          border: isSerialMismatch ? '2px solid #ef4444' : isSerialMatched ? '2px solid #16a34a' : '1px solid #cbd5e1',
+                          border: isSerialMismatch ? '2px solid #ef4444' : isSerialMatched ? '2px solid #16a34a' : '1px solid #e3e8ef',
                           backgroundColor: isSerialMismatch ? '#fef2f2' : isSerialMatched ? '#f0fdf4' : '#ffffff',
                           color: isSerialMismatch ? '#b91c1c' : isSerialMatched ? '#15803d' : '#0f172a',
                           fontSize: '0.85rem',
@@ -2707,7 +2707,7 @@ export default function QualityControl() {
                           border: '1px solid #bfdbfe',
                           backgroundColor: '#eff6ff',
                           color: '#2563eb',
-                          fontSize: '0.75rem',
+                          fontSize: '0.8rem',
                           fontWeight: 700,
                           cursor: 'pointer',
                           whiteSpace: 'nowrap'
@@ -2740,7 +2740,7 @@ export default function QualityControl() {
                           <div style={{ lineHeight: '1.4' }}>
                             Mã Serial thực tế <code>"{actualSerial}"</code> <strong>KHÔNG TRÙNG KHỚP</strong> với Serial xuất bán gốc <code>"{expectedSerial}"</code>.
                           </div>
-                          <div style={{ fontSize: '0.74rem', color: '#7f1d1d', marginTop: '0.35rem', lineHeight: '1.45' }}>
+                          <div style={{ fontSize: '0.79rem', color: '#7f1d1d', marginTop: '0.35rem', lineHeight: '1.45' }}>
                             ⚠️ <strong>Cảnh báo nghiệp vụ QC:</strong> Linh kiện gửi trả không khớp hồ sơ đơn hàng AetherPC (nguy cơ tráo linh kiện cũ/hỏng bên ngoài).
                             Hệ thống <strong>chặn các thao tác Đổi Mới 1-1 hoặc Nhập Kho</strong>. Vui lòng đối soát lại barcode hoặc chọn quyết định <strong>"TỪ CHỐI ĐỔI TRẢ"</strong>.
                           </div>
@@ -2787,7 +2787,7 @@ export default function QualityControl() {
 
                 {/* 4 Tình trạng Tem Bảo Hành */}
                 <div>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '0.4rem' }}>
+                  <label style={{ fontSize: '0.8rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '0.4rem' }}>
                     Tình trạng Tem Bảo Hành & Phương pháp Xác thực:
                   </label>
 
@@ -2845,7 +2845,7 @@ export default function QualityControl() {
                           <div style={{ fontSize: '0.8rem', fontWeight: 800, color: active ? st.color : '#0f172a' }}>
                             {st.title}
                           </div>
-                          <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '0.15rem' }}>
+                          <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.15rem' }}>
                             {st.desc}
                           </div>
                         </button>
@@ -2982,7 +2982,7 @@ export default function QualityControl() {
                         style={{
                           padding: '0.75rem',
                           borderRadius: '8px',
-                          border: active ? `2px solid ${d.color}` : '1px solid #cbd5e1',
+                          border: active ? `2px solid ${d.color}` : '1px solid #e3e8ef',
                           backgroundColor: active ? d.bg : '#ffffff',
                           color: active ? d.color : '#334155',
                           cursor: isBlockedBySerial ? 'not-allowed' : 'pointer',
@@ -2994,9 +2994,9 @@ export default function QualityControl() {
                       >
                         <div style={{ fontWeight: 800, fontSize: '0.8rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <span>{d.label}</span>
-                          {isBlockedBySerial && <span style={{ fontSize: '0.68rem', color: '#dc2626' }}>[Khóa do sai Serial]</span>}
+                          {isBlockedBySerial && <span style={{ fontSize: '0.74rem', color: '#dc2626' }}>[Khóa do sai Serial]</span>}
                         </div>
-                        <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '0.15rem' }}>{d.desc}</div>
+                        <div style={{ fontSize: '0.77rem', color: '#64748b', marginTop: '0.15rem' }}>{d.desc}</div>
                       </button>
                     );
                   })}
@@ -3011,7 +3011,7 @@ export default function QualityControl() {
                 <select
                   value={rmaDefectType}
                   onChange={e => setRmaDefectType(e.target.value)}
-                  style={{ width: '100%', padding: '0.5rem 0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem', color: '#0f172a' }}
+                  style={{ width: '100%', padding: '0.5rem 0.65rem', borderRadius: '6px', border: '1px solid #e3e8ef', fontSize: '0.82rem', color: '#0f172a' }}
                 >
                   <option value="DOA_FACTORY_DEFECT">Lỗi phần cứng do Nhà Sản Xuất (DOA - Lỗi mạch / Không POST)</option>
                   <option value="USER_PHYSICAL_DAMAGE">Hư hỏng do người dùng (Cong socket CPU / Rơi vỡ / Vào nước)</option>
@@ -3022,7 +3022,7 @@ export default function QualityControl() {
               </div>
 
               {/* Photo Proof Upload & Capture Box */}
-              <div style={{ marginBottom: '1.25rem', padding: '0.85rem', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
+              <div style={{ marginBottom: '1.25rem', padding: '0.85rem', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e3e8ef' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
                   <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                     <span>Ảnh Chụp Minh Chứng Ngoại Quan & Tem Seal (Hiển thị cho Khách hàng):</span>
@@ -3031,7 +3031,7 @@ export default function QualityControl() {
                     <button
                       type="button"
                       onClick={() => setQcProofPhoto('')}
-                      style={{ fontSize: '0.72rem', color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700 }}
+                      style={{ fontSize: '0.77rem', color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700 }}
                     >
                       Xóa ảnh
                     </button>
@@ -3043,11 +3043,11 @@ export default function QualityControl() {
                     <img
                       src={qcProofPhoto}
                       alt="QC Inspection Proof"
-                      style={{ width: '90px', height: '90px', objectFit: 'cover', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                      style={{ width: '90px', height: '90px', objectFit: 'cover', borderRadius: '6px', border: '1px solid #e3e8ef' }}
                     />
                     <div>
                       <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#16a34a' }}>Đã có ảnh chụp minh chứng thẩm định</div>
-                      <p style={{ fontSize: '0.72rem', color: '#64748b', margin: '0.2rem 0 0' }}>
+                      <p style={{ fontSize: '0.77rem', color: '#64748b', margin: '0.2rem 0 0' }}>
                         Ảnh này sẽ hiển thị trực tiếp trong mục "Chi Tiết Đơn Hàng" của Khách Hàng để khách yên tâm sản phẩm gửi đi nguyên vẹn.
                       </p>
                     </div>
@@ -3086,14 +3086,14 @@ export default function QualityControl() {
                       <button
                         type="button"
                         onClick={() => setQcProofPhoto('https://images.unsplash.com/photo-1591799264318-7e6ef8ddb7ea?w=600&auto=format&fit=crop&q=80')}
-                        style={{ padding: '0.45rem 0.75rem', backgroundColor: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.72rem', color: '#475569', cursor: 'pointer', fontWeight: 600 }}
+                        style={{ padding: '0.45rem 0.75rem', backgroundColor: '#f1f5f9', border: '1px solid #e3e8ef', borderRadius: '6px', fontSize: '0.77rem', color: '#475569', cursor: 'pointer', fontWeight: 600 }}
                       >
                         Mẫu 1: Tem Seal Nguyên Vẹn
                       </button>
                       <button
                         type="button"
                         onClick={() => setQcProofPhoto('https://images.unsplash.com/photo-1587202372775-e229f172b9d7?w=600&auto=format&fit=crop&q=80')}
-                        style={{ padding: '0.45rem 0.75rem', backgroundColor: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.72rem', color: '#475569', cursor: 'pointer', fontWeight: 600 }}
+                        style={{ padding: '0.45rem 0.75rem', backgroundColor: '#f1f5f9', border: '1px solid #e3e8ef', borderRadius: '6px', fontSize: '0.77rem', color: '#475569', cursor: 'pointer', fontWeight: 600 }}
                       >
                         Mẫu 2: Kiểm Tra Ngoại Quan
                       </button>
@@ -3112,7 +3112,7 @@ export default function QualityControl() {
                   value={rmaNotes}
                   onChange={e => setRmaNotes(e.target.value)}
                   placeholder="Ghi chú chi tiết kết quả test hoặc lý do từ chối..."
-                  style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem', boxSizing: 'border-box' }}
+                  style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #e3e8ef', fontSize: '0.82rem', boxSizing: 'border-box' }}
                 />
               </div>
 
@@ -3140,7 +3140,7 @@ export default function QualityControl() {
                     <button
                       type="button"
                       onClick={() => setSelectedRMA(null)}
-                      style={{ backgroundColor: '#ffffff', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.5rem 1rem', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
+                      style={{ backgroundColor: '#ffffff', color: '#475569', border: '1px solid #e3e8ef', borderRadius: '6px', padding: '0.5rem 1rem', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
                     >
                       Hủy Bỏ
                     </button>
@@ -3220,7 +3220,7 @@ export default function QualityControl() {
 
         return (
           <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.65)', backdropFilter: 'blur(6px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '1rem' }} onClick={() => setViewingLog(null)}>
-            <div style={{ width: '100%', maxWidth: '840px', maxHeight: '94vh', display: 'flex', flexDirection: 'column', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)', boxSizing: 'border-box', overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
+            <div style={{ width: '100%', maxWidth: '840px', maxHeight: '94vh', display: 'flex', flexDirection: 'column', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e3e8ef', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)', boxSizing: 'border-box', overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
               
               {/* MODAL HEADER TOOLBAR (CỐ ĐỊNH, KHÔNG IN) */}
               <div className="aetherpc-no-print" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem 1.25rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc', flexShrink: 0 }}>
@@ -3239,7 +3239,7 @@ export default function QualityControl() {
                   </button>
                   <button
                     onClick={() => setViewingLog(null)}
-                    style={{ background: '#ffffff', border: '1px solid #cbd5e1', color: '#64748b', cursor: 'pointer', padding: '0.35rem', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                    style={{ background: '#ffffff', border: '1px solid #e3e8ef', color: '#64748b', cursor: 'pointer', padding: '0.35rem', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                   >
                     <X size={16} />
                   </button>
@@ -3253,19 +3253,19 @@ export default function QualityControl() {
                   {/* Enterprise Certificate Header */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #0f172a', paddingBottom: '0.65rem', marginBottom: '0.85rem' }}>
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: '0.66rem', fontWeight: 800, color: '#2563eb', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#2563eb', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                         AETHER PC ENTERPRISE • HỆ THỐNG QUẢN TRỊ DOANH NGHIỆP ERP
                       </div>
                       <h2 style={{ fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', margin: '0.15rem 0 0.1rem', letterSpacing: '-0.3px' }}>
                         BIÊN BẢN NGHIỆM THU KỸ THUẬT & KIỂM ĐỊNH CHẤT LƯỢNG
                       </h2>
-                      <div style={{ fontSize: '0.74rem', color: '#64748b' }}>
+                      <div style={{ fontSize: '0.79rem', color: '#64748b' }}>
                         Số hiệu: <strong style={{ color: '#0f172a', fontFamily: 'monospace' }}>{viewingLog.id}</strong>
                         {' • '}Ngày lập: <strong style={{ color: '#0f172a' }}>{viewingLog.date}</strong>
                       </div>
                     </div>
                     <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', color: '#16a34a', padding: '0.2rem 0.6rem', borderRadius: '6px', fontSize: '0.68rem', fontWeight: 800 }}>
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', color: '#16a34a', padding: '0.2rem 0.6rem', borderRadius: '6px', fontSize: '0.74rem', fontWeight: 800 }}>
                         <CheckCircle2 size={13} />
                         CHỨNG TỪ ERP HỢP LỆ
                       </div>
@@ -3277,7 +3277,7 @@ export default function QualityControl() {
                     <tbody>
                       <tr>
                         <td style={{ width: '50%', verticalAlign: 'top', padding: '0.6rem 0.8rem', border: '1px solid #e2e8f0', borderRight: 'none', borderRadius: '8px 0 0 8px' }}>
-                          <div style={{ fontSize: '0.75rem', lineHeight: '1.55' }}>
+                          <div style={{ fontSize: '0.8rem', lineHeight: '1.55' }}>
                             <div style={{ marginBottom: '0.25rem' }}>
                               <span style={{ color: '#64748b' }}>Loại Nghiệm Thu: </span>
                               <strong style={{ color: viewingLog.type === 'CUSTOMER_RMA' ? '#8b5cf6' : '#2563eb' }}>
@@ -3294,7 +3294,7 @@ export default function QualityControl() {
                                 display: 'inline-block',
                                 padding: '2px 8px',
                                 borderRadius: '10px',
-                                fontSize: '0.72rem',
+                                fontSize: '0.77rem',
                                 fontWeight: 800,
                                 backgroundColor: isRejected ? '#fee2e2' : isPartial ? '#ffedd5' : '#dcfce7',
                                 color: isRejected ? '#dc2626' : isPartial ? '#c2410c' : '#15803d',
@@ -3306,7 +3306,7 @@ export default function QualityControl() {
                           </div>
                         </td>
                         <td style={{ width: '50%', verticalAlign: 'top', padding: '0.6rem 0.8rem', border: '1px solid #e2e8f0', borderRadius: '0 8px 8px 0' }}>
-                          <div style={{ fontSize: '0.75rem', lineHeight: '1.55' }}>
+                          <div style={{ fontSize: '0.8rem', lineHeight: '1.55' }}>
                             <div style={{ marginBottom: '0.25rem' }}>
                               <span style={{ color: '#64748b' }}>Đối Tượng Đối Tác: </span>
                               <strong style={{ color: '#0f172a' }}>{viewingLog.supplierName || viewingLog.customerName || 'N/A'}</strong>
@@ -3331,7 +3331,7 @@ export default function QualityControl() {
                       Chi Tiết Kết Quả Kiểm Định Từng Sản Phẩm:
                     </div>
 
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', overflow: 'hidden' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem', border: '1px solid #e3e8ef', borderRadius: '6px', overflow: 'hidden' }}>
                       <thead>
                         <tr style={{ backgroundColor: '#f1f5f9', borderBottom: '2px solid #cbd5e1', textAlign: 'left', color: '#475569' }}>
                           <th style={{ padding: '0.45rem 0.65rem' }}>Tên Sản Phẩm / Model</th>
@@ -3370,7 +3370,7 @@ export default function QualityControl() {
                                 <td style={{ padding: '0.5rem 0.65rem', fontWeight: 700, color: '#0f172a' }}>
                                   {itName}
                                   {(it.serialNumber || viewingLog.serialNumber) && (
-                                    <div style={{ fontSize: '0.68rem', color: '#64748b', fontFamily: 'monospace', marginTop: '1px' }}>
+                                    <div style={{ fontSize: '0.74rem', color: '#64748b', fontFamily: 'monospace', marginTop: '1px' }}>
                                       SN: {it.serialNumber || viewingLog.serialNumber}
                                     </div>
                                   )}
@@ -3385,7 +3385,7 @@ export default function QualityControl() {
                                   {failed}
                                 </td>
                                 <td style={{ padding: '0.5rem 0.65rem', textAlign: 'center' }}>
-                                  <span style={{ color: (failed > 0 || isRejected) ? '#dc2626' : '#15803d', fontWeight: 700, fontSize: '0.74rem' }}>
+                                  <span style={{ color: (failed > 0 || isRejected) ? '#dc2626' : '#15803d', fontWeight: 700, fontSize: '0.79rem' }}>
                                     {failed > 0
                                       ? `Phát hiện ${failed} SP lỗi / Không đạt`
                                       : (isRejected ? 'Hàng không đạt chuẩn kỹ thuật' : 'Seal nguyên vẹn & Đối soát Serial OK')}
@@ -3398,7 +3398,7 @@ export default function QualityControl() {
                           <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
                             <td style={{ padding: '0.5rem 0.65rem', fontWeight: 700, color: '#0f172a' }}>
                               {resolvedProductName}
-                              {viewingLog.serialNumber && <div style={{ fontSize: '0.68rem', color: '#64748b', fontFamily: 'monospace', marginTop: '1px' }}>SN: {viewingLog.serialNumber}</div>}
+                              {viewingLog.serialNumber && <div style={{ fontSize: '0.74rem', color: '#64748b', fontFamily: 'monospace', marginTop: '1px' }}>SN: {viewingLog.serialNumber}</div>}
                             </td>
                             <td style={{ padding: '0.5rem 0.5rem', textAlign: 'center', fontWeight: 700, color: '#0f172a' }}>
                               {viewingLog.totalQty || 1}
@@ -3410,7 +3410,7 @@ export default function QualityControl() {
                               {viewingLog.failedQty || 0}
                             </td>
                             <td style={{ padding: '0.5rem 0.65rem', textAlign: 'center' }}>
-                              <span style={{ color: (viewingLog.failedQty > 0 || isRejected) ? '#dc2626' : '#15803d', fontWeight: 700, fontSize: '0.74rem' }}>
+                              <span style={{ color: (viewingLog.failedQty > 0 || isRejected) ? '#dc2626' : '#15803d', fontWeight: 700, fontSize: '0.79rem' }}>
                                 {viewingLog.failedQty > 0
                                   ? `Phát hiện ${viewingLog.failedQty} SP lỗi / Không đạt`
                                   : (isRejected ? 'Hàng không đạt chuẩn kỹ thuật' : 'Seal nguyên vẹn & Đối soát Serial OK')}
@@ -3423,7 +3423,7 @@ export default function QualityControl() {
                   </div>
 
                   {/* Section 3: Criteria & Notes */}
-                  <div style={{ backgroundColor: '#ffffff', padding: '0.55rem 0.75rem', borderRadius: '6px', border: '1px solid #e2e8f0', marginBottom: '0.85rem', fontSize: '0.75rem' }}>
+                  <div style={{ backgroundColor: '#ffffff', padding: '0.55rem 0.75rem', borderRadius: '6px', border: '1px solid #e2e8f0', marginBottom: '0.85rem', fontSize: '0.8rem' }}>
                     <div style={{ fontWeight: 800, color: '#0f172a', marginBottom: '0.15rem' }}>
                       Ý Kiến Đánh Giá & Ghi Chú Của Kiểm Định Viên:
                     </div>
@@ -3438,8 +3438,8 @@ export default function QualityControl() {
                       <tr>
                         {/* CỘT 1: ĐẠI DIỆN GIAO HÀNG (NCC) */}
                         <td style={{ width: '33.33%', textAlign: 'center', verticalAlign: 'top', padding: '0.35rem 0.25rem 0' }}>
-                          <strong style={{ fontSize: '0.74rem', color: '#0f172a', display: 'block' }}>ĐẠI DIỆN GIAO HÀNG (NCC)</strong>
-                          <div style={{ fontSize: '0.64rem', color: '#94a3b8', marginTop: '0.1rem' }}>(Ký, ghi rõ họ tên)</div>
+                          <strong style={{ fontSize: '0.79rem', color: '#0f172a', display: 'block' }}>ĐẠI DIỆN GIAO HÀNG (NCC)</strong>
+                          <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '0.1rem' }}>(Ký, ghi rõ họ tên)</div>
                           <div style={{ minHeight: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0.2rem auto' }}>
                             <div style={{
                               border: '1.5px dashed #64748b',
@@ -3450,26 +3450,26 @@ export default function QualityControl() {
                               maxWidth: '160px',
                               boxSizing: 'border-box'
                             }}>
-                              <div style={{ fontSize: '0.64rem', fontWeight: 800, color: '#475569', letterSpacing: '0.2px' }}>
+                              <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', letterSpacing: '0.2px' }}>
                                 ✓ ĐÃ BÀN GIAO HÀNG
                               </div>
-                              <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#0f172a', marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#0f172a', marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                 {viewingLog.supplierName || 'Đại diện NCC'}
                               </div>
-                              <div style={{ fontSize: '0.6rem', color: '#64748b', marginTop: '1px' }}>
+                              <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '1px' }}>
                                 {viewingLog.date}
                               </div>
                             </div>
                           </div>
-                          <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#0f172a', marginTop: '2px' }}>
+                          <div style={{ fontSize: '0.79rem', fontWeight: 700, color: '#0f172a', marginTop: '2px' }}>
                             {viewingLog.supplierName || 'Đại diện NCC'}
                           </div>
                         </td>
 
                         {/* CỘT 2: KIỂM ĐỊNH VIÊN QA/QC */}
                         <td style={{ width: '33.33%', textAlign: 'center', verticalAlign: 'top', padding: '0.35rem 0.25rem 0' }}>
-                          <strong style={{ fontSize: '0.74rem', color: '#0f172a', display: 'block' }}>KIỂM ĐỊNH VIÊN QA/QC</strong>
-                          <div style={{ fontSize: '0.64rem', color: '#94a3b8', marginTop: '0.1rem' }}>(Ký, ghi rõ họ tên)</div>
+                          <strong style={{ fontSize: '0.79rem', color: '#0f172a', display: 'block' }}>KIỂM ĐỊNH VIÊN QA/QC</strong>
+                          <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '0.1rem' }}>(Ký, ghi rõ họ tên)</div>
                           <div style={{ minHeight: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0.2rem auto' }}>
                             <div style={{
                               border: isRejected ? '1.5px dashed #dc2626' : '1.5px dashed #2563eb',
@@ -3480,26 +3480,26 @@ export default function QualityControl() {
                               maxWidth: '160px',
                               boxSizing: 'border-box'
                             }}>
-                              <div style={{ fontSize: '0.64rem', fontWeight: 800, color: isRejected ? '#dc2626' : '#1d4ed8', letterSpacing: '0.2px' }}>
+                              <div style={{ fontSize: '0.72rem', fontWeight: 800, color: isRejected ? '#dc2626' : '#1d4ed8', letterSpacing: '0.2px' }}>
                                 {isRejected ? '✓ ĐÃ LẬP BIÊN BẢN LỖI' : '✓ ĐÃ KÝ SỐ (ĐẠT CHUẨN)'}
                               </div>
-                              <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#0f172a', marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#0f172a', marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                 {viewingLog.inspector || 'Kiểm Định Viên QA/QC'}
                               </div>
-                              <div style={{ fontSize: '0.6rem', color: '#64748b', marginTop: '1px' }}>
+                              <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '1px' }}>
                                 {viewingLog.date}
                               </div>
                             </div>
                           </div>
-                          <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#2563eb', marginTop: '2px' }}>
+                          <div style={{ fontSize: '0.79rem', fontWeight: 700, color: '#2563eb', marginTop: '2px' }}>
                             {viewingLog.inspector || 'Kiểm Định Viên QA/QC'}
                           </div>
                         </td>
 
                         {/* CỘT 3: THỦ KHO TIẾP NHẬN */}
                         <td style={{ width: '33.33%', textAlign: 'center', verticalAlign: 'top', padding: '0.35rem 0.25rem 0' }}>
-                          <strong style={{ fontSize: '0.74rem', color: '#0f172a', display: 'block' }}>THỦ KHO TIẾP NHẬN</strong>
-                          <div style={{ fontSize: '0.64rem', color: '#94a3b8', marginTop: '0.1rem' }}>(Ký, ghi rõ họ tên)</div>
+                          <strong style={{ fontSize: '0.79rem', color: '#0f172a', display: 'block' }}>THỦ KHO TIẾP NHẬN</strong>
+                          <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '0.1rem' }}>(Ký, ghi rõ họ tên)</div>
                           <div style={{ minHeight: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0.2rem auto' }}>
                             <div style={{
                               border: '1.5px dashed #059669',
@@ -3510,18 +3510,18 @@ export default function QualityControl() {
                               maxWidth: '160px',
                               boxSizing: 'border-box'
                             }}>
-                              <div style={{ fontSize: '0.64rem', fontWeight: 800, color: '#047857', letterSpacing: '0.2px' }}>
+                              <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#047857', letterSpacing: '0.2px' }}>
                                 ✓ ĐÃ TIẾP NHẬN KHO
                               </div>
-                              <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#0f172a', marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#0f172a', marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                 Thủ Kho AetherPC
                               </div>
-                              <div style={{ fontSize: '0.6rem', color: '#64748b', marginTop: '1px' }}>
+                              <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '1px' }}>
                                 {viewingLog.date}
                               </div>
                             </div>
                           </div>
-                          <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#0f172a', marginTop: '2px' }}>
+                          <div style={{ fontSize: '0.79rem', fontWeight: 700, color: '#0f172a', marginTop: '2px' }}>
                             Thủ Kho AetherPC
                           </div>
                         </td>
@@ -3530,7 +3530,7 @@ export default function QualityControl() {
                   </table>
 
                   {/* Dòng ghi chú chân trang biên bản điện tử */}
-                  <div style={{ marginTop: '0.8rem', borderTop: '1px solid #f1f5f9', paddingTop: '0.4rem', fontSize: '0.64rem', color: '#94a3b8', textAlign: 'center', fontStyle: 'italic' }}>
+                  <div style={{ marginTop: '0.8rem', borderTop: '1px solid #f1f5f9', paddingTop: '0.4rem', fontSize: '0.72rem', color: '#94a3b8', textAlign: 'center', fontStyle: 'italic' }}>
                     * Biên bản điện tử được trích xuất từ Hệ thống Quản trị ERP AetherPC, có giá trị đối soát kỹ thuật, bàn giao và quyết toán kho.
                   </div>
 
@@ -3548,7 +3548,7 @@ export default function QualityControl() {
                   </button>
                   <button
                     onClick={() => setViewingLog(null)}
-                    style={{ backgroundColor: '#ffffff', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.5rem 1.2rem', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
+                    style={{ backgroundColor: '#ffffff', color: '#475569', border: '1px solid #e3e8ef', borderRadius: '6px', padding: '0.5rem 1.2rem', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
                   >
                     Đóng
                   </button>
@@ -3565,7 +3565,7 @@ export default function QualityControl() {
       {/* ========================================================================= */}
       {detailRMA && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(6px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '1.5rem' }}>
-          <div data-print-doc style={{ width: '100%', maxWidth: '650px', maxHeight: '90vh', overflowY: 'auto', padding: '1.75rem', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
+          <div data-print-doc style={{ width: '100%', maxWidth: '650px', maxHeight: '90vh', overflowY: 'auto', padding: '1.75rem', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e3e8ef', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
             
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid #f1f5f9', paddingBottom: '0.75rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -3574,10 +3574,10 @@ export default function QualityControl() {
                   <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
                     Chi Tiết Phiếu Đổi Trả: {detailRMA.id}
                   </h3>
-                  <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Đơn hàng liên kết: <strong>#{detailRMA.orderId || 'N/A'}</strong></span>
+                  <span style={{ fontSize: '0.8rem', color: '#64748b' }}>Đơn hàng liên kết: <strong>#{detailRMA.orderId || 'N/A'}</strong></span>
                 </div>
               </div>
-              <button onClick={() => setDetailRMA(null)} style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#475569', cursor: 'pointer', padding: '0.4rem', borderRadius: '6px' }}>
+              <button onClick={() => setDetailRMA(null)} style={{ background: '#f1f5f9', border: '1px solid #e3e8ef', color: '#475569', cursor: 'pointer', padding: '0.4rem', borderRadius: '6px' }}>
                 <X size={18} />
               </button>
             </div>
@@ -3672,7 +3672,7 @@ export default function QualityControl() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.6rem', borderTop: '1px solid #f1f5f9', paddingTop: '1.25rem', marginTop: '1.25rem' }}>
               <button
                 onClick={(e) => printDocument(e.currentTarget.closest('[data-print-doc]'), { title: 'Phiếu kiểm định chất lượng' })}
-                style={{ backgroundColor: '#ffffff', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.5rem 0.85rem', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+                style={{ backgroundColor: '#ffffff', color: '#475569', border: '1px solid #e3e8ef', borderRadius: '6px', padding: '0.5rem 0.85rem', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
               >
                 <Printer size={15} /> In Phiếu
               </button>
@@ -3796,7 +3796,7 @@ export default function QualityControl() {
                   <span style={{ fontWeight: 800, color: '#ea580c', fontSize: '0.9rem' }}>
                     Đơn Hàng: #{selectedRestockOrder.orderId || selectedRestockOrder.id}
                   </span>
-                  <span style={{ backgroundColor: '#ffedd5', color: '#c2410c', padding: '2px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 800 }}>
+                  <span style={{ backgroundColor: '#ffedd5', color: '#c2410c', padding: '2px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 800 }}>
                     HÀNG BOM / HỦY GIAO HOÀN
                   </span>
                 </div>
@@ -3880,7 +3880,7 @@ export default function QualityControl() {
                     gap: '0.5rem',
                     padding: '0.65rem 0.85rem',
                     borderRadius: '6px',
-                    border: restockCondition === 'PERFECT_SEAL' ? '1.5px solid #16a34a' : '1px solid #cbd5e1',
+                    border: restockCondition === 'PERFECT_SEAL' ? '1.5px solid #16a34a' : '1px solid #e3e8ef',
                     backgroundColor: restockCondition === 'PERFECT_SEAL' ? '#f0fdf4' : '#ffffff',
                     cursor: 'pointer'
                   }}>
@@ -3894,7 +3894,7 @@ export default function QualityControl() {
                     />
                     <div>
                       <strong style={{ color: '#15803d', fontSize: '0.82rem' }}>ĐẠT CHUẨN 100% → NHẬP LẠI KHO BÁN MỚI</strong>
-                      <div style={{ fontSize: '0.74rem', color: '#4b5563' }}>Tem seal hoàn hảo. Tự động cộng lại số lượng vào Tồn Kho Bán Lẻ ERP ngay lập tức.</div>
+                      <div style={{ fontSize: '0.79rem', color: '#4b5563' }}>Tem seal hoàn hảo. Tự động cộng lại số lượng vào Tồn Kho Bán Lẻ ERP ngay lập tức.</div>
                     </div>
                   </label>
 
@@ -3904,7 +3904,7 @@ export default function QualityControl() {
                     gap: '0.5rem',
                     padding: '0.65rem 0.85rem',
                     borderRadius: '6px',
-                    border: restockCondition === 'DENTED_BOX_OUTLET' ? '1.5px solid #ea580c' : '1px solid #cbd5e1',
+                    border: restockCondition === 'DENTED_BOX_OUTLET' ? '1.5px solid #ea580c' : '1px solid #e3e8ef',
                     backgroundColor: restockCondition === 'DENTED_BOX_OUTLET' ? '#fff7ed' : '#ffffff',
                     cursor: 'pointer'
                   }}>
@@ -3918,7 +3918,7 @@ export default function QualityControl() {
                     />
                     <div>
                       <strong style={{ color: '#c2410c', fontSize: '0.82rem' }}>MÓP VỎ HỘP NHẸ → NHẬP KHO THANH LÝ / OPEN-BOX</strong>
-                      <div style={{ fontSize: '0.74rem', color: '#4b5563' }}>Linh kiện bên trong nguyên vẹn nhưng vỏ hộp trầy xước/móp nhẹ khi vận chuyển.</div>
+                      <div style={{ fontSize: '0.79rem', color: '#4b5563' }}>Linh kiện bên trong nguyên vẹn nhưng vỏ hộp trầy xước/móp nhẹ khi vận chuyển.</div>
                     </div>
                   </label>
 
@@ -3928,7 +3928,7 @@ export default function QualityControl() {
                     gap: '0.5rem',
                     padding: '0.65rem 0.85rem',
                     borderRadius: '6px',
-                    border: restockCondition === 'DAMAGED_CARRIER' ? '1.5px solid #dc2626' : '1px solid #cbd5e1',
+                    border: restockCondition === 'DAMAGED_CARRIER' ? '1.5px solid #dc2626' : '1px solid #e3e8ef',
                     backgroundColor: restockCondition === 'DAMAGED_CARRIER' ? '#fef2f2' : '#ffffff',
                     cursor: 'pointer'
                   }}>
@@ -3942,7 +3942,7 @@ export default function QualityControl() {
                     />
                     <div>
                       <strong style={{ color: '#b91c1c', fontSize: '0.82rem' }}>HƯ HỎNG / RÁCH SEAL DO VẬN CHUYỂN → LẬP BIÊN BẢN BỒI THƯỜNG</strong>
-                      <div style={{ fontSize: '0.74rem', color: '#4b5563' }}>Không nhập vào tồn bán mới. Chuyển vào Kho Chờ Xử Lý Bồi Thường với Đơn vị vận chuyển (Shipper/3PL).</div>
+                      <div style={{ fontSize: '0.79rem', color: '#4b5563' }}>Không nhập vào tồn bán mới. Chuyển vào Kho Chờ Xử Lý Bồi Thường với Đơn vị vận chuyển (Shipper/3PL).</div>
                     </div>
                   </label>
                 </div>
@@ -3957,7 +3957,7 @@ export default function QualityControl() {
                   value={restockNotes}
                   onChange={e => setRestockNotes(e.target.value)}
                   rows={2}
-                  style={{ width: '100%', padding: '0.55rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.8rem', boxSizing: 'border-box' }}
+                  style={{ width: '100%', padding: '0.55rem', borderRadius: '6px', border: '1px solid #e3e8ef', fontSize: '0.8rem', boxSizing: 'border-box' }}
                 />
               </div>
 
@@ -3966,7 +3966,7 @@ export default function QualityControl() {
                 <button
                   type="button"
                   onClick={() => setSelectedRestockOrder(null)}
-                  style={{ backgroundColor: '#ffffff', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.55rem 1rem', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}
+                  style={{ backgroundColor: '#ffffff', color: '#475569', border: '1px solid #e3e8ef', borderRadius: '6px', padding: '0.55rem 1rem', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}
                 >
                   Hủy Bỏ
                 </button>
@@ -4054,7 +4054,7 @@ export default function QualityControl() {
               <span style={{
                 padding: '3px 10px',
                 borderRadius: '6px',
-                fontSize: '0.72rem',
+                fontSize: '0.77rem',
                 fontWeight: 800,
                 backgroundColor: '#ffedd5',
                 color: '#c2410c',
@@ -4075,11 +4075,11 @@ export default function QualityControl() {
                 <div style={{ flex: 1, backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '0.65rem 0.85rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <strong style={{ fontSize: '0.82rem', color: '#0f172a' }}>Tạo Đơn Hàng Thành Công</strong>
-                    <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                    <span style={{ fontSize: '0.77rem', color: '#64748b' }}>
                       {selectedHistoryOrder.createdAt ? new Date(selectedHistoryOrder.createdAt).toLocaleDateString('vi-VN') : 'Hôm nay'}
                     </span>
                   </div>
-                  <div style={{ fontSize: '0.76rem', color: '#475569', marginTop: '2px' }}>
+                  <div style={{ fontSize: '0.8rem', color: '#475569', marginTop: '2px' }}>
                     Đơn hàng được ghi nhận vào hệ thống ERP. Hình thức: {selectedHistoryOrder.paymentMethod === 'VNPAY' ? 'Đã thanh toán Online' : 'Thu hộ COD khi nhận'}.
                   </div>
                 </div>
@@ -4093,11 +4093,11 @@ export default function QualityControl() {
                 <div style={{ flex: 1, backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '0.65rem 0.85rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <strong style={{ fontSize: '0.82rem', color: '#15803d' }}>Xuất Kho & Bàn Giao Shipper</strong>
-                    <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
+                    <span style={{ fontSize: '0.77rem', color: '#64748b' }}>
                       {selectedHistoryOrder.dispatchedAt ? new Date(selectedHistoryOrder.dispatchedAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : 'Đã xuất kho'}
                     </span>
                   </div>
-                  <div style={{ fontSize: '0.76rem', color: '#475569', marginTop: '2px' }}>
+                  <div style={{ fontSize: '0.8rem', color: '#475569', marginTop: '2px' }}>
                     Thủ kho đã đóng gói dán tem niêm phong và bàn giao cho Shipper đi giao trên tuyến đường.
                   </div>
                 </div>
@@ -4111,9 +4111,9 @@ export default function QualityControl() {
                 <div style={{ flex: 1, backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px', padding: '0.65rem 0.85rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <strong style={{ fontSize: '0.82rem', color: '#b91c1c' }}>Giao Không Thành Công / Báo Sự Cố</strong>
-                    <span style={{ fontSize: '0.72rem', color: '#991b1b', fontWeight: 700 }}>Báo Lỗi Vận Chuyển</span>
+                    <span style={{ fontSize: '0.77rem', color: '#991b1b', fontWeight: 700 }}>Báo Lỗi Vận Chuyển</span>
                   </div>
-                  <div style={{ fontSize: '0.76rem', color: '#7f1d1d', marginTop: '2px' }}>
+                  <div style={{ fontSize: '0.8rem', color: '#7f1d1d', marginTop: '2px' }}>
                     Lý do: <strong>{selectedHistoryOrder.failReason || selectedHistoryOrder.returnReason || 'Khách từ chối nhận hàng (Bom hàng / Đổi ý)'}</strong>
                     {selectedHistoryOrder.failNote ? ` • Ghi chú: "${selectedHistoryOrder.failNote}"` : ''}
                   </div>
@@ -4128,9 +4128,9 @@ export default function QualityControl() {
                 <div style={{ flex: 1, backgroundColor: '#fff7ed', border: '1px solid #fed7aa', borderRadius: '6px', padding: '0.65rem 0.85rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <strong style={{ fontSize: '0.82rem', color: '#c2410c' }}>Shipper Xác Nhận Chuyển Hoàn Về Kho</strong>
-                    <span style={{ fontSize: '0.72rem', color: '#9a3412', fontWeight: 700 }}>Đang Xử Lý</span>
+                    <span style={{ fontSize: '0.77rem', color: '#9a3412', fontWeight: 700 }}>Đang Xử Lý</span>
                   </div>
-                  <div style={{ fontSize: '0.76rem', color: '#9a3412', marginTop: '2px' }}>
+                  <div style={{ fontSize: '0.8rem', color: '#9a3412', marginTop: '2px' }}>
                     Shipper giữ kiện hàng mang về bàn giao lại cho Bộ phận Kiểm Định Chất Lượng (QC) & Thủ Kho.
                   </div>
                 </div>
@@ -4144,9 +4144,9 @@ export default function QualityControl() {
                 <div style={{ flex: 1, backgroundColor: '#f8fafc', border: '1px dashed #cbd5e1', borderRadius: '6px', padding: '0.65rem 0.85rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <strong style={{ fontSize: '0.82rem', color: '#475569' }}>QC Thẩm Định Tem Seal & Cập Nhật Tồn Kho</strong>
-                    <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 700 }}>Bước Kế Tiếp</span>
+                    <span style={{ fontSize: '0.77rem', color: '#64748b', fontWeight: 700 }}>Bước Kế Tiếp</span>
                   </div>
-                  <div style={{ fontSize: '0.76rem', color: '#64748b', marginTop: '2px' }}>
+                  <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '2px' }}>
                     Bấm <strong>[Thẩm Định Tem & Nhập Kho]</strong> để kiểm tra 4 tiêu chuẩn seal và hoàn trả số lượng linh kiện vào Tồn Kho ERP.
                   </div>
                 </div>

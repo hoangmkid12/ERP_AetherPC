@@ -137,7 +137,7 @@ export default function DateRangeFilter({
     <div style={{
       backgroundColor: '#ffffff',
       borderRadius: '8px',
-      border: '1px solid #cbd5e1',
+      border: '1px solid #e3e8ef',
       padding: compact ? '0.65rem 0.85rem' : '0.85rem 1rem',
       display: 'flex',
       alignItems: 'center',
@@ -162,7 +162,7 @@ export default function DateRangeFilter({
             style={{
               padding: '0.4rem 0.65rem',
               borderRadius: '6px',
-              border: '1px solid #cbd5e1',
+              border: '1px solid #e3e8ef',
               fontSize: '0.82rem',
               color: '#0f172a',
               outline: 'none',
@@ -178,7 +178,7 @@ export default function DateRangeFilter({
             style={{
               padding: '0.4rem 0.65rem',
               borderRadius: '6px',
-              border: '1px solid #cbd5e1',
+              border: '1px solid #e3e8ef',
               fontSize: '0.82rem',
               color: '#0f172a',
               outline: 'none',
@@ -201,7 +201,7 @@ export default function DateRangeFilter({
               border: '1px solid #fecaca',
               backgroundColor: '#fef2f2',
               color: '#dc2626',
-              fontSize: '0.75rem',
+              fontSize: '0.8rem',
               fontWeight: 700,
               cursor: 'pointer'
             }}
@@ -232,7 +232,7 @@ export default function DateRangeFilter({
               border: '1px solid #e2e8f0',
               backgroundColor: '#f8fafc',
               color: '#475569',
-              fontSize: '0.75rem',
+              fontSize: '0.8rem',
               fontWeight: 600,
               cursor: 'pointer',
               transition: 'all 0.15s ease'
