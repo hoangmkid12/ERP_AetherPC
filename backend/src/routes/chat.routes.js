@@ -1,7 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const { authMiddleware, optionalAuthMiddleware } = require('../middlewares/auth.middleware');
-const { handleChat, getCskhSessions, sendCskhCustomerMessage, sendCskhStaffMessage } = require('../controllers/chat.controller');
+const { handleChat, getCskhSessions, sendCskhCustomerMessage, sendCskhStaffMessage, uploadChatAttachment, getChatAttachment } = require('../controllers/chat.controller');
+const { uploadChatFile } = require('../middlewares/chatUpload.middleware');
 
 // @route   POST /api/v1/chat
 // optionalAuthMiddleware: chatbot vẫn trả lời được cho khách vãng lai chưa
@@ -17,5 +18,10 @@ router.get('/cskh/sessions', authMiddleware(['CSKH', 'SALES_MANAGER', 'CEO', 'AD
 // đang trực — cùng cơ chế 1 khách hàng vãng lai chủ động chat vào).
 router.post('/cskh/send', authMiddleware(['CUSTOMER', 'DELIVERY', 'CSKH', 'SALES_MANAGER', 'CEO', 'ADMIN']), sendCskhCustomerMessage);
 router.post('/cskh/reply', authMiddleware(['CSKH', 'SALES_MANAGER', 'CEO', 'ADMIN']), sendCskhStaffMessage);
+
+// Ảnh/video khách gửi trong chat CSKH (tối đa 10MB). Khách vãng lai chưa đăng nhập cũng gửi được,
+// nên không bắt buộc đăng nhập; quyền xem tệp kiểm tra theo phiên chat (xem getChatAttachment).
+router.post('/attachments', optionalAuthMiddleware, uploadChatFile, uploadChatAttachment);
+router.get('/attachments/:id', optionalAuthMiddleware, getChatAttachment);
 
 module.exports = router;

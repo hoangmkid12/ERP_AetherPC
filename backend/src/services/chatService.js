@@ -18,7 +18,8 @@ const formatMessage = (msg) => ({
   text: msg.text,
   time: msg.timestamp.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', timeZone: VN_TIMEZONE }),
   timestamp: msg.timestamp.toISOString(),
-  senderName: msg.senderName
+  senderName: msg.senderName,
+  attachment: msg.attachmentId ? { id: msg.attachmentId, type: msg.attachmentType, name: msg.attachmentName } : null
 });
 
 /**
@@ -198,9 +199,9 @@ const markSessionOnlineIfExists = async (sessionId) => {
  * @param {string} senderName 
  * @returns {Promise<Object>}
  */
-const addMessage = async (sessionId, sender, text, senderName = null) => {
+const addMessage = async (sessionId, sender, text, senderName = null, attachment = null) => {
   try {
-    if (!sessionId || !text) {
+    if (!sessionId || (!text && !attachment)) {
       throw new Error('Thiếu mã phiên chat hoặc nội dung tin nhắn.');
     }
 
@@ -230,9 +231,10 @@ const addMessage = async (sessionId, sender, text, senderName = null) => {
       data: {
         sessionId,
         sender,
-        text,
+        text: text || '',
         senderName,
-        timestamp: new Date()
+        timestamp: new Date(),
+        ...(attachment ? { attachmentId: attachment.id, attachmentType: attachment.type, attachmentName: attachment.name } : {})
       }
     });
 
@@ -293,6 +295,7 @@ const deleteSession = async (sessionId) => {
     await prisma.chatSession.delete({
       where: { sessionId }
     });
+    await prisma.chatAttachment.deleteMany({ where: { sessionId } });
   } catch (err) {
     console.error('[ChatService] Error deleting session:', err);
     throw err;

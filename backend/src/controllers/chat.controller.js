@@ -626,6 +626,7 @@ const handleChat = async (req, res, next) => {
 };
 
 const { getSessions, addCustomerMessage, addStaffMessage } = require('../services/websocketService');
+const { canUseSession, isStaffUser, isGuestSession } = require('../services/chatAccess');
 
 const getCskhSessions = async (req, res) => {
   try {
@@ -641,6 +642,9 @@ const sendCskhCustomerMessage = async (req, res) => {
   try {
     const { sessionId = 'session_default', text, customerName, time } = req.body;
     if (!text) return res.status(400).json({ success: false, message: 'Vui lòng nhập nội dung tin nhắn.' });
+    if (!canUseSession(req.user, sessionId)) {
+      return res.status(403).json({ success: false, message: 'Bạn không có quyền truy cập phiên chat này.' });
+    }
 
     const session = await addCustomerMessage({ sessionId, text, customerName, time });
     res.json({ success: true, session });
@@ -663,9 +667,77 @@ const sendCskhStaffMessage = async (req, res) => {
   }
 };
 
+// ─── Tệp đính kèm chat CSKH ───
+
+// POST /chat/attachments (multipart: file, sessionId) — khách gửi ảnh/video vào phiên chat của mình.
+const uploadChatAttachment = async (req, res) => {
+  try {
+    const sessionId = String(req.body.sessionId || '');
+    if (!canUseSession(req.user, sessionId)) {
+      return res.status(403).json({ success: false, message: 'Bạn không có quyền gửi tệp vào phiên chat này.' });
+    }
+    const att = await prisma.chatAttachment.create({
+      data: {
+        sessionId,
+        mimeType: req.file.mimetype,
+        fileName: String(req.file.originalname || 'tep').slice(0, 255),
+        size: req.file.size,
+        data: req.file.buffer
+      },
+      select: { id: true, mimeType: true, fileName: true, size: true }
+    });
+    res.status(201).json({ success: true, data: { ...att, type: req.file.kind } });
+  } catch (err) {
+    console.error('[Chat] Error uploading attachment:', err);
+    res.status(500).json({ success: false, message: 'Không tải được tệp lên, vui lòng thử lại.' });
+  }
+};
+
+// GET /chat/attachments/:id?s=<sessionId> — nhân viên CSKH xem mọi tệp; khách chỉ xem tệp thuộc phiên của mình:
+// khách đăng nhập/shipper xác thực bằng token; khách vãng lai chứng minh bằng mã phiên ngẫu nhiên gửi kèm (?s=).
+// Hỗ trợ Range để trình phát video tua được (Safari bắt buộc).
+const getChatAttachment = async (req, res) => {
+  try {
+    const att = await prisma.chatAttachment.findUnique({ where: { id: String(req.params.id) } });
+    const allowed = att && (isStaffUser(req.user)
+      || (isGuestSession(att.sessionId) ? req.query.s === att.sessionId : canUseSession(req.user, att.sessionId)));
+    if (!allowed) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy tệp.' });
+    }
+    const buf = Buffer.from(att.data);
+    res.setHeader('Content-Type', att.mimeType);
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Cache-Control', 'private, max-age=86400');
+    res.setHeader('Accept-Ranges', 'bytes');
+    res.setHeader('Content-Disposition', `inline; filename*=UTF-8''${encodeURIComponent(att.fileName)}`);
+    const m = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range || '');
+    if (m && (m[1] || m[2])) {
+      let start = m[1] ? parseInt(m[1], 10) : buf.length - parseInt(m[2], 10);
+      let end = m[1] && m[2] ? parseInt(m[2], 10) : buf.length - 1;
+      start = Math.max(0, start);
+      end = Math.min(end, buf.length - 1);
+      if (start > end) {
+        res.setHeader('Content-Range', `bytes */${buf.length}`);
+        return res.status(416).end();
+      }
+      res.status(206);
+      res.setHeader('Content-Range', `bytes ${start}-${end}/${buf.length}`);
+      res.setHeader('Content-Length', end - start + 1);
+      return res.end(buf.subarray(start, end + 1));
+    }
+    res.setHeader('Content-Length', buf.length);
+    res.end(buf);
+  } catch (err) {
+    console.error('[Chat] Error reading attachment:', err);
+    res.status(500).json({ success: false, message: 'Không đọc được tệp.' });
+  }
+};
+
 module.exports = { 
   handleChat,
   getCskhSessions,
   sendCskhCustomerMessage,
-  sendCskhStaffMessage
+  sendCskhStaffMessage,
+  uploadChatAttachment,
+  getChatAttachment
 };

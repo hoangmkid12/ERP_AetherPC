@@ -2,6 +2,7 @@ const WebSocket = require('ws');
 const jwt = require('jsonwebtoken');
 const { getAllSessions, createOrUpdateSession, markSessionOnlineIfExists, markRead, addMessage, closeSession, deleteSession } = require('./chatService');
 const prisma = require('../config/database');
+const { canUseSession, customerSessionId, migrateLegacyCustomerSession } = require('./chatAccess');
 
 let wss = null; // CSKH chat — path /ws/cskh
 let wssTracking = null; // Live GPS giao hàng — path /ws/tracking (tách riêng khỏi chat để 2 tính năng không đụng nhau)
@@ -221,6 +222,16 @@ const handleWSMessage = async (ws, data) => {
   if (!data || !data.type) return;
 
   const { type, payload } = data;
+  // Người dùng của kết nối (đã xác thực bằng cookie lúc connect) — dùng để kiểm tra quyền vào phiên chat,
+  // không tin mã phiên do trình duyệt tự khai.
+  const wsUser = ws._userId != null ? { id: ws._userId, role: ws._userRole } : null;
+  const forbidden = (sessionId) => {
+    if (ws._isStaff || canUseSession(wsUser, sessionId)) return false;
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: 'ERROR', code: 'SESSION_FORBIDDEN', message: 'Bạn không có quyền truy cập phiên chat này.' }));
+    }
+    return true;
+  };
   // Chỉ dùng khi client không tự gửi kèm `time` — luôn chỉ định rõ timeZone,
   // không phụ thuộc múi giờ mặc định của máy chủ (production thường chạy UTC).
   const time = payload?.time || new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Ho_Chi_Minh' });
@@ -228,7 +239,10 @@ const handleWSMessage = async (ws, data) => {
   try {
     if (type === 'CLIENT_IDENTIFY') {
       const { sessionId, customerName } = payload || {};
-      if (!sessionId) return;
+      if (!sessionId || forbidden(sessionId)) return;
+      if (wsUser && wsUser.role === 'CUSTOMER' && sessionId === customerSessionId(wsUser.id)) {
+        await migrateLegacyCustomerSession(wsUser.id, sessionId);
+      }
       ws._sessionId = sessionId;
       ws._customerName = customerName;
 
@@ -275,9 +289,18 @@ const handleWSMessage = async (ws, data) => {
       }
     }
     else if (type === 'CUSTOMER_SEND_MSG') {
-      const { sessionId, text, customerName } = payload || {};
-      if (!text || !sessionId) return;
+      const { sessionId, text, customerName, attachmentId } = payload || {};
+      if ((!text && !attachmentId) || !sessionId) return;
+      if (forbidden(sessionId)) return;
       ws._sessionId = sessionId;
+
+      // Tệp đính kèm phải đã được tải lên đúng phiên chat này (POST /chat/attachments).
+      let attachment = null;
+      if (attachmentId) {
+        const att = await prisma.chatAttachment.findUnique({ where: { id: String(attachmentId) }, select: { id: true, sessionId: true, mimeType: true, fileName: true } });
+        if (!att || att.sessionId !== sessionId) return;
+        attachment = { id: att.id, type: att.mimeType.startsWith('video/') ? 'video' : 'image', name: att.fileName };
+      }
       
       let name = customerName;
       if (!name || name.includes('undefined')) {
@@ -286,13 +309,16 @@ const handleWSMessage = async (ws, data) => {
 
       // Create session if needed, then add message
       await createOrUpdateSession(sessionId, name);
-      const session = await addMessage(sessionId, 'customer', text, name);
+      if (wsUser && wsUser.role === 'CUSTOMER') {
+        await prisma.chatSession.updateMany({ where: { sessionId, customerId: null }, data: { customerId: String(wsUser.id) } });
+      }
+      const session = await addMessage(sessionId, 'customer', text || '', name, attachment);
 
       // Broadcast to all connected clients
       broadcast({
         type: 'UPDATE_SESSIONS',
         sessions: [{ ...session, status: 'ONLINE', isOnline: true }],
-        newMsg: { sender: 'customer', text, time, sessionId: session.sessionId }
+        newMsg: { sender: 'customer', text: text || '', attachment, time, sessionId: session.sessionId }
       }, client => client._isStaff || client === ws || client._sessionId === session.sessionId);
     } 
     else if (type === 'STAFF_SEND_MSG') {
@@ -317,7 +343,7 @@ const handleWSMessage = async (ws, data) => {
       // suy ra thẳng từ ws._isStaff (đã xác thực lúc connect qua cookie JWT),
       // không tin theo payload để tránh 1 client tự khai man vai trò.
       const { sessionId } = payload || {};
-      if (!sessionId) return;
+      if (!sessionId || forbidden(sessionId)) return;
 
       const role = ws._isStaff ? 'staff' : 'customer';
       const readAt = await markRead(sessionId, role);

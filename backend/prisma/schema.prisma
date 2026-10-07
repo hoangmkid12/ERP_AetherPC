@@ -921,6 +921,23 @@ model Holiday {
 //   KHÓM MODEL CSKH & CHAT (Customer Service)
 // ============================================================================
 
+// Tệp ảnh/video gửi trong chat CSKH (tối đa 10MB). Lưu trong CSDL vì ổ đĩa của container
+// trên Railway không bền qua mỗi lần triển khai lại. Tải lên trước khi phiên chat có thể
+// chưa tồn tại (tin nhắn đầu tiên là ảnh) nên không ràng buộc khóa ngoại tới ChatSession;
+// deleteSession xóa kèm các tệp theo sessionId.
+model ChatAttachment {
+  id        String   @id @default(uuid())
+  sessionId String   @map("session_id") @db.VarChar(100)
+  mimeType  String   @map("mime_type") @db.VarChar(100)
+  fileName  String   @map("file_name") @db.VarChar(255)
+  size      Int
+  data      Bytes
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  @@index([sessionId])
+  @@map("chat_attachments")
+}
+
 model ChatSession {
   id            String   @id @default(uuid()) @map("id")
   sessionId     String   @unique @map("session_id") @db.VarChar(100)
@@ -952,7 +969,12 @@ model ChatMessage {
   text        String   @db.Text
   timestamp   DateTime @default(now()) @db.Timestamptz()
   senderName  String?  @map("sender_name") @db.VarChar(255)
-  
+  // Tệp ảnh/video khách gửi kèm (nội dung tệp nằm ở ChatAttachment, tin nhắn chỉ giữ mã để
+  // danh sách phiên phát qua WebSocket không phải mang theo dữ liệu tệp).
+  attachmentId   String? @map("attachment_id") @db.VarChar(64)
+  attachmentType String? @map("attachment_type") @db.VarChar(10) // image | video
+  attachmentName String? @map("attachment_name") @db.VarChar(255)
+
   session     ChatSession @relation(fields: [sessionId], references: [sessionId], onDelete: Cascade)
 
   @@index([sessionId])

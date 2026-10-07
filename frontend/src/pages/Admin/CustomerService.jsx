@@ -4,6 +4,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useSalesStore } from '../../stores';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../services/api';
+import ChatAttachment, { attachmentPreviewText } from '../../components/Chat/ChatAttachment';
 import { notify } from '../../context/NotificationContext';
 import { COMPLAINT_STATUS, RETURN_STATUS, getStatusLabel, getStatusInfo, formatRmaCode } from '../../utils/statusLabels';
 import {
@@ -859,7 +860,7 @@ export default function CustomerService() {
                     </div>
                     {s.phone && <span style={{ fontSize: '0.7rem', color: '#64748b', display: 'block' }}>{s.phone}</span>}
                     <p style={{ fontSize: '0.73rem', color: '#475569', margin: '0.25rem 0 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {s.messages[s.messages.length - 1]?.text || 'Bắt đầu cuộc trò chuyện...'}
+                      {attachmentPreviewText(s.messages[s.messages.length - 1]) || 'Bắt đầu cuộc trò chuyện...'}
                     </p>
                   </div>
                 );
@@ -926,7 +927,8 @@ export default function CustomerService() {
                       wordBreak: 'break-word',
                       whiteSpace: 'pre-wrap'
                     }}>
-                      {m.text}
+                      {m.attachment && <ChatAttachment attachment={m.attachment} />}
+                      {m.text && <div style={{ marginTop: m.attachment ? '0.4rem' : 0 }}>{m.text}</div>}
                     </div>
                     <span style={{ fontSize: '0.68rem', color: '#94a3b8', display: 'block', marginTop: '0.2rem', textAlign: isStaff ? 'right' : 'left' }}>
                       {m.time}

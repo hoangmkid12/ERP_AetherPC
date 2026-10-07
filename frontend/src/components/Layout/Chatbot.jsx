@@ -4,7 +4,8 @@ import { api } from '../../services/api';
 import { useCart } from '../../context/CartContext';
 import { useAuth } from '../../context/AuthContext';
 import { optimizePCBuild } from '../../config/pcBuilderAIKnowledge';
-import { MessageSquare, X, Send, Sparkles, ShoppingCart, ArrowRight, Headphones, UserCheck } from 'lucide-react';
+import { MessageSquare, X, Send, Sparkles, ShoppingCart, ArrowRight, Headphones, UserCheck, Paperclip, Loader2 } from 'lucide-react';
+import ChatAttachment, { CHAT_MAX_FILE_SIZE } from '../Chat/ChatAttachment';
 
 // ============================================================================
 //  TEXT RENDERING: Parse bold (**), bullet points (- / *), high contrast light mode
@@ -271,6 +272,16 @@ export default function Chatbot() {
   };
 
   const wsRef = useRef(null);
+  // Gửi ảnh/video trong chat CSKH: chỉ cảnh báo khi khách chọn tệp không hợp lệ hoặc quá dung lượng.
+  const fileInputRef = useRef(null);
+  const [uploadingFile, setUploadingFile] = useState(false);
+  const [fileWarning, setFileWarning] = useState('');
+  const fileWarningTimer = useRef(null);
+  const showFileWarning = (text) => {
+    setFileWarning(text);
+    clearTimeout(fileWarningTimer.current);
+    fileWarningTimer.current = setTimeout(() => setFileWarning(''), 5000);
+  };
   // Có nhân viên CSKH nào đang trực (đang mở kết nối /ws/cskh) hay không —
   // server báo qua STAFF_ONLINE_STATUS, cả lúc vừa identify lẫn khi có
   // staff vào/thoát trong lúc khung chat đang mở sẵn.
@@ -299,24 +310,27 @@ export default function Chatbot() {
       } catch (e) {}
     }
 
-    if (currentUser) {
-      const displayName = currentUser.fullname || currentUser.fullName || currentUser.name || currentUser.username || (currentUser.email ? currentUser.email.split('@')[0] : null);
-
-      if (displayName && String(displayName) !== 'undefined' && String(displayName).trim() !== '') {
-        const cleanUserSlug = String(displayName).toLowerCase().replace(/[^a-z0-9_]/g, '_');
-        sessId = `session_user_${cleanUserSlug}`;
-        custName = `${displayName} (Khách Hàng)`;
-        return { sessId, custName };
-      }
+    // Khách hàng đã đăng nhập: phiên gắn với mã khách hàng — máy chủ chỉ cho đúng tài khoản đó vào phiên
+    // (xác thực bằng token), nên không ai khác mở được hội thoại dù biết mã phiên.
+    const isCustomer = currentUser && (!currentUser.role || currentUser.role === 'CUSTOMER');
+    if (isCustomer && currentUser.id) {
+      const displayName = currentUser.fullname || currentUser.fullName || currentUser.name || currentUser.username || (currentUser.email ? currentUser.email.split('@')[0] : 'Khách Hàng');
+      sessId = `session_cust_${String(currentUser.id).toLowerCase().replace(/[^a-z0-9_]/g, '_')}`;
+      custName = `${displayName} (Khách Hàng)`;
+      return { sessId, custName };
     }
 
-    let storedGuestId = localStorage.getItem('aetherpc_cskh_guest_id');
-    if (!storedGuestId) {
-      storedGuestId = `session_guest_${Math.floor(1000 + Math.random() * 9000)}`;
-      localStorage.setItem('aetherpc_cskh_guest_id', storedGuestId);
+    // Khách vãng lai: mã phiên ngẫu nhiên 128 bit (không đoán được). Mã cũ dạng 4 chữ số được thay mới.
+    let storedGuestId = null;
+    try { storedGuestId = localStorage.getItem('aetherpc_cskh_guest_id'); } catch (e) {}
+    if (!/^session_guest_[a-f0-9]{32}$/.test(storedGuestId || '')) {
+      const bytes = new Uint8Array(16);
+      crypto.getRandomValues(bytes);
+      storedGuestId = `session_guest_${Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('')}`;
+      try { localStorage.setItem('aetherpc_cskh_guest_id', storedGuestId); } catch (e) {}
     }
     sessId = storedGuestId;
-    custName = `Khách Hàng Trực Tuyến (#${storedGuestId.replace('session_guest_', '')})`;
+    custName = `Khách Hàng Trực Tuyến (#${storedGuestId.slice(-4).toUpperCase()})`;
     return { sessId, custName };
   };
 
@@ -386,6 +400,7 @@ export default function Chatbot() {
                 const mapped = currentSession.messages.map(m => ({
                   sender: m.sender === 'staff' ? 'cskh' : 'user',
                   text: m.text,
+                  attachment: m.attachment || null,
                   time: m.time,
                   timestamp: m.timestamp
                 }));
@@ -453,6 +468,48 @@ export default function Chatbot() {
   }, [messages, cskhMessages, isTyping, chatMode]);
 
   // Handle user send message
+  const handleAttachFile = async (e) => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    if (!/^(image|video)\//.test(file.type)) {
+      showFileWarning('Chỉ gửi được tệp ảnh hoặc video.');
+      return;
+    }
+    if (file.size > CHAT_MAX_FILE_SIZE) {
+      showFileWarning(`Tệp "${file.name}" có dung lượng ${(file.size / 1024 / 1024).toFixed(1)}MB, vượt quá giới hạn 10MB. Vui lòng chọn tệp nhỏ hơn.`);
+      return;
+    }
+    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+      showFileWarning('Mất kết nối tới CSKH, vui lòng thử lại sau giây lát.');
+      return;
+    }
+    const { sessId, custName } = getCSKHSessionInfo();
+    setUploadingFile(true);
+    try {
+      const form = new FormData();
+      form.append('sessionId', sessId);
+      form.append('file', file);
+      const res = await fetch(`${import.meta.env.VITE_API_BASE_URL || '/api/v1'}/chat/attachments`, { method: 'POST', body: form, credentials: 'include' });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.data) {
+        showFileWarning(json.message || 'Không gửi được tệp, vui lòng thử lại.');
+        return;
+      }
+      const attachment = { id: json.data.id, type: json.data.type, name: json.data.fileName };
+      const time = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+      setCskhMessages(prev => [...prev, { sender: 'user', text: '', attachment, time, timestamp: new Date().toISOString() }]);
+      wsRef.current.send(JSON.stringify({
+        type: 'CUSTOMER_SEND_MSG',
+        payload: { sessionId: sessId, sender: 'customer', text: '', attachmentId: attachment.id, time, customerName: custName }
+      }));
+    } catch (err) {
+      showFileWarning('Không gửi được tệp, vui lòng kiểm tra kết nối mạng.');
+    } finally {
+      setUploadingFile(false);
+    }
+  };
+
   const handleSend = async (textToSend) => {
     const text = textToSend || input;
     if (!text.trim()) return;
@@ -885,7 +942,8 @@ export default function Chatbot() {
                   minWidth: 0,
                   boxSizing: 'border-box'
                 }}>
-                  {renderMessageText(msg.text, msg.sender === 'user')}
+                  {msg.attachment && <ChatAttachment attachment={msg.attachment} sessionId={getCSKHSessionInfo().sessId} />}
+                  {(msg.text || !msg.attachment) && renderMessageText(msg.text, msg.sender === 'user')}
 
                   {/* CUSTOM LAYOUTS */}
                   {msg.layout === 'quiz_usage' && (
@@ -1169,6 +1227,12 @@ export default function Chatbot() {
             ))}
           </div>
 
+          {fileWarning && chatMode === 'cskh' && (
+            <div role="alert" style={{ margin: '0 0.85rem 0.5rem', padding: '0.5rem 0.75rem', borderRadius: '10px', backgroundColor: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', fontSize: '0.78rem', fontWeight: 600, lineHeight: 1.4 }}>
+              {fileWarning}
+            </div>
+          )}
+
           {/* Footer Input */}
           <form
             onSubmit={(e) => { e.preventDefault(); handleSend(); }}
@@ -1181,6 +1245,20 @@ export default function Chatbot() {
               backgroundColor: '#ffffff'
             }}
           >
+            {chatMode === 'cskh' && (
+              <>
+                <input ref={fileInputRef} type="file" accept="image/*,video/*" onChange={handleAttachFile} style={{ display: 'none' }} />
+                <button
+                  type="button"
+                  aria-label="Đính kèm ảnh hoặc video"
+                  disabled={uploadingFile}
+                  onClick={() => fileInputRef.current && fileInputRef.current.click()}
+                  style={{ width: '38px', height: '38px', flexShrink: 0, borderRadius: '10px', backgroundColor: '#f1f5f9', border: '1.5px solid #cbd5e1', color: '#475569', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: uploadingFile ? 'wait' : 'pointer' }}
+                >
+                  {uploadingFile ? <Loader2 size={16} className="animate-spin" /> : <Paperclip size={16} />}
+                </button>
+              </>
+            )}
             <input
               type="text"
               placeholder={chatMode === 'cskh' ? "Nhắn tin trực tiếp với NV CSKH..." : "Nhập nội dung tin nhắn..."}
