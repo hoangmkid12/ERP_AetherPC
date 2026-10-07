@@ -1,4 +1,5 @@
 import React, { useState, useEffect, Suspense, lazy } from 'react';
+import './styles/storefront.css';
 import { BrowserRouter as Router, Routes, Route, Navigate, Outlet, useLocation, Link } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
@@ -59,9 +60,9 @@ const RouteLoadingFallback = () => (
 // 1. Layout for Storefront Customer Views
 const StorefrontLayout = () => {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+    <div className="sf-root">
       <Header />
-      <main style={{ flex: 1 }}>
+      <main className="sf-main">
         <Outlet />
       </main>
       <Footer />

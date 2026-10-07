@@ -8,42 +8,112 @@ import { getRoleName } from '../../utils/rbacEngine';
 import {
   ShoppingBag, Cpu, LogIn, LogOut, LayoutDashboard,
   ChevronDown, Tag, Newspaper, Building2, Users,
-  Wrench, Star, X, Menu, Package, Heart, Key, Award, Mail, HelpCircle, Bell, CheckCircle, AlertCircle, Info
+  Wrench, Star, X, Menu, Package, Heart, Key, Award, Mail, HelpCircle, Bell, CheckCircle, AlertCircle, Info,
+  Search, Phone, Zap, LayoutGrid, Truck, ShieldCheck, Gift, ClipboardList, User as UserIcon
 } from 'lucide-react';
+import CategoryMenu from '../Storefront/CategoryMenu';
+import useCatalog from '../Storefront/useCatalog';
+import { fmtVnd, PLACEHOLDER_IMG, SHOP } from '../Storefront/catalog';
 
+// Thanh điều hướng phụ dưới header (cũng dùng cho menu di động)
 const NAV_ITEMS = [
-  { label: 'Sản Phẩm', path: '/products' },
-  {
-    label: 'Khuyến Mãi',
-    path: '/promotions',
-    icon: <Tag size={15} />,
-    highlight: true,
-  },
-  {
-    label: 'Tự Build PC',
-    path: '/pc-builder',
-    icon: <Wrench size={15} />,
-  },
-  {
-    label: 'Tin Tức',
-    path: '/news',
-    icon: <Newspaper size={15} />,
-    dropdown: [
-      { label: 'Tất Cả Bài Viết', path: '/news', icon: <Newspaper size={14} /> },
-      { label: 'Review Sản Phẩm', path: '/news?cat=review', icon: <Star size={14} /> },
-      { label: 'Hướng Dẫn Build PC', path: '/news?cat=guide', icon: <Wrench size={14} /> },
-    ],
-  },
-  {
-    label: 'Về Chúng Tôi',
-    path: '/about',
-    icon: <Building2 size={15} />,
-    dropdown: [
-      { label: 'Giới Thiệu Công Ty', path: '/about', icon: <Building2 size={14} /> },
-      { label: 'Tuyển Dụng', path: '/careers', icon: <Users size={14} /> },
-    ],
-  },
+  { label: 'Khuyến Mãi', path: '/promotions', icon: <Tag size={15} />, highlight: true },
+  { label: 'Flash Sale', path: '/flash-sale', icon: <Zap size={15} />, highlight: true },
+  { label: 'Tất Cả Sản Phẩm', path: '/products', icon: <LayoutGrid size={15} /> },
+  { label: 'Tự Build PC', path: '/pc-builder', icon: <Wrench size={15} /> },
+  { label: 'Tin Công Nghệ', path: '/news', icon: <Newspaper size={15} /> },
+  { label: 'Hạng Thành Viên', path: '/member-tier', icon: <Award size={15} /> },
+  { label: 'Giới Thiệu', path: '/about', icon: <Building2 size={15} /> },
+  { label: 'Tuyển Dụng', path: '/careers', icon: <Users size={15} /> },
 ];
+
+// Ô tìm kiếm có gợi ý sản phẩm tức thì
+function normalizeText(t) {
+  return String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd');
+}
+
+function HeaderSearch() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { products } = useCatalog();
+  const [q, setQ] = useState('');
+  const [open, setOpen] = useState(false);
+  const [hi, setHi] = useState(-1);
+  const boxRef = useRef(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    setQ(location.pathname === '/products' ? (params.get('q') || '') : '');
+    setOpen(false);
+  }, [location.pathname, location.search]);
+
+  useEffect(() => {
+    const close = (e) => { if (boxRef.current && !boxRef.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, []);
+
+  const suggestions = React.useMemo(() => {
+    const words = normalizeText(q).split(/\s+/).filter(Boolean);
+    if (!words.length) return [];
+    const out = [];
+    for (const p of products) {
+      const hay = normalizeText(`${p.name} ${p.brand} ${p.sku}`);
+      if (words.every(w => hay.includes(w))) out.push(p);
+      if (out.length >= 6) break;
+    }
+    return out;
+  }, [q, products]);
+
+  const submit = (e) => {
+    e.preventDefault();
+    if (hi >= 0 && suggestions[hi]) {
+      navigate(`/product/${suggestions[hi].id}`);
+    } else {
+      navigate(q.trim() ? `/products?q=${encodeURIComponent(q.trim())}` : '/products');
+    }
+    setOpen(false);
+  };
+
+  return (
+    <div className="sf-search" ref={boxRef}>
+      <form onSubmit={submit} role="search">
+        <input
+          value={q}
+          onChange={e => { setQ(e.target.value); setOpen(true); setHi(-1); }}
+          onFocus={() => setOpen(true)}
+          onKeyDown={e => {
+            if (e.key === 'ArrowDown') { e.preventDefault(); setHi(h => Math.min(h + 1, suggestions.length - 1)); }
+            if (e.key === 'ArrowUp') { e.preventDefault(); setHi(h => Math.max(h - 1, -1)); }
+            if (e.key === 'Escape') setOpen(false);
+          }}
+          placeholder="Bạn cần tìm gì? VGA, CPU, màn hình..."
+          aria-label="Tìm kiếm sản phẩm"
+        />
+        <button type="submit" aria-label="Tìm kiếm"><Search size={20} /></button>
+      </form>
+      {open && q.trim() && (
+        <div className="sf-suggest">
+          {suggestions.length === 0 ? (
+            <div style={{ padding: '14px', fontSize: 13, color: '#6b7280' }}>Không tìm thấy sản phẩm phù hợp với "{q}"</div>
+          ) : suggestions.map((p, i) => (
+            <div key={p.id} className={`sf-suggest-item${i === hi ? ' is-active' : ''}`}
+              onMouseDown={e => { e.preventDefault(); navigate(`/product/${p.id}`); setOpen(false); }}>
+              <img src={p.image || PLACEHOLDER_IMG} alt="" />
+              <div style={{ minWidth: 0 }}>
+                <div className="n">{p.name}</div>
+                <div className="p">{fmtVnd(p.price)}</div>
+              </div>
+            </div>
+          ))}
+          <Link className="sf-suggest-all" to={`/products?q=${encodeURIComponent(q.trim())}`} onClick={() => setOpen(false)}>
+            Xem tất cả kết quả cho "{q.trim()}"
+          </Link>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function Header() {
   const { user, logout, isAuthenticated } = useAuth();
@@ -51,7 +121,7 @@ export default function Header() {
   const { notifications, unreadCount, markAsRead, markAllAsRead, removeNotification, clearAllNotifications } = useNotification();
   const navigate = useNavigate();
   const location = useLocation();
-  const [openDropdown, setOpenDropdown] = useState(null);
+  const [catOpen, setCatOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [wishlistOpen, setWishlistOpen] = useState(false);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
@@ -93,10 +163,12 @@ export default function Header() {
   };
 
   // Close dropdown on outside click
+  useEffect(() => { setCatOpen(false); }, [location.pathname, location.search]);
+
   useEffect(() => {
     const handleClick = (e) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
-        setOpenDropdown(null);
+        setCatOpen(false);
       }
       if (notificationRef.current && !notificationRef.current.contains(e.target)) {
         setNotificationOpen(false);
@@ -118,260 +190,66 @@ export default function Header() {
           to { opacity: 1; transform: translateY(0); }
         }
       `}</style>
-      {/* Announcement Bar */}
-      <div className="announcement-bar">
-        FLASH SALE — Giảm đến 30% linh kiện CPU &amp; VGA hôm nay!&nbsp;&nbsp;|&nbsp;&nbsp;
-        Miễn phí vận chuyển cho đơn từ 500.000₫&nbsp;&nbsp;|&nbsp;&nbsp;
-        Bảo hành chính hãng 24–36 tháng
+      {/* Thanh khuyến mãi */}
+      <div className="sf-topbar">
+        <div className="sf-container sf-topbar-inner">
+          <span><Zap size={14} /> <b>FLASH SALE</b> mỗi ngày — giá sốc linh kiện PC chính hãng</span>
+          <span><Truck size={14} /> <b>Miễn phí giao hàng</b> toàn quốc mọi đơn</span>
+          <span><ShieldCheck size={14} /> Bảo hành chính hãng 24–36 tháng</span>
+          <span><Phone size={14} /> Hotline <b>{SHOP.hotline}</b></span>
+        </div>
       </div>
 
-      <header style={{
-        position: 'sticky',
-        top: 0,
-        zIndex: 9999999,
-        background: 'rgba(255, 255, 255, 0.95)',
-        backdropFilter: 'blur(16px)',
-        WebkitBackdropFilter: 'blur(16px)',
-        borderBottom: '1px solid var(--border-glass)',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-        padding: '0.875rem 0',
-      }}>
-        <div className="container" style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          gap: '1rem',
-        }}>
-          {/* Logo */}
-          <Link to="/" style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            fontFamily: 'var(--font-title)',
-            fontSize: '1.4rem',
-            fontWeight: 800,
-            background: 'linear-gradient(135deg, var(--secondary), var(--primary))',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            flexShrink: 0,
-          }}>
-            <Cpu size={26} style={{ stroke: 'var(--secondary)', flexShrink: 0 }} />
-            <span>AetherPC</span>
+      <header className="sf-header">
+        <div className="sf-container sf-header-inner" style={{ position: 'relative' }} ref={dropdownRef}>
+          <Link to="/" className="sf-logo" aria-label="AetherPC - Trang chủ">
+            <span className="sf-logo-mark"><Cpu size={22} /></span>
+            <span className="t">AetherPC<small>PC &amp; GAMING GEAR</small></span>
           </Link>
 
-          {/* Desktop Navigation */}
-          <nav ref={dropdownRef} className="header-desktop-nav" style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.25rem',
-            flex: 1,
-            justifyContent: 'center',
-          }}>
-            {NAV_ITEMS.map((item) => {
-              const active = isActive(item.path, item.exact);
-              const hasDropdown = item.dropdown && item.dropdown.length > 0;
-              const isOpen = openDropdown === item.label;
+          <button type="button" className={`sf-cat-btn${catOpen ? ' is-open' : ''}`} onClick={() => setCatOpen(o => !o)} aria-expanded={catOpen}>
+            <Menu size={20} /><span>Danh mục</span>
+          </button>
+          {catOpen && (
+            <div className="sf-catmenu-pop">
+              <CategoryMenu onNavigate={() => setCatOpen(false)} />
+            </div>
+          )}
 
-              return (
-                <div key={item.label} style={{ position: 'relative' }}>
-                  {hasDropdown ? (
-                    <button
-                      onClick={() => setOpenDropdown(isOpen ? null : item.label)}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.35rem',
-                        padding: '0.5rem 0.875rem',
-                        borderRadius: 'var(--radius-md)',
-                        border: 'none',
-                        background: active ? 'rgba(99,102,241,0.12)' : 'transparent',
-                        color: active ? 'var(--primary)' : 'var(--text-secondary)',
-                        fontWeight: 500,
-                        fontSize: '0.875rem',
-                        cursor: 'pointer',
-                        transition: 'all var(--transition-fast)',
-                        fontFamily: 'var(--font-sans)',
-                        whiteSpace: 'nowrap',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.color = 'var(--text-primary)';
-                        e.currentTarget.style.background = 'rgba(255,255,255,0.04)';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.color = active ? 'var(--primary)' : 'var(--text-secondary)';
-                        e.currentTarget.style.background = active ? 'rgba(99,102,241,0.12)' : 'transparent';
-                      }}
-                    >
-                      {item.icon}
-                      {item.label}
-                      <ChevronDown size={13} style={{ transition: 'transform 0.2s', transform: isOpen ? 'rotate(180deg)' : 'none' }} />
-                    </button>
-                  ) : (
-                    <Link
-                      to={item.path}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.35rem',
-                        padding: '0.5rem 0.875rem',
-                        borderRadius: 'var(--radius-md)',
-                        background: active ? 'rgba(99,102,241,0.12)' : 'transparent',
-                        color: item.highlight
-                          ? 'var(--danger)'
-                          : active ? 'var(--primary)' : 'var(--text-secondary)',
-                        fontWeight: item.highlight ? 700 : 500,
-                        fontSize: '0.875rem',
-                        transition: 'all var(--transition-fast)',
-                        whiteSpace: 'nowrap',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background = 'rgba(255,255,255,0.04)';
-                        if (!item.highlight) e.currentTarget.style.color = 'var(--text-primary)';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = active ? 'rgba(99,102,241,0.12)' : 'transparent';
-                        e.currentTarget.style.color = item.highlight ? 'var(--danger)' : active ? 'var(--primary)' : 'var(--text-secondary)';
-                      }}
-                    >
-                      {item.icon}
-                      {item.label}
-                    </Link>
-                  )}
-
-                  {/* Dropdown menu */}
-                  {hasDropdown && isOpen && (
-                    <div className="nav-dropdown">
-                      {item.dropdown.map((sub) => (
-                        <Link
-                          key={sub.path}
-                          to={sub.path}
-                          className="nav-dropdown-item"
-                          onClick={() => setOpenDropdown(null)}
-                        >
-                          {sub.icon}
-                          {sub.label}
-                        </Link>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </nav>
+          <HeaderSearch />
 
           {/* Actions */}
-          <div className="header-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexShrink: 0 }}>
+          <div className="sf-hactions">
+            <a href={`tel:${SHOP.hotline.replace(/\s/g, '')}`} className="sf-hitem sf-hitem-opt">
+              <Phone size={22} />
+              <span className="sf-htext sf-htext-opt">Hotline<b>{SHOP.hotline}</b></span>
+            </a>
+            <Link to={isAuthenticated && user?.role === 'CUSTOMER' ? '/my-orders' : '/login'} className="sf-hitem sf-hitem-opt">
+              <ClipboardList size={22} />
+              <span className="sf-htext">Tra cứu<b>đơn hàng</b></span>
+            </Link>
             {/* Cart */}
-            <Link to="/cart" className="header-cart-link" style={{
-              position: 'relative',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.35rem',
-              height: '38px',
-              padding: '0 0.875rem',
-              borderRadius: 'var(--radius-md)',
-              backgroundColor: 'var(--bg-tertiary)',
-              border: '1px solid var(--border-glass)',
-              color: 'var(--text-secondary)',
-              fontSize: '0.8125rem',
-              fontWeight: 500,
-              transition: 'all var(--transition-fast)',
-              whiteSpace: 'nowrap',
-              boxSizing: 'border-box'
-            }}
-              onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.color = 'var(--text-primary)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border-glass)'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
-            >
-              <ShoppingBag size={15} />
-              <span className="header-cart-text">Giỏ Hàng</span>
-              {cartCount > 0 && (
-                <span style={{
-                  position: 'absolute',
-                  top: '-6px',
-                  right: '-6px',
-                  backgroundColor: 'var(--danger)',
-                  color: 'white',
-                  fontSize: '0.7rem',
-                  fontWeight: 'bold',
-                  borderRadius: '50%',
-                  padding: '2px 5px',
-                  minWidth: '18px',
-                  textAlign: 'center',
-                  lineHeight: '1.2',
-                }}>
-                  {cartCount}
-                </span>
-              )}
+            <Link to="/cart" className="sf-hitem">
+              <ShoppingBag size={22} />
+              {cartCount > 0 && <span className="sf-badge-count">{cartCount > 99 ? '99+' : cartCount}</span>}
+              <span className="sf-htext">Giỏ<b>hàng</b></span>
             </Link>
 
             {/* Wishlist Trigger Button */}
-            <button className="desktop-only" onClick={() => setWishlistOpen(true)} style={{
-              position: 'relative',
-              alignItems: 'center',
-              gap: '0.35rem',
-              height: '38px',
-              padding: '0 0.875rem',
-              borderRadius: 'var(--radius-md)',
-              backgroundColor: 'var(--bg-tertiary)',
-              border: '1px solid var(--border-glass)',
-              color: 'var(--text-secondary)',
-              fontSize: '0.8125rem',
-              fontWeight: 500,
-              cursor: 'pointer',
-              transition: 'all var(--transition-fast)',
-              whiteSpace: 'nowrap',
-              fontFamily: 'var(--font-sans)',
-              boxSizing: 'border-box'
-            }}
-              onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.color = 'var(--text-primary)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border-glass)'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
-            >
-              <Heart size={15} style={{ color: wishlist && wishlist.length > 0 ? 'var(--danger)' : 'inherit', fill: wishlist && wishlist.length > 0 ? 'var(--danger)' : 'none' }} />
-              <span>Yêu Thích</span>
-              {wishlist && wishlist.length > 0 && (
-                <span style={{
-                  position: 'absolute',
-                  top: '-6px',
-                  right: '-6px',
-                  backgroundColor: 'var(--danger)',
-                  color: 'white',
-                  fontSize: '0.7rem',
-                  fontWeight: 'bold',
-                  borderRadius: '50%',
-                  padding: '2px 5px',
-                  minWidth: '18px',
-                  textAlign: 'center',
-                  lineHeight: '1.2',
-                }}>
-                  {wishlist.length}
-                </span>
-              )}
+            <button type="button" className="sf-hitem sf-hitem-opt" onClick={() => setWishlistOpen(true)} title="Sản phẩm yêu thích">
+              <Heart size={22} />
+              {wishlist && wishlist.length > 0 && <span className="sf-badge-count">{wishlist.length}</span>}
             </button>
 
             {/* Notification Bell — Chỉ hiển thị khi đã đăng nhập */}
             {isAuthenticated && (
               <div style={{ position: 'relative' }} ref={notificationRef}>
-                <button style={{
-                  position: 'relative',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  width: '38px',
-                  height: '38px',
-                  borderRadius: 'var(--radius-md)',
-                  backgroundColor: 'var(--bg-tertiary)',
-                  border: '1px solid var(--border-glass)',
-                  color: 'var(--text-secondary)',
-                  cursor: 'pointer',
-                  transition: 'all var(--transition-fast)',
-                }}
+                <button type="button" className="sf-hitem" title="Thông báo"
                   onClick={() => setNotificationOpen(!notificationOpen)}
-                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.color = 'var(--text-primary)'; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border-glass)'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
                 >
-                  <Bell size={18} />
+                  <Bell size={22} />
                   {unreadCount > 0 && (
-                    <span style={{
+                    <span className="sf-badge-count" style={{
                       position: 'absolute',
                       top: '-4px',
                       right: '-4px',
@@ -517,44 +395,24 @@ export default function Header() {
                 onMouseEnter={() => setUserDropdownOpen(true)}
                 onMouseLeave={() => setUserDropdownOpen(false)}
               >
-                <button style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  height: '38px',
-                  padding: '0 0.875rem',
-                  borderRadius: 'var(--radius-md)',
-                  backgroundColor: 'var(--bg-tertiary)',
-                  border: '1px solid var(--border-glass)',
-                  color: 'var(--text-secondary)',
-                  fontSize: '0.8125rem',
-                  fontWeight: 500,
-                  cursor: 'pointer',
-                  transition: 'all var(--transition-fast)',
-                  fontFamily: 'var(--font-sans)',
-                  boxSizing: 'border-box'
-                }}
-                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.color = 'var(--text-primary)'; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border-glass)'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
-                >
+                <button type="button" className="sf-hitem">
                   <div style={{
-                    width: '18px',
-                    height: '18px',
+                    width: '30px',
+                    height: '30px',
                     borderRadius: '50%',
-                    backgroundColor: 'rgba(99, 102, 241, 0.2)',
-                    color: 'var(--primary)',
+                    backgroundColor: '#fff',
+                    color: 'var(--sf-primary)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    fontWeight: 'bold',
-                    fontSize: '0.7rem',
+                    fontWeight: 800,
+                    fontSize: '0.85rem',
                     textTransform: 'uppercase',
                     flexShrink: 0
                   }}>
                     {(user.fullname || user.name || 'K').charAt(0)}
                   </div>
-                  <span className="header-user-name-span" style={{ 
-                    maxWidth: '120px', 
+                  <span className="header-user-name-span sf-htext" style={{ fontWeight: 700, fontSize: '13px', maxWidth: '110px', 
                     overflow: 'hidden', 
                     textOverflow: 'ellipsis', 
                     whiteSpace: 'nowrap',
@@ -873,35 +731,36 @@ export default function Header() {
                 )}
               </div>
             ) : (
-              <Link to="/login" className="btn btn-primary" style={{ padding: '0.5rem 1.125rem', fontSize: '0.875rem' }}>
-                <LogIn size={15} />
-                Đăng Nhập
+              <Link to="/login" className="sf-hitem sf-hitem-login">
+                <UserIcon size={22} />
+                <span className="sf-htext">Đăng nhập<b>Đăng ký</b></span>
               </Link>
             )}
 
             {/* Mobile Hamburger Menu Toggle Button */}
             <button
-              className="header-mobile-toggle"
+              type="button"
+              className="sf-hitem sf-burger"
               onClick={() => setMobileMenuOpen(true)}
               aria-label="Mở Menu Điều Hướng"
-              style={{
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: '38px',
-                height: '38px',
-                borderRadius: 'var(--radius-md)',
-                backgroundColor: 'var(--bg-tertiary)',
-                border: '1px solid var(--border-glass)',
-                color: 'var(--text-primary)',
-                cursor: 'pointer',
-                flexShrink: 0,
-              }}
             >
               <Menu size={20} />
             </button>
           </div>
         </div>
       </header>
+
+      <nav className="sf-subnav" aria-label="Điều hướng nhanh">
+        <div className="sf-container sf-subnav-inner">
+          {NAV_ITEMS.map(item => (
+            <Link key={item.path} to={item.path}
+              className={`${isActive(item.path) ? 'is-active' : ''}${item.highlight ? ' is-hot' : ''}`}>
+              {item.icon}{item.label}
+            </Link>
+          ))}
+          <span className="sf-subnav-note"><Gift size={14} /> Tích điểm mọi đơn hàng</span>
+        </div>
+      </nav>
 
       {/* Wishlist side-drawer */}
       {wishlistOpen && (

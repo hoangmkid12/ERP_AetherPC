@@ -499,7 +499,7 @@ export default function MemberTier() {
                   <td><strong>Phí vận chuyển</strong></td>
                   {Object.entries(TIER_CONFIGS).map(([key, config]) => (
                     <td key={key} style={{ textAlign: 'center', fontSize: '0.8125rem', background: key === currentTierKey ? 'rgba(255,255,255,0.02)' : 'none' }}>
-                      {key === 'BRONZE' ? 'Mặc định' : key === 'SILVER' ? 'Free đơn từ 1M' : 'Miễn phí 100%'}
+                      {'Miễn phí toàn quốc'}
                     </td>
                   ))}
                 </tr>

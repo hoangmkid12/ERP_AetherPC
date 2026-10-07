@@ -1,6 +1,6 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
-import { ArrowRight, Users, Target, Heart, Zap, User, Compass } from 'lucide-react';
+import React, { useEffect } from 'react';
+import { Link, useLocation } from 'react-router-dom';
+import { ArrowRight, Users, Target, Heart, Zap, User, Compass, ShieldCheck, RotateCcw, Truck, CreditCard } from 'lucide-react';
 import BrandLogo from '../../components/BrandLogo';
 
 const TEAM = [
@@ -30,7 +30,38 @@ const TIMELINE = [
 
 const PARTNERS = ['Intel', 'AMD', 'NVIDIA', 'ASUS', 'MSI', 'Gigabyte', 'Corsair', 'Kingston', 'Samsung', 'Seagate', 'NZXT', 'Deepcool'];
 
+// Chính sách mô tả đúng cách hệ thống đang vận hành (giỏ hàng, đổi trả, giao hàng)
+const POLICIES = [
+  { id: 'bao-hanh', icon: ShieldCheck, title: 'Chính sách bảo hành', items: [
+    'Sản phẩm được bảo hành chính hãng theo thời hạn ghi trên trang chi tiết (phổ biến 24–36 tháng).',
+    'Mỗi linh kiện được ghi nhận số Serial khi xuất kho, dùng để tra cứu và tiếp nhận bảo hành.',
+    'Máy lắp ráp tại AetherPC được kiểm tra BIOS/POST, cài hệ điều hành, chạy kiểm tra tải nặng và niêm phong trước khi giao.',
+  ] },
+  { id: 'doi-tra', icon: RotateCcw, title: 'Chính sách đổi trả', items: [
+    'Gửi yêu cầu đổi trả cho đơn hàng đã giao ngay trong mục "Đơn hàng của tôi", kèm lý do và hình ảnh.',
+    'Bộ phận chăm sóc khách hàng xem xét yêu cầu, sau đó bộ phận kiểm định thẩm định sản phẩm hoàn trả.',
+    'Sản phẩm đạt điều kiện được đổi mới hoặc hoàn tiền theo hình thức khách hàng đã chọn.',
+  ] },
+  { id: 'giao-hang', icon: Truck, title: 'Chính sách giao hàng', items: [
+    'Miễn phí giao hàng toàn quốc cho mọi đơn hàng.',
+    'Đơn hàng được đội giao hàng của AetherPC phân công và giao tận nơi; ảnh xác nhận được lưu khi giao thành công.',
+    'Theo dõi trạng thái đơn và vị trí người giao hàng trực tuyến trong mục "Đơn hàng của tôi".',
+  ] },
+  { id: 'thanh-toan', icon: CreditCard, title: 'Hướng dẫn thanh toán', items: [
+    'Tiền mặt khi nhận hàng (COD).',
+    'Chuyển khoản qua mã VietQR hiển thị ở bước thanh toán; đơn được xác nhận sau khi nhận được tiền.',
+    'Nhập mã giảm giá ở bước thanh toán; giảm giá theo hạng thành viên được áp dụng tự động.',
+  ] },
+];
+
 export default function About() {
+  const { hash } = useLocation();
+  useEffect(() => {
+    if (!hash) return;
+    const el = document.getElementById(hash.slice(1));
+    if (el) setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+  }, [hash]);
+
   return (
     <div style={{ paddingBottom: '4rem' }}>
       {/* Hero */}
@@ -59,7 +90,7 @@ export default function About() {
               AetherPC là hệ thống cửa hàng linh kiện máy tính chính hãng, được tin tưởng bởi hơn 50.000 khách hàng trên toàn quốc.
             </p>
             <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-              <Link to="/" className="btn btn-primary" style={{ padding: '0.75rem 1.75rem' }}>
+              <Link to="/products" className="btn btn-primary" style={{ padding: '0.75rem 1.75rem' }}>
                 Xem Sản Phẩm <ArrowRight size={15} />
               </Link>
               <Link to="/careers" className="btn btn-secondary" style={{ padding: '0.75rem 1.75rem' }}>
@@ -213,6 +244,25 @@ export default function About() {
               </div>
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* Chính sách */}
+      <section id="chinh-sach" className="container" style={{ marginBottom: '3rem', scrollMarginTop: '90px' }}>
+        <h2 style={{ fontSize: '1.75rem', fontWeight: 800, marginBottom: '1.25rem', textAlign: 'center' }}>
+          Chính Sách <span className="gradient-text">Mua Hàng</span>
+        </h2>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
+          {POLICIES.map(p => (
+            <div key={p.id} id={p.id} className="sf-box" style={{ padding: '1.25rem 1.4rem', scrollMarginTop: '90px' }}>
+              <h3 style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '1.05rem', fontWeight: 800, margin: '0 0 0.75rem' }}>
+                <p.icon size={20} color="var(--sf-primary)" /> {p.title}
+              </h3>
+              <ul style={{ margin: 0, paddingLeft: '1.1rem', display: 'flex', flexDirection: 'column', gap: 6, fontSize: '0.9rem', color: 'var(--text-secondary)', lineHeight: 1.55 }}>
+                {p.items.map(t => <li key={t}>{t}</li>)}
+              </ul>
+            </div>
+          ))}
         </div>
       </section>
 
