@@ -30,7 +30,7 @@ const renderMessageText = (text, isUserMessage = false) => {
     if (isBullet) {
       return (
         <div key={lineIdx} style={{ display: 'flex', gap: '0.4rem', marginLeft: '0.5rem', marginBottom: '0.25rem' }}>
-          <span style={{ color: isUserMessage ? '#bfdbfe' : '#2563eb', flexShrink: 0, fontWeight: 800 }}>•</span>
+          <span style={{ color: isUserMessage ? '#fecaca' : '#dc2626', flexShrink: 0, fontWeight: 800 }}>•</span>
           <span style={{ flex: 1, minWidth: 0, color: isUserMessage ? '#ffffff' : '#0f172a' }}>{renderedLine}</span>
         </div>
       );
@@ -782,14 +782,14 @@ export default function Chatbot() {
             width: '62px',
             height: '62px',
             borderRadius: '50%',
-            background: 'linear-gradient(135deg, #2563eb, #3b82f6)',
+            background: 'linear-gradient(135deg, #ef4444, #dc2626)',
             border: 'none',
             color: '#ffffff',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             cursor: 'pointer',
-            boxShadow: '0 8px 25px rgba(37, 99, 235, 0.4)',
+            boxShadow: '0 8px 25px rgba(220, 38, 38, 0.4)',
             transition: 'transform 0.2s',
           }}
           onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.08)'}
@@ -816,7 +816,7 @@ export default function Chatbot() {
           {/* Header with Mode Switching (AI / CSKH) */}
           <div style={{
             padding: '0.85rem 1rem',
-            background: 'linear-gradient(135deg, #2563eb, #1d4ed8)',
+            background: 'linear-gradient(135deg, #ef4444, #dc2626)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
@@ -833,17 +833,17 @@ export default function Chatbot() {
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  color: '#2563eb'
+                  color: '#dc2626'
                 }}>
                   {chatMode === 'ai' ? <Sparkles size={20} /> : <Headphones size={20} />}
                 </div>
-                <div style={{ width: '10px', height: '10px', background: (chatMode === 'ai' || staffOnline) ? '#22c55e' : '#94a3b8', borderRadius: '50%', border: '2px solid #2563eb', position: 'absolute', bottom: 0, right: 0, transition: 'background-color 0.2s' }} />
+                <div style={{ width: '10px', height: '10px', background: (chatMode === 'ai' || staffOnline) ? '#22c55e' : '#94a3b8', borderRadius: '50%', border: '2px solid #dc2626', position: 'absolute', bottom: 0, right: 0, transition: 'background-color 0.2s' }} />
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <h4 style={{ fontSize: '0.92rem', fontWeight: 800, margin: 0, color: '#ffffff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {chatMode === 'ai' ? 'Trợ lý AI AetherPC' : 'CSKH AetherPC'}
                 </h4>
-                <div style={{ fontSize: '0.72rem', color: '#dbeafe', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                <div style={{ fontSize: '0.72rem', color: '#fee2e2', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {chatMode === 'ai' ? 'Hỗ trợ tự động 24/7' : (staffOnline ? 'Đã kết nối' : 'Đang đợi kết nối')}
                 </div>
               </div>
@@ -858,7 +858,7 @@ export default function Chatbot() {
                     padding: '0.25rem 0.65rem', borderRadius: '14px', border: 'none',
                     fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer',
                     backgroundColor: chatMode === 'ai' ? '#ffffff' : 'transparent',
-                    color: chatMode === 'ai' ? '#2563eb' : '#ffffff',
+                    color: chatMode === 'ai' ? '#dc2626' : '#ffffff',
                     transition: 'all 0.15s'
                   }}
                 >
@@ -870,7 +870,7 @@ export default function Chatbot() {
                     padding: '0.25rem 0.65rem', borderRadius: '14px', border: 'none',
                     fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer',
                     backgroundColor: chatMode === 'cskh' ? '#ffffff' : 'transparent',
-                    color: chatMode === 'cskh' ? '#2563eb' : '#ffffff',
+                    color: chatMode === 'cskh' ? '#dc2626' : '#ffffff',
                     transition: 'all 0.15s'
                   }}
                 >
@@ -931,9 +931,9 @@ export default function Chatbot() {
                 <div style={{
                   padding: '0.75rem 1rem',
                   borderRadius: msg.sender === 'user' ? '14px 14px 2px 14px' : '14px 14px 14px 2px',
-                  background: msg.sender === 'user' ? 'linear-gradient(135deg, #2563eb, #1d4ed8)' : '#ffffff',
+                  background: msg.sender === 'user' ? 'linear-gradient(135deg, #ef4444, #dc2626)' : '#ffffff',
                   border: msg.sender === 'user' ? 'none' : '1.5px solid #e2e8f0',
-                  boxShadow: msg.sender === 'user' ? '0 4px 12px rgba(37,99,235,0.2)' : '0 2px 8px rgba(0,0,0,0.04)',
+                  boxShadow: msg.sender === 'user' ? '0 4px 12px rgba(220,38,38,0.2)' : '0 2px 8px rgba(0,0,0,0.04)',
                   color: msg.sender === 'user' ? '#ffffff' : '#0f172a',
                   fontSize: '0.85rem',
                   lineHeight: '1.5',
@@ -1213,9 +1213,9 @@ export default function Chatbot() {
                   padding: '0.35rem 0.75rem',
                   fontSize: '0.73rem',
                   borderRadius: '20px',
-                  border: '1.5px solid #bfdbfe',
-                  backgroundColor: '#eff6ff',
-                  color: '#2563eb',
+                  border: '1.5px solid #fecaca',
+                  backgroundColor: '#fef2f2',
+                  color: '#dc2626',
                   fontWeight: 700,
                   cursor: 'pointer',
                   flexShrink: 0,
@@ -1282,13 +1282,14 @@ export default function Chatbot() {
                 width: '38px',
                 height: '38px',
                 borderRadius: '10px',
-                backgroundColor: '#2563eb',
+                backgroundColor: '#dc2626',
                 border: 'none',
                 color: '#ffffff',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                cursor: 'pointer'
+                cursor: 'pointer',
+                transition: 'background-color 0.2s'
               }}
             >
               <Send size={16} />

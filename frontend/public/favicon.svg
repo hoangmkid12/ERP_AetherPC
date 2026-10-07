@@ -1,16 +1,55 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
   <defs>
-    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#3b82f6"/>
-      <stop offset="100%" stop-color="#1d4ed8"/>
+    <!-- Modern Tech Crimson/Ruby Red Gradient Background -->
+    <linearGradient id="aether-bg-red" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ef4444" />
+      <stop offset="45%" stop-color="#dc2626" />
+      <stop offset="100%" stop-color="#991b1b" />
     </linearGradient>
+
+    <!-- Glowing Accent Gradient for PC Core (Neon Gold/Amber Glow) -->
+    <linearGradient id="core-glow-red" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fef08a" />
+      <stop offset="100%" stop-color="#f59e0b" />
+    </linearGradient>
+
+    <filter id="shadow-red" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#450a0a" flood-opacity="0.35"/>
+    </filter>
   </defs>
-  <!-- Blue rounded square background -->
-  <rect width="32" height="32" rx="7" fill="url(#bg)"/>
-  <!-- ShieldAlert icon (lucide), scaled to 20x20, centered in 32x32 -->
-  <g transform="translate(6,5) scale(0.833)" stroke="white" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M12 22s8-4 8-10V7l-8-2-8 2v5c0 6 8 10 8 10z"/>
-    <line x1="12" y1="8" x2="12" y2="12"/>
-    <circle cx="12" cy="16" r="0.6" fill="white" stroke="none"/>
-  </g>
+
+  <!-- Squircle App Icon Container -->
+  <rect width="48" height="48" rx="12" fill="url(#aether-bg-red)" filter="url(#shadow-red)"/>
+
+  <!-- Subtle Corner Circuit Accents -->
+  <circle cx="10" cy="10" r="1.5" fill="#fecaca" opacity="0.45" />
+  <circle cx="38" cy="10" r="1.5" fill="#fecaca" opacity="0.45" />
+  <circle cx="10" cy="38" r="1.5" fill="#fecaca" opacity="0.45" />
+  <circle cx="38" cy="38" r="1.5" fill="#fecaca" opacity="0.45" />
+
+  <!-- Outer Cyber-Shield Silhouette -->
+  <path d="M24 8.5 L36 13.5 V23.5 C36 30.5 24 38.5 24 38.5 C24 38.5 12 30.5 12 23.5 V13.5 Z"
+        fill="none"
+        stroke="#ffffff"
+        stroke-width="2.5"
+        stroke-linejoin="round"
+        stroke-linecap="round" />
+
+  <!-- Stylized Monogram 'A' forming a Modern CPU / Tower core -->
+  <!-- Left/Right legs of A -->
+  <path d="M19.5 28.5 L24 16 L28.5 28.5"
+        fill="none"
+        stroke="#ffffff"
+        stroke-width="2.5"
+        stroke-linecap="round"
+        stroke-linejoin="round" />
+
+  <!-- Crossbar of A / Digital Circuit Connection -->
+  <line x1="21" y1="24.5" x2="27" y2="24.5"
+        stroke="url(#core-glow-red)"
+        stroke-width="2.2"
+        stroke-linecap="round" />
+
+  <!-- Core Pulse Light inside -->
+  <circle cx="24" cy="20.5" r="1.4" fill="#fef08a" />
 </svg>

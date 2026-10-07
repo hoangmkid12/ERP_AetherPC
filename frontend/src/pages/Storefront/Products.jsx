@@ -1,524 +1,262 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { useCart } from '../../context/CartContext';
-import { notify } from '../../context/NotificationContext';
-import { api } from '../../services/api';
-import { 
-  Cpu, Gamepad2, Database, Layers, HardDrive, Zap, Box, Wind, Monitor, Keyboard, Mouse,
-  Search, SlidersHorizontal, ArrowUpDown, ChevronDown, Check, Star, ShoppingCart, Eye, 
-  ArrowRight, ShieldCheck, Tag, Sparkles, Filter, RefreshCw
-} from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { SlidersHorizontal, X, ChevronLeft, ChevronRight, SearchX, GitCompare } from 'lucide-react';
+import ProductCard from '../../components/Storefront/ProductCard';
+import ComparisonModal from '../../components/Storefront/ProductComparison';
+import useCatalog from '../../components/Storefront/useCatalog';
+import { SF_CATEGORIES, PRICE_RANGES, SORTS, categoryLabel, discountOf, isInStock, fmtVnd } from '../../components/Storefront/catalog';
 
-const CATEGORIES = [
-  { key: 'ALL', label: 'Tất Cả Danh Mục', icon: Box },
-  { key: 'CPU', label: 'CPU (Vi Xử Lý)', icon: Cpu },
-  { key: 'VGA', label: 'Card Màn Hình (VGA)', icon: Gamepad2 },
-  { key: 'RAM', label: 'Bộ Nhớ RAM', icon: Database },
-  { key: 'MAINBOARD', label: 'Bo Mạch Chủ', icon: Layers },
-  { key: 'STORAGE', label: 'Ổ Cứng SSD / HDD', icon: HardDrive },
-  { key: 'PSU', label: 'Nguồn Máy Tính', icon: Zap },
-  { key: 'CASE', label: 'Vỏ Case PC', icon: Box },
-  { key: 'COOLER', label: 'Tản Nhiệt CPU', icon: Wind },
-  { key: 'MONITOR', label: 'Màn Hình', icon: Monitor },
-  { key: 'KEYBOARD', label: 'Bàn Phím Cơ', icon: Keyboard },
-  { key: 'MOUSE', label: 'Chuột Gaming', icon: Mouse }
-];
+const PAGE_SIZE = 20;
 
-const PRICE_PRESETS = [
-  { key: 'ALL', label: 'Tất Cả Mức Giá' },
-  { key: 'UNDER_2M', label: 'Dưới 2 triệu', min: 0, max: 2000000 },
-  { key: '2M_5M', label: '2 - 5 triệu', min: 2000000, max: 5000000 },
-  { key: '5M_10M', label: '5 - 10 triệu', min: 5000000, max: 10000000 },
-  { key: '10M_20M', label: '10 - 20 triệu', min: 10000000, max: 20000000 },
-  { key: 'OVER_20M', label: 'Trên 20 triệu', min: 20000000, max: Infinity }
-];
-
-function fmt(price) {
-  return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price || 0);
-}
+const norm = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd');
 
 export default function Products() {
-  const [searchParams, setSearchParams] = useSearchParams();
-  const navigate = useNavigate();
-  const { addToCart } = useCart();
+  const [params, setParams] = useSearchParams();
+  const { products, loading } = useCatalog();
+  const [showFilter, setShowFilter] = useState(false);
+  const [showCompare, setShowCompare] = useState(false);
+  const [showAllBrands, setShowAllBrands] = useState(false);
 
-  const [products, setProducts] = useState([]);
-  const [loading, setLoading] = useState(true);
-  
-  // Filters
-  const [search, setSearch] = useState(searchParams.get('q') || '');
-  const [selectedCategory, setSelectedCategory] = useState(searchParams.get('category')?.toUpperCase() || 'ALL');
-  const [selectedBrands, setSelectedBrands] = useState([]);
-  const [priceRange, setPriceRange] = useState('ALL');
-  const [sliderMaxPrice, setSliderMaxPrice] = useState(50000000);
-  const [sortBy, setSortBy] = useState('default');
-  const [addedId, setAddedId] = useState(null);
+  // Bộ lọc đọc từ URL để chia sẻ/lưu được và để menu danh mục trỏ thẳng tới đây
+  const category = (params.get('category') || '').toUpperCase();
+  const brands = (params.get('brand') || '').split(',').filter(Boolean);
+  const price = params.get('price') || '';
+  const minP = Number(params.get('min')) || 0;
+  const maxP = Number(params.get('max')) || 0;
+  const sort = params.get('sort') || 'popular';
+  const q = params.get('q') || '';
+  const onlyStock = params.get('stock') === '1';
+  const onlySale = params.get('sale') === '1';
+  const page = Math.max(1, Number(params.get('page')) || 1);
+  const [minInput, setMinInput] = useState(minP ? String(minP) : '');
+  const [maxInput, setMaxInput] = useState(maxP ? String(maxP) : '');
+  useEffect(() => { setMinInput(minP ? String(minP) : ''); setMaxInput(maxP ? String(maxP) : ''); }, [minP, maxP]);
 
-  useEffect(() => {
-    const fetchProducts = async () => {
-      const cached = localStorage.getItem('aetherpc_products');
-      if (cached) {
-        setProducts(JSON.parse(cached));
-        setLoading(false);
-      }
-      try {
-        const res = await api.get('/products');
-        if (res && res.length > 0) {
-          setProducts(res);
-          localStorage.setItem('aetherpc_products', JSON.stringify(res));
-        }
-      } catch (e) {
-        console.warn('Using cached products.', e);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchProducts();
-  }, []);
+  const update = (changes, keepPage = false) => {
+    const next = new URLSearchParams(params);
+    Object.entries(changes).forEach(([k, v]) => {
+      if (v === null || v === undefined || v === '' || v === false) next.delete(k);
+      else next.set(k, String(v));
+    });
+    if (!keepPage) next.delete('page');
+    setParams(next);
+  };
 
-  // Update query params
-  useEffect(() => {
-    const cat = searchParams.get('category');
-    if (cat) setSelectedCategory(cat.toUpperCase());
-    const q = searchParams.get('q');
-    if (q) setSearch(q);
-  }, [searchParams]);
+  useEffect(() => { window.scrollTo({ top: 0, behavior: 'smooth' }); }, [page, category]);
 
-  // Available brands based on selected category
-  const availableBrands = useMemo(() => {
-    const relevant = selectedCategory === 'ALL'
-      ? products
-      : products.filter(p => p.category?.toUpperCase() === selectedCategory);
-    const brands = [...new Set(relevant.map(p => p.brand).filter(Boolean))];
-    return brands.sort();
-  }, [products, selectedCategory]);
+  const words = norm(q).split(/\s+/).filter(Boolean);
+  const range = PRICE_RANGES.find(r => r.key === price);
 
-  // Filter and sort products (Prioritize in-stock over preorder)
-  const filteredProducts = useMemo(() => {
-    return products
-      .filter(p => {
-        const matchSearch = !search || 
-          p.name.toLowerCase().includes(search.toLowerCase()) ||
-          p.brand?.toLowerCase().includes(search.toLowerCase()) ||
-          p.sku?.toLowerCase().includes(search.toLowerCase());
+  // Lọc theo mọi điều kiện trừ thương hiệu → dùng để đếm số sản phẩm của từng thương hiệu
+  const baseFiltered = useMemo(() => products.filter(p => {
+    if (category && p.category !== category) return false;
+    if (words.length && !words.every(w => norm(`${p.name} ${p.brand} ${p.sku}`).includes(w))) return false;
+    if (range && !(p.price >= range.min && p.price < range.max)) return false;
+    if (minP && p.price < minP) return false;
+    if (maxP && p.price > maxP) return false;
+    if (onlyStock && !isInStock(p)) return false;
+    if (onlySale && discountOf(p) <= 0) return false;
+    return true;
+  }), [products, category, q, price, minP, maxP, onlyStock, onlySale]); // eslint-disable-line react-hooks/exhaustive-deps
 
-        const matchCat = selectedCategory === 'ALL' || p.category?.toUpperCase() === selectedCategory;
-        const matchBrand = selectedBrands.length === 0 || selectedBrands.includes(p.brand);
+  const brandCounts = useMemo(() => {
+    const m = {};
+    baseFiltered.forEach(p => { if (p.brand && p.brand !== 'Khác') m[p.brand] = (m[p.brand] || 0) + 1; });
+    brands.forEach(b => { if (!(b in m)) m[b] = 0; });
+    return Object.entries(m).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  }, [baseFiltered, params]); // eslint-disable-line react-hooks/exhaustive-deps
 
-        let matchPrice = true;
-        if (priceRange === 'SLIDER') {
-          matchPrice = p.price <= sliderMaxPrice;
-        } else if (priceRange !== 'ALL') {
-          const preset = PRICE_PRESETS.find(pr => pr.key === priceRange);
-          if (preset) {
-            matchPrice = p.price >= preset.min && p.price <= preset.max;
-          }
-        }
-        return matchSearch && matchCat && matchBrand && matchPrice;
-      })
-      .sort((a, b) => {
-        // 1. Prioritize In-stock (stockQuantity > 0 || stock > 0) over Preorder
-        const aInStock = (Number(a.stockQuantity) > 0 || Number(a.stock) > 0) && !a.isPreorder;
-        const bInStock = (Number(b.stockQuantity) > 0 || Number(b.stock) > 0) && !b.isPreorder;
+  const catCounts = useMemo(() => {
+    const m = {};
+    products.forEach(p => { m[p.category] = (m[p.category] || 0) + 1; });
+    return m;
+  }, [products]);
 
-        if (aInStock && !bInStock) return -1;
-        if (!aInStock && bInStock) return 1;
+  const list = useMemo(() => {
+    const arr = brands.length ? baseFiltered.filter(p => brands.includes(p.brand)) : [...baseFiltered];
+    return arr.sort((a, b) => {
+      const s = isInStock(b) - isInStock(a);           // còn hàng luôn lên trước
+      if (s) return s;
+      if (sort === 'price_asc') return a.price - b.price;
+      if (sort === 'price_desc') return b.price - a.price;
+      if (sort === 'name_asc') return a.name.localeCompare(b.name, 'vi');
+      if (sort === 'discount') return discountOf(b) - discountOf(a);
+      return (Number(b.stockQuantity) || 0) - (Number(a.stockQuantity) || 0) || discountOf(b) - discountOf(a);
+    });
+  }, [baseFiltered, params]); // eslint-disable-line react-hooks/exhaustive-deps
 
-        // 2. Then apply user sorting
-        if (sortBy === 'price_asc') return a.price - b.price;
-        if (sortBy === 'price_desc') return b.price - a.price;
-        if (sortBy === 'name_asc') return a.name.localeCompare(b.name);
-        if (sortBy === 'name_desc') return b.name.localeCompare(a.name);
-        return 0;
-      });
-  }, [products, search, selectedCategory, selectedBrands, priceRange, sliderMaxPrice, sortBy]);
+  const pages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
+  const curPage = Math.min(page, pages);
+  const view = list.slice((curPage - 1) * PAGE_SIZE, curPage * PAGE_SIZE);
 
-  const handleAddToCart = (p) => {
-    const isPreorder = (!p.stockQuantity || p.stockQuantity <= 0) && (!p.stock || p.stock <= 0);
-    if (isPreorder || p.isPreorder) {
-      notify('Sản phẩm này hiện đang trong trạng thái ĐẶT TRƯỚC (Hết hàng sẵn tại kho). Vui lòng liên hệ CSKH / Hotline để được hỗ trợ đặt giữ hàng!', 'error');
-      return;
+  const toggleBrand = (b) => {
+    const next = brands.includes(b) ? brands.filter(x => x !== b) : [...brands, b];
+    update({ brand: next.join(',') });
+  };
+
+  const title = q ? `Kết quả tìm kiếm cho "${q}"` : category ? categoryLabel(category) : 'Tất cả sản phẩm';
+
+  const activeChips = [
+    category && { label: categoryLabel(category), clear: { category: null, brand: null } },
+    q && { label: `"${q}"`, clear: { q: null } },
+    ...brands.map(b => ({ label: b, clear: { brand: brands.filter(x => x !== b).join(',') } })),
+    range && { label: range.label, clear: { price: null } },
+    (minP || maxP) && { label: `${minP ? fmtVnd(minP) : '0₫'} – ${maxP ? fmtVnd(maxP) : '...'}`, clear: { min: null, max: null } },
+    onlyStock && { label: 'Còn hàng', clear: { stock: null } },
+    onlySale && { label: 'Đang giảm giá', clear: { sale: null } },
+  ].filter(Boolean);
+
+  const pageNumbers = (() => {
+    const out = [];
+    for (let i = 1; i <= pages; i++) {
+      if (i === 1 || i === pages || Math.abs(i - curPage) <= 2) out.push(i);
+      else if (out[out.length - 1] !== '…') out.push('…');
     }
-    addToCart(p, 1);
-    setAddedId(p.id);
-    setTimeout(() => setAddedId(null), 2000);
-  };
+    return out;
+  })();
 
-  const handleClearFilters = () => {
-    setSelectedBrands([]);
-    setPriceRange('ALL');
-    setSortBy('default');
-    setSelectedCategory('ALL');
-    setSearch('');
-  };
+  const visibleBrands = showAllBrands ? brandCounts : brandCounts.slice(0, 8);
 
   return (
-    <div style={{ backgroundColor: '#f8fafc', minHeight: '100vh', padding: '2rem 0', fontFamily: 'Inter, sans-serif' }}>
-      <div className="container" style={{ maxWidth: '1380px', margin: '0 auto', padding: '0 1.5rem' }}>
-        
-        {/* Breadcrumb & Header Banner */}
-        <div style={{ marginBottom: '1.5rem', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', padding: '1.5rem 2rem', boxShadow: '0 2px 10px rgba(0,0,0,0.02)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.35rem' }}>
-                <Link to="/" style={{ color: '#64748b', textDecoration: 'none' }}>Trang Chủ</Link>
-                <span>/</span>
-                <span style={{ color: '#2563eb', fontWeight: 700 }}>Danh Mục Sản Phẩm</span>
-              </div>
-              <h1 style={{ fontSize: '1.6rem', fontWeight: 900, color: '#0f172a', margin: 0, letterSpacing: '-0.02em' }}>
-                Tất Cả Linh Kiện & Sản Phẩm PC Chính Hãng
-              </h1>
-              <p style={{ color: '#64748b', fontSize: '0.85rem', margin: '0.35rem 0 0' }}>
-                Khám phá kho linh kiện máy tính, màn hình và phụ kiện cao cấp bảo hành 36 tháng
-              </p>
-            </div>
+    <div className="sf-container">
+      <nav className="sf-breadcrumb" aria-label="breadcrumb">
+        <Link to="/">Trang chủ</Link><span>/</span>
+        {category ? <><Link to="/products">Sản phẩm</Link><span>/</span><span className="cur">{categoryLabel(category)}</span></> : <span className="cur">Sản phẩm</span>}
+      </nav>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <div style={{ position: 'relative', width: '280px' }}>
-                <input
-                  type="text"
-                  placeholder="Tìm theo tên linh kiện, thương hiệu..."
-                  value={search}
-                  onChange={e => setSearch(e.target.value)}
-                  style={{ width: '100%', padding: '0.55rem 0.75rem 0.55rem 2.2rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.85rem' }}
-                />
-                <Search size={16} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
-              </div>
-            </div>
-          </div>
-
-          {/* Quick Categories Bar */}
-          <div style={{ display: 'flex', gap: '0.5rem', overflowX: 'auto', padding: '1rem 0 0', marginTop: '1rem', borderTop: '1px solid #f1f5f9' }}>
-            {CATEGORIES.map(cat => {
-              const Icon = cat.icon;
-              const isSelected = selectedCategory === cat.key;
-              return (
-                <button
-                  key={cat.key}
-                  onClick={() => {
-                    setSelectedCategory(cat.key);
-                    setSelectedBrands([]);
-                  }}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.4rem',
-                    padding: '0.45rem 0.9rem',
-                    borderRadius: '99px',
-                    border: isSelected ? '1px solid #2563eb' : '1px solid #e2e8f0',
-                    backgroundColor: isSelected ? '#eff6ff' : '#ffffff',
-                    color: isSelected ? '#2563eb' : '#475569',
-                    fontSize: '0.8rem',
-                    fontWeight: isSelected ? 800 : 500,
-                    cursor: 'pointer',
-                    whiteSpace: 'nowrap',
-                    transition: 'all 0.15s'
-                  }}
-                >
-                  <Icon size={15} />
-                  <span>{cat.label}</span>
-                </button>
-              );
-            })}
-          </div>
+      {/* Danh mục nhanh */}
+      <div className="sf-section-box" style={{ marginBottom: 12, padding: 12 }}>
+        <div className="sf-section-links" style={{ flexWrap: 'nowrap', overflowX: 'auto', scrollbarWidth: 'none' }}>
+          <button type="button" className={`sf-chip${!category ? ' is-active' : ''}`} onClick={() => update({ category: null, brand: null })}>Tất cả</button>
+          {SF_CATEGORIES.map(c => (
+            <button key={c.key} type="button" className={`sf-chip${category === c.key ? ' is-active' : ''}`}
+              onClick={() => update({ category: c.key, brand: null })}>
+              <c.icon size={15} /> {c.label}
+            </button>
+          ))}
         </div>
+      </div>
 
-        {/* Main Grid: Filters Sidebar + Products Grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: '260px 1fr', gap: '1.5rem', alignItems: 'start' }}>
-          
-          {/* Left: Filter Sidebar */}
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', padding: '1.25rem', position: 'sticky', top: '90px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', paddingBottom: '0.75rem', borderBottom: '1px solid #e2e8f0' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 800, color: '#0f172a', fontSize: '0.95rem' }}>
-                <Filter size={16} style={{ color: '#2563eb' }} />
-                <span>Bộ Lọc Sản Phẩm</span>
-              </div>
-              <button
-                onClick={handleClearFilters}
-                style={{ background: 'none', border: 'none', color: '#2563eb', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer' }}
-              >
-                Xóa tất cả
-              </button>
-            </div>
-
-            {/* Brand Filter */}
-            <div style={{ marginBottom: '1.25rem' }}>
-              <strong style={{ fontSize: '0.85rem', color: '#0f172a', display: 'block', marginBottom: '0.6rem' }}>
-                Thương Hiệu ({availableBrands.length})
-              </strong>
-              <div style={{ maxHeight: '200px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                {availableBrands.map(b => (
-                  <label key={b} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem', color: '#475569', cursor: 'pointer' }}>
-                    <input
-                      type="checkbox"
-                      checked={selectedBrands.includes(b)}
-                      onChange={e => {
-                        if (e.target.checked) setSelectedBrands(p => [...p, b]);
-                        else setSelectedBrands(p => p.filter(item => item !== b));
-                      }}
-                    />
-                    <span>{b}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            {/* Price Filter with Slider */}
-            <div>
-              <strong style={{ fontSize: '0.85rem', color: '#0f172a', display: 'block', marginBottom: '0.6rem' }}>
-                Mức Giá
-              </strong>
-
-              {/* Range Slider UI */}
-              <div style={{ backgroundColor: '#f8fafc', padding: '0.75rem', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '0.85rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem', fontSize: '0.75rem', color: '#64748b' }}>
-                  <span>Từ 0 ₫</span>
-                  <span style={{ fontWeight: 800, color: '#2563eb' }}>Đến {fmt(sliderMaxPrice)}</span>
-                </div>
-                <input
-                  type="range"
-                  min="500000"
-                  max="50000000"
-                  step="500000"
-                  value={sliderMaxPrice}
-                  onChange={(e) => {
-                    setSliderMaxPrice(Number(e.target.value));
-                    setPriceRange('SLIDER');
-                  }}
-                  style={{
-                    width: '100%',
-                    accentColor: '#2563eb',
-                    cursor: 'pointer'
-                  }}
-                />
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.68rem', color: '#94a3b8', marginTop: '0.2rem' }}>
-                  <span>500k</span>
-                  <span>25 triệu</span>
-                  <span>50 triệu+</span>
-                </div>
-              </div>
-
-              {/* Price Presets */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                {PRICE_PRESETS.map(pr => (
-                  <label key={pr.key} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem', color: '#475569', cursor: 'pointer' }}>
-                    <input
-                      type="radio"
-                      name="pricePreset"
-                      checked={priceRange === pr.key}
-                      onChange={() => setPriceRange(pr.key)}
-                    />
-                    <span>{pr.label}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-
+      <div className="sf-listing">
+        {showFilter && <div className="sf-filter-backdrop" onClick={() => setShowFilter(false)} />}
+        <aside className={`sf-filter${showFilter ? ' is-open' : ''}`} aria-label="Bộ lọc sản phẩm">
+          <div className="sf-filter-head">
+            <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><SlidersHorizontal size={16} /> Bộ lọc</span>
+            <span style={{ display: 'flex', gap: 10 }}>
+              <button type="button" onClick={() => setParams(q ? { q } : {})}>Xóa lọc</button>
+              <button type="button" className="sf-mobile-filter-btn" onClick={() => setShowFilter(false)} aria-label="Đóng"><X size={18} /></button>
+            </span>
           </div>
 
-          {/* Right: Products List */}
-          <div>
-            
-            {/* Top Bar: Total Count & Sort */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', backgroundColor: '#ffffff', padding: '0.75rem 1.25rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-              <div style={{ fontSize: '0.85rem', color: '#64748b' }}>
-                Tìm thấy <strong style={{ color: '#0f172a' }}>{filteredProducts.length}</strong> sản phẩm
-              </div>
+          <div className="sf-filter-group">
+            <h4>Danh mục</h4>
+            {SF_CATEGORIES.map(c => (
+              <label key={c.key} className={`sf-check${category === c.key ? ' is-on' : ''}`}>
+                <input type="radio" name="cat" checked={category === c.key} onChange={() => update({ category: c.key, brand: null })} />
+                {c.label}<span className="cnt">{catCounts[c.key] || 0}</span>
+              </label>
+            ))}
+          </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>Sắp xếp:</span>
-                <select
-                  value={sortBy}
-                  onChange={e => setSortBy(e.target.value)}
-                  style={{ padding: '0.35rem 0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.8rem', color: '#0f172a' }}
-                >
-                  <option value="default">Mặc định (Còn hàng lên đầu)</option>
-                  <option value="price_asc">Giá tăng dần</option>
-                  <option value="price_desc">Giá giảm dần</option>
-                  <option value="name_asc">Tên A → Z</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Products Grid */}
-            {filteredProducts.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '4rem 1rem', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1' }}>
-                <Box size={48} style={{ color: '#94a3b8', margin: '0 auto 1rem' }} />
-                <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', margin: '0 0 0.5rem' }}>Không tìm thấy sản phẩm phù hợp</h3>
-                <p style={{ fontSize: '0.85rem', color: '#64748b', margin: '0 0 1.25rem' }}>Hãy thử điều chỉnh bộ lọc hoặc xóa từ khóa tìm kiếm</p>
-                <button
-                  onClick={handleClearFilters}
-                  style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.5rem 1.25rem', fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer' }}
-                >
-                  Xóa Bộ Lọc
+          {brandCounts.length > 0 && (
+            <div className="sf-filter-group">
+              <h4>Thương hiệu</h4>
+              {visibleBrands.map(([b, n]) => (
+                <label key={b} className={`sf-check${brands.includes(b) ? ' is-on' : ''}`}>
+                  <input type="checkbox" checked={brands.includes(b)} onChange={() => toggleBrand(b)} />
+                  {b}<span className="cnt">{n}</span>
+                </label>
+              ))}
+              {brandCounts.length > 8 && (
+                <button type="button" onClick={() => setShowAllBrands(v => !v)}
+                  style={{ border: 'none', background: 'none', color: 'var(--sf-primary)', fontSize: 13, fontWeight: 600, cursor: 'pointer', padding: '6px 0 0' }}>
+                  {showAllBrands ? 'Thu gọn' : `Xem thêm ${brandCounts.length - 8} thương hiệu`}
                 </button>
+              )}
+            </div>
+          )}
+
+          <div className="sf-filter-group">
+            <h4>Mức giá</h4>
+            <label className={`sf-check${!price ? ' is-on' : ''}`}>
+              <input type="radio" name="price" checked={!price} onChange={() => update({ price: null })} /> Tất cả
+            </label>
+            {PRICE_RANGES.map(r => (
+              <label key={r.key} className={`sf-check${price === r.key ? ' is-on' : ''}`}>
+                <input type="radio" name="price" checked={price === r.key} onChange={() => update({ price: r.key, min: null, max: null })} /> {r.label}
+              </label>
+            ))}
+            <form className="sf-price-inputs" onSubmit={e => { e.preventDefault(); update({ min: Number(minInput) || null, max: Number(maxInput) || null, price: null }); }}>
+              <input inputMode="numeric" placeholder="Từ" value={minInput} onChange={e => setMinInput(e.target.value.replace(/\D/g, ''))} />
+              <span>–</span>
+              <input inputMode="numeric" placeholder="Đến" value={maxInput} onChange={e => setMaxInput(e.target.value.replace(/\D/g, ''))} />
+              <button type="submit" className="sf-btn sf-btn-outline" style={{ height: 34, padding: '0 10px' }}>Áp dụng</button>
+            </form>
+          </div>
+
+          <div className="sf-filter-group">
+            <h4>Tình trạng</h4>
+            <label className={`sf-check${onlyStock ? ' is-on' : ''}`}>
+              <input type="checkbox" checked={onlyStock} onChange={() => update({ stock: onlyStock ? null : 1 })} /> Còn hàng tại kho
+            </label>
+            <label className={`sf-check${onlySale ? ' is-on' : ''}`}>
+              <input type="checkbox" checked={onlySale} onChange={() => update({ sale: onlySale ? null : 1 })} /> Đang giảm giá
+            </label>
+          </div>
+        </aside>
+
+        <div style={{ minWidth: 0 }}>
+          <div className="sf-listing-top">
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
+              <div style={{ flex: 1, minWidth: 200 }}>
+                <h1>{title}</h1>
+                <div className="count">{loading && !products.length ? 'Đang tải sản phẩm...' : `${list.length.toLocaleString('vi-VN')} sản phẩm`}</div>
               </div>
-            ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '1.25rem' }}>
-                {filteredProducts.map(p => {
-                  const inStock = (Number(p.stockQuantity) > 0 || Number(p.stock) > 0) && !p.isPreorder;
-                  const showDiscount = p.discountPercent > 0;
-
-                  return (
-                    <div
-                      key={p.id}
-                      style={{
-                        backgroundColor: '#ffffff',
-                        borderRadius: '12px',
-                        border: '1px solid #cbd5e1',
-                        padding: '1rem',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        justifyContent: 'space-between',
-                        transition: 'all 0.2s',
-                        boxShadow: '0 2px 6px rgba(0,0,0,0.02)',
-                        position: 'relative'
-                      }}
-                    >
-                      {/* Top Image + Badges */}
-                      <div>
-                        <div style={{ position: 'relative', height: '180px', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#fdfdfd', borderRadius: '8px', overflow: 'hidden', marginBottom: '0.75rem' }}>
-                          <img
-                            src={p.image || 'https://images.unsplash.com/photo-1587202372775-e229f172b9d7?w=400&auto=format&fit=crop&q=80'}
-                            alt={p.name}
-                            style={{ maxHeight: '160px', maxWidth: '90%', objectFit: 'contain', transition: 'transform 0.2s' }}
-                          />
-
-                          {showDiscount && (
-                            <span style={{ position: 'absolute', top: '8px', left: '8px', backgroundColor: '#ef4444', color: '#ffffff', fontSize: '0.7rem', fontWeight: 800, padding: '2px 6px', borderRadius: '4px' }}>
-                              -{p.discountPercent}%
-                            </span>
-                          )}
-
-                          {inStock ? (
-                            <span style={{ position: 'absolute', top: '8px', right: '8px', backgroundColor: '#10b981', color: '#ffffff', fontSize: '0.68rem', fontWeight: 800, padding: '2px 7px', borderRadius: '4px' }}>
-                              Còn {p.stockQuantity || p.stock || 10} sp
-                            </span>
-                          ) : (
-                            <span style={{ position: 'absolute', top: '8px', right: '8px', backgroundColor: '#f59e0b', color: '#ffffff', fontSize: '0.68rem', fontWeight: 800, padding: '2px 7px', borderRadius: '4px' }}>
-                              Đặt trước
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Category & Brand */}
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
-                          <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#2563eb', backgroundColor: '#eff6ff', padding: '2px 6px', borderRadius: '4px' }}>
-                            {p.category}
-                          </span>
-                          <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 700 }}>
-                            {p.brand}
-                          </span>
-                        </div>
-
-                        {/* Title */}
-                        <Link
-                          to={`/product/${p.id}`}
-                          style={{
-                            display: 'block',
-                            fontSize: '0.88rem',
-                            fontWeight: 700,
-                            color: '#0f172a',
-                            lineHeight: 1.4,
-                            textDecoration: 'none',
-                            marginBottom: '0.5rem',
-                            height: '2.5rem',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis'
-                          }}
-                        >
-                          {p.name}
-                        </Link>
-                      </div>
-
-                      {/* Bottom: Price + CTA Button */}
-                      <div style={{ marginTop: '0.75rem', borderTop: '1px solid #f1f5f9', paddingTop: '0.75rem' }}>
-                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.4rem', marginBottom: '0.65rem' }}>
-                          <span style={{ fontSize: '1.15rem', fontWeight: 900, color: '#16a34a' }}>
-                            {fmt(p.price)}
-                          </span>
-                          {showDiscount && (
-                            <span style={{ fontSize: '0.75rem', color: '#94a3b8', textDecoration: 'line-through' }}>
-                              {fmt(p.originalPrice)}
-                            </span>
-                          )}
-                        </div>
-
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 38px', gap: '0.4rem' }}>
-                          {inStock ? (
-                            <button
-                              onClick={() => handleAddToCart(p)}
-                              style={{
-                                backgroundColor: addedId === p.id ? '#16a34a' : '#2563eb',
-                                color: '#ffffff',
-                                border: 'none',
-                                borderRadius: '6px',
-                                padding: '0.5rem',
-                                fontSize: '0.82rem',
-                                fontWeight: 800,
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                gap: '0.35rem',
-                                transition: 'all 0.15s'
-                              }}
-                            >
-                              {addedId === p.id ? <><Check size={14} /> Đã Thêm</> : <><ShoppingCart size={14} /> Thêm Vào Giỏ</>}
-                            </button>
-                          ) : (
-                            <button
-                              disabled
-                              title="Sản phẩm hết hàng sẵn tại kho, vui lòng liên hệ đặt trước"
-                              style={{
-                                backgroundColor: '#f1f5f9',
-                                color: '#94a3b8',
-                                border: '1px solid #cbd5e1',
-                                borderRadius: '6px',
-                                padding: '0.5rem',
-                                fontSize: '0.78rem',
-                                fontWeight: 700,
-                                cursor: 'not-allowed',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                gap: '0.25rem'
-                              }}
-                            >
-                              Đặt Trước
-                            </button>
-                          )}
-
-                          <Link
-                            to={`/product/${p.id}`}
-                            style={{
-                              backgroundColor: '#ffffff',
-                              border: '1px solid #cbd5e1',
-                              borderRadius: '6px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              color: '#475569',
-                              textDecoration: 'none'
-                            }}
-                            title="Xem chi tiết sản phẩm"
-                          >
-                            <Eye size={15} />
-                          </Link>
-                        </div>
-                      </div>
-
-                    </div>
-                  );
-                })}
+              <button type="button" className="sf-btn sf-btn-ghost sf-mobile-filter-btn" onClick={() => setShowFilter(true)}><SlidersHorizontal size={16} /> Bộ lọc</button>
+              <button type="button" className="sf-btn sf-btn-ghost" onClick={() => setShowCompare(true)}><GitCompare size={16} /> So sánh sản phẩm</button>
+            </div>
+            <div className="sf-sortbar">
+              <span>Sắp xếp:</span>
+              {SORTS.map(s => (
+                <button key={s.key} type="button" className={`sf-chip${sort === s.key ? ' is-active' : ''}`} onClick={() => update({ sort: s.key === 'popular' ? null : s.key })}>{s.label}</button>
+              ))}
+            </div>
+            {activeChips.length > 0 && (
+              <div className="sf-active-filters">
+                {activeChips.map(c => (
+                  <button key={c.label} type="button" className="sf-chip" onClick={() => update(c.clear)}>{c.label} <X size={13} /></button>
+                ))}
+                <button type="button" className="sf-viewall" style={{ marginLeft: 4, border: 'none', background: 'none', cursor: 'pointer' }} onClick={() => setParams({})}>Xóa tất cả</button>
               </div>
             )}
-
           </div>
 
-        </div>
+          {view.length === 0 ? (
+            <div className="sf-empty">
+              <SearchX size={44} color="#9ca3af" />
+              <h3>{loading ? 'Đang tải sản phẩm...' : 'Không tìm thấy sản phẩm phù hợp'}</h3>
+              {!loading && <p>Hãy thử bỏ bớt bộ lọc hoặc tìm với từ khóa khác.</p>}
+              {!loading && <button type="button" className="sf-btn sf-btn-primary" onClick={() => setParams({})}>Xem tất cả sản phẩm</button>}
+            </div>
+          ) : (
+            <div className="sf-grid sf-grid-4">
+              {view.map(p => <ProductCard key={p.id} product={p} />)}
+            </div>
+          )}
 
+          {pages > 1 && (
+            <div className="sf-pagination">
+              <button type="button" disabled={curPage === 1} onClick={() => update({ page: curPage - 1 }, true)} aria-label="Trang trước"><ChevronLeft size={16} /></button>
+              {pageNumbers.map((n, i) => n === '…'
+                ? <button key={`e${i}`} type="button" disabled>…</button>
+                : <button key={n} type="button" className={n === curPage ? 'is-on' : ''} onClick={() => update({ page: n === 1 ? null : n }, true)}>{n}</button>)}
+              <button type="button" disabled={curPage === pages} onClick={() => update({ page: curPage + 1 }, true)} aria-label="Trang sau"><ChevronRight size={16} /></button>
+            </div>
+          )}
+        </div>
       </div>
+
+      {showCompare && <ComparisonModal products={products} onClose={() => setShowCompare(false)} />}
     </div>
   );
 }

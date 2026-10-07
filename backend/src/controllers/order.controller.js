@@ -1,6 +1,7 @@
 const prisma = require('../config/database');
 const { sendOrderConfirmationEmail, sendOrderStatusUpdateEmail } = require('../services/emailService');
 const { claimAvailableSerials } = require('../utils/serialAllocation');
+const { deductInventory, restockInventory } = require('../services/stockSync');
 const { hasOperationalPermission } = require('../middlewares/rbac.middleware');
 const { ORDER_STATUS_VI, labelOf } = require('../constants/statusLabels');
 
@@ -246,35 +247,8 @@ const createOrder = async (req, res, next) => {
 
           totalCogs += Number(productBeforeUpdate?.averageCost || 0) * qty;
 
-          // 2. Trừ tồn kho vật lý tại kho chính (Warehouse 1)
-          const inventory = await tx.inventory.findFirst({
-            where: {
-              productId: itemProdId,
-              warehouseId: 1
-            }
-          });
-
-          if (!inventory || inventory.quantityOnHand < qty) {
-            const error = new Error(`Kho vật lý không đủ tồn cho sản phẩm ${itemProdId}`);
-            error.statusCode = 409;
-            throw error;
-          }
-          await tx.inventory.update({
-            where: { id: inventory.id },
-            data: { quantityOnHand: { decrement: qty } }
-          });
-
-          // 3. Ghi nhật ký biến động kho (StockMovement OUT)
-          await tx.stockMovement.create({
-            data: {
-              productId: itemProdId,
-              fromWarehouseId: 1,
-              type: 'OUT',
-              quantity: qty,
-              referenceId: ordCode,
-              note: `Xuất kho tự động cho Đơn Hàng ${ordCode}`
-            }
-          });
+          // 2. Trừ tồn kho vật lý (ưu tiên Kho 1, thiếu thì lấy tiếp ở kho khác) + nhật ký OUT
+          await deductInventory(tx, itemProdId, qty, { referenceId: ordCode, note: `Xuất kho tự động cho Đơn Hàng ${ordCode}` });
         }
 
         // Giá vốn hàng bán (COGS) thực tế theo giá bình quân gia quyền — ghi Sổ
@@ -691,59 +665,8 @@ const updateOrderStatus = async (req, res, next) => {
 
             totalCogs += Number(productBeforeUpdate?.averageCost || 0) * item.quantity;
 
-            // Trừ tồn kho vật lý: ưu tiên kho 1 (nếu đủ), hoặc chọn kho có đủ số lượng tồn
-            let inventory = await tx.inventory.findFirst({
-              where: {
-                productId: item.productId,
-                warehouseId: 1,
-                quantityOnHand: { gte: item.quantity }
-              }
-            });
-
-            if (!inventory) {
-              // Tìm kho có đủ tồn
-              inventory = await tx.inventory.findFirst({
-                where: {
-                  productId: item.productId,
-                  quantityOnHand: { gte: item.quantity }
-                },
-                orderBy: { quantityOnHand: 'desc' }
-              });
-            }
-
-            // Fallback: nếu không có kho nào đủ item.quantity nhưng Product.stockQuantity vẫn còn, lấy kho có số tồn lớn nhất
-            if (!inventory) {
-              inventory = await tx.inventory.findFirst({
-                where: { productId: item.productId },
-                orderBy: { quantityOnHand: 'desc' }
-              });
-            }
-
-            const chosenWarehouseId = inventory?.warehouseId || 1;
-
-            if (inventory && inventory.quantityOnHand >= item.quantity) {
-              await tx.inventory.update({
-                where: { id: inventory.id },
-                data: { quantityOnHand: { decrement: item.quantity } }
-              });
-            } else if (inventory && inventory.quantityOnHand > 0) {
-              await tx.inventory.update({
-                where: { id: inventory.id },
-                data: { quantityOnHand: 0 }
-              });
-            }
-
-            // Ghi log xuất kho
-            await tx.stockMovement.create({
-              data: {
-                productId: item.productId,
-                fromWarehouseId: chosenWarehouseId,
-                type: 'OUT',
-                quantity: item.quantity,
-                referenceId: id,
-                note: `Xuất kho khi duyệt Đơn Hàng ${id}`
-              }
-            });
+            // Trừ tồn kho vật lý đúng bằng số đã trừ ở Product.stockQuantity (có thể lấy từ nhiều kho)
+            await deductInventory(tx, item.productId, item.quantity, { referenceId: id, note: `Xuất kho khi duyệt Đơn Hàng ${id}` });
           }
 
           if (totalCogs > 0) {
@@ -797,35 +720,10 @@ const updateOrderStatus = async (req, res, next) => {
               }
             });
 
-            // Cộng trả tồn kho vật lý tại Kho 1
-            const inventory = await tx.inventory.findFirst({
-              where: {
-                productId: item.productId,
-                warehouseId: 1
-              }
-            });
-
-            if (inventory) {
-              await tx.inventory.update({
-                where: { id: inventory.id },
-                data: {
-                  quantityOnHand: {
-                    increment: item.quantity
-                  }
-                }
-              });
-            }
-
-            // Ghi nhật ký nhập hoàn kho
-            await tx.stockMovement.create({
-              data: {
-                productId: item.productId,
-                toWarehouseId: 1,
-                type: 'IN',
-                quantity: item.quantity,
-                referenceId: id,
-                note: `Hoàn kho tự động cho Đơn Hàng ${id} (${status === 'CANCELLED' ? 'Đã Hủy' : 'Giao Thất Bại'})`
-              }
+            // Cộng trả tồn kho vật lý tại Kho 1 (tạo dòng tồn nếu chưa có) + nhật ký IN
+            await restockInventory(tx, item.productId, item.quantity, {
+              referenceId: id,
+              note: `Hoàn kho tự động cho Đơn Hàng ${id} (${status === 'CANCELLED' ? 'Đã Hủy' : 'Giao Thất Bại'})`
             });
           }
 
@@ -1689,26 +1587,9 @@ const confirmReturnWarehouse = async (req, res, next) => {
             data: { stockQuantity: { increment: item.quantity } }
           });
 
-          const inventory = await tx.inventory.findFirst({
-            where: { productId: item.productId, warehouseId: 1 }
-          });
-
-          if (inventory) {
-            await tx.inventory.update({
-              where: { id: inventory.id },
-              data: { quantityOnHand: { increment: item.quantity } }
-            });
-          }
-
-          await tx.stockMovement.create({
-            data: {
-              productId: item.productId,
-              toWarehouseId: 1,
-              type: 'IN',
-              quantity: item.quantity,
-              referenceId: existingOrder.orderId,
-              note: `Nhập lại kho từ Đơn Hoàn Trả #${existingOrder.orderId} vào ${shelfLocation || 'Kệ kho'}`
-            }
+          await restockInventory(tx, item.productId, item.quantity, {
+            referenceId: existingOrder.orderId,
+            note: `Nhập lại kho từ Đơn Hoàn Trả #${existingOrder.orderId} vào ${shelfLocation || 'Kệ kho'}`
           });
         }
       }

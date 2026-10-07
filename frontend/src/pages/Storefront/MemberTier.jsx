@@ -327,12 +327,38 @@ export default function MemberTier() {
               <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', lineHeight: 1.6, maxWidth: '340px', marginBottom: '2rem' }}>
                 Đăng nhập tài khoản khách hàng để xem số điểm tích lũy và kiểm tra hạng thành viên của mình.
               </p>
-              <div style={{ display: 'flex', gap: '1rem', width: '100%', maxWidth: '280px' }}>
-                <button className="btn btn-primary" style={{ flex: 1, gap: '0.375rem' }} onClick={() => navigate('/login')}>
-                  <LogIn size={15} /> Đăng nhập
+              <div style={{ display: 'flex', gap: '0.75rem', width: '100%', maxWidth: '300px', justifyContent: 'center' }}>
+                <button 
+                  className="btn btn-primary" 
+                  style={{ 
+                    flex: 1, 
+                    display: 'inline-flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center', 
+                    gap: '0.45rem',
+                    padding: '0.7rem 1rem',
+                    whiteSpace: 'nowrap',
+                    fontWeight: 700
+                  }} 
+                  onClick={() => navigate('/login')}
+                >
+                  <LogIn size={16} /> <span>Đăng nhập</span>
                 </button>
-                <button className="btn btn-secondary" style={{ flex: 1, gap: '0.375rem' }} onClick={() => navigate('/login?register=true')}>
-                  <UserPlus size={15} /> Đăng ký
+                <button 
+                  className="btn btn-secondary" 
+                  style={{ 
+                    flex: 1, 
+                    display: 'inline-flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center', 
+                    gap: '0.45rem',
+                    padding: '0.7rem 1rem',
+                    whiteSpace: 'nowrap',
+                    fontWeight: 700
+                  }} 
+                  onClick={() => navigate('/login?register=true')}
+                >
+                  <UserPlus size={16} /> <span>Đăng ký</span>
                 </button>
               </div>
             </div>
@@ -355,9 +381,20 @@ export default function MemberTier() {
                   className="form-input"
                   value={phoneSearch}
                   onChange={(e) => setPhoneSearch(e.target.value)}
-                  style={{ fontSize: '0.875rem' }}
+                  style={{ fontSize: '0.875rem', flex: 1 }}
                 />
-                <button type="submit" className="btn btn-primary" style={{ padding: '0.625rem 1.25rem' }}>
+                <button 
+                  type="submit" 
+                  className="btn btn-primary" 
+                  style={{ 
+                    padding: '0.625rem 1.4rem', 
+                    whiteSpace: 'nowrap', 
+                    display: 'inline-flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center',
+                    fontWeight: 700
+                  }}
+                >
                   Tra cứu
                 </button>
               </form>
@@ -499,7 +536,7 @@ export default function MemberTier() {
                   <td><strong>Phí vận chuyển</strong></td>
                   {Object.entries(TIER_CONFIGS).map(([key, config]) => (
                     <td key={key} style={{ textAlign: 'center', fontSize: '0.8125rem', background: key === currentTierKey ? 'rgba(255,255,255,0.02)' : 'none' }}>
-                      {key === 'BRONZE' ? 'Mặc định' : key === 'SILVER' ? 'Free đơn từ 1M' : 'Miễn phí 100%'}
+                      {'Miễn phí toàn quốc'}
                     </td>
                   ))}
                 </tr>

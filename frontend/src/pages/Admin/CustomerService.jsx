@@ -28,6 +28,15 @@ import {
   Legend
 } from 'chart.js';
 
+// Mốc thời gian của tin nhắn cuối trong phiên — tin CSKH vừa gửi (chưa có
+// timestamp từ máy chủ) dùng localSentAt để vẫn được đưa lên đầu ngay.
+const lastMessageTime = (session) => {
+  const last = session.messages?.[session.messages.length - 1];
+  if (!last) return 0;
+  return last.timestamp ? Date.parse(last.timestamp) : (last.localSentAt || 0);
+};
+const sortSessionsByLatest = (sessions) => [...sessions].sort((a, b) => lastMessageTime(b) - lastMessageTime(a));
+
 ChartJS.register(
   CategoryScale,
   LinearScale,
@@ -227,7 +236,7 @@ export default function CustomerService() {
                 if (data.sessions.length > 0) {
                   setActiveSessionId(prev => {
                     const exists = data.sessions.some(s => s.id === prev);
-                    return exists ? prev : data.sessions[0].id;
+                    return exists ? prev : sortSessionsByLatest(data.sessions)[0].id;
                   });
                 }
               }
@@ -329,7 +338,7 @@ export default function CustomerService() {
 
     setLiveChatSessions(prev => prev.map(s => {
       if (s.id === activeSessionId) {
-        return { ...s, messages: [...s.messages, { sender: 'staff', text: msgToSend, time }] };
+        return { ...s, messages: [...s.messages, { sender: 'staff', text: msgToSend, time, localSentAt: Date.now() }] };
       }
       return s;
     }));
@@ -415,7 +424,11 @@ export default function CustomerService() {
     });
   }, [complaints, search, statusFilter]);
 
-  const activeChat = liveChatSessions.find(s => s.id === activeSessionId) || liveChatSessions[0];
+  // Hội thoại có tin nhắn mới nhất (khách gửi hoặc CSKH trả lời) luôn nằm trên
+  // cùng, giống Zalo/Messenger — UPDATE_SESSIONS chỉ gộp vào danh sách cũ nên
+  // thứ tự ban đầu của máy chủ không tự cập nhật khi có tin mới.
+  const sortedChatSessions = useMemo(() => sortSessionsByLatest(liveChatSessions), [liveChatSessions]);
+  const activeChat = liveChatSessions.find(s => s.id === activeSessionId) || sortedChatSessions[0];
 
   return (
     <div style={{ backgroundColor: '#f8fafc', minHeight: '100vh', padding: '1.5rem 2rem', maxWidth: '1400px', margin: '0 auto', fontFamily: 'Inter, sans-serif' }}>
@@ -571,7 +584,7 @@ export default function CustomerService() {
                 Khách Đang Chờ Chat Trực Tuyến
               </h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                {liveChatSessions.map((s, sIdx) => (
+                {sortedChatSessions.map((s, sIdx) => (
                   <div key={s.id || sIdx} style={{ padding: '0.65rem 0.85rem', borderRadius: '6px', border: '1px solid #e2e8f0', backgroundColor: '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
                       <strong style={{ fontSize: '0.82rem', color: '#0f172a' }}>{s.customerName}</strong>
@@ -783,7 +796,7 @@ export default function CustomerService() {
               </span>
             </div>
             <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
-              {liveChatSessions.map(s => {
+              {sortedChatSessions.map(s => {
                 const isActive = s.id === activeSessionId;
                 const isOnline = s.status === 'ONLINE' || s.isOnline === true;
                 const unreadCount = unreadCounts[s.id] || 0;

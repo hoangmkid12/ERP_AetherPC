@@ -17,7 +17,9 @@ import {
   ArcElement, 
   Title, 
   Tooltip, 
-  Legend 
+  Legend,
+  BarController,
+  LineController
 } from 'chart.js';
 import { 
   DollarSign, ShoppingBag, AlertTriangle, Users, TrendingUp, Truck, Wrench, 
@@ -40,13 +42,20 @@ ChartJS.register(
   ArcElement,
   Title,
   Tooltip,
-  Legend
+  Legend,
+  BarController,
+  LineController
 );
 
 const parseDateVal = (val) => {
   if (!val) return null;
   if (val instanceof Date) return val;
   if (typeof val === 'string') {
+    const vn = val.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    if (vn) {
+      const tm = val.match(/(\d{1,2}):(\d{2})/);
+      return new Date(Number(vn[3]), Number(vn[2]) - 1, Number(vn[1]), tm ? Number(tm[1]) : 0, tm ? Number(tm[2]) : 0);
+    }
     if (val.includes('/')) {
       const parts = val.split('/');
       if (parts.length === 3) {
@@ -697,60 +706,151 @@ export default function Dashboard() {
     { label: 'Chờ CEO Phê Duyệt', value: `${totalPendingCeoApprovals} nhiệm vụ`, change: 'PO, Bảng lương, Nghỉ phép', icon: <Bell size={20} />, color: '#ef4444', bg: '#fef2f2' }
   ];
 
-  // Sales Trend Chart Data
-  const salesByDate = {};
-  [...filteredOrders].reverse().forEach(order => {
-    const d = order.date || '19/06';
-    salesByDate[d] = (salesByDate[d] || 0) + (Number(order.totalAmount) || 0);
-  });
-  const rawLabels = Object.keys(salesByDate);
-  const rawData = Object.values(salesByDate).map(val => val / 1000000);
-  const salesLabels = rawLabels.length >= 3 ? rawLabels : ['15/06', '16/06', '17/06', '18/06', '19/06'];
-  const salesValues = rawData.length >= 3 ? rawData : [18.49, 8.39, 24.49, 1.39, 3.25];
+  // Xu hướng doanh thu & lợi nhuận gộp: gom theo ngày / tuần / tháng tùy độ dài kỳ đang lọc
+  // (trước đây mỗi đơn hàng là một điểm theo "giờ:phút ngày" nên trục ngang dày đặc nhãn).
+  // Lợi nhuận gộp = doanh thu − giá vốn từ bút toán COGS thật trong cùng kỳ, không nhân hệ số ước lượng.
+  const trend = useMemo(() => {
+    const pts = revenueOrders
+      .map(o => ({ d: parseDateVal(o.createdAt || o.date), v: Number(o.totalAmount) || 0 }))
+      .filter(x => x.d && !isNaN(x.d.getTime()));
+    if (!pts.length) return { labels: [], revenue: [], profit: [], unit: '' };
+    // Khoảng trục thời gian: theo kỳ đang lọc (đủ ngày của tháng, đủ tháng của năm...), còn
+    // "Tất cả"/tùy chọn thì theo ngày đơn sớm nhất – muộn nhất. Mốc không có đơn vẫn hiện giá trị 0.
+    const now = new Date();
+    const times = pts.map(x => x.d.getTime());
+    let start = new Date(Math.min(...times));
+    let end = new Date(Math.max(...times));
+    let unit;
+    if (dateFilterPeriod === 'TODAY' || dateFilterPeriod === 'THIS_WEEK') {
+      unit = 'day';
+      if (dateFilterPeriod === 'THIS_WEEK') { start = new Date(now); start.setDate(now.getDate() - ((now.getDay() + 6) % 7)); }
+      else start = new Date(now);
+      end = new Date(now);
+    } else if (dateFilterPeriod === 'THIS_MONTH') {
+      unit = 'day'; start = new Date(now.getFullYear(), now.getMonth(), 1); end = new Date(now);
+    } else if (dateFilterPeriod === 'THIS_QUARTER') {
+      unit = 'week'; start = new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1); end = new Date(now);
+    } else if (dateFilterPeriod === 'THIS_YEAR') {
+      unit = 'month'; start = new Date(now.getFullYear(), 0, 1); end = new Date(now);
+    } else {
+      const spanDays = (end - start) / 86400000;
+      unit = spanDays <= 31 ? 'day' : spanDays <= 120 ? 'week' : 'month';
+    }
+    const pad = (n) => String(n).padStart(2, '0');
+    const keyOf = (d) => {
+      if (unit === 'month') return { k: `${d.getFullYear()}-${pad(d.getMonth() + 1)}`, l: `T${d.getMonth() + 1}/${String(d.getFullYear()).slice(2)}` };
+      const day = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+      if (unit === 'week') day.setDate(day.getDate() - ((day.getDay() + 6) % 7));
+      return { k: `${day.getFullYear()}-${pad(day.getMonth() + 1)}-${pad(day.getDate())}`, l: `${unit === 'week' ? 'Tuần ' : ''}${pad(day.getDate())}/${pad(day.getMonth() + 1)}` };
+    };
+    const map = {};
+    for (let c = new Date(start.getFullYear(), start.getMonth(), start.getDate()); c <= end;) {
+      const { k, l } = keyOf(c);
+      map[k] ||= { label: l, revenue: 0, cogs: 0 };
+      if (unit === 'month') c = new Date(c.getFullYear(), c.getMonth() + 1, 1);
+      else c.setDate(c.getDate() + (unit === 'week' ? 7 : 1));
+    }
+    pts.forEach(({ d, v }) => {
+      const { k, l } = keyOf(d);
+      (map[k] ||= { label: l, revenue: 0, cogs: 0 }).revenue += v;
+    });
+    (generalLedger || []).forEach(tx => {
+      if (!tx || tx.type !== 'EXPENSE' || typeof tx.referenceId !== 'string' || !tx.referenceId.startsWith('COGS-')) return;
+      if (!isDateInFilter(tx.date || tx.createdAt, dateFilterPeriod, customStartDate, customEndDate)) return;
+      const d = parseDateVal(tx.date || tx.createdAt);
+      if (!d) return;
+      const { k } = keyOf(d);
+      if (map[k]) map[k].cogs += Number(tx.amount) || 0;
+    });
+    const keys = Object.keys(map).sort();
+    return {
+      unit,
+      labels: keys.map(k => map[k].label),
+      revenue: keys.map(k => Number((map[k].revenue / 1e6).toFixed(1))),
+      profit: keys.map(k => Number(((map[k].revenue - map[k].cogs) / 1e6).toFixed(1))),
+    };
+  }, [revenueOrders, generalLedger, dateFilterPeriod, customStartDate, customEndDate]);
 
+  const trendUnitLabel = { day: 'theo ngày', week: 'theo tuần', month: 'theo tháng' }[trend.unit] || '';
   const salesChartData = {
-    labels: salesLabels,
+    labels: trend.labels,
     datasets: [
       {
-        label: 'Doanh thu (Triệu VNĐ)',
-        data: salesValues,
-        borderColor: '#2563eb',
-        backgroundColor: 'rgba(37, 99, 235, 0.15)',
-        tension: 0.35,
-        fill: true
+        type: 'bar',
+        label: 'Doanh thu',
+        data: trend.revenue,
+        backgroundColor: 'rgba(37, 99, 235, 0.85)',
+        hoverBackgroundColor: '#1d4ed8',
+        borderRadius: 4,
+        maxBarThickness: 34,
+        order: 2
       },
       {
-        label: 'Lợi nhuận gộp (Triệu VNĐ)',
-        data: salesValues.map(v => Number((v * 0.28).toFixed(2))),
+        type: 'line',
+        label: 'Lợi nhuận gộp',
+        data: trend.profit,
         borderColor: '#16a34a',
-        backgroundColor: 'transparent',
-        borderDash: [5, 5],
-        tension: 0.35
+        backgroundColor: '#16a34a',
+        pointRadius: trend.labels.length > 24 ? 0 : 3,
+        pointHoverRadius: 5,
+        borderWidth: 2.5,
+        tension: 0.35,
+        order: 1
       }
     ]
   };
-
-  // Category Distribution Data
-  const categoryCounts = {};
-  filteredOrders.forEach(order => {
-    if (order.items && Array.isArray(order.items)) {
-      order.items.forEach(item => {
-        const cat = item.category || 'Linh Kiện Khác';
-        categoryCounts[cat] = (categoryCounts[cat] || 0) + (item.quantity || 1);
-      });
+  const salesChartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { position: 'top', align: 'end', labels: { boxWidth: 10, boxHeight: 10, usePointStyle: true, font: { size: 11 } } },
+      tooltip: { callbacks: { label: (ctx) => ` ${ctx.dataset.label}: ${Number(ctx.parsed.y).toLocaleString('vi-VN')} triệu ₫` } }
+    },
+    scales: {
+      y: { beginAtZero: true, grid: { color: '#f1f5f9' }, border: { display: false }, ticks: { font: { size: 10 }, callback: (v) => `${Number(v).toLocaleString('vi-VN')} tr` } },
+      x: { grid: { display: false }, ticks: { font: { size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } }
     }
-  });
-  const catLabels = Object.keys(categoryCounts).length > 0 ? Object.keys(categoryCounts) : ['Card Màn Hình (VGA)', 'Bộ Vi Xử Lý (CPU)', 'Bo Mạch Chủ', 'RAM & SSD', 'Khác'];
-  const catValues = Object.values(categoryCounts).length > 0 ? Object.values(categoryCounts) : [8, 5, 4, 6, 2];
+  };
+
+  // Cơ cấu doanh số theo danh mục: tiền hàng của từng dòng sản phẩm, danh mục lấy từ kho theo mã sản phẩm
+  const CATEGORY_LABELS = { CPU: 'CPU', VGA: 'Card màn hình', MAINBOARD: 'Bo mạch chủ', RAM: 'RAM', STORAGE: 'Ổ cứng SSD/HDD', PSU: 'Nguồn', CASE: 'Vỏ case', COOLER: 'Tản nhiệt', MONITOR: 'Màn hình', MOUSE: 'Chuột', KEYBOARD: 'Bàn phím' };
+  const CATEGORY_COLORS = ['#2563eb', '#16a34a', '#f59e0b', '#8b5cf6', '#ec4899', '#0ea5e9', '#94a3b8'];
+  const categoryShare = useMemo(() => {
+    const catById = {};
+    (inventory || []).forEach(it => { if (it && it.id != null) catById[String(it.id)] = it.category; });
+    const guess = (name = '') => {
+      const n = name.toLowerCase();
+      if (/card màn hình|geforce|radeon|rtx|gtx/.test(n)) return 'VGA';
+      if (/màn hình/.test(n)) return 'MONITOR';
+      if (/bộ vi xử lý|cpu|core i|ryzen/.test(n)) return 'CPU';
+      if (/bo mạch chủ|mainboard/.test(n)) return 'MAINBOARD';
+      if (/ram|ddr/.test(n)) return 'RAM';
+      if (/ssd|hdd|ổ cứng/.test(n)) return 'STORAGE';
+      if (/nguồn|psu/.test(n)) return 'PSU';
+      if (/tản nhiệt|cooler/.test(n)) return 'COOLER';
+      if (/vỏ|case/.test(n)) return 'CASE';
+      if (/chuột|mouse/.test(n)) return 'MOUSE';
+      return 'OTHER';
+    };
+    const sum = {};
+    revenueOrders.forEach(o => (o.items || []).forEach(it => {
+      const cat = catById[String(it.productId)] || guess(it.name || it.product?.name);
+      const v = Number(it.totalPrice) || (Number(it.price) || 0) * (Number(it.quantity) || 1);
+      sum[cat] = (sum[cat] || 0) + v;
+    }));
+    const total = Object.values(sum).reduce((a, b) => a + b, 0);
+    const sorted = Object.entries(sum).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
+    const top = sorted.slice(0, 6);
+    const rest = sorted.slice(6).reduce((a, [, v]) => a + v, 0);
+    const rows = top.map(([k, v]) => ({ label: CATEGORY_LABELS[k] || 'Khác', value: v }));
+    if (rest > 0) rows.push({ label: 'Khác', value: rest });
+    return rows.map((r, i) => ({ ...r, pct: total ? (r.value / total) * 100 : 0, color: CATEGORY_COLORS[i % CATEGORY_COLORS.length] }));
+  }, [revenueOrders, inventory]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const categoryChartData = {
-    labels: catLabels,
-    datasets: [
-      {
-        data: catValues,
-        backgroundColor: ['#3b82f6', '#10b981', '#8b5cf6', '#f59e0b', '#ec4899', '#64748b']
-      }
-    ]
+    labels: categoryShare.map(c => c.label),
+    datasets: [{ data: categoryShare.map(c => Math.round(c.value)), backgroundColor: categoryShare.map(c => c.color), borderWidth: 2, borderColor: '#ffffff', hoverOffset: 6 }]
   };
 
   // Cashflow In vs Out Data — real monthly buckets from actual Order dates (inflow) and
@@ -969,69 +1069,101 @@ export default function Dashboard() {
           </div>
 
           {/* Charts Row */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1.8fr 1.2fr', gap: '1.25rem', marginBottom: '1.25rem' }}>
-            
-            {/* Sales Trend Chart */}
-            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem', height: '340px', display: 'flex', flexDirection: 'column' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                <h3 style={{ fontSize: '0.92rem', fontWeight: 800, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                  <TrendingUp size={16} style={{ color: '#2563eb' }} />
-                  <span>Xu Hướng Doanh Thu & Lợi Nhuận Gộp</span>
-                </h3>
-                <span style={{ fontSize: '0.72rem', color: '#64748b' }}>Đơn vị: Triệu VNĐ</span>
+          <div className="dash-charts-row" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 2fr) minmax(0, 1fr)', gap: '1rem', marginBottom: '1rem' }}>
+
+            {/* Xu hướng doanh thu */}
+            <div style={{ backgroundColor: '#ffffff', borderRadius: '10px', border: '1px solid #cbd5e1', padding: '1.1rem 1.25rem', height: '360px', display: 'flex', flexDirection: 'column', boxShadow: '0 2px 8px rgba(15, 23, 42, 0.04)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.75rem', marginBottom: '0.5rem' }}>
+                <div>
+                  <h3 style={{ fontSize: '0.92rem', fontWeight: 800, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <TrendingUp size={16} style={{ color: '#2563eb' }} />
+                    <span>Doanh Thu & Lợi Nhuận Gộp</span>
+                  </h3>
+                  <span style={{ fontSize: '0.72rem', color: '#64748b' }}>Tổng hợp {trendUnitLabel} · đơn vị triệu ₫</span>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0f172a' }}>{(totalRevenueVal / 1e6).toLocaleString('vi-VN', { maximumFractionDigits: 1 })} tr</div>
+                  <div style={{ fontSize: '0.72rem', color: '#16a34a', fontWeight: 700 }}>Lãi gộp {grossMarginPct.toFixed(1)}%</div>
+                </div>
               </div>
-              <div style={{ flex: 1, position: 'relative' }}>
-                <Line
-                  data={salesChartData}
-                  options={{
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { position: 'top', labels: { boxWidth: 12, font: { size: 11 } } } },
-                    scales: {
-                      y: { grid: { color: '#f1f5f9' }, ticks: { font: { size: 10 } } },
-                      x: { grid: { color: '#f1f5f9' }, ticks: { font: { size: 10 } } }
-                    }
-                  }}
-                />
+              <div style={{ flex: 1, position: 'relative', minHeight: 0 }}>
+                {trend.labels.length === 0 ? (
+                  <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontSize: '0.82rem' }}>Chưa có đơn hàng trong kỳ đã chọn.</div>
+                ) : (
+                  <Bar data={salesChartData} options={salesChartOptions} />
+                )}
               </div>
             </div>
 
-            {/* Category Breakdown Chart */}
-            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem', height: '340px', display: 'flex', flexDirection: 'column' }}>
-              <h3 style={{ fontSize: '0.92rem', fontWeight: 800, color: '#0f172a', margin: '0 0 1rem 0', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+            {/* Cơ cấu doanh số theo danh mục */}
+            <div style={{ backgroundColor: '#ffffff', borderRadius: '10px', border: '1px solid #cbd5e1', padding: '1.1rem 1.25rem', height: '360px', display: 'flex', flexDirection: 'column', boxShadow: '0 2px 8px rgba(15, 23, 42, 0.04)' }}>
+              <h3 style={{ fontSize: '0.92rem', fontWeight: 800, color: '#0f172a', margin: '0 0 0.25rem 0', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                 <PieChart size={16} style={{ color: '#8b5cf6' }} />
-                <span>Cơ Cấu Doanh Số Theo Linh Kiện</span>
+                <span>Cơ Cấu Doanh Số Theo Danh Mục</span>
               </h3>
-              <div style={{ flex: 1, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Doughnut
-                  data={categoryChartData}
-                  options={{
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } }
-                  }}
-                />
-              </div>
+              <span style={{ fontSize: '0.72rem', color: '#64748b', marginBottom: '0.5rem' }}>Tỷ trọng tiền hàng của các đơn trong kỳ</span>
+              {categoryShare.length === 0 ? (
+                <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontSize: '0.82rem' }}>Chưa có dữ liệu.</div>
+              ) : (
+                <div style={{ flex: 1, minHeight: 0, display: 'flex', alignItems: 'center', gap: '0.9rem' }}>
+                  <div style={{ width: '46%', height: '170px', position: 'relative', flexShrink: 0 }}>
+                    <Doughnut
+                      data={categoryChartData}
+                      options={{
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        cutout: '62%',
+                        plugins: {
+                          legend: { display: false },
+                          tooltip: { callbacks: { label: (ctx) => ` ${ctx.label}: ${(ctx.parsed / 1e6).toLocaleString('vi-VN', { maximumFractionDigits: 1 })} triệu ₫` } }
+                        }
+                      }}
+                    />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+                    {categoryShare.map(c => (
+                      <div key={c.label} style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.78rem' }}>
+                        <span style={{ width: 10, height: 10, borderRadius: 3, backgroundColor: c.color, flexShrink: 0 }} />
+                        <span style={{ flex: 1, color: '#334155', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.label}</span>
+                        <strong style={{ color: '#0f172a' }}>{c.pct.toFixed(1)}%</strong>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
           </div>
 
           {/* Quick Approvals & Recent Orders Preview */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.8fr', gap: '1.25rem' }}>
+          <div className="dash-bottom-row" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 2fr)', gap: '1rem', alignItems: 'stretch' }}>
             
             {/* Pending POs Preview */}
-            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem' }}>
+            <div style={{ backgroundColor: '#ffffff', borderRadius: '10px', border: '1px solid #cbd5e1', padding: '1.1rem 1.25rem', boxShadow: '0 2px 8px rgba(15, 23, 42, 0.04)', display: 'flex', flexDirection: 'column' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.85rem' }}>
                 <h3 style={{ fontSize: '0.9rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
-                  Báo Giá NCC Đang Chờ Duyệt
+                  Việc Chờ Ban Giám Đốc Duyệt
                 </h3>
                 <button onClick={() => setTab('approvals')} style={{ background: 'none', border: 'none', color: '#2563eb', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer' }}>
                   Xem tất cả →
                 </button>
               </div>
 
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                {[
+                  { label: 'Báo giá PO', n: pendingQuotedPOsCount, color: '#2563eb' },
+                  { label: 'Bảng lương', n: pendingPayrollApprovalCount, color: '#0ea5e9' },
+                  { label: 'Nghỉ phép', n: pendingLeaveApprovalCount, color: '#f59e0b' },
+                ].map(x => (
+                  <button key={x.label} type="button" onClick={() => setTab('approvals')}
+                    style={{ border: '1px solid #e2e8f0', borderRadius: '8px', backgroundColor: '#f8fafc', padding: '0.55rem 0.4rem', cursor: 'pointer', textAlign: 'center' }}>
+                    <div style={{ fontSize: '1.2rem', fontWeight: 800, color: x.n ? x.color : '#94a3b8' }}>{x.n}</div>
+                    <div style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 600 }}>{x.label}</div>
+                  </button>
+                ))}
+              </div>
               {filteredQuotedOrders.length === 0 ? (
-                <div style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8', fontSize: '0.8rem' }}>
+                <div style={{ padding: '1.25rem', textAlign: 'center', color: '#94a3b8', fontSize: '0.8rem', border: '1px dashed #e2e8f0', borderRadius: '8px' }}>
                   Không có đơn báo giá nào chờ duyệt.
                 </div>
               ) : (
@@ -1058,7 +1190,7 @@ export default function Dashboard() {
             </div>
 
             {/* Orders in Fulfillment Flow */}
-            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem' }}>
+            <div style={{ backgroundColor: '#ffffff', borderRadius: '10px', border: '1px solid #cbd5e1', padding: '1.1rem 1.25rem', boxShadow: '0 2px 8px rgba(15, 23, 42, 0.04)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.85rem' }}>
                 <h3 style={{ fontSize: '0.9rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
                   Đơn Hàng Trong Luồng Giao Hàng & Lắp Ráp
@@ -1079,7 +1211,7 @@ export default function Dashboard() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredOrders.slice(0, 4).map(o => (
+                    {filteredOrders.slice(0, 6).map(o => (
                       <tr key={o.orderId || o.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
                         <td style={{ padding: '0.5rem 0.65rem', fontWeight: 700, color: '#2563eb' }}>
                           #{o.orderId || o.id}

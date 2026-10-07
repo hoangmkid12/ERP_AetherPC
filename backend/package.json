@@ -12,6 +12,7 @@
     "db:seed": "node prisma/seed.js",
     "db:upgrade-hr": "node prisma/upgrade-hr-module.js",
     "db:backfill-cogs": "node prisma/backfill-cogs.js",
+    "db:reconcile-stock": "node prisma/reconcile-stock.js",
     "queue:worker": "node src/services/orderWorker.js",
     "queue:producer-demo": "node scripts/enqueue_demo.js"
   },
