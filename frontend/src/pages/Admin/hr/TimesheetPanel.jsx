@@ -2,9 +2,11 @@ import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import {
   LogIn, LogOut, Hourglass, Search, Filter, RotateCw,
   HelpCircle, Download, Calendar, X, CheckCircle2,
-  ScanFace, AlertCircle, Clock
+  ScanFace, AlertCircle, Clock, ChevronLeft, ChevronRight,
+  List, CalendarDays
 } from 'lucide-react';
 import { api } from '../../../services/api';
+import { useAuth } from '../../../context/AuthContext';
 import { notify } from '../../../context/NotificationContext';
 import { getRoleName } from '../../../utils/rbacEngine';
 import { DEPARTMENTS, downloadCsv } from './hrUi';
@@ -31,23 +33,63 @@ const formatVnDateHeader = (dateObj) => {
   return `${dayName}, ${dd}/${mm}/${yyyy}`;
 };
 
-export default function TimesheetPanel() {
-  // 1. Quản lý thời gian & khoảng ngày lọc
-  const now = new Date();
-  const currentYear = now.getFullYear();
-  const currentMonth = now.getMonth(); // 0-indexed
+export default function TimesheetPanel({ defaultView }) {
+  const { user } = useAuth();
 
-  // Mặc định: Ngày đầu tháng đến ngày cuối tháng hiện tại
-  const defaultStart = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-01`;
-  const lastDayOfMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
-  const defaultEnd = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(lastDayOfMonth).padStart(2, '0')}`;
+  // 1. Kiểm tra quyền Quản lý
+  // Admin, CEO, HR có toàn quyền quản lý toàn doanh nghiệp.
+  // Các role Trưởng phòng / Quản lý (SALES_MANAGER, WAREHOUSE_MANAGER...) có quyền quản lý phòng của mình.
+  const isCompanyManager = ['ADMIN', 'CEO', 'HR'].includes(user?.role);
+  const isDeptManager = ['SALES_MANAGER', 'WAREHOUSE_MANAGER'].includes(user?.role) || (user?.role || '').includes('MANAGER');
+  const canManageAttendance = isCompanyManager || isDeptManager;
+
+  // Nếu không có quyền quản lý, BẮT BUỘC chỉ xem "Chấm công của tôi"
+  const [activeView, setActiveView] = useState(() => {
+    if (defaultView) return defaultView;
+    return canManageAttendance ? 'manage' : 'my';
+  });
+
+  useEffect(() => {
+    if (!canManageAttendance && activeView !== 'my') {
+      setActiveView('my');
+    }
+  }, [canManageAttendance, activeView]);
+
+  // Bộ phận mặc định nếu là Quản lý phòng ban
+  const defaultDept = useMemo(() => {
+    if (user?.role === 'SALES_MANAGER') return 'Kinh Doanh';
+    if (user?.role === 'WAREHOUSE_MANAGER') return 'Kho Vận';
+    return 'ALL';
+  }, [user]);
+
+  // 2. Thời gian & Lọc ngày tháng
+  const now = new Date();
+  const [selectedYear, setSelectedYear] = useState(now.getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1); // 1-12
+
+  // Chế độ xem cá nhân: 'calendar' (Lịch) hoặc 'list' (Danh sách)
+  const [personalViewMode, setPersonalViewMode] = useState('calendar');
+
+  // Khoảng ngày cho Bảng ma trận quản lý
+  const defaultStart = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-01`;
+  const lastDayOfMonth = new Date(selectedYear, selectedMonth, 0).getDate();
+  const defaultEnd = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-${String(lastDayOfMonth).padStart(2, '0')}`;
 
   const [startDate, setStartDate] = useState(defaultStart);
   const [endDate, setEndDate] = useState(defaultEnd);
   const [search, setSearch] = useState('');
-  const [department, setDepartment] = useState('ALL');
+  const [department, setDepartment] = useState(defaultDept);
 
-  // 2. Đồng hồ số thời gian thực (Live Digital Clock)
+  // Đồng bộ khi đổi Tháng / Năm ở bộ chọn
+  useEffect(() => {
+    const s = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-01`;
+    const lastDay = new Date(selectedYear, selectedMonth, 0).getDate();
+    const e = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+    setStartDate(s);
+    setEndDate(e);
+  }, [selectedYear, selectedMonth]);
+
+  // 3. Đồng hồ số thời gian thực (Live Digital Clock)
   const [currentTime, setCurrentTime] = useState(() => {
     const d = new Date();
     return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
@@ -61,9 +103,10 @@ export default function TimesheetPanel() {
     return () => clearInterval(timer);
   }, []);
 
-  // 3. State dữ liệu
+  // 4. State dữ liệu
   const [employees, setEmployees] = useState([]);
   const [attendanceLogs, setAttendanceLogs] = useState([]);
+  const [myAttendanceLogs, setMyAttendanceLogs] = useState([]);
   const [leaveRequests, setLeaveRequests] = useState([]);
   const [holidays, setHolidays] = useState([]);
   const [shiftSettings, setShiftSettings] = useState({
@@ -78,62 +121,156 @@ export default function TimesheetPanel() {
   });
   const [loading, setLoading] = useState(false);
 
-  // Modal Chú thích & Modal Camera Chấm công
+  // Modals
   const [showLegend, setShowLegend] = useState(false);
   const [showCameraModal, setShowCameraModal] = useState(false);
 
-  // 4. Load dữ liệu từ Backend
+  // 5. Fetch API dữ liệu
   const fetchData = useCallback(async () => {
     setLoading(true);
+    const monthStr = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
     try {
-      const [empRes, attRes, leaveRes, holRes, setRes, todayRes] = await Promise.allSettled([
-        api.get('/hr/employees'),
-        api.get(`/hr/attendance?from=${startDate}&to=${endDate}`),
-        api.get('/hr/leaves'),
-        api.get('/hr/holidays'),
+      const promises = [
         api.get('/hr/settings'),
-        api.get('/hr/me/attendance/today')
-      ]);
+        api.get('/hr/me/attendance/today'),
+        api.get(`/hr/me/attendance?month=${monthStr}`),
+        api.get('/hr/holidays'),
+        api.get('/hr/leaves')
+      ];
 
-      if (empRes.status === 'fulfilled' && empRes.value?.data) {
-        setEmployees(empRes.value.data.filter(e => e.status !== 'INACTIVE'));
+      // Nếu có quyền quản lý, tải thêm danh sách nhân viên và toàn bộ logs
+      if (canManageAttendance) {
+        promises.push(api.get('/hr/employees'));
+        promises.push(api.get(`/hr/attendance?from=${startDate}&to=${endDate}`));
       }
-      if (attRes.status === 'fulfilled' && attRes.value?.data) {
-        setAttendanceLogs(attRes.value.data || []);
-      }
-      if (leaveRes.status === 'fulfilled' && leaveRes.value?.data) {
-        setLeaveRequests(leaveRes.value.data || []);
-      }
-      if (holRes.status === 'fulfilled' && holRes.value?.data) {
-        setHolidays(holRes.value.data || []);
-      }
-      if (setRes.status === 'fulfilled' && setRes.value?.data) {
+
+      const results = await Promise.allSettled(promises);
+
+      // Cài đặt ca
+      if (results[0].status === 'fulfilled' && results[0].value?.data) {
         setShiftSettings({
-          workStartTime: setRes.value.data.workStartTime || '08:00',
-          workEndTime: setRes.value.data.workEndTime || '17:30',
-          workOnSaturday: Boolean(setRes.value.data.workOnSaturday)
+          workStartTime: results[0].value.data.workStartTime || '08:00',
+          workEndTime: results[0].value.data.workEndTime || '17:30',
+          workOnSaturday: Boolean(results[0].value.data.workOnSaturday)
         });
       }
-      if (todayRes.status === 'fulfilled' && todayRes.value?.data) {
-        const rec = todayRes.value.data.record;
+
+      // Check-in hôm nay
+      if (results[1].status === 'fulfilled' && results[1].value?.data) {
+        const rec = results[1].value.data.record;
         setTodayRecord({
           checkIn: rec?.checkIn || '--',
           checkOut: rec?.checkOut || '--',
           workHours: rec?.workHours != null ? `${rec.workHours}h` : '--'
         });
       }
+
+      // Lịch sử chấm công của chính tôi
+      if (results[2].status === 'fulfilled' && results[2].value?.data) {
+        setMyAttendanceLogs(results[2].value.data.records || []);
+      }
+
+      // Ngày lễ
+      if (results[3].status === 'fulfilled' && results[3].value?.data) {
+        setHolidays(results[3].value.data || []);
+      }
+
+      // Nghỉ phép
+      if (results[4].status === 'fulfilled' && results[4].value?.data) {
+        setLeaveRequests(results[4].value.data || []);
+      }
+
+      // Dữ liệu quản lý (nếu có quyền)
+      if (canManageAttendance) {
+        if (results[5]?.status === 'fulfilled' && results[5].value?.data) {
+          setEmployees(results[5].value.data.filter(e => e.status !== 'INACTIVE'));
+        }
+        if (results[6]?.status === 'fulfilled' && results[6].value?.data) {
+          setAttendanceLogs(results[6].value.data || []);
+        }
+      }
     } catch (err) {
-      notify(err.message || 'Không thể tải dữ liệu bảng công.', 'error');
+      notify(err.message || 'Lỗi tải dữ liệu chấm công.', 'error');
     } finally {
       setLoading(false);
     }
-  }, [startDate, endDate]);
+  }, [startDate, endDate, selectedYear, selectedMonth, canManageAttendance]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
 
-  // 5. Danh sách các ngày trong khoảng ngày đã chọn (Dates columns)
+  // 6. Tính toán Lịch tháng cho "Chấm công của tôi" (7 cột Thứ Hai -> Chủ Nhật)
+  const personalCalendarDays = useMemo(() => {
+    const days = [];
+    const firstDayOfMonth = new Date(selectedYear, selectedMonth - 1, 1);
+    const daysInCurrentMonth = new Date(selectedYear, selectedMonth, 0).getDate();
+
+    // Thứ trong tuần của ngày 1 (0 = CN, 1 = T2... 6 = T7).
+    // Chuẩn Việt Nam: Tuần bắt đầu từ Thứ Hai (0: T2 ... 6: CN)
+    const firstDayDow = (firstDayOfMonth.getDay() + 6) % 7;
+
+    // Các ngày từ tháng trước bù vào tuần đầu
+    const daysInPrevMonth = new Date(selectedYear, selectedMonth - 1, 0).getDate();
+    for (let i = firstDayDow - 1; i >= 0; i--) {
+      const d = daysInPrevMonth - i;
+      const prevMonth = selectedMonth === 1 ? 12 : selectedMonth - 1;
+      const prevYear = selectedMonth === 1 ? selectedYear - 1 : selectedYear;
+      const iso = `${prevYear}-${String(prevMonth).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      days.push({
+        dayNumber: d,
+        formatted: `${String(d).padStart(2, '0')}/${String(prevMonth).padStart(2, '0')}`,
+        isoDate: iso,
+        isCurrentMonth: false,
+        isWeekend: false
+      });
+    }
+
+    // Các ngày của tháng hiện tại
+    for (let d = 1; d <= daysInCurrentMonth; d++) {
+      const curDate = new Date(selectedYear, selectedMonth - 1, d);
+      const dow = (curDate.getDay() + 6) % 7; // 0 = T2, 5 = T7, 6 = CN
+      const iso = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      const isWeekend = dow === 5 || dow === 6; // T7 hoặc CN
+      days.push({
+        dayNumber: d,
+        formatted: `${String(d).padStart(2, '0')}/${String(selectedMonth).padStart(2, '0')}`,
+        isoDate: iso,
+        isCurrentMonth: true,
+        isWeekend,
+        isSunday: dow === 6,
+        isSaturday: dow === 5
+      });
+    }
+
+    // Bù thêm ngày của tháng sau cho đủ bội số của 7
+    const remaining = (7 - (days.length % 7)) % 7;
+    for (let d = 1; d <= remaining; d++) {
+      const nextMonth = selectedMonth === 12 ? 1 : selectedMonth + 1;
+      const nextYear = selectedMonth === 12 ? selectedYear + 1 : selectedYear;
+      const iso = `${nextYear}-${String(nextMonth).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      days.push({
+        dayNumber: d,
+        formatted: `${String(d).padStart(2, '0')}/${String(nextMonth).padStart(2, '0')}`,
+        isoDate: iso,
+        isCurrentMonth: false,
+        isWeekend: false
+      });
+    }
+
+    return days;
+  }, [selectedYear, selectedMonth]);
+
+  // Index map logs cá nhân [isoDate] -> log
+  const myLogsIndex = useMemo(() => {
+    const map = {};
+    for (const log of myAttendanceLogs) {
+      if (log.isoDate) map[log.isoDate] = log;
+    }
+    return map;
+  }, [myAttendanceLogs]);
+
+  // 7. Dữ liệu cho Bảng Ma Trận Quản Lý (Matrix Columns)
   const daysList = useMemo(() => {
     const list = [];
     if (!startDate || !endDate) return list;
@@ -164,7 +301,7 @@ export default function TimesheetPanel() {
     return list;
   }, [startDate, endDate, shiftSettings.workOnSaturday]);
 
-  // 6. Lọc nhân viên theo tìm kiếm và phòng ban
+  // Lọc nhân viên theo phòng ban & tìm kiếm
   const filteredEmployees = useMemo(() => {
     return employees.filter(emp => {
       const q = search.toLowerCase().trim();
@@ -178,7 +315,7 @@ export default function TimesheetPanel() {
     });
   }, [employees, search, department]);
 
-  // 7. Tạo Index tra cứu dữ liệu chấm công nhanh [empId][isoDate]
+  // Index map logs quản lý [empId][isoDate] -> log
   const attendanceIndex = useMemo(() => {
     const idx = {};
     for (const log of attendanceLogs) {
@@ -190,7 +327,7 @@ export default function TimesheetPanel() {
     return idx;
   }, [attendanceLogs]);
 
-  // Index tra cứu ngày lễ [isoDate]
+  // Index ngày lễ
   const holidaySet = useMemo(() => {
     const set = new Set();
     for (const h of holidays) {
@@ -199,7 +336,7 @@ export default function TimesheetPanel() {
     return set;
   }, [holidays]);
 
-  // Index tra cứu ngày nghỉ phép đã duyệt [empId][isoDate]
+  // Index nghỉ phép đã duyệt
   const approvedLeavesIndex = useMemo(() => {
     const idx = {};
     for (const l of leaveRequests) {
@@ -220,7 +357,7 @@ export default function TimesheetPanel() {
     return idx;
   }, [leaveRequests]);
 
-  // 8. Tính tổng số ngày công (D) và tổng số giờ làm (H) cho từng nhân viên
+  // Thống kê ngày & giờ công từng nhân viên
   const employeeSummary = useMemo(() => {
     const summary = {};
     for (const emp of employees) {
@@ -243,16 +380,11 @@ export default function TimesheetPanel() {
     return summary;
   }, [employees, daysList, attendanceIndex]);
 
-  // 9. Xuất file Excel / CSV đầy đủ ma trận
+  // Xuất CSV ma trận
   const exportMatrixCsv = () => {
     const filename = `bang-cham-cong-${startDate}-den-${endDate}.csv`;
     const headers = [
-      'Mã NV',
-      'Họ và Tên',
-      'Chức Vụ',
-      'Phòng Ban',
-      'Tổng Ngày (D)',
-      'Tổng Giờ (H)',
+      'Mã NV', 'Họ và Tên', 'Chức Vụ', 'Phòng Ban', 'Tổng Ngày (D)', 'Tổng Giờ (H)',
       ...daysList.map(d => `${d.dayOfWeekName} ${d.dateFormatted}`)
     ];
 
@@ -263,9 +395,7 @@ export default function TimesheetPanel() {
 
       const dayCells = daysList.map(d => {
         const log = empLogs[d.isoDate];
-        if (log && log.checkIn) {
-          return `${log.checkIn} - ${log.checkOut || '--'}`;
-        }
+        if (log && log.checkIn) return `${log.checkIn} - ${log.checkOut || '--'}`;
         if (empLeaves[d.isoDate]) return 'Nghỉ phép';
         if (holidaySet.has(d.isoDate)) return 'Nghỉ lễ';
         if (d.isWeekend) return 'N';
@@ -288,11 +418,92 @@ export default function TimesheetPanel() {
 
   const isCheckedIn = todayRecord.checkIn !== '--';
 
+  // Điều hướng Tháng / Năm
+  const prevMonthHandler = () => {
+    if (selectedMonth === 1) {
+      setSelectedMonth(12);
+      setSelectedYear(y => y - 1);
+    } else {
+      setSelectedMonth(m => m - 1);
+    }
+  };
+
+  const nextMonthHandler = () => {
+    if (selectedMonth === 12) {
+      setSelectedMonth(1);
+      setSelectedYear(y => y + 1);
+    } else {
+      setSelectedMonth(m => m + 1);
+    }
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', fontFamily: 'Inter, sans-serif' }}>
       
       {/* ========================================================================= */}
-      {/* 1. TOP HEADER WIDGETS (KHUNG ĐỒNG HỒ & THÔNG TIN CA LÀM VIỆC) */}
+      {/* TIÊU ĐỀ BẢNG CHẤM CÔNG & NÚT CHUYỂN ĐỔI (QUẢN LÝ / CHẤM CÔNG CỦA TÔI) */}
+      {/* ========================================================================= */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+        <div>
+          <h2 style={{ fontSize: '1.45rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+            Bảng chấm công
+          </h2>
+          <p style={{ color: '#64748b', fontSize: '0.85rem', margin: '0.25rem 0 0' }}>
+            Theo dõi, quản lý và xử lý dữ liệu chấm công
+          </p>
+        </div>
+
+        {/* NÚT CHUYỂN ĐỔI: CHỈ HIỂN THỊ KHI CÓ QUYỀN QUẢN LÝ */}
+        {canManageAttendance && (
+          <div style={{
+            display: 'inline-flex',
+            backgroundColor: '#f1f5f9',
+            padding: '3px',
+            borderRadius: '8px',
+            border: '1px solid #e2e8f0'
+          }}>
+            <button
+              type="button"
+              onClick={() => setActiveView('manage')}
+              style={{
+                padding: '0.45rem 1rem',
+                borderRadius: '6px',
+                border: activeView === 'manage' ? '1px solid #cbd5e1' : 'none',
+                backgroundColor: activeView === 'manage' ? '#ffffff' : 'transparent',
+                color: activeView === 'manage' ? '#0f172a' : '#64748b',
+                fontSize: '0.82rem',
+                fontWeight: activeView === 'manage' ? 700 : 600,
+                cursor: 'pointer',
+                boxShadow: activeView === 'manage' ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              Quản lý chấm công
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveView('my')}
+              style={{
+                padding: '0.45rem 1rem',
+                borderRadius: '6px',
+                border: activeView === 'my' ? '1px solid #cbd5e1' : 'none',
+                backgroundColor: activeView === 'my' ? '#ffffff' : 'transparent',
+                color: activeView === 'my' ? '#0f172a' : '#64748b',
+                fontSize: '0.82rem',
+                fontWeight: activeView === 'my' ? 700 : 600,
+                cursor: 'pointer',
+                boxShadow: activeView === 'my' ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              Chấm công của tôi
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* ========================================================================= */}
+      {/* KHỐI ĐỒNG HỒ & THÔNG TIN CA LÀM VIỆC (DÙNG CHUNG CHO CẢ 2 CHẾ ĐỘ) */}
       {/* ========================================================================= */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem', alignItems: 'stretch' }}>
         
@@ -458,485 +669,748 @@ export default function TimesheetPanel() {
       </div>
 
       {/* ========================================================================= */}
-      {/* 2. FILTER & TOOLBAR (TÌM KIẾM, PHÒNG BAN, KHOẢNG NGÀY & THAO TÁC) */}
+      {/* TRƯỜNG HỢP 1: GIAO DIỆN "CHẤM CÔNG CỦA TÔI" (LỊCH THÁNG CÁ NHÂN) */}
       {/* ========================================================================= */}
-      <div style={{
-        backgroundColor: '#ffffff',
-        borderRadius: '10px',
-        border: '1px solid #e2e8f0',
-        padding: '0.75rem 1rem',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        flexWrap: 'wrap',
-        gap: '0.75rem'
-      }}>
-        {/* Bộ lọc bên trái */}
-        <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.65rem' }}>
+      {activeView === 'my' && (
+        <div style={{
+          backgroundColor: '#ffffff',
+          borderRadius: '12px',
+          border: '1px solid #e2e8f0',
+          padding: '1.25rem 1.5rem',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '1rem'
+        }}>
           
-          {/* Ô Tìm kiếm */}
-          <div style={{ position: 'relative', minWidth: '200px' }}>
-            <Search size={15} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
-            <input
-              type="text"
-              placeholder="Tìm kiếm..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '0.45rem 0.65rem 0.45rem 2rem',
-                borderRadius: '6px',
-                border: '1px solid #cbd5e1',
-                fontSize: '0.82rem',
-                outline: 'none',
-                boxSizing: 'border-box'
-              }}
-            />
-          </div>
+          {/* Header phần Lịch sử chấm công */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+            <div>
+              <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                Lịch sử chấm công
+              </h3>
+            </div>
 
-          {/* Lọc phòng ban */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-            <Filter size={14} style={{ color: '#64748b' }} />
-            <select
-              value={department}
-              onChange={(e) => setDepartment(e.target.value)}
-              style={{
-                padding: '0.45rem 0.65rem',
-                borderRadius: '6px',
-                border: '1px solid #cbd5e1',
-                fontSize: '0.82rem',
-                color: '#0f172a',
-                backgroundColor: '#ffffff',
-                outline: 'none'
-              }}
-            >
-              <option value="ALL">Tất cả phòng ban</option>
-              {DEPARTMENTS.map(d => (
-                <option key={d} value={d}>{d}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Chọn khoảng ngày: Từ ngày */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => e.target.value && setStartDate(e.target.value)}
-              style={{
-                padding: '0.4rem 0.65rem',
-                borderRadius: '6px',
-                border: '1px solid #cbd5e1',
-                fontSize: '0.82rem',
-                color: '#0f172a',
-                outline: 'none'
-              }}
-            />
-          </div>
-
-          <span style={{ color: '#94a3b8', fontSize: '0.82rem' }}>—</span>
-
-          {/* Chọn khoảng ngày: Đến ngày */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => e.target.value && setEndDate(e.target.value)}
-              style={{
-                padding: '0.4rem 0.65rem',
-                borderRadius: '6px',
-                border: '1px solid #cbd5e1',
-                fontSize: '0.82rem',
-                color: '#0f172a',
-                outline: 'none'
-              }}
-            />
-          </div>
-
-        </div>
-
-        {/* Nút tác vụ bên phải */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-          
-          <button
-            type="button"
-            onClick={fetchData}
-            style={{
+            {/* Chuyển đổi Lịch / Danh sách */}
+            <div style={{
               display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.35rem',
-              backgroundColor: '#ffffff',
-              color: '#334155',
-              border: '1px solid #cbd5e1',
+              backgroundColor: '#f1f5f9',
+              padding: '2px',
               borderRadius: '6px',
-              padding: '0.45rem 0.85rem',
-              fontSize: '0.8rem',
-              fontWeight: 600,
-              cursor: 'pointer'
-            }}
-          >
-            <span>Làm mới</span>
-            <RotateCw size={14} className={loading ? 'spin' : ''} />
-          </button>
+              border: '1px solid #e2e8f0'
+            }}>
+              <button
+                type="button"
+                onClick={() => setPersonalViewMode('calendar')}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.3rem',
+                  padding: '0.35rem 0.85rem',
+                  borderRadius: '5px',
+                  border: personalViewMode === 'calendar' ? '1px solid #cbd5e1' : 'none',
+                  backgroundColor: personalViewMode === 'calendar' ? '#ffffff' : 'transparent',
+                  color: personalViewMode === 'calendar' ? '#0f172a' : '#64748b',
+                  fontSize: '0.8rem',
+                  fontWeight: personalViewMode === 'calendar' ? 700 : 500,
+                  cursor: 'pointer'
+                }}
+              >
+                <CalendarDays size={14} />
+                <span>Lịch</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setPersonalViewMode('list')}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.3rem',
+                  padding: '0.35rem 0.85rem',
+                  borderRadius: '5px',
+                  border: personalViewMode === 'list' ? '1px solid #cbd5e1' : 'none',
+                  backgroundColor: personalViewMode === 'list' ? '#ffffff' : 'transparent',
+                  color: personalViewMode === 'list' ? '#0f172a' : '#64748b',
+                  fontSize: '0.8rem',
+                  fontWeight: personalViewMode === 'list' ? 700 : 500,
+                  cursor: 'pointer'
+                }}
+              >
+                <List size={14} />
+                <span>Danh sách</span>
+              </button>
+            </div>
+          </div>
 
-          <button
-            type="button"
-            onClick={() => setShowLegend(true)}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.35rem',
-              backgroundColor: '#ffffff',
-              color: '#334155',
-              border: '1px solid #cbd5e1',
-              borderRadius: '6px',
-              padding: '0.45rem 0.85rem',
-              fontSize: '0.8rem',
-              fontWeight: 600,
-              cursor: 'pointer'
-            }}
-          >
-            <span>Chú thích</span>
-            <HelpCircle size={14} />
-          </button>
-
-          <button
-            type="button"
-            onClick={exportMatrixCsv}
-            disabled={!filteredEmployees.length}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.35rem',
-              backgroundColor: '#ffffff',
-              color: '#334155',
-              border: '1px solid #cbd5e1',
-              borderRadius: '6px',
-              padding: '0.45rem 0.85rem',
-              fontSize: '0.8rem',
-              fontWeight: 600,
-              cursor: 'pointer'
-            }}
-          >
-            <Download size={14} />
-            <span>Xuất Excel</span>
-          </button>
-
-        </div>
-      </div>
-
-      {/* ========================================================================= */}
-      {/* 3. MA TRẬN CHẤM CÔNG CHI TIẾT THEO NGÀY (TIMESHEET MATRIX TABLE) */}
-      {/* ========================================================================= */}
-      <div style={{
-        backgroundColor: '#ffffff',
-        borderRadius: '12px',
-        border: '1px solid #e2e8f0',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-        overflow: 'hidden'
-      }}>
-        <div style={{ overflowX: 'auto', maxHeight: '720px' }}>
-          <table style={{
-            width: '100%',
-            borderCollapse: 'collapse',
-            fontSize: '0.8rem',
-            textAlign: 'left'
+          {/* Thanh chuyển tháng/năm & Chú thích phân loại */}
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '1rem',
+            paddingTop: '0.25rem',
+            paddingBottom: '0.5rem',
+            borderBottom: '1px solid #f1f5f9'
           }}>
-            
-            {/* Header bảng */}
-            <thead>
-              <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
-                
-                {/* Cột 1: Nhân viên (Cố định Sticky) */}
-                <th style={{
-                  padding: '0.75rem 1rem',
-                  fontWeight: 700,
+            {/* Bộ chọn Tháng / Năm */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <button
+                type="button"
+                onClick={prevMonthHandler}
+                style={{
+                  padding: '0.35rem',
+                  borderRadius: '6px',
+                  border: '1px solid #cbd5e1',
+                  backgroundColor: '#ffffff',
+                  cursor: 'pointer',
                   color: '#475569',
-                  minWidth: '250px',
-                  position: 'sticky',
-                  left: 0,
-                  zIndex: 20,
-                  backgroundColor: '#f8fafc',
-                  borderRight: '1px solid #e2e8f0'
-                }}>
-                  Nhân viên
-                </th>
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                <ChevronLeft size={16} />
+              </button>
 
-                {/* Cột 2: Ngày (D) / giờ (H) (Cố định Sticky) */}
-                <th style={{
-                  padding: '0.75rem 0.65rem',
-                  fontWeight: 700,
+              <select
+                value={selectedMonth}
+                onChange={(e) => setSelectedMonth(Number(e.target.value))}
+                style={{
+                  padding: '0.4rem 0.65rem',
+                  borderRadius: '6px',
+                  border: '1px solid #cbd5e1',
+                  fontSize: '0.82rem',
+                  fontWeight: 600,
+                  color: '#0f172a',
+                  backgroundColor: '#ffffff'
+                }}
+              >
+                {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
+                  <option key={m} value={m}>Tháng {m}</option>
+                ))}
+              </select>
+
+              <select
+                value={selectedYear}
+                onChange={(e) => setSelectedYear(Number(e.target.value))}
+                style={{
+                  padding: '0.4rem 0.65rem',
+                  borderRadius: '6px',
+                  border: '1px solid #cbd5e1',
+                  fontSize: '0.82rem',
+                  fontWeight: 600,
+                  color: '#0f172a',
+                  backgroundColor: '#ffffff'
+                }}
+              >
+                {[2024, 2025, 2026, 2027].map(y => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
+              </select>
+
+              <button
+                type="button"
+                onClick={nextMonthHandler}
+                style={{
+                  padding: '0.35rem',
+                  borderRadius: '6px',
+                  border: '1px solid #cbd5e1',
+                  backgroundColor: '#ffffff',
+                  cursor: 'pointer',
                   color: '#475569',
-                  minWidth: '90px',
-                  position: 'sticky',
-                  left: '250px',
-                  zIndex: 20,
-                  backgroundColor: '#f8fafc',
-                  borderRight: '1px solid #e2e8f0',
-                  textAlign: 'center'
-                }}>
-                  <div>Ngày (D) /</div>
-                  <div>giờ (H)</div>
-                </th>
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
 
-                {/* Các cột ngày trong khoảng thời gian */}
-                {daysList.map(d => {
-                  const isRed = d.isSunday || d.isSaturday;
+            {/* Các nhãn chú thích (Legend) */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', flexWrap: 'wrap', fontSize: '0.78rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                <span style={{ width: 14, height: 14, borderRadius: 3, border: '1.5px solid #16a34a', display: 'inline-block' }} />
+                <span style={{ color: '#475569', fontWeight: 600 }}>Đủ công</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                <span style={{ width: 14, height: 14, borderRadius: 3, border: '1.5px solid #f59e0b', display: 'inline-block' }} />
+                <span style={{ color: '#475569', fontWeight: 600 }}>Không đủ công</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                <span style={{ width: 14, height: 14, borderRadius: 3, border: '1.5px solid #dc2626', display: 'inline-block' }} />
+                <span style={{ color: '#475569', fontWeight: 600 }}>Nghỉ phép</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                <span style={{ width: 14, height: 14, borderRadius: 3, border: '1.5px solid #8b5cf6', display: 'inline-block' }} />
+                <span style={{ color: '#475569', fontWeight: 600 }}>OT</span>
+              </div>
+            </div>
+          </div>
+
+          {/* DẠNG 1: LỊCH THÁNG (CALENDAR GRID THEO Ô) */}
+          {personalViewMode === 'calendar' && (
+            <div style={{ border: '1px solid #e2e8f0', borderRadius: '10px', overflow: 'hidden' }}>
+              
+              {/* Header 7 cột: Thứ hai -> Chủ nhật */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(7, 1fr)',
+                backgroundColor: '#f8fafc',
+                borderBottom: '1px solid #e2e8f0',
+                textAlign: 'center',
+                padding: '0.65rem 0',
+                fontSize: '0.78rem',
+                fontWeight: 700
+              }}>
+                <div style={{ color: '#475569' }}>Thứ hai</div>
+                <div style={{ color: '#475569' }}>Thứ ba</div>
+                <div style={{ color: '#475569' }}>Thứ tư</div>
+                <div style={{ color: '#475569' }}>Thứ năm</div>
+                <div style={{ color: '#475569' }}>Thứ sáu</div>
+                <div style={{ color: '#ef4444' }}>Thứ bảy</div>
+                <div style={{ color: '#ef4444' }}>Chủ nhật</div>
+              </div>
+
+              {/* Các ô ngày trong tháng */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(7, 1fr)',
+                backgroundColor: '#ffffff'
+              }}>
+                {personalCalendarDays.map((cell, idx) => {
+                  const log = myLogsIndex[cell.isoDate];
+                  const hasLog = Boolean(log && log.checkIn);
+                  const isLate = log?.lateMinutes > 0;
+                  const isEarly = log?.earlyLeaveMinutes > 0;
+                  const hasOT = Boolean(log?.overtimeHours > 0);
+
                   return (
-                    <th
-                      key={d.isoDate}
+                    <div
+                      key={idx}
                       style={{
-                        padding: '0.55rem 0.4rem',
-                        minWidth: '64px',
-                        textAlign: 'center',
-                        borderRight: '1px solid #f1f5f9',
-                        backgroundColor: isRed ? '#fffdf5' : '#f8fafc'
-                      }}
-                    >
-                      <div style={{
-                        fontSize: '0.72rem',
-                        fontWeight: 800,
-                        color: isRed ? '#ef4444' : '#475569',
-                        marginBottom: '2px'
-                      }}>
-                        {d.dayOfWeekName}
-                      </div>
-                      <div style={{
-                        fontSize: '0.72rem',
-                        fontWeight: 600,
-                        color: isRed ? '#ef4444' : '#64748b'
-                      }}>
-                        {d.dateFormatted}
-                      </div>
-                    </th>
-                  );
-                })}
-
-              </tr>
-            </thead>
-
-            {/* Dữ liệu từng nhân viên */}
-            <tbody>
-              {filteredEmployees.length === 0 ? (
-                <tr>
-                  <td colSpan={daysList.length + 2} style={{ padding: '3rem 1rem', textAlign: 'center', color: '#94a3b8' }}>
-                    {loading ? 'Đang tải dữ liệu chấm công...' : 'Không tìm thấy nhân viên nào phù hợp.'}
-                  </td>
-                </tr>
-              ) : (
-                filteredEmployees.map((emp, idx) => {
-                  const empLogs = attendanceIndex[emp.id] || {};
-                  const empLeaves = approvedLeavesIndex[emp.id] || {};
-                  const stats = employeeSummary[emp.id] || { days: 0, hours: 0 };
-                  const initials = getInitials(emp.fullName || emp.fullname);
-                  const isEven = idx % 2 === 0;
-
-                  return (
-                    <tr
-                      key={emp.id}
-                      style={{
+                        minHeight: '84px',
+                        borderRight: (idx + 1) % 7 === 0 ? 'none' : '1px solid #f1f5f9',
                         borderBottom: '1px solid #f1f5f9',
-                        backgroundColor: isEven ? '#ffffff' : '#fafafa'
+                        padding: '0.45rem',
+                        backgroundColor: !cell.isCurrentMonth
+                          ? '#fafafa'
+                          : cell.isWeekend
+                          ? '#fffdf5'
+                          : '#ffffff',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'space-between',
+                        boxSizing: 'border-box'
                       }}
                     >
-                      {/* Cột 1: Thông tin nhân viên (Avatar tròn + Tên + Chức danh) */}
-                      <td style={{
-                        padding: '0.65rem 1rem',
-                        position: 'sticky',
-                        left: 0,
-                        zIndex: 10,
-                        backgroundColor: isEven ? '#ffffff' : '#fafafa',
-                        borderRight: '1px solid #e2e8f0'
-                      }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                          {/* Avatar tròn viết tắt */}
-                          <div style={{
-                            width: '38px',
-                            height: '38px',
-                            borderRadius: '50%',
-                            backgroundColor: '#f1f5f9',
-                            border: '1px solid #e2e8f0',
-                            color: '#475569',
-                            fontWeight: 800,
-                            fontSize: '0.8rem',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            flexShrink: 0
-                          }}>
-                            {initials}
-                          </div>
-
-                          {/* Tên & Chức vụ */}
-                          <div style={{ minWidth: 0, overflow: 'hidden' }}>
-                            <div style={{
-                              fontWeight: 700,
-                              color: '#0f172a',
-                              fontSize: '0.84rem',
-                              whiteSpace: 'nowrap',
-                              textOverflow: 'ellipsis',
-                              overflow: 'hidden'
-                            }}>
-                              {emp.fullName || emp.fullname}
-                            </div>
-                            <div style={{
-                              fontSize: '0.7rem',
-                              color: '#64748b',
-                              whiteSpace: 'nowrap',
-                              textOverflow: 'ellipsis',
-                              overflow: 'hidden',
-                              textTransform: 'uppercase',
-                              marginTop: '2px'
-                            }}>
-                              {emp.jobTitle || getRoleName(emp.role)} • {emp.department || 'Chung'}
-                            </div>
-                          </div>
-                        </div>
-                      </td>
-
-                      {/* Cột 2: Ngày (D) / Giờ (H) */}
-                      <td style={{
-                        padding: '0.65rem 0.5rem',
-                        position: 'sticky',
-                        left: '250px',
-                        zIndex: 10,
-                        backgroundColor: isEven ? '#ffffff' : '#fafafa',
-                        borderRight: '1px solid #e2e8f0',
+                      {/* Số ngày ở góc trên */}
+                      <div style={{
                         fontSize: '0.75rem',
-                        fontWeight: 700,
-                        color: '#334155',
-                        lineHeight: 1.4
+                        fontWeight: cell.isCurrentMonth ? 700 : 500,
+                        color: !cell.isCurrentMonth ? '#cbd5e1' : cell.isWeekend ? '#94a3b8' : '#334155'
                       }}>
-                        <div>D: {stats.days}</div>
-                        <div>H: {stats.hours}</div>
-                      </td>
+                        {cell.formatted}
+                      </div>
 
-                      {/* Các cột từng ngày */}
-                      {daysList.map(d => {
-                        const log = empLogs[d.isoDate];
-                        const isRed = d.isSunday || d.isSaturday;
-
-                        // Trường hợp 1: Có dữ liệu chấm công (CheckIn / CheckOut)
-                        if (log && log.checkIn) {
-                          const isLate = log.lateMinutes > 0;
-                          const isEarly = log.earlyLeaveMinutes > 0;
-
-                          return (
-                            <td
-                              key={d.isoDate}
-                              style={{
-                                padding: '0.45rem 0.25rem',
-                                textAlign: 'center',
-                                borderRight: '1px solid #f1f5f9',
-                                backgroundColor: isRed ? '#fffdf5' : undefined,
-                                fontSize: '0.72rem',
-                                fontWeight: 700,
-                                lineHeight: 1.3
-                              }}
-                            >
-                              <div style={{ color: isLate ? '#d97706' : '#0f172a' }}>
+                      {/* Nội dung trạng thái ở giữa ô */}
+                      <div style={{ textAlign: 'center', margin: 'auto 0' }}>
+                        {cell.isCurrentMonth && (
+                          hasLog ? (
+                            <div style={{ fontSize: '0.72rem', fontWeight: 700, lineHeight: 1.25 }}>
+                              <div style={{ color: isLate ? '#d97706' : '#16a34a' }}>
                                 {log.checkIn}
                               </div>
                               <div style={{ color: isEarly ? '#d97706' : '#0f172a' }}>
                                 {log.checkOut || '--'}
                               </div>
-                            </td>
-                          );
-                        }
-
-                        // Trường hợp 2: Có đơn nghỉ phép đã duyệt
-                        if (empLeaves[d.isoDate]) {
-                          const leaveType = empLeaves[d.isoDate];
-                          const code = leaveType === 'Không Lương' ? 'KL' : leaveType === 'Nghỉ Ốm' ? 'Ô' : 'P';
-                          return (
-                            <td
-                              key={d.isoDate}
-                              style={{
-                                padding: '0.45rem 0.25rem',
-                                textAlign: 'center',
-                                borderRight: '1px solid #f1f5f9',
-                                backgroundColor: '#eff6ff',
-                                color: '#2563eb',
-                                fontSize: '0.78rem',
-                                fontWeight: 800
-                              }}
-                              title={`Nghỉ phép: ${leaveType}`}
-                            >
-                              {code}
-                            </td>
-                          );
-                        }
-
-                        // Trường hợp 3: Ngày lễ
-                        if (holidaySet.has(d.isoDate)) {
-                          return (
-                            <td
-                              key={d.isoDate}
-                              style={{
-                                padding: '0.45rem 0.25rem',
-                                textAlign: 'center',
-                                borderRight: '1px solid #f1f5f9',
-                                backgroundColor: '#fef2f2',
-                                color: '#ef4444',
-                                fontSize: '0.72rem',
-                                fontWeight: 800
-                              }}
-                              title="Ngày nghỉ lễ"
-                            >
-                              Lễ
-                            </td>
-                          );
-                        }
-
-                        // Trường hợp 4: Ngày nghỉ cuối tuần (Thứ 7 / Chủ Nhật)
-                        if (d.isWeekend) {
-                          return (
-                            <td
-                              key={d.isoDate}
-                              style={{
-                                padding: '0.45rem 0.25rem',
-                                textAlign: 'center',
-                                borderRight: '1px solid #f1f5f9',
-                                backgroundColor: '#fffdf5',
-                                color: '#6366f1',
-                                fontSize: '0.8rem',
-                                fontWeight: 700
-                              }}
-                            >
+                              {hasOT && (
+                                <span style={{ fontSize: '0.62rem', backgroundColor: '#f3e8ff', color: '#7e22ce', padding: '1px 4px', borderRadius: '4px', fontWeight: 800 }}>
+                                  +{log.overtimeHours}h OT
+                                </span>
+                              )}
+                            </div>
+                          ) : cell.isWeekend ? (
+                            <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#94a3b8' }}>
                               N
-                            </td>
-                          );
-                        }
+                            </span>
+                          ) : (
+                            <span style={{ fontSize: '0.85rem', color: '#cbd5e1' }}>
+                              -
+                            </span>
+                          )
+                        )}
+                      </div>
 
-                        // Trường hợp 5: Ngày thường chưa có dữ liệu chấm công
-                        return (
-                          <td
-                            key={d.isoDate}
-                            style={{
-                              padding: '0.45rem 0.25rem',
-                              textAlign: 'center',
-                              borderRight: '1px solid #f1f5f9',
-                              color: '#94a3b8',
-                              fontSize: '0.85rem'
-                            }}
-                          >
-                            -
-                          </td>
-                        );
-                      })}
-
-                    </tr>
+                    </div>
                   );
-                })
-              )}
-            </tbody>
+                })}
+              </div>
 
-          </table>
+            </div>
+          )}
+
+          {/* DẠNG 2: DANH SÁCH CHI TIẾT (LIST VIEW) */}
+          {personalViewMode === 'list' && (
+            <div style={{ overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: '10px' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
+                <thead>
+                  <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', textAlign: 'left', color: '#475569' }}>
+                    <th style={{ padding: '0.65rem 0.85rem' }}>Ngày</th>
+                    <th style={{ padding: '0.65rem 0.85rem' }}>Giờ Vào</th>
+                    <th style={{ padding: '0.65rem 0.85rem' }}>Giờ Ra</th>
+                    <th style={{ padding: '0.65rem 0.85rem' }}>Đi Muộn</th>
+                    <th style={{ padding: '0.65rem 0.85rem' }}>Về Sớm</th>
+                    <th style={{ padding: '0.65rem 0.85rem' }}>Giờ Làm</th>
+                    <th style={{ padding: '0.65rem 0.85rem' }}>Tăng Ca</th>
+                    <th style={{ padding: '0.65rem 0.85rem' }}>Trạng Thái</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {myAttendanceLogs.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} style={{ padding: '2.5rem', textAlign: 'center', color: '#94a3b8' }}>
+                        Chưa có dữ liệu chấm công nào trong tháng này.
+                      </td>
+                    </tr>
+                  ) : (
+                    myAttendanceLogs.map((r, i) => (
+                      <tr key={r.id || i} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                        <td style={{ padding: '0.65rem 0.85rem', fontWeight: 700 }}>{r.date}</td>
+                        <td style={{ padding: '0.65rem 0.85rem', color: r.lateMinutes ? '#d97706' : '#16a34a', fontWeight: 700 }}>{r.checkIn || '—'}</td>
+                        <td style={{ padding: '0.65rem 0.85rem', color: r.earlyLeaveMinutes ? '#d97706' : '#0f172a', fontWeight: 700 }}>{r.checkOut || '—'}</td>
+                        <td style={{ padding: '0.65rem 0.85rem', color: r.lateMinutes ? '#d97706' : '#94a3b8' }}>{r.lateMinutes ? `${r.lateMinutes}′` : '—'}</td>
+                        <td style={{ padding: '0.65rem 0.85rem', color: r.earlyLeaveMinutes ? '#d97706' : '#94a3b8' }}>{r.earlyLeaveMinutes ? `${r.earlyLeaveMinutes}′` : '—'}</td>
+                        <td style={{ padding: '0.65rem 0.85rem', fontWeight: 700 }}>{r.workHours ? `${r.workHours}h` : '—'}</td>
+                        <td style={{ padding: '0.65rem 0.85rem', color: r.overtimeHours ? '#7e22ce' : '#94a3b8' }}>{r.overtimeHours ? `+${r.overtimeHours}h` : '—'}</td>
+                        <td style={{ padding: '0.65rem 0.85rem' }}>
+                          <span style={{
+                            padding: '2px 8px',
+                            borderRadius: '10px',
+                            fontSize: '0.72rem',
+                            fontWeight: 800,
+                            backgroundColor: r.status === 'PRESENT' ? '#f0fdf4' : r.status === 'LATE' ? '#fffbeb' : '#fef2f2',
+                            color: r.status === 'PRESENT' ? '#16a34a' : r.status === 'LATE' ? '#d97706' : '#dc2626'
+                          }}>
+                            {r.status === 'PRESENT' ? 'Đúng giờ' : r.status === 'LATE' ? 'Đi muộn' : 'Vắng'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+
         </div>
-      </div>
+      )}
 
       {/* ========================================================================= */}
-      {/* 4. MODAL CHÚ THÍCH (GIẢI THÍCH KÝ HIỆU & MÀU SẮC) */}
+      {/* TRƯỜNG HỢP 2: GIAO DIỆN "QUẢN LÝ CHẤM CÔNG" (CHỈ HIỂN THỊ KHI LÀ QUẢN LÝ) */}
+      {/* ========================================================================= */}
+      {activeView === 'manage' && canManageAttendance && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          
+          {/* Thanh Filter & Actions */}
+          <div style={{
+            backgroundColor: '#ffffff',
+            borderRadius: '10px',
+            border: '1px solid #e2e8f0',
+            padding: '0.75rem 1rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '0.75rem'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.65rem' }}>
+              
+              {/* Ô Tìm kiếm */}
+              <div style={{ position: 'relative', minWidth: '200px' }}>
+                <Search size={15} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                <input
+                  type="text"
+                  placeholder="Tìm kiếm..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '0.45rem 0.65rem 0.45rem 2rem',
+                    borderRadius: '6px',
+                    border: '1px solid #cbd5e1',
+                    fontSize: '0.82rem',
+                    outline: 'none',
+                    boxSizing: 'border-box'
+                  }}
+                />
+              </div>
+
+              {/* Lọc phòng ban */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                <Filter size={14} style={{ color: '#64748b' }} />
+                <select
+                  value={department}
+                  onChange={(e) => setDepartment(e.target.value)}
+                  style={{
+                    padding: '0.45rem 0.65rem',
+                    borderRadius: '6px',
+                    border: '1px solid #cbd5e1',
+                    fontSize: '0.82rem',
+                    color: '#0f172a',
+                    backgroundColor: '#ffffff',
+                    outline: 'none'
+                  }}
+                >
+                  <option value="ALL">Tất cả phòng ban</option>
+                  {DEPARTMENTS.map(d => (
+                    <option key={d} value={d}>{d}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Khoảng ngày */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => e.target.value && setStartDate(e.target.value)}
+                  style={{
+                    padding: '0.4rem 0.65rem',
+                    borderRadius: '6px',
+                    border: '1px solid #cbd5e1',
+                    fontSize: '0.82rem',
+                    color: '#0f172a',
+                    outline: 'none'
+                  }}
+                />
+                <span style={{ color: '#94a3b8' }}>—</span>
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => e.target.value && setEndDate(e.target.value)}
+                  style={{
+                    padding: '0.4rem 0.65rem',
+                    borderRadius: '6px',
+                    border: '1px solid #cbd5e1',
+                    fontSize: '0.82rem',
+                    color: '#0f172a',
+                    outline: 'none'
+                  }}
+                />
+              </div>
+
+            </div>
+
+            {/* Các nút bấm */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                onClick={fetchData}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.35rem',
+                  backgroundColor: '#ffffff',
+                  color: '#334155',
+                  border: '1px solid #cbd5e1',
+                  borderRadius: '6px',
+                  padding: '0.45rem 0.85rem',
+                  fontSize: '0.8rem',
+                  fontWeight: 600,
+                  cursor: 'pointer'
+                }}
+              >
+                <span>Làm mới</span>
+                <RotateCw size={14} className={loading ? 'spin' : ''} />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowLegend(true)}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.35rem',
+                  backgroundColor: '#ffffff',
+                  color: '#334155',
+                  border: '1px solid #cbd5e1',
+                  borderRadius: '6px',
+                  padding: '0.45rem 0.85rem',
+                  fontSize: '0.8rem',
+                  fontWeight: 600,
+                  cursor: 'pointer'
+                }}
+              >
+                <span>Chú thích</span>
+                <HelpCircle size={14} />
+              </button>
+
+              <button
+                type="button"
+                onClick={exportMatrixCsv}
+                disabled={!filteredEmployees.length}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.35rem',
+                  backgroundColor: '#ffffff',
+                  color: '#334155',
+                  border: '1px solid #cbd5e1',
+                  borderRadius: '6px',
+                  padding: '0.45rem 0.85rem',
+                  fontSize: '0.8rem',
+                  fontWeight: 600,
+                  cursor: 'pointer'
+                }}
+              >
+                <Download size={14} />
+                <span>Xuất Excel</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Bảng Ma Trận Chấm Công Toàn Bộ Nhân Viên */}
+          <div style={{
+            backgroundColor: '#ffffff',
+            borderRadius: '12px',
+            border: '1px solid #e2e8f0',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+            overflow: 'hidden'
+          }}>
+            <div style={{ overflowX: 'auto', maxHeight: '720px' }}>
+              <table style={{
+                width: '100%',
+                borderCollapse: 'collapse',
+                fontSize: '0.8rem',
+                textAlign: 'left'
+              }}>
+                <thead>
+                  <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
+                    <th style={{
+                      padding: '0.75rem 1rem',
+                      fontWeight: 700,
+                      color: '#475569',
+                      minWidth: '250px',
+                      position: 'sticky',
+                      left: 0,
+                      zIndex: 20,
+                      backgroundColor: '#f8fafc',
+                      borderRight: '1px solid #e2e8f0'
+                    }}>
+                      Nhân viên
+                    </th>
+                    <th style={{
+                      padding: '0.75rem 0.65rem',
+                      fontWeight: 700,
+                      color: '#475569',
+                      minWidth: '90px',
+                      position: 'sticky',
+                      left: '250px',
+                      zIndex: 20,
+                      backgroundColor: '#f8fafc',
+                      borderRight: '1px solid #e2e8f0',
+                      textAlign: 'center'
+                    }}>
+                      <div>Ngày (D) /</div>
+                      <div>giờ (H)</div>
+                    </th>
+                    {daysList.map(d => {
+                      const isRed = d.isSunday || d.isSaturday;
+                      return (
+                        <th
+                          key={d.isoDate}
+                          style={{
+                            padding: '0.55rem 0.4rem',
+                            minWidth: '64px',
+                            textAlign: 'center',
+                            borderRight: '1px solid #f1f5f9',
+                            backgroundColor: isRed ? '#fffdf5' : '#f8fafc'
+                          }}
+                        >
+                          <div style={{
+                            fontSize: '0.72rem',
+                            fontWeight: 800,
+                            color: isRed ? '#ef4444' : '#475569',
+                            marginBottom: '2px'
+                          }}>
+                            {d.dayOfWeekName}
+                          </div>
+                          <div style={{
+                            fontSize: '0.72rem',
+                            fontWeight: 600,
+                            color: isRed ? '#ef4444' : '#64748b'
+                          }}>
+                            {d.dateFormatted}
+                          </div>
+                        </th>
+                      );
+                    })}
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredEmployees.length === 0 ? (
+                    <tr>
+                      <td colSpan={daysList.length + 2} style={{ padding: '3rem 1rem', textAlign: 'center', color: '#94a3b8' }}>
+                        {loading ? 'Đang tải dữ liệu...' : 'Không tìm thấy nhân viên nào phù hợp.'}
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredEmployees.map((emp, idx) => {
+                      const empLogs = attendanceIndex[emp.id] || {};
+                      const empLeaves = approvedLeavesIndex[emp.id] || {};
+                      const stats = employeeSummary[emp.id] || { days: 0, hours: 0 };
+                      const initials = getInitials(emp.fullName || emp.fullname);
+                      const isEven = idx % 2 === 0;
+
+                      return (
+                        <tr
+                          key={emp.id}
+                          style={{
+                            borderBottom: '1px solid #f1f5f9',
+                            backgroundColor: isEven ? '#ffffff' : '#fafafa'
+                          }}
+                        >
+                          <td style={{
+                            padding: '0.65rem 1rem',
+                            position: 'sticky',
+                            left: 0,
+                            zIndex: 10,
+                            backgroundColor: isEven ? '#ffffff' : '#fafafa',
+                            borderRight: '1px solid #e2e8f0'
+                          }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                              <div style={{
+                                width: '38px',
+                                height: '38px',
+                                borderRadius: '50%',
+                                backgroundColor: '#f1f5f9',
+                                border: '1px solid #e2e8f0',
+                                color: '#475569',
+                                fontWeight: 800,
+                                fontSize: '0.8rem',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                flexShrink: 0
+                              }}>
+                                {initials}
+                              </div>
+                              <div style={{ minWidth: 0, overflow: 'hidden' }}>
+                                <div style={{
+                                  fontWeight: 700,
+                                  color: '#0f172a',
+                                  fontSize: '0.84rem',
+                                  whiteSpace: 'nowrap',
+                                  textOverflow: 'ellipsis',
+                                  overflow: 'hidden'
+                                }}>
+                                  {emp.fullName || emp.fullname}
+                                </div>
+                                <div style={{
+                                  fontSize: '0.7rem',
+                                  color: '#64748b',
+                                  whiteSpace: 'nowrap',
+                                  textOverflow: 'ellipsis',
+                                  overflow: 'hidden',
+                                  textTransform: 'uppercase',
+                                  marginTop: '2px'
+                                }}>
+                                  {emp.jobTitle || getRoleName(emp.role)} • {emp.department || 'Chung'}
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+
+                          <td style={{
+                            padding: '0.65rem 0.5rem',
+                            position: 'sticky',
+                            left: '250px',
+                            zIndex: 10,
+                            backgroundColor: isEven ? '#ffffff' : '#fafafa',
+                            borderRight: '1px solid #e2e8f0',
+                            fontSize: '0.75rem',
+                            fontWeight: 700,
+                            color: '#334155',
+                            lineHeight: 1.4
+                          }}>
+                            <div>D: {stats.days}</div>
+                            <div>H: {stats.hours}</div>
+                          </td>
+
+                          {daysList.map(d => {
+                            const log = empLogs[d.isoDate];
+                            const isRed = d.isSunday || d.isSaturday;
+
+                            if (log && log.checkIn) {
+                              const isLate = log.lateMinutes > 0;
+                              const isEarly = log.earlyLeaveMinutes > 0;
+                              return (
+                                <td
+                                  key={d.isoDate}
+                                  style={{
+                                    padding: '0.45rem 0.25rem',
+                                    textAlign: 'center',
+                                    borderRight: '1px solid #f1f5f9',
+                                    backgroundColor: isRed ? '#fffdf5' : undefined,
+                                    fontSize: '0.72rem',
+                                    fontWeight: 700,
+                                    lineHeight: 1.3
+                                  }}
+                                >
+                                  <div style={{ color: isLate ? '#d97706' : '#0f172a' }}>{log.checkIn}</div>
+                                  <div style={{ color: isEarly ? '#d97706' : '#0f172a' }}>{log.checkOut || '--'}</div>
+                                </td>
+                              );
+                            }
+
+                            if (empLeaves[d.isoDate]) {
+                              const leaveType = empLeaves[d.isoDate];
+                              const code = leaveType === 'Không Lương' ? 'KL' : leaveType === 'Nghỉ Ốm' ? 'Ô' : 'P';
+                              return (
+                                <td key={d.isoDate} style={{ padding: '0.45rem 0.25rem', textAlign: 'center', borderRight: '1px solid #f1f5f9', backgroundColor: '#eff6ff', color: '#2563eb', fontSize: '0.78rem', fontWeight: 800 }}>
+                                  {code}
+                                </td>
+                              );
+                            }
+
+                            if (holidaySet.has(d.isoDate)) {
+                              return (
+                                <td key={d.isoDate} style={{ padding: '0.45rem 0.25rem', textAlign: 'center', borderRight: '1px solid #f1f5f9', backgroundColor: '#fef2f2', color: '#ef4444', fontSize: '0.72rem', fontWeight: 800 }}>
+                                  Lễ
+                                </td>
+                              );
+                            }
+
+                            if (d.isWeekend) {
+                              return (
+                                <td key={d.isoDate} style={{ padding: '0.45rem 0.25rem', textAlign: 'center', borderRight: '1px solid #f1f5f9', backgroundColor: '#fffdf5', color: '#6366f1', fontSize: '0.8rem', fontWeight: 700 }}>
+                                  N
+                                </td>
+                              );
+                            }
+
+                            return (
+                              <td key={d.isoDate} style={{ padding: '0.45rem 0.25rem', textAlign: 'center', borderRight: '1px solid #f1f5f9', color: '#94a3b8', fontSize: '0.85rem' }}>
+                                -
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL CHÚ THÍCH KÝ HIỆU BẢNG CÔNG */}
       {/* ========================================================================= */}
       {showLegend && (
         <div style={{
@@ -989,7 +1463,7 @@ export default function TimesheetPanel() {
                   <div>08:00</div>
                   <div>18:00</div>
                 </div>
-                <div><strong>Giờ màu đen:</strong> Vào ca và ra ca đúng giờ quy định.</div>
+                <div><strong>Giờ màu đen / xanh:</strong> Vào ca và ra ca đúng giờ quy định.</div>
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
@@ -1044,7 +1518,7 @@ export default function TimesheetPanel() {
       )}
 
       {/* ========================================================================= */}
-      {/* 5. MODAL CAMERA CHẤM CÔNG NHẬN DIỆN KHUÔN MẶT */}
+      {/* MODAL CAMERA CHẤM CÔNG NHẬN DIỆN KHUÔN MẶT */}
       {/* ========================================================================= */}
       {showCameraModal && (
         <div style={{

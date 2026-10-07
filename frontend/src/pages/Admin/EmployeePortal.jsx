@@ -11,6 +11,7 @@ import { getRoleName } from '../../utils/rbacEngine';
 import { LEAVE_STATUS, ATTENDANCE_STATUS, getStatusInfo, getStatusLabel } from '../../utils/statusLabels';
 import FaceCamera from '../../components/HR/FaceCamera';
 import PayslipView, { fmtVnd, periodLabel } from '../../components/HR/PayslipView';
+import TimesheetPanel from './hr/TimesheetPanel';
 
 const TABS = [
   { key: 'overview', label: 'Tổng Quan', icon: LayoutDashboard },
@@ -180,57 +181,7 @@ export default function EmployeePortal() {
       )}
 
       {tab === 'attendance' && (
-        <div style={card}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '0.9rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <label style={{ ...label, margin: 0 }}>Tháng:</label>
-              <input type="month" value={month} onChange={e => e.target.value && setMonth(e.target.value)} style={{ ...input, width: 'auto' }} />
-            </div>
-            {summary && (
-              <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', fontSize: '0.8rem', fontWeight: 700 }}>
-                <span style={{ backgroundColor: '#ecfdf5', color: '#047857', padding: '3px 9px', borderRadius: '6px' }}>Đi làm {summary.workedDays} ngày</span>
-                <span style={{ backgroundColor: '#fffbeb', color: '#b45309', padding: '3px 9px', borderRadius: '6px' }}>Muộn {summary.lateDays} lần ({summary.lateMinutes}′)</span>
-                <span style={{ backgroundColor: '#eff6ff', color: '#1d4ed8', padding: '3px 9px', borderRadius: '6px' }}>Tăng ca {summary.overtimeHours}h</span>
-                <span style={{ backgroundColor: '#fff1f2', color: '#be123c', padding: '3px 9px', borderRadius: '6px' }}>Vắng {summary.absentDays} ngày</span>
-              </div>
-            )}
-          </div>
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead><tr style={{ backgroundColor: '#f8fafc' }}>
-                <th style={th}>Ngày</th><th style={th}>Vào ca</th><th style={th}>Ra ca</th><th style={th}>Hình thức</th>
-                <th style={th}>Đi muộn</th><th style={th}>Về sớm</th><th style={th}>Giờ làm</th><th style={th}>Tăng ca</th><th style={th}>Trạng thái</th>
-              </tr></thead>
-              <tbody>
-                {(attendance?.records || []).map(r => (
-                  <tr key={r.id}>
-                    <td style={{ ...td, fontWeight: 700 }}>{WEEKDAYS[new Date(`${r.isoDate}T00:00:00Z`).getUTCDay()]}, {r.date}</td>
-                    <td style={td}>{r.checkIn || '—'}</td>
-                    <td style={td}>{r.checkOut || '—'}</td>
-                    <td style={td}>{r.checkInMethod === 'FACE' ? 'Khuôn mặt' : r.checkInMethod === 'MANUAL' ? 'HR nhập' : '—'}</td>
-                    <td style={{ ...td, color: r.lateMinutes ? '#d97706' : '#94a3b8' }}>{r.lateMinutes ? `${r.lateMinutes}′` : '—'}</td>
-                    <td style={{ ...td, color: r.earlyLeaveMinutes ? '#d97706' : '#94a3b8' }}>{r.earlyLeaveMinutes ? `${r.earlyLeaveMinutes}′` : '—'}</td>
-                    <td style={td}>{r.workHours ? `${r.workHours}h` : '—'}</td>
-                    <td style={td}>{r.overtimeHours ? `${r.overtimeHours}h` : '—'}</td>
-                    <td style={td}>
-                      <span style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '0.78rem', fontWeight: 700, backgroundColor: getStatusInfo(ATTENDANCE_STATUS, r.status).bg, color: getStatusInfo(ATTENDANCE_STATUS, r.status).color }}>
-                        {getStatusLabel(ATTENDANCE_STATUS, r.status)}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-                {attendance && attendance.records.length === 0 && (
-                  <tr><td colSpan={9} style={{ ...td, textAlign: 'center', color: '#94a3b8', padding: '2rem' }}>Chưa có dữ liệu chấm công trong tháng này.</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-          {attendance?.holidays?.length > 0 && (
-            <div style={{ marginTop: '0.75rem', fontSize: '0.82rem', color: '#64748b' }}>
-              Ngày lễ trong tháng: {attendance.holidays.map(h => `${fmtDate(h.date)} (${h.name})`).join(' · ')}
-            </div>
-          )}
-        </div>
+        <TimesheetPanel defaultView="my" />
       )}
 
       {tab === 'leaves' && (
