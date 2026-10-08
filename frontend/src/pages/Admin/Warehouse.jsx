@@ -225,7 +225,7 @@ const ProductSpecsEditor = ({ category, specs = {}, onChange }) => {
       </div>
 
       {currentEntries.length === 0 ? (
-        <div style={{ padding: '0.8rem', textAlign: 'center', backgroundColor: '#ffffff', borderRadius: '6px', border: '1px dashed #cbd5e1', fontSize: '0.78rem', color: '#64748b', marginBottom: '0.6rem' }}>
+        <div style={{ padding: '0.65rem 0.8rem', textAlign: 'center', backgroundColor: '#ffffff', borderRadius: '6px', border: '1px dashed #cbd5e1', fontSize: '0.75rem', color: '#64748b', marginBottom: '0.6rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
           Chưa có thông số kỹ thuật nào. Bấm nút nạp mẫu gợi ý phía trên hoặc thêm từng thông số bên dưới.
         </div>
       ) : (
@@ -325,7 +325,7 @@ const ProductGalleryField = ({
   return (
     <div>
       <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: '0.5rem', color: '#1e293b' }}>
-        Hình Ảnh Sản Phẩm (Tải tệp từ thiết bị và lưu vĩnh viễn vào CSDL)
+        Hình Ảnh Sản Phẩm
       </label>
 
       <div style={{ display: 'flex', gap: '1.1rem', alignItems: 'flex-start' }}>
@@ -355,7 +355,6 @@ const ProductGalleryField = ({
             )}
           </label>
           <input id="product-cover-input" type="file" accept="image/jpeg,image/png,image/webp,image/gif" onChange={(e) => onCoverSelect(e.target.files?.[0] || null)} style={{ display: 'none' }} />
-          <div style={{ fontSize: '0.74rem', fontWeight: 600, color: '#64748b', textAlign: 'center', marginTop: '0.4rem' }}>Ảnh Bìa</div>
         </div>
 
         <div style={{ width: '1px', alignSelf: 'stretch', backgroundColor: '#e2e8f0', flexShrink: 0 }} />
@@ -417,9 +416,6 @@ const ProductGalleryField = ({
             onChange={(e) => { if (e.target.files?.length) onAddFiles(e.target.files); e.target.value = ''; }}
             style={{ display: 'none' }}
           />
-          <div style={{ fontSize: '0.74rem', fontWeight: 600, color: '#64748b', marginTop: '0.4rem' }}>
-            Ảnh Phụ ({totalGalleryCount}/{MAX_GALLERY_IMAGES})
-          </div>
         </div>
       </div>
     </div>

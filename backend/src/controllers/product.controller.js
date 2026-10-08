@@ -483,6 +483,8 @@ const createProduct = async (req, res, next) => {
       parsedSpecs['Bảo hành'] = warrantyStr;
     }
 
+    const coverFile = req.files?.image?.[0];
+    const directCover = (imageUrl || req.body?.primaryImage) ? String(imageUrl || req.body?.primaryImage).trim() : null;
     let resolvedCover = directCover;
     if (coverFile) {
       if (coverFile.buffer) {
@@ -677,6 +679,8 @@ const updateProduct = async (req, res, next) => {
     }
 
     // Cover image
+    const coverFile = req.files?.image?.[0];
+    const directCover = (imageUrl || req.body?.primaryImage) ? String(imageUrl || req.body?.primaryImage).trim() : undefined;
     let resolvedCover = directCover;
     if (coverFile) {
       if (coverFile.buffer) {
