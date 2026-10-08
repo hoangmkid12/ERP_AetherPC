@@ -58,6 +58,20 @@ const DEFECT_LABELS = {
   NONE: 'Đạt tiêu chuẩn hoàn hảo'
 };
 
+const extractDefectCategory = (text = '') => {
+  const t = String(text || '').toLowerCase();
+  if (t.includes('móp hộp') || t.includes('seal') || t.includes('niêm phong') || t.includes('bao bì') || t.includes('outer')) return 'PACKAGE_DAMAGED';
+  if (t.includes('nguồn') || t.includes('điện') || t.includes('mạch') || t.includes('cháy')) return 'ELECTRICAL_POWER_FAIL';
+  if (t.includes('tem') || t.includes('serial')) return 'SERIAL_WARRANTY_MISSING';
+  if (t.includes('trầy') || t.includes('xước') || t.includes('thông số')) return 'SPEC_MISMATCH';
+  if (t.includes('giả') || t.includes('phụ kiện') || t.includes('chính hãng')) return 'COUNTERFEIT_FAKE';
+  if (t.includes('doa') || t.includes('post') || t.includes('chip') || t.includes('nhà sản xuất')) return 'DOA_FACTORY_DEFECT';
+  if (t.includes('người dùng') || t.includes('socket') || t.includes('rơi vỡ') || t.includes('vào nước')) return 'USER_PHYSICAL_DAMAGE';
+  if (t.includes('nguyên seal') || t.includes('đổi ý')) return 'NORMAL_RESTOCK';
+  return 'PACKAGE_DAMAGED';
+};
+
+
 export default function QualityControl() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -315,25 +329,46 @@ export default function QualityControl() {
       // đây khi có, để mọi máy/vai trò đều thấy cùng một kết quả nghiệm thu.
       const dbInsp = (po.receipts || []).flatMap(r => r.qcInspections || [])[0];
       const hasDbInsp = dbInsp && Number.isFinite(dbInsp.passedQuantity);
-      if (log && (log.status || log.decision)) {
-        const isLogPassed = log.status === 'QA_PASSED' || log.decision === 'ACCEPT_ALL' || (Number(log.totalQty) > 0 && Number(log.passedQty) === Number(log.totalQty));
+
+      const effectivePassed = hasDbInsp ? dbInsp.passedQuantity : Number(log?.passedQty ?? po.passedQty);
+      const effectiveFailed = hasDbInsp ? dbInsp.defectiveQuantity : Number(log?.failedQty ?? po.failedQty);
+      const hasRealCounts = (Number.isFinite(effectivePassed) && effectivePassed >= 0) && (Number.isFinite(effectiveFailed) && effectiveFailed >= 0);
+
+      let effectiveStatus = po.status;
+      let effectiveDecision = po.decision || 'ACCEPT_ALL';
+
+      if (hasRealCounts && (effectivePassed > 0 || effectiveFailed > 0)) {
+        if (effectiveFailed > 0 && effectivePassed > 0) {
+          effectiveStatus = 'QA_PARTIAL';
+          effectiveDecision = 'ACCEPT_PARTIAL';
+        } else if (effectiveFailed > 0 && effectivePassed === 0) {
+          effectiveStatus = 'QA_REJECTED';
+          effectiveDecision = 'REJECT_ALL';
+        } else {
+          effectiveStatus = 'QA_PASSED';
+          effectiveDecision = 'ACCEPT_ALL';
+        }
+      } else if (log && (log.status || log.decision)) {
+        const isLogPartial = log.status === 'QA_PARTIAL' || log.decision === 'ACCEPT_PARTIAL' || (Number(log.failedQty) > 0 && Number(log.passedQty) > 0);
         const isLogRejected = log.status === 'QA_REJECTED' || log.decision === 'REJECT_ALL';
-        const effectiveStatus = isLogPassed ? 'QA_PASSED' : isLogRejected ? 'QA_REJECTED' : 'QA_PARTIAL';
-        merged = {
-          ...merged,
-          status: effectiveStatus,
-          decision: log.decision || (isLogPassed ? 'ACCEPT_ALL' : isLogRejected ? 'REJECT_ALL' : 'ACCEPT_PARTIAL'),
-          supplierNote: log.notes || merged.supplierNote,
-          passedQty: hasDbInsp ? dbInsp.passedQuantity : log.passedQty,
-          failedQty: hasDbInsp ? dbInsp.defectiveQuantity : log.failedQty
-        };
-      } else if (hasDbInsp) {
-        merged = {
-          ...merged,
-          passedQty: dbInsp.passedQuantity,
-          failedQty: dbInsp.defectiveQuantity
-        };
+        effectiveStatus = isLogPartial ? 'QA_PARTIAL' : isLogRejected ? 'QA_REJECTED' : 'QA_PASSED';
+        effectiveDecision = isLogPartial ? 'ACCEPT_PARTIAL' : isLogRejected ? 'REJECT_ALL' : 'ACCEPT_ALL';
       }
+
+      const noteText = `${merged.supplierNote || ''} ${merged.notes || ''} ${dbInsp?.notes || ''} ${log?.notes || ''}`;
+      if (/NHẬP MỘT PHẦN|HOÀN TRẢ NCC/i.test(noteText) && effectiveStatus !== 'QA_REJECTED') {
+        effectiveStatus = 'QA_PARTIAL';
+        effectiveDecision = 'ACCEPT_PARTIAL';
+      }
+
+      merged = {
+        ...merged,
+        status: effectiveStatus,
+        decision: effectiveDecision,
+        supplierNote: dbInsp?.notes || log?.notes || merged.supplierNote,
+        passedQty: effectivePassed,
+        failedQty: effectiveFailed
+      };
       merged.poNumber = formatPurchaseReference(merged);
       return merged;
     });
@@ -379,38 +414,65 @@ export default function QualityControl() {
       String(l.id) === String(po.id)
     );
 
+    // 1. Kiểm tra số lượng nghiệm thu thực tế từ DB hoặc log/po
+    const dbInsp = (po.receipts || []).flatMap(r => r.qcInspections || [])[0];
+    const passedCnt = Number(dbInsp?.passedQuantity ?? log?.passedQty ?? po.passedQty);
+    const failedCnt = Number(dbInsp?.defectiveQuantity ?? log?.failedQty ?? po.failedQty);
+    const hasDefiniteCounts = (Number.isFinite(passedCnt) && passedCnt >= 0) && (Number.isFinite(failedCnt) && failedCnt >= 0);
+
+    if (hasDefiniteCounts && (passedCnt > 0 || failedCnt > 0)) {
+      if (failedCnt > 0 && passedCnt > 0) return 'PARTIAL';
+      if (failedCnt > 0 && passedCnt === 0) return 'REJECTED';
+      if (passedCnt > 0 && failedCnt === 0) return 'PASSED';
+    }
+
+    // 2. Kiểm tra log kiểm định
     if (log) {
-      if (log.status === 'QA_PASSED' || log.decision === 'ACCEPT_ALL' || (Number(log.totalQty) > 0 && Number(log.passedQty) === Number(log.totalQty))) {
-        return 'PASSED';
-      }
-      if (log.status === 'QA_REJECTED' || log.decision === 'REJECT_ALL') {
-        return 'REJECTED';
-      }
       if (log.status === 'QA_PARTIAL' || log.decision === 'ACCEPT_PARTIAL' || (Number(log.failedQty) > 0 && Number(log.passedQty) > 0)) {
         return 'PARTIAL';
       }
+      if (log.status === 'QA_REJECTED' || log.decision === 'REJECT_ALL' || (Number(log.failedQty) > 0 && Number(log.passedQty) === 0)) {
+        return 'REJECTED';
+      }
+      if (log.status === 'QA_PASSED' || log.decision === 'ACCEPT_ALL' || (Number(log.totalQty) > 0 && Number(log.passedQty) === Number(log.totalQty))) {
+        return 'PASSED';
+      }
     }
 
+    // 3. Ghi chú thông báo hoàn trả NCC
+    const noteText = `${po.supplierNote || ''} ${po.notes || ''} ${dbInsp?.notes || ''}`;
+    if (/NHẬP MỘT PHẦN|HOÀN TRẢ NCC/i.test(noteText)) {
+      return 'PARTIAL';
+    }
+
+    // 4. Trạng thái hàng chưa về / chờ nghiệm thu
     if (PENDING_QA_STATUSES.includes(po.status)) {
       return 'PENDING';
     }
     if (NOT_ARRIVED_STATUSES.includes(po.status)) {
       return 'NOT_ARRIVED';
     }
-    if (po.status === 'QA_PASSED' || po.decision === 'ACCEPT_ALL' || PASSED_QA_STATUSES.includes(po.status)) {
-      return 'PASSED';
+
+    // 5. Trạng thái QA rõ ràng trên đơn
+    if (po.status === 'QA_PARTIAL' || po.decision === 'ACCEPT_PARTIAL') {
+      return 'PARTIAL';
     }
     if (po.status === 'QA_REJECTED' || po.decision === 'REJECT_ALL') {
       return 'REJECTED';
     }
-    if (po.status === 'QA_PARTIAL' || po.decision === 'ACCEPT_PARTIAL' || (Number(po.failedQty) > 0 && Number(po.passedQty) > 0)) {
-      return 'PARTIAL';
-    }
-    // If not pending and no failed items, treat as passed
-    if (Number(po.failedQty) === 0 || po.failedQty === undefined || po.failedQty === null) {
+    if (po.status === 'QA_PASSED' || po.decision === 'ACCEPT_ALL') {
       return 'PASSED';
     }
-    return 'PARTIAL';
+
+    // 6. Trạng thái kho: chỉ là PASSED nếu không có linh kiện lỗi
+    if (PASSED_QA_STATUSES.includes(po.status)) {
+      if (Number(failedCnt) > 0) {
+        return passedCnt > 0 ? 'PARTIAL' : 'REJECTED';
+      }
+      return 'PASSED';
+    }
+
+    return 'PENDING';
   };
 
   const ordersInPeriod = useMemo(() => {
@@ -1261,19 +1323,22 @@ export default function QualityControl() {
                       </td>
                       <td style={{ padding: '0.5rem 0.65rem' }}>
                         {(() => {
-                          const isLogPassed = log.status === 'QA_PASSED' || log.decision === 'ACCEPT_ALL' || (Number(log.totalQty) > 0 && Number(log.passedQty) === Number(log.totalQty));
-                          const isLogRejected = log.status === 'QA_REJECTED' || log.decision === 'REJECT_ALL';
+                          const logPassedCnt = Number(log.passedQty);
+                          const logFailedCnt = Number(log.failedQty);
+                          const isLogPartial = (logFailedCnt > 0 && logPassedCnt > 0) || log.status === 'QA_PARTIAL' || log.decision === 'ACCEPT_PARTIAL' || /NHẬP MỘT PHẦN|HOÀN TRẢ NCC/i.test(log.notes || '');
+                          const isLogRejected = (logFailedCnt > 0 && logPassedCnt === 0) || log.status === 'QA_REJECTED' || log.decision === 'REJECT_ALL';
+                          const isLogPassed = !isLogPartial && !isLogRejected && (log.status === 'QA_PASSED' || log.decision === 'ACCEPT_ALL' || (Number(log.totalQty) > 0 && logPassedCnt === Number(log.totalQty)));
                           return (
                             <span style={{
-                              backgroundColor: isLogPassed ? '#f0fdf4' : isLogRejected ? '#fef2f2' : '#fff7ed',
-                              color: isLogPassed ? '#15803d' : isLogRejected ? '#dc2626' : '#c2410c',
-                              border: `1px solid ${isLogPassed ? '#bbf7d0' : isLogRejected ? '#fecaca' : '#fed7aa'}`,
+                              backgroundColor: isLogPartial ? '#fff7ed' : isLogPassed ? '#f0fdf4' : '#fef2f2',
+                              color: isLogPartial ? '#c2410c' : isLogPassed ? '#15803d' : '#dc2626',
+                              border: `1px solid ${isLogPartial ? '#fed7aa' : isLogPassed ? '#bbf7d0' : '#fecaca'}`,
                               padding: '2px 8px',
                               borderRadius: '10px',
                               fontSize: '0.75rem',
                               fontWeight: 700
                             }}>
-                              {isLogPassed ? 'CHO NHẬP KHO 100%' : isLogRejected ? 'HOÀN TRẢ NCC' : 'NHẬP 1 PHẦN'}
+                              {isLogPartial ? 'NHẬP 1 PHẦN' : isLogPassed ? 'CHO NHẬP KHO 100%' : 'HOÀN TRẢ NCC'}
                             </span>
                           );
                         })()}
@@ -1477,24 +1542,42 @@ export default function QualityControl() {
                                   const poItems = po.items || [];
                                   const primaryName = poItems[0]?.product?.name || poItems[0]?.productName || poItems[0]?.name || po.productName || po.name || '';
                                   if (log) {
+                                    const dbInsp = (po.receipts || []).flatMap(r => r.qcInspections || [])[0];
+                                    const hasDbInsp = dbInsp && Number.isFinite(dbInsp.passedQuantity);
+                                    const effectivePassed = hasDbInsp ? Number(dbInsp.passedQuantity) : Number(log.passedQty ?? po.passedQty ?? totalQty);
+                                    const effectiveFailed = hasDbInsp ? Number(dbInsp.defectiveQuantity) : Number(log.failedQty ?? po.failedQty ?? 0);
+                                    const notesText = log.notes || dbInsp?.notes || po.supplierNote || po.notes || 'Lô hàng đã được nghiệm thu kỹ thuật và đối soát tiêu chuẩn chất lượng.';
+                                    const isActualPartial = (effectiveFailed > 0 && effectivePassed > 0) || isPartial || log.status === 'QA_PARTIAL' || log.decision === 'ACCEPT_PARTIAL' || /NHẬP MỘT PHẦN|HOÀN TRẢ NCC/i.test(notesText);
+                                    const isActualRejected = (effectiveFailed > 0 && effectivePassed === 0) || isRejected || log.status === 'QA_REJECTED' || log.decision === 'REJECT_ALL';
+                                    const defectCat = isActualPartial || isActualRejected
+                                      ? (extractDefectCategory(notesText) || log.defectCategory || 'PACKAGE_DAMAGED')
+                                      : (log.defectCategory || 'NONE');
+
                                     setViewingLog({
                                       ...log,
                                       items: (log.items && log.items.length > 0) ? log.items : poItems,
                                       productName: log.productName || primaryName,
-                                      poRecord: po
+                                      poRecord: po,
+                                      passedQty: effectivePassed,
+                                      failedQty: effectiveFailed,
+                                      decision: isActualRejected ? 'REJECT_ALL' : (isActualPartial ? 'ACCEPT_PARTIAL' : (log.decision || 'ACCEPT_ALL')),
+                                      status: isActualRejected ? 'QA_REJECTED' : (isActualPartial ? 'QA_PARTIAL' : (log.status || 'QA_PASSED')),
+                                      defectCategory: defectCat,
+                                      notes: notesText
                                     });
                                   } else {
                                     const totalQty = poItems.reduce((s, i) => s + (parseInt(i.quantity) || 1), 0) || po.quantity || 1;
-                                    // Không có qaLog cục bộ (PO này chưa từng được QC ở TRÌNH DUYỆT
-                                    // NÀY) — trước đây rơi vào bịa số cứng "failedQty: 2" cho MỌI đơn
-                                    // Nhập Một Phần, sai lệch với kết quả nghiệm thu thật. Ưu tiên bản
-                                    // ghi QcInspection thật trong DB (GET /purchasing/orders đã kèm
-                                    // receipts[].qcInspections[]) trước khi phải đoán.
                                     const dbInsp = (po.receipts || []).flatMap(r => r.qcInspections || [])[0];
                                     const hasDbInsp = dbInsp && Number.isFinite(dbInsp.passedQuantity);
-                                    // Không có biên bản trong DB: chỉ dùng số liệu đơn đang lưu, không tự đặt số lượng lỗi.
                                     const guessedPassed = Number.isFinite(Number(po.passedQty)) && po.passedQty !== null ? Number(po.passedQty) : (isRejected ? 0 : totalQty);
                                     const guessedFailed = Number.isFinite(Number(po.failedQty)) && po.failedQty !== null ? Number(po.failedQty) : (isRejected ? totalQty : 0);
+                                    const effectivePassed = hasDbInsp ? Number(dbInsp.passedQuantity) : guessedPassed;
+                                    const effectiveFailed = hasDbInsp ? Number(dbInsp.defectiveQuantity) : guessedFailed;
+                                    const notesText = dbInsp?.notes || po.supplierNote || po.notes || 'Lô hàng đã được nghiệm thu kỹ thuật và đối soát tiêu chuẩn chất lượng.';
+                                    const isActualPartial = (effectiveFailed > 0 && effectivePassed > 0) || isPartial || /NHẬP MỘT PHẦN|HOÀN TRẢ NCC/i.test(notesText);
+                                    const isActualRejected = (effectiveFailed > 0 && effectivePassed === 0) || isRejected;
+                                    const defectCat = isActualPartial || isActualRejected ? (extractDefectCategory(notesText) || 'PACKAGE_DAMAGED') : 'NONE';
+
                                     setViewingLog({
                                       id: `QA-LOG-${targetPoNum}`,
                                       type: 'INBOUND_PO',
@@ -1505,12 +1588,12 @@ export default function QualityControl() {
                                       poRecord: po,
                                       date: dbInsp?.inspectedAt ? new Date(dbInsp.inspectedAt).toLocaleDateString('vi-VN') : (po.createdAt ? new Date(po.createdAt).toLocaleDateString('vi-VN') : new Date().toLocaleDateString('vi-VN')),
                                       totalQty: totalQty,
-                                      passedQty: hasDbInsp ? dbInsp.passedQuantity : guessedPassed,
-                                      failedQty: hasDbInsp ? dbInsp.defectiveQuantity : guessedFailed,
-                                      decision: isRejected ? 'REJECT_ALL' : (isPartial ? 'ACCEPT_PARTIAL' : 'ACCEPT_ALL'),
-                                      defectCategory: isRejected || isPartial ? 'PACKAGE_DAMAGED' : 'NONE',
-                                      notes: dbInsp?.notes || po.supplierNote || 'Lô hàng đã được nghiệm thu kỹ thuật và đối soát tiêu chuẩn chất lượng.',
-                                      status: isRejected ? 'QA_REJECTED' : (isPartial ? 'QA_PARTIAL' : 'QA_PASSED'),
+                                      passedQty: effectivePassed,
+                                      failedQty: effectiveFailed,
+                                      decision: isActualRejected ? 'REJECT_ALL' : (isActualPartial ? 'ACCEPT_PARTIAL' : 'ACCEPT_ALL'),
+                                      defectCategory: defectCat,
+                                      notes: notesText,
+                                      status: isActualRejected ? 'QA_REJECTED' : (isActualPartial ? 'QA_PARTIAL' : 'QA_PASSED'),
                                       items: poItems,
                                       productName: primaryName
                                     });
@@ -3210,9 +3293,14 @@ export default function QualityControl() {
       {/* MODAL 3: XEM CHI TIẾT BIÊN BẢN NGHIỆM THU KỸ THUẬT (ENTERPRISE CERTIFICATE) */}
       {/* ========================================================================= */}
       {viewingLog && (() => {
-        const isPassed = viewingLog.status === 'QA_PASSED' || viewingLog.decision === 'ACCEPT_ALL';
-        const isPartial = viewingLog.status === 'QA_PARTIAL' || viewingLog.decision === 'ACCEPT_PARTIAL';
-        const isRejected = viewingLog.status === 'REJECTED' || viewingLog.status === 'QA_REJECTED' || viewingLog.decision === 'REJECT';
+        const actualFailed = Number(viewingLog.failedQty ?? 0);
+        const actualPassed = Number(viewingLog.passedQty ?? 0);
+        const hasPartialCounts = actualFailed > 0 && actualPassed > 0;
+        const hasPartialNote = /NHẬP MỘT PHẦN|HOÀN TRẢ NCC/i.test(viewingLog.notes || '');
+
+        const isRejected = viewingLog.status === 'REJECTED' || viewingLog.status === 'QA_REJECTED' || viewingLog.decision === 'REJECT' || viewingLog.decision === 'REJECT_ALL' || viewingLog.decision === 'REJECT_RMA' || (actualPassed === 0 && actualFailed > 0);
+        const isPartial = !isRejected && (hasPartialCounts || hasPartialNote || viewingLog.status === 'QA_PARTIAL' || viewingLog.decision === 'ACCEPT_PARTIAL');
+        const isPassed = !isRejected && !isPartial && (viewingLog.status === 'QA_PASSED' || viewingLog.decision === 'ACCEPT_ALL');
 
         // Tự động tìm lại PO tương ứng trong orders nếu log lưu trong localStorage bị thiếu items/tên
         const relatedPO = orders.find(p => 
@@ -3324,7 +3412,14 @@ export default function QualityControl() {
                                 color: isRejected ? '#dc2626' : isPartial ? '#c2410c' : '#15803d',
                                 border: `1px solid ${isRejected ? '#fca5a5' : isPartial ? '#fed7aa' : '#bbf7d0'}`
                               }}>
-                                {viewingLog.decision === 'EXCHANGE_NEW' ? 'DUYỆT ĐỔI MỚI 1-1' : viewingLog.decision === 'VENDOR_WARRANTY' ? 'GỬI HÃNG BẢO HÀNH' : viewingLog.decision === 'RESTOCK_WAREHOUSE' ? 'NHẬP LẠI KHO BÁN LẺ' : viewingLog.decision === 'ACCEPT_ALL' ? 'CHO NHẬP KHO 100%' : viewingLog.decision === 'ACCEPT_PARTIAL' ? 'NHẬP MỘT PHẦN' : 'TỪ CHỐI BẢO HÀNH'}
+                                {isPartial
+                                  ? 'NHẬP MỘT PHẦN'
+                                  : (viewingLog.decision === 'EXCHANGE_NEW' ? 'DUYỆT ĐỔI MỚI 1-1'
+                                     : viewingLog.decision === 'VENDOR_WARRANTY' ? 'GỬI HÃNG BẢO HÀNH'
+                                     : viewingLog.decision === 'RESTOCK_WAREHOUSE' ? 'NHẬP LẠI KHO BÁN LẺ'
+                                     : (viewingLog.decision === 'ACCEPT_ALL' || isPassed) ? 'CHO NHẬP KHO 100%'
+                                     : isRejected ? (viewingLog.type === 'CUSTOMER_RMA' ? 'TỪ CHỐI BẢO HÀNH' : 'HOÀN TRẢ NCC 100%')
+                                     : 'TỪ CHỐI BẢO HÀNH')}
                               </span>
                             </div>
                           </div>
@@ -3341,7 +3436,17 @@ export default function QualityControl() {
                             </div>
                             <div>
                               <span style={{ color: '#64748b' }}>Phân Loại: </span>
-                              <strong style={{ color: '#0f172a' }}>{DEFECT_LABELS[viewingLog.defectCategory] || viewingLog.defectCategory || 'Đạt tiêu chuẩn hoàn hảo'}</strong>
+                              <strong style={{ color: '#0f172a' }}>
+                                {(() => {
+                                  if (isPartial || isRejected) {
+                                    const cat = viewingLog.defectCategory && viewingLog.defectCategory !== 'NONE'
+                                      ? viewingLog.defectCategory
+                                      : extractDefectCategory(viewingLog.notes || '');
+                                    return DEFECT_LABELS[cat] || cat || 'Móp hộp outer / Rách seal niêm phong';
+                                  }
+                                  return DEFECT_LABELS[viewingLog.defectCategory] || viewingLog.defectCategory || 'Đạt tiêu chuẩn hoàn hảo';
+                                })()}
+                              </strong>
                             </div>
                           </div>
                         </td>
