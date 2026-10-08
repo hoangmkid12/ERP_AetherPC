@@ -2126,62 +2126,144 @@ export default function Dashboard() {
       })()}
 
       {/* ================= MODAL XEM CHI TIẾT BẢNG LƯƠNG NHÂN SỰ ================= */}
-      {showKPIDetailModal && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(6px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '1.5rem' }}>
-          <div style={{ width: '100%', maxWidth: '850px', maxHeight: '90vh', overflowY: 'auto', padding: '2rem', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e3e8ef', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                <DollarSign size={22} style={{ color: '#16a34a' }} />
-                <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
-                  Bảng Lương & Thưởng Hoa Hồng Nhân Sự Toàn Doanh Nghiệp
-                </h3>
+      {showKPIDetailModal && (() => {
+        const displayPayrolls = shownPayrolls.length > 0 ? shownPayrolls : payrolls;
+        const totalBase = displayPayrolls.reduce((sum, p) => sum + (Number(p.baseSalary ?? p.base ?? 0) || 0), 0);
+        const totalBonus = displayPayrolls.reduce((sum, p) => sum + (Number(p.commission || 0) + Number(p.assemblyBonus || 0) + Number(p.otherBonus || 0) + Number(p.bonus || 0)), 0);
+        const totalNet = displayPayrolls.reduce((sum, p) => sum + (Number(p.netSalary) || 0), 0);
+
+        return (
+          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.55)', backdropFilter: 'blur(6px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '1rem' }}>
+            <div style={{ width: '95%', maxWidth: '1050px', maxHeight: '90vh', display: 'flex', flexDirection: 'column', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e3e8ef', boxShadow: '0 25px 30px -5px rgba(0, 0, 0, 0.15)', boxSizing: 'border-box' }}>
+              
+              {/* Modal Header */}
+              <div style={{ padding: '1.25rem 1.75rem', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  <div style={{ width: '38px', height: '38px', borderRadius: '8px', backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#16a34a' }}>
+                    <DollarSign size={20} />
+                  </div>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                      <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                        Bảng Lương & Thưởng Hoa Hồng Nhân Sự Toàn Doanh Nghiệp
+                      </h3>
+                      {shownPayrollPeriod && (
+                        <span style={{ backgroundColor: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', fontSize: '0.75rem', fontWeight: 700, padding: '2px 8px', borderRadius: '10px' }}>
+                          Kỳ {shownPayrollPeriod}
+                        </span>
+                      )}
+                    </div>
+                    <p style={{ margin: '0.2rem 0 0', fontSize: '0.78rem', color: '#64748b' }}>
+                      Tổng hợp chi tiết thu nhập, lương cơ bản, thưởng KPI & thực lĩnh của {displayPayrolls.length} nhân sự
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => setShowKPIDetailModal(false)}
+                  style={{ background: '#f1f5f9', border: '1px solid #e2e8f0', color: '#475569', cursor: 'pointer', padding: '0.45rem', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                  title="Đóng"
+                >
+                  <X size={18} />
+                </button>
               </div>
-              <button onClick={() => setShowKPIDetailModal(false)} style={{ background: '#f1f5f9', border: '1px solid #e3e8ef', color: '#475569', cursor: 'pointer', padding: '0.4rem', borderRadius: '6px' }}>
-                <X size={18} />
-              </button>
-            </div>
 
-            <div style={{ overflowX: 'auto', marginBottom: '1.5rem' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
-                <thead>
-                  <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569' }}>
-                    <th style={{ padding: '0.5rem' }}>Mã NV</th>
-                    <th style={{ padding: '0.5rem' }}>Họ & Tên</th>
-                    <th style={{ padding: '0.5rem' }}>Chức Vụ / Phòng Ban</th>
-                    <th style={{ padding: '0.5rem', textAlign: 'right' }}>Lương Cơ Bản</th>
-                    <th style={{ padding: '0.5rem', textAlign: 'right' }}>Thưởng KPI / Hoa Hồng</th>
-                    <th style={{ padding: '0.5rem', textAlign: 'right' }}>Thực Nhận</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {payrolls.length === 0 && (
-                    <tr><td colSpan={5} style={{ padding: '1rem', textAlign: 'center', color: '#64748b' }}>Chưa có bảng lương trong kỳ.</td></tr>
-                  )}
-                  {payrolls.map((p, pIdx) => (
-                    <tr key={pIdx} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                      <td style={{ padding: '0.5rem', fontWeight: 700, color: '#2563eb' }}>{p.employee?.employeeCode || (p.employeeId ? `NV-${p.employeeId}` : '—')}</td>
-                      <td style={{ padding: '0.5rem', fontWeight: 600, color: '#0f172a' }}>{p.employeeName || p.employee?.fullName || p.name || '—'}</td>
-                      <td style={{ padding: '0.5rem', color: '#64748b' }}>{getRoleName(p.role) || 'Nhân viên'}</td>
-                      <td style={{ padding: '0.5rem', textAlign: 'right' }}>{formatPrice(Number(p.baseSalary ?? p.base ?? 0) || 0)}</td>
-                      <td style={{ padding: '0.5rem', textAlign: 'right', color: '#16a34a', fontWeight: 700 }}>+{formatPrice((Number(p.commission) || 0) + (Number(p.assemblyBonus) || 0) + (Number(p.otherBonus) || 0) + (Number(p.bonus) || 0))}</td>
-                      <td style={{ padding: '0.5rem', textAlign: 'right', fontWeight: 800, color: '#0f172a' }}>{formatPrice(Number(p.netSalary) || 0)}</td>
+              {/* Table Container with Horizontal Scroll */}
+              <div style={{ overflowX: 'auto', overflowY: 'auto', flex: 1, padding: '1rem 1.75rem' }}>
+                <table style={{ width: '100%', minWidth: '850px', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+                  <thead>
+                    <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', color: '#475569' }}>
+                      <th style={{ padding: '0.75rem 0.85rem', textAlign: 'left', whiteSpace: 'nowrap', width: '110px' }}>Mã NV</th>
+                      <th style={{ padding: '0.75rem 0.85rem', textAlign: 'left', whiteSpace: 'nowrap', minWidth: '180px' }}>Họ & Tên</th>
+                      <th style={{ padding: '0.75rem 0.85rem', textAlign: 'left', whiteSpace: 'nowrap', minWidth: '170px' }}>Chức Vụ / Phòng Ban</th>
+                      <th style={{ padding: '0.75rem 0.85rem', textAlign: 'right', whiteSpace: 'nowrap', width: '130px' }}>Lương Cơ Bản</th>
+                      <th style={{ padding: '0.75rem 0.85rem', textAlign: 'right', whiteSpace: 'nowrap', width: '150px' }}>Thưởng KPI / Hoa Hồng</th>
+                      <th style={{ padding: '0.75rem 0.85rem', textAlign: 'right', whiteSpace: 'nowrap', width: '140px' }}>Thực Nhận</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {displayPayrolls.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} style={{ padding: '2.5rem', textAlign: 'center', color: '#64748b' }}>
+                          Chưa có bảng lương trong kỳ được chọn.
+                        </td>
+                      </tr>
+                    ) : (
+                      displayPayrolls.map((p, pIdx) => {
+                        const bonusVal = (Number(p.commission) || 0) + (Number(p.assemblyBonus) || 0) + (Number(p.otherBonus) || 0) + (Number(p.bonus) || 0);
+                        const empPos = p.employee?.position || p.position;
+                        const empRole = getRoleName(p.role || p.employee?.role);
+                        const empDept = p.employee?.department || p.department;
+                        const positionLabel = empPos || empRole || 'Nhân viên';
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem', borderTop: '1px solid #f1f5f9', paddingTop: '1rem' }}>
-              <button
-                onClick={() => setShowKPIDetailModal(false)}
-                style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.5rem 1.25rem', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
-              >
-                Đóng
-              </button>
+                        return (
+                          <tr key={pIdx} style={{ borderBottom: '1px solid #f1f5f9', transition: 'background-color 0.15s ease' }}>
+                            <td style={{ padding: '0.65rem 0.85rem', fontWeight: 700, color: '#2563eb', whiteSpace: 'nowrap' }}>
+                              {p.employee?.employeeCode || (p.employeeId ? `NV-${p.employeeId}` : (p.id || '—'))}
+                            </td>
+                            <td style={{ padding: '0.65rem 0.85rem', fontWeight: 700, color: '#0f172a', whiteSpace: 'nowrap' }}>
+                              {p.employeeName || p.employee?.fullName || p.name || '—'}
+                            </td>
+                            <td style={{ padding: '0.65rem 0.85rem', color: '#475569', whiteSpace: 'nowrap' }}>
+                              <span>{positionLabel}</span>
+                              {empDept && (
+                                <span style={{ color: '#94a3b8', fontSize: '0.77rem', marginLeft: '0.35rem' }}>
+                                  ({empDept})
+                                </span>
+                              )}
+                            </td>
+                            <td style={{ padding: '0.65rem 0.85rem', textAlign: 'right', color: '#334155', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                              {formatPrice(Number(p.baseSalary ?? p.base ?? 0) || 0)}
+                            </td>
+                            <td style={{ padding: '0.65rem 0.85rem', textAlign: 'right', color: bonusVal > 0 ? '#16a34a' : '#64748b', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                              {bonusVal > 0 ? `+${formatPrice(bonusVal)}` : '+0 ₫'}
+                            </td>
+                            <td style={{ padding: '0.65rem 0.85rem', textAlign: 'right', fontWeight: 800, color: '#0f172a', fontSize: '0.9rem', whiteSpace: 'nowrap' }}>
+                              {formatPrice(Number(p.netSalary) || 0)}
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                  {displayPayrolls.length > 0 && (
+                    <tfoot>
+                      <tr style={{ backgroundColor: '#f8fafc', borderTop: '2px solid #cbd5e1', fontWeight: 800 }}>
+                        <td colSpan={3} style={{ padding: '0.75rem 0.85rem', color: '#0f172a', textAlign: 'left', whiteSpace: 'nowrap' }}>
+                          TỔNG CỘNG TOÀN DOANH NGHIỆP ({displayPayrolls.length} NHÂN VIÊN)
+                        </td>
+                        <td style={{ padding: '0.75rem 0.85rem', textAlign: 'right', color: '#334155', whiteSpace: 'nowrap' }}>
+                          {formatPrice(totalBase)}
+                        </td>
+                        <td style={{ padding: '0.75rem 0.85rem', textAlign: 'right', color: '#16a34a', whiteSpace: 'nowrap' }}>
+                          +{formatPrice(totalBonus)}
+                        </td>
+                        <td style={{ padding: '0.75rem 0.85rem', textAlign: 'right', color: '#15803d', fontSize: '0.98rem', whiteSpace: 'nowrap' }}>
+                          {formatPrice(totalNet)}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  )}
+                </table>
+              </div>
+
+              {/* Modal Footer */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.75rem', borderTop: '1px solid #e2e8f0', backgroundColor: '#f8fafc', borderRadius: '0 0 12px 12px', flexWrap: 'wrap', gap: '0.75rem' }}>
+                <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                  Tổng thực lĩnh cần giải ngân: <strong style={{ color: '#15803d' }}>{formatPrice(totalNet)}</strong>
+                </div>
+                <button
+                  onClick={() => setShowKPIDetailModal(false)}
+                  style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.5rem 1.35rem', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer', transition: 'background-color 0.15s ease' }}
+                >
+                  Đóng
+                </button>
+              </div>
+
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Modal Detail Order */}
       {selectedDetailOrder && (
