@@ -68,20 +68,20 @@ export default function FlashSale() {
             </p>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {[[Package, `${deals.length} sản phẩm đang sale`], [Percent, `Giảm trung bình ${avgOff}%`], [TrendingDown, `Giảm tối đa ${maxOff}%`]].map(([Icon, t]) => (
-                <span key={t} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(0,0,0,.18)', padding: '6px 12px', borderRadius: 20, fontSize: 13, fontWeight: 600 }}>
+                <span key={t} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#fff', border: '1px solid #fecdd3', color: '#b91c1c', padding: '6px 12px', borderRadius: 20, fontSize: 13, fontWeight: 700, boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
                   <Icon size={14} /> {t}
                 </span>
               ))}
             </div>
           </div>
           <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', marginBottom: 8 }}>Kết thúc sau</div>
+            <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', marginBottom: 8, color: '#475569' }}>Kết thúc sau</div>
             <div className="sf-countdown" style={{ gap: 8 }}>
               {[[h, 'Giờ'], [m, 'Phút'], [s, 'Giây']].map(([v, l], i) => (
                 <React.Fragment key={l}>
                   {i > 0 && <span style={{ fontSize: 22, fontWeight: 800 }}>:</span>}
                   <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-                    <b style={{ minWidth: 56, height: 52, fontSize: 26, background: '#fff', color: 'var(--sf-primary)' }}>{pad(v)}</b>
+                    <b style={{ minWidth: 56, height: 52, fontSize: 26, background: '#fff', color: '#d70018', border: '1px solid #fecdd3', borderRadius: 10, boxShadow: '0 2px 6px rgba(0,0,0,0.05)' }}>{pad(v)}</b>
                     <span style={{ fontSize: 11, fontWeight: 600 }}>{l}</span>
                   </span>
                 </React.Fragment>

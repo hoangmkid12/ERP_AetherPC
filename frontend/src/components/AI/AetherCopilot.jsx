@@ -286,6 +286,11 @@ export default function AetherCopilot() {
     });
   };
 
+  // Ẩn hoàn toàn chat Copilot đối với actor giao hàng (DELIVERY)
+  if (user?.role === 'DELIVERY') {
+    return null;
+  }
+
   return (
     <>
       {/* Floating Action Button (FAB) */}

@@ -106,7 +106,6 @@ const AdminLayout = () => {
     return (
       <DeliveryAppShell>
         <Outlet />
-        <AetherCopilot />
       </DeliveryAppShell>
     );
   }

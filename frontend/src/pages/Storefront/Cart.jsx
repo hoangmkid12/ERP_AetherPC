@@ -7,7 +7,7 @@ import {
   ShoppingCart, ShoppingBag, Trash2, ArrowLeft, CreditCard, Sparkles, 
   MapPin, User, Phone, Lock, LogIn, UserPlus, CheckCircle, 
   ShieldCheck, Truck, RotateCcw, AlertCircle, QrCode, Banknote, Mail,
-  ChevronDown, Search
+  ChevronDown, Search, X
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../../services/api';
@@ -147,6 +147,8 @@ export default function Cart() {
 
   // Invoice / Success state
   const [invoice, setInvoice] = useState(null);
+  // Modal QR cho chuyển khoản SePay
+  const [qrModalOrder, setQrModalOrder] = useState(null);
 
   // Coupon states
   const [couponCode, setCouponCode] = useState('');
@@ -348,6 +350,29 @@ export default function Cart() {
     return Number(price).toLocaleString('vi-VN') + ' đ';
   };
 
+  const handleQrPaid = (paymentData) => {
+    addNotification(`Thanh toán thành công cho đơn hàng #${qrModalOrder?.orderId}!`, 'success', '/my-orders');
+    setTimeout(() => {
+      if (qrModalOrder) {
+        setInvoice({
+          ...qrModalOrder,
+          isPaid: true,
+          paidData: paymentData,
+        });
+        setQrModalOrder(null);
+      }
+    }, 1200);
+  };
+
+  const handleCloseQrModal = () => {
+    const oId = qrModalOrder?.orderId;
+    setQrModalOrder(null);
+    if (oId) {
+      addNotification(`Đơn hàng #${oId} đã được tạo ở trạng thái Chờ thanh toán. Bạn có thể thanh toán tại mục Đơn hàng của tôi.`, 'info');
+      navigate('/my-orders');
+    }
+  };
+
   const handleCheckout = async (e) => {
     e.preventDefault();
     if (selectedCartItems.length === 0) {
@@ -424,14 +449,17 @@ export default function Cart() {
         email: targetEmail
       };
 
-      setInvoice(invoiceData);
-      addNotification(`Đơn hàng #${orderId} đã đặt thành công!`, 'success', '/my-orders');
-
-      // Email xác nhận đơn hàng được backend tự gửi ngay khi tạo đơn (POST /orders,
-      // xem order.controller.js) với đầy đủ dữ liệu thật từ DB — gọi thêm
-      // /orders/email-notify ở đây trước kia khiến khách nhận 2 email trùng nội dung.
-
       removeSelectedFromCart(selectedCartItems.map(getItemKey));
+
+      if (paymentMethod === 'BANK_TRANSFER') {
+        // Hiện mã QR thanh toán dạng modal, chỉ chuyển sang trạng thái đã đặt hàng khi đã quét và xác nhận
+        setQrModalOrder(invoiceData);
+        addNotification(`Đơn hàng #${orderId} đã được khởi tạo. Vui lòng quét mã VietQR để hoàn tất!`, 'info');
+      } else {
+        // Tiền mặt / COD: chuyển thẳng sang màn hình đặt hàng thành công
+        setInvoice(invoiceData);
+        addNotification(`Đơn hàng #${orderId} đã đặt thành công!`, 'success', '/my-orders');
+      }
     } catch (err) {
       addNotification('Không thể hoàn tất thanh toán. Vui lòng kiểm tra lại kết nối!', 'error');
     } finally {
@@ -439,24 +467,15 @@ export default function Cart() {
     }
   };
 
-  // Invoice Success Screen
+  // Invoice Success Screen (Hiển thị sau khi xác nhận thanh toán QR hoặc đặt COD)
   if (invoice) {
-    const isQrPay = invoice.paymentMethod === 'BANK_TRANSFER';
+    const isPaidOnline = invoice.isPaid || (invoice.paymentMethod === 'BANK_TRANSFER' && invoice.isPaid);
 
     return (
       <div className="container" style={{ padding: '3.5rem 1.5rem', display: 'flex', justifyContent: 'center' }}>
-        <style>{`
-          @keyframes scan { 0% { top: 0%; } 50% { top: 100%; } 100% { top: 0%; } }
-          .scanner-line {
-            position: absolute; left: 0; width: 100%; height: 3px;
-            background: #10b981; boxShadow: 0 0 10px #10b981, 0 0 20px #10b981;
-            animation: scan 4s linear infinite;
-          }
-        `}</style>
-
         <div className="card-glass" style={{ 
           width: '100%', 
-          maxWidth: isQrPay ? '850px' : '600px', 
+          maxWidth: '650px', 
           padding: '2.5rem', 
           borderRadius: '20px',
           border: '1px solid #e2e8f0',
@@ -464,36 +483,49 @@ export default function Cart() {
         }}>
           <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
             <div style={{
-              width: '64px', height: '64px', borderRadius: '50%',
+              width: '68px', height: '68px', borderRadius: '50%',
               backgroundColor: '#ecfdf5', color: '#10b981',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              margin: '0 auto 1.25rem auto'
+              margin: '0 auto 1.25rem auto',
+              boxShadow: '0 8px 20px rgba(16, 185, 129, 0.2)'
             }}>
-              <CheckCircle size={36} />
+              <CheckCircle size={40} />
             </div>
             <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#0f172a', fontFamily: 'var(--font-title)', marginBottom: '0.5rem' }}>
-              Đặt Hàng Thành Công!
+              {isPaidOnline ? 'Đặt Hàng & Thanh Toán Thành Công!' : 'Đặt Hàng Thành Công!'}
             </h2>
             <p style={{ color: '#64748b', fontSize: '0.95rem' }}>
               Mã đơn hàng: <strong style={{ color: '#2563eb' }}>#{invoice.orderId}</strong> — Cảm ơn quý khách đã mua hàng tại AetherPC.
             </p>
+            {isPaidOnline && (
+              <div style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+                backgroundColor: '#ecfdf5',
+                color: '#059669',
+                padding: '0.4rem 1.1rem',
+                borderRadius: '20px',
+                fontSize: '0.82rem',
+                fontWeight: 800,
+                marginTop: '0.65rem',
+                border: '1px solid #a7f3d0'
+              }}>
+                <CheckCircle size={15} /> ĐÃ XÁC NHẬN THANH TOÁN (SEPAY VIETQR)
+              </div>
+            )}
           </div>
 
-          {isQrPay ? (
-            <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '1.5rem', marginBottom: '1.5rem' }}>
-              <SepayPayment orderId={invoice.orderId} />
+          <div style={{ backgroundColor: '#f8fafc', padding: '1.5rem', borderRadius: '14px', border: '1px solid #e2e8f0', marginBottom: '1.5rem' }}>
+            <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#0f172a', marginBottom: '0.75rem' }}>Chi Tiết Đơn Hàng & Giao Hàng</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem', fontSize: '0.85rem', color: '#475569' }}>
+              <div><strong>Người nhận:</strong> {invoice.customerName} ({invoice.phone})</div>
+              <div><strong>Địa chỉ giao:</strong> {invoice.address}</div>
+              <div><strong>Phương thức thanh toán:</strong> {invoice.paymentMethod === 'BANK_TRANSFER' ? 'Chuyển khoản VietQR qua SePay' : 'Tiền mặt khi nhận hàng (COD)'}</div>
+              <div><strong>Trạng thái thanh toán:</strong> <strong style={{ color: isPaidOnline ? '#16a34a' : '#d97706' }}>{isPaidOnline ? '✓ Đã thanh toán thành công' : 'Chờ thanh toán khi nhận hàng (COD)'}</strong></div>
+              <div><strong>Tổng tiền thanh toán:</strong> <strong style={{ color: '#dc2626', fontSize: '1.1rem' }}>{formatPrice(invoice.totalAmount)}</strong></div>
             </div>
-          ) : (
-            <div style={{ backgroundColor: '#f8fafc', padding: '1.5rem', borderRadius: '14px', border: '1px solid #e2e8f0', marginBottom: '1.5rem' }}>
-              <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#0f172a', marginBottom: '0.75rem' }}>Chi Tiết Giao Hàng</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', fontSize: '0.85rem', color: '#475569' }}>
-                <div><strong>Người nhận:</strong> {invoice.customerName} ({invoice.phone})</div>
-                <div><strong>Địa chỉ giao:</strong> {invoice.address}</div>
-                <div><strong>Phương thức thanh toán:</strong> {invoice.paymentMethod === 'BANK_TRANSFER' ? 'Chuyển khoản VietQR / Internet Banking' : invoice.paymentMethod === 'CASH' ? 'Tiền mặt khi nhận hàng' : 'Tiền mặt khi nhận hàng'}</div>
-                <div><strong>Tổng tiền thanh toán:</strong> <strong style={{ color: '#dc2626', fontSize: '1.1rem' }}>{formatPrice(invoice.totalAmount)}</strong></div>
-              </div>
-            </div>
-          )}
+          </div>
 
           {/* Email Notification Banner */}
           {invoice.email && (
@@ -521,10 +553,10 @@ export default function Cart() {
           )}
 
           <div style={{ display: 'flex', gap: '1rem', marginTop: '2rem', justifyContent: 'center' }}>
-            <Link to="/" className="btn btn-primary" style={{ padding: '0.75rem 2rem', borderRadius: '12px', fontWeight: 700 }}>
+            <Link to="/" style={{ padding: '0.75rem 2rem', borderRadius: '12px', fontWeight: 700, backgroundColor: '#fff1f2', color: '#d70018', border: '1.5px solid #fecdd3', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
               Tiếp Tục Mua Sắm
             </Link>
-            <Link to="/my-orders" className="btn btn-secondary" style={{ padding: '0.75rem 2rem', borderRadius: '12px', fontWeight: 700, backgroundColor: '#f1f5f9', color: '#0f172a', border: '1px solid #cbd5e1' }}>
+            <Link to="/my-orders" style={{ padding: '0.75rem 2rem', borderRadius: '12px', fontWeight: 700, backgroundColor: '#f1f5f9', color: '#0f172a', border: '1px solid #cbd5e1', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
               Xem Đơn Hàng Của Tôi
             </Link>
           </div>
@@ -1160,12 +1192,15 @@ export default function Cart() {
                     type="submit"
                     disabled={checkingOut}
                     style={{
-                      width: '100%', padding: '0.85rem', borderRadius: '12px', border: 'none',
-                      backgroundColor: '#dc2626', color: '#ffffff', fontSize: '1rem', fontWeight: 900,
+                      width: '100%', padding: '0.85rem', borderRadius: '12px',
+                      border: '1.5px solid #fecdd3',
+                      backgroundColor: '#fff1f2', color: '#d70018', fontSize: '1rem', fontWeight: 900,
                       cursor: checkingOut ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center',
-                      justifyContent: 'center', gap: '0.5rem', boxShadow: '0 4px 15px rgba(220,38,38,0.3)',
+                      justifyContent: 'center', gap: '0.5rem', boxShadow: '0 4px 15px rgba(225,29,72,0.08)',
                       transition: 'all 0.2s'
                     }}
+                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#ffe4e6'; e.currentTarget.style.borderColor = '#fda4af'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#fff1f2'; e.currentTarget.style.borderColor = '#fecdd3'; }}
                   >
                     <CreditCard size={18} />
                     {checkingOut ? 'Đang thực hiện hạch toán ERP...' : 'Xác Nhận Thanh Toán'}
@@ -1176,6 +1211,150 @@ export default function Cart() {
             )}
           </div>
 
+        </div>
+      )}
+      {/* Modal Quét Mã QR Thanh Toán SePay */}
+      {qrModalOrder && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9999,
+            backgroundColor: 'rgba(15, 23, 42, 0.72)',
+            backdropFilter: 'blur(6px)',
+            WebkitBackdropFilter: 'blur(6px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '1.25rem',
+            animation: 'fadeIn 0.2s ease-out'
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              handleCloseQrModal();
+            }
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: '#ffffff',
+              borderRadius: '24px',
+              width: '100%',
+              maxWidth: '780px',
+              maxHeight: '92vh',
+              overflowY: 'auto',
+              boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(226, 232, 240, 0.8)',
+              padding: '2rem',
+              position: 'relative'
+            }}
+          >
+            {/* Modal Header */}
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '1.25rem', borderBottom: '1px solid #f1f5f9', paddingBottom: '1.25rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+                <div style={{
+                  width: '46px',
+                  height: '46px',
+                  borderRadius: '14px',
+                  backgroundColor: '#eff6ff',
+                  color: '#2563eb',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 4px 10px rgba(37, 99, 235, 0.12)'
+                }}>
+                  <QrCode size={26} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.35rem', fontWeight: 900, color: '#0f172a', fontFamily: 'var(--font-title)' }}>
+                    Quét Mã QR Thanh Toán
+                  </h3>
+                  <p style={{ margin: '0.2rem 0 0', fontSize: '0.85rem', color: '#64748b' }}>
+                    Đơn hàng: <strong style={{ color: '#2563eb' }}>#{qrModalOrder.orderId}</strong> • Số tiền: <strong style={{ color: '#dc2626' }}>{formatPrice(qrModalOrder.totalAmount)}</strong>
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleCloseQrModal}
+                style={{
+                  background: '#f1f5f9',
+                  border: 'none',
+                  borderRadius: '50%',
+                  width: '36px',
+                  height: '36px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  color: '#64748b',
+                  transition: 'all 0.15s'
+                }}
+                title="Đóng / Thanh toán sau"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Hướng dẫn ngắn */}
+            <div style={{
+              backgroundColor: '#eff6ff',
+              border: '1px solid #bfdbfe',
+              borderRadius: '12px',
+              padding: '0.75rem 1rem',
+              marginBottom: '1.25rem',
+              fontSize: '0.82rem',
+              color: '#1e40af',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}>
+              <QrCode size={16} />
+              <span>Vui lòng quét mã QR bên dưới. Sau khi hệ thống SePay xác nhận chuyển khoản thành công, đơn hàng sẽ tự động chuyển sang trạng thái <strong>Đã đặt hàng</strong>.</span>
+            </div>
+
+            {/* Sepay Payment Component */}
+            <div style={{ marginBottom: '1.25rem' }}>
+              <SepayPayment
+                orderId={qrModalOrder.orderId}
+                onPaid={handleQrPaid}
+              />
+            </div>
+
+            {/* Modal Footer */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: '0.75rem',
+              paddingTop: '1rem',
+              borderTop: '1px solid #f1f5f9',
+              fontSize: '0.82rem',
+              color: '#64748b'
+            }}>
+              <div>
+                💡 <em>Hệ thống tự động kiểm tra trạng thái chuyển khoản mỗi vài giây.</em>
+              </div>
+              <button
+                type="button"
+                onClick={handleCloseQrModal}
+                style={{
+                  padding: '0.55rem 1.25rem',
+                  borderRadius: '10px',
+                  border: '1px solid #cbd5e1',
+                  backgroundColor: '#ffffff',
+                  color: '#475569',
+                  fontWeight: 700,
+                  fontSize: '0.82rem',
+                  cursor: 'pointer',
+                  transition: 'background 0.15s'
+                }}
+              >
+                Thanh toán sau (Xem đơn hàng)
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

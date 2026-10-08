@@ -57,8 +57,8 @@
   font-size: 14px; font-weight: 600; cursor: pointer; transition: all .15s ease;
   white-space: nowrap; line-height: 1;
 }
-.sf-btn-primary { background: var(--sf-primary); color: #fff; }
-.sf-btn-primary:hover { background: var(--sf-primary-dark); }
+.sf-btn-primary { background: var(--sf-primary-soft); color: var(--sf-primary) !important; border: 1.5px solid #fecdd3; font-weight: 700; }
+.sf-btn-primary:hover { background: #ffe4e6; border-color: #fda4af; color: var(--sf-primary-dark) !important; box-shadow: 0 4px 14px rgba(225, 29, 72, 0.12); }
 .sf-btn-outline { background: #fff; color: var(--sf-primary); border-color: var(--sf-primary); }
 .sf-btn-outline:hover { background: var(--sf-primary-soft); }
 .sf-btn-ghost { background: #fff; color: var(--sf-text); border-color: var(--sf-border); }
@@ -347,14 +347,15 @@
 .sf-usp-item span { font-size: 12.5px; color: var(--sf-muted); }
 
 /* Flash sale */
-.sf-flash { background: linear-gradient(135deg, #e3001b 0%, #ff4d2e 100%); border-radius: var(--sf-radius-lg); padding: 16px; color: #fff; }
+.sf-flash { background: #fff5f6; border: 1.5px solid #fecdd3; border-radius: var(--sf-radius-lg); padding: 18px 20px; color: var(--sf-text); box-shadow: 0 4px 20px -4px rgba(225, 29, 72, 0.08); }
 .sf-flash-head { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 14px; }
-.sf-flash-title { color: #fff; display: flex; align-items: center; gap: 8px; font-size: 26px; font-weight: 900; font-style: italic; letter-spacing: -.01em; text-transform: uppercase; margin: 0; }
-.sf-flash-title svg { color: #ffd400; fill: #ffd400; }
-.sf-countdown { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; }
-.sf-countdown b { min-width: 34px; height: 30px; border-radius: 6px; background: #111; color: #fff; font-size: 16px; font-weight: 800; display: inline-flex; align-items: center; justify-content: center; font-variant-numeric: tabular-nums; }
-.sf-flash .sf-viewall { color: #fff !important; background: rgba(0, 0, 0, .18); padding: 7px 12px; border-radius: 6px; }
-.sf-flash .sf-card { border-color: transparent; }
+.sf-flash-title { color: #d70018; display: flex; align-items: center; gap: 8px; font-size: 26px; font-weight: 900; font-style: italic; letter-spacing: -.01em; text-transform: uppercase; margin: 0; }
+.sf-flash-title svg { color: #e11d48; fill: #e11d48; }
+.sf-countdown { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; color: #475569; }
+.sf-countdown b { min-width: 34px; height: 30px; border-radius: 6px; background: #0f172a; color: #fff; font-size: 16px; font-weight: 800; display: inline-flex; align-items: center; justify-content: center; font-variant-numeric: tabular-nums; }
+.sf-flash .sf-viewall { color: #d70018 !important; background: #ffffff; border: 1px solid #fecdd3; padding: 7px 14px; border-radius: 8px; font-weight: 700; box-shadow: 0 1px 3px rgba(0,0,0,0.05); transition: all .15s ease; }
+.sf-flash .sf-viewall:hover { background: #ffe4e6; border-color: #fda4af; color: #b80015 !important; }
+.sf-flash .sf-card { border: 1px solid #fecdd3; background: #ffffff; }
 
 /* Danh mục nổi bật */
 .sf-catgrid { display: grid; grid-template-columns: repeat(11, minmax(0, 1fr)); gap: 10px; }
@@ -724,10 +725,10 @@
 }
 
 /* ---------- Mua kèm giá sốc (trang chi tiết sản phẩm) ---------- */
-.sf-bundle { margin-top: 16px; padding: 0; overflow: hidden; }
-.sf-bundle-head { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 14px; padding: 12px 18px; background: linear-gradient(90deg, #d70018, #f43f5e); color: #fff; }
-.sf-bundle-head h2 { display: inline-flex; align-items: center; gap: 7px; margin: 0; font-size: 17px; font-weight: 800; text-transform: uppercase; letter-spacing: .02em; }
-.sf-bundle-head span { font-size: 13px; opacity: .92; }
+.sf-bundle { margin-top: 16px; padding: 0; overflow: hidden; border: 1px solid #fecdd3; border-radius: var(--sf-radius); }
+.sf-bundle-head { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 14px; padding: 12px 18px; background: var(--sf-primary-soft); color: var(--sf-primary); border-bottom: 1px solid #fecdd3; }
+.sf-bundle-head h2 { display: inline-flex; align-items: center; gap: 7px; margin: 0; font-size: 17px; font-weight: 800; text-transform: uppercase; letter-spacing: .02em; color: var(--sf-primary); }
+.sf-bundle-head span { font-size: 13px; color: #64748b; font-weight: 500; }
 .sf-bundle-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 330px), 1fr)); gap: 10px; padding: 14px 18px; }
 .sf-bundle-item { position: relative; display: flex; align-items: center; gap: 10px; padding: 10px 10px 10px 40px; border: 1.5px solid var(--sf-border); border-radius: 10px; background: #fff; cursor: pointer; transition: border-color .15s ease, box-shadow .15s ease; min-width: 0; }
 .sf-bundle-item:hover { border-color: #fca5a5; }
@@ -784,3 +785,17 @@
   .sf-sepay, .sf-sepay.is-compact { grid-template-columns: minmax(0, 1fr); }
 }
 .sf-sepay-partial { display: flex; flex-direction: column; gap: 4px; padding: 9px 12px; border-radius: 9px; background: #fffbeb; border: 1px solid #fde68a; color: #92400e; font-size: 13px; line-height: 1.5; }
+
+/* Nút bấm dạng soft-red thanh lịch đồng bộ với phong cách ô ưu đãi */
+.sf-root .btn-primary {
+  background-color: #fff1f2 !important;
+  color: #d70018 !important;
+  border: 1.5px solid #fecdd3 !important;
+  box-shadow: 0 2px 8px rgba(225, 29, 72, 0.08) !important;
+}
+.sf-root .btn-primary:hover {
+  background-color: #ffe4e6 !important;
+  border-color: #fda4af !important;
+  color: #b80015 !important;
+  box-shadow: 0 4px 14px rgba(225, 29, 72, 0.14) !important;
+}
