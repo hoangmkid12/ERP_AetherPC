@@ -679,7 +679,7 @@ export default function PCBuilder() {
             this card; a second identical button used to sit in the action row below,
             which just meant two buttons doing the exact same generateAIBuild() call. */}
         <div style={{ marginBottom: '1rem' }}>
-          <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.6rem' }}>
+          <div className="pcb-ai-row" style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.6rem' }}>
             <input
               type="text"
               value={customPromptText}

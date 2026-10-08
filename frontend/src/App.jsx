@@ -1,6 +1,7 @@
 import React, { useState, useEffect, Suspense, lazy } from 'react';
 import './styles/storefront.css';
 import './styles/erp.css';
+import './styles/mobile.css';
 import './utils/chartTheme';
 import { BrowserRouter as Router, Routes, Route, Navigate, Outlet, useLocation, Link } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -128,7 +129,7 @@ const AdminLayout = () => {
           boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', minWidth: 0, flex: 1 }}>
           <button
             type="button"
             onClick={() => setMobileSidebarOpen(true)}
@@ -152,9 +153,9 @@ const AdminLayout = () => {
               <line x1="3" y1="18" x2="21" y2="18"></line>
             </svg>
           </button>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-            <span style={{ fontWeight: 800, fontSize: '1rem', color: '#0f172a' }}>AetherPC</span>
-            <span style={{ fontSize: '0.7rem', fontWeight: 800, background: '#eff6ff', color: '#2563eb', padding: '2px 6px', borderRadius: '4px', border: '1px solid #bfdbfe' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', minWidth: 0 }}>
+            <span style={{ fontWeight: 800, fontSize: '1rem', color: '#0f172a', flexShrink: 0 }}>AetherPC</span>
+            <span style={{ fontSize: '0.7rem', fontWeight: 800, background: '#eff6ff', color: '#2563eb', padding: '2px 6px', borderRadius: '4px', border: '1px solid #bfdbfe', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>
               {getRoleName(user?.role) || 'ERP'}
             </span>
           </div>
@@ -170,6 +171,8 @@ const AdminLayout = () => {
             display: 'flex',
             alignItems: 'center',
             gap: '0.25rem',
+            whiteSpace: 'nowrap',
+            flexShrink: 0,
           }}
         >
           <span>Ra Cửa Hàng</span>

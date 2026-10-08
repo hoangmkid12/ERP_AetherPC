@@ -292,6 +292,7 @@ export default function AetherCopilot() {
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}
+          className="copilot-fab"
           aria-label="Mở Trợ Lý AI AetherCopilot"
           style={{
             position: 'fixed',
@@ -343,7 +344,7 @@ export default function AetherCopilot() {
               border: '2px solid #0f172a'
             }} />
           </div>
-          <div style={{ textAlign: 'left' }}>
+          <div className="copilot-fab-text" style={{ textAlign: 'left' }}>
             <div style={{ fontSize: '0.85rem', fontWeight: 800, letterSpacing: '0.3px', color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '4px' }}>
               <span>AetherCopilot</span>
               <Sparkles size={13} style={{ color: '#38bdf8' }} />

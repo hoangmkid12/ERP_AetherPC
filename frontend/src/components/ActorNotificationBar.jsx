@@ -17,7 +17,7 @@ export default function ActorNotificationBar() {
   const accent = pending.some(t => t.urgent) ? '#d97706' : pending.length > 0 ? '#2563eb' : '#16a34a';
 
   // Tóm tắt 1 dòng khi thu gọn
-  const summaryText = loading && Object.keys(data).length === 0
+  const summaryText = loading && Object.keys(data).length === 0 && pending.length === 0
     ? 'Đang tải...'
     : pending.length === 0
       ? (config.info || 'Không có việc tồn đọng — quy trình của bạn đã xử lý hết.')
