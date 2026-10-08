@@ -30,6 +30,7 @@ import {
 import { printDocument } from '../../utils/printDocument';
 import SupplierConfirmationModal from '../../components/SupplierConfirmationModal';
 import DateRangeFilter, { isDateInRange } from '../../components/Common/DateRangeFilter';
+import PeriodFilterBar, { isDateInPeriod } from '../../components/Common/PeriodFilterBar';
 import { SignatureRow, SignatureCell, displaySigner, historySigner } from '../../components/Signature/ESignature';
 
 // Register ChartJS modules
@@ -79,6 +80,8 @@ export default function QualityControl() {
   const setTab = (tabName) => {
     setSearchParams({ tab: tabName });
   };
+
+  const [overviewPeriod, setOverviewPeriod] = useState('ALL');
 
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -410,10 +413,14 @@ export default function QualityControl() {
     return 'PARTIAL';
   };
 
-  const pendingQaPOs = orders.filter(po => getPoQaStatus(po) === 'PENDING');
-  const passedQaPOs = orders.filter(po => getPoQaStatus(po) === 'PASSED');
-  const partialQaPOs = orders.filter(po => getPoQaStatus(po) === 'PARTIAL');
-  const rejectedQaPOs = orders.filter(po => getPoQaStatus(po) === 'REJECTED');
+  const ordersInPeriod = useMemo(() => {
+    return orders.filter(po => isDateInPeriod(po.createdAt || po.orderDate || po.date, overviewPeriod));
+  }, [orders, overviewPeriod]);
+
+  const pendingQaPOs = ordersInPeriod.filter(po => getPoQaStatus(po) === 'PENDING');
+  const passedQaPOs = ordersInPeriod.filter(po => getPoQaStatus(po) === 'PASSED');
+  const partialQaPOs = ordersInPeriod.filter(po => getPoQaStatus(po) === 'PARTIAL');
+  const rejectedQaPOs = ordersInPeriod.filter(po => getPoQaStatus(po) === 'REJECTED');
 
   const totalInspected = passedQaPOs.length + partialQaPOs.length + rejectedQaPOs.length;
   const passRate = totalInspected > 0 ? Math.round(((passedQaPOs.length + partialQaPOs.length * 0.8) / totalInspected) * 100) : null;
@@ -1014,25 +1021,31 @@ export default function QualityControl() {
           </p>
         </div>
 
-        <button
-          onClick={fetchData}
-          style={{
-            backgroundColor: '#ffffff',
-            color: '#2563eb',
-            border: '1px solid #bfdbfe',
-            borderRadius: '6px',
-            padding: '0.45rem 0.9rem',
-            fontSize: '0.8rem',
-            fontWeight: 700,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.4rem'
-          }}
-        >
-          <RefreshCw size={14} />
-          <span>Làm Mới Dữ Liệu</span>
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+          {activeTab === 'overview' && (
+            <PeriodFilterBar selectedPeriod={overviewPeriod} onSelectPeriod={setOverviewPeriod} />
+          )}
+
+          <button
+            onClick={fetchData}
+            style={{
+              backgroundColor: '#ffffff',
+              color: '#2563eb',
+              border: '1px solid #bfdbfe',
+              borderRadius: '6px',
+              padding: '0.45rem 0.9rem',
+              fontSize: '0.8rem',
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.4rem'
+            }}
+          >
+            <RefreshCw size={14} />
+            <span>Làm Mới</span>
+          </button>
+        </div>
       </div>
 
       {/* ========================================================================= */}
@@ -1163,10 +1176,10 @@ export default function QualityControl() {
                 </div>
 
                 <div style={{ marginTop: '0.45rem' }}>
-                  <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  <div className="erp-kpi-value" style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {st.value}
                   </div>
-                  <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.15rem' }}>
+                  <div className="erp-kpi-sub" style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.15rem' }}>
                     {st.change}
                   </div>
                 </div>

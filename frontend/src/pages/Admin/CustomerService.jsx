@@ -6,6 +6,7 @@ import { useAuth } from '../../context/AuthContext';
 import { api } from '../../services/api';
 import ChatAttachment, { attachmentPreviewText } from '../../components/Chat/ChatAttachment';
 import { notify } from '../../context/NotificationContext';
+import PeriodFilterBar, { isDateInPeriod } from '../../components/Common/PeriodFilterBar';
 import { COMPLAINT_STATUS, RETURN_STATUS, getStatusLabel, getStatusInfo, formatRmaCode } from '../../utils/statusLabels';
 import {
   HeadphonesIcon, AlertCircle, MessageSquare, RefreshCw, CheckCircle,
@@ -365,13 +366,24 @@ export default function CustomerService() {
     setActiveSessionId(prev => (prev === sessionId ? null : prev));
   };
 
-  // KPI Calculations
-  const totalComplaints = complaints.length;
-  const inProgressComplaints = complaints.filter(c => c.status === 'IN_PROGRESS').length;
-  const openComplaints = complaints.filter(c => c.status === 'OPEN').length;
-  const resolvedComplaints = complaints.filter(c => c.status === 'RESOLVED' || c.status === 'CLOSED').length;
+  // Overview Period Filter
+  const [cskhPeriod, setCskhPeriod] = useState('ALL');
+
+  // KPI Calculations filtered by cskhPeriod
+  const complaintsInPeriod = useMemo(() => {
+    return complaints.filter(c => isDateInPeriod(c.createdAt || c.date, cskhPeriod));
+  }, [complaints, cskhPeriod]);
+
+  const returnRequestsInPeriod = useMemo(() => {
+    return returnRequests.filter(r => isDateInPeriod(r.createdAt || r.requestDate, cskhPeriod));
+  }, [returnRequests, cskhPeriod]);
+
+  const totalComplaints = complaintsInPeriod.length;
+  const inProgressComplaints = complaintsInPeriod.filter(c => c.status === 'IN_PROGRESS').length;
+  const openComplaints = complaintsInPeriod.filter(c => c.status === 'OPEN').length;
+  const resolvedComplaints = complaintsInPeriod.filter(c => c.status === 'RESOLVED' || c.status === 'CLOSED').length;
   const resolutionRate = totalComplaints > 0 ? Math.round((resolvedComplaints / totalComplaints) * 100) : 98;
-  const pendingRmaCount = returnRequests.filter(r => r.status === 'PENDING').length;
+  const pendingRmaCount = returnRequestsInPeriod.filter(r => r.status === 'PENDING').length;
 
   const stats = [
     { label: 'Tổng Ticket Tiếp Nhận', value: `${totalComplaints} ticket`, change: 'Hỗ trợ khách hàng đa kênh', icon: <HeadphonesIcon size={20} />, color: '#2563eb', bg: '#eff6ff' },
@@ -451,6 +463,10 @@ export default function CustomerService() {
           </p>
         </div>
 
+        {activeTab === 'overview' && (
+          <PeriodFilterBar selectedPeriod={cskhPeriod} onSelectPeriod={setCskhPeriod} />
+        )}
+
         {activeTab === 'complaints' && (
           <button
             onClick={() => setShowAddTicket(true)}
@@ -508,10 +524,10 @@ export default function CustomerService() {
                 </div>
 
                 <div style={{ marginTop: '0.45rem' }}>
-                  <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  <div className="erp-kpi-value" style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {st.value}
                   </div>
-                  <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.15rem' }}>
+                  <div className="erp-kpi-sub" style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.15rem' }}>
                     {st.change}
                   </div>
                 </div>

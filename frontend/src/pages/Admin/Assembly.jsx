@@ -10,6 +10,7 @@ import {
   Eye, Calendar, User, Package, Award, TrendingUp, BarChart2, ShieldAlert, Sparkles
 } from 'lucide-react';
 import { printDocument } from '../../utils/printDocument';
+import PeriodFilterBar, { isDateInPeriod } from '../../components/Common/PeriodFilterBar';
 
 const CATEGORY_MAP_VI = {
   CPU: 'Bộ Vi Xử Lý (CPU)',
@@ -162,18 +163,25 @@ export default function Assembly() {
   const relatedOrder = activeJob ? (orders || []).find(o => o.orderId === activeJob.orderId || o.id === activeJob.orderId) : null;
   const isCancelled = activeJob?.status === 'CANCELLED' || relatedOrder?.status === 'CANCELLED';
 
-  // KPI Statistics
+  // Overview period filter
+  const [assemblyPeriod, setAssemblyPeriod] = useState('ALL');
+
+  // KPI Statistics filtered by assemblyPeriod
   const todayStr = new Date().toLocaleDateString('vi-VN');
-  const pendingJobs = jobs.filter(j => {
+  const jobsInPeriod = useMemo(() => {
+    return jobs.filter(j => isDateInPeriod(j.createdAt || j.date, assemblyPeriod));
+  }, [jobs, assemblyPeriod]);
+
+  const pendingJobs = jobsInPeriod.filter(j => {
     const ord = (orders || []).find(o => o.orderId === j.orderId || o.id === j.orderId);
     return j.status === 'PENDING' && ord?.status !== 'CANCELLED';
   });
-  const assemblingJobs = jobs.filter(j => {
+  const assemblingJobs = jobsInPeriod.filter(j => {
     const ord = (orders || []).find(o => o.orderId === j.orderId || o.id === j.orderId);
     return j.status === 'ASSEMBLING' && ord?.status !== 'CANCELLED';
   });
-  const completedToday = jobs.filter(j => j.status === 'COMPLETED' && (j.date === todayStr || j.updatedAt?.includes(todayStr)));
-  const totalCompleted = jobs.filter(j => j.status === 'COMPLETED');
+  const completedToday = jobsInPeriod.filter(j => j.status === 'COMPLETED' && (j.date === todayStr || j.updatedAt?.includes(todayStr)));
+  const totalCompleted = jobsInPeriod.filter(j => j.status === 'COMPLETED');
   // Chỉ số thật từ lệnh lắp ráp: thời gian từ lúc tạo lệnh đến lúc nghiệm thu, và tỷ lệ lệnh kết thúc bằng nghiệm thu
   // (máy chủ chỉ cho nghiệm thu khi đủ 4 mục kiểm thử và đủ Serial). Chưa có dữ liệu thì hiện "—".
   const durationsMin = totalCompleted
@@ -332,16 +340,21 @@ export default function Assembly() {
       {/* ========================================================================= */}
       {/* 1. TOP HEADER & ASSEMBLY TASK CENTER BANNER */}
       {/* ========================================================================= */}
-      <div style={{ marginBottom: '1.25rem' }}>
-        <h2 style={{ fontSize: '1.35rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
-          {activeTab === 'overview' && 'Tổng Quan Bộ Phận Kỹ Thuật Lắp Ráp'}
-          {activeTab === 'jobs' && 'Quản Lý Lệnh Lắp Ráp & Nghiệm Thu Máy Tính'}
-          {activeTab === 'qa' && 'Kiểm Định Chất Lượng Xuất Xưởng & Tem Bảo Hành'}
-          {activeTab === 'reports' && 'Báo Cáo Năng Suất & Hiệu Suất Xưởng Kỹ Thuật'}
-        </h2>
-        <p style={{ color: '#64748b', fontSize: '0.85rem', margin: '0.25rem 0 0' }}>
-          Tiếp nhận đơn build PC, chọn mã Serial linh kiện có sẵn, kiểm thử QA và bàn giao kho xuất hàng
-        </p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.25rem' }}>
+        <div>
+          <h2 style={{ fontSize: '1.35rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+            {activeTab === 'overview' && 'Tổng Quan Bộ Phận Kỹ Thuật Lắp Ráp'}
+            {activeTab === 'jobs' && 'Quản Lý Lệnh Lắp Ráp & Nghiệm Thu Máy Tính'}
+            {activeTab === 'qa' && 'Kiểm Định Chất Lượng Xuất Xưởng & Tem Bảo Hành'}
+            {activeTab === 'reports' && 'Báo Cáo Năng Suất & Hiệu Suất Xưởng Kỹ Thuật'}
+          </h2>
+          <p style={{ color: '#64748b', fontSize: '0.85rem', margin: '0.25rem 0 0' }}>
+            Tiếp nhận đơn build PC, chọn mã Serial linh kiện có sẵn, kiểm thử QA và bàn giao kho xuất hàng
+          </p>
+        </div>
+        {activeTab === 'overview' && (
+          <PeriodFilterBar selectedPeriod={assemblyPeriod} onSelectPeriod={setAssemblyPeriod} />
+        )}
       </div>
 
       {/* Assembly Task Center Banner */}
@@ -426,34 +439,34 @@ export default function Assembly() {
         <div>
           {/* 6 Odoo KPI Cards */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.85rem', marginBottom: '1.25rem' }}>
-            <div style={{ backgroundColor: '#ffffff', padding: '1rem 0.75rem', borderRadius: '10px', border: '1px solid #e3e8ef', boxShadow: '0 1px 2px rgba(15,23,42,0.04)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '92px' }}>
-              <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#d97706' }}>{pendingJobs.length}</div>
-              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', marginTop: '0.25rem' }}>Chờ Tiếp Nhận</div>
+            <div className="erp-stat" style={{ backgroundColor: '#ffffff', padding: '1rem 0.75rem', borderRadius: '10px', border: '1px solid #e3e8ef', boxShadow: '0 1px 2px rgba(15,23,42,0.04)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '92px' }}>
+              <div className="erp-stat-value" style={{ fontSize: '1.5rem', fontWeight: 800, color: '#d97706' }}>{pendingJobs.length}</div>
+              <div className="erp-stat-label" style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', marginTop: '0.25rem' }}>Chờ Tiếp Nhận</div>
             </div>
 
-            <div style={{ backgroundColor: '#ffffff', padding: '1rem 0.75rem', borderRadius: '10px', border: '1px solid #e3e8ef', boxShadow: '0 1px 2px rgba(15,23,42,0.04)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '92px' }}>
-              <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#2563eb' }}>{assemblingJobs.length}</div>
-              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', marginTop: '0.25rem' }}>Đang Lắp Ráp & Test</div>
+            <div className="erp-stat" style={{ backgroundColor: '#ffffff', padding: '1rem 0.75rem', borderRadius: '10px', border: '1px solid #e3e8ef', boxShadow: '0 1px 2px rgba(15,23,42,0.04)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '92px' }}>
+              <div className="erp-stat-value" style={{ fontSize: '1.5rem', fontWeight: 800, color: '#2563eb' }}>{assemblingJobs.length}</div>
+              <div className="erp-stat-label" style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', marginTop: '0.25rem' }}>Đang Lắp Ráp & Test</div>
             </div>
 
-            <div style={{ backgroundColor: '#ffffff', padding: '1rem 0.75rem', borderRadius: '10px', border: '1px solid #e3e8ef', boxShadow: '0 1px 2px rgba(15,23,42,0.04)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '92px' }}>
-              <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#16a34a' }}>{completedToday.length}</div>
-              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', marginTop: '0.25rem' }}>Hoàn Thành Hôm Nay</div>
+            <div className="erp-stat" style={{ backgroundColor: '#ffffff', padding: '1rem 0.75rem', borderRadius: '10px', border: '1px solid #e3e8ef', boxShadow: '0 1px 2px rgba(15,23,42,0.04)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '92px' }}>
+              <div className="erp-stat-value" style={{ fontSize: '1.5rem', fontWeight: 800, color: '#16a34a' }}>{completedToday.length}</div>
+              <div className="erp-stat-label" style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', marginTop: '0.25rem' }}>Hoàn Thành Hôm Nay</div>
             </div>
 
-            <div style={{ backgroundColor: '#ffffff', padding: '1rem 0.75rem', borderRadius: '10px', border: '1px solid #e3e8ef', boxShadow: '0 1px 2px rgba(15,23,42,0.04)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '92px' }}>
-              <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#0f172a' }}>{totalCompleted.length}</div>
-              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', marginTop: '0.25rem' }}>Tổng Máy Đã Xuất Xưởng</div>
+            <div className="erp-stat" style={{ backgroundColor: '#ffffff', padding: '1rem 0.75rem', borderRadius: '10px', border: '1px solid #e3e8ef', boxShadow: '0 1px 2px rgba(15,23,42,0.04)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '92px' }}>
+              <div className="erp-stat-value" style={{ fontSize: '1.5rem', fontWeight: 800, color: '#0f172a' }}>{totalCompleted.length}</div>
+              <div className="erp-stat-label" style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', marginTop: '0.25rem' }}>Tổng Máy Đã Xuất Xưởng</div>
             </div>
 
-            <div style={{ backgroundColor: '#ffffff', padding: '1rem 0.75rem', borderRadius: '10px', border: '1px solid #e3e8ef', boxShadow: '0 1px 2px rgba(15,23,42,0.04)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '92px' }}>
-              <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#10b981' }}>{acceptanceRateLabel}</div>
-              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', marginTop: '0.25rem' }}>Tỷ Lệ Nghiệm Thu Thành Công</div>
+            <div className="erp-stat" style={{ backgroundColor: '#ffffff', padding: '1rem 0.75rem', borderRadius: '10px', border: '1px solid #e3e8ef', boxShadow: '0 1px 2px rgba(15,23,42,0.04)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '92px' }}>
+              <div className="erp-stat-value" style={{ fontSize: '1.5rem', fontWeight: 800, color: '#10b981' }}>{acceptanceRateLabel}</div>
+              <div className="erp-stat-label" style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', marginTop: '0.25rem' }}>Tỷ Lệ Nghiệm Thu Thành Công</div>
             </div>
 
-            <div style={{ backgroundColor: '#ffffff', padding: '1rem 0.75rem', borderRadius: '10px', border: '1px solid #e3e8ef', boxShadow: '0 1px 2px rgba(15,23,42,0.04)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '92px' }}>
-              <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#8b5cf6' }}>{avgCompletionLabel}</div>
-              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', marginTop: '0.25rem' }}>Thời Gian Hoàn Thành TB</div>
+            <div className="erp-stat" style={{ backgroundColor: '#ffffff', padding: '1rem 0.75rem', borderRadius: '10px', border: '1px solid #e3e8ef', boxShadow: '0 1px 2px rgba(15,23,42,0.04)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '92px' }}>
+              <div className="erp-stat-value" style={{ fontSize: '1.5rem', fontWeight: 800, color: '#8b5cf6' }}>{avgCompletionLabel}</div>
+              <div className="erp-stat-label" style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', marginTop: '0.25rem' }}>Thời Gian Hoàn Thành TB</div>
             </div>
           </div>
 
@@ -990,21 +1003,21 @@ export default function Assembly() {
                 Chỉ Số Chất Lượng Xưởng Lắp Ráp
               </h3>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                <div style={{ backgroundColor: '#f8fafc', padding: '1rem', borderRadius: '6px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
-                  <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#16a34a' }}>{acceptanceRateLabel}</div>
-                  <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 700, marginTop: '0.2rem' }}>Tỷ Lệ Nghiệm Thu Thành Công</div>
+                <div className="erp-stat" style={{ backgroundColor: '#f8fafc', padding: '1rem', borderRadius: '6px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
+                  <div className="erp-stat-value" style={{ fontSize: '1.5rem', fontWeight: 800, color: '#16a34a' }}>{acceptanceRateLabel}</div>
+                  <div className="erp-stat-label" style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 700, marginTop: '0.2rem' }}>Tỷ Lệ Nghiệm Thu Thành Công</div>
                 </div>
-                <div style={{ backgroundColor: '#f8fafc', padding: '1rem', borderRadius: '6px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
-                  <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#2563eb' }}>{avgCompletionLabel}</div>
-                  <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 700, marginTop: '0.2rem' }}>Thời Gian Hoàn Thành TB</div>
+                <div className="erp-stat" style={{ backgroundColor: '#f8fafc', padding: '1rem', borderRadius: '6px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
+                  <div className="erp-stat-value" style={{ fontSize: '1.5rem', fontWeight: 800, color: '#2563eb' }}>{avgCompletionLabel}</div>
+                  <div className="erp-stat-label" style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 700, marginTop: '0.2rem' }}>Thời Gian Hoàn Thành TB</div>
                 </div>
-                <div style={{ backgroundColor: '#f8fafc', padding: '1rem', borderRadius: '6px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
-                  <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#0f172a' }}>{jobs.length}</div>
-                  <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 700, marginTop: '0.2rem' }}>Tổng Lệnh Lắp Ráp</div>
+                <div className="erp-stat" style={{ backgroundColor: '#f8fafc', padding: '1rem', borderRadius: '6px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
+                  <div className="erp-stat-value" style={{ fontSize: '1.5rem', fontWeight: 800, color: '#0f172a' }}>{jobs.length}</div>
+                  <div className="erp-stat-label" style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 700, marginTop: '0.2rem' }}>Tổng Lệnh Lắp Ráp</div>
                 </div>
-                <div style={{ backgroundColor: '#f8fafc', padding: '1rem', borderRadius: '6px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
-                  <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#d97706' }}>0%</div>
-                  <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 700, marginTop: '0.2rem' }}>Tỷ Lệ Hỏng Hóc Lắp Ráp</div>
+                <div className="erp-stat" style={{ backgroundColor: '#f8fafc', padding: '1rem', borderRadius: '6px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
+                  <div className="erp-stat-value" style={{ fontSize: '1.5rem', fontWeight: 800, color: '#d97706' }}>0%</div>
+                  <div className="erp-stat-label" style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 700, marginTop: '0.2rem' }}>Tỷ Lệ Hỏng Hóc Lắp Ráp</div>
                 </div>
               </div>
             </div>

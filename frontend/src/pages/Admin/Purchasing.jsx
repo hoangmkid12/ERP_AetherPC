@@ -18,6 +18,7 @@ import {
 import { formatCurrencyInWords } from '../../utils/numberToWords';
 import { printDocument } from '../../utils/printDocument';
 import DateRangeFilter from '../../components/Common/DateRangeFilter';
+import PeriodFilterBar, { isDateInPeriod } from '../../components/Common/PeriodFilterBar';
 import SupplierConfirmationModal from '../../components/SupplierConfirmationModal';
 import { SignatureRow, SignatureCell, displaySigner, historySigner } from '../../components/Signature/ESignature';
 
@@ -150,6 +151,9 @@ export default function Purchasing() {
   const [selectedViewPR, setSelectedViewPR] = useState(null);
   const [selectedProcessPR, setSelectedProcessPR] = useState(null);
   const [processQty, setProcessQty] = useState(1);
+  // Period filter for overview tab
+  const [overviewPeriod, setOverviewPeriod] = useState('ALL');
+  const [showAllBackorders, setShowAllBackorders] = useState(false);
   // id của Phiếu Yêu Cầu Mua Hàng (đã được Quản Lý Kho duyệt) mà RFQ đang lập dựa trên
   // — gửi kèm khi tạo RFQ để backend kiểm tra đề xuất đã duyệt và đánh dấu RFQ_CREATED.
   const [rfqSourcePrId, setRfqSourcePrId] = useState(null);
@@ -1219,23 +1223,27 @@ export default function Purchasing() {
     setProductPage(1);
   }, [productSearch, productCategoryFilter, productSupplierFilter, productStockStatusFilter]);
 
-  // KPI Calculations
-  const rfqDraftCount = orders.filter(po => po.status === 'RFQ').length;
-  const rfqSentCount = orders.filter(po => po.status === 'RFQ_SENT').length;
-  const rfqQuotedCount = orders.filter(po => po.status === 'QUOTED').length;
-  const rfqPendingDraftCount = orders.filter(po => po.status === 'PENDING_PO_DRAFT').length;
-  const rfqPendingCeoCount = orders.filter(po => po.status === 'QUOTED_PENDING_CEO').length;
+  // KPI Calculations filtered by overview period
+  const ordersInPeriod = useMemo(() => {
+    return orders.filter(po => isDateInPeriod(po.createdAt || po.orderDate || po.date, overviewPeriod));
+  }, [orders, overviewPeriod]);
+
+  const rfqDraftCount = ordersInPeriod.filter(po => po.status === 'RFQ').length;
+  const rfqSentCount = ordersInPeriod.filter(po => po.status === 'RFQ_SENT').length;
+  const rfqQuotedCount = ordersInPeriod.filter(po => po.status === 'QUOTED').length;
+  const rfqPendingDraftCount = ordersInPeriod.filter(po => po.status === 'PENDING_PO_DRAFT').length;
+  const rfqPendingCeoCount = ordersInPeriod.filter(po => po.status === 'QUOTED_PENDING_CEO').length;
   // Every PO the backend actually issues (status !== RFQ/RFQ_SENT/QUOTED/
   // CANCELLED) routes through CONFIRMED_BY_SUPPLIER → QA_PASSED/QA_PARTIAL
   // before ever reaching RECEIVED/DONE — excluding those stages from the
   // "in-flight PO" aggregates undercounted the bulk of real active orders.
   const ISSUED_PO_STATUSES = ['PO', 'SENT', 'CONFIRMED_BY_SUPPLIER', 'PENDING_QA', 'QA_PASSED', 'QA_PARTIAL', 'RECEIVED', 'DONE', 'COMPLETED'];
-  const poConfirmedCount = orders.filter(po => ISSUED_PO_STATUSES.includes(po.status)).length;
-  const pendingReceiptCount = orders.filter(po => ['PO', 'SENT', 'CONFIRMED_BY_SUPPLIER', 'PENDING_QA', 'QA_PASSED', 'QA_PARTIAL'].includes(po.status)).length;
+  const poConfirmedCount = ordersInPeriod.filter(po => ISSUED_PO_STATUSES.includes(po.status)).length;
+  const pendingReceiptCount = ordersInPeriod.filter(po => ['PO', 'SENT', 'CONFIRMED_BY_SUPPLIER', 'PENDING_QA', 'QA_PASSED', 'QA_PARTIAL'].includes(po.status)).length;
   // Tỷ lệ giao đúng hạn thật: trong các đơn có hạn giao và đã có hàng về (mốc đầu tiên sang kiểm định/nhập kho),
   // hàng về không trễ hơn hết ngày hạn giao. Chưa có đơn đủ dữ liệu thì hiện "—".
   const ARRIVAL_STATUSES = ['PENDING_QA', 'QA_PASSED', 'QA_PARTIAL', 'QA_REJECTED', 'RECEIVED', 'DONE'];
-  const onTimeStats = orders.reduce((acc, po) => {
+  const onTimeStats = ordersInPeriod.reduce((acc, po) => {
     if (!po.expectedDeliveryDate) return acc;
     const arrival = (po.statusHistory || [])
       .filter(h => ARRIVAL_STATUSES.includes(h.toStatus || h.status))
@@ -1248,7 +1256,7 @@ export default function Purchasing() {
     return acc;
   }, { total: 0, onTime: 0 });
   const onTimeRateLabel = onTimeStats.total ? `${Math.round((onTimeStats.onTime / onTimeStats.total) * 100)}%` : '—';
-  const totalSpent = orders
+  const totalSpent = ordersInPeriod
     .filter(po => ISSUED_PO_STATUSES.includes(po.status))
     .reduce((sum, po) => sum + parseFloat(po.totalAmount || 0), 0);
 
@@ -1291,13 +1299,16 @@ export default function Purchasing() {
       {/* ========================================================================= */}
       {activeTab === 'overview' && (
         <div>
-          <div style={{ marginBottom: '1.25rem' }}>
-            <h2 style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
-              Tổng Quan Phân Hệ Mua Hàng
-            </h2>
-            <p style={{ color: '#64748b', fontSize: '0.85rem', margin: '0.25rem 0 0' }}>
-              Theo dõi hiệu quả mua sắm, các chỉ số giao hàng và đơn hàng cần xử lý theo chuẩn Odoo
-            </p>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.25rem' }}>
+            <div>
+              <h2 style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                Tổng Quan Phân Hệ Mua Hàng
+              </h2>
+              <p style={{ color: '#64748b', fontSize: '0.85rem', margin: '0.25rem 0 0' }}>
+                Theo dõi hiệu quả mua sắm, các chỉ số giao hàng và đơn hàng cần xử lý theo chuẩn Odoo
+              </p>
+            </div>
+            <PeriodFilterBar selectedPeriod={overviewPeriod} onSelectPeriod={setOverviewPeriod} />
           </div>
 
           {/* 1. Top Mission Task Center Banner */}
@@ -1421,12 +1432,57 @@ export default function Purchasing() {
             </div>
           </div>
 
-          {/* 2. Trung Tâm Nhiệm Vụ theo vai trò (việc cần làm ở bước hiện tại) */}
+          {/* 2. Trung Tâm Nhiệm Vụ theo vai trò */}
           <div style={{ marginBottom: '1.25rem' }}>
             <ActorNotificationBar />
           </div>
 
-          {/* 2.1 Backorders Demand Banner (If there are AWAITING_STOCK customer orders) */}
+          {/* 3. Odoo KPI Cards Grid (Moved up for high-level visibility) */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', marginBottom: '1.25rem' }}>
+            <div className="erp-stat" style={{ backgroundColor: '#ffffff', padding: '1rem', borderRadius: '8px', border: '1px solid #e3e8ef', textAlign: 'center' }}>
+              <div className="erp-stat-value" style={{ fontSize: '1.6rem', fontWeight: 800, color: '#0f172a' }}>{rfqDraftCount}</div>
+              <div className="erp-stat-label" style={{ fontSize: '0.78rem', fontWeight: 700, color: '#64748b', marginTop: '0.2rem' }}>Mới (Bản Nháp)</div>
+            </div>
+
+            <div className="erp-stat" style={{ backgroundColor: '#ffffff', padding: '1rem', borderRadius: '8px', border: '1px solid #e3e8ef', textAlign: 'center' }}>
+              <div className="erp-stat-value" style={{ fontSize: '1.6rem', fontWeight: 800, color: '#2563eb' }}>{rfqSentCount}</div>
+              <div className="erp-stat-label" style={{ fontSize: '0.78rem', fontWeight: 700, color: '#2563eb', marginTop: '0.2rem' }}>RFQ Đã Gửi</div>
+            </div>
+
+            <div className="erp-stat" style={{ backgroundColor: '#fffbeb', padding: '1rem', borderRadius: '8px', border: '1px solid #fde68a', textAlign: 'center' }}>
+              <div className="erp-stat-value" style={{ fontSize: '1.6rem', fontWeight: 800, color: '#d97706' }}>{rfqQuotedCount}</div>
+              <div className="erp-stat-label" style={{ fontSize: '0.78rem', fontWeight: 700, color: '#b45309', marginTop: '0.2rem' }}>Chờ Duyệt Báo Giá</div>
+            </div>
+
+            <div className="erp-stat" style={{ backgroundColor: '#eff6ff', padding: '1rem', borderRadius: '8px', border: '1px solid #bfdbfe', textAlign: 'center' }}>
+              <div className="erp-stat-value" style={{ fontSize: '1.6rem', fontWeight: 800, color: '#2563eb' }}>{rfqPendingDraftCount}</div>
+              <div className="erp-stat-label" style={{ fontSize: '0.78rem', fontWeight: 700, color: '#2563eb', marginTop: '0.2rem' }}>Chờ Lập Phiếu</div>
+            </div>
+
+            <div className="erp-stat" style={{ backgroundColor: '#fffbeb', padding: '1rem', borderRadius: '8px', border: '1px solid #fde68a', textAlign: 'center' }}>
+              <div className="erp-stat-value" style={{ fontSize: '1.6rem', fontWeight: 800, color: '#d97706' }}>{rfqPendingCeoCount}</div>
+              <div className="erp-stat-label" style={{ fontSize: '0.78rem', fontWeight: 700, color: '#b45309', marginTop: '0.2rem' }}>Chờ CEO Duyệt</div>
+            </div>
+
+            <div className="erp-stat" style={{ backgroundColor: '#f0fdf4', padding: '1rem', borderRadius: '8px', border: '1px solid #bbf7d0', textAlign: 'center' }}>
+              <div className="erp-stat-value" style={{ fontSize: '1.6rem', fontWeight: 800, color: '#16a34a' }}>{poConfirmedCount}</div>
+              <div className="erp-stat-label" style={{ fontSize: '0.78rem', fontWeight: 700, color: '#15803d', marginTop: '0.2rem' }}>Đơn Mua Hàng (PO)</div>
+            </div>
+
+            <div className="erp-stat" style={{ backgroundColor: '#ffffff', padding: '1rem', borderRadius: '8px', border: '1px solid #e3e8ef', textAlign: 'center' }}>
+              <div className="erp-stat-value" style={{ fontSize: '1.6rem', fontWeight: 800, color: pendingReceiptCount > 0 ? '#ef4444' : '#10b981' }}>
+                {pendingReceiptCount}
+              </div>
+              <div className="erp-stat-label" style={{ fontSize: '0.78rem', fontWeight: 700, color: '#64748b', marginTop: '0.2rem' }}>Chờ Nhập Kho</div>
+            </div>
+
+            <div className="erp-stat" style={{ backgroundColor: '#ffffff', padding: '1rem', borderRadius: '8px', border: '1px solid #e3e8ef', textAlign: 'center' }}>
+              <div className="erp-stat-value" style={{ fontSize: '1.6rem', fontWeight: 800, color: '#16a34a' }}>{onTimeRateLabel}</div>
+              <div className="erp-stat-label" style={{ fontSize: '0.78rem', fontWeight: 700, color: '#64748b', marginTop: '0.2rem' }}>Giao Hàng Đúng Hạn</div>
+            </div>
+          </div>
+
+          {/* 4. Backorders Demand Banner (Collapsible and balanced) */}
           {backorderSalesOrders.length > 0 && (
             <div style={{
               backgroundColor: '#fff7ed',
@@ -1436,24 +1492,53 @@ export default function Purchasing() {
               marginBottom: '1.25rem',
               boxShadow: '0 4px 12px rgba(234, 88, 12, 0.08)'
             }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '0.75rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '0.85rem' }}>
                 <div>
-                  <h3 style={{ fontSize: '0.98rem', fontWeight: 800, color: '#c2410c', margin: 0 }}>
-                    Nhu Cầu Nhập Hàng Gấp Cho Đơn Khách Đang Chờ ({backorderSalesOrders.length} Đơn Hàng)
+                  <h3 style={{ fontSize: '0.98rem', fontWeight: 800, color: '#c2410c', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <span>Nhu Cầu Nhập Hàng Cho Đơn Khách Đang Chờ</span>
+                    <span style={{ fontSize: '0.78rem', backgroundColor: '#ea580c', color: '#fff', padding: '2px 8px', borderRadius: '12px' }}>
+                      {backorderSalesOrders.length} đơn thiếu hàng
+                    </span>
                   </h3>
-                  <p style={{ fontSize: '0.78rem', color: '#9a3412', margin: '0.15rem 0 0 0' }}>
-                    Các đơn hàng bán lẻ của khách đang tạm giữ chỗ do thiếu tồn kho. Nhấn tạo RFQ để đề xuất mua bổ sung từ nhà cung cấp.
+                  <p style={{ fontSize: '0.78rem', color: '#9a3412', margin: '0.2rem 0 0 0' }}>
+                    Các mặt hàng thiếu kho đã được gom theo mã SP. Bấm "Tạo RFQ" để xuất yêu cầu báo giá NCC ngay.
                   </p>
                 </div>
 
-                <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#ea580c' }}>
-                  Tổng {backorderRequiredItems.length} mặt hàng cần mua
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#ea580c' }}>
+                    Tổng {backorderRequiredItems.length} mặt hàng
+                  </span>
+                  {backorderRequiredItems.length > 6 && (
+                    <button
+                      onClick={() => setShowAllBackorders(!showAllBackorders)}
+                      style={{
+                        backgroundColor: '#ffffff',
+                        color: '#c2410c',
+                        border: '1px solid #fdba74',
+                        borderRadius: '6px',
+                        padding: '0.35rem 0.75rem',
+                        fontSize: '0.78rem',
+                        fontWeight: 700,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {showAllBackorders ? 'Thu gọn (6 SP)' : `Xem tất cả (${backorderRequiredItems.length} SP)`}
+                    </button>
+                  )}
                 </div>
               </div>
 
-              {/* Items Grid */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '0.75rem' }}>
-                {backorderRequiredItems.map((item, idx) => (
+              {/* Items Grid (Max 6 when collapsed) */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+                gap: '0.75rem',
+                maxHeight: showAllBackorders ? '420px' : 'none',
+                overflowY: showAllBackorders ? 'auto' : 'visible',
+                paddingRight: showAllBackorders ? '4px' : '0'
+              }}>
+                {(showAllBackorders ? backorderRequiredItems : backorderRequiredItems.slice(0, 6)).map((item, idx) => (
                   <div key={idx} style={{
                     backgroundColor: '#ffffff',
                     borderRadius: '6px',
@@ -1461,12 +1546,15 @@ export default function Purchasing() {
                     padding: '0.75rem 1rem',
                     display: 'flex',
                     justifyContent: 'space-between',
-                    alignItems: 'center'
+                    alignItems: 'center',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
                   }}>
-                    <div>
-                      <div style={{ fontWeight: 800, fontSize: '0.85rem', color: '#0f172a' }}>{item.name}</div>
-                      <div style={{ fontSize: '0.77rem', color: '#64748b', marginTop: '0.15rem' }}>
-                        Khách đang nợ: <strong style={{ color: '#dc2626' }}>{item.neededQty} SP</strong> (trong {item.ordersCount} đơn: {item.orderIds.slice(0, 2).map(id => `#${id}`).join(', ')}{item.orderIds.length > 2 ? '...' : ''})
+                    <div style={{ marginRight: '0.5rem', overflow: 'hidden' }}>
+                      <div style={{ fontWeight: 800, fontSize: '0.84rem', color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={item.name}>
+                        {item.name}
+                      </div>
+                      <div style={{ fontSize: '0.76rem', color: '#64748b', marginTop: '0.15rem' }}>
+                        Cần mua: <strong style={{ color: '#dc2626' }}>{item.neededQty} SP</strong> ({item.ordersCount} đơn: {item.orderIds.slice(0, 2).map(id => `#${id}`).join(', ')}{item.orderIds.length > 2 ? '...' : ''})
                       </div>
                     </div>
 
@@ -1478,10 +1566,11 @@ export default function Purchasing() {
                         border: 'none',
                         borderRadius: '5px',
                         padding: '0.45rem 0.85rem',
-                        fontSize: '0.8rem',
+                        fontSize: '0.78rem',
                         fontWeight: 700,
                         cursor: 'pointer',
-                        whiteSpace: 'nowrap'
+                        whiteSpace: 'nowrap',
+                        flexShrink: 0
                       }}
                     >
                       Tạo RFQ
@@ -1491,51 +1580,6 @@ export default function Purchasing() {
               </div>
             </div>
           )}
-
-          {/* Odoo KPI Cards Grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', marginBottom: '1.25rem' }}>
-            <div style={{ backgroundColor: '#ffffff', padding: '1rem', borderRadius: '8px', border: '1px solid #e3e8ef', textAlign: 'center' }}>
-              <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#0f172a' }}>{rfqDraftCount}</div>
-              <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#64748b', marginTop: '0.2rem' }}>Mới (Bản Nháp)</div>
-            </div>
-
-            <div style={{ backgroundColor: '#ffffff', padding: '1rem', borderRadius: '8px', border: '1px solid #e3e8ef', textAlign: 'center' }}>
-              <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#2563eb' }}>{rfqSentCount}</div>
-              <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#2563eb', marginTop: '0.2rem' }}>RFQ Đã Gửi</div>
-            </div>
-
-            <div style={{ backgroundColor: '#fffbeb', padding: '1rem', borderRadius: '8px', border: '1px solid #fde68a', textAlign: 'center' }}>
-              <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#d97706' }}>{rfqQuotedCount}</div>
-              <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#b45309', marginTop: '0.2rem' }}>Chờ Duyệt Báo Giá</div>
-            </div>
-
-            <div style={{ backgroundColor: '#eff6ff', padding: '1rem', borderRadius: '8px', border: '1px solid #bfdbfe', textAlign: 'center' }}>
-              <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#2563eb' }}>{rfqPendingDraftCount}</div>
-              <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#2563eb', marginTop: '0.2rem' }}>Chờ Lập Phiếu</div>
-            </div>
-
-            <div style={{ backgroundColor: '#fffbeb', padding: '1rem', borderRadius: '8px', border: '1px solid #fde68a', textAlign: 'center' }}>
-              <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#d97706' }}>{rfqPendingCeoCount}</div>
-              <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#b45309', marginTop: '0.2rem' }}>Chờ CEO Duyệt</div>
-            </div>
-
-            <div style={{ backgroundColor: '#f0fdf4', padding: '1rem', borderRadius: '8px', border: '1px solid #bbf7d0', textAlign: 'center' }}>
-              <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#16a34a' }}>{poConfirmedCount}</div>
-              <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#15803d', marginTop: '0.2rem' }}>Đơn Mua Hàng (PO)</div>
-            </div>
-
-            <div style={{ backgroundColor: '#ffffff', padding: '1rem', borderRadius: '8px', border: '1px solid #e3e8ef', textAlign: 'center' }}>
-              <div style={{ fontSize: '1.6rem', fontWeight: 800, color: pendingReceiptCount > 0 ? '#ef4444' : '#10b981' }}>
-                {pendingReceiptCount}
-              </div>
-              <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#64748b', marginTop: '0.2rem' }}>Chờ Nhập Kho</div>
-            </div>
-
-            <div style={{ backgroundColor: '#ffffff', padding: '1rem', borderRadius: '8px', border: '1px solid #e3e8ef', textAlign: 'center' }}>
-              <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#16a34a' }}>{onTimeRateLabel}</div>
-              <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#64748b', marginTop: '0.2rem' }}>Giao Hàng Đúng Hạn</div>
-            </div>
-          </div>
 
           {/* Quick Action Navigation Panels */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.25rem', marginBottom: '1.5rem' }}>
