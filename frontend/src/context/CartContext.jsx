@@ -1,6 +1,7 @@
 import React, { createContext, useState, useEffect, useContext, useRef } from 'react';
 import { CheckCircle2, ShoppingBag, X } from 'lucide-react';
 import { useAuth } from './AuthContext';
+import { effectiveUnitPrice } from '../components/Storefront/bundleRules';
 
 const CartContext = createContext(null);
 
@@ -224,7 +225,7 @@ export const CartProvider = ({ children }) => {
   const cartCount = cartItems.reduce((sum, item) => sum + (parseInt(item.quantity, 10) || 1), 0);
   
   const cartTotal = cartItems.reduce((sum, item) => {
-    const price = Number(item?.product?.price ?? item?.product?.unitPrice ?? 0);
+    const price = effectiveUnitPrice(item, cartItems);
     return sum + price * (parseInt(item.quantity, 10) || 1);
   }, 0);
 

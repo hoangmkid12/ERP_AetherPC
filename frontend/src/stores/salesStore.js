@@ -315,7 +315,7 @@ export const useSalesStore = create((set, get) => ({
         customerName,
         phone,
         email: userEmail,
-        items: items.map(it => ({ productId: it.productId || it.id, quantity: it.quantity || 1 })),
+        items: items.map(it => ({ productId: it.productId || it.id, quantity: it.quantity || 1, ...(it.bundleWith ? { bundleWith: it.bundleWith } : {}) })),
         paymentMethod: paymentMethod === 'BANK_TRANSFER' ? 'BANK_TRANSFER' : 'COD',
         shippingAddress: shippingAddress || (type === 'POS' ? 'Bán tại cửa hàng (POS)' : 'Hồ Chí Minh'),
         shippingCity: inferredCity,

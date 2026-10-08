@@ -4,6 +4,7 @@ const { claimAvailableSerials } = require('../utils/serialAllocation');
 const { deductInventory, restockInventory } = require('../services/stockSync');
 const { hasOperationalPermission } = require('../middlewares/rbac.middleware');
 const { ORDER_STATUS_VI, labelOf } = require('../constants/statusLabels');
+const { bundlePercent, bundlePrice, groupOfSlug } = require('../services/bundleDeals');
 
 const LOYALTY_VND_PER_POINT = 10000; // 10.000 VNĐ = 1 điểm
 
@@ -80,14 +81,35 @@ const createOrder = async (req, res, next) => {
       let subtotal = 0;
       let discount = 0;
       const orderItemsData = [];
+      const bundleNotes = [];
       let hasShortage = false;
       const shortageItems = [];
 
+      // "Mua kèm giá sốc": dòng có bundleWith là linh kiện mua kèm sản phẩm chính cùng đơn.
+      // Chỉ áp giá mua kèm khi sản phẩm chính có trong đơn (dòng mua thường), cặp danh mục có
+      // ưu đãi, và số lượng mua kèm không vượt quá số lượng sản phẩm chính.
+      const productCache = new Map();
+      const loadProduct = async (pid) => {
+        const key = String(pid);
+        if (!productCache.has(key)) {
+          productCache.set(key, await tx.product.findUnique({
+            where: { productId: key },
+            include: { category: { select: { slug: true } } }
+          }));
+        }
+        return productCache.get(key);
+      };
+      const mainQty = {};
+      for (const it of items) {
+        if (it && !it.bundleWith) {
+          const k = String(it.productId);
+          mainQty[k] = (mainQty[k] || 0) + (parseInt(it.quantity) || 0);
+        }
+      }
+
       for (const cartItem of items) {
         const targetProdId = String(cartItem.productId);
-        const prod = await tx.product.findUnique({
-          where: { productId: targetProdId }
-        });
+        const prod = await loadProduct(targetProdId);
 
         if (!prod) {
           throw new Error(`Không tìm thấy sản phẩm với mã: ${cartItem.productId}`);
@@ -99,8 +121,18 @@ const createOrder = async (req, res, next) => {
           error.statusCode = 400;
           throw error;
         }
-        const itemPrice = parseFloat(prod.price);
+        let itemPrice = parseFloat(prod.price);
         const itemOrigPrice = parseFloat(prod.originalPrice || prod.price);
+        let bundleNote = null;
+        if (cartItem.bundleWith && String(cartItem.bundleWith) !== targetProdId) {
+          const mainId = String(cartItem.bundleWith);
+          const main = mainQty[mainId] ? await loadProduct(mainId) : null;
+          const pct = main ? bundlePercent(groupOfSlug(main.category?.slug), groupOfSlug(prod.category?.slug)) : 0;
+          if (pct > 0 && qty <= mainQty[mainId]) {
+            itemPrice = bundlePrice(itemPrice, pct);
+            bundleNote = `Mua kèm giá sốc -${pct}% cùng ${main.name}`;
+          }
+        }
 
         const itemSubtotal = itemPrice * qty;
         const itemDiscount = (itemOrigPrice - itemPrice) * qty;
@@ -115,6 +147,7 @@ const createOrder = async (req, res, next) => {
         }
 
         const randSuffix = Math.floor(Math.random() * 1000);
+        if (bundleNote) bundleNotes.push(`${prod.name}: ${bundleNote}`);
         orderItemsData.push({
           orderItemId: `ORI-${Date.now()}-${randSuffix}`,
           productId: prod.productId,
@@ -205,7 +238,7 @@ const createOrder = async (req, res, next) => {
           paymentStatus: initialPaymentStatus,
           shippingAddress: shippingAddress || 'Chưa cung cấp',
           shippingCity: shippingCity || 'TP. Hồ Chí Minh',
-          notes,
+          notes: bundleNotes.length ? [notes, `Ưu đãi mua kèm: ${bundleNotes.join('; ')}`].filter(Boolean).join(' | ') : notes,
           status: initialStatus,
           soldById,
           items: {
