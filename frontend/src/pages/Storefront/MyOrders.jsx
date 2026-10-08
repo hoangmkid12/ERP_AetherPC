@@ -3,7 +3,7 @@ import { useSalesStore, useUtilityStore, useInventoryStore } from '../../stores'
 import { useAuth } from '../../context/AuthContext';
 import { useNotification, notify, confirm } from '../../context/NotificationContext';
 import { COMPLAINT_STATUS, getStatusInfo, getStatusLabel, formatRmaCode } from '../../utils/statusLabels';
-import { Search, Package, Clock, ShieldCheck, CheckCircle2, ChevronRight, HelpCircle, RefreshCw, X, AlertCircle, Sparkles, Eye, Upload, CheckCircle, MapPin, Camera } from 'lucide-react';
+import { Search, Package, Clock, ShieldCheck, CheckCircle2, ChevronRight, ChevronDown, ChevronUp, HelpCircle, RefreshCw, X, AlertCircle, Sparkles, Eye, Upload, CheckCircle, MapPin, Camera } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { api } from '../../services/api';
 import { REGION_COORDS, detectDeliveryRegion, getAddressCoordinates } from '../../utils/deliveryRegions';
@@ -35,6 +35,7 @@ export default function MyOrders() {
   const [selectedOrderId, setSelectedOrderId] = useState(null);
   const [confirmingReceivedId, setConfirmingReceivedId] = useState(null);
   const [justPaidOrderId, setJustPaidOrderId] = useState(null);
+  const [showAllOrders, setShowAllOrders] = useState(false);
 
   useEffect(() => {
     if (typeof getOrders === 'function') getOrders().catch(() => { });
@@ -1031,94 +1032,175 @@ export default function MyOrders() {
         <div className="my-orders-grid">
 
           {/* Left Column: Orders List */}
-          <div className="card-glass" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <h3 style={{ fontSize: '1rem', borderBottom: '1px solid var(--border-glass)', paddingBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0, fontWeight: 800 }}>
-              <Package size={18} color="#2563eb" />
-              Đơn Hàng Của Bạn ({matchedOrders.length})
-            </h3>
+          <div
+            className="card-glass"
+            style={{
+              padding: '1.25rem',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.85rem',
+              position: 'sticky',
+              top: '90px',
+              backgroundColor: '#ffffff',
+              borderRadius: '16px',
+              border: '1px solid #e2e8f0',
+              boxShadow: '0 4px 20px rgba(0,0,0,0.04)'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.75rem' }}>
+              <h3 style={{ fontSize: '0.98rem', display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0, fontWeight: 800, color: '#0f172a' }}>
+                <Package size={18} color="#2563eb" />
+                Đơn Hàng Của Bạn
+              </h3>
+              <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#2563eb', backgroundColor: '#eff6ff', padding: '2px 8px', borderRadius: '999px', border: '1px solid #bfdbfe' }}>
+                {matchedOrders.length} đơn
+              </span>
+            </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              {matchedOrders.map(order => {
-                const isSelected = selectedOrderId === order.orderId;
-                return (
+            {/* List Orders */}
+            {(() => {
+              const displayedOrders = (() => {
+                if (showAllOrders) return matchedOrders;
+                const top5 = matchedOrders.slice(0, 5);
+                if (selectedOrderId && !top5.some(o => o.orderId === selectedOrderId)) {
+                  const current = matchedOrders.find(o => o.orderId === selectedOrderId);
+                  if (current) return [...top5, current];
+                }
+                return top5;
+              })();
+
+              return (
+                <>
                   <div
-                    key={order.orderId}
-                    onClick={() => setSelectedOrderId(order.orderId)}
                     style={{
-                      padding: '0.9rem 1rem',
-                      border: isSelected ? '1.5px solid #2563eb' : '1px solid #e2e8f0',
-                      borderLeft: isSelected ? '4px solid #2563eb' : '4px solid transparent',
-                      borderRadius: '10px',
-                      backgroundColor: isSelected ? 'rgba(37, 99, 235, 0.04)' : '#ffffff',
-                      boxShadow: isSelected ? '0 4px 12px rgba(37,99,235,0.08)' : '0 1px 3px rgba(0,0,0,0.02)',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s ease'
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.65rem',
+                      maxHeight: showAllOrders ? '560px' : 'none',
+                      overflowY: showAllOrders ? 'auto' : 'visible',
+                      paddingRight: showAllOrders ? '4px' : '0'
                     }}
                   >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem', flexWrap: 'wrap', gap: '0.3rem' }}>
-                      <strong style={{ color: isSelected ? '#2563eb' : '#0f172a', fontSize: '0.92rem' }}>{order.orderId}</strong>
-                      {(() => {
-                        const badge = getOrderStatusLabel(order);
-                        return (
-                          <span
-                            style={{
-                              fontSize: '0.68rem',
-                              fontWeight: 750,
-                              padding: '2.5px 8px',
-                              borderRadius: '6px',
-                              color: badge.color,
-                              backgroundColor: badge.bg,
-                              border: `1px solid ${badge.border}`
-                            }}
-                          >
-                            {badge.text}
-                          </span>
-                        );
-                      })()}
-                    </div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'flex', justifyContent: 'space-between' }}>
-                      <span>Ngày: {formatOrderDate(order.date, order.createdAt)}</span>
-                      <strong style={{ color: 'var(--success)' }}>{formatPrice(order.totalAmount)}</strong>
-                    </div>
+                    {displayedOrders.map(order => {
+                      const isSelected = selectedOrderId === order.orderId;
+                      return (
+                        <div
+                          key={order.orderId}
+                          onClick={() => setSelectedOrderId(order.orderId)}
+                          style={{
+                            padding: '0.85rem 0.95rem',
+                            border: isSelected ? '1.5px solid #2563eb' : '1px solid #e2e8f0',
+                            borderLeft: isSelected ? '4px solid #2563eb' : '4px solid transparent',
+                            borderRadius: '10px',
+                            backgroundColor: isSelected ? 'rgba(37, 99, 235, 0.04)' : '#ffffff',
+                            boxShadow: isSelected ? '0 4px 12px rgba(37,99,235,0.08)' : '0 1px 3px rgba(0,0,0,0.02)',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease'
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem', flexWrap: 'wrap', gap: '0.3rem' }}>
+                            <strong style={{ color: isSelected ? '#2563eb' : '#0f172a', fontSize: '0.9rem' }}>{order.orderId}</strong>
+                            {(() => {
+                              const badge = getOrderStatusLabel(order);
+                              return (
+                                <span
+                                  style={{
+                                    fontSize: '0.68rem',
+                                    fontWeight: 750,
+                                    padding: '2px 7px',
+                                    borderRadius: '6px',
+                                    color: badge.color,
+                                    backgroundColor: badge.bg,
+                                    border: `1px solid ${badge.border}`
+                                  }}
+                                >
+                                  {badge.text}
+                                </span>
+                              );
+                            })()}
+                          </div>
+                          <div style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', display: 'flex', justifyContent: 'space-between' }}>
+                            <span>Ngày: {formatOrderDate(order.date, order.createdAt)}</span>
+                            <strong style={{ color: 'var(--success)' }}>{formatPrice(order.totalAmount)}</strong>
+                          </div>
 
-                    {order.status === 'SHIPPED' && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedOrderId(order.orderId);
-                          setTimeout(() => {
-                            const el = document.getElementById('live-gps-tracking-card');
-                            if (el) el.scrollIntoView({ behavior: 'smooth' });
-                          }, 120);
-                        }}
-                        style={{
-                          marginTop: '0.6rem',
-                          width: '100%',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '0.4rem',
-                          padding: '0.45rem 0.65rem',
-                          borderRadius: '6px',
-                          fontSize: '0.75rem',
-                          fontWeight: 800,
-                          cursor: 'pointer',
-                          backgroundColor: '#eff6ff',
-                          color: '#2563eb',
-                          border: '1px solid #bfdbfe',
-                          boxShadow: '0 1px 3px rgba(37,99,235,0.1)',
-                          transition: 'all 0.2s'
-                        }}
-                      >
-                        <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#ef4444', boxShadow: '0 0 6px #ef4444' }} />
-                        Theo Dõi Trực Tiếp
-                      </button>
-                    )}
+                          {order.status === 'SHIPPED' && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedOrderId(order.orderId);
+                                setTimeout(() => {
+                                  const el = document.getElementById('live-gps-tracking-card');
+                                  if (el) el.scrollIntoView({ behavior: 'smooth' });
+                                }, 120);
+                              }}
+                              style={{
+                                marginTop: '0.5rem',
+                                width: '100%',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '0.4rem',
+                                padding: '0.4rem 0.6rem',
+                                borderRadius: '6px',
+                                fontSize: '0.74rem',
+                                fontWeight: 800,
+                                cursor: 'pointer',
+                                backgroundColor: '#eff6ff',
+                                color: '#2563eb',
+                                border: '1px solid #bfdbfe',
+                                boxShadow: '0 1px 3px rgba(37,99,235,0.1)',
+                                transition: 'all 0.2s'
+                              }}
+                            >
+                              <span style={{ display: 'inline-block', width: '7px', height: '7px', borderRadius: '50%', backgroundColor: '#ef4444', boxShadow: '0 0 6px #ef4444' }} />
+                              Theo Dõi Trực Tiếp
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
-                );
-              })}
-            </div>
+
+                  {matchedOrders.length > 5 && (
+                    <button
+                      type="button"
+                      onClick={() => setShowAllOrders(prev => !prev)}
+                      className="btn hover-scale"
+                      style={{
+                        marginTop: '0.25rem',
+                        padding: '0.6rem 0.9rem',
+                        borderRadius: '10px',
+                        border: '1.5px solid #bfdbfe',
+                        backgroundColor: showAllOrders ? '#f1f5f9' : '#eff6ff',
+                        color: showAllOrders ? '#475569' : '#2563eb',
+                        fontSize: '0.82rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '0.4rem',
+                        transition: 'all 0.2s ease',
+                        width: '100%',
+                        boxShadow: '0 2px 6px rgba(37,99,235,0.06)'
+                      }}
+                    >
+                      {showAllOrders ? (
+                        <>
+                          <ChevronUp size={16} /> Thu gọn (Hiện 5 đơn gần nhất)
+                        </>
+                      ) : (
+                        <>
+                          <ChevronDown size={16} /> Xem tất cả ({matchedOrders.length} đơn hàng)
+                        </>
+                      )}
+                    </button>
+                  )}
+                </>
+              );
+            })()}
 
             {/* Return success banner */}
             {returnSuccess && (
@@ -2474,10 +2556,10 @@ export default function MyOrders() {
       )}
 
       {/* Lịch Sử Khiếu Nại & Ticket Hỗ Trợ Khách Hàng */}
-      <div id="complaintHistorySection" className="card-glass" style={{ padding: '1.75rem', marginTop: '2.5rem', backgroundColor: '#ffffff', borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.05)' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
-          <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-            <HelpCircle size={22} color="#ef4444" />
+      <div id="complaintHistorySection" className="card-glass" style={{ padding: '1.25rem 1.5rem', marginTop: '1.75rem', backgroundColor: '#ffffff', borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 4px 15px -3px rgba(0,0,0,0.04)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+          <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <HelpCircle size={20} color="#ef4444" />
             Lịch Sử Khiếu Nại & Yêu Cầu Hỗ Trợ ({userComplaints.length})
           </h3>
           {userComplaints.length > 0 && (
@@ -2495,8 +2577,8 @@ export default function MyOrders() {
         </div>
 
         {userComplaints.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '2.5rem 1rem', color: '#64748b', backgroundColor: '#f8fafc', borderRadius: '12px', border: '1px dashed #cbd5e1' }}>
-            <p style={{ margin: '0 0 0.85rem 0', fontSize: '0.92rem', color: '#475569', fontWeight: 500 }}>
+          <div style={{ textAlign: 'center', padding: '1.25rem 1rem', color: '#64748b', backgroundColor: '#f8fafc', borderRadius: '12px', border: '1px dashed #cbd5e1' }}>
+            <p style={{ margin: '0 0 0.6rem 0', fontSize: '0.88rem', color: '#475569', fontWeight: 500 }}>
               Bạn chưa có phiếu khiếu nại hoặc ticket hỗ trợ nào trên hệ thống.
             </p>
             <button
@@ -2505,9 +2587,9 @@ export default function MyOrders() {
                 setShowComplaintModal(true);
               }}
               className="btn btn-primary"
-              style={{ borderRadius: '10px', fontSize: '0.82rem', padding: '0.5rem 1.25rem', backgroundColor: '#ef4444', border: 'none', fontWeight: 700 }}
+              style={{ borderRadius: '8px', fontSize: '0.8rem', padding: '0.45rem 1.1rem', backgroundColor: '#ef4444', border: 'none', fontWeight: 700 }}
             >
-              <AlertCircle size={16} style={{ marginRight: '0.4rem' }} /> Gửi Ticket Khiếu Nại Ngay
+              <AlertCircle size={15} style={{ marginRight: '0.4rem' }} /> Gửi Ticket Khiếu Nại Ngay
             </button>
           </div>
         ) : (
