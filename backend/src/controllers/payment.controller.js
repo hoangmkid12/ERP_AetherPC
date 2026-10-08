@@ -24,7 +24,6 @@ const getSepayPayment = async (req, res, next) => {
       where: { orderId: order.orderId, method: 'BANK_TRANSFER', status: 'SUCCESS', transactionId: { startsWith: 'SEPAY-' } },
       _sum: { amount: true },
     });
-    const paidAmount = Number(paid._sum.amount || 0);
     const total = Number(order.totalAmount);
     const base = {
       orderId: order.orderId,
@@ -32,8 +31,7 @@ const getSepayPayment = async (req, res, next) => {
       paymentMethod: order.paymentMethod,
       paymentStatus: order.paymentStatus,
       amount: total,
-      paidAmount,
-      remaining: Math.max(0, total - paidAmount),
+      paidAmount: Number(paid._sum.amount || 0),
     };
 
     if (order.paymentStatus === 'PAID' || order.paymentMethod !== 'BANK_TRANSFER' || order.status === 'CANCELLED') {
@@ -50,7 +48,7 @@ const getSepayPayment = async (req, res, next) => {
       data: {
         ...base,
         content,
-        qrUrl: buildQrUrl(account, base.remaining, content),
+        qrUrl: buildQrUrl(account, total, content),
         bank: account.bank,
         bankName: account.bankName,
         accountNumber: account.accountNumber,
@@ -101,16 +99,31 @@ const sepayWebhook = async (req, res, next) => {
       if (already) return { orderId, outcome: 'DUPLICATE' };
 
       const order = await db.order.findUnique({ where: { orderId } });
+      const total = Number(order.totalAmount);
+      const log = (status, note) => db.orderStatusHistory.create({ data: { orderId, status, note, changedBy: 'SePay' } });
+
+      // Mỗi lần quét QR là một lần thanh toán trọn đơn: chỉ một giao dịch ĐỦ tổng tiền mới xác nhận
+      // đơn. Giao dịch ít hơn (khách sửa số tiền trong app ngân hàng) không cộng dồn, không xác nhận —
+      // ghi nhận REFUND_PENDING để Kế toán hoàn trả; đơn vẫn chờ thanh toán đúng số tiền.
+      let outcome;
+      if (order.status === 'CANCELLED') outcome = 'CANCELLED_NEEDS_REFUND';
+      else if (order.paymentStatus === 'PAID') outcome = 'ALREADY_PAID';
+      else if (amount < total) outcome = 'UNDERPAID';
+      else outcome = 'PAID';
 
       await db.orderPayment.create({
-        data: { orderId, method: 'BANK_TRANSFER', amount, transactionId, status: 'SUCCESS', settledAt: new Date(), settledBy: 'SePay' },
+        data: {
+          orderId, method: 'BANK_TRANSFER', amount, transactionId,
+          status: outcome === 'PAID' ? 'SUCCESS' : 'REFUND_PENDING',
+          settledAt: new Date(), settledBy: 'SePay',
+        },
       });
 
-      // Tiền vào tài khoản công ty: ghi sổ cái và cộng số dư tài khoản ngân hàng
+      // Tiền đã vào tài khoản công ty (kể cả khoản phải hoàn): ghi sổ cái và cộng số dư ngân hàng
       await db.ledgerEntry.create({
         data: {
           type: 'INCOME', amount, channel: 'BANK', bankAccountId: account?.bankAccountId || null,
-          description: `Thu chuyển khoản SePay cho Đơn Hàng ${orderId} (${tx.gateway || 'Ngân hàng'}${ref})`,
+          description: `Thu chuyển khoản SePay cho Đơn Hàng ${orderId} (${tx.gateway || 'Ngân hàng'}${ref})${outcome === 'PAID' ? '' : ' — chờ hoàn trả khách'}`,
           referenceId: transactionId,
           date: tx.transactionDate ? new Date(String(tx.transactionDate).replace(' ', 'T') + '+07:00') : new Date(),
         },
@@ -119,26 +132,17 @@ const sepayWebhook = async (req, res, next) => {
         await db.companyBankAccount.update({ where: { id: account.bankAccountId }, data: { currentBalance: { increment: amount } } });
       }
 
-      const paid = await db.orderPayment.aggregate({
-        where: { orderId, method: 'BANK_TRANSFER', status: 'SUCCESS', transactionId: { startsWith: 'SEPAY-' } },
-        _sum: { amount: true },
-      });
-      const paidTotal = Number(paid._sum.amount || 0);
-      const total = Number(order.totalAmount);
-
-      const log = (status, note) => db.orderStatusHistory.create({ data: { orderId, status, note, changedBy: 'SePay' } });
-
-      if (order.status === 'CANCELLED') {
+      if (outcome === 'CANCELLED_NEEDS_REFUND') {
         await log(order.status, `Nhận ${fmt(amount)} chuyển khoản qua SePay${ref} nhưng đơn đã hủy — cần Kế toán hoàn tiền cho khách.`);
-        return { orderId, outcome: 'CANCELLED_NEEDS_REFUND' };
+        return { orderId, outcome };
       }
-      if (order.paymentStatus === 'PAID') {
-        await log(order.status, `Nhận thêm ${fmt(amount)} qua SePay${ref} sau khi đơn đã thanh toán đủ — kiểm tra và hoàn phần dư cho khách.`);
-        return { orderId, outcome: 'OVERPAID' };
+      if (outcome === 'ALREADY_PAID') {
+        await log(order.status, `Nhận thêm ${fmt(amount)} qua SePay${ref} sau khi đơn đã thanh toán — cần Kế toán hoàn lại khoản này cho khách.`);
+        return { orderId, outcome };
       }
-      if (paidTotal < total) {
-        await log(order.status, `Nhận ${fmt(amount)} qua SePay${ref}. Đã nhận ${fmt(paidTotal)}/${fmt(total)}, còn thiếu ${fmt(total - paidTotal)}.`);
-        return { orderId, outcome: 'PARTIAL' };
+      if (outcome === 'UNDERPAID') {
+        await log(order.status, `Nhận ${fmt(amount)} qua SePay${ref}, không đúng số tiền đơn hàng ${fmt(total)} — đơn chưa được xác nhận. Cần Kế toán hoàn lại ${fmt(amount)} cho khách.`);
+        return { orderId, outcome };
       }
 
       // Đủ tiền: đánh dấu đã thanh toán, đưa đơn về PENDING rồi duyệt ngay (trừ kho, gán serial,
@@ -149,9 +153,9 @@ const sepayWebhook = async (req, res, next) => {
         data: { paymentStatus: 'PAID', ...(wasWaiting ? { status: 'PENDING' } : {}) },
       });
       await log(wasWaiting ? 'PENDING' : order.status,
-        `Đã nhận đủ ${fmt(paidTotal)} chuyển khoản qua SePay${ref}${paidTotal > total ? ` (dư ${fmt(paidTotal - total)}, cần hoàn cho khách)` : ''}.`);
+        `Đã thanh toán ${fmt(total)} qua SePay${ref}${amount > total ? ` (khách chuyển dư ${fmt(amount - total)}, cần hoàn lại)` : ''}.`);
       const approved = wasWaiting ? await approveOrderIfReady(db, orderId, { noteSuffix: ' (đã thanh toán chuyển khoản)' }) : null;
-      return { orderId, outcome: 'PAID', status: approved?.status || (wasWaiting ? 'PENDING' : order.status) };
+      return { orderId, outcome, status: approved?.status || (wasWaiting ? 'PENDING' : order.status) };
     });
 
     console.log(`[SePay] Giao dịch ${sepayId}: ${fmt(amount)} → đơn ${result.orderId} (${result.outcome})`);

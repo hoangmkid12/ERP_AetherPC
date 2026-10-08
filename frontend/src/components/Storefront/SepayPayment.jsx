@@ -65,7 +65,7 @@ export default function SepayPayment({ orderId, onPaid, compact = false }) {
         <CheckCircle size={40} />
         <div>
           <b>Thanh toán thành công</b>
-          <span>AetherPC đã nhận {fmtVnd(info.paidAmount || info.amount)} cho đơn #{info.orderId}. Đơn hàng đang được xử lý.</span>
+          <span>AetherPC đã nhận {fmtVnd(info.amount)} cho đơn #{info.orderId}. Đơn hàng đang được xử lý.</span>
         </div>
       </div>
     );
@@ -91,7 +91,7 @@ export default function SepayPayment({ orderId, onPaid, compact = false }) {
     { key: 'bank', label: 'Ngân hàng', val: info.bankName || info.bank },
     { key: 'acc', label: 'Số tài khoản', val: info.accountNumber, copy: true },
     { key: 'name', label: 'Chủ tài khoản', val: info.accountHolder },
-    { key: 'amount', label: 'Số tiền', val: fmtVnd(info.remaining), raw: info.remaining, copy: true, money: true },
+    { key: 'amount', label: 'Số tiền', val: fmtVnd(info.amount), raw: info.amount, copy: true, money: true },
     { key: 'content', label: 'Nội dung', val: info.content, copy: true, strong: true },
   ].filter(r => r.val);
 
@@ -117,9 +117,6 @@ export default function SepayPayment({ orderId, onPaid, compact = false }) {
             </span>
           </div>
         ))}
-        {info.paidAmount > 0 && (
-          <div className="sf-sepay-partial">Đã nhận {fmtVnd(info.paidAmount)} / {fmtVnd(info.amount)} — vui lòng chuyển thêm phần còn thiếu.</div>
-        )}
         <div className="sf-sepay-status" aria-live="polite">
           {polling
             ? <><Loader2 size={16} className="spin" /> Đang chờ thanh toán — đơn sẽ tự xác nhận khi tiền về tài khoản</>
@@ -128,7 +125,7 @@ export default function SepayPayment({ orderId, onPaid, compact = false }) {
                 <button type="button" onClick={() => { startedAt.current = Date.now(); setPolling(true); load(); }}><RefreshCw size={13} /> Kiểm tra lại</button>
               </>}
         </div>
-        <p className="sf-sepay-note">Vui lòng giữ nguyên <b>nội dung chuyển khoản</b> để hệ thống nhận diện đúng đơn hàng.</p>
+        <p className="sf-sepay-note">Vui lòng giữ nguyên <b>số tiền</b> và <b>nội dung chuyển khoản</b> để đơn hàng được xác nhận tự động.</p>
       </div>
     </div>
   );
