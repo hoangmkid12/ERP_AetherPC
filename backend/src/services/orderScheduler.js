@@ -36,10 +36,26 @@ const checkAndApprovePendingOrders = async () => {
   }
 };
 
+const checkAndCancelUnpaidOrders = async () => {
+  try {
+    const { autoCancelUnpaidOrders } = require('../controllers/order.controller');
+    if (typeof autoCancelUnpaidOrders === 'function') {
+      await autoCancelUnpaidOrders();
+    }
+  } catch (error) {
+    console.error('[OrderScheduler] Error in checkAndCancelUnpaidOrders:', error.message);
+  }
+};
+
 const startScheduler = () => {
-  console.log('[OrderScheduler] Order automatic approval scheduler initialized.');
-  // Run check every 1 minute
-  setInterval(checkAndApprovePendingOrders, 60000);
+  console.log('[OrderScheduler] Order automatic approval & unpaid expiration scheduler initialized.');
+  // Run immediately on boot
+  checkAndCancelUnpaidOrders().catch(() => {});
+  // Run checks every 1 minute
+  setInterval(async () => {
+    await checkAndApprovePendingOrders();
+    await checkAndCancelUnpaidOrders();
+  }, 60000);
 };
 
 module.exports = { startScheduler };

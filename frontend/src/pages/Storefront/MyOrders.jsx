@@ -19,6 +19,7 @@ export default function MyOrders() {
   const getReturnRequests = useSalesStore(state => state.getReturnRequests);
   const addReturnRequest = useSalesStore(state => state.addReturnRequest);
   const updateOrderStatus = useSalesStore(state => state.updateOrderStatus);
+  const cancelOrder = useSalesStore(state => state.cancelOrder);
   const confirmReceivedOrder = useSalesStore(state => state.confirmReceivedOrder);
   const updateOrderDetails = useSalesStore(state => state.updateOrderDetails);
   const updateReturnStatus = useSalesStore(state => state.updateReturnStatus);
@@ -57,6 +58,23 @@ export default function MyOrders() {
       }
     });
   }, [orders, confirmReceivedOrder]);
+
+  // Tự động kiểm tra các đơn chờ thanh toán (WAITING_PAYMENT) quá 30 phút -> tự động hủy
+  useEffect(() => {
+    if (!orders || orders.length === 0) return;
+    const now = Date.now();
+    const thirtyMinutesMs = 30 * 60 * 1000;
+    orders.forEach(o => {
+      if (o.status === 'WAITING_PAYMENT' && o.paymentStatus !== 'PAID') {
+        const createdTime = o.createdAt ? new Date(o.createdAt).getTime() : (o.date ? new Date(o.date).getTime() : null);
+        if (createdTime && (now - createdTime >= thirtyMinutesMs)) {
+          if (typeof cancelOrder === 'function') {
+            cancelOrder(o.orderId, 'Hệ thống tự động hủy đơn sau 30 phút chưa thanh toán').catch(() => { });
+          }
+        }
+      }
+    });
+  }, [orders, cancelOrder]);
 
   const handleConfirmReceived = async (order) => {
     if (!order) return;
@@ -98,6 +116,7 @@ export default function MyOrders() {
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancelForm, setCancelForm] = useState({ reason: '', evidenceUrl: '' });
   const [cancelTargetOrder, setCancelTargetOrder] = useState(null);
+  const [submittingCancel, setSubmittingCancel] = useState(false);
   // Complaint / Ticket Modal State
   const [showComplaintModal, setShowComplaintModal] = useState(false);
   const [complaintForm, setComplaintForm] = useState({ orderId: '', title: '', description: '', priority: 'HIGH' });
@@ -1578,10 +1597,32 @@ export default function MyOrders() {
                         })()
                       )}
 
+                      {/* Cảnh báo tự động hủy đơn sau 30 phút nếu chưa chuyển khoản */}
+                      {selectedOrder.status === 'WAITING_PAYMENT' && (
+                        <div style={{
+                          marginTop: '1rem',
+                          padding: '0.75rem 1rem',
+                          borderRadius: '10px',
+                          backgroundColor: '#fffbeb',
+                          border: '1px solid #fde68a',
+                          color: '#b45309',
+                          fontSize: '0.84rem',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.5rem'
+                        }}>
+                          <Clock size={17} style={{ flexShrink: 0, color: '#d97706' }} />
+                          <span>
+                            <strong>Thời hạn thanh toán:</strong> Hệ thống sẽ <strong>tự động hủy đơn hàng sau 30 phút</strong> kể từ khi tạo đơn nếu chưa nhận được tiền chuyển khoản.
+                          </span>
+                        </div>
+                      )}
+
                       {/* Hành động sửa/hủy đơn - bottom right */}
-                      {selectedOrder.status === 'PENDING' && (
+                      {['PENDING', 'WAITING_PAYMENT', 'AWAITING_STOCK'].includes(selectedOrder.status) && (
                         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1.25rem', paddingTop: '1.25rem', borderTop: '1px solid #e2e8f0' }}>
                           <button
+                            type="button"
                             onClick={() => {
                               setCancelTargetOrder(selectedOrder);
                               setShowCancelModal(true);
@@ -1607,37 +1648,40 @@ export default function MyOrders() {
                             <X size={16} /> Hủy đơn
                           </button>
 
-                          <button
-                            onClick={() => {
-                              setEditTargetOrder(selectedOrder);
-                              setEditForm({
-                                customerName: selectedOrder.customerName || '',
-                                phone: selectedOrder.phone || '',
-                                shippingAddress: selectedOrder.shippingAddress || '',
-                                notes: selectedOrder.lastNote || ''
-                              });
-                              setShowEditModal(true);
-                            }}
-                            className="btn"
-                            style={{
-                              padding: '0.5rem 1rem',
-                              fontSize: '0.85rem',
-                              background: 'rgba(234,179,8,0.1)',
-                              color: '#eab308',
-                              border: '1px solid rgba(234,179,8,0.25)',
-                              borderRadius: '8px',
-                              cursor: 'pointer',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '0.35rem',
-                              fontWeight: 600,
-                              transition: 'all 0.2s'
-                            }}
-                            onMouseEnter={e => e.currentTarget.style.background = 'rgba(234,179,8,0.2)'}
-                            onMouseLeave={e => e.currentTarget.style.background = 'rgba(234,179,8,0.1)'}
-                          >
-                            Sửa thông tin
-                          </button>
+                          {selectedOrder.status === 'PENDING' && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditTargetOrder(selectedOrder);
+                                setEditForm({
+                                  customerName: selectedOrder.customerName || '',
+                                  phone: selectedOrder.phone || '',
+                                  shippingAddress: selectedOrder.shippingAddress || '',
+                                  notes: selectedOrder.lastNote || ''
+                                });
+                                setShowEditModal(true);
+                              }}
+                              className="btn"
+                              style={{
+                                padding: '0.5rem 1rem',
+                                fontSize: '0.85rem',
+                                background: 'rgba(234,179,8,0.1)',
+                                color: '#eab308',
+                                border: '1px solid rgba(234,179,8,0.25)',
+                                borderRadius: '8px',
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.35rem',
+                                fontWeight: 600,
+                                transition: 'all 0.2s'
+                              }}
+                              onMouseEnter={e => e.currentTarget.style.background = 'rgba(234,179,8,0.2)'}
+                              onMouseLeave={e => e.currentTarget.style.background = 'rgba(234,179,8,0.1)'}
+                            >
+                              Sửa thông tin
+                            </button>
+                          )}
                         </div>
                       )}
                     </>
@@ -2867,22 +2911,51 @@ export default function MyOrders() {
 
             {/* Modal Footer */}
             <div style={{ padding: '1rem 1.5rem 1.5rem 1.5rem', borderTop: '1px solid #e2e8f0', display: 'flex', gap: '1rem' }}>
-              <button onClick={() => setShowCancelModal(false)} className="btn btn-secondary" style={{ flex: 1, padding: '0.75rem', borderRadius: '8px', fontWeight: 600 }}>Quay lại</button>
               <button
-                onClick={() => {
+                type="button"
+                disabled={submittingCancel}
+                onClick={() => setShowCancelModal(false)}
+                className="btn btn-secondary"
+                style={{ flex: 1, padding: '0.75rem', borderRadius: '8px', fontWeight: 600 }}
+              >
+                Quay lại
+              </button>
+              <button
+                type="button"
+                disabled={submittingCancel}
+                onClick={async () => {
                   if (!cancelForm.reason.trim()) {
                     addNotification('Vui lòng nhập lý do hủy đơn hàng.', 'error');
                     return;
                   }
-                  updateOrderStatus(cancelTargetOrder.orderId, 'CANCELLED', `Hủy bởi Khách hàng: ${cancelForm.reason}`, { evidenceUrl: cancelForm.evidenceUrl });
-                  setShowCancelModal(false);
-                  setCancelForm({ reason: '', evidenceUrl: '' });
-                  addNotification(`Đơn hàng #${cancelTargetOrder.orderId} đã hủy thành công!`, 'success', '/my-orders');
+                  setSubmittingCancel(true);
+                  try {
+                    await cancelOrder(cancelTargetOrder.orderId, cancelForm.reason, { evidenceUrl: cancelForm.evidenceUrl });
+                    setShowCancelModal(false);
+                    setCancelForm({ reason: '', evidenceUrl: '' });
+                    if (typeof getOrders === 'function') {
+                      await getOrders().catch(() => {});
+                    }
+                    addNotification(`Đơn hàng #${cancelTargetOrder.orderId} đã hủy thành công!`, 'success', '/my-orders');
+                  } catch (err) {
+                    addNotification(`Hủy đơn thất bại: ${err.message || 'Lỗi kết nối máy chủ'}`, 'error');
+                  } finally {
+                    setSubmittingCancel(false);
+                  }
                 }}
                 className="btn btn-primary"
-                style={{ flex: 1, padding: '0.75rem', borderRadius: '8px', fontWeight: 600, backgroundColor: '#ef4444', color: 'white', border: 'none' }}
+                style={{
+                  flex: 1,
+                  padding: '0.75rem',
+                  borderRadius: '8px',
+                  fontWeight: 600,
+                  backgroundColor: submittingCancel ? '#9ca3af' : '#ef4444',
+                  color: 'white',
+                  border: 'none',
+                  cursor: submittingCancel ? 'not-allowed' : 'pointer'
+                }}
               >
-                Xác nhận Hủy Đơn
+                {submittingCancel ? 'Đang xử lý...' : 'Xác nhận Hủy Đơn'}
               </button>
             </div>
 
