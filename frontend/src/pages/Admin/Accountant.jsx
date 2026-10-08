@@ -28,6 +28,7 @@ import {
 } from 'chart.js';
 import { printDocument } from '../../utils/printDocument';
 import DateRangeFilter, { isDateInRange } from '../../components/Common/DateRangeFilter';
+import TransferRefunds from '../../components/Accounting/TransferRefunds';
 
 ChartJS.register(
   CategoryScale, 
@@ -211,6 +212,16 @@ export default function Accountant() {
   // bộ không đi qua Zustand store (COD chưa đối soát, danh sách PO local).
   useAutoRefresh(fetchBackendPOs);
   useAutoRefresh(loadCodSettlement);
+
+  // Số khoản chuyển khoản SePay đang chờ hoàn cho khách (badge tab "Hoàn Tiền Chuyển Khoản")
+  const [transferRefundCount, setTransferRefundCount] = useState(0);
+  const loadTransferRefundCount = React.useCallback(() => {
+    api.get('/payments/refunds?status=REFUND_PENDING')
+      .then(res => setTransferRefundCount(Array.isArray(res?.data) ? res.data.length : 0))
+      .catch(() => {});
+  }, []);
+  useEffect(() => { loadTransferRefundCount(); }, [loadTransferRefundCount]);
+  useAutoRefresh(loadTransferRefundCount);
 
   const formatLedgerDate = (dateStr) => {
     if (!dateStr) return '—';
@@ -728,6 +739,7 @@ export default function Accountant() {
             <DollarSign size={24} style={{ color: '#16a34a' }} />
             {activeTab === 'overview' && 'Tổng Quan Tài Chính & Dòng Tiền Doanh Nghiệp'}
             {activeTab === 'refunds' && 'Chi Hoàn Tiền Đổi Trả Khách Hàng'}
+            {activeTab === 'transfer_refunds' && 'Hoàn Tiền Chuyển Khoản Cho Khách (SePay)'}
             {activeTab === 'ledger' && 'Sổ Cái Kế Toán & Lịch Sử Dòng Tiền'}
             {activeTab === 'po_payments' && 'Thanh Toán Đơn Mua Hàng Nhà Cung Cấp'}
             {activeTab === 'cod_settlement' && 'Đối Soát Tiền Mặt COD Từ Shipper'}
@@ -812,6 +824,7 @@ export default function Accountant() {
         {[
           { key: 'overview', label: 'Tổng Quan Tài Chính' },
           { key: 'refunds', label: 'Chi Hoàn Tiền RMA', badge: pendingRefunds.length },
+          { key: 'transfer_refunds', label: 'Hoàn Tiền Chuyển Khoản', badge: transferRefundCount },
           { key: 'ledger', label: 'Sổ Cái Kế Toán' },
           { key: 'po_payments', label: 'Thanh Toán PO NCC', badge: unpaidPOs.length },
           { key: 'cod_settlement', label: 'Đối Soát COD Shipper', badge: codGroups.length },
@@ -847,7 +860,7 @@ export default function Accountant() {
                   borderRadius: '10px',
                   fontSize: '0.75rem',
                   fontWeight: 800,
-                  backgroundColor: isActive ? '#ffffff' : (tabItem.key === 'refunds' ? '#dc2626' : '#d97706'),
+                  backgroundColor: isActive ? '#ffffff' : (['refunds', 'transfer_refunds'].includes(tabItem.key) ? '#dc2626' : '#d97706'),
                   color: isActive ? '#2563eb' : '#ffffff'
                 }}>
                   {tabItem.badge}
@@ -861,6 +874,10 @@ export default function Accountant() {
       {/* ========================================================================= */}
       {/* TAB: REFUNDS (CHI HOÀN TIỀN ĐỔI TRẢ KHÁCH HÀNG) */}
       {/* ========================================================================= */}
+      {activeTab === 'transfer_refunds' && (
+        <TransferRefunds onCountChange={setTransferRefundCount} />
+      )}
+
       {activeTab === 'refunds' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
           {/* Summary KPIs */}

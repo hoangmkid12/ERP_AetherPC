@@ -7,6 +7,14 @@ const { approveOrderIfReady } = require('../services/orderApprovalService');
 const STAFF_ROLES = ['SALES', 'SALES_MANAGER', 'CSKH', 'ACCOUNTANT', 'CEO', 'ADMIN'];
 const fmt = (n) => `${Math.round(Number(n) || 0).toLocaleString('vi-VN')}đ`;
 
+// Lý do một khoản chuyển khoản phải hoàn lại cho khách
+function refundReasonOf(payment, order) {
+  if (String(payment.transactionId || '').endsWith('-DU')) return 'Chuyển dư so với giá trị đơn';
+  if (order?.status === 'CANCELLED') return 'Chuyển vào đơn đã hủy';
+  if (Number(payment.amount) < Number(order?.totalAmount || 0)) return 'Chuyển thiếu số tiền đơn hàng';
+  return 'Chuyển trùng, đơn đã được thanh toán';
+}
+
 // GET /payments/sepay/orders/:orderId — thông tin chuyển khoản (QR, số tài khoản, nội dung) và
 // trạng thái thanh toán hiện tại của đơn. Trang thanh toán gọi lại định kỳ để biết khi nào tiền về.
 const getSepayPayment = async (req, res, next) => {
@@ -24,6 +32,11 @@ const getSepayPayment = async (req, res, next) => {
       where: { orderId: order.orderId, method: 'BANK_TRANSFER', status: 'SUCCESS', transactionId: { startsWith: 'SEPAY-' } },
       _sum: { amount: true },
     });
+    const refundRows = await prisma.orderPayment.findMany({
+      where: { orderId: order.orderId, method: 'BANK_TRANSFER', status: { in: ['REFUND_PENDING', 'REFUNDED'] } },
+      select: { amount: true, status: true, createdAt: true, transactionId: true },
+      orderBy: { createdAt: 'asc' },
+    });
     const total = Number(order.totalAmount);
     const base = {
       orderId: order.orderId,
@@ -32,6 +45,11 @@ const getSepayPayment = async (req, res, next) => {
       paymentStatus: order.paymentStatus,
       amount: total,
       paidAmount: Number(paid._sum.amount || 0),
+      // Khoản đã chuyển nhưng không dùng để thanh toán đơn (thiếu / dư / trùng) — sẽ được hoàn lại
+      refunds: refundRows.map(r => ({
+        amount: Number(r.amount), status: r.status, at: r.createdAt,
+        reason: refundReasonOf(r, order),
+      })),
     };
 
     if (order.paymentStatus === 'PAID' || order.paymentMethod !== 'BANK_TRANSFER' || order.status === 'CANCELLED') {
@@ -95,7 +113,7 @@ const sepayWebhook = async (req, res, next) => {
     const result = await prisma.$transaction(async (db) => {
       // Khóa theo đơn hàng: các webhook cùng đơn (kể cả SePay gửi lại cùng giao dịch) xử lý lần lượt
       await db.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${'sepay:' + orderId}))::text`;
-      const already = await db.orderPayment.findFirst({ where: { transactionId } });
+      const already = await db.orderPayment.findFirst({ where: { transactionId: { in: [transactionId, `${transactionId}-DU`] } } });
       if (already) return { orderId, outcome: 'DUPLICATE' };
 
       const order = await db.order.findUnique({ where: { orderId } });
@@ -111,13 +129,22 @@ const sepayWebhook = async (req, res, next) => {
       else if (amount < total) outcome = 'UNDERPAID';
       else outcome = 'PAID';
 
-      await db.orderPayment.create({
-        data: {
-          orderId, method: 'BANK_TRANSFER', amount, transactionId,
-          status: outcome === 'PAID' ? 'SUCCESS' : 'REFUND_PENDING',
-          settledAt: new Date(), settledBy: 'SePay',
-        },
-      });
+      const paidPart = outcome === 'PAID' ? total : 0;
+      const refundPart = amount - paidPart; // > 0: chuyển thiếu / dư / trùng / vào đơn đã hủy
+      if (paidPart > 0) {
+        await db.orderPayment.create({
+          data: { orderId, method: 'BANK_TRANSFER', amount: paidPart, transactionId, status: 'SUCCESS', settledAt: new Date(), settledBy: 'SePay' },
+        });
+      }
+      if (refundPart > 0) {
+        await db.orderPayment.create({
+          data: {
+            orderId, method: 'BANK_TRANSFER', amount: refundPart,
+            transactionId: paidPart > 0 ? `${transactionId}-DU` : transactionId,
+            status: 'REFUND_PENDING',
+          },
+        });
+      }
 
       // Tiền đã vào tài khoản công ty (kể cả khoản phải hoàn): ghi sổ cái và cộng số dư ngân hàng
       await db.ledgerEntry.create({
@@ -141,7 +168,7 @@ const sepayWebhook = async (req, res, next) => {
         return { orderId, outcome };
       }
       if (outcome === 'UNDERPAID') {
-        await log(order.status, `Nhận ${fmt(amount)} qua SePay${ref}, không đúng số tiền đơn hàng ${fmt(total)} — đơn chưa được xác nhận. Cần Kế toán hoàn lại ${fmt(amount)} cho khách.`);
+        await log(order.status, `Nhận ${fmt(amount)} qua SePay${ref}, chưa đủ số tiền đơn hàng ${fmt(total)} — đơn chưa được xác nhận. Khoản ${fmt(amount)} chờ Kế toán hoàn lại cho khách.`);
         return { orderId, outcome };
       }
 
@@ -165,4 +192,114 @@ const sepayWebhook = async (req, res, next) => {
   }
 };
 
-module.exports = { getSepayPayment, sepayWebhook };
+// GET /payments/refunds?status=REFUND_PENDING|REFUNDED — các khoản chuyển khoản SePay phải hoàn cho khách
+const listTransferRefunds = async (req, res, next) => {
+  try {
+    const status = req.query.status === 'REFUNDED' ? 'REFUNDED' : 'REFUND_PENDING';
+    const rows = await prisma.orderPayment.findMany({
+      where: { method: 'BANK_TRANSFER', status, transactionId: { startsWith: 'SEPAY-' } },
+      include: {
+        order: {
+          select: {
+            orderId: true, totalAmount: true, status: true, paymentStatus: true,
+            customer: { select: { name: true, phone: true, email: true } },
+          },
+        },
+      },
+      orderBy: { createdAt: status === 'REFUNDED' ? 'desc' : 'asc' },
+      take: 200,
+    });
+    // Mã giao dịch ngân hàng gốc nằm trong mô tả bút toán thu tương ứng
+    const baseIdOf = (r) => r.transactionId.replace(/-DU$/, '');
+    const ledger = await prisma.ledgerEntry.findMany({
+      where: { referenceId: { in: [...new Set(rows.map(baseIdOf))] }, type: 'INCOME' },
+      select: { referenceId: true, description: true, date: true },
+    });
+    const ledgerOf = Object.fromEntries(ledger.map(l => [l.referenceId, l]));
+    res.json({
+      success: true,
+      data: rows.map(r => {
+        const l = ledgerOf[baseIdOf(r)];
+        return {
+          id: r.id,
+          orderId: r.orderId,
+          amount: Number(r.amount),
+          status: r.status,
+          reason: refundReasonOf(r, r.order),
+          receivedAt: l?.date || r.createdAt,
+          bankRef: (l?.description.match(/Mã GD ngân hàng ([^)\s]+)/) || [])[1] || null,
+          refundedAt: r.status === 'REFUNDED' ? r.settledAt : null,
+          refundedBy: r.status === 'REFUNDED' ? r.settledBy : null,
+          orderTotal: Number(r.order?.totalAmount || 0),
+          orderStatus: r.order?.status,
+          orderPaymentStatus: r.order?.paymentStatus,
+          customerName: r.order?.customer?.name || '',
+          customerPhone: r.order?.customer?.phone || '',
+          customerEmail: r.order?.customer?.email || '',
+        };
+      }),
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// POST /payments/refunds/:id/complete { refundRef, note } — Kế toán xác nhận đã chuyển trả khách.
+// Ghi bút toán REFUND, trừ số dư tài khoản đã nhận tiền, ghi lịch sử đơn.
+const completeTransferRefund = async (req, res, next) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const refundRef = String(req.body?.refundRef || '').trim().slice(0, 60);
+    const note = String(req.body?.note || '').trim().slice(0, 300);
+    if (!Number.isInteger(id)) return res.status(400).json({ success: false, message: 'Mã khoản hoàn không hợp lệ.' });
+    if (!refundRef) {
+      return res.status(400).json({ success: false, message: 'Vui lòng nhập mã giao dịch chuyển trả tiền cho khách.' });
+    }
+    const by = req.user?.fullname || req.user?.name || req.user?.email || req.user?.code || 'Kế toán';
+
+    const result = await prisma.$transaction(async (db) => {
+      // Chỉ chuyển REFUND_PENDING → REFUNDED một lần (hai người bấm cùng lúc: người sau nhận lỗi)
+      const claimed = await db.orderPayment.updateMany({
+        where: { id, status: 'REFUND_PENDING', method: 'BANK_TRANSFER' },
+        data: { status: 'REFUNDED', settledAt: new Date(), settledBy: by },
+      });
+      if (claimed.count !== 1) {
+        const error = new Error('Khoản này không còn ở trạng thái chờ hoàn tiền.');
+        error.statusCode = 409;
+        throw error;
+      }
+      const payment = await db.orderPayment.findUnique({ where: { id }, include: { order: true } });
+      const income = await db.ledgerEntry.findFirst({ where: { referenceId: payment.transactionId.replace(/-DU$/, ''), type: 'INCOME' } });
+      const amount = Number(payment.amount);
+      const reason = refundReasonOf(payment, payment.order);
+      const detail = `(${reason}) · Mã GD hoàn ${refundRef}${note ? ` · ${note}` : ''}`;
+
+      await db.ledgerEntry.create({
+        data: {
+          type: 'REFUND', amount, channel: 'BANK', bankAccountId: income?.bankAccountId || null,
+          description: `Hoàn tiền chuyển khoản cho khách — Đơn Hàng ${payment.orderId} ${detail}`,
+          referenceId: `RF-${payment.transactionId}`.slice(0, 50),
+        },
+      });
+      if (income?.bankAccountId) {
+        await db.companyBankAccount.update({ where: { id: income.bankAccountId }, data: { currentBalance: { decrement: amount } } });
+      }
+      await db.orderStatusHistory.create({
+        data: {
+          orderId: payment.orderId,
+          status: payment.order.status,
+          note: `Kế toán ${by} đã hoàn ${fmt(amount)} cho khách ${detail}.`,
+          changedBy: by,
+        },
+      });
+      return { id, orderId: payment.orderId, amount };
+    });
+
+    res.json({ success: true, message: `Đã ghi nhận hoàn ${fmt(result.amount)} cho đơn ${result.orderId}.`, data: result });
+  } catch (err) {
+    next(err);
+  }
+};
+
+module.exports = { getSepayPayment, sepayWebhook, listTransferRefunds, completeTransferRefund };
+

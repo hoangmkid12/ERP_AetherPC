@@ -59,17 +59,34 @@ export default function SepayPayment({ orderId, onPaid, compact = false }) {
     }).catch(() => {});
   };
 
+  // Khoản đã chuyển nhưng không dùng để thanh toán đơn (thiếu / dư / trùng): Kế toán sẽ hoàn lại
+  const refundsPending = (info?.refunds || []).filter(r => r.status === 'REFUND_PENDING');
+  const refundsDone = (info?.refunds || []).filter(r => r.status === 'REFUNDED');
+  const sum = (list) => list.reduce((s, r) => s + (Number(r.amount) || 0), 0);
+  const refundNote = (refundsPending.length > 0 || refundsDone.length > 0) && (
+    <div className="sf-sepay-partial">
+      {refundsPending.length > 0 && <div>Khoản {fmtVnd(sum(refundsPending))} chưa dùng để thanh toán sẽ được AetherPC hoàn lại vào tài khoản đã chuyển trong 1–3 ngày làm việc.</div>}
+      {refundsDone.length > 0 && <div>Đã hoàn lại {fmtVnd(sum(refundsDone))} cho bạn.</div>}
+    </div>
+  );
+
   if (info?.paymentStatus === 'PAID') {
     return (
-      <div className="sf-sepay sf-sepay-done" role="status">
-        <CheckCircle size={40} />
-        <div>
-          <b>Thanh toán thành công</b>
-          <span>AetherPC đã nhận {fmtVnd(info.amount)} cho đơn #{info.orderId}. Đơn hàng đang được xử lý.</span>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div className="sf-sepay sf-sepay-done" role="status">
+          <CheckCircle size={40} />
+          <div>
+            <b>Thanh toán thành công</b>
+            <span>AetherPC đã nhận {fmtVnd(info.amount)} cho đơn #{info.orderId}. Đơn hàng đang được xử lý.</span>
+          </div>
         </div>
+        {refundNote}
       </div>
     );
   }
+
+  // Trả thiếu: khách sửa số tiền khi chuyển — đơn chưa được xác nhận, phải quét lại đúng số tiền
+  const underpaid = refundsPending.filter(r => /thiếu/i.test(r.reason || ''));
 
   if (!info) {
     return (
@@ -117,6 +134,12 @@ export default function SepayPayment({ orderId, onPaid, compact = false }) {
             </span>
           </div>
         ))}
+        {underpaid.length > 0 && (
+          <div className="sf-sepay-partial" role="alert">
+            <b>Chưa đủ số tiền:</b> AetherPC đã nhận {fmtVnd(sum(underpaid))}, chưa đủ {fmtVnd(info.amount)} của đơn hàng nên đơn chưa được xác nhận.
+            Khoản {fmtVnd(sum(underpaid))} sẽ được hoàn lại cho bạn trong 1–3 ngày làm việc. Vui lòng quét lại mã QR để thanh toán đúng {fmtVnd(info.amount)}.
+          </div>
+        )}
         <div className="sf-sepay-status" aria-live="polite">
           {polling
             ? <><Loader2 size={16} className="spin" /> Đang chờ thanh toán — đơn sẽ tự xác nhận khi tiền về tài khoản</>
