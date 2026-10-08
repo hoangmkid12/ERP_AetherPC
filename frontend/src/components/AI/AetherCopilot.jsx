@@ -3,7 +3,7 @@ import {
   Bot, Sparkles, X, Send, Trash2, ChevronDown, ExternalLink, 
   ShieldCheck, AlertCircle, RefreshCw, FileText, CheckCircle2,
   Cpu, DollarSign, Package, Truck, ArrowRight, Minimize2, Maximize2,
-  ThumbsUp, ThumbsDown, ClipboardCheck
+  ThumbsUp, ThumbsDown, ClipboardCheck, MessageSquare
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../services/api';
@@ -299,64 +299,63 @@ export default function AetherCopilot() {
           onClick={() => setIsOpen(true)}
           className="copilot-fab"
           aria-label="Mở Trợ Lý AI AetherCopilot"
+          title="Mở Trợ Lý AI AetherCopilot"
           style={{
             position: 'fixed',
             bottom: '24px',
             right: '24px',
             zIndex: 9980,
-            backgroundColor: '#0f172a',
-            color: '#ffffff',
-            border: '1.5px solid #38bdf8',
-            borderRadius: '9999px',
-            padding: '10px 18px 10px 14px',
+            width: '52px',
+            height: '52px',
+            borderRadius: '50%',
+            backgroundColor: 'rgba(255, 255, 255, 0.85)',
+            backdropFilter: 'blur(16px)',
+            WebkitBackdropFilter: 'blur(16px)',
+            color: '#1e293b',
+            border: '1.5px solid rgba(226, 232, 240, 0.9)',
+            padding: 0,
             display: 'flex',
             alignItems: 'center',
-            gap: '10px',
-            boxShadow: '0 10px 25px -3px rgba(14, 165, 233, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.2)',
+            justifyContent: 'center',
+            boxShadow: '0 10px 25px -4px rgba(37, 99, 235, 0.2), 0 4px 12px rgba(0, 0, 0, 0.08)',
             cursor: 'pointer',
             transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
             transform: 'scale(1)',
           }}
           onMouseEnter={e => {
-            e.currentTarget.style.transform = 'scale(1.05)';
-            e.currentTarget.style.boxShadow = '0 15px 30px -3px rgba(14, 165, 233, 0.6)';
+            e.currentTarget.style.transform = 'scale(1.08)';
+            e.currentTarget.style.boxShadow = '0 14px 30px -4px rgba(37, 99, 235, 0.35), 0 6px 16px rgba(0, 0, 0, 0.1)';
+            e.currentTarget.style.borderColor = '#38bdf8';
           }}
           onMouseLeave={e => {
             e.currentTarget.style.transform = 'scale(1)';
-            e.currentTarget.style.boxShadow = '0 10px 25px -3px rgba(14, 165, 233, 0.4)';
+            e.currentTarget.style.boxShadow = '0 10px 25px -4px rgba(37, 99, 235, 0.2), 0 4px 12px rgba(0, 0, 0, 0.08)';
+            e.currentTarget.style.borderColor = 'rgba(226, 232, 240, 0.9)';
           }}
         >
           <div style={{
             position: 'relative',
-            width: '32px',
-            height: '32px',
+            width: '38px',
+            height: '38px',
             borderRadius: '50%',
-            background: 'linear-gradient(135deg, #2563eb, #38bdf8)',
+            background: 'linear-gradient(135deg, #2563eb, #06b6d4)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            color: '#ffffff'
+            color: '#ffffff',
+            boxShadow: '0 2px 8px rgba(37, 99, 235, 0.3)'
           }}>
-            <Bot size={20} />
+            <MessageSquare size={19} />
             <span style={{
               position: 'absolute',
-              top: '-1px',
-              right: '-1px',
-              width: '8px',
-              height: '8px',
+              top: '0',
+              right: '0',
+              width: '9px',
+              height: '9px',
               borderRadius: '50%',
               backgroundColor: '#10b981',
-              border: '2px solid #0f172a'
+              border: '2px solid #ffffff'
             }} />
-          </div>
-          <div className="copilot-fab-text" style={{ textAlign: 'left' }}>
-            <div style={{ fontSize: '0.85rem', fontWeight: 800, letterSpacing: '0.3px', color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <span>AetherCopilot</span>
-              <Sparkles size={13} style={{ color: '#38bdf8' }} />
-            </div>
-            <div style={{ fontSize: '0.68rem', color: '#94a3b8', fontWeight: 600 }}>
-              AI Tri Thức & Live ERP
-            </div>
           </div>
         </button>
       )}
@@ -385,13 +384,15 @@ export default function AetherCopilot() {
         >
           {/* Header */}
           <div style={{
-            background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+            background: 'rgba(255, 255, 255, 0.9)',
+            backdropFilter: 'blur(16px)',
+            WebkitBackdropFilter: 'blur(16px)',
             padding: '12px 16px',
-            color: '#ffffff',
+            color: '#0f172a',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            borderBottom: '1px solid rgba(255, 255, 255, 0.1)'
+            borderBottom: '1px solid #e2e8f0'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <div style={{
@@ -402,26 +403,26 @@ export default function AetherCopilot() {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                boxShadow: '0 0 12px rgba(37, 99, 235, 0.5)'
+                boxShadow: '0 2px 8px rgba(37, 99, 235, 0.35)'
               }}>
                 <Bot size={22} color="#ffffff" />
               </div>
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span style={{ fontSize: '0.95rem', fontWeight: 800, letterSpacing: '0.2px' }}>AetherCopilot</span>
+                  <span style={{ fontSize: '0.95rem', fontWeight: 800, letterSpacing: '0.2px', color: '#0f172a' }}>AetherCopilot</span>
                   <span style={{
                     fontSize: '0.65rem',
                     fontWeight: 800,
                     padding: '2px 6px',
                     borderRadius: '4px',
-                    backgroundColor: '#1e3a8a',
-                    color: '#93c5fd',
-                    border: '1px solid #3b82f6'
+                    backgroundColor: '#eff6ff',
+                    color: '#2563eb',
+                    border: '1px solid #bfdbfe'
                   }}>
                     {user?.role || 'USER'}
                   </span>
                 </div>
-                <div style={{ fontSize: '0.7rem', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <div style={{ fontSize: '0.7rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
                   <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#10b981' }} />
                   <span>Sẵn sàng kết nối SOP & Live DB</span>
                 </div>
@@ -436,14 +437,15 @@ export default function AetherCopilot() {
                   style={{
                     background: 'transparent',
                     border: 'none',
-                    color: '#94a3b8',
+                    color: '#64748b',
                     cursor: 'pointer',
                     padding: '6px',
                     borderRadius: '6px',
-                    display: 'flex'
+                    display: 'flex',
+                    transition: 'all 0.15s ease'
                   }}
-                  onMouseEnter={e => e.currentTarget.style.color = '#ffffff'}
-                  onMouseLeave={e => e.currentTarget.style.color = '#94a3b8'}
+                  onMouseEnter={e => { e.currentTarget.style.color = '#0f172a'; e.currentTarget.style.backgroundColor = '#f1f5f9'; }}
+                  onMouseLeave={e => { e.currentTarget.style.color = '#64748b'; e.currentTarget.style.backgroundColor = 'transparent'; }}
                 >
                   <ClipboardCheck size={16} />
                 </button>
@@ -454,14 +456,15 @@ export default function AetherCopilot() {
                 style={{
                   background: 'transparent',
                   border: 'none',
-                  color: '#94a3b8',
+                  color: '#64748b',
                   cursor: 'pointer',
                   padding: '6px',
                   borderRadius: '6px',
-                  display: 'flex'
+                  display: 'flex',
+                  transition: 'all 0.15s ease'
                 }}
-                onMouseEnter={e => e.currentTarget.style.color = '#ffffff'}
-                onMouseLeave={e => e.currentTarget.style.color = '#94a3b8'}
+                onMouseEnter={e => { e.currentTarget.style.color = '#0f172a'; e.currentTarget.style.backgroundColor = '#f1f5f9'; }}
+                onMouseLeave={e => { e.currentTarget.style.color = '#64748b'; e.currentTarget.style.backgroundColor = 'transparent'; }}
               >
                 <Trash2 size={16} />
               </button>
@@ -471,14 +474,15 @@ export default function AetherCopilot() {
                 style={{
                   background: 'transparent',
                   border: 'none',
-                  color: '#94a3b8',
+                  color: '#64748b',
                   cursor: 'pointer',
                   padding: '6px',
                   borderRadius: '6px',
-                  display: 'flex'
+                  display: 'flex',
+                  transition: 'all 0.15s ease'
                 }}
-                onMouseEnter={e => e.currentTarget.style.color = '#ffffff'}
-                onMouseLeave={e => e.currentTarget.style.color = '#94a3b8'}
+                onMouseEnter={e => { e.currentTarget.style.color = '#0f172a'; e.currentTarget.style.backgroundColor = '#f1f5f9'; }}
+                onMouseLeave={e => { e.currentTarget.style.color = '#64748b'; e.currentTarget.style.backgroundColor = 'transparent'; }}
               >
                 {isExpanded ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
               </button>
@@ -488,14 +492,15 @@ export default function AetherCopilot() {
                 style={{
                   background: 'transparent',
                   border: 'none',
-                  color: '#94a3b8',
+                  color: '#64748b',
                   cursor: 'pointer',
                   padding: '6px',
                   borderRadius: '6px',
-                  display: 'flex'
+                  display: 'flex',
+                  transition: 'all 0.15s ease'
                 }}
-                onMouseEnter={e => e.currentTarget.style.color = '#ef4444'}
-                onMouseLeave={e => e.currentTarget.style.color = '#94a3b8'}
+                onMouseEnter={e => { e.currentTarget.style.color = '#ef4444'; e.currentTarget.style.backgroundColor = '#fee2e2'; }}
+                onMouseLeave={e => { e.currentTarget.style.color = '#64748b'; e.currentTarget.style.backgroundColor = 'transparent'; }}
               >
                 <X size={18} />
               </button>
