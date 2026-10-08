@@ -338,7 +338,7 @@ const createOrder = async (req, res, next) => {
 
     // Gửi email xác nhận đơn hàng cho khách hàng (đơn thanh toán online chỉ gửi khi thanh toán thành công)
     const customer = await prisma.customer.findUnique({ where: { customerId: req.user.id } });
-    if (customer?.email && initialStatus !== 'WAITING_PAYMENT') {
+    if (customer?.email && order.status !== 'WAITING_PAYMENT') {
       sendOrderConfirmationEmail({
         toEmail: customer.email,
         customerName: customer.name,
