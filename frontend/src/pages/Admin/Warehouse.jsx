@@ -225,7 +225,7 @@ const ProductSpecsEditor = ({ category, specs = {}, onChange }) => {
       </div>
 
       {currentEntries.length === 0 ? (
-        <div style={{ padding: '0.65rem 0.8rem', textAlign: 'center', backgroundColor: '#ffffff', borderRadius: '6px', border: '1px dashed #cbd5e1', fontSize: '0.75rem', color: '#64748b', marginBottom: '0.6rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        <div style={{ padding: '0.6rem 0.5rem', textAlign: 'center', backgroundColor: '#ffffff', borderRadius: '6px', border: '1px dashed #cbd5e1', fontSize: '0.72rem', color: '#64748b', marginBottom: '0.6rem', whiteSpace: 'nowrap' }}>
           Chưa có thông số kỹ thuật nào. Bấm nút nạp mẫu gợi ý phía trên hoặc thêm từng thông số bên dưới.
         </div>
       ) : (
