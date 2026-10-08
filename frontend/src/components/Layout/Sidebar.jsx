@@ -242,87 +242,87 @@ export default function Sidebar({ isOpen = false, onClose }) {
     {
       id: 'dashboard',
       path: '/admin/dashboard',
-      label: 'Tổng Quan Điều Hành',
+      label: 'Tổng Quan',
       icon: <BarChart2 size={18} />,
       visible: canRead('dashboard') || isCEO
     },
     {
       id: 'sales',
       path: '/admin/sales',
-      label: 'Bán Hàng & Đơn Hàng',
+      label: 'Bán Hàng',
       icon: <ShoppingCart size={18} />,
       visible: canRead('sales')
     },
     {
       id: 'warehouse',
       path: '/admin/warehouse',
-      label: 'Kho & Tồn Kho',
+      label: 'Kho',
       icon: <Database size={18} />,
       visible: canRead('warehouse')
     },
     {
       id: 'purchasing',
       path: '/admin/purchasing',
-      label: 'Mua Hàng (RFQ/PO)',
+      label: 'Mua Hàng',
       icon: <ShoppingCart size={18} />,
       visible: canRead('purchasing')
     },
     {
       id: 'quality-control',
       path: '/admin/quality-control',
-      label: 'Kiểm Định QA/QC',
+      label: 'Kiểm Định',
       icon: <ShieldAlert size={18} />,
       visible: canRead('quality-control')
     },
     {
       id: 'assembly',
       path: '/admin/assembly',
-      label: 'Lắp Ráp PC',
+      label: 'Lắp Ráp',
       icon: <Wrench size={18} />,
       visible: canRead('assembly')
     },
     {
       id: 'hr',
       path: '/admin/hr',
-      label: 'Nhân Sự (HRM)',
+      label: 'Nhân Sự',
       icon: <Users size={18} />,
       visible: canRead('hr')
     },
     {
       id: 'accounting',
       path: '/admin/accounting',
-      label: 'Kế Toán & Dòng Tiền',
+      label: 'Kế Toán',
       icon: <DollarSign size={18} />,
       visible: canRead('accounting')
     },
     {
       id: 'cskh',
       path: '/admin/cskh',
-      label: 'Chăm Sóc Khách Hàng',
+      label: 'CSKH',
       icon: <HeadphonesIcon size={18} />,
       visible: canRead('cskh')
     },
     {
       id: 'delivery',
       path: '/admin/delivery',
-      label: 'Giao Vận & Điều Phối',
+      label: 'Giao Vận',
       icon: <Truck size={18} />,
       visible: canRead('delivery')
-    },
-    {
-      id: 'system',
-      path: '/admin/system',
-      label: 'Hệ Thống & Phân Quyền',
-      icon: <Settings size={18} />,
-      visible: canRead('system') || isAdmin
     },
     {
       // Tự phục vụ cho mọi nhân viên: chấm công khuôn mặt, nghỉ phép, phiếu lương, hồ sơ.
       id: 'me',
       path: '/admin/me',
-      label: 'Thông Tin Cá Nhân',
+      label: 'Thông tin cá nhân',
       icon: <User size={18} />,
       visible: true
+    },
+    {
+      id: 'system',
+      path: '/admin/system',
+      label: 'Hệ Thống',
+      icon: <Settings size={18} />,
+      visible: canRead('system') || isAdmin
     }
   ];
 
