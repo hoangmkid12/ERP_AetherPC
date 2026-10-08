@@ -9,6 +9,7 @@ import { api } from '../../services/api';
 import { REGION_COORDS, detectDeliveryRegion, getAddressCoordinates } from '../../utils/deliveryRegions';
 import ReturnRequestModal from '../../components/ReturnRequestModal';
 import DeliveryMap from '../../components/DeliveryMap';
+import SepayPayment from '../../components/Storefront/SepayPayment';
 
 export default function MyOrders() {
   const orders = useSalesStore(state => state.orders) || [];
@@ -29,6 +30,8 @@ export default function MyOrders() {
   const [phoneQuery, setPhoneQuery] = useState('');
   const [searched, setSearched] = useState(false);
   const [selectedOrderId, setSelectedOrderId] = useState(null);
+  // Đơn vừa thanh toán SePay xong: giữ khung thanh toán để hiện "Thanh toán thành công" sau khi đơn rời trạng thái chờ
+  const [justPaidOrderId, setJustPaidOrderId] = useState(null);
   const [confirmingReceivedId, setConfirmingReceivedId] = useState(null);
 
   useEffect(() => {
@@ -1308,6 +1311,14 @@ export default function MyOrders() {
                           </div>
                         </div>
                       </div>
+
+                      {/* Thanh toán chuyển khoản SePay cho đơn đang chờ thanh toán */}
+                      {(selectedOrder.status === 'WAITING_PAYMENT' || justPaidOrderId === selectedOrder.orderId) && (selectedOrder.paymentMethod === 'BANK_TRANSFER' || selectedOrder.payment_method === 'BANK_TRANSFER') && (
+                        <div style={{ marginTop: '1.25rem', padding: '1.25rem', borderRadius: '14px', border: '1px solid #bfdbfe', backgroundColor: '#f8fbff' }}>
+                          <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', marginBottom: '0.9rem' }}>Thanh toán chuyển khoản</div>
+                          <SepayPayment orderId={selectedOrder.orderId || selectedOrder.id} compact onPaid={() => { setJustPaidOrderId(selectedOrder.orderId); if (typeof getOrders === 'function') getOrders().catch(() => { }); }} />
+                        </div>
+                      )}
 
                       {/* Minh Chứng Bàn Giao Hàng (Proof of Delivery - POD) */}
                       {Boolean(selectedOrder.proofPhoto || selectedOrder.proof_photo || selectedOrder.deliveryProofPhoto || ['SHIPPED', 'DELIVERED', 'COMPLETED', 'RETURNING_TO_WAREHOUSE', 'RETURN_REQUESTED'].includes(selectedOrder.status)) && (

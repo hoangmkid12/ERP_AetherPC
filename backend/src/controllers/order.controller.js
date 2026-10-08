@@ -71,6 +71,10 @@ const createOrder = async (req, res, next) => {
     const soldById = Number.isInteger(req.posEmployeeId) ? req.posEmployeeId : null;
     const posEmployeeRole = req.posEmployeeRole || null;
     const { items, paymentMethod, shippingAddress, shippingCity, notes } = req.body;
+    // Khách tự đặt ở storefront không được tự khai "đã chuyển khoản" — đơn chuyển khoản chỉ được
+    // xác nhận thanh toán khi webhook SePay báo tiền đã vào tài khoản (payment.controller.js).
+    // Cờ isPaid chỉ có hiệu lực với đơn POS, nơi nhân viên đã thu tiền tại quầy.
+    const isPaidAtCounter = !!posEmployeeRole && req.body.isPaid === true;
 
     if (!items || items.length === 0) {
       return res.status(400).json({ success: false, message: 'Giỏ hàng không được để trống' });
@@ -204,7 +208,7 @@ const createOrder = async (req, res, next) => {
 
       // Xác định trạng thái ban đầu dựa vào phương thức thanh toán & tồn kho
       let initialStatus = 'PENDING';
-      if (['BANK_TRANSFER', 'ONLINE_GATEWAY'].includes(paymentMethod) && req.body.isPaid !== true) {
+      if (['BANK_TRANSFER', 'ONLINE_GATEWAY'].includes(paymentMethod) && !isPaidAtCounter) {
         initialStatus = 'WAITING_PAYMENT';
       } else if (hasShortage) {
         initialStatus = 'AWAITING_STOCK';
@@ -221,7 +225,7 @@ const createOrder = async (req, res, next) => {
       // "Đang Giao" của Shipper sẽ hiển thị nhầm COD thành "Đã trả online".
       // Bán tại quầy (POS, khách WALK-IN) thì tiền đã thu ngay nên coi là PAID.
       const initialPaymentStatus = customerId === 'WALK-IN'
-        || (['BANK_TRANSFER', 'ONLINE_GATEWAY'].includes(paymentMethod) && req.body.isPaid === true)
+        || (['BANK_TRANSFER', 'ONLINE_GATEWAY'].includes(paymentMethod) && isPaidAtCounter)
         ? 'PAID'
         : 'PENDING';
 
