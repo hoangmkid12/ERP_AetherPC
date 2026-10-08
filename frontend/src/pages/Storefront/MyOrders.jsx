@@ -842,15 +842,15 @@ export default function MyOrders() {
     // Case 4: Trạng thái Đã Hủy Đơn (CANCELLED)
     if (status === 'CANCELLED') {
       return (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1.5rem', padding: '1rem 0' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-secondary)' }}>
-            <div style={{ width: '22px', height: '22px', borderRadius: '50%', backgroundColor: 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)', fontSize: '0.75rem' }}>✓</div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1.25rem', padding: '0.4rem 0' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', color: '#64748b', fontSize: '0.8rem', fontWeight: 600 }}>
+            <div style={{ width: '22px', height: '22px', borderRadius: '50%', backgroundColor: '#f1f5f9', border: '1.5px solid #cbd5e1', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', fontSize: '0.72rem', fontWeight: 800 }}>✓</div>
             <span>Đặt hàng</span>
           </div>
-          <div style={{ width: '80px', height: '2px', backgroundColor: '#ef4444' }} />
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#ef4444' }}>
-            <div style={{ width: '22px', height: '22px', borderRadius: '50%', backgroundColor: 'rgba(239,68,68,0.2)', border: '1.5px solid #ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ef4444', fontSize: '0.75rem', fontWeight: 'bold' }}>✕</div>
-            <strong style={{ fontSize: '0.85rem' }}>Đã hủy đơn</strong>
+          <div style={{ width: '60px', height: '2px', backgroundColor: '#fca5a5', borderRadius: '2px' }} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', color: '#ef4444', fontSize: '0.8rem', fontWeight: 750 }}>
+            <div style={{ width: '22px', height: '22px', borderRadius: '50%', backgroundColor: '#fee2e2', border: '1.5px solid #ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ef4444', fontSize: '0.72rem', fontWeight: 800 }}>✕</div>
+            <span>Đã hủy đơn</span>
           </div>
         </div>
       );
@@ -877,8 +877,8 @@ export default function MyOrders() {
     }
 
     return (
-      <div className="order-stepper-container">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative', width: '100%', minWidth: '400px', padding: '0.5rem 0' }}>
+      <div className="order-stepper-container" style={{ overflowX: 'auto', paddingBottom: '2px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative', width: '100%', minWidth: '320px', padding: '0.25rem 0' }}>
           {steps.map((stepName, idx) => {
             const isDone = idx < activeIdx || (idx === activeIdx && (status === 'DELIVERED' || status === 'COMPLETED'));
             const isActive = idx === activeIdx && !isDone;
@@ -888,17 +888,17 @@ export default function MyOrders() {
                 {idx > 0 && (
                   <div style={{
                     flex: 1,
-                    height: '2.5px',
+                    height: '2px',
                     backgroundColor: isLineActive ? '#2563eb' : '#e2e8f0',
                     margin: '0 0.25rem',
-                    marginBottom: '1.25rem',
+                    marginBottom: '1rem',
                     transition: 'all 0.3s ease'
                   }} />
                 )}
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: '55px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: '50px' }}>
                   <div style={{
-                    width: '30px',
-                    height: '30px',
+                    width: '26px',
+                    height: '26px',
                     borderRadius: '50%',
                     backgroundColor: isDone ? '#2563eb' : isActive ? '#eff6ff' : '#f8fafc',
                     border: isActive ? '2px solid #2563eb' : isDone ? '2px solid #2563eb' : '1px solid #cbd5e1',
@@ -906,17 +906,17 @@ export default function MyOrders() {
                     alignItems: 'center',
                     justifyContent: 'center',
                     color: isDone ? '#ffffff' : isActive ? '#2563eb' : '#64748b',
-                    fontSize: '0.75rem',
+                    fontSize: '0.72rem',
                     fontWeight: 800,
-                    boxShadow: isActive ? '0 0 10px rgba(37,99,235,0.3)' : 'none',
+                    boxShadow: isActive ? '0 0 8px rgba(37,99,235,0.25)' : 'none',
                     transition: 'all 0.3s ease'
                   }}>
                     {isDone ? '✓' : idx + 1}
                   </div>
                   <span style={{
-                    fontSize: '0.7rem',
+                    fontSize: '0.68rem',
                     color: isDone || isActive ? '#0f172a' : '#64748b',
-                    marginTop: '0.4rem',
+                    marginTop: '0.3rem',
                     textAlign: 'center',
                     fontWeight: isActive || isDone ? 750 : 500,
                     whiteSpace: 'nowrap'
@@ -1182,8 +1182,8 @@ export default function MyOrders() {
                         alignItems: 'center',
                         justifyContent: 'center',
                         gap: '0.4rem',
-                        transition: 'all 0.2s ease',
                         width: '100%',
+                        transition: 'all 0.2s ease',
                         boxShadow: '0 2px 6px rgba(37,99,235,0.06)'
                       }}
                     >
@@ -1212,7 +1212,7 @@ export default function MyOrders() {
 
           {/* Right Column: Detail Order Status */}
           {selectedOrder && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
               {/* Order Info */}
               <div className="card-glass" style={{ padding: '1.25rem 1.5rem' }}>
                 {(() => {
@@ -1232,7 +1232,7 @@ export default function MyOrders() {
                     <>
                       <div style={{
                         display: 'flex',
-                        justify: 'space-between',
+                        justifyContent: 'space-between',
                         borderBottom: hasItems ? '1px solid #e2e8f0' : 'none',
                         paddingBottom: hasItems ? '1rem' : 0,
                         marginBottom: hasItems ? '1rem' : 0,
@@ -1330,6 +1330,35 @@ export default function MyOrders() {
                           )}
                         </div>
                       </div>
+
+                      {/* Tiến Độ Đơn Hàng (Thu gọn tinh tế, nằm ngay trong khung chi tiết đơn hàng) */}
+                      {(() => {
+                        const isExcOrder = selectedOrder.type === 'EXCHANGE' || String(selectedOrder.orderId).startsWith('ORD-EXC-');
+                        const currentReturn = (returnRequests || []).find(r =>
+                          String(r.orderId) === String(selectedOrder.orderId) ||
+                          String(r.id) === String(selectedOrder.orderId) ||
+                          (selectedOrder.originalOrderId && String(r.orderId) === String(selectedOrder.originalOrderId)) ||
+                          (isExcOrder && String(selectedOrder.orderId).replace('ORD-EXC-', 'ORD-') === String(r.orderId)) ||
+                          (isExcOrder && String(selectedOrder.orderId).includes(String(r.orderId).replace('ORD-', '')))
+                        );
+                        return (
+                          <div style={{
+                            marginBottom: '1rem',
+                            padding: '0.75rem 1rem',
+                            backgroundColor: '#f8fafc',
+                            borderRadius: '12px',
+                            border: '1px solid #e2e8f0'
+                          }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.4rem', flexWrap: 'wrap', gap: '0.4rem' }}>
+                              <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#334155', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                <Clock size={15} color="#2563eb" />
+                                {isExcOrder ? 'Tiến Độ Giao Hàng Đổi Mới 1-1' : 'Tiến Độ Đơn Hàng'}
+                              </span>
+                            </div>
+                            {getStatusProgress(selectedOrder.status, currentReturn, selectedOrder)}
+                          </div>
+                        );
+                      })()}
 
                       {hasItems && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
@@ -2436,24 +2465,7 @@ export default function MyOrders() {
                 );
               })()}
 
-              {/* Order Status Progress Bar */}
-              <div className="card-glass" style={{ padding: '1.5rem' }}>
-                <h3 style={{ fontSize: '1.05rem', fontWeight: 800, marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#0f172a' }}>
-                  <Clock size={18} color="#2563eb" />
-                  {Boolean(selectedOrder.type === 'EXCHANGE' || String(selectedOrder.orderId).startsWith('ORD-EXC-')) ? 'Tiến Độ Giao Hàng Đổi Mới 1-1' : 'Tiến Độ Đơn Hàng'}
-                </h3>
-                {(() => {
-                  const isExcOrder = selectedOrder.type === 'EXCHANGE' || String(selectedOrder.orderId).startsWith('ORD-EXC-');
-                  const currentReturn = returnRequests.find(r =>
-                    String(r.orderId) === String(selectedOrder.orderId) ||
-                    String(r.id) === String(selectedOrder.orderId) ||
-                    (selectedOrder.originalOrderId && String(r.orderId) === String(selectedOrder.originalOrderId)) ||
-                    (isExcOrder && String(selectedOrder.orderId).replace('ORD-EXC-', 'ORD-') === String(r.orderId)) ||
-                    (isExcOrder && String(selectedOrder.orderId).includes(String(r.orderId).replace('ORD-', '')))
-                  );
-                  return getStatusProgress(selectedOrder.status, currentReturn, selectedOrder);
-                })()}
-              </div>
+
 
               {/* Theo Dõi Vị Trí Giao Hàng Trực Tiếp — chỉ hiện khi đơn đang được Shipper giao */}
               {selectedOrder.status === 'SHIPPED' && (
