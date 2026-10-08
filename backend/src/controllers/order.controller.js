@@ -336,9 +336,9 @@ const createOrder = async (req, res, next) => {
       return newOrder;
     }), req.body.orderId);
 
-    // Gửi email xác nhận đơn hàng cho khách hàng
+    // Gửi email xác nhận đơn hàng cho khách hàng (đơn thanh toán online chỉ gửi khi thanh toán thành công)
     const customer = await prisma.customer.findUnique({ where: { customerId: req.user.id } });
-    if (customer?.email) {
+    if (customer?.email && order.status !== 'WAITING_PAYMENT') {
       sendOrderConfirmationEmail({
         toEmail: customer.email,
         customerName: customer.name,
@@ -529,7 +529,15 @@ const getCustomerOrders = async (req, res, next) => {
               select: {
                 productId: true,
                 name: true,
-                price: true
+                price: true,
+                primaryImage: true,
+                category: {
+                  select: {
+                    id: true,
+                    name: true,
+                    slug: true
+                  }
+                }
               }
             }
           }
@@ -578,6 +586,12 @@ const getCustomerOrders = async (req, res, next) => {
         address: ord.shippingAddress,
         total: parseFloat(ord.totalAmount),
         date: dateFormatted,
+        items: (ord.items || []).map(it => ({
+          ...it,
+          image: it.product?.primaryImage || it.image || null,
+          primaryImage: it.product?.primaryImage || it.primaryImage || null,
+          category: it.product?.category?.name || it.category || null
+        })),
         ...(openJobByOrder.has(ord.orderId) ? {
           assemblyPending: true,
           assemblyJobCode: openJobByOrder.get(ord.orderId).jobCode,
@@ -1991,7 +2005,23 @@ const updateOrderDetails = async (req, res, next) => {
         shippingAddress: shippingAddress || order.shippingAddress,
         notes: notes !== undefined ? notes : order.notes
       },
-      include: { customer: true, items: true, statusHistory: { orderBy: { timestamp: 'desc' } } }
+      include: {
+        customer: true,
+        items: {
+          include: {
+            product: {
+              select: {
+                productId: true,
+                name: true,
+                price: true,
+                primaryImage: true,
+                category: { select: { id: true, name: true, slug: true } }
+              }
+            }
+          }
+        },
+        statusHistory: { orderBy: { timestamp: 'desc' } }
+      }
     });
 
     await prisma.orderStatusHistory.create({

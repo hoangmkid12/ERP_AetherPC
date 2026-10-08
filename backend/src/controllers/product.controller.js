@@ -428,7 +428,10 @@ const slugifyHandle = (text) => (text || '')
 
 const createProduct = async (req, res, next) => {
   try {
-    const { name, category, brand, stockQuantity, threshold, price, sku, description, descriptionText, available, supplierCode } = req.body;
+    const {
+      name, category, brand, stockQuantity, threshold, price, originalPrice, sku,
+      description, descriptionText, available, supplierCode, warranty, specs, imageUrl, galleryUrls
+    } = req.body;
     if (!name) return res.status(400).json({ success: false, message: 'Tên sản phẩm là bắt buộc' });
 
     if (supplierCode !== undefined && supplierCode !== null && String(supplierCode).trim() !== '') {
@@ -438,9 +441,7 @@ const createProduct = async (req, res, next) => {
       }
     }
 
-    // Resolve to the real seeded Category (see PRODUCT_CODE_TO_CATEGORY_SLUG above) —
-    // only fall back to creating a brand-new category when the code isn't one of Kho's
-    // known ones, same "find or create" safety net as before for that edge case.
+    // Resolve category
     const categorySlug = PRODUCT_CODE_TO_CATEGORY_SLUG[(category || '').toUpperCase()] || (category || 'other').toLowerCase();
     let categoryRecord = await prisma.category.findFirst({ where: { slug: categorySlug } });
     if (!categoryRecord) {
@@ -459,19 +460,84 @@ const createProduct = async (req, res, next) => {
     const productId = `PROD-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
     const handle = `${slugifyHandle(name)}-${Date.now()}`;
     const qty = parseInt(stockQuantity, 10) || 0;
-    const coverFile = req.files?.image?.[0];
-    const galleryFiles = req.files?.images || [];
 
-    // Also create the matching Inventory row (default warehouse 1, same fallback
-    // adjustInventory already uses) in the same transaction — without this, a brand-new
-    // Product has zero Inventory rows and would be invisible in Kho's own product table
-    // (GET /warehouse/inventory joins off Inventory, not Product), i.e. the very screen
-    // this was just added from. locationId is left null, same as adjustInventory today —
-    // structured zone/shelf/bin assignment isn't wired up anywhere yet.
-    // `images` (ProductImage rows) never include the cover shot — Product.primaryImage
-    // already carries it, and ProductDetail.jsx:280-281 separately prepends
-    // product.image ahead of imageUrls, so duplicating it into ProductImage would show
-    // the cover photo twice in the storefront gallery.
+    const numPrice = parseFloat(price) || 0;
+    const numOrigPrice = (originalPrice !== undefined && originalPrice !== '' && !isNaN(parseFloat(originalPrice)))
+      ? parseFloat(originalPrice)
+      : numPrice;
+    let discountPercent = 0;
+    if (numOrigPrice > numPrice && numOrigPrice > 0) {
+      discountPercent = Math.round(((numOrigPrice - numPrice) / numOrigPrice) * 100);
+    }
+
+    let parsedSpecs = {};
+    if (specs) {
+      if (typeof specs === 'string') {
+        try { parsedSpecs = JSON.parse(specs); } catch (_) { parsedSpecs = {}; }
+      } else if (typeof specs === 'object' && specs !== null) {
+        parsedSpecs = specs;
+      }
+    }
+    const warrantyStr = warranty ? String(warranty).trim() : '36 tháng';
+    if (!parsedSpecs['Bảo hành'] && !parsedSpecs['bảo_hành'] && warrantyStr) {
+      parsedSpecs['Bảo hành'] = warrantyStr;
+    }
+
+    const coverFile = req.files?.image?.[0];
+    const directCover = (imageUrl || req.body?.primaryImage) ? String(imageUrl || req.body?.primaryImage).trim() : null;
+    let resolvedCover = directCover;
+    if (coverFile) {
+      if (coverFile.buffer) {
+        const blob = await prisma.productImageBlob.create({
+          data: {
+            filename: String(coverFile.originalname || 'cover.jpg').slice(0, 255),
+            mimeType: coverFile.mimetype || 'image/jpeg',
+            size: coverFile.size || coverFile.buffer.length,
+            data: coverFile.buffer
+          }
+        });
+        resolvedCover = `/api/v1/products/blobs/${blob.id}`;
+      } else if (coverFile.filename) {
+        resolvedCover = `/api/uploads/products/${coverFile.filename}`;
+      }
+    }
+
+    const galleryFiles = req.files?.images || [];
+    let parsedGalleryUrls = [];
+    if (Array.isArray(galleryUrls)) {
+      parsedGalleryUrls = galleryUrls.map(u => String(u).trim()).filter(Boolean);
+    } else if (typeof galleryUrls === 'string' && galleryUrls.trim()) {
+      try {
+        const arr = JSON.parse(galleryUrls);
+        if (Array.isArray(arr)) parsedGalleryUrls = arr.map(u => String(u).trim()).filter(Boolean);
+        else parsedGalleryUrls = galleryUrls.split(',').map(u => u.trim()).filter(Boolean);
+      } catch (_) {
+        parsedGalleryUrls = galleryUrls.split(',').map(u => u.trim()).filter(Boolean);
+      }
+    }
+
+    const savedGalleryUrls = [];
+    for (const file of galleryFiles) {
+      if (file.buffer) {
+        const blob = await prisma.productImageBlob.create({
+          data: {
+            filename: String(file.originalname || 'gallery.jpg').slice(0, 255),
+            mimeType: file.mimetype || 'image/jpeg',
+            size: file.size || file.buffer.length,
+            data: file.buffer
+          }
+        });
+        savedGalleryUrls.push(`/api/v1/products/blobs/${blob.id}`);
+      } else if (file.filename) {
+        savedGalleryUrls.push(`/api/uploads/products/${file.filename}`);
+      }
+    }
+
+    const allGalleryItems = [
+      ...savedGalleryUrls,
+      ...parsedGalleryUrls
+    ];
+
     const [createdProduct] = await prisma.$transaction([
       prisma.product.create({
         data: {
@@ -481,15 +547,18 @@ const createProduct = async (req, res, next) => {
           name,
           categoryId: categoryRecord.id,
           brandId: brandRecord.id,
-          price: parseFloat(price) || 0,
-          originalPrice: parseFloat(price) || 0,
+          price: numPrice,
+          originalPrice: numOrigPrice,
+          discountPercent,
+          warranty: warrantyStr,
+          specs: parsedSpecs,
           stockQuantity: qty,
           descriptionText: descriptionText || description || '',
           available: available !== undefined ? parseBoolField(available) : true,
-          ...(coverFile && { primaryImage: `/api/uploads/products/${coverFile.filename}` }),
+          ...(resolvedCover && { primaryImage: resolvedCover }),
           ...(supplierCode !== undefined && String(supplierCode).trim() !== '' && { defaultSupplierCode: String(supplierCode).trim() })
         },
-        include: { category: true, defaultSupplier: { select: { code: true, name: true } }, images: { orderBy: { sortOrder: 'asc' } } }
+        include: { category: true, brand: true, defaultSupplier: { select: { code: true, name: true } }, images: { orderBy: { sortOrder: 'asc' } } }
       }),
       prisma.inventory.create({
         data: {
@@ -499,23 +568,19 @@ const createProduct = async (req, res, next) => {
           reorderPoint: parseInt(threshold, 10) || 5
         }
       }),
-      ...(galleryFiles.length > 0 ? [prisma.productImage.createMany({
-        data: galleryFiles.map((file, idx) => ({
+      ...(allGalleryItems.length > 0 ? [prisma.productImage.createMany({
+        data: allGalleryItems.map((url, idx) => ({
           productId,
-          url: `/api/uploads/products/${file.filename}`,
+          url,
           sortOrder: idx
         }))
       })] : [])
     ]);
 
-    // createdProduct.images is always [] here — the ProductImage rows above are
-    // inserted as a LATER step in the same transaction array, so the `images` include
-    // captured on product.create() ran before they existed. Re-fetch once the
-    // transaction has committed so the response actually reflects the saved gallery.
-    const newProduct = galleryFiles.length > 0
+    const newProduct = allGalleryItems.length > 0
       ? await prisma.product.findUnique({
           where: { productId },
-          include: { category: true, defaultSupplier: { select: { code: true, name: true } }, images: { orderBy: { sortOrder: 'asc' } } }
+          include: { category: true, brand: true, defaultSupplier: { select: { code: true, name: true } }, images: { orderBy: { sortOrder: 'asc' } } }
         })
       : createdProduct;
 
@@ -528,14 +593,19 @@ const createProduct = async (req, res, next) => {
 const updateProduct = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { name, price, stockQuantity, stock, available, description, descriptionText, supplierCode } = req.body;
+    const {
+      name, category, brand, price, originalPrice, stockQuantity, stock, available,
+      description, descriptionText, supplierCode, warranty, specs, imageUrl, galleryUrls
+    } = req.body;
 
     const qty = stockQuantity !== undefined ? parseInt(stockQuantity, 10) : (stock !== undefined ? parseInt(stock, 10) : undefined);
-    const targetPrice = price !== undefined ? parseFloat(price) : undefined;
+    const targetPrice = price !== undefined && price !== '' ? parseFloat(price) : undefined;
+    const targetOrigPrice = originalPrice !== undefined && originalPrice !== '' && !isNaN(parseFloat(originalPrice))
+      ? parseFloat(originalPrice)
+      : undefined;
     const targetDesc = description || descriptionText;
 
     const strId = String(id);
-    // Find product by productId or sku
     let target = await prisma.product.findUnique({ where: { productId: strId } });
     if (!target) {
       target = await prisma.product.findFirst({
@@ -553,10 +623,6 @@ const updateProduct = async (req, res, next) => {
       return res.status(404).json({ success: false, message: `Không tìm thấy sản phẩm với ID ${id} trong CSDL` });
     }
 
-    // Kho's product-edit form assigns the manufacturer/distributor via this field —
-    // validate against the real Supplier table so a stale/mistyped code can't silently
-    // stick a product with a NCC that doesn't exist (findFirst below returns
-    // undefined -> "Chưa rõ" everywhere the code is displayed).
     if (supplierCode !== undefined && supplierCode !== null && String(supplierCode).trim() !== '') {
       const supplierExists = await prisma.supplier.findUnique({ where: { code: String(supplierCode).trim() } });
       if (!supplierExists) {
@@ -564,25 +630,132 @@ const updateProduct = async (req, res, next) => {
       }
     }
 
-    const coverFile = req.files?.image?.[0];
-    const galleryFiles = req.files?.images || [];
+    // Resolve brand if specified
+    let brandIdToSet = undefined;
+    if (brand && String(brand).trim()) {
+      const brandName = String(brand).trim();
+      let brandRecord = await prisma.brand.findFirst({ where: { name: brandName } });
+      if (!brandRecord) {
+        brandRecord = await prisma.brand.create({ data: { name: brandName } });
+      }
+      brandIdToSet = brandRecord.id;
+    }
 
-    // Sửa số lượng tồn ở form sản phẩm phải đi kèm thay đổi bằng nhau trên tồn kho vật lý
-    // (trang Kho đọc bảng inventory) — trước đây chỉ ghi Product.stockQuantity nên hai trang lệch nhau.
+    // Resolve category if specified
+    let categoryIdToSet = undefined;
+    if (category && String(category).trim()) {
+      const categorySlug = PRODUCT_CODE_TO_CATEGORY_SLUG[(category || '').toUpperCase()] || (category || 'other').toLowerCase();
+      let categoryRecord = await prisma.category.findFirst({ where: { slug: categorySlug } });
+      if (!categoryRecord) {
+        categoryRecord = await prisma.category.create({
+          data: { name: category || 'OTHER', slug: categorySlug }
+        });
+      }
+      categoryIdToSet = categoryRecord.id;
+    }
+
+    // Calculate discountPercent
+    let calculatedDiscount = undefined;
+    const effectivePrice = targetPrice !== undefined ? targetPrice : parseFloat(target.price);
+    const effectiveOrigPrice = targetOrigPrice !== undefined ? targetOrigPrice : parseFloat(target.originalPrice || target.price);
+    if (effectiveOrigPrice > effectivePrice && effectiveOrigPrice > 0) {
+      calculatedDiscount = Math.round(((effectiveOrigPrice - effectivePrice) / effectiveOrigPrice) * 100);
+    } else if (effectiveOrigPrice <= effectivePrice) {
+      calculatedDiscount = 0;
+    }
+
+    // Parse specs & warranty
+    let parsedSpecs = undefined;
+    if (specs !== undefined) {
+      if (typeof specs === 'string') {
+        try { parsedSpecs = JSON.parse(specs); } catch (_) { parsedSpecs = {}; }
+      } else if (typeof specs === 'object' && specs !== null) {
+        parsedSpecs = specs;
+      }
+    }
+    const targetWarranty = warranty !== undefined ? String(warranty).trim() : undefined;
+    if (parsedSpecs && targetWarranty && !parsedSpecs['Bảo hành'] && !parsedSpecs['bảo_hành']) {
+      parsedSpecs['Bảo hành'] = targetWarranty;
+    }
+
+    // Cover image
+    const coverFile = req.files?.image?.[0];
+    const directCover = (imageUrl || req.body?.primaryImage) ? String(imageUrl || req.body?.primaryImage).trim() : undefined;
+    let resolvedCover = directCover;
+    if (coverFile) {
+      if (coverFile.buffer) {
+        const blob = await prisma.productImageBlob.create({
+          data: {
+            filename: String(coverFile.originalname || 'cover.jpg').slice(0, 255),
+            mimeType: coverFile.mimetype || 'image/jpeg',
+            size: coverFile.size || coverFile.buffer.length,
+            data: coverFile.buffer
+          }
+        });
+        resolvedCover = `/api/v1/products/blobs/${blob.id}`;
+      } else if (coverFile.filename) {
+        resolvedCover = `/api/uploads/products/${coverFile.filename}`;
+      }
+    }
+
+    // Gallery images
+    const galleryFiles = req.files?.images || [];
+    let parsedGalleryUrls = [];
+    if (Array.isArray(galleryUrls)) {
+      parsedGalleryUrls = galleryUrls.map(u => String(u).trim()).filter(Boolean);
+    } else if (typeof galleryUrls === 'string' && galleryUrls.trim()) {
+      try {
+        const arr = JSON.parse(galleryUrls);
+        if (Array.isArray(arr)) parsedGalleryUrls = arr.map(u => String(u).trim()).filter(Boolean);
+        else parsedGalleryUrls = galleryUrls.split(',').map(u => u.trim()).filter(Boolean);
+      } catch (_) {
+        parsedGalleryUrls = galleryUrls.split(',').map(u => u.trim()).filter(Boolean);
+      }
+    }
+
+    const savedNewGalleryUrls = [];
+    for (const file of galleryFiles) {
+      if (file.buffer) {
+        const blob = await prisma.productImageBlob.create({
+          data: {
+            filename: String(file.originalname || 'gallery.jpg').slice(0, 255),
+            mimeType: file.mimetype || 'image/jpeg',
+            size: file.size || file.buffer.length,
+            data: file.buffer
+          }
+        });
+        savedNewGalleryUrls.push(`/api/v1/products/blobs/${blob.id}`);
+      } else if (file.filename) {
+        savedNewGalleryUrls.push(`/api/uploads/products/${file.filename}`);
+      }
+    }
+
+    const allNewGalleryItems = [
+      ...savedNewGalleryUrls,
+      ...parsedGalleryUrls
+    ];
+
     const updated = await prisma.$transaction(async (tx) => {
       const u = await tx.product.update({
         where: { productId: target.productId },
         data: {
           ...(name && { name }),
+          ...(categoryIdToSet && { categoryId: categoryIdToSet }),
+          ...(brandIdToSet && { brandId: brandIdToSet }),
           ...(targetPrice !== undefined && !isNaN(targetPrice) && { price: targetPrice }),
+          ...(targetOrigPrice !== undefined && !isNaN(targetOrigPrice) && { originalPrice: targetOrigPrice }),
+          ...(calculatedDiscount !== undefined && { discountPercent: calculatedDiscount }),
+          ...(targetWarranty !== undefined && { warranty: targetWarranty }),
+          ...(parsedSpecs !== undefined && { specs: parsedSpecs }),
           ...(qty !== undefined && !isNaN(qty) && { stockQuantity: qty }),
           ...(available !== undefined && { available: parseBoolField(available) }),
-          ...(targetDesc && { descriptionText: targetDesc }),
-          ...(coverFile && { primaryImage: `/api/uploads/products/${coverFile.filename}` }),
+          ...(targetDesc !== undefined && { descriptionText: targetDesc }),
+          ...(resolvedCover && { primaryImage: resolvedCover }),
           ...(supplierCode !== undefined && String(supplierCode).trim() !== '' && { defaultSupplierCode: String(supplierCode).trim() })
         },
-        include: { defaultSupplier: { select: { code: true, name: true } } }
+        include: { category: true, brand: true, defaultSupplier: { select: { code: true, name: true } }, images: { orderBy: { sortOrder: 'asc' } } }
       });
+
       if (qty !== undefined && !isNaN(qty) && qty !== target.stockQuantity) {
         const delta = qty - target.stockQuantity;
         const opts = {
@@ -596,38 +769,27 @@ const updateProduct = async (req, res, next) => {
       return u;
     });
 
-    // Best-effort cleanup of the replaced cover photo — only ever a file this endpoint
-    // itself saved (local /api/uploads/products/... path), never one of the scraper's
-    // external hstatic.net URLs, and never allowed to fail the request if it can't be removed.
     if (coverFile && target.primaryImage && target.primaryImage.startsWith('/api/uploads/products/')) {
       const oldFilePath = path.join(UPLOAD_DIR, path.basename(target.primaryImage));
       fs.unlink(oldFilePath, () => {});
     }
 
-    // New gallery photos are appended after whatever's already saved — deleting an
-    // existing gallery photo is a separate action (DELETE .../images/:imageId below),
-    // this endpoint never removes ProductImage rows on its own.
-    if (galleryFiles.length > 0) {
-      // Deleting a gallery photo (DELETE .../images/:imageId) leaves a gap in sortOrder
-      // rather than renumbering the rest — using count() here would collide with
-      // whatever sortOrder value survived the gap (e.g. delete #1 of [0,1,2], count()
-      // says 2, next new photo gets sortOrder 2 too, same as the surviving photo).
-      // max()+1 always lands strictly after every remaining photo.
+    if (allNewGalleryItems.length > 0) {
       const { _max } = await prisma.productImage.aggregate({ where: { productId: target.productId }, _max: { sortOrder: true } });
       const nextSortOrder = (_max.sortOrder ?? -1) + 1;
       await prisma.productImage.createMany({
-        data: galleryFiles.map((file, idx) => ({
+        data: allNewGalleryItems.map((url, idx) => ({
           productId: target.productId,
-          url: `/api/uploads/products/${file.filename}`,
+          url,
           sortOrder: nextSortOrder + idx
         }))
       });
     }
 
-    const responseProduct = galleryFiles.length > 0
+    const responseProduct = allNewGalleryItems.length > 0
       ? await prisma.product.findUnique({
           where: { productId: target.productId },
-          include: { defaultSupplier: { select: { code: true, name: true } }, images: { orderBy: { sortOrder: 'asc' } } }
+          include: { category: true, brand: true, defaultSupplier: { select: { code: true, name: true } }, images: { orderBy: { sortOrder: 'asc' } } }
         })
       : updated;
 
@@ -690,6 +852,14 @@ const deleteProductImage = async (req, res, next) => {
     if (image.url && image.url.startsWith('/api/uploads/products/')) {
       fs.unlink(path.join(UPLOAD_DIR, path.basename(image.url)), () => {});
     }
+    if (image.url && image.url.includes('/api/v1/products/blobs/')) {
+      const match = image.url.match(/\/api\/v1\/products\/blobs\/(\d+)/);
+      if (match && match[1]) {
+        try {
+          await prisma.productImageBlob.delete({ where: { id: parseInt(match[1], 10) } });
+        } catch (_) {}
+      }
+    }
 
     res.json({ success: true, message: 'Đã xoá ảnh.' });
   } catch (err) {
@@ -710,4 +880,30 @@ const deleteProduct = async (req, res, next) => {
   }
 };
 
-Object.assign(module.exports, { createProduct, updateProduct, updateProductVisibility, deleteProductImage, deleteProduct });
+// GET /api/v1/products/blobs/:id
+// Phục vụ dữ liệu ảnh trực tiếp từ CSDL PostgreSQL (bảng product_image_blobs)
+// Đảm bảo không bao giờ bị mất hoặc 404 khi container khởi động lại
+const getProductImageBlob = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (!id || isNaN(id)) {
+      return res.status(404).json({ success: false, message: 'Ảnh không tồn tại' });
+    }
+    const blob = await prisma.productImageBlob.findUnique({
+      where: { id }
+    });
+    if (!blob || !blob.data) {
+      return res.status(404).json({ success: false, message: 'Ảnh không tồn tại' });
+    }
+    res.setHeader('Content-Type', blob.mimeType || 'image/jpeg');
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    res.setHeader('Content-Length', blob.size || blob.data.length);
+    res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(blob.filename || 'image.jpg')}"`);
+    return res.end(blob.data);
+  } catch (err) {
+    console.error('Lỗi khi tải ảnh từ CSDL:', err);
+    return res.status(500).json({ success: false, message: 'Lỗi khi tải ảnh từ CSDL' });
+  }
+};
+
+Object.assign(module.exports, { createProduct, updateProduct, updateProductVisibility, deleteProductImage, deleteProduct, getProductImageBlob });

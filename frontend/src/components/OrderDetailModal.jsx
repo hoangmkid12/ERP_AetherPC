@@ -389,6 +389,7 @@ export default function OrderDetailModal({ order, onClose }) {
                       const qty = it.quantity || 1;
                       const price = it.price || 0;
                       const total = it.totalPrice || (price * qty);
+                      const itImage = it.image || it.primaryImage || it.product?.primaryImage || it.product?.image || it.product?.imageUrl || it.imageUrl;
                       return (
                         <tr 
                           key={idx} 
@@ -401,10 +402,21 @@ export default function OrderDetailModal({ order, onClose }) {
                           onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#ffffff'}
                         >
                           <td style={{ padding: '0.85rem 1rem', color: '#0f172a' }}>
-                            <div style={{ fontWeight: 700, fontSize: '0.875rem', lineHeight: '1.4', color: '#0f172a' }}>
-                              {it.name || it.productName || `Mã sản phẩm #${it.productId}`}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                              <div style={{ width: '42px', height: '42px', borderRadius: '8px', overflow: 'hidden', backgroundColor: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, border: '1px solid #e2e8f0', padding: '2px' }}>
+                                {itImage ? (
+                                  <img src={itImage} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                                ) : (
+                                  <Package size={20} color="#94a3b8" />
+                                )}
+                              </div>
+                              <div>
+                                <div style={{ fontWeight: 700, fontSize: '0.875rem', lineHeight: '1.4', color: '#0f172a' }}>
+                                  {it.name || it.productName || `Mã sản phẩm #${it.productId}`}
+                                </div>
+                                {it.sku && <span style={{ fontSize: '0.77rem', color: '#64748b', backgroundColor: '#f1f5f9', padding: '1px 6px', borderRadius: '4px', marginTop: '3px', display: 'inline-block' }}>SKU: {it.sku}</span>}
+                              </div>
                             </div>
-                            {it.sku && <span style={{ fontSize: '0.77rem', color: '#64748b', backgroundColor: '#f1f5f9', padding: '1px 6px', borderRadius: '4px', marginTop: '3px', display: 'inline-block' }}>SKU: {it.sku}</span>}
                           </td>
                           <td style={{ padding: '0.85rem 0.5rem', textAlign: 'center', fontWeight: 800, color: '#334155' }}>
                             <span style={{ backgroundColor: '#f1f5f9', padding: '3px 8px', borderRadius: '12px', fontSize: '0.8rem' }}>x{qty}</span>
