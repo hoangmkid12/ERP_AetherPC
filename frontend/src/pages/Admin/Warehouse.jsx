@@ -14,6 +14,7 @@ import PackAndScanModal from '../../components/PackAndScanModal';
 import OrderDetailModal from '../../components/OrderDetailModal';
 import { printDocument } from '../../utils/printDocument';
 import { numberToVietnameseWords } from '../../utils/numberToWords';
+import { SignatureRow, SignatureCell, displaySigner, historySigner } from '../../components/Signature/ESignature';
 
 // Nút hành động dùng chung cho bảng "Hoạt Động / Lệnh Giao Hàng" — style cố định
 // để các nút cùng loại (vd "Xem Gói Hàng") luôn thẳng hàng nhau giữa các dòng.
@@ -22,7 +23,7 @@ const ACTION_BTN_BASE = {
   border: 'none',
   borderRadius: '5px',
   padding: '0.32rem 0.5rem',
-  fontSize: '0.72rem',
+  fontSize: '0.77rem',
   cursor: 'pointer',
   whiteSpace: 'nowrap',
   overflow: 'hidden',
@@ -34,7 +35,7 @@ const ACTION_BTN_BASE = {
   boxSizing: 'border-box'
 };
 const ACTION_BTN_PRIMARY = { ...ACTION_BTN_BASE, backgroundColor: '#2563eb', color: '#ffffff', fontWeight: 700 };
-const ACTION_BTN_SECONDARY = { ...ACTION_BTN_BASE, backgroundColor: '#ffffff', color: '#475569', border: '1px solid #cbd5e1', fontWeight: 600 };
+const ACTION_BTN_SECONDARY = { ...ACTION_BTN_BASE, backgroundColor: '#ffffff', color: '#475569', border: '1px solid #e3e8ef', fontWeight: 600 };
 const ACTION_BTN_WARNING = { ...ACTION_BTN_BASE, backgroundColor: '#fff7ed', color: '#c2410c', border: '1px solid #fdba74', fontWeight: 700 };
 const ACTION_BADGE_BASE = {
   width: '100%',
@@ -125,7 +126,7 @@ const ProductGalleryField = ({ coverFile, coverUrl, onCoverSelect, existingImage
             style={{
               display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
               width: GALLERY_THUMB_SIZE, height: GALLERY_THUMB_SIZE, borderRadius: '8px', cursor: 'pointer', overflow: 'hidden',
-              border: coverPreview ? '1px solid #cbd5e1' : '2px dashed #cbd5e1',
+              border: coverPreview ? '1px solid #e3e8ef' : '2px dashed #cbd5e1',
               backgroundColor: coverPreview ? 'transparent' : '#f8fafc'
             }}
           >
@@ -134,12 +135,12 @@ const ProductGalleryField = ({ coverFile, coverUrl, onCoverSelect, existingImage
             ) : (
               <>
                 <Image size={20} style={{ color: '#94a3b8' }} />
-                <span style={{ fontSize: '0.65rem', color: '#94a3b8', marginTop: '0.25rem', textAlign: 'center', padding: '0 0.3rem' }}>Chọn ảnh</span>
+                <span style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '0.25rem', textAlign: 'center', padding: '0 0.3rem' }}>Chọn ảnh</span>
               </>
             )}
           </label>
           <input id="product-cover-input" type="file" accept="image/jpeg,image/png,image/webp,image/gif" onChange={(e) => onCoverSelect(e.target.files?.[0] || null)} style={{ display: 'none' }} />
-          <div style={{ fontSize: '0.68rem', fontWeight: 600, color: '#64748b', textAlign: 'center', marginTop: '0.4rem' }}>Ảnh Bìa</div>
+          <div style={{ fontSize: '0.74rem', fontWeight: 600, color: '#64748b', textAlign: 'center', marginTop: '0.4rem' }}>Ảnh Bìa</div>
         </div>
 
         {/* Divider between cover and gallery — makes the "one main photo, several extra
@@ -151,7 +152,7 @@ const ProductGalleryField = ({ coverFile, coverUrl, onCoverSelect, existingImage
           <div style={{ display: 'flex', gap: '0.6rem', overflowX: 'auto', padding: '7px 7px 0.3rem 2px', margin: '-7px -7px 0 -2px' }}>
             {(existingImages || []).map(img => (
               <div key={img.id} style={thumbWrapStyle}>
-                <img src={img.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '6px', border: '1px solid #cbd5e1' }} />
+                <img src={img.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '6px', border: '1px solid #e3e8ef' }} />
                 <button
                   type="button"
                   disabled={deletingImageId === img.id}
@@ -192,7 +193,7 @@ const ProductGalleryField = ({ coverFile, coverUrl, onCoverSelect, existingImage
             onChange={(e) => { if (e.target.files?.length) onAddFiles(e.target.files); e.target.value = ''; }}
             style={{ display: 'none' }}
           />
-          <div style={{ fontSize: '0.68rem', fontWeight: 600, color: '#64748b', marginTop: '0.4rem' }}>Ảnh Phụ ({totalGalleryCount}/{MAX_GALLERY_IMAGES})</div>
+          <div style={{ fontSize: '0.74rem', fontWeight: 600, color: '#64748b', marginTop: '0.4rem' }}>Ảnh Phụ ({totalGalleryCount}/{MAX_GALLERY_IMAGES})</div>
         </div>
       </div>
     </div>
@@ -321,7 +322,7 @@ function LocationProductsModal({ location, onClose, safeFormatPrice, activeInven
         width: '100%',
         maxHeight: '90vh',
         boxShadow: '0 20px 45px rgba(0, 0, 0, 0.25)',
-        border: '1px solid #cbd5e1',
+        border: '1px solid #e3e8ef',
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden'
@@ -363,7 +364,7 @@ function LocationProductsModal({ location, onClose, safeFormatPrice, activeInven
             onClick={onClose}
             style={{
               backgroundColor: '#ffffff',
-              border: '1px solid #cbd5e1',
+              border: '1px solid #e3e8ef',
               borderRadius: '6px',
               padding: '0.35rem 0.75rem',
               fontSize: '0.8rem',
@@ -387,7 +388,7 @@ function LocationProductsModal({ location, onClose, safeFormatPrice, activeInven
               flex: 1,
               padding: '0.5rem 0.85rem',
               fontSize: '0.83rem',
-              border: '1px solid #cbd5e1',
+              border: '1px solid #e3e8ef',
               borderRadius: '6px'
             }}
           />
@@ -440,7 +441,7 @@ function LocationProductsModal({ location, onClose, safeFormatPrice, activeInven
                       <span style={{
                         padding: '2px 7px',
                         borderRadius: '4px',
-                        fontSize: '0.72rem',
+                        fontSize: '0.77rem',
                         fontWeight: 600,
                         backgroundColor: '#f1f5f9',
                         color: '#475569'
@@ -517,7 +518,7 @@ function MovementDetailModal({ movement, onClose, formatDateTime }) {
         maxWidth: '560px',
         width: '100%',
         boxShadow: '0 20px 40px rgba(0, 0, 0, 0.2)',
-        border: '1px solid #cbd5e1',
+        border: '1px solid #e3e8ef',
         overflow: 'hidden'
       }}>
         {/* Header */}
@@ -537,7 +538,7 @@ function MovementDetailModal({ movement, onClose, formatDateTime }) {
           </div>
           <button
             onClick={onClose}
-            style={{ background: 'none', border: '1px solid #cbd5e1', borderRadius: '4px', padding: '0.2rem 0.5rem', cursor: 'pointer', color: '#475569' }}
+            style={{ background: 'none', border: '1px solid #e3e8ef', borderRadius: '4px', padding: '0.2rem 0.5rem', cursor: 'pointer', color: '#475569' }}
           >
             Đóng
           </button>
@@ -630,7 +631,7 @@ function RfqAlertHistoryModal({ show, onClose, logs, formatDateTime }) {
         width: '100%',
         maxHeight: '90vh',
         boxShadow: '0 20px 40px rgba(0, 0, 0, 0.2)',
-        border: '1px solid #cbd5e1',
+        border: '1px solid #e3e8ef',
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden'
@@ -653,7 +654,7 @@ function RfqAlertHistoryModal({ show, onClose, logs, formatDateTime }) {
           <button
             onClick={onClose}
             style={{
-              background: 'none', border: '1px solid #cbd5e1', borderRadius: '4px',
+              background: 'none', border: '1px solid #e3e8ef', borderRadius: '4px',
               padding: '0.3rem 0.6rem', fontSize: '0.85rem', cursor: 'pointer', color: '#475569'
             }}
           >
@@ -669,7 +670,7 @@ function RfqAlertHistoryModal({ show, onClose, logs, formatDateTime }) {
             placeholder="Tìm theo tên linh kiện, nhà cung cấp, lý do cảnh báo..."
             style={{
               width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.82rem',
-              backgroundColor: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '6px', color: '#0f172a'
+              backgroundColor: '#f8fafc', border: '1px solid #e3e8ef', borderRadius: '6px', color: '#0f172a'
             }}
             value={historySearch}
             onChange={(e) => setHistorySearch(e.target.value)}
@@ -701,11 +702,11 @@ function RfqAlertHistoryModal({ show, onClose, logs, formatDateTime }) {
                     </td>
                     <td style={{ padding: '0.75rem 0.5rem' }}>
                       <strong style={{ color: '#0f172a', display: 'block' }}>{log.productName}</strong>
-                      <span style={{ fontSize: '0.72rem', color: '#64748b' }}>Mã #{log.productId} | NCC: {log.supplier}</span>
+                      <span style={{ fontSize: '0.77rem', color: '#64748b' }}>Mã #{log.productId} | NCC: {log.supplier}</span>
                     </td>
                     <td style={{ padding: '0.75rem 0.5rem', textAlign: 'center' }}>
                       <span style={{
-                        padding: '2px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 700,
+                        padding: '2px 8px', borderRadius: '4px', fontSize: '0.8rem', fontWeight: 700,
                         backgroundColor: Number(log.currentStock) === 0 ? '#ffe4e6' : '#fef3c7',
                         color: Number(log.currentStock) === 0 ? '#e11d48' : '#d97706'
                       }}>
@@ -717,7 +718,7 @@ function RfqAlertHistoryModal({ show, onClose, logs, formatDateTime }) {
                     </td>
                     <td style={{ padding: '0.75rem 0.5rem', color: '#334155' }}>
                       <div style={{ fontSize: '0.78rem', marginBottom: '2px' }}>{log.reason}</div>
-                      <span style={{ fontSize: '0.7rem', color: '#64748b' }}>Bởi: {log.sender}</span>
+                      <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Bởi: {log.sender}</span>
                     </td>
                   </tr>
                 ))}
@@ -738,7 +739,7 @@ function RfqAlertHistoryModal({ show, onClose, logs, formatDateTime }) {
             onClick={onClose}
             style={{
               padding: '0.45rem 1.15rem', fontSize: '0.82rem', fontWeight: 700,
-              color: '#475569', backgroundColor: '#ffffff', border: '1px solid #cbd5e1',
+              color: '#475569', backgroundColor: '#ffffff', border: '1px solid #e3e8ef',
               borderRadius: '6px', cursor: 'pointer'
             }}
           >
@@ -916,7 +917,7 @@ function RegionalShipperModal({
           border-radius: 12px;
           max-width: 640px;
           width: 100%;
-          border: 1px solid #cbd5e1;
+          border: 1px solid #e3e8ef;
           overflow: hidden;
           box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
           max-height: 90vh;
@@ -1026,11 +1027,11 @@ function RegionalShipperModal({
                 <h3 style={{ margin: 0, fontSize: '1.02rem', color: '#0f172a', fontWeight: 800 }}>
                   Điều Phối Vận Chuyển
                 </h3>
-                <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#2563eb', backgroundColor: '#eff6ff', padding: '2px 7px', borderRadius: '5px', border: '1px solid #bfdbfe' }}>
+                <span style={{ fontSize: '0.77rem', fontWeight: 800, color: '#2563eb', backgroundColor: '#eff6ff', padding: '2px 7px', borderRadius: '5px', border: '1px solid #bfdbfe' }}>
                   #{orderToAssign.orderId || orderToAssign.id}
                 </span>
               </div>
-              <div style={{ fontSize: '0.76rem', color: '#64748b', marginTop: '0.15rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.15rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 Khách hàng: <strong style={{ color: '#0f172a' }}>{orderToAssign.customerName}</strong> ({orderToAssign.phone || '090xxxxxxx'})
               </div>
             </div>
@@ -1041,7 +1042,7 @@ function RegionalShipperModal({
             style={{
               flexShrink: 0,
               background: '#ffffff',
-              border: '1px solid #cbd5e1',
+              border: '1px solid #e3e8ef',
               borderRadius: '6px',
               padding: '0.35rem 0.65rem',
               cursor: 'pointer',
@@ -1163,7 +1164,7 @@ function RegionalShipperModal({
                   <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#1e40af', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
                     <MapPin size={13} color="#2563eb" /> Tuyến Vận Chuyển Phân Bổ:
                   </label>
-                  <span style={{ fontSize: '0.7rem', color: '#64748b', fontStyle: 'italic' }}>
+                  <span style={{ fontSize: '0.75rem', color: '#64748b', fontStyle: 'italic' }}>
                     (Tự động nhận diện từ địa chỉ)
                   </span>
                 </div>
@@ -1212,19 +1213,19 @@ function RegionalShipperModal({
               {/* 3-Column Info Metrics */}
               <div className="d-stats-grid">
                 <div style={{ backgroundColor: '#ffffff', padding: '0.45rem 0.6rem', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
-                  <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 600 }}>Thu Hộ COD</div>
+                  <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 600 }}>Thu Hộ COD</div>
                   <div style={{ fontSize: '0.88rem', fontWeight: 800, color: '#16a34a', marginTop: '0.1rem' }}>
                     {safeFormatPrice(orderToAssign.totalAmount || orderToAssign.total || 0)}
                   </div>
                 </div>
                 <div style={{ backgroundColor: '#ffffff', padding: '0.45rem 0.6rem', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
-                  <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 600 }}>Hình Thức TT</div>
+                  <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 600 }}>Hình Thức TT</div>
                   <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#0f172a', marginTop: '0.15rem' }}>
                     {orderToAssign.paymentMethod || 'COD'}
                   </div>
                 </div>
                 <div className="d-stat-full" style={{ backgroundColor: '#ffffff', padding: '0.45rem 0.6rem', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
-                  <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 600 }}>Đóng Gói</div>
+                  <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 600 }}>Đóng Gói</div>
                   <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#2563eb', marginTop: '0.15rem' }}>
                     {orderToAssign.packedSerials?.length || 1} kiện niêm phong
                   </div>
@@ -1249,19 +1250,19 @@ function RegionalShipperModal({
                   <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     <span style={{ color: '#475569' }}>Đề xuất theo tải:</span>{' '}
                     <strong style={{ color: '#0f172a' }}>{bestShipper.fullname}</strong>{' '}
-                    <span style={{ color: bestShipperWorkload?.badgeColor, fontWeight: 700, fontSize: '0.74rem' }}>
+                    <span style={{ color: bestShipperWorkload?.badgeColor, fontWeight: 700, fontSize: '0.79rem' }}>
                       ({bestShipperWorkload?.statusText})
                     </span>
                   </div>
                 </div>
                 <span style={{
-                  fontSize: '0.68rem',
+                  fontSize: '0.74rem',
                   fontWeight: 800,
                   backgroundColor: bestShipperWorkload?.badgeBg,
                   color: bestShipperWorkload?.badgeColor,
                   padding: '2px 7px',
                   borderRadius: '5px',
-                  border: '1px solid #cbd5e1',
+                  border: '1px solid #e3e8ef',
                   whiteSpace: 'nowrap',
                   flexShrink: 0
                 }}>
@@ -1332,7 +1333,7 @@ function RegionalShipperModal({
                   </optgroup>
                 )}
               </select>
-              <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '0.3rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.2rem' }}>
+              <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.3rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.2rem' }}>
                 <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
                   <CheckCircle size={12} color="#16a34a" /> Gán trực tiếp vào app Shipper
                 </span>
@@ -1357,7 +1358,7 @@ function RegionalShipperModal({
                   fontSize: '0.82rem',
                   fontWeight: 700,
                   color: '#2563eb',
-                  border: '1px solid #cbd5e1',
+                  border: '1px solid #e3e8ef',
                   borderRadius: '6px',
                   backgroundColor: '#f8fafc',
                   fontFamily: 'monospace'
@@ -1380,7 +1381,7 @@ function RegionalShipperModal({
                   boxSizing: 'border-box',
                   padding: '0.5rem 0.75rem',
                   fontSize: '0.8rem',
-                  border: '1px solid #cbd5e1',
+                  border: '1px solid #e3e8ef',
                   borderRadius: '6px',
                   fontFamily: 'inherit',
                   resize: 'vertical'
@@ -1391,7 +1392,7 @@ function RegionalShipperModal({
 
           {/* Sticky Modal Actions Footer */}
           <div className="d-footer">
-            <span className="d-footer-hint" style={{ fontSize: '0.75rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '0.3rem', whiteSpace: 'nowrap' }}>
+            <span className="d-footer-hint" style={{ fontSize: '0.8rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '0.3rem', whiteSpace: 'nowrap' }}>
               <CheckCircle size={13} color="#2563eb" /> Đơn sẽ vào mục <strong>Chờ Nhận</strong> của shipper này
             </span>
             <div className="d-footer-actions">
@@ -1403,7 +1404,7 @@ function RegionalShipperModal({
                   padding: '0.5rem 1rem',
                   fontSize: '0.82rem',
                   fontWeight: 600,
-                  border: '1px solid #cbd5e1',
+                  border: '1px solid #e3e8ef',
                   borderRadius: '6px',
                   background: '#ffffff',
                   color: '#475569',
@@ -1529,7 +1530,7 @@ function RfqAlertModal({ rfqModalData, setRfqModalData, sendSystemNotification, 
         maxWidth: '560px',
         width: '100%',
         boxShadow: '0 20px 40px rgba(0, 0, 0, 0.2)',
-        border: '1px solid #cbd5e1',
+        border: '1px solid #e3e8ef',
         overflow: 'hidden'
       }}>
         {/* Header */}
@@ -1549,7 +1550,7 @@ function RfqAlertModal({ rfqModalData, setRfqModalData, sendSystemNotification, 
           </div>
           <button
             onClick={() => setRfqModalData(null)}
-            style={{ background: 'none', border: '1px solid #cbd5e1', borderRadius: '4px', padding: '0.2rem 0.5rem', cursor: 'pointer' }}
+            style={{ background: 'none', border: '1px solid #e3e8ef', borderRadius: '4px', padding: '0.2rem 0.5rem', cursor: 'pointer' }}
           >
             Đóng
           </button>
@@ -1651,7 +1652,7 @@ function RfqAlertModal({ rfqModalData, setRfqModalData, sendSystemNotification, 
               fontWeight: 600,
               color: '#475569',
               backgroundColor: '#ffffff',
-              border: '1px solid #cbd5e1',
+              border: '1px solid #e3e8ef',
               borderRadius: '6px',
               cursor: 'pointer'
             }}
@@ -1729,7 +1730,7 @@ function ReceiptDetailModal({ selectedReceipt, onClose, purchaseOrders = [], onR
     ? effectivePo.items
     : (selectedReceipt.items?.length > 0
         ? selectedReceipt.items
-        : [{ name: 'Intel Core i9-14900K (Linh kiện mẫu)', quantity: 10, unitCost: 14500000 }]);
+        : []); // không chèn dòng hàng mẫu khi chứng từ chưa có chi tiết
 
   const itemsList = rawItemsList.map(item => {
     const originalQty = parseInt(item.quantity || item.qty) || 1;
@@ -1762,7 +1763,7 @@ function ReceiptDetailModal({ selectedReceipt, onClose, purchaseOrders = [], onR
 
   return (
     <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.65)', backdropFilter: 'blur(4px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 10000, padding: '1.5rem' }} onClick={onClose}>
-      <div style={{ width: '100%', maxWidth: '950px', maxHeight: '92vh', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', boxShadow: '0 20px 40px rgba(15,23,42,0.2)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }} onClick={(e) => e.stopPropagation()}>
+      <div style={{ width: '100%', maxWidth: '950px', maxHeight: '92vh', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e3e8ef', boxShadow: '0 20px 40px rgba(15,23,42,0.2)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }} onClick={(e) => e.stopPropagation()}>
         
         {/* Toolbar Header */}
         <div style={{ borderBottom: '2px solid #2563eb', background: '#f8fafc', padding: '1.25rem 1.75rem' }}>
@@ -1812,7 +1813,7 @@ function ReceiptDetailModal({ selectedReceipt, onClose, purchaseOrders = [], onR
 
             <button 
               onClick={onClose} 
-              style={{ background: '#ffffff', border: '1px solid #cbd5e1', color: '#334155', cursor: 'pointer', padding: '0.3rem 0.8rem', borderRadius: '4px', fontWeight: 600 }} 
+              style={{ background: '#ffffff', border: '1px solid #e3e8ef', color: '#334155', cursor: 'pointer', padding: '0.3rem 0.8rem', borderRadius: '4px', fontWeight: 600 }} 
             >
               Đóng
             </button>
@@ -1857,7 +1858,7 @@ function ReceiptDetailModal({ selectedReceipt, onClose, purchaseOrders = [], onR
                 <React.Fragment key={step.key}>
                   <div style={{
                     padding: '0.4rem 0.55rem',
-                    fontSize: '0.73rem', fontWeight: isActive ? 800 : (isPassed ? 700 : 500),
+                    fontSize: '0.78rem', fontWeight: isActive ? 800 : (isPassed ? 700 : 500),
                     background: isActive ? activeBg : (isPassed ? '#f1f5f9' : '#ffffff'),
                     color: isActive ? '#ffffff' : (isPassed ? '#334155' : '#94a3b8'),
                     borderRadius: '4px',
@@ -1890,7 +1891,7 @@ function ReceiptDetailModal({ selectedReceipt, onClose, purchaseOrders = [], onR
           </div>
 
           {/* Table */}
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1rem', marginBottom: '1.5rem' }}>
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1rem', marginBottom: '1.5rem' }}>
             <h4 style={{ margin: '0 0 0.75rem 0', fontSize: '0.9rem', color: '#0f172a', fontWeight: 800 }}>Danh Sách Linh Kiện Nhập Kho</h4>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.83rem' }}>
               <thead>
@@ -1943,12 +1944,12 @@ function ReceiptDetailModal({ selectedReceipt, onClose, purchaseOrders = [], onR
             if (!inspectorName && !inspectedAt && passedQtyDisplay === undefined && !notesDisplay) return null;
 
             return (
-              <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1rem', marginBottom: '1.5rem' }}>
+              <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1rem', marginBottom: '1.5rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                     <h4 style={{ margin: 0, fontSize: '0.9rem', color: '#0f172a', fontWeight: 800 }}>Biên Bản Kiểm Định QA/QC</h4>
                     {badge && (
-                      <span style={{ padding: '2px 10px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 800, backgroundColor: badge.bg, color: badge.color, border: `1px solid ${badge.border}` }}>
+                      <span style={{ padding: '2px 10px', borderRadius: '4px', fontSize: '0.77rem', fontWeight: 800, backgroundColor: badge.bg, color: badge.color, border: `1px solid ${badge.border}` }}>
                         {badge.text}
                       </span>
                     )}
@@ -1963,7 +1964,7 @@ function ReceiptDetailModal({ selectedReceipt, onClose, purchaseOrders = [], onR
                         gap: '0.35rem',
                         padding: '0.35rem 0.85rem',
                         borderRadius: '6px',
-                        fontSize: '0.76rem',
+                        fontSize: '0.8rem',
                         fontWeight: 700,
                         backgroundColor: '#eff6ff',
                         color: '#1d4ed8',
@@ -1978,21 +1979,21 @@ function ReceiptDetailModal({ selectedReceipt, onClose, purchaseOrders = [], onR
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.75rem', fontSize: '0.82rem' }}>
                   <div>
-                    <div style={{ color: '#94a3b8', fontWeight: 700, fontSize: '0.72rem', textTransform: 'uppercase' }}>Người Kiểm Định</div>
+                    <div style={{ color: '#94a3b8', fontWeight: 700, fontSize: '0.77rem', textTransform: 'uppercase' }}>Người Kiểm Định</div>
                     <div style={{ color: '#0f172a', fontWeight: 700 }}>{inspectorName || 'Chưa rõ'}</div>
                   </div>
                   <div>
-                    <div style={{ color: '#94a3b8', fontWeight: 700, fontSize: '0.72rem', textTransform: 'uppercase' }}>Ngày Kiểm Định</div>
+                    <div style={{ color: '#94a3b8', fontWeight: 700, fontSize: '0.77rem', textTransform: 'uppercase' }}>Ngày Kiểm Định</div>
                     <div style={{ color: '#0f172a', fontWeight: 700 }}>{inspectedAt || 'Chưa rõ'}</div>
                   </div>
                   {sampleRateDisplay !== undefined && (
                     <div>
-                      <div style={{ color: '#94a3b8', fontWeight: 700, fontSize: '0.72rem', textTransform: 'uppercase' }}>Tỷ Lệ Lấy Mẫu</div>
+                      <div style={{ color: '#94a3b8', fontWeight: 700, fontSize: '0.77rem', textTransform: 'uppercase' }}>Tỷ Lệ Lấy Mẫu</div>
                       <div style={{ color: '#0f172a', fontWeight: 700 }}>{sampleRateDisplay}%</div>
                     </div>
                   )}
                   <div>
-                    <div style={{ color: '#94a3b8', fontWeight: 700, fontSize: '0.72rem', textTransform: 'uppercase' }}>Số Lượng Đạt / Lỗi</div>
+                    <div style={{ color: '#94a3b8', fontWeight: 700, fontSize: '0.77rem', textTransform: 'uppercase' }}>Số Lượng Đạt / Lỗi</div>
                     <div style={{ fontWeight: 700 }}>
                       <span style={{ color: '#16a34a' }}>{passedQtyDisplay ?? '—'}</span>
                       <span style={{ color: '#94a3b8' }}> / </span>
@@ -2062,7 +2063,7 @@ function SerialEntryModal({ target, onClose, onConfirm, submitting }) {
 
   return (
     <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.7)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10001, padding: '1rem' }}>
-      <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', maxWidth: '640px', width: '100%', maxHeight: '88vh', border: '1px solid #cbd5e1', overflow: 'hidden', boxShadow: '0 20px 40px rgba(0,0,0,0.25)', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', maxWidth: '640px', width: '100%', maxHeight: '88vh', border: '1px solid #e3e8ef', overflow: 'hidden', boxShadow: '0 20px 40px rgba(0,0,0,0.25)', display: 'flex', flexDirection: 'column' }}>
         <div style={{ padding: '1.1rem 1.5rem', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
           <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#0f172a' }}>Quét / Nhập Serial Number</h3>
           <p style={{ margin: '0.3rem 0 0 0', fontSize: '0.8rem', color: '#64748b' }}>
@@ -2080,8 +2081,8 @@ function SerialEntryModal({ target, onClose, onConfirm, submitting }) {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', gap: '0.75rem' }}>
                   <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name || item.productName}</span>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>
-                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: ok ? '#15803d' : '#b45309' }}>{got}/{need} mã</span>
-                    <button type="button" onClick={() => genSerialsFor(item)} style={{ fontSize: '0.72rem', fontWeight: 700, padding: '0.25rem 0.55rem', borderRadius: '4px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#2563eb', cursor: 'pointer' }}>Tự Sinh Mã</button>
+                    <span style={{ fontSize: '0.8rem', fontWeight: 700, color: ok ? '#15803d' : '#b45309' }}>{got}/{need} mã</span>
+                    <button type="button" onClick={() => genSerialsFor(item)} style={{ fontSize: '0.77rem', fontWeight: 700, padding: '0.25rem 0.55rem', borderRadius: '4px', border: '1px solid #e3e8ef', background: '#ffffff', color: '#2563eb', cursor: 'pointer' }}>Tự Sinh Mã</button>
                   </div>
                 </div>
                 <textarea
@@ -2089,7 +2090,7 @@ function SerialEntryModal({ target, onClose, onConfirm, submitting }) {
                   onChange={(e) => setRawByProduct(prev => ({ ...prev, [item.productId]: e.target.value }))}
                   placeholder={`Nhập ${need} Serial Number, mỗi dòng 1 mã...`}
                   rows={Math.min(6, Math.max(2, need))}
-                  style={{ width: '100%', boxSizing: 'border-box', padding: '0.5rem 0.65rem', fontSize: '0.8rem', fontFamily: 'monospace', border: '1px solid #cbd5e1', borderRadius: '6px', resize: 'vertical' }}
+                  style={{ width: '100%', boxSizing: 'border-box', padding: '0.5rem 0.65rem', fontSize: '0.8rem', fontFamily: 'monospace', border: '1px solid #e3e8ef', borderRadius: '6px', resize: 'vertical' }}
                 />
               </div>
             );
@@ -2100,7 +2101,7 @@ function SerialEntryModal({ target, onClose, onConfirm, submitting }) {
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', borderTop: '1px solid #e2e8f0', padding: '1rem 1.5rem' }}>
-          <button type="button" onClick={onClose} disabled={submitting} style={{ padding: '0.5rem 1.15rem', fontSize: '0.82rem', fontWeight: 600, border: '1px solid #cbd5e1', borderRadius: '6px', background: '#ffffff', color: '#475569', cursor: 'pointer' }}>Hủy</button>
+          <button type="button" onClick={onClose} disabled={submitting} style={{ padding: '0.5rem 1.15rem', fontSize: '0.82rem', fontWeight: 600, border: '1px solid #e3e8ef', borderRadius: '6px', background: '#ffffff', color: '#475569', cursor: 'pointer' }}>Hủy</button>
           <button
             type="button"
             disabled={!allValid || submitting}
@@ -2128,7 +2129,7 @@ function WarehouseQcCertificateModal({ target, onClose, purchaseOrders = [] }) {
     || receipt?.po?.poNumber 
     || receipt?.poId 
     || receipt?.receiptNumber?.replace('GRN-', '') 
-    || 'PO-260925-4187';
+    || '—';
 
   if (!qaLog) {
     try {
@@ -2156,7 +2157,7 @@ function WarehouseQcCertificateModal({ target, onClose, purchaseOrders = [] }) {
   if (!hasInspectionRecord) {
     return (
       <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.7)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10002, padding: '1rem' }} onClick={onClose}>
-        <div style={{ width: '100%', maxWidth: '480px', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', padding: '1.75rem', textAlign: 'center', boxShadow: '0 20px 40px rgba(0,0,0,0.2)' }} onClick={e => e.stopPropagation()}>
+        <div style={{ width: '100%', maxWidth: '480px', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e3e8ef', padding: '1.75rem', textAlign: 'center', boxShadow: '0 20px 40px rgba(0,0,0,0.2)' }} onClick={e => e.stopPropagation()}>
           <div style={{ width: '52px', height: '52px', borderRadius: '50%', backgroundColor: '#fef3c7', color: '#d97706', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem auto' }}>
             <AlertCircle size={30} />
           </div>
@@ -2192,15 +2193,9 @@ function WarehouseQcCertificateModal({ target, onClose, purchaseOrders = [] }) {
     || relatedPO?.supplier?.name 
     || relatedPO?.supplierName 
     || receipt.supplierName 
-    || 'Công ty TNHH Gigabyte Việt Nam';
+    || 'Chưa xác định nhà cung cấp';
 
-  const fallbackName = supplierName.includes('Gigabyte')
-    ? 'Màn hình GIGABYTE M27QA 27" IPS 2K 180Hz chuyên game'
-    : supplierName.includes('AMD')
-      ? 'CPU AMD Ryzen 7 7800X3D Box Chính Hãng'
-      : supplierName.includes('Intel')
-        ? 'CPU Intel Core i9-14900K Box'
-        : 'Linh Kiện Máy Tính Cao Cấp';
+  const fallbackName = 'Hàng hóa theo đơn mua'; // không đoán tên sản phẩm theo nhà cung cấp
 
   const productName = qaLog?.productName 
     || relatedPO?.productName 
@@ -2211,7 +2206,8 @@ function WarehouseQcCertificateModal({ target, onClose, purchaseOrders = [] }) {
 
   const inspector = target.dbInspection?.inspector?.fullName 
     || qaLog?.inspector 
-    || 'Đặng Văn Kiểm (QA/QC)';
+    || '';
+  const inspectedAt = target.dbInspection?.inspectedAt || qaLog?.inspectedAt || qaLog?.date || null;
 
   const dateStr = target.dbInspection?.inspectedAt
     ? new Date(target.dbInspection.inspectedAt).toLocaleDateString('vi-VN')
@@ -2238,7 +2234,7 @@ function WarehouseQcCertificateModal({ target, onClose, purchaseOrders = [] }) {
 
   return (
     <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.7)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10002, padding: '1rem' }} onClick={onClose}>
-      <div style={{ width: '100%', maxWidth: '850px', maxHeight: '92vh', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', boxShadow: '0 20px 40px rgba(0,0,0,0.25)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
+      <div style={{ width: '100%', maxWidth: '850px', maxHeight: '92vh', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e3e8ef', boxShadow: '0 20px 40px rgba(0,0,0,0.25)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
         {/* Toolbar Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.85rem 1.25rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -2271,7 +2267,7 @@ function WarehouseQcCertificateModal({ target, onClose, purchaseOrders = [] }) {
             <button
               type="button"
               onClick={onClose}
-              style={{ background: '#ffffff', border: '1px solid #cbd5e1', color: '#64748b', cursor: 'pointer', padding: '0.35rem 0.65rem', borderRadius: '6px' }}
+              style={{ background: '#ffffff', border: '1px solid #e3e8ef', color: '#64748b', cursor: 'pointer', padding: '0.35rem 0.65rem', borderRadius: '6px' }}
             >
               <X size={16} />
             </button>
@@ -2284,19 +2280,19 @@ function WarehouseQcCertificateModal({ target, onClose, purchaseOrders = [] }) {
             {/* Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #0f172a', paddingBottom: '0.65rem', marginBottom: '0.85rem' }}>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: '0.66rem', fontWeight: 800, color: '#2563eb', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#2563eb', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                   AETHER PC ENTERPRISE • HỆ THỐNG QUẢN TRỊ DOANH NGHIỆP ERP
                 </div>
                 <h2 style={{ fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', margin: '0.15rem 0 0.1rem', letterSpacing: '-0.3px' }}>
                   BIÊN BẢN NGHIỆM THU KỸ THUẬT & KIỂM ĐỊNH CHẤT LƯỢNG
                 </h2>
-                <div style={{ fontSize: '0.74rem', color: '#64748b' }}>
+                <div style={{ fontSize: '0.79rem', color: '#64748b' }}>
                   Số hiệu: <strong style={{ color: '#0f172a', fontFamily: 'monospace' }}>{qaLog?.id || `QA-${String(Date.now()).slice(-4)}`}</strong>
                   {' • '}Ngày lập: <strong style={{ color: '#0f172a' }}>{dateStr}</strong>
                 </div>
               </div>
               <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', color: '#16a34a', padding: '0.2rem 0.6rem', borderRadius: '6px', fontSize: '0.68rem', fontWeight: 800 }}>
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', color: '#16a34a', padding: '0.2rem 0.6rem', borderRadius: '6px', fontSize: '0.74rem', fontWeight: 800 }}>
                   <CheckCircle2 size={13} />
                   CHỨNG TỪ ERP HỢP LỆ
                 </div>
@@ -2308,7 +2304,7 @@ function WarehouseQcCertificateModal({ target, onClose, purchaseOrders = [] }) {
               <tbody>
                 <tr>
                   <td style={{ width: '50%', verticalAlign: 'top', padding: '0.6rem 0.8rem', border: '1px solid #e2e8f0', borderRight: 'none', borderRadius: '8px 0 0 8px' }}>
-                    <div style={{ fontSize: '0.75rem', lineHeight: '1.55' }}>
+                    <div style={{ fontSize: '0.8rem', lineHeight: '1.55' }}>
                       <div style={{ marginBottom: '0.25rem' }}>
                         <span style={{ color: '#64748b' }}>Loại Nghiệm Thu: </span>
                         <strong style={{ color: '#2563eb' }}>NGHIỆM THU HÀNG NHẬP NHÀ CUNG CẤP (PO)</strong>
@@ -2323,7 +2319,7 @@ function WarehouseQcCertificateModal({ target, onClose, purchaseOrders = [] }) {
                           display: 'inline-block',
                           padding: '2px 8px',
                           borderRadius: '10px',
-                          fontSize: '0.72rem',
+                          fontSize: '0.77rem',
                           fontWeight: 800,
                           backgroundColor: isRejected ? '#fee2e2' : isPartial ? '#ffedd5' : '#dcfce7',
                           color: isRejected ? '#dc2626' : isPartial ? '#c2410c' : '#15803d',
@@ -2335,7 +2331,7 @@ function WarehouseQcCertificateModal({ target, onClose, purchaseOrders = [] }) {
                     </div>
                   </td>
                   <td style={{ width: '50%', verticalAlign: 'top', padding: '0.6rem 0.8rem', border: '1px solid #e2e8f0', borderRadius: '0 8px 8px 0' }}>
-                    <div style={{ fontSize: '0.75rem', lineHeight: '1.55' }}>
+                    <div style={{ fontSize: '0.8rem', lineHeight: '1.55' }}>
                       <div style={{ marginBottom: '0.25rem' }}>
                         <span style={{ color: '#64748b' }}>Đối Tượng Đối Tác: </span>
                         <strong style={{ color: '#0f172a' }}>{supplierName}</strong>
@@ -2359,7 +2355,7 @@ function WarehouseQcCertificateModal({ target, onClose, purchaseOrders = [] }) {
               <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.78rem', marginBottom: '0.3rem' }}>
                 Chi Tiết Kết Quả Kiểm Định Từng Sản Phẩm:
               </div>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', overflow: 'hidden' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem', border: '1px solid #e3e8ef', borderRadius: '6px', overflow: 'hidden' }}>
                 <thead>
                   <tr style={{ backgroundColor: '#f1f5f9', borderBottom: '2px solid #cbd5e1', textAlign: 'left', color: '#475569' }}>
                     <th style={{ padding: '0.45rem 0.65rem' }}>Tên Sản Phẩm / Model</th>
@@ -2397,7 +2393,7 @@ function WarehouseQcCertificateModal({ target, onClose, purchaseOrders = [] }) {
                         <tr key={it.id || idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
                           <td style={{ padding: '0.5rem 0.65rem', fontWeight: 700, color: '#0f172a' }}>
                             {itName}
-                            {it.serialNumber && <div style={{ fontSize: '0.68rem', color: '#64748b', fontFamily: 'monospace', marginTop: '1px' }}>SN: {it.serialNumber}</div>}
+                            {it.serialNumber && <div style={{ fontSize: '0.74rem', color: '#64748b', fontFamily: 'monospace', marginTop: '1px' }}>SN: {it.serialNumber}</div>}
                           </td>
                           <td style={{ padding: '0.5rem 0.5rem', textAlign: 'center', fontWeight: 700, color: '#0f172a' }}>
                             {itQty}
@@ -2409,7 +2405,7 @@ function WarehouseQcCertificateModal({ target, onClose, purchaseOrders = [] }) {
                             {failed}
                           </td>
                           <td style={{ padding: '0.5rem 0.65rem', textAlign: 'center' }}>
-                            <span style={{ color: (failed > 0 || isRejected) ? '#dc2626' : '#15803d', fontWeight: 700, fontSize: '0.74rem' }}>
+                            <span style={{ color: (failed > 0 || isRejected) ? '#dc2626' : '#15803d', fontWeight: 700, fontSize: '0.79rem' }}>
                               {failed > 0
                                 ? `Phát hiện ${failed} SP lỗi / Không đạt`
                                 : (isRejected ? 'Hàng không đạt chuẩn kỹ thuật' : 'Seal nguyên vẹn & Đối soát Serial OK')}
@@ -2433,7 +2429,7 @@ function WarehouseQcCertificateModal({ target, onClose, purchaseOrders = [] }) {
                         {failedQty}
                       </td>
                       <td style={{ padding: '0.5rem 0.65rem', textAlign: 'center' }}>
-                        <span style={{ color: (failedQty > 0 || isRejected) ? '#dc2626' : '#15803d', fontWeight: 700, fontSize: '0.74rem' }}>
+                        <span style={{ color: (failedQty > 0 || isRejected) ? '#dc2626' : '#15803d', fontWeight: 700, fontSize: '0.79rem' }}>
                           {failedQty > 0
                             ? `Phát hiện ${failedQty} SP lỗi / Không đạt`
                             : (isRejected ? 'Hàng không đạt chuẩn kỹ thuật' : 'Seal nguyên vẹn & Đối soát Serial OK')}
@@ -2446,7 +2442,7 @@ function WarehouseQcCertificateModal({ target, onClose, purchaseOrders = [] }) {
             </div>
 
             {/* Notes */}
-            <div style={{ backgroundColor: '#ffffff', padding: '0.55rem 0.75rem', borderRadius: '6px', border: '1px solid #e2e8f0', marginBottom: '0.85rem', fontSize: '0.75rem' }}>
+            <div style={{ backgroundColor: '#ffffff', padding: '0.55rem 0.75rem', borderRadius: '6px', border: '1px solid #e2e8f0', marginBottom: '0.85rem', fontSize: '0.8rem' }}>
               <div style={{ fontWeight: 800, color: '#0f172a', marginBottom: '0.15rem' }}>
                 Ý Kiến Đánh Giá & Ghi Chú Của Kiểm Định Viên:
               </div>
@@ -2455,56 +2451,16 @@ function WarehouseQcCertificateModal({ target, onClose, purchaseOrders = [] }) {
               </div>
             </div>
 
-            {/* Signatures Block (3 columns) */}
-            <table style={{ width: '100%', borderCollapse: 'collapse', border: 'none', marginTop: '0.3rem', borderTop: '1px dashed #cbd5e1', paddingTop: '0.5rem' }}>
-              <tbody>
-                <tr>
-                  {/* Column 1: NCC */}
-                  <td style={{ width: '33.33%', textAlign: 'center', verticalAlign: 'top', padding: '0.35rem 0.25rem 0' }}>
-                    <strong style={{ fontSize: '0.74rem', color: '#0f172a', display: 'block' }}>ĐẠI DIỆN GIAO HÀNG (NCC)</strong>
-                    <div style={{ fontSize: '0.64rem', color: '#94a3b8', marginTop: '0.1rem' }}>(Ký, ghi rõ họ tên)</div>
-                    <div style={{ minHeight: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0.2rem auto' }}>
-                      <div style={{ border: '1.5px dashed #64748b', borderRadius: '6px', backgroundColor: '#f8fafc', padding: '0.2rem 0.45rem', width: '100%', maxWidth: '160px', boxSizing: 'border-box' }}>
-                        <div style={{ fontSize: '0.64rem', fontWeight: 800, color: '#475569', letterSpacing: '0.2px' }}>✓ ĐÃ BÀN GIAO HÀNG</div>
-                        <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#0f172a', marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{supplierName}</div>
-                        <div style={{ fontSize: '0.6rem', color: '#64748b', marginTop: '1px' }}>{dateStr}</div>
-                      </div>
-                    </div>
-                    <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#0f172a', marginTop: '2px' }}>{supplierName}</div>
-                  </td>
-
-                  {/* Column 2: QA Inspector */}
-                  <td style={{ width: '33.33%', textAlign: 'center', verticalAlign: 'top', padding: '0.35rem 0.25rem 0' }}>
-                    <strong style={{ fontSize: '0.74rem', color: '#0f172a', display: 'block' }}>KIỂM ĐỊNH VIÊN QA/QC</strong>
-                    <div style={{ fontSize: '0.64rem', color: '#94a3b8', marginTop: '0.1rem' }}>(Ký, ghi rõ họ tên)</div>
-                    <div style={{ minHeight: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0.2rem auto' }}>
-                      <div style={{ border: isRejected ? '1.5px dashed #dc2626' : '1.5px dashed #2563eb', borderRadius: '6px', backgroundColor: isRejected ? '#fef2f2' : '#eff6ff', padding: '0.2rem 0.45rem', width: '100%', maxWidth: '160px', boxSizing: 'border-box' }}>
-                        <div style={{ fontSize: '0.64rem', fontWeight: 800, color: isRejected ? '#dc2626' : '#1d4ed8', letterSpacing: '0.2px' }}>
-                          {isRejected ? '✓ ĐÃ LẬP BIÊN BẢN LỖI' : '✓ ĐÃ KÝ SỐ (ĐẠT CHUẨN)'}
-                        </div>
-                        <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#0f172a', marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{inspector}</div>
-                        <div style={{ fontSize: '0.6rem', color: '#64748b', marginTop: '1px' }}>{dateStr}</div>
-                      </div>
-                    </div>
-                    <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#2563eb', marginTop: '2px' }}>{inspector}</div>
-                  </td>
-
-                  {/* Column 3: Warehouse Keeper */}
-                  <td style={{ width: '33.33%', textAlign: 'center', verticalAlign: 'top', padding: '0.35rem 0.25rem 0' }}>
-                    <strong style={{ fontSize: '0.74rem', color: '#0f172a', display: 'block' }}>THỦ KHO TIẾP NHẬN</strong>
-                    <div style={{ fontSize: '0.64rem', color: '#94a3b8', marginTop: '0.1rem' }}>(Ký, ghi rõ họ tên)</div>
-                    <div style={{ minHeight: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0.2rem auto' }}>
-                      <div style={{ border: '1.5px dashed #059669', borderRadius: '6px', backgroundColor: '#ecfdf5', padding: '0.2rem 0.45rem', width: '100%', maxWidth: '160px', boxSizing: 'border-box' }}>
-                        <div style={{ fontSize: '0.64rem', fontWeight: 800, color: '#047857', letterSpacing: '0.2px' }}>✓ ĐÃ TIẾP NHẬN KHO</div>
-                        <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#0f172a', marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Thủ Kho AetherPC</div>
-                        <div style={{ fontSize: '0.6rem', color: '#64748b', marginTop: '1px' }}>{dateStr}</div>
-                      </div>
-                    </div>
-                    <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#0f172a', marginTop: '2px' }}>Thủ Kho AetherPC</div>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+            {/* Chữ ký điện tử 3 bên — người ký và thời điểm lấy từ biên bản kiểm định và phiếu nhập thật */}
+            <SignatureRow>
+              <SignatureCell title="Đại diện giao hàng (NCC)" name={supplierName !== 'Chưa xác định nhà cung cấp' ? supplierName : ''}
+                signedAt={inspectedAt} docRef={poNumber} result="Đã bàn giao" color="#334155" />
+              <SignatureCell title="Kiểm định viên QA/QC" name={inspector} signedAt={inspectedAt} docRef={poNumber}
+                result={isRejected ? 'Không đạt' : isPartial ? 'Đạt một phần' : 'Đạt'} color={isRejected ? '#b91c1c' : undefined} />
+              <SignatureCell title="Thủ kho tiếp nhận" name={displaySigner(receipt.receivedBy)} signedAt={receipt.receivedDate}
+                signed={!isRejected && (receipt.status === 'DONE' || !!receipt.receivedDate)} seal sealLabel="ĐÃ NHẬP KHO"
+                docRef={poNumber} pendingText={isRejected ? 'Không nhập kho' : 'Chờ nhập kho'} />
+            </SignatureRow>
           </div>
         </div>
 
@@ -2521,7 +2477,7 @@ function WarehouseQcCertificateModal({ target, onClose, purchaseOrders = [] }) {
           <button
             type="button"
             onClick={onClose}
-            style={{ backgroundColor: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.45rem 1.1rem', fontSize: '0.82rem', fontWeight: 600, color: '#475569', cursor: 'pointer' }}
+            style={{ backgroundColor: '#ffffff', border: '1px solid #e3e8ef', borderRadius: '6px', padding: '0.45rem 1.1rem', fontSize: '0.82rem', fontWeight: 600, color: '#475569', cursor: 'pointer' }}
           >
             Đóng
           </button>
@@ -2564,7 +2520,7 @@ function GoodsReceiptSuccessModal({ doc, onClose, formatPrice }) {
 
   return (
     <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.7)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10003, padding: '1rem' }} onClick={onClose}>
-      <div style={{ width: '100%', maxWidth: '880px', maxHeight: '92vh', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', boxShadow: '0 20px 40px rgba(0,0,0,0.25)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
+      <div style={{ width: '100%', maxWidth: '880px', maxHeight: '92vh', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e3e8ef', boxShadow: '0 20px 40px rgba(0,0,0,0.25)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
         {/* Modal Toolbar Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.85rem 1.25rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f0fdf4' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -2573,7 +2529,7 @@ function GoodsReceiptSuccessModal({ doc, onClose, formatPrice }) {
               <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#15803d' }}>
                 Xác Nhận Nhập Kho Thành Công • Xuất Phiếu Nhập Kho
               </h3>
-              <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
+              <div style={{ fontSize: '0.77rem', color: '#64748b' }}>
                 Mã phiếu: <strong style={{ color: '#0f172a', fontFamily: 'monospace' }}>{doc.receiptNumber}</strong>
                 {' • '}Đơn liên kết: <strong style={{ color: '#2563eb' }}>{doc.poNumber}</strong>
               </div>
@@ -2604,7 +2560,7 @@ function GoodsReceiptSuccessModal({ doc, onClose, formatPrice }) {
             <button
               type="button"
               onClick={onClose}
-              style={{ background: '#ffffff', border: '1px solid #cbd5e1', color: '#64748b', cursor: 'pointer', padding: '0.35rem 0.65rem', borderRadius: '6px' }}
+              style={{ background: '#ffffff', border: '1px solid #e3e8ef', color: '#64748b', cursor: 'pointer', padding: '0.35rem 0.65rem', borderRadius: '6px' }}
             >
               <X size={16} />
             </button>
@@ -2617,20 +2573,20 @@ function GoodsReceiptSuccessModal({ doc, onClose, formatPrice }) {
             {/* Enterprise Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #0f172a', paddingBottom: '0.65rem', marginBottom: '0.85rem' }}>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: '0.66rem', fontWeight: 800, color: '#2563eb', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#2563eb', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                   AETHER PC ENTERPRISE • HỆ THỐNG QUẢN TRỊ DOANH NGHIỆP ERP
                 </div>
                 <h2 style={{ fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', margin: '0.15rem 0 0.1rem', letterSpacing: '-0.3px' }}>
                   PHIẾU NHẬP KHO & BIÊN BẢN GIAO NHẬN THÀNH CÔNG
                 </h2>
-                <div style={{ fontSize: '0.74rem', color: '#64748b' }}>
+                <div style={{ fontSize: '0.79rem', color: '#64748b' }}>
                   Số phiếu: <strong style={{ color: '#0f172a', fontFamily: 'monospace' }}>{doc.receiptNumber}</strong>
                   {' • '}Mã PO: <strong style={{ color: '#2563eb', fontFamily: 'monospace' }}>{doc.poNumber}</strong>
                   {' • '}Thời gian nhập: <strong style={{ color: '#0f172a' }}>{doc.intakeDate}</strong>
                 </div>
               </div>
               <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', backgroundColor: '#f0fdf4', border: '1.5px solid #86efac', color: '#15803d', padding: '0.25rem 0.75rem', borderRadius: '6px', fontSize: '0.72rem', fontWeight: 800 }}>
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', backgroundColor: '#f0fdf4', border: '1.5px solid #86efac', color: '#15803d', padding: '0.25rem 0.75rem', borderRadius: '6px', fontSize: '0.77rem', fontWeight: 800 }}>
                   <CheckCircle2 size={14} />
                   ĐÃ NHẬP KHO THÀNH CÔNG
                 </div>
@@ -2642,7 +2598,7 @@ function GoodsReceiptSuccessModal({ doc, onClose, formatPrice }) {
               <tbody>
                 <tr>
                   <td style={{ width: '50%', verticalAlign: 'top', padding: '0.65rem 0.85rem', border: '1px solid #e2e8f0', borderRight: 'none', borderRadius: '8px 0 0 8px' }}>
-                    <div style={{ fontSize: '0.75rem', lineHeight: '1.6' }}>
+                    <div style={{ fontSize: '0.8rem', lineHeight: '1.6' }}>
                       <div style={{ marginBottom: '0.2rem' }}>
                         <span style={{ color: '#64748b' }}>Đơn Vị Giao Hàng (NCC): </span>
                         <strong style={{ color: '#0f172a' }}>{doc.supplierName}</strong>
@@ -2658,7 +2614,7 @@ function GoodsReceiptSuccessModal({ doc, onClose, formatPrice }) {
                     </div>
                   </td>
                   <td style={{ width: '50%', verticalAlign: 'top', padding: '0.65rem 0.85rem', border: '1px solid #e2e8f0', borderRadius: '0 8px 8px 0' }}>
-                    <div style={{ fontSize: '0.75rem', lineHeight: '1.6' }}>
+                    <div style={{ fontSize: '0.8rem', lineHeight: '1.6' }}>
                       <div style={{ marginBottom: '0.2rem' }}>
                         <span style={{ color: '#64748b' }}>Thủ Kho Tiếp Nhận: </span>
                         <strong style={{ color: '#0f172a' }}>{cleanStaffName(doc.warehouseStaff)}</strong>
@@ -2682,7 +2638,7 @@ function GoodsReceiptSuccessModal({ doc, onClose, formatPrice }) {
               <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.78rem', marginBottom: '0.35rem' }}>
                 Danh Mục Linh Kiện / Thiết Bị Thực Tế Nhập Kho:
               </div>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', overflow: 'hidden' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem', border: '1px solid #e3e8ef', borderRadius: '6px', overflow: 'hidden' }}>
                 <thead>
                   <tr style={{ backgroundColor: '#f1f5f9', borderBottom: '2px solid #cbd5e1', textAlign: 'left', color: '#475569' }}>
                     <th style={{ padding: '0.5rem 0.6rem', textAlign: 'center', width: '35px' }}>STT</th>
@@ -2745,83 +2701,24 @@ function GoodsReceiptSuccessModal({ doc, onClose, formatPrice }) {
 
             {/* In words & note */}
             {wordsText && (
-              <div style={{ fontSize: '0.74rem', color: '#334155', fontStyle: 'italic', marginBottom: '0.65rem' }}>
+              <div style={{ fontSize: '0.79rem', color: '#334155', fontStyle: 'italic', marginBottom: '0.65rem' }}>
                 <strong>Tổng số tiền bằng chữ: </strong>{wordsText}
               </div>
             )}
 
-            <div style={{ backgroundColor: '#ffffff', padding: '0.5rem 0.75rem', borderRadius: '6px', border: '1px solid #e2e8f0', marginBottom: '0.85rem', fontSize: '0.73rem', color: '#475569', lineHeight: 1.45 }}>
+            <div style={{ backgroundColor: '#ffffff', padding: '0.5rem 0.75rem', borderRadius: '6px', border: '1px solid #e2e8f0', marginBottom: '0.85rem', fontSize: '0.78rem', color: '#475569', lineHeight: 1.45 }}>
               <strong style={{ color: '#0f172a' }}>Ghi chú xác nhận nhập kho: </strong>
               {isPartialIntake
                 ? `Lô hàng đã được kiểm đếm theo đúng kết quả nghiệm thu MỘT PHẦN từ biên bản QA/QC (${doc.qaLog?.failedQty || 0} SP lỗi không đưa vào kho, chờ hoàn trả NCC) — chỉ ${totalQty} SP đạt chuẩn được ghi nhận vào kho dữ liệu ERP AetherPC, các mã Serial đã cập nhật tức thì vào sổ cái tồn kho.`
                 : 'Lô hàng trên đã được kiểm đếm đủ số lượng thực tế, đối soát đạt chuẩn kỹ thuật 100% từ biên bản QA/QC, các mã Serial đã được ghi nhận vào kho dữ liệu ERP AetherPC và cập nhật tức thì vào sổ cái tồn kho.'}
             </div>
 
-            {/* Signatures block - 3 columns with Warehouse Keeper Official Stamp */}
-            <table style={{ width: '100%', borderCollapse: 'collapse', border: 'none', marginTop: '0.3rem', borderTop: '1px dashed #cbd5e1', paddingTop: '0.5rem' }}>
-              <tbody>
-                <tr>
-                  {/* Column 1: NCC */}
-                  <td style={{ width: '33.33%', textAlign: 'center', verticalAlign: 'top', padding: '0.35rem 0.25rem 0' }}>
-                    <strong style={{ fontSize: '0.74rem', color: '#0f172a', display: 'block' }}>ĐẠI DIỆN GIAO HÀNG (NCC)</strong>
-                    <div style={{ fontSize: '0.64rem', color: '#94a3b8', marginTop: '0.1rem' }}>(Ký, ghi rõ họ tên)</div>
-                    <div style={{ minHeight: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0.2rem auto' }}>
-                      <div style={{ border: '1.5px dashed #64748b', borderRadius: '6px', backgroundColor: '#f8fafc', padding: '0.2rem 0.45rem', width: '100%', maxWidth: '170px', boxSizing: 'border-box' }}>
-                        <div style={{ fontSize: '0.64rem', fontWeight: 800, color: '#475569', letterSpacing: '0.2px' }}>✓ ĐÃ BÀN GIAO HÀNG</div>
-                        <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#0f172a', marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc.supplierName}</div>
-                        <div style={{ fontSize: '0.6rem', color: '#64748b', marginTop: '1px' }}>{doc.intakeDate?.split(' ')[1] || doc.intakeDate}</div>
-                      </div>
-                    </div>
-                    <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#0f172a', marginTop: '2px' }}>{doc.supplierName}</div>
-                  </td>
-
-                  {/* Column 2: QA Inspector */}
-                  <td style={{ width: '33.33%', textAlign: 'center', verticalAlign: 'top', padding: '0.35rem 0.25rem 0' }}>
-                    <strong style={{ fontSize: '0.74rem', color: '#0f172a', display: 'block' }}>QA KIỂM ĐỊNH</strong>
-                    <div style={{ fontSize: '0.64rem', color: '#94a3b8', marginTop: '0.1rem' }}>(Ký, ghi rõ họ tên)</div>
-                    <div style={{ minHeight: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0.2rem auto' }}>
-                      <div style={{ border: '1.5px dashed #2563eb', borderRadius: '6px', backgroundColor: '#eff6ff', padding: '0.2rem 0.45rem', width: '100%', maxWidth: '170px', boxSizing: 'border-box' }}>
-                        <div style={{ fontSize: '0.64rem', fontWeight: 800, color: '#1d4ed8', letterSpacing: '0.2px' }}>✓ ĐÃ ĐỐI SOÁT ĐẠT CHUẨN</div>
-                        <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#0f172a', marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc.qaInspector}</div>
-                        <div style={{ fontSize: '0.6rem', color: '#64748b', marginTop: '1px' }}>{doc.intakeDate?.split(' ')[1] || doc.intakeDate}</div>
-                      </div>
-                    </div>
-                    <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#2563eb', marginTop: '2px' }}>{doc.qaInspector}</div>
-                  </td>
-
-                  {/* Column 3: Warehouse Keeper Signature (CHỮ KÝ THỦ KHO) */}
-                  <td style={{ width: '33.33%', textAlign: 'center', verticalAlign: 'top', padding: '0.35rem 0.25rem 0' }}>
-                    <strong style={{ fontSize: '0.74rem', color: '#0f172a', display: 'block' }}>THỦ KHO</strong>
-                    <div style={{ fontSize: '0.64rem', color: '#94a3b8', marginTop: '0.1rem' }}>(Ký, ghi rõ họ tên)</div>
-                    <div style={{ minHeight: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0.2rem auto' }}>
-                      <div style={{
-                        border: '2px solid #059669',
-                        borderRadius: '8px',
-                        backgroundColor: '#ecfdf5',
-                        padding: '0.3rem 0.5rem',
-                        width: '100%',
-                        maxWidth: '185px',
-                        boxSizing: 'border-box',
-                        boxShadow: '0 1px 3px rgba(5,150,105,0.15)'
-                      }}>
-                        <div style={{ fontSize: '0.65rem', fontWeight: 900, color: '#047857', letterSpacing: '0.3px', textTransform: 'uppercase' }}>
-                          ✓ ĐÃ XÁC NHẬN NHẬP KHO
-                        </div>
-                        <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#065f46', marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {cleanStaffName(doc.warehouseStaff)}
-                        </div>
-                        <div style={{ fontSize: '0.6rem', color: '#047857', marginTop: '1px', fontWeight: 600 }}>
-                          {doc.intakeDate}
-                        </div>
-                      </div>
-                    </div>
-                    <div style={{ fontSize: '0.76rem', fontWeight: 800, color: '#047857', marginTop: '2px' }}>
-                      {cleanStaffName(doc.warehouseStaff)}
-                    </div>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+            {/* Chữ ký điện tử 3 bên — thủ kho xác nhận nhập kho kèm mộc công ty */}
+            <SignatureRow>
+              <SignatureCell title="Đại diện giao hàng (NCC)" name={doc.supplierName} signedAt={doc.intakeDate} docRef={doc.receiptNumber} result="Đã bàn giao" color="#334155" />
+              <SignatureCell title="QA kiểm định" name={doc.qaInspector} signedAt={doc.intakeDate} docRef={doc.receiptNumber} result={isPartialIntake ? 'Đạt một phần' : 'Đạt'} />
+              <SignatureCell title="Thủ kho" name={cleanStaffName(doc.warehouseStaff)} signedAt={doc.intakeDate} docRef={doc.receiptNumber} seal sealLabel="ĐÃ NHẬP KHO" />
+            </SignatureRow>
           </div>
         </div>
 
@@ -2838,7 +2735,7 @@ function GoodsReceiptSuccessModal({ doc, onClose, formatPrice }) {
           <button
             type="button"
             onClick={onClose}
-            style={{ backgroundColor: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.45rem 1.1rem', fontSize: '0.82rem', fontWeight: 600, color: '#475569', cursor: 'pointer' }}
+            style={{ backgroundColor: '#ffffff', border: '1px solid #e3e8ef', borderRadius: '6px', padding: '0.45rem 1.1rem', fontSize: '0.82rem', fontWeight: 600, color: '#475569', cursor: 'pointer' }}
           >
             Đóng
           </button>
@@ -2859,6 +2756,10 @@ export default function Warehouse() {
   };
 
   const { user, isCEO, isWarehouseManager, isWarehouse, isAdmin } = useAuth();
+  // Khớp phân quyền đọc ở backend (warehouse.routes.js, purchase.routes.js): vai trò chỉ được xem tồn kho
+  // (vd. Quản lý bán hàng) không gọi các API bị từ chối, tránh 403 làm hỏng cả lượt tải dữ liệu.
+  const canReadReceipts = ['WAREHOUSE', 'WAREHOUSE_MANAGER', 'QC', 'QA', 'QUALITY_CONTROL', 'PURCHASING', 'ACCOUNTANT', 'CEO', 'ADMIN'].includes(user?.role);
+  const canReadSuppliers = ['PURCHASING', 'WAREHOUSE_MANAGER', 'CEO', 'ADMIN'].includes(user?.role);
   const { can, canDo, canCreate, canEdit, canDelete, canApprove } = usePermission();
   const isManager = canDo('warehouse_dispatch_shipper') || canApprove('warehouse') || isCEO || isAdmin;
   const canPackScan = canDo('warehouse_pack_scan') || isWarehouse || isAdmin;
@@ -3326,7 +3227,7 @@ export default function Warehouse() {
       let apiReceipts = [];
       try {
         const [receiptsRes, movementsRes] = await Promise.all([
-          api.get('/warehouse/receipts'),
+          canReadReceipts ? api.get('/warehouse/receipts') : Promise.resolve({ success: true, data: [] }),
           api.get('/warehouse/stock-movements?limit=50')
         ]);
         if (receiptsRes?.success) apiReceipts = receiptsRes.data || [];
@@ -3458,6 +3359,7 @@ export default function Warehouse() {
   const [realSuppliers, setRealSuppliers] = useState([]);
   useEffect(() => {
     (async () => {
+      if (!canReadSuppliers) return;
       try {
         const res = await api.get('/purchasing/suppliers');
         if (res?.success && Array.isArray(res.data)) {
@@ -3586,7 +3488,7 @@ export default function Warehouse() {
       const intakeDoc = {
         receiptNumber: receipt.receiptNumber || `GRN-${poNum}`,
         poNumber: poNum,
-        supplierName: effectivePo?.supplier?.name || effectivePo?.supplierName || receipt.supplierName || 'Công ty TNHH Gigabyte Việt Nam',
+        supplierName: effectivePo?.supplier?.name || effectivePo?.supplierName || receipt.supplierName || 'Chưa xác định nhà cung cấp',
         warehouseStaff: cleanStaffName(user?.fullname),
         qaInspector: qaLog?.inspector || 'Đặng Văn Kiểm (QA/QC)',
         intakeDate: new Date().toLocaleString('vi-VN'),
@@ -3984,7 +3886,8 @@ export default function Warehouse() {
   const readyReceipts = effectiveReceipts.filter(r => r.status === 'READY');
   // Shared with the Delivery tab's default "PENDING" filter (below) so the
   // Overview KPI card always matches the count the linked tab actually shows.
-  const PENDING_DELIVERY_STATUSES = ['CONFIRMED', 'READY_TO_SHIP', 'PACKED', 'PENDING', 'PROCESSING', 'AWAITING_SHIP'];
+  // Đơn 'PENDING' còn chờ bán hàng xác nhận (chưa trừ tồn) — chưa thuộc việc của kho.
+  const PENDING_DELIVERY_STATUSES = ['CONFIRMED', 'READY_TO_SHIP', 'PACKED', 'PROCESSING', 'AWAITING_SHIP'];
   // Đơn còn lệnh lắp ráp chưa xong (assemblyPending — backend gắn từ assembly_jobs) là việc của
   // Lắp Ráp: khi lắp xong hệ thống tự chuyển đơn sang READY_TO_SHIP, lúc đó Kho mới xuất.
   const isAwaitingKhoExport = (o) => PENDING_DELIVERY_STATUSES.includes(o.status) && !o.assemblyPending;
@@ -4279,7 +4182,7 @@ export default function Warehouse() {
             <div style={{
               backgroundColor: '#ffffff',
               borderRadius: '8px',
-              border: '1px solid #cbd5e1',
+              border: '1px solid #e3e8ef',
               padding: '1.25rem',
               boxShadow: '0 2px 6px rgba(0,0,0,0.03)',
               display: 'flex',
@@ -4318,7 +4221,7 @@ export default function Warehouse() {
             <div style={{
               backgroundColor: '#ffffff',
               borderRadius: '8px',
-              border: '1px solid #cbd5e1',
+              border: '1px solid #e3e8ef',
               padding: '1.25rem',
               boxShadow: '0 2px 6px rgba(0,0,0,0.03)',
               display: 'flex',
@@ -4357,7 +4260,7 @@ export default function Warehouse() {
             <div style={{
               backgroundColor: '#ffffff',
               borderRadius: '8px',
-              border: '1px solid #cbd5e1',
+              border: '1px solid #e3e8ef',
               padding: '1.25rem',
               boxShadow: '0 2px 6px rgba(0,0,0,0.03)',
               display: 'flex',
@@ -4395,7 +4298,7 @@ export default function Warehouse() {
             <div style={{
               backgroundColor: '#ffffff',
               borderRadius: '8px',
-              border: '1px solid #cbd5e1',
+              border: '1px solid #e3e8ef',
               padding: '1.25rem',
               boxShadow: '0 2px 6px rgba(0,0,0,0.03)',
               display: 'flex',
@@ -4434,7 +4337,7 @@ export default function Warehouse() {
             <div style={{
               backgroundColor: '#ffffff',
               borderRadius: '8px',
-              border: '1px solid #cbd5e1',
+              border: '1px solid #e3e8ef',
               padding: '1.25rem',
               boxShadow: '0 2px 6px rgba(0,0,0,0.03)',
               display: 'flex',
@@ -4471,7 +4374,7 @@ export default function Warehouse() {
             {/* Card 6: Đơn Chờ Hàng (Backorders) */}
             <div style={{
               borderRadius: '8px',
-              border: backorderOrders.length > 0 ? '1.5px solid #fdba74' : '1px solid #cbd5e1',
+              border: backorderOrders.length > 0 ? '1.5px solid #fdba74' : '1px solid #e3e8ef',
               padding: '1.25rem',
               boxShadow: '0 2px 6px rgba(0,0,0,0.03)',
               display: 'flex',
@@ -4566,8 +4469,8 @@ export default function Warehouse() {
 
           {/* Quick Metrics */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem', marginBottom: '1.25rem' }}>
-            <div style={{ backgroundColor: '#ffffff', padding: '1.1rem', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
-              <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+            <div style={{ backgroundColor: '#ffffff', padding: '1.1rem', borderRadius: '8px', border: '1px solid #e3e8ef' }}>
+              <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                 Đơn Hàng Chờ Xử Lý
               </div>
               <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#ea580c', marginTop: '0.25rem' }}>
@@ -4575,8 +4478,8 @@ export default function Warehouse() {
               </div>
             </div>
 
-            <div style={{ backgroundColor: '#ffffff', padding: '1.1rem', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
-              <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+            <div style={{ backgroundColor: '#ffffff', padding: '1.1rem', borderRadius: '8px', border: '1px solid #e3e8ef' }}>
+              <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                 Mặt Hàng Thiếu Tồn Kho
               </div>
               <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#dc2626', marginTop: '0.25rem' }}>
@@ -4590,8 +4493,8 @@ export default function Warehouse() {
               </div>
             </div>
 
-            <div style={{ backgroundColor: '#ffffff', padding: '1.1rem', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
-              <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+            <div style={{ backgroundColor: '#ffffff', padding: '1.1rem', borderRadius: '8px', border: '1px solid #e3e8ef' }}>
+              <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                 Tổng Giá Trị Đơn Treo
               </div>
               <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#0f172a', marginTop: '0.25rem' }}>
@@ -4601,18 +4504,18 @@ export default function Warehouse() {
           </div>
 
           {/* Search Filter Bar */}
-          <div style={{ backgroundColor: '#ffffff', padding: '0.85rem 1rem', borderRadius: '8px', border: '1px solid #cbd5e1', marginBottom: '1.25rem', display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <div style={{ backgroundColor: '#ffffff', padding: '0.85rem 1rem', borderRadius: '8px', border: '1px solid #e3e8ef', marginBottom: '1.25rem', display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
             <input
               type="text"
               placeholder="Tìm theo mã đơn hàng, tên khách hàng, tên linh kiện..."
               value={backorderSearch}
               onChange={e => setBackorderSearch(e.target.value)}
-              style={{ flex: '1 1 260px', padding: '0.55rem 0.85rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px' }}
+              style={{ flex: '1 1 260px', padding: '0.55rem 0.85rem', fontSize: '0.83rem', border: '1px solid #e3e8ef', borderRadius: '6px' }}
             />
             <select
               value={backorderStockFilter}
               onChange={e => setBackorderStockFilter(e.target.value)}
-              style={{ padding: '0.55rem 0.85rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px' }}
+              style={{ padding: '0.55rem 0.85rem', fontSize: '0.83rem', border: '1px solid #e3e8ef', borderRadius: '6px' }}
             >
               <option value="ALL">Tất cả tình trạng tồn kho</option>
               <option value="READY">Đã đủ hàng (sẵn sàng đóng gói)</option>
@@ -4621,7 +4524,7 @@ export default function Warehouse() {
           </div>
 
           {/* Backorders Table */}
-          <div className="table-responsive" style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', overflowX: 'auto', WebkitOverflowScrolling: 'touch', maxWidth: '100%' }}>
+          <div className="table-responsive" style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', overflowX: 'auto', WebkitOverflowScrolling: 'touch', maxWidth: '100%' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.83rem' }}>
               <thead>
                 <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569' }}>
@@ -4671,7 +4574,7 @@ export default function Warehouse() {
                           <div style={{ fontWeight: 800, color: '#2563eb', fontSize: '0.9rem' }}>
                             #{order.orderId || order.id}
                           </div>
-                          <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.25rem' }}>
+                          <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.25rem' }}>
                             {order.createdAt ? new Date(order.createdAt).toLocaleDateString('vi-VN') : '18/08/2026'}
                           </div>
                         </td>
@@ -4681,7 +4584,7 @@ export default function Warehouse() {
                           <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.85rem' }}>
                             {order.customerName || 'Khách Hàng'}
                           </div>
-                          <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.15rem' }}>
+                          <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.15rem' }}>
                             {order.phone || '090xxxxxxx'}
                           </div>
                         </td>
@@ -4706,7 +4609,7 @@ export default function Warehouse() {
                                   <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.82rem', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', lineHeight: '1.3' }}>
                                     {it.name || it.productName || 'Linh Kiện Máy Tính'}
                                   </div>
-                                  <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '0.1rem' }}>
+                                  <div style={{ fontSize: '0.77rem', color: '#64748b', marginTop: '0.1rem' }}>
                                     Yêu cầu: <strong>{it.neededQty}</strong> · Tồn kho: <strong>{it.currentStock}</strong>
                                   </div>
                                 </div>
@@ -4716,7 +4619,7 @@ export default function Warehouse() {
                                     <span style={{
                                       padding: '2px 8px',
                                       borderRadius: '4px',
-                                      fontSize: '0.72rem',
+                                      fontSize: '0.77rem',
                                       fontWeight: 800,
                                       backgroundColor: '#fee2e2',
                                       color: '#b91c1c',
@@ -4729,11 +4632,11 @@ export default function Warehouse() {
                                     <span style={{
                                       padding: '2px 8px',
                                       borderRadius: '4px',
-                                      fontSize: '0.72rem',
+                                      fontSize: '0.77rem',
                                       fontWeight: 700,
                                       backgroundColor: '#f1f5f9',
                                       color: '#475569',
-                                      border: '1px solid #cbd5e1',
+                                      border: '1px solid #e3e8ef',
                                       whiteSpace: 'nowrap'
                                     }}>
                                       Đủ hàng
@@ -4756,7 +4659,7 @@ export default function Warehouse() {
                             <span style={{
                               padding: '4px 10px',
                               borderRadius: '4px',
-                              fontSize: '0.75rem',
+                              fontSize: '0.8rem',
                               fontWeight: 800,
                               backgroundColor: '#dcfce7',
                               color: '#15803d',
@@ -4769,7 +4672,7 @@ export default function Warehouse() {
                             <span style={{
                               padding: '4px 10px',
                               borderRadius: '4px',
-                              fontSize: '0.75rem',
+                              fontSize: '0.8rem',
                               fontWeight: 800,
                               backgroundColor: '#ffedd5',
                               color: '#c2410c',
@@ -4829,10 +4732,10 @@ export default function Warehouse() {
                               style={{
                                 backgroundColor: '#ffffff',
                                 color: '#475569',
-                                border: '1px solid #cbd5e1',
+                                border: '1px solid #e3e8ef',
                                 borderRadius: '5px',
                                 padding: '0.4rem 0.5rem',
-                                fontSize: '0.75rem',
+                                fontSize: '0.8rem',
                                 fontWeight: 600,
                                 cursor: 'pointer',
                                 width: '100%',
@@ -4866,18 +4769,18 @@ export default function Warehouse() {
           </div>
 
           {/* Filter bar */}
-          <div style={{ backgroundColor: '#ffffff', padding: '1rem', borderRadius: '8px', border: '1px solid #cbd5e1', marginBottom: '1.25rem', display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
+          <div style={{ backgroundColor: '#ffffff', padding: '1rem', borderRadius: '8px', border: '1px solid #e3e8ef', marginBottom: '1.25rem', display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
             <input
               type="text"
               placeholder="Tìm theo mã phiếu nhập GRN, mã PO..."
               value={receiptSearch}
               onChange={(e) => setReceiptSearch(e.target.value)}
-              style={{ flex: 1, minWidth: '220px', padding: '0.55rem 0.85rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px' }}
+              style={{ flex: 1, minWidth: '220px', padding: '0.55rem 0.85rem', fontSize: '0.83rem', border: '1px solid #e3e8ef', borderRadius: '6px' }}
             />
             <select
               value={receiptStatusFilter}
               onChange={(e) => setReceiptStatusFilter(e.target.value)}
-              style={{ padding: '0.55rem 0.85rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px' }}
+              style={{ padding: '0.55rem 0.85rem', fontSize: '0.83rem', border: '1px solid #e3e8ef', borderRadius: '6px' }}
             >
               <option value="ALL">Tất cả trạng thái</option>
               <option value="READY">Chờ nhập kho</option>
@@ -4886,7 +4789,7 @@ export default function Warehouse() {
           </div>
 
           {/* Receipts Table */}
-          <div className="table-responsive" style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', overflowX: 'auto', WebkitOverflowScrolling: 'touch', maxWidth: '100%' }}>
+          <div className="table-responsive" style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', overflowX: 'auto', WebkitOverflowScrolling: 'touch', maxWidth: '100%' }}>
             <table style={{ width: '100%', minWidth: '1080px', borderCollapse: 'collapse', fontSize: '0.83rem' }}>
               <thead>
                 <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569' }}>
@@ -4928,7 +4831,7 @@ export default function Warehouse() {
                               whiteSpace: 'nowrap',
                               padding: '0.28rem 0.65rem',
                               borderRadius: '6px',
-                              fontSize: '0.73rem',
+                              fontSize: '0.78rem',
                               fontWeight: 700,
                               backgroundColor: qcBadge.bg,
                               color: qcBadge.color,
@@ -4948,7 +4851,7 @@ export default function Warehouse() {
                           whiteSpace: 'nowrap',
                           padding: '0.28rem 0.65rem',
                           borderRadius: '6px',
-                          fontSize: '0.73rem',
+                          fontSize: '0.78rem',
                           fontWeight: 700,
                           backgroundColor: r.status === 'DONE' ? '#dcfce7' : '#fef3c7',
                           color: r.status === 'DONE' ? '#15803d' : '#d97706',
@@ -4969,7 +4872,7 @@ export default function Warehouse() {
                               border: 'none',
                               borderRadius: '5px',
                               padding: '0.38rem 0.75rem',
-                              fontSize: '0.75rem',
+                              fontSize: '0.8rem',
                               fontWeight: 700,
                               cursor: 'pointer',
                               display: 'inline-flex',
@@ -5025,7 +4928,7 @@ export default function Warehouse() {
                                 setViewingIntakeSuccessDoc({
                                   receiptNumber: r.receiptNumber || `GRN-${poNum}`,
                                   poNumber: poNum,
-                                  supplierName: poObj.supplier?.name || poObj.supplierName || r.supplierName || 'Công ty TNHH Gigabyte Việt Nam',
+                                  supplierName: poObj.supplier?.name || poObj.supplierName || r.supplierName || 'Chưa xác định nhà cung cấp',
                                   warehouseStaff: cleanStaffName(user?.fullname),
                                   qaInspector: rQaLog?.inspector || 'Đặng Văn Kiểm (QA/QC)',
                                   intakeDate: new Date().toLocaleString('vi-VN'),
@@ -5040,7 +4943,7 @@ export default function Warehouse() {
                                 border: 'none',
                                 borderRadius: '5px',
                                 padding: '0.38rem 0.75rem',
-                                fontSize: '0.75rem',
+                                fontSize: '0.8rem',
                                 fontWeight: 700,
                                 cursor: 'pointer',
                                 display: 'inline-flex',
@@ -5083,7 +4986,7 @@ export default function Warehouse() {
                                   border: '1px solid #bfdbfe',
                                   borderRadius: '5px',
                                   padding: '0.38rem 0.75rem',
-                                  fontSize: '0.75rem',
+                                  fontSize: '0.8rem',
                                   fontWeight: 700,
                                   cursor: 'pointer',
                                   display: 'inline-flex',
@@ -5126,18 +5029,18 @@ export default function Warehouse() {
           </div>
 
           {/* Filter bar */}
-          <div style={{ backgroundColor: '#ffffff', padding: '1rem', borderRadius: '8px', border: '1px solid #cbd5e1', marginBottom: '1.25rem', display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
+          <div style={{ backgroundColor: '#ffffff', padding: '1rem', borderRadius: '8px', border: '1px solid #e3e8ef', marginBottom: '1.25rem', display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
             <input
               type="text"
               placeholder="Tìm theo mã đơn hàng ORD, tên khách hàng..."
               value={deliverySearch}
               onChange={(e) => setDeliverySearch(e.target.value)}
-              style={{ flex: 1, minWidth: '220px', padding: '0.55rem 0.85rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px' }}
+              style={{ flex: 1, minWidth: '220px', padding: '0.55rem 0.85rem', fontSize: '0.83rem', border: '1px solid #e3e8ef', borderRadius: '6px' }}
             />
             <select
               value={deliveryFilter}
               onChange={(e) => setDeliveryFilter(e.target.value)}
-              style={{ padding: '0.55rem 0.85rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px' }}
+              style={{ padding: '0.55rem 0.85rem', fontSize: '0.83rem', border: '1px solid #e3e8ef', borderRadius: '6px' }}
             >
               <option value="PENDING">Chờ xuất kho & bàn giao</option>
               <option value="ASSEMBLING">Đang lắp ráp (chưa tới lượt Kho)</option>
@@ -5151,7 +5054,7 @@ export default function Warehouse() {
             <select
               value={deliveryShipperFilter}
               onChange={(e) => setDeliveryShipperFilter(e.target.value)}
-              style={{ padding: '0.55rem 0.85rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px' }}
+              style={{ padding: '0.55rem 0.85rem', fontSize: '0.83rem', border: '1px solid #e3e8ef', borderRadius: '6px' }}
             >
               <option value="ALL">Tất cả Shipper</option>
               <option value="UNASSIGNED">Chưa phân công</option>
@@ -5162,7 +5065,7 @@ export default function Warehouse() {
           </div>
 
           {/* Delivery Orders Table */}
-          <div className="table-responsive" style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', overflowX: 'auto', WebkitOverflowScrolling: 'touch', maxWidth: '100%' }}>
+          <div className="table-responsive" style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', overflowX: 'auto', WebkitOverflowScrolling: 'touch', maxWidth: '100%' }}>
             <table style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
               <thead>
                 <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569' }}>
@@ -5207,7 +5110,7 @@ export default function Warehouse() {
                         </td>
                         <td style={{ padding: '0.65rem 0.6rem', color: '#0f172a', overflow: 'hidden' }}>
                           <div style={{ fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{o.customerName || 'Khách hàng'}</div>
-                          <div style={{ fontSize: '0.73rem', color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{o.phone || o.customerPhone || '090xxxxxxx'}</div>
+                          <div style={{ fontSize: '0.78rem', color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{o.phone || o.customerPhone || '090xxxxxxx'}</div>
                         </td>
                         <td style={{ padding: '0.65rem 0.6rem', color: '#475569', overflow: 'hidden' }}>
                           <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -5231,7 +5134,7 @@ export default function Warehouse() {
                         <td style={{ padding: '0.65rem 0.6rem', textAlign: 'center', whiteSpace: 'nowrap', overflow: 'hidden' }}>
                           {isAssemblingNow && (
                             <span title={o.assemblyJobCode ? `Lệnh lắp ráp ${o.assemblyJobCode}` : undefined} style={{
-                              padding: '0.28rem 0.65rem', borderRadius: '6px', fontSize: '0.73rem', fontWeight: 700, whiteSpace: 'nowrap',
+                              padding: '0.28rem 0.65rem', borderRadius: '6px', fontSize: '0.78rem', fontWeight: 700, whiteSpace: 'nowrap',
                               backgroundColor: '#eef2ff', color: '#4338ca', border: '1px solid #c7d2fe', display: 'inline-flex', alignItems: 'center', justifyContent: 'center'
                             }}>
                               {o.assemblyJobStatus === 'ASSEMBLING' ? 'Đang Lắp Ráp' : 'Chờ Lắp Ráp'}
@@ -5241,7 +5144,7 @@ export default function Warehouse() {
                             <span style={{
                               padding: '0.28rem 0.65rem',
                               borderRadius: '6px',
-                              fontSize: '0.73rem',
+                              fontSize: '0.78rem',
                               fontWeight: 700,
                               whiteSpace: 'nowrap',
                               backgroundColor: '#fff7ed',
@@ -5259,7 +5162,7 @@ export default function Warehouse() {
                             <span style={{
                               padding: '0.28rem 0.65rem',
                               borderRadius: '6px',
-                              fontSize: '0.73rem',
+                              fontSize: '0.78rem',
                               fontWeight: 700,
                               whiteSpace: 'nowrap',
                               backgroundColor: isAwaitingShipperAccept ? '#eff6ff' : '#f0fdf4',
@@ -5277,7 +5180,7 @@ export default function Warehouse() {
                             <span style={{
                               padding: '0.28rem 0.65rem',
                               borderRadius: '6px',
-                              fontSize: '0.73rem',
+                              fontSize: '0.78rem',
                               fontWeight: 700,
                               whiteSpace: 'nowrap',
                               backgroundColor: '#eff6ff',
@@ -5295,7 +5198,7 @@ export default function Warehouse() {
                             <span style={{
                               padding: '0.28rem 0.65rem',
                               borderRadius: '6px',
-                              fontSize: '0.73rem',
+                              fontSize: '0.78rem',
                               fontWeight: 700,
                               whiteSpace: 'nowrap',
                               backgroundColor: '#f0fdf4',
@@ -5313,12 +5216,12 @@ export default function Warehouse() {
                             <span style={{
                               padding: '0.28rem 0.65rem',
                               borderRadius: '6px',
-                              fontSize: '0.73rem',
+                              fontSize: '0.78rem',
                               fontWeight: 700,
                               whiteSpace: 'nowrap',
                               backgroundColor: '#f1f5f9',
                               color: '#64748b',
-                              border: '1px solid #cbd5e1',
+                              border: '1px solid #e3e8ef',
                               display: 'inline-flex',
                               alignItems: 'center',
                               justifyContent: 'center'
@@ -5331,7 +5234,7 @@ export default function Warehouse() {
                             <span style={{
                               padding: '0.28rem 0.65rem',
                               borderRadius: '6px',
-                              fontSize: '0.73rem',
+                              fontSize: '0.78rem',
                               fontWeight: 700,
                               whiteSpace: 'nowrap',
                               backgroundColor: '#fef2f2',
@@ -5349,7 +5252,7 @@ export default function Warehouse() {
                             <span style={{
                               padding: '0.28rem 0.65rem',
                               borderRadius: '6px',
-                              fontSize: '0.73rem',
+                              fontSize: '0.78rem',
                               fontWeight: 700,
                               whiteSpace: 'nowrap',
                               backgroundColor: '#fff7ed',
@@ -5368,7 +5271,7 @@ export default function Warehouse() {
                             {/* Slot 1: trạng thái chính / nút hành động chính — cột cố định để thẳng hàng giữa các dòng */}
                             <div style={{ width: '150px', flexShrink: 0, display: 'flex' }}>
                               {isAssemblingNow && (
-                                <span style={{ width: '100%', boxSizing: 'border-box', fontSize: '0.72rem', color: '#64748b', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                <span style={{ width: '100%', boxSizing: 'border-box', fontSize: '0.77rem', color: '#64748b', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                   Chờ Lắp Ráp hoàn tất{o.assemblyJobCode ? ` (${o.assemblyJobCode})` : ''}
                                 </span>
                               )}
@@ -5457,7 +5360,7 @@ export default function Warehouse() {
           )}
 
           {canStockIntake && (
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.5rem' }}>
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1.5rem' }}>
             <fieldset disabled={!canStockIntake} style={{ border: 'none', padding: 0, margin: 0 }}>
             <form onSubmit={handleDirectIntakeSubmit}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.25rem', marginBottom: '1.25rem' }}>
@@ -5468,7 +5371,7 @@ export default function Warehouse() {
                   <select
                     value={directProduct}
                     onChange={(e) => setDirectProduct(e.target.value)}
-                    style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px' }}
+                    style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.83rem', border: '1px solid #e3e8ef', borderRadius: '6px' }}
                   >
                     <option value="">-- Chọn sản phẩm --</option>
                     {activeInventory.map(prod => (
@@ -5489,7 +5392,7 @@ export default function Warehouse() {
                     placeholder="Nhập số lượng..."
                     value={directQty}
                     onChange={(e) => setDirectQty(e.target.value)}
-                    style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px' }}
+                    style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.83rem', border: '1px solid #e3e8ef', borderRadius: '6px' }}
                   />
                 </div>
 
@@ -5500,7 +5403,7 @@ export default function Warehouse() {
                   <select
                     value={directLocation}
                     onChange={(e) => setDirectLocation(e.target.value)}
-                    style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px' }}
+                    style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.83rem', border: '1px solid #e3e8ef', borderRadius: '6px' }}
                   >
                     {PREDEFINED_LOCATIONS.map(loc => (
                       <option key={loc} value={loc}>{loc}</option>
@@ -5517,7 +5420,7 @@ export default function Warehouse() {
                     placeholder="VD: INT-2026-001"
                     value={directRef}
                     onChange={(e) => setDirectRef(e.target.value)}
-                    style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px' }}
+                    style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.83rem', border: '1px solid #e3e8ef', borderRadius: '6px' }}
                   />
                 </div>
               </div>
@@ -5531,7 +5434,7 @@ export default function Warehouse() {
                   placeholder="Ghi rõ lý do nhập bổ sung hoặc kiểm kê thừa..."
                   value={directNote}
                   onChange={(e) => setDirectNote(e.target.value)}
-                  style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontFamily: 'inherit' }}
+                  style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.83rem', border: '1px solid #e3e8ef', borderRadius: '6px', fontFamily: 'inherit' }}
                 />
               </div>
 
@@ -5544,7 +5447,7 @@ export default function Warehouse() {
                   placeholder="Mỗi dòng 1 Serial Number, số dòng phải khớp đúng số lượng nhập..."
                   value={directSerials}
                   onChange={(e) => setDirectSerials(e.target.value)}
-                  style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.8rem', fontFamily: 'monospace', border: '1px solid #cbd5e1', borderRadius: '6px' }}
+                  style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.8rem', fontFamily: 'monospace', border: '1px solid #e3e8ef', borderRadius: '6px' }}
                 />
               </div>
 
@@ -5569,7 +5472,7 @@ export default function Warehouse() {
           )}
 
           {/* Danh sách phiếu nhập kho trực tiếp — Quản Lý Kho duyệt / từ chối */}
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem', marginTop: '1.5rem' }}>
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1.25rem', marginTop: '1.5rem' }}>
             <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a', margin: '0 0 0.75rem 0' }}>
               Phiếu Nhập Kho Trực Tiếp ({stockIntakes.filter(s => s.status === 'PENDING').length} chờ duyệt)
             </h3>
@@ -5596,28 +5499,28 @@ export default function Warehouse() {
                         <td style={{ padding: '0.55rem 0.75rem', fontWeight: 700, color: '#2563eb' }}>{s.code}</td>
                         <td style={{ padding: '0.55rem 0.75rem', color: '#0f172a' }} title={`Serial: ${(s.serials || []).join(', ')}`}>
                           <div style={{ fontWeight: 600 }}>{s.product?.name || s.productId}</div>
-                          {s.note && <div style={{ fontSize: '0.72rem', color: '#64748b' }}>{s.note}</div>}
+                          {s.note && <div style={{ fontSize: '0.77rem', color: '#64748b' }}>{s.note}</div>}
                         </td>
                         <td style={{ padding: '0.55rem 0.75rem', textAlign: 'center', fontWeight: 800 }}>{s.quantity}</td>
-                        <td style={{ padding: '0.55rem 0.75rem', color: '#475569' }}>{s.location || '—'}<div style={{ fontSize: '0.72rem', color: '#94a3b8' }}>{s.refCode}</div></td>
+                        <td style={{ padding: '0.55rem 0.75rem', color: '#475569' }}>{s.location || '—'}<div style={{ fontSize: '0.77rem', color: '#94a3b8' }}>{s.refCode}</div></td>
                         <td style={{ padding: '0.55rem 0.75rem', color: '#475569' }}>
                           {s.requestedBy || 'Thủ Kho'}
-                          <div style={{ fontSize: '0.72rem', color: '#94a3b8' }}>{s.createdAt ? new Date(s.createdAt).toLocaleString('vi-VN') : ''}</div>
+                          <div style={{ fontSize: '0.77rem', color: '#94a3b8' }}>{s.createdAt ? new Date(s.createdAt).toLocaleString('vi-VN') : ''}</div>
                         </td>
                         <td style={{ padding: '0.55rem 0.75rem' }}>
-                          <span style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 800, backgroundColor: st.bg, color: st.color, border: `1px solid ${st.border}`, whiteSpace: 'nowrap' }}>{st.label}</span>
+                          <span style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 800, backgroundColor: st.bg, color: st.color, border: `1px solid ${st.border}`, whiteSpace: 'nowrap' }}>{st.label}</span>
                           {s.status !== 'PENDING' && s.approvedBy && (
-                            <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: '0.2rem' }}>bởi {s.approvedBy}{s.rejectReason ? ` — ${s.rejectReason}` : ''}</div>
+                            <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '0.2rem' }}>bởi {s.approvedBy}{s.rejectReason ? ` — ${s.rejectReason}` : ''}</div>
                           )}
                         </td>
                         <td style={{ padding: '0.55rem 0.75rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
                           {s.status === 'PENDING' && canApproveIntake ? (
                             <>
-                              <button disabled={intakeBusyId === s.id} onClick={() => handleDecideIntake(s, 'approve')} style={{ backgroundColor: '#16a34a', color: '#ffffff', border: 'none', borderRadius: '5px', padding: '0.3rem 0.7rem', fontSize: '0.74rem', fontWeight: 700, cursor: 'pointer', marginRight: '0.35rem' }}>Duyệt</button>
-                              <button disabled={intakeBusyId === s.id} onClick={() => handleDecideIntake(s, 'reject')} style={{ backgroundColor: '#ffffff', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '5px', padding: '0.3rem 0.7rem', fontSize: '0.74rem', fontWeight: 700, cursor: 'pointer' }}>Từ Chối</button>
+                              <button disabled={intakeBusyId === s.id} onClick={() => handleDecideIntake(s, 'approve')} style={{ backgroundColor: '#16a34a', color: '#ffffff', border: 'none', borderRadius: '5px', padding: '0.3rem 0.7rem', fontSize: '0.79rem', fontWeight: 700, cursor: 'pointer', marginRight: '0.35rem' }}>Duyệt</button>
+                              <button disabled={intakeBusyId === s.id} onClick={() => handleDecideIntake(s, 'reject')} style={{ backgroundColor: '#ffffff', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '5px', padding: '0.3rem 0.7rem', fontSize: '0.79rem', fontWeight: 700, cursor: 'pointer' }}>Từ Chối</button>
                             </>
                           ) : s.status === 'PENDING' ? (
-                            <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>Chờ Quản Lý Kho</span>
+                            <span style={{ fontSize: '0.77rem', color: '#94a3b8' }}>Chờ Quản Lý Kho</span>
                           ) : '—'}
                         </td>
                       </tr>
@@ -5654,7 +5557,7 @@ export default function Warehouse() {
                     <select
                       value={auditForm.productId}
                       onChange={(e) => setAuditForm(f => ({ ...f, productId: e.target.value }))}
-                      style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px' }}
+                      style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.83rem', border: '1px solid #e3e8ef', borderRadius: '6px' }}
                     >
                       <option value="">-- Chọn sản phẩm --</option>
                       {activeInventory.map(prod => (
@@ -5668,7 +5571,7 @@ export default function Warehouse() {
                       type="number" min="1"
                       value={auditForm.quantity}
                       onChange={(e) => setAuditForm(f => ({ ...f, quantity: e.target.value }))}
-                      style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px' }}
+                      style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.83rem', border: '1px solid #e3e8ef', borderRadius: '6px' }}
                     />
                   </div>
                   <div>
@@ -5677,7 +5580,7 @@ export default function Warehouse() {
                       type="text" placeholder="Thất lạc, hư hỏng, sai lệch kiểm kê..."
                       value={auditForm.reason}
                       onChange={(e) => setAuditForm(f => ({ ...f, reason: e.target.value }))}
-                      style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px' }}
+                      style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.83rem', border: '1px solid #e3e8ef', borderRadius: '6px' }}
                     />
                   </div>
                   <div style={{ gridColumn: '1 / -1' }}>
@@ -5688,7 +5591,7 @@ export default function Warehouse() {
                       rows={3}
                       value={auditForm.serials}
                       onChange={(e) => setAuditForm(f => ({ ...f, serials: e.target.value }))}
-                      style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontFamily: 'monospace' }}
+                      style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.83rem', border: '1px solid #e3e8ef', borderRadius: '6px', fontFamily: 'monospace' }}
                     />
                   </div>
                   <div style={{ gridColumn: '1 / -1' }}>
@@ -5740,7 +5643,7 @@ export default function Warehouse() {
           {/* Phiếu Yêu Cầu Mua Hàng nội bộ (PurchaseRequest) — warehouse_create_pr / warehouse_approve_pr.
               Trước đây "Đề xuất bổ sung" chỉ gửi thông báo + log localStorage, không có
               hồ sơ thật nào để Quản Lý Kho ký duyệt. */}
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem', marginBottom: '1.25rem' }}>
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1.25rem', marginBottom: '1.25rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
               <div>
                 <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>Phiếu Yêu Cầu Mua Hàng Nội Bộ (PR)</h3>
@@ -5787,7 +5690,7 @@ export default function Warehouse() {
                 <select
                   value={prForm.productId}
                   onChange={(e) => setPrForm(f => ({ ...f, productId: e.target.value }))}
-                  style={{ padding: '0.55rem 0.75rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px' }}
+                  style={{ padding: '0.55rem 0.75rem', fontSize: '0.83rem', border: '1px solid #e3e8ef', borderRadius: '6px' }}
                 >
                   <option value="">-- Chọn sản phẩm --</option>
                   {activeInventory.map(prod => (
@@ -5798,13 +5701,13 @@ export default function Warehouse() {
                   type="number" min="1" placeholder="Số lượng đề xuất"
                   value={prForm.quantity}
                   onChange={(e) => setPrForm(f => ({ ...f, quantity: e.target.value }))}
-                  style={{ padding: '0.55rem 0.75rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px' }}
+                  style={{ padding: '0.55rem 0.75rem', fontSize: '0.83rem', border: '1px solid #e3e8ef', borderRadius: '6px' }}
                 />
                 <input
                   type="text" placeholder="Lý do đề xuất"
                   value={prForm.reason}
                   onChange={(e) => setPrForm(f => ({ ...f, reason: e.target.value }))}
-                  style={{ padding: '0.55rem 0.75rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px' }}
+                  style={{ padding: '0.55rem 0.75rem', fontSize: '0.83rem', border: '1px solid #e3e8ef', borderRadius: '6px' }}
                 />
                 <button
                   onClick={handleCreatePr}
@@ -5850,13 +5753,13 @@ export default function Warehouse() {
                           <td style={{ padding: '0.75rem 1rem', color: '#64748b' }}>{pr.reason || '-'}</td>
                           <td style={{ padding: '0.75rem 1rem', color: '#64748b', fontSize: '0.78rem', whiteSpace: 'nowrap' }}>{pr.requestedBy}</td>
                           <td style={{ padding: '0.75rem 1rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
-                            <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: '12px', fontSize: '0.72rem', fontWeight: 700, backgroundColor: statusBg, color: statusColor, border: `1px solid ${statusBorder}`, whiteSpace: 'nowrap' }}>{statusLabel}</span>
+                            <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: '12px', fontSize: '0.77rem', fontWeight: 700, backgroundColor: statusBg, color: statusColor, border: `1px solid ${statusBorder}`, whiteSpace: 'nowrap' }}>{statusLabel}</span>
                           </td>
                           <td style={{ padding: '0.75rem 1rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
                             <button
                               onClick={() => setViewingPR(pr)}
                               title="Xem / In Phiếu Đề Xuất Mua Hàng"
-                              style={{ backgroundColor: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', borderRadius: '4px', padding: '0.3rem 0.55rem', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                              style={{ backgroundColor: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', borderRadius: '4px', padding: '0.3rem 0.55rem', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
                             >
                               <Eye size={13} /> Xem
                             </button>
@@ -5865,11 +5768,11 @@ export default function Warehouse() {
                             <td style={{ padding: '0.75rem 1rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
                               {pr.status === 'PENDING' ? (
                                 <div style={{ display: 'flex', gap: '0.35rem', justifyContent: 'center' }}>
-                                  <button disabled={isBusy} onClick={() => handleDecidePr(pr, 'approve')} style={{ backgroundColor: '#16a34a', color: '#fff', border: 'none', borderRadius: '4px', padding: '0.35rem 0.65rem', fontSize: '0.75rem', fontWeight: 700, cursor: isBusy ? 'default' : 'pointer', whiteSpace: 'nowrap' }}>Duyệt</button>
-                                  <button disabled={isBusy} onClick={() => handleDecidePr(pr, 'reject')} style={{ backgroundColor: '#fff', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '4px', padding: '0.35rem 0.65rem', fontSize: '0.75rem', fontWeight: 700, cursor: isBusy ? 'default' : 'pointer', whiteSpace: 'nowrap' }}>Từ Chối</button>
+                                  <button disabled={isBusy} onClick={() => handleDecidePr(pr, 'approve')} style={{ backgroundColor: '#16a34a', color: '#fff', border: 'none', borderRadius: '4px', padding: '0.35rem 0.65rem', fontSize: '0.8rem', fontWeight: 700, cursor: isBusy ? 'default' : 'pointer', whiteSpace: 'nowrap' }}>Duyệt</button>
+                                  <button disabled={isBusy} onClick={() => handleDecidePr(pr, 'reject')} style={{ backgroundColor: '#fff', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '4px', padding: '0.35rem 0.65rem', fontSize: '0.8rem', fontWeight: 700, cursor: isBusy ? 'default' : 'pointer', whiteSpace: 'nowrap' }}>Từ Chối</button>
                                 </div>
                               ) : (
-                                <span style={{ fontSize: '0.74rem', color: '#94a3b8', whiteSpace: 'nowrap' }}>{pr.approvedBy}</span>
+                                <span style={{ fontSize: '0.79rem', color: '#94a3b8', whiteSpace: 'nowrap' }}>{pr.approvedBy}</span>
                               )}
                             </td>
                           )}
@@ -5898,13 +5801,13 @@ export default function Warehouse() {
               `}</style>
               <div
                 className="aetherpc-pr-print"
-                style={{ width: '100%', maxWidth: '640px', maxHeight: '90vh', overflowY: 'auto', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.15)' }}
+                style={{ width: '100%', maxWidth: '640px', maxHeight: '90vh', overflowY: 'auto', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e3e8ef', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.15)' }}
                 onClick={(e) => e.stopPropagation()}
               >
                 <div style={{ padding: '1.75rem' }}>
                   {/* Company header — trình bày như tiêu đề một chứng từ thật */}
                   <div style={{ textAlign: 'center', borderBottom: '2px solid #0f172a', paddingBottom: '1rem', marginBottom: '1.25rem' }}>
-                    <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                       CÔNG TY TNHH CÔNG NGHỆ AETHERPC — BỘ PHẬN KHO
                     </div>
                     <h2 style={{ margin: '0.4rem 0 0', fontSize: '1.3rem', fontWeight: 800, color: '#0f172a' }}>PHIẾU ĐỀ XUẤT MUA HÀNG</h2>
@@ -5941,42 +5844,19 @@ export default function Warehouse() {
                     )}
                   </div>
 
-                  {/* Signature blocks — bản in để lưu hồ sơ / trình ký giấy */}
-                  <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px dashed #cbd5e1', tableLayout: 'fixed' }}>
-                    <tbody>
-                      <tr>
-                        <td style={{ width: '50%', textAlign: 'center', padding: '0.5rem 0.5rem 0' }}>
-                          <strong style={{ fontSize: '0.8rem', color: '#0f172a' }}>NGƯỜI ĐỀ XUẤT</strong>
-                        </td>
-                        <td style={{ width: '50%', textAlign: 'center', padding: '0.5rem 0.5rem 0' }}>
-                          <strong style={{ fontSize: '0.8rem', color: '#0f172a' }}>QUẢN LÝ KHO DUYỆT</strong>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td style={{ textAlign: 'center', padding: '0.15rem 0.5rem 0' }}>
-                          <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>(Ký, ghi rõ họ tên)</div>
-                        </td>
-                        <td style={{ textAlign: 'center', padding: '0.15rem 0.5rem 0' }}>
-                          <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>(Ký, ghi rõ họ tên)</div>
-                        </td>
-                      </tr>
-                      <tr style={{ height: '60px' }}><td /><td /></tr>
-                      <tr>
-                        <td style={{ textAlign: 'center', padding: '0 0.5rem 0.5rem' }}>
-                          <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#0f172a' }}>{viewingPR.requestedBy || ''}</div>
-                        </td>
-                        <td style={{ textAlign: 'center', padding: '0 0.5rem 0.5rem' }}>
-                          <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#0f172a' }}>{viewingPR.approvedBy || ''}</div>
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
+                  {/* Chữ ký điện tử — người đề xuất và quản lý kho duyệt */}
+                  <SignatureRow>
+                    <SignatureCell title="Người đề xuất" name={displaySigner(viewingPR.requestedBy)} signedAt={viewingPR.createdAt || viewingPR.requestedAt} docRef={viewingPR.prCode || viewingPR.id} />
+                    <SignatureCell title="Quản lý kho duyệt" name={displaySigner(viewingPR.approvedBy)} signedAt={viewingPR.approvedAt}
+                      signed={!!viewingPR.approvedBy && viewingPR.status !== 'PENDING'} seal={viewingPR.status !== 'REJECTED'} sealLabel="ĐÃ DUYỆT"
+                      result={viewingPR.status === 'REJECTED' ? 'Từ chối' : 'Đã duyệt'} docRef={viewingPR.prCode || viewingPR.id} pendingText="Chờ duyệt" />
+                  </SignatureRow>
                 </div>
 
                 <div className="aetherpc-no-print" style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem', padding: '1.25rem 1.75rem', borderTop: '1px solid #f1f5f9' }}>
                   <button
                     onClick={() => setViewingPR(null)}
-                    style={{ backgroundColor: '#ffffff', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.5rem 1.1rem', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
+                    style={{ backgroundColor: '#ffffff', color: '#475569', border: '1px solid #e3e8ef', borderRadius: '6px', padding: '0.5rem 1.1rem', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
                   >
                     Đóng
                   </button>
@@ -5992,18 +5872,18 @@ export default function Warehouse() {
           )}
 
           {/* Filter bar */}
-          <div style={{ backgroundColor: '#ffffff', padding: '1rem', borderRadius: '8px', border: '1px solid #cbd5e1', marginBottom: '1.25rem', display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
+          <div style={{ backgroundColor: '#ffffff', padding: '1rem', borderRadius: '8px', border: '1px solid #e3e8ef', marginBottom: '1.25rem', display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
             <input
               type="text"
               placeholder="Tìm theo tên sản phẩm, nhà cung cấp..."
               value={rfqSearch}
               onChange={(e) => setRfqSearch(e.target.value)}
-              style={{ flex: 1, minWidth: '220px', padding: '0.55rem 0.85rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px' }}
+              style={{ flex: 1, minWidth: '220px', padding: '0.55rem 0.85rem', fontSize: '0.83rem', border: '1px solid #e3e8ef', borderRadius: '6px' }}
             />
             <select
               value={rfqSupplierFilter}
               onChange={(e) => setRfqSupplierFilter(e.target.value)}
-              style={{ padding: '0.55rem 0.85rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px' }}
+              style={{ padding: '0.55rem 0.85rem', fontSize: '0.83rem', border: '1px solid #e3e8ef', borderRadius: '6px' }}
             >
               <option value="ALL">Tất cả nhà cung cấp</option>
               {rfqSupplierOptions.map(sup => (
@@ -6013,7 +5893,7 @@ export default function Warehouse() {
             <select
               value={rfqStockStatusFilter}
               onChange={(e) => setRfqStockStatusFilter(e.target.value)}
-              style={{ padding: '0.55rem 0.85rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px' }}
+              style={{ padding: '0.55rem 0.85rem', fontSize: '0.83rem', border: '1px solid #e3e8ef', borderRadius: '6px' }}
             >
               <option value="ALL">Tất cả trạng thái</option>
               <option value="OUT_OF_STOCK">Hết Hàng</option>
@@ -6022,7 +5902,7 @@ export default function Warehouse() {
           </div>
 
           {/* Low stock table */}
-          <div className="table-responsive" style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', overflowX: 'auto', WebkitOverflowScrolling: 'touch', maxWidth: '100%' }}>
+          <div className="table-responsive" style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', overflowX: 'auto', WebkitOverflowScrolling: 'touch', maxWidth: '100%' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.83rem' }}>
               <thead>
                 <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569' }}>
@@ -6055,7 +5935,7 @@ export default function Warehouse() {
                       <td style={{ padding: '0.75rem 1rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
                         <span style={{
                           display: 'inline-block',
-                          padding: '3px 10px', borderRadius: '12px', fontSize: '0.72rem', fontWeight: 700,
+                          padding: '3px 10px', borderRadius: '12px', fontSize: '0.77rem', fontWeight: 700,
                           backgroundColor: Number(item.stock) === 0 ? '#ffe4e6' : '#fef3c7',
                           color: Number(item.stock) === 0 ? '#e11d48' : '#d97706',
                           border: `1px solid ${Number(item.stock) === 0 ? '#fecdd3' : '#fde68a'}`,
@@ -6159,7 +6039,7 @@ export default function Warehouse() {
               style={{
                 backgroundColor: returnStatusTab === 'ALL' ? '#eff6ff' : '#ffffff',
                 borderRadius: '10px',
-                border: returnStatusTab === 'ALL' ? '2px solid #2563eb' : '1px solid #cbd5e1',
+                border: returnStatusTab === 'ALL' ? '2px solid #2563eb' : '1px solid #e3e8ef',
                 padding: '1rem 1.25rem',
                 cursor: 'pointer',
                 transition: 'all 0.15s ease',
@@ -6170,14 +6050,14 @@ export default function Warehouse() {
                 <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#475569' }}>
                   TỔNG HỒ SƠ ĐỔI TRẢ (RMA)
                 </span>
-                <span style={{ backgroundColor: '#e2e8f0', color: '#334155', fontSize: '0.72rem', fontWeight: 800, padding: '2px 7px', borderRadius: '10px' }}>
+                <span style={{ backgroundColor: '#e2e8f0', color: '#334155', fontSize: '0.77rem', fontWeight: 800, padding: '2px 7px', borderRadius: '10px' }}>
                   Tất cả
                 </span>
               </div>
               <div style={{ fontSize: '1.65rem', fontWeight: 850, color: '#0f172a', marginTop: '0.35rem' }}>
                 {effectiveReturnRequests.length}
               </div>
-              <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.2rem' }}>
+              <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.2rem' }}>
                 Toàn bộ kiện hàng khách hàng và giao vận đã gửi về
               </div>
             </div>
@@ -6199,14 +6079,14 @@ export default function Warehouse() {
                 <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#b45309', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                   <span>ĐANG XỬ LÝ (CHỜ NHẬP KHO)</span>
                 </span>
-                <span style={{ backgroundColor: '#fef3c7', color: '#b45309', border: '1px solid #fde68a', fontSize: '0.72rem', fontWeight: 800, padding: '2px 7px', borderRadius: '10px' }}>
+                <span style={{ backgroundColor: '#fef3c7', color: '#b45309', border: '1px solid #fde68a', fontSize: '0.77rem', fontWeight: 800, padding: '2px 7px', borderRadius: '10px' }}>
                   Cần xử lý ngay
                 </span>
               </div>
               <div style={{ fontSize: '1.65rem', fontWeight: 850, color: '#d97706', marginTop: '0.35rem' }}>
                 {pendingReturnsList.length}
               </div>
-              <div style={{ fontSize: '0.75rem', color: '#92400e', marginTop: '0.2rem' }}>
+              <div style={{ fontSize: '0.8rem', color: '#92400e', marginTop: '0.2rem' }}>
                 Kiện hàng đang chờ QC thẩm định & thủ kho phân luồng xếp kệ
               </div>
             </div>
@@ -6228,14 +6108,14 @@ export default function Warehouse() {
                 <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#15803d', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                   <span>ĐÃ XỬ LÝ (ĐÃ VÀO KỆ LƯU TRỮ)</span>
                 </span>
-                <span style={{ backgroundColor: '#dcfce7', color: '#15803d', border: '1px solid #bbf7d0', fontSize: '0.72rem', fontWeight: 800, padding: '2px 7px', borderRadius: '10px' }}>
+                <span style={{ backgroundColor: '#dcfce7', color: '#15803d', border: '1px solid #bbf7d0', fontSize: '0.77rem', fontWeight: 800, padding: '2px 7px', borderRadius: '10px' }}>
                   Hoàn tất
                 </span>
               </div>
               <div style={{ fontSize: '1.65rem', fontWeight: 850, color: '#16a34a', marginTop: '0.35rem' }}>
                 {processedReturnsList.length}
               </div>
-              <div style={{ fontSize: '0.75rem', color: '#166534', marginTop: '0.2rem' }}>
+              <div style={{ fontSize: '0.8rem', color: '#166534', marginTop: '0.2rem' }}>
                 Đã phân vào Kệ A1/B3 (Bán lại), C2 (Gửi hãng), D (Xác lỗi) & chuyển tiếp
               </div>
             </div>
@@ -6246,7 +6126,7 @@ export default function Warehouse() {
           <div style={{
             backgroundColor: '#ffffff',
             borderRadius: '10px',
-            border: '1px solid #cbd5e1',
+            border: '1px solid #e3e8ef',
             padding: '0.85rem 1rem',
             marginBottom: '1rem',
             display: 'flex',
@@ -6277,7 +6157,7 @@ export default function Warehouse() {
                 }}
               >
                 <span>Tất Cả</span>
-                <span style={{ fontSize: '0.72rem', padding: '1px 6px', borderRadius: '10px', backgroundColor: returnStatusTab === 'ALL' ? '#e2e8f0' : '#e2e8f0', color: '#334155' }}>
+                <span style={{ fontSize: '0.77rem', padding: '1px 6px', borderRadius: '10px', backgroundColor: returnStatusTab === 'ALL' ? '#e2e8f0' : '#e2e8f0', color: '#334155' }}>
                   {effectiveReturnRequests.length}
                 </span>
               </button>
@@ -6301,7 +6181,7 @@ export default function Warehouse() {
                 }}
               >
                 <span>Đang Xử Lý</span>
-                <span style={{ fontSize: '0.72rem', padding: '1px 6px', borderRadius: '10px', backgroundColor: '#fef3c7', color: '#b45309', fontWeight: 800 }}>
+                <span style={{ fontSize: '0.77rem', padding: '1px 6px', borderRadius: '10px', backgroundColor: '#fef3c7', color: '#b45309', fontWeight: 800 }}>
                   {pendingReturnsList.length}
                 </span>
               </button>
@@ -6325,7 +6205,7 @@ export default function Warehouse() {
                 }}
               >
                 <span>Đã Xử Lý</span>
-                <span style={{ fontSize: '0.72rem', padding: '1px 6px', borderRadius: '10px', backgroundColor: '#dcfce7', color: '#15803d', fontWeight: 800 }}>
+                <span style={{ fontSize: '0.77rem', padding: '1px 6px', borderRadius: '10px', backgroundColor: '#dcfce7', color: '#15803d', fontWeight: 800 }}>
                   {processedReturnsList.length}
                 </span>
               </button>
@@ -6344,7 +6224,7 @@ export default function Warehouse() {
                     width: '100%',
                     padding: '0.45rem 0.85rem',
                     fontSize: '0.8rem',
-                    border: '1px solid #cbd5e1',
+                    border: '1px solid #e3e8ef',
                     borderRadius: '6px',
                     backgroundColor: '#f8fafc',
                     boxSizing: 'border-box'
@@ -6369,7 +6249,7 @@ export default function Warehouse() {
                   padding: '0.45rem 0.85rem',
                   fontSize: '0.8rem',
                   fontWeight: 600,
-                  border: '1px solid #cbd5e1',
+                  border: '1px solid #e3e8ef',
                   borderRadius: '6px',
                   backgroundColor: '#ffffff',
                   color: '#334155',
@@ -6411,7 +6291,7 @@ export default function Warehouse() {
           </div>
 
           {/* Table */}
-          <div className="table-responsive" style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', overflowX: 'auto', WebkitOverflowScrolling: 'touch', maxWidth: '100%', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
+          <div className="table-responsive" style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', overflowX: 'auto', WebkitOverflowScrolling: 'touch', maxWidth: '100%', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.83rem' }}>
               <thead>
                 <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569' }}>
@@ -6507,13 +6387,13 @@ export default function Warehouse() {
                         {/* Sản phẩm */}
                         <td style={{ padding: '0.85rem 1rem', verticalAlign: 'middle' }}>
                           <strong style={{ color: '#0f172a', display: 'block', fontSize: '0.85rem' }}>{prodName}</strong>
-                          <span style={{ fontSize: '0.72rem', color: '#64748b' }}>Đơn hàng <strong>#{orderNum}</strong> | SL: {qty} SP</span>
+                          <span style={{ fontSize: '0.77rem', color: '#64748b' }}>Đơn hàng <strong>#{orderNum}</strong> | SL: {qty} SP</span>
                         </td>
 
                         {/* Khách hàng */}
                         <td style={{ padding: '0.85rem 1rem', verticalAlign: 'middle' }}>
                           <div style={{ color: '#0f172a', fontWeight: 700 }}>{custName}</div>
-                          <span style={{ fontSize: '0.72rem', color: '#64748b' }}>SĐT: {phone}</span>
+                          <span style={{ fontSize: '0.77rem', color: '#64748b' }}>SĐT: {phone}</span>
                         </td>
 
                         {/* Lý do đổi trả */}
@@ -6532,7 +6412,7 @@ export default function Warehouse() {
                               gap: '0.3rem',
                               padding: '3px 8px',
                               borderRadius: '6px',
-                              fontSize: '0.72rem',
+                              fontSize: '0.77rem',
                               fontWeight: 800,
                               backgroundColor: '#f0fdf4',
                               color: '#16a34a',
@@ -6549,7 +6429,7 @@ export default function Warehouse() {
                               gap: '0.3rem',
                               padding: '3px 8px',
                               borderRadius: '6px',
-                              fontSize: '0.72rem',
+                              fontSize: '0.77rem',
                               fontWeight: 800,
                               backgroundColor: '#fffbeb',
                               color: '#d97706',
@@ -6569,7 +6449,7 @@ export default function Warehouse() {
                               <span style={{
                                 padding: '4px 10px',
                                 borderRadius: '6px',
-                                fontSize: '0.74rem',
+                                fontSize: '0.79rem',
                                 fontWeight: 800,
                                 backgroundColor: rsd.bg,
                                 color: rsd.color,
@@ -6674,7 +6554,7 @@ export default function Warehouse() {
             backgroundColor: '#ffffff',
             padding: '0.85rem 1rem',
             borderRadius: '8px',
-            border: '1px solid #cbd5e1',
+            border: '1px solid #e3e8ef',
             marginBottom: '1.25rem',
             display: 'grid',
             gridTemplateColumns: 'minmax(220px, 1.8fr) minmax(140px, 1fr) minmax(160px, 1.2fr) minmax(170px, 1.2fr) minmax(130px, 1fr)',
@@ -6691,7 +6571,7 @@ export default function Warehouse() {
                 height: '38px',
                 padding: '0 0.85rem',
                 fontSize: '0.83rem',
-                border: '1px solid #cbd5e1',
+                border: '1px solid #e3e8ef',
                 borderRadius: '6px',
                 boxSizing: 'border-box',
                 outline: 'none'
@@ -6708,7 +6588,7 @@ export default function Warehouse() {
                 height: '38px',
                 padding: '0 0.65rem',
                 fontSize: '0.83rem',
-                border: '1px solid #cbd5e1',
+                border: '1px solid #e3e8ef',
                 borderRadius: '6px',
                 color: '#0f172a',
                 boxSizing: 'border-box',
@@ -6738,7 +6618,7 @@ export default function Warehouse() {
                 height: '38px',
                 padding: '0 0.65rem',
                 fontSize: '0.83rem',
-                border: '1px solid #cbd5e1',
+                border: '1px solid #e3e8ef',
                 borderRadius: '6px',
                 color: '#0f172a',
                 boxSizing: 'border-box',
@@ -6760,7 +6640,7 @@ export default function Warehouse() {
                 height: '38px',
                 padding: '0 0.65rem',
                 fontSize: '0.83rem',
-                border: '1px solid #cbd5e1',
+                border: '1px solid #e3e8ef',
                 borderRadius: '6px',
                 color: '#0f172a',
                 boxSizing: 'border-box',
@@ -6782,7 +6662,7 @@ export default function Warehouse() {
                 height: '38px',
                 padding: '0 0.65rem',
                 fontSize: '0.83rem',
-                border: '1px solid #cbd5e1',
+                border: '1px solid #e3e8ef',
                 borderRadius: '6px',
                 color: '#0f172a',
                 boxSizing: 'border-box',
@@ -6797,7 +6677,7 @@ export default function Warehouse() {
           </div>
 
           {/* Inventory Table */}
-          <div className="table-responsive" style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', overflowX: 'auto', WebkitOverflowScrolling: 'touch', maxWidth: '100%' }}>
+          <div className="table-responsive" style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', overflowX: 'auto', WebkitOverflowScrolling: 'touch', maxWidth: '100%' }}>
             <table style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse', fontSize: '0.83rem' }}>
               <thead>
                 <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569' }}>
@@ -6845,7 +6725,7 @@ export default function Warehouse() {
                             <span style={{
                               display: 'inline-block',
                               padding: '0.2rem 0.6rem',
-                              fontSize: '0.72rem',
+                              fontSize: '0.77rem',
                               fontWeight: 700,
                               color: '#dc2626',
                               backgroundColor: '#fef2f2',
@@ -6858,7 +6738,7 @@ export default function Warehouse() {
                             <span style={{
                               display: 'inline-block',
                               padding: '0.2rem 0.6rem',
-                              fontSize: '0.72rem',
+                              fontSize: '0.77rem',
                               fontWeight: 700,
                               color: '#b45309',
                               backgroundColor: '#fffbeb',
@@ -6871,7 +6751,7 @@ export default function Warehouse() {
                             <span style={{
                               display: 'inline-block',
                               padding: '0.2rem 0.6rem',
-                              fontSize: '0.72rem',
+                              fontSize: '0.77rem',
                               fontWeight: 700,
                               color: '#15803d',
                               backgroundColor: '#f0fdf4',
@@ -6893,10 +6773,10 @@ export default function Warehouse() {
                               boxSizing: 'border-box',
                               backgroundColor: '#ffffff',
                               color: '#2563eb',
-                              border: '1px solid #cbd5e1',
+                              border: '1px solid #e3e8ef',
                               borderRadius: '4px',
                               padding: '0.3rem 0.4rem',
-                              fontSize: '0.72rem',
+                              fontSize: '0.77rem',
                               fontWeight: 700,
                               cursor: 'pointer'
                             }}
@@ -6931,18 +6811,18 @@ export default function Warehouse() {
           </div>
 
           {/* Filter Toolbar */}
-          <div style={{ backgroundColor: '#ffffff', padding: '1rem', borderRadius: '8px', border: '1px solid #cbd5e1', marginBottom: '1.25rem', display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
+          <div style={{ backgroundColor: '#ffffff', padding: '1rem', borderRadius: '8px', border: '1px solid #e3e8ef', marginBottom: '1.25rem', display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
             <input
               type="text"
               placeholder="Tìm theo mã chứng từ GRN/ORD, tên sản phẩm..."
               value={historySearch}
               onChange={(e) => setHistorySearch(e.target.value)}
-              style={{ flex: 1, minWidth: '220px', padding: '0.55rem 0.85rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px' }}
+              style={{ flex: 1, minWidth: '220px', padding: '0.55rem 0.85rem', fontSize: '0.83rem', border: '1px solid #e3e8ef', borderRadius: '6px' }}
             />
             <select
               value={movementTypeFilter}
               onChange={(e) => setMovementTypeFilter(e.target.value)}
-              style={{ padding: '0.55rem 0.85rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px' }}
+              style={{ padding: '0.55rem 0.85rem', fontSize: '0.83rem', border: '1px solid #e3e8ef', borderRadius: '6px' }}
             >
               <option value="ALL">Tất cả loại biến động</option>
               <option value="IN">Nhập Kho (IN)</option>
@@ -6951,7 +6831,7 @@ export default function Warehouse() {
           </div>
 
           {/* History Table with Full Click & Detail Viewer */}
-          <div className="table-responsive" style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', overflowX: 'auto', WebkitOverflowScrolling: 'touch', maxWidth: '100%' }}>
+          <div className="table-responsive" style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', overflowX: 'auto', WebkitOverflowScrolling: 'touch', maxWidth: '100%' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.83rem' }}>
               <thead>
                 <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569' }}>
@@ -6984,14 +6864,14 @@ export default function Warehouse() {
                         <div style={{ fontWeight: 600, color: '#0f172a', fontSize: '0.82rem' }}>
                           {new Date(mv.timestamp).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                         </div>
-                        <div style={{ fontSize: '0.73rem', color: '#64748b', marginTop: '2px' }}>
+                        <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '2px' }}>
                           {new Date(mv.timestamp).toLocaleDateString('vi-VN')}
                         </div>
                       </td>
                       <td style={{ padding: '0.75rem 0.75rem', textAlign: 'left', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
                         <span style={{
                           display: 'inline-block',
-                          padding: '3px 9px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 800,
+                          padding: '3px 9px', borderRadius: '4px', fontSize: '0.77rem', fontWeight: 800,
                           letterSpacing: '0.02em',
                           whiteSpace: 'nowrap',
                           backgroundColor: mv.type === 'IN' ? '#dcfce7' : '#fee2e2',
@@ -7020,10 +6900,10 @@ export default function Warehouse() {
                           style={{
                             backgroundColor: '#ffffff',
                             color: '#2563eb',
-                            border: '1px solid #cbd5e1',
+                            border: '1px solid #e3e8ef',
                             borderRadius: '4px',
                             padding: '0.35rem 0.75rem',
-                            fontSize: '0.75rem',
+                            fontSize: '0.8rem',
                             fontWeight: 700,
                             cursor: 'pointer',
                             whiteSpace: 'nowrap'
@@ -7064,19 +6944,19 @@ export default function Warehouse() {
           </div>
 
           {showCreateLocationForm && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '1rem', marginBottom: '1.25rem', padding: '1rem', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '1rem', marginBottom: '1.25rem', padding: '1rem', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e3e8ef' }}>
               <select
                 value={locationForm.warehouseId}
                 onChange={(e) => setLocationForm(f => ({ ...f, warehouseId: e.target.value }))}
-                style={{ padding: '0.55rem 0.75rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px' }}
+                style={{ padding: '0.55rem 0.75rem', fontSize: '0.83rem', border: '1px solid #e3e8ef', borderRadius: '6px' }}
               >
                 <option value="1">Kho Tổng TP.HCM</option>
                 <option value="2">Kho Chi Nhánh Hà Nội</option>
               </select>
-              <input type="text" placeholder="Zone (VD: A)" value={locationForm.zone} onChange={(e) => setLocationForm(f => ({ ...f, zone: e.target.value }))} style={{ padding: '0.55rem 0.75rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px' }} />
-              <input type="text" placeholder="Shelf (VD: 01)" value={locationForm.shelf} onChange={(e) => setLocationForm(f => ({ ...f, shelf: e.target.value }))} style={{ padding: '0.55rem 0.75rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px' }} />
-              <input type="text" placeholder="Bin (VD: 01)" value={locationForm.bin} onChange={(e) => setLocationForm(f => ({ ...f, bin: e.target.value }))} style={{ padding: '0.55rem 0.75rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px' }} />
-              <input type="number" placeholder="Sức chứa" value={locationForm.capacity} onChange={(e) => setLocationForm(f => ({ ...f, capacity: e.target.value }))} style={{ padding: '0.55rem 0.75rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px' }} />
+              <input type="text" placeholder="Zone (VD: A)" value={locationForm.zone} onChange={(e) => setLocationForm(f => ({ ...f, zone: e.target.value }))} style={{ padding: '0.55rem 0.75rem', fontSize: '0.83rem', border: '1px solid #e3e8ef', borderRadius: '6px' }} />
+              <input type="text" placeholder="Shelf (VD: 01)" value={locationForm.shelf} onChange={(e) => setLocationForm(f => ({ ...f, shelf: e.target.value }))} style={{ padding: '0.55rem 0.75rem', fontSize: '0.83rem', border: '1px solid #e3e8ef', borderRadius: '6px' }} />
+              <input type="text" placeholder="Bin (VD: 01)" value={locationForm.bin} onChange={(e) => setLocationForm(f => ({ ...f, bin: e.target.value }))} style={{ padding: '0.55rem 0.75rem', fontSize: '0.83rem', border: '1px solid #e3e8ef', borderRadius: '6px' }} />
+              <input type="number" placeholder="Sức chứa" value={locationForm.capacity} onChange={(e) => setLocationForm(f => ({ ...f, capacity: e.target.value }))} style={{ padding: '0.55rem 0.75rem', fontSize: '0.83rem', border: '1px solid #e3e8ef', borderRadius: '6px' }} />
               <button onClick={handleCreateLocation} style={{ backgroundColor: '#16a34a', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.55rem 1rem', fontSize: '0.83rem', fontWeight: 700, cursor: 'pointer' }}>Tạo Vị Trí</button>
             </div>
           )}
@@ -7092,7 +6972,7 @@ export default function Warehouse() {
                     backgroundColor: '#ffffff',
                     padding: '1.25rem',
                     borderRadius: '8px',
-                    border: '1px solid #cbd5e1',
+                    border: '1px solid #e3e8ef',
                     cursor: 'pointer',
                     transition: 'all 0.18s ease',
                     boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
@@ -7124,13 +7004,13 @@ export default function Warehouse() {
                       >
                         <span>{loc.zone}-{loc.shelf}-{loc.bin}</span>
                       </h4>
-                      <div style={{ fontSize: '0.72rem', color: '#64748b' }}>{loc.warehouse?.name}</div>
+                      <div style={{ fontSize: '0.77rem', color: '#64748b' }}>{loc.warehouse?.name}</div>
                     </div>
                     {canManageLocations && (
                       <button
                         onClick={(e) => { e.stopPropagation(); handleDeleteLocation(loc); }}
                         title="Xóa vị trí (chỉ khi chưa gán hàng)"
-                        style={{ backgroundColor: '#fff', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '4px', padding: '0.3rem 0.5rem', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}
+                        style={{ backgroundColor: '#fff', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '4px', padding: '0.3rem 0.5rem', fontSize: '0.77rem', fontWeight: 700, cursor: 'pointer' }}
                       >
                         Xóa
                       </button>
@@ -7149,7 +7029,7 @@ export default function Warehouse() {
                       Đã gán: <strong style={{ color: '#0f172a' }}>{loc.assignedCount}</strong> / {loc.capacity}
                     </div>
                     <span style={{
-                      fontSize: '0.74rem',
+                      fontSize: '0.79rem',
                       color: '#2563eb',
                       fontWeight: 700,
                       whiteSpace: 'nowrap',
@@ -7196,13 +7076,13 @@ export default function Warehouse() {
           </div>
 
           {showCreateCategoryForm && (
-            <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.25rem', padding: '1rem', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #cbd5e1', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.25rem', padding: '1rem', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e3e8ef', flexWrap: 'wrap' }}>
               <input
                 type="text"
                 placeholder="Tên danh mục mới (VD: Thiết bị mạng)"
                 value={newCategoryName}
                 onChange={(e) => setNewCategoryName(e.target.value)}
-                style={{ flex: '1 1 260px', padding: '0.55rem 0.85rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px' }}
+                style={{ flex: '1 1 260px', padding: '0.55rem 0.85rem', fontSize: '0.83rem', border: '1px solid #e3e8ef', borderRadius: '6px' }}
               />
               <button onClick={handleCreateCategory} style={{ backgroundColor: '#16a34a', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.55rem 1.25rem', fontSize: '0.83rem', fontWeight: 700, cursor: 'pointer' }}>
                 Tạo Danh Mục
@@ -7213,7 +7093,7 @@ export default function Warehouse() {
           {loadingCategories ? (
             <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>Đang tải...</div>
           ) : (
-            <div className="table-responsive" style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', overflowX: 'auto', WebkitOverflowScrolling: 'touch', maxWidth: '100%' }}>
+            <div className="table-responsive" style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', overflowX: 'auto', WebkitOverflowScrolling: 'touch', maxWidth: '100%' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.83rem' }}>
                 <thead>
                   <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569' }}>
@@ -7310,7 +7190,7 @@ export default function Warehouse() {
             setViewingIntakeSuccessDoc({
               receiptNumber: receipt.receiptNumber || `GRN-${poNum}`,
               poNumber: poNum,
-              supplierName: po?.supplier?.name || po?.supplierName || receipt.supplierName || 'Công ty TNHH Gigabyte Việt Nam',
+              supplierName: po?.supplier?.name || po?.supplierName || receipt.supplierName || 'Chưa xác định nhà cung cấp',
               warehouseStaff: cleanStaffName(user?.fullname),
               qaInspector: qaLog?.inspector || 'Đặng Văn Kiểm (QA/QC)',
               intakeDate: new Date().toLocaleString('vi-VN'),
@@ -7387,21 +7267,21 @@ export default function Warehouse() {
       {/* Add Product Modal */}
       {showAddProduct && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.65)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000, padding: '1rem' }}>
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', maxWidth: '600px', width: '100%', maxHeight: '90vh', border: '1px solid #cbd5e1', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', maxWidth: '600px', width: '100%', maxHeight: '90vh', border: '1px solid #e3e8ef', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
             <div style={{ padding: '1.25rem 1.5rem', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
               <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#0f172a' }}>Thêm Sản Phẩm Mới Vào Sổ Kho</h3>
-              <button onClick={() => setShowAddProduct(false)} style={{ background: 'none', border: '1px solid #cbd5e1', borderRadius: '4px', padding: '0.2rem 0.5rem', cursor: 'pointer' }}>Đóng</button>
+              <button onClick={() => setShowAddProduct(false)} style={{ background: 'none', border: '1px solid #e3e8ef', borderRadius: '4px', padding: '0.2rem 0.5rem', cursor: 'pointer' }}>Đóng</button>
             </div>
             <form onSubmit={handleAddProductSubmit} style={{ padding: '1.5rem', overflowY: 'auto', flex: 1, minHeight: 0 }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: '0.35rem' }}>Tên Sản Phẩm *</label>
-                  <input type="text" required value={newProdForm.name} onChange={(e) => setNewProdForm({ ...newProdForm, name: e.target.value })} style={{ width: '100%', padding: '0.55rem 0.85rem', border: '1px solid #cbd5e1', borderRadius: '6px' }} />
+                  <input type="text" required value={newProdForm.name} onChange={(e) => setNewProdForm({ ...newProdForm, name: e.target.value })} style={{ width: '100%', padding: '0.55rem 0.85rem', border: '1px solid #e3e8ef', borderRadius: '6px' }} />
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                   <div>
                     <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: '0.35rem' }}>Phân Nhóm</label>
-                    <select value={newProdForm.category} onChange={(e) => setNewProdForm({ ...newProdForm, category: e.target.value })} style={{ width: '100%', padding: '0.55rem 0.85rem', border: '1px solid #cbd5e1', borderRadius: '6px' }}>
+                    <select value={newProdForm.category} onChange={(e) => setNewProdForm({ ...newProdForm, category: e.target.value })} style={{ width: '100%', padding: '0.55rem 0.85rem', border: '1px solid #e3e8ef', borderRadius: '6px' }}>
                       <option value="CPU">CPU</option>
                       <option value="VGA">VGA</option>
                       <option value="MAINBOARD">Mainboard</option>
@@ -7413,22 +7293,22 @@ export default function Warehouse() {
                   </div>
                   <div>
                     <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: '0.35rem' }}>Số Lượng Tồn Kho *</label>
-                    <input type="number" required min="0" value={newProdForm.stock} onChange={(e) => setNewProdForm({ ...newProdForm, stock: e.target.value })} style={{ width: '100%', padding: '0.55rem 0.85rem', border: '1px solid #cbd5e1', borderRadius: '6px' }} />
+                    <input type="number" required min="0" value={newProdForm.stock} onChange={(e) => setNewProdForm({ ...newProdForm, stock: e.target.value })} style={{ width: '100%', padding: '0.55rem 0.85rem', border: '1px solid #e3e8ef', borderRadius: '6px' }} />
                   </div>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                   <div>
                     <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: '0.35rem' }}>Đơn Giá (VNĐ)</label>
-                    <input type="number" min="0" value={newProdForm.price} onChange={(e) => setNewProdForm({ ...newProdForm, price: e.target.value })} style={{ width: '100%', padding: '0.55rem 0.85rem', border: '1px solid #cbd5e1', borderRadius: '6px' }} />
+                    <input type="number" min="0" value={newProdForm.price} onChange={(e) => setNewProdForm({ ...newProdForm, price: e.target.value })} style={{ width: '100%', padding: '0.55rem 0.85rem', border: '1px solid #e3e8ef', borderRadius: '6px' }} />
                   </div>
                   <div>
                     <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: '0.35rem' }}>Ngưỡng An Toàn</label>
-                    <input type="number" min="1" value={newProdForm.threshold} onChange={(e) => setNewProdForm({ ...newProdForm, threshold: e.target.value })} style={{ width: '100%', padding: '0.55rem 0.85rem', border: '1px solid #cbd5e1', borderRadius: '6px' }} />
+                    <input type="number" min="1" value={newProdForm.threshold} onChange={(e) => setNewProdForm({ ...newProdForm, threshold: e.target.value })} style={{ width: '100%', padding: '0.55rem 0.85rem', border: '1px solid #e3e8ef', borderRadius: '6px' }} />
                   </div>
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: '0.35rem' }}>Nhà Cung Cấp</label>
-                  <select value={newProdForm.supplierCode} onChange={(e) => { const sup = realSuppliers.find(s => s.code === e.target.value); setNewProdForm({ ...newProdForm, supplierCode: e.target.value, supplier: sup ? sup.name : newProdForm.supplier }); }} style={{ width: '100%', padding: '0.55rem 0.85rem', border: '1px solid #cbd5e1', borderRadius: '6px' }}>
+                  <select value={newProdForm.supplierCode} onChange={(e) => { const sup = realSuppliers.find(s => s.code === e.target.value); setNewProdForm({ ...newProdForm, supplierCode: e.target.value, supplier: sup ? sup.name : newProdForm.supplier }); }} style={{ width: '100%', padding: '0.55rem 0.85rem', border: '1px solid #e3e8ef', borderRadius: '6px' }}>
                     <option value="">-- Chọn Nhà Cung Cấp (không bắt buộc) --</option>
                     {realSuppliers.map(s => (
                       <option key={s.code} value={s.code}>{s.name}</option>
@@ -7451,7 +7331,7 @@ export default function Warehouse() {
                 />
                 <div>
                   <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: '0.35rem' }}>Mô Tả Sản Phẩm</label>
-                  <textarea rows={3} value={newProdForm.description || ''} onChange={(e) => setNewProdForm({ ...newProdForm, description: e.target.value })} style={{ width: '100%', padding: '0.55rem 0.85rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontFamily: 'inherit', fontSize: '0.83rem', resize: 'vertical', boxSizing: 'border-box' }} />
+                  <textarea rows={3} value={newProdForm.description || ''} onChange={(e) => setNewProdForm({ ...newProdForm, description: e.target.value })} style={{ width: '100%', padding: '0.55rem 0.85rem', border: '1px solid #e3e8ef', borderRadius: '6px', fontFamily: 'inherit', fontSize: '0.83rem', resize: 'vertical', boxSizing: 'border-box' }} />
                 </div>
                 <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.83rem', fontWeight: 600, color: '#334155', cursor: 'pointer' }}>
                   <input type="checkbox" checked={newProdForm.available !== false} onChange={(e) => setNewProdForm({ ...newProdForm, available: e.target.checked })} />
@@ -7459,7 +7339,7 @@ export default function Warehouse() {
                 </label>
               </div>
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
-                <button type="button" onClick={() => setShowAddProduct(false)} style={{ padding: '0.5rem 1rem', border: '1px solid #cbd5e1', borderRadius: '6px', background: '#fff' }}>Hủy</button>
+                <button type="button" onClick={() => setShowAddProduct(false)} style={{ padding: '0.5rem 1rem', border: '1px solid #e3e8ef', borderRadius: '6px', background: '#fff' }}>Hủy</button>
                 <button type="submit" style={{ padding: '0.5rem 1.25rem', border: 'none', borderRadius: '6px', background: '#2563eb', color: '#fff', fontWeight: 700 }}>Lưu Sản Phẩm</button>
               </div>
             </form>
@@ -7485,19 +7365,19 @@ export default function Warehouse() {
         // edit form with its inputs greyed out.
         const infoRow = (label, value) => (
           <div key={label}>
-            <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.03em', marginBottom: '0.3rem' }}>{label}</div>
+            <div style={{ fontSize: '0.77rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.03em', marginBottom: '0.3rem' }}>{label}</div>
             <div style={{ fontSize: '0.92rem', fontWeight: 700, color: '#0f172a' }}>{value}</div>
           </div>
         );
         return (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.65)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000, padding: '1rem' }}>
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', maxWidth: '560px', width: '100%', maxHeight: '90vh', border: '1px solid #cbd5e1', boxShadow: '0 20px 40px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', maxWidth: '560px', width: '100%', maxHeight: '90vh', border: '1px solid #e3e8ef', boxShadow: '0 20px 40px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
             <div style={{ padding: '1.25rem 1.5rem', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
               <div>
                 <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#0f172a' }}>{isReadOnlyView ? 'Thông Tin Sản Phẩm' : 'Chỉnh Sửa Thông Tin Sản Phẩm'}</h3>
                 <span style={{ fontSize: '0.78rem', color: '#64748b' }}>Mã định danh: <strong style={{ color: '#2563eb' }}>#{editingProd.id}</strong></span>
               </div>
-              <button onClick={closeModal} style={{ background: 'none', border: '1px solid #cbd5e1', borderRadius: '4px', padding: '0.2rem 0.6rem', cursor: 'pointer', color: '#475569', fontWeight: 600, flexShrink: 0 }}>Đóng</button>
+              <button onClick={closeModal} style={{ background: 'none', border: '1px solid #e3e8ef', borderRadius: '4px', padding: '0.2rem 0.6rem', cursor: 'pointer', color: '#475569', fontWeight: 600, flexShrink: 0 }}>Đóng</button>
             </div>
 
             {isReadOnlyView ? (
@@ -7505,7 +7385,7 @@ export default function Warehouse() {
               <div style={{ padding: '1.5rem', overflowY: 'auto', flex: 1, minHeight: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', marginBottom: '1.1rem' }}>
                   {editingProd.image && (
-                    <img src={editingProd.image} alt={editingProd.name} style={{ width: '56px', height: '56px', objectFit: 'cover', borderRadius: '6px', border: '1px solid #cbd5e1', flexShrink: 0 }} />
+                    <img src={editingProd.image} alt={editingProd.name} style={{ width: '56px', height: '56px', objectFit: 'cover', borderRadius: '6px', border: '1px solid #e3e8ef', flexShrink: 0 }} />
                   )}
                   <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0f172a' }}>{editingProd.name}</div>
                 </div>
@@ -7519,26 +7399,26 @@ export default function Warehouse() {
                     ? <span style={{ color: '#15803d' }}>Đang hiển thị</span>
                     : <span style={{ color: '#dc2626' }}>Đang ẩn</span>)}
                   <div>
-                    <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.03em', marginBottom: '0.3rem' }}>Tồn Kho Hiện Tại</div>
+                    <div style={{ fontSize: '0.77rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.03em', marginBottom: '0.3rem' }}>Tồn Kho Hiện Tại</div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                       <span style={{ fontSize: '0.92rem', fontWeight: 700, color: '#0f172a' }}>{stockNum} sản phẩm</span>
-                      <span style={{ fontSize: '0.68rem', fontWeight: 700, padding: '0.15rem 0.5rem', borderRadius: '10px', color: stockBadge.color, backgroundColor: stockBadge.bg, border: `1px solid ${stockBadge.border}` }}>{stockBadge.label}</span>
+                      <span style={{ fontSize: '0.74rem', fontWeight: 700, padding: '0.15rem 0.5rem', borderRadius: '10px', color: stockBadge.color, backgroundColor: stockBadge.bg, border: `1px solid ${stockBadge.border}` }}>{stockBadge.label}</span>
                     </div>
                   </div>
                 </div>
                 {editingProd.gallery?.length > 0 && (
                   <div style={{ marginBottom: '1.1rem' }}>
-                    <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.03em', marginBottom: '0.3rem' }}>Ảnh Phụ ({editingProd.gallery.length})</div>
+                    <div style={{ fontSize: '0.77rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.03em', marginBottom: '0.3rem' }}>Ảnh Phụ ({editingProd.gallery.length})</div>
                     <div style={{ display: 'flex', gap: '0.5rem', overflowX: 'auto', paddingBottom: '0.2rem' }}>
                       {editingProd.gallery.map(img => (
-                        <img key={img.id} src={img.url} alt="" style={{ width: '56px', height: '56px', objectFit: 'cover', borderRadius: '6px', border: '1px solid #cbd5e1', flexShrink: 0 }} />
+                        <img key={img.id} src={img.url} alt="" style={{ width: '56px', height: '56px', objectFit: 'cover', borderRadius: '6px', border: '1px solid #e3e8ef', flexShrink: 0 }} />
                       ))}
                     </div>
                   </div>
                 )}
                 {editingProd.description && (
                   <div style={{ marginBottom: '1.1rem' }}>
-                    <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.03em', marginBottom: '0.3rem' }}>Mô Tả Sản Phẩm</div>
+                    <div style={{ fontSize: '0.77rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.03em', marginBottom: '0.3rem' }}>Mô Tả Sản Phẩm</div>
                     <div style={{ fontSize: '0.85rem', color: '#334155', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{editingProd.description}</div>
                   </div>
                 )}
@@ -7549,7 +7429,7 @@ export default function Warehouse() {
                   </div>
                 )}
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', borderTop: '1px solid #e2e8f0', paddingTop: '1rem', marginTop: '1.1rem' }}>
-                  <button type="button" onClick={closeModal} style={{ padding: '0.5rem 1.15rem', fontSize: '0.82rem', fontWeight: 600, border: '1px solid #cbd5e1', borderRadius: '6px', background: '#ffffff', color: '#475569', cursor: 'pointer' }}>Đóng</button>
+                  <button type="button" onClick={closeModal} style={{ padding: '0.5rem 1.15rem', fontSize: '0.82rem', fontWeight: 600, border: '1px solid #e3e8ef', borderRadius: '6px', background: '#ffffff', color: '#475569', cursor: 'pointer' }}>Đóng</button>
                   {isManager && (
                     <button type="button" onClick={() => setProductViewOnly(false)} style={{ padding: '0.5rem 1.35rem', fontSize: '0.82rem', border: 'none', borderRadius: '6px', background: '#2563eb', color: '#ffffff', fontWeight: 700, cursor: 'pointer' }}>Chỉnh Sửa</button>
                   )}
@@ -7561,13 +7441,13 @@ export default function Warehouse() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem', marginBottom: '1.5rem' }}>
                   <div>
                     <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.35rem' }}>Tên Linh Kiện / Sản Phẩm *</label>
-                    <input type="text" required value={editingProd.name || ''} onChange={(e) => setEditingProd({ ...editingProd, name: e.target.value })} style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.85rem', border: '1px solid #cbd5e1', borderRadius: '6px', backgroundColor: '#ffffff', color: '#0f172a' }} />
+                    <input type="text" required value={editingProd.name || ''} onChange={(e) => setEditingProd({ ...editingProd, name: e.target.value })} style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.85rem', border: '1px solid #e3e8ef', borderRadius: '6px', backgroundColor: '#ffffff', color: '#0f172a' }} />
                   </div>
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                     <div>
                       <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.35rem' }}>Phân Nhóm Danh Mục</label>
-                      <select value={editingProd.category || 'CPU'} onChange={(e) => setEditingProd({ ...editingProd, category: e.target.value })} style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px', backgroundColor: '#ffffff', color: '#0f172a' }}>
+                      <select value={editingProd.category || 'CPU'} onChange={(e) => setEditingProd({ ...editingProd, category: e.target.value })} style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.83rem', border: '1px solid #e3e8ef', borderRadius: '6px', backgroundColor: '#ffffff', color: '#0f172a' }}>
                         <option value="CPU">CPU</option>
                         <option value="VGA">VGA</option>
                         <option value="MAINBOARD">Mainboard</option>
@@ -7587,7 +7467,7 @@ export default function Warehouse() {
                           const sup = realSuppliers.find(s => s.code === e.target.value);
                           setEditingProd({ ...editingProd, supplierCode: e.target.value, supplier: sup ? sup.name : editingProd.supplier });
                         }}
-                        style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px', backgroundColor: '#ffffff', color: '#0f172a' }}
+                        style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.83rem', border: '1px solid #e3e8ef', borderRadius: '6px', backgroundColor: '#ffffff', color: '#0f172a' }}
                       >
                         <option value="">-- Chọn Nhà Cung Cấp --</option>
                         {realSuppliers.map(s => (
@@ -7600,7 +7480,7 @@ export default function Warehouse() {
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                     <div>
                       <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.35rem' }}>Vị Trí Kệ Lưu Kho</label>
-                      <select value={editingProd.location || 'ZONE-A/SHELF-01/BIN-01'} onChange={(e) => setEditingProd({ ...editingProd, location: e.target.value })} style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px', backgroundColor: '#ffffff', color: '#0f172a' }}>
+                      <select value={editingProd.location || 'ZONE-A/SHELF-01/BIN-01'} onChange={(e) => setEditingProd({ ...editingProd, location: e.target.value })} style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.83rem', border: '1px solid #e3e8ef', borderRadius: '6px', backgroundColor: '#ffffff', color: '#0f172a' }}>
                         <option value="Chưa xếp kệ">Chưa xếp kệ</option>
                         {PREDEFINED_LOCATIONS.map(loc => (
                           <option key={loc} value={loc}>{loc}</option>
@@ -7609,18 +7489,18 @@ export default function Warehouse() {
                     </div>
                     <div>
                       <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.35rem' }}>Đơn Giá Niêm Yết (VNĐ)</label>
-                      <input type="number" min="0" value={editingProd.price !== undefined ? editingProd.price : 0} onChange={(e) => setEditingProd({ ...editingProd, price: parseFloat(e.target.value) || 0 })} style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.85rem', fontWeight: 700, color: '#16a34a', border: '1px solid #cbd5e1', borderRadius: '6px', backgroundColor: '#ffffff' }} />
+                      <input type="number" min="0" value={editingProd.price !== undefined ? editingProd.price : 0} onChange={(e) => setEditingProd({ ...editingProd, price: parseFloat(e.target.value) || 0 })} style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.85rem', fontWeight: 700, color: '#16a34a', border: '1px solid #e3e8ef', borderRadius: '6px', backgroundColor: '#ffffff' }} />
                     </div>
                   </div>
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                     <div>
                       <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.35rem' }}>Số Lượng Tồn Kho Thực Tế</label>
-                      <input type="number" required min="0" value={editingProd.stock !== undefined ? editingProd.stock : 0} onChange={(e) => setEditingProd({ ...editingProd, stock: parseInt(e.target.value, 10) || 0 })} style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.85rem', fontWeight: 700, border: '1px solid #cbd5e1', borderRadius: '6px', backgroundColor: '#ffffff', color: '#0f172a' }} />
+                      <input type="number" required min="0" value={editingProd.stock !== undefined ? editingProd.stock : 0} onChange={(e) => setEditingProd({ ...editingProd, stock: parseInt(e.target.value, 10) || 0 })} style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.85rem', fontWeight: 700, border: '1px solid #e3e8ef', borderRadius: '6px', backgroundColor: '#ffffff', color: '#0f172a' }} />
                     </div>
                     <div>
                       <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.35rem' }}>Ngưỡng An Toàn</label>
-                      <input type="number" min="1" value={editingProd.threshold || 5} onChange={(e) => setEditingProd({ ...editingProd, threshold: parseInt(e.target.value, 10) || 5 })} style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.85rem', border: '1px solid #cbd5e1', borderRadius: '6px', backgroundColor: '#ffffff', color: '#0f172a' }} />
+                      <input type="number" min="1" value={editingProd.threshold || 5} onChange={(e) => setEditingProd({ ...editingProd, threshold: parseInt(e.target.value, 10) || 5 })} style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.85rem', border: '1px solid #e3e8ef', borderRadius: '6px', backgroundColor: '#ffffff', color: '#0f172a' }} />
                     </div>
                   </div>
 
@@ -7640,7 +7520,7 @@ export default function Warehouse() {
                   />
                   <div>
                     <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.35rem' }}>Mô Tả Sản Phẩm</label>
-                    <textarea rows={3} value={editingProd.description || ''} onChange={(e) => setEditingProd({ ...editingProd, description: e.target.value })} style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.85rem', border: '1px solid #cbd5e1', borderRadius: '6px', backgroundColor: '#ffffff', color: '#0f172a', fontFamily: 'inherit', resize: 'vertical', boxSizing: 'border-box' }} />
+                    <textarea rows={3} value={editingProd.description || ''} onChange={(e) => setEditingProd({ ...editingProd, description: e.target.value })} style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.85rem', border: '1px solid #e3e8ef', borderRadius: '6px', backgroundColor: '#ffffff', color: '#0f172a', fontFamily: 'inherit', resize: 'vertical', boxSizing: 'border-box' }} />
                   </div>
 
                   <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.83rem', fontWeight: 600, color: '#334155', cursor: 'pointer' }}>
@@ -7650,7 +7530,7 @@ export default function Warehouse() {
                 </div>
 
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', borderTop: '1px solid #e2e8f0', paddingTop: '1rem' }}>
-                  <button type="button" onClick={closeModal} style={{ padding: '0.5rem 1.15rem', fontSize: '0.82rem', fontWeight: 600, border: '1px solid #cbd5e1', borderRadius: '6px', background: '#ffffff', color: '#475569', cursor: 'pointer' }}>Hủy bỏ</button>
+                  <button type="button" onClick={closeModal} style={{ padding: '0.5rem 1.15rem', fontSize: '0.82rem', fontWeight: 600, border: '1px solid #e3e8ef', borderRadius: '6px', background: '#ffffff', color: '#475569', cursor: 'pointer' }}>Hủy bỏ</button>
                   <button type="button" onClick={handleEditProductSubmit} style={{ padding: '0.5rem 1.35rem', fontSize: '0.82rem', border: 'none', borderRadius: '6px', background: '#2563eb', color: '#ffffff', fontWeight: 700, cursor: 'pointer' }}>Lưu Cập Nhật</button>
                 </div>
               </form>
@@ -7671,7 +7551,7 @@ export default function Warehouse() {
       {/* Backorder RFQ Proposal Modal */}
       {backorderRfqData && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.65)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000, padding: '1rem' }}>
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', maxWidth: '580px', width: '100%', border: '1px solid #cbd5e1', overflow: 'hidden', boxShadow: '0 20px 40px rgba(0,0,0,0.2)' }}>
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', maxWidth: '580px', width: '100%', border: '1px solid #e3e8ef', overflow: 'hidden', boxShadow: '0 20px 40px rgba(0,0,0,0.2)' }}>
             
             {/* Header */}
             <div style={{ padding: '1.25rem 1.5rem', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -7683,7 +7563,7 @@ export default function Warehouse() {
                   Phục vụ đơn nợ khách: <strong style={{ color: '#2563eb' }}>#{backorderRfqData.orderId}</strong> ({backorderRfqData.customerName})
                 </span>
               </div>
-              <button onClick={() => setBackorderRfqData(null)} style={{ background: 'none', border: '1px solid #cbd5e1', borderRadius: '4px', padding: '0.2rem 0.6rem', cursor: 'pointer', color: '#475569', fontWeight: 600 }}>
+              <button onClick={() => setBackorderRfqData(null)} style={{ background: 'none', border: '1px solid #e3e8ef', borderRadius: '4px', padding: '0.2rem 0.6rem', cursor: 'pointer', color: '#475569', fontWeight: 600 }}>
                 Đóng
               </button>
             </div>
@@ -7698,7 +7578,7 @@ export default function Warehouse() {
                   <div>Khách yêu cầu: <strong style={{ color: '#dc2626' }}>{backorderRfqData.neededQty || 1} cái</strong></div>
                   <div>Tồn kho hiện tại: <strong style={{ color: Number(backorderRfqData.currentStock || 0) === 0 ? '#dc2626' : '#15803d' }}>{backorderRfqData.currentStock || 0} cái</strong></div>
                   <div>Đơn giá vốn ước tính: <strong style={{ color: '#0f172a' }}>{safeFormatPrice(backorderRfqData.unitPrice || 0)}</strong></div>
-                  <div>Tổng trị giá đề xuất: <strong style={{ color: '#16a34a' }}>{safeFormatPrice((Number(backorderRfqData.suggestedQty) || 5) * (Number(backorderRfqData.unitPrice) || 1500000))}</strong></div>
+                  <div>Tổng trị giá đề xuất: <strong style={{ color: '#16a34a' }}>{safeFormatPrice((Number(backorderRfqData.suggestedQty) || 0) * (Number(backorderRfqData.unitPrice) || 0))}</strong></div>
                 </div>
               </div>
 
@@ -7716,7 +7596,7 @@ export default function Warehouse() {
                       onChange={(e) => setBackorderRfqData({ ...backorderRfqData, suggestedQty: parseInt(e.target.value, 10) || 1 })}
                       style={{ width: '100%', padding: '0.55rem 0.85rem', fontSize: '0.9rem', fontWeight: 800, color: '#2563eb', border: '1.5px solid #bfdbfe', borderRadius: '6px', backgroundColor: '#eff6ff', boxSizing: 'border-box' }}
                     />
-                    <span style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '0.2rem', display: 'block' }}>
+                    <span style={{ fontSize: '0.77rem', color: '#64748b', marginTop: '0.2rem', display: 'block' }}>
                       (Tối thiểu {backorderRfqData.neededQty || 1} cái để trả khách)
                     </span>
                   </div>
@@ -7728,7 +7608,7 @@ export default function Warehouse() {
                     <select
                       value={backorderRfqData.supplier || 'Intel Vietnam'}
                       onChange={(e) => setBackorderRfqData({ ...backorderRfqData, supplier: e.target.value })}
-                      style={{ width: '100%', padding: '0.55rem 0.85rem', fontSize: '0.82rem', border: '1px solid #cbd5e1', borderRadius: '6px', boxSizing: 'border-box' }}
+                      style={{ width: '100%', padding: '0.55rem 0.85rem', fontSize: '0.82rem', border: '1px solid #e3e8ef', borderRadius: '6px', boxSizing: 'border-box' }}
                     >
                       {STANDARD_SUPPLIERS.map(s => (
                         <option key={s} value={s}>{s}</option>
@@ -7748,7 +7628,7 @@ export default function Warehouse() {
                     rows={3}
                     value={backorderRfqData.reason}
                     onChange={(e) => setBackorderRfqData({ ...backorderRfqData, reason: e.target.value })}
-                    style={{ width: '100%', padding: '0.55rem 0.85rem', fontSize: '0.82rem', border: '1px solid #cbd5e1', borderRadius: '6px', boxSizing: 'border-box' }}
+                    style={{ width: '100%', padding: '0.55rem 0.85rem', fontSize: '0.82rem', border: '1px solid #e3e8ef', borderRadius: '6px', boxSizing: 'border-box' }}
                   />
                 </div>
               </div>
@@ -7758,7 +7638,7 @@ export default function Warehouse() {
                 <button
                   type="button"
                   onClick={() => setBackorderRfqData(null)}
-                  style={{ padding: '0.55rem 1.15rem', fontSize: '0.82rem', fontWeight: 600, border: '1px solid #cbd5e1', borderRadius: '6px', background: '#ffffff', color: '#475569', cursor: 'pointer' }}
+                  style={{ padding: '0.55rem 1.15rem', fontSize: '0.82rem', fontWeight: 600, border: '1px solid #e3e8ef', borderRadius: '6px', background: '#ffffff', color: '#475569', cursor: 'pointer' }}
                 >
                   Hủy Bỏ
                 </button>
@@ -7899,7 +7779,7 @@ export default function Warehouse() {
                   <span style={{
                     padding: '3px 9px',
                     borderRadius: '6px',
-                    fontSize: '0.72rem',
+                    fontSize: '0.77rem',
                     fontWeight: 800,
                     backgroundColor: isPassed ? '#dcfce7' : isExchange ? '#ede9fe' : isVendor ? '#ffedd5' : isScrap ? '#ffe4e6' : isReject ? '#fee2e2' : '#fef3c7',
                     color: isPassed ? '#15803d' : isExchange ? '#6d28d9' : isVendor ? '#c2410c' : isScrap ? '#be123c' : isReject ? '#dc2626' : '#b45309',
@@ -7913,7 +7793,7 @@ export default function Warehouse() {
                   {prodName}
                 </div>
 
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', fontSize: '0.76rem', color: '#475569', marginTop: '0.35rem' }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', fontSize: '0.8rem', color: '#475569', marginTop: '0.35rem' }}>
                   <span>Khách hàng: <strong>{custName}</strong></span>
                   <span>SĐT: {phone}</span>
                   <span style={{ color: '#dc2626', fontWeight: 600 }}>Lý do: {reasonText}</span>
@@ -7929,7 +7809,7 @@ export default function Warehouse() {
                     />
                     <div>
                       <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#6d28d9' }}>Ảnh Thẩm Định Từ Kỹ Thuật QC (Tem Seal / Ngoại Quan)</div>
-                      <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '2px' }}>
+                      <div style={{ fontSize: '0.77rem', color: '#64748b', marginTop: '2px' }}>
                         Kỹ thuật QC đã chụp ảnh xác nhận kiện hàng còn nguyên trạng khi tiếp nhận.
                       </div>
                     </div>
@@ -7940,7 +7820,7 @@ export default function Warehouse() {
                   <div style={{ marginTop: '0.65rem', padding: '0.65rem 0.85rem', backgroundColor: '#f0fdf4', border: '1px solid #86efac', borderRadius: '8px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.4rem' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                        <span style={{ backgroundColor: '#15803d', color: '#ffffff', fontSize: '0.68rem', fontWeight: 800, padding: '2px 6px', borderRadius: '4px' }}>
+                        <span style={{ backgroundColor: '#15803d', color: '#ffffff', fontSize: '0.74rem', fontWeight: 800, padding: '2px 6px', borderRadius: '4px' }}>
                           HỒ SƠ HOÀN TIỀN 100%
                         </span>
                         <span style={{ fontSize: '0.78rem', color: '#166534', fontWeight: 700 }}>
@@ -7951,7 +7831,7 @@ export default function Warehouse() {
                         {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(refundVal)}
                       </div>
                     </div>
-                    <div style={{ fontSize: '0.76rem', color: '#14532d', marginTop: '0.35rem', display: 'flex', flexWrap: 'wrap', gap: '0.6rem' }}>
+                    <div style={{ fontSize: '0.8rem', color: '#14532d', marginTop: '0.35rem', display: 'flex', flexWrap: 'wrap', gap: '0.6rem' }}>
                       <span>Ngân hàng: <strong>{item.bankName || 'MB Bank'}</strong></span>
                       <span>Số tài khoản: <code style={{ fontWeight: 800, color: '#15803d' }}>{item.bankAccountNo || 'Chưa cung cấp'}</code></span>
                       <span>Chủ tài khoản: <strong style={{ textTransform: 'uppercase' }}>{item.bankAccountName || custName}</strong></span>
@@ -7962,7 +7842,7 @@ export default function Warehouse() {
                 {isExchange && (
                   <div style={{ marginTop: '0.65rem', padding: '0.65rem 0.85rem', backgroundColor: '#eff6ff', border: '1px solid #93c5fd', borderRadius: '8px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                      <span style={{ backgroundColor: '#1d4ed8', color: '#ffffff', fontSize: '0.68rem', fontWeight: 800, padding: '2px 6px', borderRadius: '4px' }}>
+                      <span style={{ backgroundColor: '#1d4ed8', color: '#ffffff', fontSize: '0.74rem', fontWeight: 800, padding: '2px 6px', borderRadius: '4px' }}>
                         HỒ SƠ ĐỔI MỚI 1-1
                       </span>
                       <span style={{ fontSize: '0.78rem', color: '#1e40af', fontWeight: 700 }}>
@@ -8012,7 +7892,7 @@ export default function Warehouse() {
                           style={{
                             padding: '0.75rem 0.85rem',
                             borderRadius: '8px',
-                            border: isSelected ? `2px solid ${shelf.color}` : '1px solid #cbd5e1',
+                            border: isSelected ? `2px solid ${shelf.color}` : '1px solid #e3e8ef',
                             backgroundColor: isSelected ? shelf.bg : '#ffffff',
                             cursor: 'pointer',
                             transition: 'all 0.15s ease'
@@ -8021,7 +7901,7 @@ export default function Warehouse() {
                           <div style={{ fontWeight: 750, fontSize: '0.82rem', color: shelf.color }}>
                             {shelf.label}
                           </div>
-                          <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '3px' }}>
+                          <div style={{ fontSize: '0.77rem', color: '#64748b', marginTop: '3px' }}>
                             {shelf.desc}
                           </div>
                         </div>
@@ -8039,7 +7919,7 @@ export default function Warehouse() {
                     value={returnProcessNote}
                     onChange={e => setReturnProcessNote(e.target.value)}
                     placeholder="Ví dụ: Đã xếp vào Ô Kệ A1-04, mã vạch seal nguyên vẹn..."
-                    style={{ width: '100%', padding: '0.6rem 0.75rem', fontSize: '0.82rem', border: '1px solid #cbd5e1', borderRadius: '6px', backgroundColor: '#ffffff', boxSizing: 'border-box' }}
+                    style={{ width: '100%', padding: '0.6rem 0.75rem', fontSize: '0.82rem', border: '1px solid #e3e8ef', borderRadius: '6px', backgroundColor: '#ffffff', boxSizing: 'border-box' }}
                   />
                 </div>
               </div>
@@ -8092,7 +7972,7 @@ export default function Warehouse() {
                   <button
                     type="button"
                     onClick={() => setSelectedReturnProcessing(null)}
-                    style={{ backgroundColor: '#ffffff', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.5rem 1rem', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}
+                    style={{ backgroundColor: '#ffffff', color: '#475569', border: '1px solid #e3e8ef', borderRadius: '6px', padding: '0.5rem 1rem', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}
                   >
                     Đóng
                   </button>

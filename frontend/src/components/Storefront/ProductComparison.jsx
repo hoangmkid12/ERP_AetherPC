@@ -375,10 +375,9 @@ function ProductComparison({ products, onAddCart, onClose, initialProduct, clear
               key={cat}
               onClick={() => {
                 setSelectedCategory(cat);
-                const catProds = (products || []).filter(p => p && p.category && p.category.toUpperCase() === cat);
-                setCompareList([catProds[0] || null, catProds[1] || null]);
+                setCompareList([null, null]);
                 setSlotSearchQueries(['', '', '']);
-                setIsSearchingSlot([catProds[0] ? false : true, catProds[1] ? false : true, false]);
+                setIsSearchingSlot([true, true, false]);
               }}
               style={{
                 display: 'inline-flex',
@@ -386,8 +385,8 @@ function ProductComparison({ products, onAddCart, onClose, initialProduct, clear
                 gap: '0.35rem',
                 padding: '0.35rem 0.75rem',
                 borderRadius: '8px',
-                border: isSelected ? '1px solid #2563eb' : '1px solid #e2e8f0',
-                background: isSelected ? 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)' : '#f8fafc',
+                border: isSelected ? '1px solid #dc2626' : '1px solid #e2e8f0',
+                background: isSelected ? 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)' : '#f8fafc',
                 color: isSelected ? '#ffffff' : '#475569',
                 cursor: 'pointer',
                 fontWeight: isSelected ? 700 : 600,
@@ -396,7 +395,7 @@ function ProductComparison({ products, onAddCart, onClose, initialProduct, clear
                 transition: 'all 0.2s ease'
               }}
             >
-              <IconComp size={13} style={{ color: isSelected ? '#ffffff' : '#2563eb' }} />
+              <IconComp size={13} style={{ color: isSelected ? '#ffffff' : '#dc2626' }} />
               {getCategoryLabel(cat)}
               <span style={{
                 fontSize: '0.65rem',

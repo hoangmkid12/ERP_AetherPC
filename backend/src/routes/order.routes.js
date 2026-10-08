@@ -69,7 +69,7 @@ router.post('/:orderId/location', authMiddleware(['DELIVERY', 'CEO', 'ADMIN']), 
 
 // @route   GET /api/v1/orders/returns
 // @desc    Lấy danh sách các đơn đổi trả (Shipper / QC / Kho / Kế toán / CSKH)
-router.get('/returns', authMiddleware(['SALES', 'SALES_MANAGER', 'CEO', 'ADMIN', 'CSKH', 'WAREHOUSE', 'WAREHOUSE_MANAGER', 'ACCOUNTANT', 'DELIVERY', ...QC_ROLES]), getReturnRequests);
+router.get('/returns', authMiddleware(['CUSTOMER', 'SALES', 'SALES_MANAGER', 'CEO', 'ADMIN', 'CSKH', 'WAREHOUSE', 'WAREHOUSE_MANAGER', 'ACCOUNTANT', 'DELIVERY', ...QC_ROLES]), getReturnRequests);
 
 // @route   GET/PUT /api/v1/orders/returns/settings
 // @desc    Lấy & Cập nhật cấu hình Tự Động Duyệt (Auto-Approve) đổi trả

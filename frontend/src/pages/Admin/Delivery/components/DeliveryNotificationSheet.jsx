@@ -126,7 +126,7 @@ export default function DeliveryNotificationSheet({
                 </strong>
                 {unreadCount > 0 && (
                   <span style={{
-                    fontSize: '0.68rem', fontWeight: 800, color: '#fff',
+                    fontSize: '0.74rem', fontWeight: 800, color: '#fff',
                     backgroundColor: 'var(--danger, #ef4444)',
                     padding: '0.15rem 0.45rem', borderRadius: '999px'
                   }}>
@@ -134,7 +134,7 @@ export default function DeliveryNotificationSheet({
                   </span>
                 )}
               </div>
-              <p style={{ margin: 0, fontSize: '0.72rem', color: 'var(--text-muted, #64748b)' }}>
+              <p style={{ margin: 0, fontSize: '0.77rem', color: 'var(--text-muted, #64748b)' }}>
                 Nhắc giờ hẹn, cảnh báo trễ & phân công chuyến đi
               </p>
             </div>
@@ -151,7 +151,7 @@ export default function DeliveryNotificationSheet({
                   border: '1px solid var(--border-glass, #cbd5e1)',
                   backgroundColor: 'var(--bg-secondary, #f8fafc)',
                   color: 'var(--primary, #2563eb)',
-                  fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer'
+                  fontSize: '0.77rem', fontWeight: 700, cursor: 'pointer'
                 }}
                 title="Đánh dấu tất cả đã đọc"
               >
@@ -199,7 +199,7 @@ export default function DeliveryNotificationSheet({
                   border: isSelected ? '1px solid var(--primary, #2563eb)' : '1px solid var(--border-glass, #cbd5e1)',
                   backgroundColor: isSelected ? 'var(--primary, #2563eb)' : 'var(--bg-primary, #ffffff)',
                   color: isSelected ? '#ffffff' : 'var(--text-primary, #334155)',
-                  fontSize: '0.73rem', fontWeight: 700, cursor: 'pointer',
+                  fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer',
                   whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: '0.35rem',
                   transition: 'all 0.15s ease'
                 }}
@@ -208,7 +208,7 @@ export default function DeliveryNotificationSheet({
                 {tab.count > 0 && (
                   <span style={{
                     padding: '0.05rem 0.35rem', borderRadius: '999px',
-                    fontSize: '0.65rem',
+                    fontSize: '0.72rem',
                     backgroundColor: isSelected ? 'rgba(255,255,255,0.25)' : 'rgba(100,116,139,0.15)',
                     color: isSelected ? '#fff' : 'var(--text-muted, #64748b)'
                   }}>
@@ -301,14 +301,14 @@ export default function DeliveryNotificationSheet({
                   <div style={{ flex: 1, minWidth: 0, paddingRight: notif.isRead ? 0 : '12px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', marginBottom: '0.2rem' }}>
                       <span style={{
-                        fontSize: '0.64rem', fontWeight: 800,
+                        fontSize: '0.72rem', fontWeight: 800,
                         padding: '0.12rem 0.4rem', borderRadius: '4px',
                         backgroundColor: badge.bg, color: badge.text,
                         letterSpacing: '0.02em'
                       }}>
                         {badge.label}
                       </span>
-                      <span style={{ fontSize: '0.68rem', color: 'var(--text-muted, #94a3b8)' }}>
+                      <span style={{ fontSize: '0.74rem', color: 'var(--text-muted, #94a3b8)' }}>
                         {notif.timeLabel || 'Vừa xong'}
                       </span>
                     </div>
@@ -333,7 +333,7 @@ export default function DeliveryNotificationSheet({
                     <div style={{
                       marginTop: '0.45rem',
                       display: 'flex', alignItems: 'center', gap: '0.25rem',
-                      fontSize: '0.74rem', fontWeight: 700,
+                      fontSize: '0.79rem', fontWeight: 700,
                       color: isUrgent ? '#dc2626' : 'var(--primary, #2563eb)'
                     }}>
                       <span>{notif.actionText || 'Xem chi tiết đơn hàng'}</span>
@@ -352,7 +352,7 @@ export default function DeliveryNotificationSheet({
           backgroundColor: 'var(--bg-secondary, #f8fafc)',
           borderTop: '1px solid var(--border-glass, #e2e8f0)',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          fontSize: '0.72rem', color: 'var(--text-muted, #64748b)'
+          fontSize: '0.77rem', color: 'var(--text-muted, #64748b)'
         }}>
           <span>Cập nhật theo thời gian thực (VRPTW)</span>
           <button
@@ -361,7 +361,7 @@ export default function DeliveryNotificationSheet({
             style={{
               padding: '0.35rem 0.85rem', borderRadius: '8px',
               border: 'none', backgroundColor: 'var(--primary, #2563eb)',
-              color: '#fff', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer'
+              color: '#fff', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer'
             }}
           >
             Đóng

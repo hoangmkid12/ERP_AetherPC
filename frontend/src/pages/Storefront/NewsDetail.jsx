@@ -187,11 +187,20 @@ export default function NewsDetail() {
             {/* Share */}
             <div style={{ marginTop: '3rem', paddingTop: '1.5rem', borderTop: '1px solid var(--border-glass)', display: 'flex', gap: '1rem', alignItems: 'center' }}>
               <span style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Chia sẻ:</span>
-              <button className="btn btn-secondary" style={{ gap: '0.375rem', fontSize: '0.8rem' }}>
+              <button type="button" className="btn btn-secondary" style={{ gap: '0.375rem', fontSize: '0.8rem' }}
+                onClick={() => window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(window.location.href)}`, '_blank', 'noopener,width=640,height=560')}>
                 <Share2 size={13} /> Facebook
               </button>
-              <button className="btn btn-secondary" style={{ gap: '0.375rem', fontSize: '0.8rem' }}>
+              <button type="button" className="btn btn-secondary" style={{ gap: '0.375rem', fontSize: '0.8rem' }}
+                onClick={() => window.open(`https://twitter.com/intent/tweet?url=${encodeURIComponent(window.location.href)}`, '_blank', 'noopener,width=640,height=560')}>
                 <Share2 size={13} /> Twitter
+              </button>
+              <button type="button" className="btn btn-secondary" style={{ gap: '0.375rem', fontSize: '0.8rem' }}
+                onClick={(e) => {
+                  const btn = e.currentTarget;
+                  navigator.clipboard?.writeText(window.location.href).then(() => { btn.textContent = 'Đã sao chép liên kết'; }).catch(() => {});
+                }}>
+                Sao chép liên kết
               </button>
             </div>
           </article>

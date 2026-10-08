@@ -18,6 +18,8 @@ import {
 import { formatCurrencyInWords } from '../../utils/numberToWords';
 import { printDocument } from '../../utils/printDocument';
 import DateRangeFilter from '../../components/Common/DateRangeFilter';
+import SupplierConfirmationModal from '../../components/SupplierConfirmationModal';
+import { SignatureRow, SignatureCell, displaySigner, historySigner } from '../../components/Signature/ESignature';
 
 const CAT_ALIASES = {
   CPU: ['CPU', 'VI XỬ LÝ', 'CHIP', 'BỘ VI XỬ LÝ'],
@@ -79,6 +81,7 @@ const isDateInRange = (dateVal, startDate, endDate) => {
 
 export default function Purchasing() {
   const location = useLocation();
+  const navigate = useNavigate();
   const rawTab = new URLSearchParams(location.search).get('tab') || 'overview';
   const activeTab = rawTab === 'catalog' ? 'products' : rawTab;
   
@@ -1229,6 +1232,22 @@ export default function Purchasing() {
   const ISSUED_PO_STATUSES = ['PO', 'SENT', 'CONFIRMED_BY_SUPPLIER', 'PENDING_QA', 'QA_PASSED', 'QA_PARTIAL', 'RECEIVED', 'DONE', 'COMPLETED'];
   const poConfirmedCount = orders.filter(po => ISSUED_PO_STATUSES.includes(po.status)).length;
   const pendingReceiptCount = orders.filter(po => ['PO', 'SENT', 'CONFIRMED_BY_SUPPLIER', 'PENDING_QA', 'QA_PASSED', 'QA_PARTIAL'].includes(po.status)).length;
+  // Tỷ lệ giao đúng hạn thật: trong các đơn có hạn giao và đã có hàng về (mốc đầu tiên sang kiểm định/nhập kho),
+  // hàng về không trễ hơn hết ngày hạn giao. Chưa có đơn đủ dữ liệu thì hiện "—".
+  const ARRIVAL_STATUSES = ['PENDING_QA', 'QA_PASSED', 'QA_PARTIAL', 'QA_REJECTED', 'RECEIVED', 'DONE'];
+  const onTimeStats = orders.reduce((acc, po) => {
+    if (!po.expectedDeliveryDate) return acc;
+    const arrival = (po.statusHistory || [])
+      .filter(h => ARRIVAL_STATUSES.includes(h.toStatus || h.status))
+      .map(h => new Date(h.changedAt || h.createdAt || h.timestamp))
+      .filter(d => !isNaN(d))
+      .sort((x, y) => x - y)[0];
+    if (!arrival) return acc;
+    const deadline = new Date(po.expectedDeliveryDate); deadline.setHours(23, 59, 59, 999);
+    acc.total += 1; if (arrival <= deadline) acc.onTime += 1;
+    return acc;
+  }, { total: 0, onTime: 0 });
+  const onTimeRateLabel = onTimeStats.total ? `${Math.round((onTimeStats.onTime / onTimeStats.total) * 100)}%` : '—';
   const totalSpent = orders
     .filter(po => ISSUED_PO_STATUSES.includes(po.status))
     .reduce((sum, po) => sum + parseFloat(po.totalAmount || 0), 0);
@@ -1265,7 +1284,7 @@ export default function Purchasing() {
   })();
 
   return (
-    <div style={{ backgroundColor: '#f8fafc', minHeight: '100vh', padding: '1.5rem 2rem', maxWidth: '1400px', margin: '0 auto', fontFamily: 'Inter, sans-serif' }}>
+    <div style={{ backgroundColor: '#f8fafc', minHeight: '100vh', padding: '1.5rem 2rem', maxWidth: '1400px', margin: '0 auto', fontFamily: 'inherit' }}>
       
       {/* ========================================================================= */}
       {/* TAB 1: OVERVIEW (TỔNG QUAN MUA HÀNG) */}
@@ -1284,7 +1303,7 @@ export default function Purchasing() {
           {/* 1. Top Mission Task Center Banner */}
           <div style={{
             backgroundColor: '#ffffff',
-            border: '1px solid #cbd5e1',
+            border: '1px solid #e3e8ef',
             borderRadius: '8px',
             padding: '1rem 1.25rem',
             marginBottom: '0.85rem',
@@ -1318,7 +1337,7 @@ export default function Purchasing() {
                       backgroundColor: '#fef3c7',
                       color: '#b45309',
                       border: '1px solid #fde68a',
-                      fontSize: '0.72rem',
+                      fontSize: '0.77rem',
                       fontWeight: 700,
                       padding: '2px 8px',
                       borderRadius: '12px'
@@ -1331,7 +1350,7 @@ export default function Purchasing() {
                       backgroundColor: '#eff6ff',
                       color: '#2563eb',
                       border: '1px solid #bfdbfe',
-                      fontSize: '0.72rem',
+                      fontSize: '0.77rem',
                       fontWeight: 700,
                       padding: '2px 8px',
                       borderRadius: '12px'
@@ -1344,7 +1363,7 @@ export default function Purchasing() {
                       backgroundColor: '#fef3c7',
                       color: '#b45309',
                       border: '1px solid #fde68a',
-                      fontSize: '0.72rem',
+                      fontSize: '0.77rem',
                       fontWeight: 700,
                       padding: '2px 8px',
                       borderRadius: '12px'
@@ -1446,7 +1465,7 @@ export default function Purchasing() {
                   }}>
                     <div>
                       <div style={{ fontWeight: 800, fontSize: '0.85rem', color: '#0f172a' }}>{item.name}</div>
-                      <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '0.15rem' }}>
+                      <div style={{ fontSize: '0.77rem', color: '#64748b', marginTop: '0.15rem' }}>
                         Khách đang nợ: <strong style={{ color: '#dc2626' }}>{item.neededQty} SP</strong> (trong {item.ordersCount} đơn: {item.orderIds.slice(0, 2).map(id => `#${id}`).join(', ')}{item.orderIds.length > 2 ? '...' : ''})
                       </div>
                     </div>
@@ -1459,7 +1478,7 @@ export default function Purchasing() {
                         border: 'none',
                         borderRadius: '5px',
                         padding: '0.45rem 0.85rem',
-                        fontSize: '0.75rem',
+                        fontSize: '0.8rem',
                         fontWeight: 700,
                         cursor: 'pointer',
                         whiteSpace: 'nowrap'
@@ -1475,12 +1494,12 @@ export default function Purchasing() {
 
           {/* Odoo KPI Cards Grid */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', marginBottom: '1.25rem' }}>
-            <div style={{ backgroundColor: '#ffffff', padding: '1rem', borderRadius: '8px', border: '1px solid #cbd5e1', textAlign: 'center' }}>
+            <div style={{ backgroundColor: '#ffffff', padding: '1rem', borderRadius: '8px', border: '1px solid #e3e8ef', textAlign: 'center' }}>
               <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#0f172a' }}>{rfqDraftCount}</div>
               <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#64748b', marginTop: '0.2rem' }}>Mới (Bản Nháp)</div>
             </div>
 
-            <div style={{ backgroundColor: '#ffffff', padding: '1rem', borderRadius: '8px', border: '1px solid #cbd5e1', textAlign: 'center' }}>
+            <div style={{ backgroundColor: '#ffffff', padding: '1rem', borderRadius: '8px', border: '1px solid #e3e8ef', textAlign: 'center' }}>
               <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#2563eb' }}>{rfqSentCount}</div>
               <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#2563eb', marginTop: '0.2rem' }}>RFQ Đã Gửi</div>
             </div>
@@ -1505,22 +1524,22 @@ export default function Purchasing() {
               <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#15803d', marginTop: '0.2rem' }}>Đơn Mua Hàng (PO)</div>
             </div>
 
-            <div style={{ backgroundColor: '#ffffff', padding: '1rem', borderRadius: '8px', border: '1px solid #cbd5e1', textAlign: 'center' }}>
+            <div style={{ backgroundColor: '#ffffff', padding: '1rem', borderRadius: '8px', border: '1px solid #e3e8ef', textAlign: 'center' }}>
               <div style={{ fontSize: '1.6rem', fontWeight: 800, color: pendingReceiptCount > 0 ? '#ef4444' : '#10b981' }}>
                 {pendingReceiptCount}
               </div>
               <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#64748b', marginTop: '0.2rem' }}>Chờ Nhập Kho</div>
             </div>
 
-            <div style={{ backgroundColor: '#ffffff', padding: '1rem', borderRadius: '8px', border: '1px solid #cbd5e1', textAlign: 'center' }}>
-              <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#16a34a' }}>100%</div>
+            <div style={{ backgroundColor: '#ffffff', padding: '1rem', borderRadius: '8px', border: '1px solid #e3e8ef', textAlign: 'center' }}>
+              <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#16a34a' }}>{onTimeRateLabel}</div>
               <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#64748b', marginTop: '0.2rem' }}>Giao Hàng Đúng Hạn</div>
             </div>
           </div>
 
           {/* Quick Action Navigation Panels */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.25rem', marginBottom: '1.5rem' }}>
-            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem' }}>
+            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1.25rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', gap: '0.5rem' }}>
                 <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', margin: 0, lineHeight: 1.3 }}>
                   Yêu Cầu Báo Giá (RFQ)
@@ -1533,7 +1552,7 @@ export default function Purchasing() {
                     border: '1px solid #bfdbfe',
                     borderRadius: '6px',
                     padding: '0.35rem 0.65rem',
-                    fontSize: '0.75rem',
+                    fontSize: '0.8rem',
                     fontWeight: 700,
                     cursor: 'pointer',
                     whiteSpace: 'nowrap',
@@ -1558,14 +1577,14 @@ export default function Purchasing() {
                 </button>
                 <button
                   onClick={() => { setSelectedGroupKey(rfqGroups[0]?.key || null); setShowCompareModal(true); }}
-                  style={{ backgroundColor: '#ffffff', color: '#2563eb', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.45rem 0.9rem', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer' }}
+                  style={{ backgroundColor: '#ffffff', color: '#2563eb', border: '1px solid #e3e8ef', borderRadius: '6px', padding: '0.45rem 0.9rem', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer' }}
                 >
                   So Sánh Báo Giá
                 </button>
               </div>
             </div>
 
-            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem' }}>
+            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1.25rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', gap: '0.5rem' }}>
                 <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', margin: 0, lineHeight: 1.3 }}>
                   Đơn Mua Hàng Chính Thức (PO)
@@ -1578,7 +1597,7 @@ export default function Purchasing() {
                     border: '1px solid #bfdbfe',
                     borderRadius: '6px',
                     padding: '0.35rem 0.65rem',
-                    fontSize: '0.75rem',
+                    fontSize: '0.8rem',
                     fontWeight: 700,
                     cursor: 'pointer',
                     whiteSpace: 'nowrap',
@@ -1603,14 +1622,14 @@ export default function Purchasing() {
                 </button>
                 <button
                   onClick={() => navigate('/admin/purchasing?tab=suppliers')}
-                  style={{ backgroundColor: '#ffffff', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.45rem 0.9rem', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer' }}
+                  style={{ backgroundColor: '#ffffff', color: '#475569', border: '1px solid #e3e8ef', borderRadius: '6px', padding: '0.45rem 0.9rem', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer' }}
                 >
                   Danh Bạ NCC ({suppliers.length})
                 </button>
               </div>
             </div>
 
-            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem' }}>
+            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1.25rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', gap: '0.5rem' }}>
                 <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', margin: 0, lineHeight: 1.3 }}>
                   Yêu Cầu Mua Hàng Nội Bộ (PR)
@@ -1623,7 +1642,7 @@ export default function Purchasing() {
                     border: '1px solid #bfdbfe',
                     borderRadius: '6px',
                     padding: '0.35rem 0.65rem',
-                    fontSize: '0.75rem',
+                    fontSize: '0.8rem',
                     fontWeight: 700,
                     cursor: 'pointer',
                     whiteSpace: 'nowrap',
@@ -1696,7 +1715,7 @@ export default function Purchasing() {
                   style={{
                     backgroundColor: '#ffffff',
                     color: '#475569',
-                    border: '1px solid #cbd5e1',
+                    border: '1px solid #e3e8ef',
                     borderRadius: '6px',
                     padding: '0.5rem 0.9rem',
                     fontSize: '0.82rem',
@@ -1735,7 +1754,7 @@ export default function Purchasing() {
 
             {/* 4 KPI Cards */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1.25rem' }}>
-              <div style={{ backgroundColor: '#ffffff', padding: '1rem 1.25rem', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
+              <div style={{ backgroundColor: '#ffffff', padding: '1rem 1.25rem', borderRadius: '8px', border: '1px solid #e3e8ef' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
                     <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#64748b' }}>Tổng Yêu Cầu</div>
@@ -1785,7 +1804,7 @@ export default function Purchasing() {
             </div>
 
             {/* Filter & Search Bar */}
-            <div style={{ backgroundColor: '#ffffff', padding: '1rem', borderRadius: '8px', border: '1px solid #cbd5e1', marginBottom: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.85rem' }}>
+            <div style={{ backgroundColor: '#ffffff', padding: '1rem', borderRadius: '8px', border: '1px solid #e3e8ef', marginBottom: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.85rem' }}>
               <div style={{ position: 'relative', flex: 1, minWidth: '260px' }}>
                 <Search size={16} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
                 <input
@@ -1793,7 +1812,7 @@ export default function Purchasing() {
                   placeholder="Tìm theo mã phiếu PR, tên sản phẩm, lý do, người đề xuất..."
                   value={prSearchTerm}
                   onChange={e => setPrSearchTerm(e.target.value)}
-                  style={{ width: '100%', padding: '0.5rem 0.85rem 0.5rem 2.2rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem' }}
+                  style={{ width: '100%', padding: '0.5rem 0.85rem 0.5rem 2.2rem', borderRadius: '6px', border: '1px solid #e3e8ef', fontSize: '0.82rem' }}
                 />
               </div>
 
@@ -1811,7 +1830,7 @@ export default function Purchasing() {
                     style={{
                       padding: '0.45rem 0.85rem',
                       borderRadius: '6px',
-                      border: prStatusFilter === f.key ? '1px solid #2563eb' : '1px solid #cbd5e1',
+                      border: prStatusFilter === f.key ? '1px solid #2563eb' : '1px solid #e3e8ef',
                       backgroundColor: prStatusFilter === f.key ? '#2563eb' : '#ffffff',
                       color: prStatusFilter === f.key ? '#ffffff' : '#475569',
                       fontSize: '0.78rem',
@@ -1826,7 +1845,7 @@ export default function Purchasing() {
             </div>
 
             {/* Table Container */}
-            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, fontSize: '0.82rem' }}>
                   <thead>
@@ -1906,7 +1925,7 @@ export default function Purchasing() {
                               </div>
                               {pr.sku && (
                                 <div style={{ marginTop: '2px' }}>
-                                  <span style={{ fontSize: '0.68rem', color: '#475569', backgroundColor: '#f1f5f9', padding: '1px 5px', borderRadius: '3px', border: '1px solid #e2e8f0', fontFamily: 'monospace' }}>
+                                  <span style={{ fontSize: '0.74rem', color: '#475569', backgroundColor: '#f1f5f9', padding: '1px 5px', borderRadius: '3px', border: '1px solid #e2e8f0', fontFamily: 'monospace' }}>
                                     SKU: {pr.sku}
                                   </span>
                                 </div>
@@ -1917,7 +1936,7 @@ export default function Purchasing() {
                                 display: 'inline-block',
                                 padding: '2px 8px',
                                 borderRadius: '6px',
-                                fontSize: '0.76rem',
+                                fontSize: '0.8rem',
                                 fontWeight: 700,
                                 backgroundColor: pr.stock === 0 ? '#fef2f2' : (pr.stock && pr.stock <= 5) ? '#fffbeb' : '#f0fdf4',
                                 color: pr.stock === 0 ? '#dc2626' : (pr.stock && pr.stock <= 5) ? '#d97706' : '#15803d',
@@ -1969,7 +1988,7 @@ export default function Purchasing() {
                                 display: 'inline-block',
                                 padding: '3px 8px',
                                 borderRadius: '12px',
-                                fontSize: '0.72rem',
+                                fontSize: '0.77rem',
                                 fontWeight: 700,
                                 backgroundColor: badgeBg,
                                 color: badgeColor,
@@ -1994,7 +2013,7 @@ export default function Purchasing() {
                                     {/* Chưa được Quản Lý Kho ký duyệt — Phòng Mua Hàng chưa được lập RFQ */}
                                     <span
                                       title="Phiếu đang chờ Quản Lý Kho ký duyệt"
-                                      style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.74rem', fontWeight: 600, color: '#b45309', whiteSpace: 'nowrap' }}
+                                      style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.79rem', fontWeight: 600, color: '#b45309', whiteSpace: 'nowrap' }}
                                     >
                                       <Clock size={13} />
                                       <span>Chờ QL Kho</span>
@@ -2005,7 +2024,7 @@ export default function Purchasing() {
                                       style={{
                                         backgroundColor: '#f8fafc',
                                         color: '#475569',
-                                        border: '1px solid #cbd5e1',
+                                        border: '1px solid #e3e8ef',
                                         borderRadius: '6px',
                                         padding: '0.42rem 0.5rem',
                                         cursor: 'pointer',
@@ -2031,7 +2050,7 @@ export default function Purchasing() {
                                         border: 'none',
                                         borderRadius: '6px',
                                         padding: '0.42rem 0.75rem',
-                                        fontSize: '0.76rem',
+                                        fontSize: '0.8rem',
                                         fontWeight: 700,
                                         cursor: 'pointer',
                                         display: 'inline-flex',
@@ -2050,7 +2069,7 @@ export default function Purchasing() {
                                       style={{
                                         backgroundColor: '#f8fafc',
                                         color: '#475569',
-                                        border: '1px solid #cbd5e1',
+                                        border: '1px solid #e3e8ef',
                                         borderRadius: '6px',
                                         padding: '0.42rem 0.5rem',
                                         cursor: 'pointer',
@@ -2069,10 +2088,10 @@ export default function Purchasing() {
                                     style={{
                                       backgroundColor: '#f8fafc',
                                       color: '#64748b',
-                                      border: '1px solid #cbd5e1',
+                                      border: '1px solid #e3e8ef',
                                       borderRadius: '6px',
                                       padding: '0.42rem 0.65rem',
-                                      fontSize: '0.76rem',
+                                      fontSize: '0.8rem',
                                       fontWeight: 600,
                                       cursor: 'pointer',
                                       display: 'inline-flex',
@@ -2141,7 +2160,7 @@ export default function Purchasing() {
             backgroundColor: '#ffffff',
             padding: '0.85rem 1rem',
             borderRadius: '8px',
-            border: '1px solid #cbd5e1',
+            border: '1px solid #e3e8ef',
             marginBottom: '1.25rem',
             display: 'grid',
             gridTemplateColumns: 'minmax(220px, 1.8fr) minmax(140px, 1fr) minmax(160px, 1.2fr) minmax(140px, 1fr) minmax(140px, 1fr)',
@@ -2158,7 +2177,7 @@ export default function Purchasing() {
                 height: '38px',
                 padding: '0 0.85rem',
                 fontSize: '0.83rem',
-                border: '1px solid #cbd5e1',
+                border: '1px solid #e3e8ef',
                 borderRadius: '6px',
                 boxSizing: 'border-box',
                 outline: 'none'
@@ -2173,7 +2192,7 @@ export default function Purchasing() {
                 height: '38px',
                 padding: '0 0.65rem',
                 fontSize: '0.83rem',
-                border: '1px solid #cbd5e1',
+                border: '1px solid #e3e8ef',
                 borderRadius: '6px',
                 color: '#0f172a',
                 boxSizing: 'border-box',
@@ -2195,7 +2214,7 @@ export default function Purchasing() {
                 height: '38px',
                 padding: '0 0.65rem',
                 fontSize: '0.83rem',
-                border: '1px solid #cbd5e1',
+                border: '1px solid #e3e8ef',
                 borderRadius: '6px',
                 color: '#0f172a',
                 boxSizing: 'border-box',
@@ -2219,7 +2238,7 @@ export default function Purchasing() {
                 height: '38px',
                 padding: '0 0.5rem',
                 fontSize: '0.8rem',
-                border: '1px solid #cbd5e1',
+                border: '1px solid #e3e8ef',
                 borderRadius: '6px',
                 boxSizing: 'border-box',
                 backgroundColor: '#ffffff'
@@ -2236,7 +2255,7 @@ export default function Purchasing() {
                 height: '38px',
                 padding: '0 0.5rem',
                 fontSize: '0.8rem',
-                border: '1px solid #cbd5e1',
+                border: '1px solid #e3e8ef',
                 borderRadius: '6px',
                 boxSizing: 'border-box',
                 backgroundColor: '#ffffff'
@@ -2245,7 +2264,7 @@ export default function Purchasing() {
           </div>
 
           {/* Orders Data Table */}
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', overflowX: 'auto' }}>
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.83rem' }}>
               <thead>
                 <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569' }}>
@@ -2282,7 +2301,7 @@ export default function Purchasing() {
                         </td>
                         <td style={{ padding: '0.75rem 0.65rem', color: '#475569', maxWidth: '140px' }} title={po.createdBy || 'Phòng Mua Hàng'}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                            <div style={{ width: '20px', height: '20px', borderRadius: '50%', backgroundColor: '#e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.62rem', fontWeight: 700, color: '#475569', flexShrink: 0 }}>
+                            <div style={{ width: '20px', height: '20px', borderRadius: '50%', backgroundColor: '#e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem', fontWeight: 700, color: '#475569', flexShrink: 0 }}>
                               {(po.createdBy || 'P')[0]?.toUpperCase()}
                             </div>
                             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '0.8rem' }}>
@@ -2304,7 +2323,7 @@ export default function Purchasing() {
                           <span style={{
                             display: 'inline-block',
                             padding: '0.2rem 0.65rem',
-                            fontSize: '0.72rem',
+                            fontSize: '0.77rem',
                             fontWeight: 700,
                             color: badge.color,
                             backgroundColor: badge.bg,
@@ -2326,7 +2345,7 @@ export default function Purchasing() {
                                   border: 'none',
                                   borderRadius: '4px',
                                   padding: '0.3rem 0.5rem',
-                                  fontSize: '0.74rem',
+                                  fontSize: '0.79rem',
                                   fontWeight: 700,
                                   cursor: 'pointer',
                                   minWidth: '68px',
@@ -2351,7 +2370,7 @@ export default function Purchasing() {
                                   border: 'none',
                                   borderRadius: '4px',
                                   padding: '0.3rem 0.5rem',
-                                  fontSize: '0.74rem',
+                                  fontSize: '0.79rem',
                                   fontWeight: 700,
                                   cursor: 'pointer',
                                   minWidth: '70px',
@@ -2375,7 +2394,7 @@ export default function Purchasing() {
                                   border: 'none',
                                   borderRadius: '4px',
                                   padding: '0.3rem 0.5rem',
-                                  fontSize: '0.74rem',
+                                  fontSize: '0.79rem',
                                   fontWeight: 700,
                                   cursor: 'pointer',
                                   minWidth: '58px',
@@ -2401,7 +2420,7 @@ export default function Purchasing() {
                                     border: '1px solid #bfdbfe',
                                     borderRadius: '4px',
                                     padding: '0.3rem 0.5rem',
-                                    fontSize: '0.74rem',
+                                    fontSize: '0.79rem',
                                     fontWeight: 700,
                                     cursor: 'pointer',
                                     display: 'inline-flex',
@@ -2426,7 +2445,7 @@ export default function Purchasing() {
                                       border: '1px solid #86efac',
                                       borderRadius: '4px',
                                       padding: '0.3rem 0.5rem',
-                                      fontSize: '0.74rem',
+                                      fontSize: '0.79rem',
                                       fontWeight: 700,
                                       cursor: 'pointer',
                                       display: 'inline-flex',
@@ -2454,7 +2473,7 @@ export default function Purchasing() {
                                     border: '1px solid #bfdbfe',
                                     borderRadius: '4px',
                                     padding: '0.3rem 0.5rem',
-                                    fontSize: '0.74rem',
+                                    fontSize: '0.79rem',
                                     fontWeight: 700,
                                     cursor: 'pointer',
                                     display: 'inline-flex',
@@ -2477,7 +2496,7 @@ export default function Purchasing() {
                               style={{
                                 backgroundColor: '#ffffff',
                                 color: '#2563eb',
-                                border: '1px solid #cbd5e1',
+                                border: '1px solid #e3e8ef',
                                 borderRadius: '4px',
                                 padding: '0',
                                 width: '28px',
@@ -2525,7 +2544,7 @@ export default function Purchasing() {
                   placeholder="Tìm theo tên, email, số điện thoại NCC..."
                   value={supplierSearch}
                   onChange={(e) => setSupplierSearch(e.target.value)}
-                  style={{ width: '100%', height: '38px', padding: '0 0.85rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px', boxSizing: 'border-box' }}
+                  style={{ width: '100%', height: '38px', padding: '0 0.85rem', fontSize: '0.83rem', border: '1px solid #e3e8ef', borderRadius: '6px', boxSizing: 'border-box' }}
                 />
               </div>
               {(isPurchasing || isCEO || isAdmin) && (
@@ -2554,7 +2573,7 @@ export default function Purchasing() {
 
                 const isInactive = sup.status === 'INACTIVE';
                 return (
-                  <div key={sup.code || idx} style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', opacity: isInactive ? 0.6 : 1 }}>
+                  <div key={sup.code || idx} style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1.25rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', opacity: isInactive ? 0.6 : 1 }}>
                     <div>
                       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '0.85rem' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
@@ -2563,18 +2582,18 @@ export default function Purchasing() {
                           </div>
                           <div>
                             <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', lineHeight: 1.3 }}>{sup.name}</h4>
-                            <span style={{ fontSize: '0.72rem', color: '#64748b' }}>Mã: {sup.code || `SUP-${idx+1}`}</span>
+                            <span style={{ fontSize: '0.77rem', color: '#64748b' }}>Mã: {sup.code || `SUP-${idx+1}`}</span>
                           </div>
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.3rem' }}>
                           {isInactive && (
-                            <span style={{ backgroundColor: '#fee2e2', color: '#dc2626', padding: '2px 8px', borderRadius: '10px', fontSize: '0.68rem', fontWeight: 800, whiteSpace: 'nowrap' }}>
+                            <span style={{ backgroundColor: '#fee2e2', color: '#dc2626', padding: '2px 8px', borderRadius: '10px', fontSize: '0.74rem', fontWeight: 800, whiteSpace: 'nowrap' }}>
                               Ngừng hợp tác
                             </span>
                           )}
                           <span
                             title={avgScore === null ? 'Chưa có đánh giá nào cho NCC này' : `Điểm trung bình từ ${sup.evaluations.length} lần đánh giá`}
-                            style={{ backgroundColor: avgScore === null ? '#f1f5f9' : '#fef3c7', color: avgScore === null ? '#64748b' : '#b45309', padding: '2px 8px', borderRadius: '10px', fontSize: '0.72rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '2px', whiteSpace: 'nowrap' }}
+                            style={{ backgroundColor: avgScore === null ? '#f1f5f9' : '#fef3c7', color: avgScore === null ? '#64748b' : '#b45309', padding: '2px 8px', borderRadius: '10px', fontSize: '0.77rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '2px', whiteSpace: 'nowrap' }}
                           >
                             <Star size={12} fill={avgScore === null ? 'none' : '#b45309'} />
                             {avgScore === null ? 'Chưa đánh giá' : `${avgScore}/10`}
@@ -2584,16 +2603,16 @@ export default function Purchasing() {
 
                       {/* Main Distributed Categories Badges */}
                       <div style={{ marginBottom: '0.85rem' }}>
-                        <span style={{ fontSize: '0.7rem', color: '#64748b', display: 'block', marginBottom: '0.25rem', fontWeight: 600 }}>Phân phối chính:</span>
+                        <span style={{ fontSize: '0.75rem', color: '#64748b', display: 'block', marginBottom: '0.25rem', fontWeight: 600 }}>Phân phối chính:</span>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem' }}>
                           {distributedCats.length > 0 ? (
                             distributedCats.slice(0, 4).map((cat, cIdx) => (
-                              <span key={cIdx} style={{ backgroundColor: '#f1f5f9', color: '#334155', fontSize: '0.68rem', padding: '1px 6px', borderRadius: '4px', border: '1px solid #e2e8f0', fontWeight: 600 }}>
+                              <span key={cIdx} style={{ backgroundColor: '#f1f5f9', color: '#334155', fontSize: '0.74rem', padding: '1px 6px', borderRadius: '4px', border: '1px solid #e2e8f0', fontWeight: 600 }}>
                                 {cat}
                               </span>
                             ))
                           ) : (
-                            <span style={{ backgroundColor: '#f1f5f9', color: '#64748b', fontSize: '0.68rem', padding: '1px 6px', borderRadius: '4px' }}>
+                            <span style={{ backgroundColor: '#f1f5f9', color: '#64748b', fontSize: '0.74rem', padding: '1px 6px', borderRadius: '4px' }}>
                               Linh kiện máy tính chính hãng
                             </span>
                           )}
@@ -2619,11 +2638,11 @@ export default function Purchasing() {
                     <div>
                       <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '0.75rem', marginBottom: '0.85rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <div>
-                          <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block' }}>Giao Dịch</span>
+                          <span style={{ fontSize: '0.77rem', color: '#64748b', display: 'block' }}>Giao Dịch</span>
                           <strong style={{ fontSize: '0.85rem', color: '#0f172a' }}>{supOrders.length} Đơn Hàng</strong>
                         </div>
                         <div style={{ textAlign: 'right' }}>
-                          <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block' }}>Tổng Mua Sắm</span>
+                          <span style={{ fontSize: '0.77rem', color: '#64748b', display: 'block' }}>Tổng Mua Sắm</span>
                           <strong style={{ fontSize: '0.85rem', color: totalSupSpend > 0 ? '#16a34a' : '#64748b' }}>
                             {totalSupSpend > 0 ? formatCurrency(totalSupSpend) : '0 đ'}
                           </strong>
@@ -2648,7 +2667,7 @@ export default function Purchasing() {
                             border: 'none',
                             borderRadius: '6px',
                             padding: '0.45rem',
-                            fontSize: '0.75rem',
+                            fontSize: '0.8rem',
                             fontWeight: 700,
                             cursor: 'pointer',
                             display: 'flex',
@@ -2672,7 +2691,7 @@ export default function Purchasing() {
                             border: '1px solid #bfdbfe',
                             borderRadius: '6px',
                             padding: '0.45rem',
-                            fontSize: '0.75rem',
+                            fontSize: '0.8rem',
                             fontWeight: 700,
                             cursor: 'pointer',
                             display: 'flex',
@@ -2697,7 +2716,7 @@ export default function Purchasing() {
                               border: '1px solid #fde68a',
                               borderRadius: '6px',
                               padding: '0.45rem',
-                              fontSize: '0.75rem',
+                              fontSize: '0.8rem',
                               fontWeight: 700,
                               cursor: 'pointer',
                               display: 'flex',
@@ -2716,8 +2735,8 @@ export default function Purchasing() {
                             <button
                               onClick={() => handleOpenEditSupplier(sup)}
                               style={{
-                                backgroundColor: '#f8fafc', color: '#334155', border: '1px solid #cbd5e1', borderRadius: '6px',
-                                padding: '0.45rem', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer',
+                                backgroundColor: '#f8fafc', color: '#334155', border: '1px solid #e3e8ef', borderRadius: '6px',
+                                padding: '0.45rem', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer',
                                 display: 'flex', alignItems: 'center', justifyContent: 'center'
                               }}
                             >
@@ -2729,7 +2748,7 @@ export default function Purchasing() {
                                 backgroundColor: isInactive ? '#f0fdf4' : '#fef2f2',
                                 color: isInactive ? '#16a34a' : '#dc2626',
                                 border: `1px solid ${isInactive ? '#bbf7d0' : '#fecaca'}`,
-                                borderRadius: '6px', padding: '0.45rem', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer',
+                                borderRadius: '6px', padding: '0.45rem', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer',
                                 display: 'flex', alignItems: 'center', justifyContent: 'center'
                               }}
                             >
@@ -2769,7 +2788,7 @@ export default function Purchasing() {
           </div>
 
           {rfqGroups.length === 0 ? (
-            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '3rem', textAlign: 'center', color: '#64748b' }}>
+            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '3rem', textAlign: 'center', color: '#64748b' }}>
               <BarChart2 size={48} style={{ margin: '0 auto 1rem', opacity: 0.3 }} />
               <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#0f172a', marginBottom: '0.4rem' }}>Chưa có nhóm Yêu Cầu Báo Giá đa NCC nào</h3>
               <p style={{ fontSize: '0.85rem', margin: '0 0 1.25rem' }}>
@@ -2785,7 +2804,7 @@ export default function Purchasing() {
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
               {rfqGroups.map((group, gIdx) => (
-                <div key={group.key || gIdx} style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem' }}>
+                <div key={group.key || gIdx} style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1.25rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
                     <div>
                       <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
@@ -2810,7 +2829,7 @@ export default function Purchasing() {
                         <div key={po.id || pIdx} style={{ backgroundColor: '#f8fafc', borderRadius: '6px', border: '1px solid #e2e8f0', padding: '1rem' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
                             <strong style={{ fontSize: '0.85rem', color: '#0f172a' }}>{po.supplier?.name || po.supplierCode}</strong>
-                            <span style={{ fontSize: '0.7rem', fontWeight: 700, padding: '2px 6px', borderRadius: '8px', backgroundColor: badge.bg, color: badge.color, border: `1px solid ${badge.border}` }}>
+                            <span style={{ fontSize: '0.75rem', fontWeight: 700, padding: '2px 6px', borderRadius: '8px', backgroundColor: badge.bg, color: badge.color, border: `1px solid ${badge.border}` }}>
                               {badge.text}
                             </span>
                           </div>
@@ -2852,7 +2871,7 @@ export default function Purchasing() {
             backgroundColor: '#ffffff', 
             padding: '0.85rem 1rem', 
             borderRadius: '8px', 
-            border: '1px solid #cbd5e1', 
+            border: '1px solid #e3e8ef', 
             marginBottom: '1.25rem', 
             display: 'grid', 
             gridTemplateColumns: 'minmax(200px, 2fr) minmax(140px, 1.2fr) minmax(160px, 1.3fr) minmax(140px, 1fr)', 
@@ -2864,7 +2883,7 @@ export default function Purchasing() {
               placeholder="Tìm theo tên linh kiện, mã SKU..."
               value={productSearch}
               onChange={(e) => setProductSearch(e.target.value)}
-              style={{ width: '100%', height: '38px', padding: '0 0.85rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px', boxSizing: 'border-box' }}
+              style={{ width: '100%', height: '38px', padding: '0 0.85rem', fontSize: '0.83rem', border: '1px solid #e3e8ef', borderRadius: '6px', boxSizing: 'border-box' }}
             />
 
             <select
@@ -2873,7 +2892,7 @@ export default function Purchasing() {
                 setProductCategoryFilter(e.target.value);
                 setProductSupplierFilter('ALL');
               }}
-              style={{ width: '100%', height: '38px', padding: '0 0.65rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px', color: '#0f172a', boxSizing: 'border-box', backgroundColor: '#ffffff', cursor: 'pointer' }}
+              style={{ width: '100%', height: '38px', padding: '0 0.65rem', fontSize: '0.83rem', border: '1px solid #e3e8ef', borderRadius: '6px', color: '#0f172a', boxSizing: 'border-box', backgroundColor: '#ffffff', cursor: 'pointer' }}
             >
               <option value="ALL">Tất cả phân nhóm</option>
               <option value="CPU">CPU</option>
@@ -2892,7 +2911,7 @@ export default function Purchasing() {
             <select
               value={productSupplierFilter}
               onChange={(e) => setProductSupplierFilter(e.target.value)}
-              style={{ width: '100%', height: '38px', padding: '0 0.65rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px', color: '#0f172a', boxSizing: 'border-box', backgroundColor: '#ffffff', cursor: 'pointer' }}
+              style={{ width: '100%', height: '38px', padding: '0 0.65rem', fontSize: '0.83rem', border: '1px solid #e3e8ef', borderRadius: '6px', color: '#0f172a', boxSizing: 'border-box', backgroundColor: '#ffffff', cursor: 'pointer' }}
             >
               <option value="ALL">Tất cả nhà cung cấp ({availableProductSuppliers.length})</option>
               {availableProductSuppliers.map(s => (
@@ -2903,7 +2922,7 @@ export default function Purchasing() {
             <select
               value={productStockStatusFilter}
               onChange={(e) => setProductStockStatusFilter(e.target.value)}
-              style={{ width: '100%', height: '38px', padding: '0 0.65rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px', color: '#0f172a', boxSizing: 'border-box', backgroundColor: '#ffffff', cursor: 'pointer' }}
+              style={{ width: '100%', height: '38px', padding: '0 0.65rem', fontSize: '0.83rem', border: '1px solid #e3e8ef', borderRadius: '6px', color: '#0f172a', boxSizing: 'border-box', backgroundColor: '#ffffff', cursor: 'pointer' }}
             >
               <option value="ALL">Tất cả trạng thái</option>
               <option value="IN_STOCK">Còn hàng</option>
@@ -2912,7 +2931,7 @@ export default function Purchasing() {
             </select>
           </div>
 
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', overflow: 'hidden' }}>
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', overflow: 'hidden' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.83rem' }}>
               <thead>
                 <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569' }}>
@@ -2943,7 +2962,7 @@ export default function Purchasing() {
                       <tr key={p.productId || p.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
                         <td style={{ padding: '0.75rem 1rem', fontWeight: 700, color: '#0f172a' }}>
                           <div>{p.name}</div>
-                          {p.sku && <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 400 }}>SKU: {p.sku}</span>}
+                          {p.sku && <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 400 }}>SKU: {p.sku}</span>}
                         </td>
                         <td style={{ padding: '0.75rem 0.85rem', color: '#475569', fontWeight: 600, whiteSpace: 'nowrap' }}>
                           {p.category || getCategoryUpper(p)}
@@ -2956,15 +2975,15 @@ export default function Purchasing() {
                         </td>
                         <td style={{ padding: '0.75rem 0.85rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
                           {isOutOfStock ? (
-                            <span style={{ backgroundColor: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca', fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: '10px' }}>
+                            <span style={{ backgroundColor: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca', fontSize: '0.75rem', fontWeight: 700, padding: '2px 8px', borderRadius: '10px' }}>
                               Hết Hàng
                             </span>
                           ) : isLowStock ? (
-                            <span style={{ backgroundColor: '#fffbeb', color: '#d97706', border: '1px solid #fde68a', fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: '10px' }}>
+                            <span style={{ backgroundColor: '#fffbeb', color: '#d97706', border: '1px solid #fde68a', fontSize: '0.75rem', fontWeight: 700, padding: '2px 8px', borderRadius: '10px' }}>
                               Cảnh Báo Tồn
                             </span>
                           ) : (
-                            <span style={{ backgroundColor: '#f0fdf4', color: '#16a34a', border: '1px solid #bbf7d0', fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: '10px' }}>
+                            <span style={{ backgroundColor: '#f0fdf4', color: '#16a34a', border: '1px solid #bbf7d0', fontSize: '0.75rem', fontWeight: 700, padding: '2px 8px', borderRadius: '10px' }}>
                               Còn Hàng
                             </span>
                           )}
@@ -2981,7 +3000,7 @@ export default function Purchasing() {
                               border: '1px solid #bfdbfe',
                               borderRadius: '4px',
                               padding: '0.3rem 0.65rem',
-                              fontSize: '0.75rem',
+                              fontSize: '0.8rem',
                               fontWeight: 700,
                               cursor: 'pointer'
                             }}
@@ -3006,7 +3025,7 @@ export default function Purchasing() {
                   <button
                     disabled={productPage <= 1}
                     onClick={() => setProductPage(p => Math.max(p - 1, 1))}
-                    style={{ backgroundColor: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '4px', padding: '0.3rem 0.6rem', cursor: productPage <= 1 ? 'not-allowed' : 'pointer', opacity: productPage <= 1 ? 0.5 : 1 }}
+                    style={{ backgroundColor: '#ffffff', border: '1px solid #e3e8ef', borderRadius: '4px', padding: '0.3rem 0.6rem', cursor: productPage <= 1 ? 'not-allowed' : 'pointer', opacity: productPage <= 1 ? 0.5 : 1 }}
                   >
                     <ChevronLeft size={14} />
                   </button>
@@ -3016,7 +3035,7 @@ export default function Purchasing() {
                   <button
                     disabled={productPage >= totalProductPages}
                     onClick={() => setProductPage(p => Math.min(p + 1, totalProductPages))}
-                    style={{ backgroundColor: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '4px', padding: '0.3rem 0.6rem', cursor: productPage >= totalProductPages ? 'not-allowed' : 'pointer', opacity: productPage >= totalProductPages ? 0.5 : 1 }}
+                    style={{ backgroundColor: '#ffffff', border: '1px solid #e3e8ef', borderRadius: '4px', padding: '0.3rem 0.6rem', cursor: productPage >= totalProductPages ? 'not-allowed' : 'pointer', opacity: productPage >= totalProductPages ? 0.5 : 1 }}
                   >
                     <ChevronRight size={14} />
                   </button>
@@ -3123,29 +3142,29 @@ export default function Purchasing() {
 
             {/* KPI Cards Overview for Reports */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1.25rem' }}>
-              <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1rem' }}>
-                <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700, display: 'block' }}>Tổng Chi Phí Đã Mua</span>
+              <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1rem' }}>
+                <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 700, display: 'block' }}>Tổng Chi Phí Đã Mua</span>
                 <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#16a34a', marginTop: '0.25rem' }}>
                   {formatCurrency(totalCalculatedSpend)}
                 </div>
               </div>
 
-              <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1rem' }}>
-                <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700, display: 'block' }}>Tổng Số Đơn Đã Lập</span>
+              <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1rem' }}>
+                <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 700, display: 'block' }}>Tổng Số Đơn Đã Lập</span>
                 <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#2563eb', marginTop: '0.25rem' }}>
                   {orders.length} Đơn Hàng
                 </div>
               </div>
 
-              <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1rem' }}>
-                <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700, display: 'block' }}>Tỷ Lệ Giao Đúng Hạn</span>
+              <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1rem' }}>
+                <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 700, display: 'block' }}>Tỷ Lệ Giao Đúng Hạn</span>
                 <div style={{ fontSize: '1.4rem', fontWeight: 800, color: onTimeRate === null ? '#94a3b8' : onTimeRate >= 80 ? '#10b981' : '#d97706', marginTop: '0.25rem' }}>
                   {onTimeRate === null ? 'Chưa đủ dữ liệu' : `${onTimeRate}% Đúng Hạn`}
                 </div>
               </div>
 
-              <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1rem' }}>
-                <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700, display: 'block' }}>Thời Gian Báo Giá TB</span>
+              <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1rem' }}>
+                <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 700, display: 'block' }}>Thời Gian Báo Giá TB</span>
                 <div style={{ fontSize: '1.4rem', fontWeight: 800, color: quoteTurnaroundDays === null ? '#94a3b8' : '#d97706', marginTop: '0.25rem' }}>
                   {quoteTurnaroundDays === null ? 'Chưa đủ dữ liệu' : `${quoteTurnaroundDays.toFixed(1)} Ngày`}
                 </div>
@@ -3156,12 +3175,12 @@ export default function Purchasing() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem', marginBottom: '1.25rem' }}>
               
               {/* Box 1: Top Suppliers Spending */}
-              <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem' }}>
+              <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1.25rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                   <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
                     Top Nhà Cung Cấp Chi Phí Lớn Nhất
                   </h3>
-                  <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Xếp theo tổng giá trị</span>
+                  <span style={{ fontSize: '0.8rem', color: '#64748b' }}>Xếp theo tổng giá trị</span>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', maxHeight: '360px', overflowY: 'auto', paddingRight: '0.35rem' }}>
                   {supSpendList.slice(0, 8).map((s, idx) => {
@@ -3186,12 +3205,12 @@ export default function Purchasing() {
               </div>
 
               {/* Box 2: Category Cost Distribution */}
-              <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem' }}>
+              <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1.25rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                   <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
                     Cơ Cấu Chi Phí Theo Phân Nhóm Linh Kiện
                   </h3>
-                  <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Phân bổ chi phí</span>
+                  <span style={{ fontSize: '0.8rem', color: '#64748b' }}>Phân bổ chi phí</span>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', maxHeight: '360px', overflowY: 'auto', paddingRight: '0.35rem' }}>
                   {catEntries.length > 0 ? (
@@ -3222,7 +3241,7 @@ export default function Purchasing() {
             </div>
 
             {/* Box 3: Top Purchased Products Table */}
-            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem' }}>
+            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1.25rem' }}>
               <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', margin: '0 0 1rem' }}>
                 Top Linh Kiện Nhập Hàng Nhiều Nhất
               </h3>
@@ -3243,12 +3262,12 @@ export default function Purchasing() {
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                               <span>#{idx + 1}. {item.name}</span>
                               {item.category && (
-                                <span style={{ backgroundColor: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', fontSize: '0.68rem', padding: '1px 6px', borderRadius: '4px', fontWeight: 600 }}>
+                                <span style={{ backgroundColor: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', fontSize: '0.74rem', padding: '1px 6px', borderRadius: '4px', fontWeight: 600 }}>
                                   {item.category}
                                 </span>
                               )}
                             </div>
-                            {item.sku && <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 400 }}>SKU: {item.sku}</span>}
+                            {item.sku && <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 400 }}>SKU: {item.sku}</span>}
                           </td>
                           <td style={{ padding: '0.65rem 0.85rem', textAlign: 'center', fontWeight: 800, color: '#2563eb' }}>
                             {item.totalQty} chiếc
@@ -3284,14 +3303,14 @@ export default function Purchasing() {
               .aetherpc-no-print { display: none !important; }
             }
           `}</style>
-          <div className="aetherpc-pr-print" style={{ width: '100%', maxWidth: '640px', maxHeight: '90vh', overflowY: 'auto', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.15)' }}>
+          <div className="aetherpc-pr-print" style={{ width: '100%', maxWidth: '640px', maxHeight: '90vh', overflowY: 'auto', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e3e8ef', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.15)' }}>
             <div style={{ padding: '1.75rem' }}>
               {/* Company header — trình bày như tiêu đề một chứng từ thật */}
               <div style={{ textAlign: 'center', borderBottom: '2px solid #0f172a', paddingBottom: '1rem', marginBottom: '1.25rem', position: 'relative' }}>
-                <button onClick={() => setSelectedViewPR(null)} className="aetherpc-no-print" style={{ position: 'absolute', right: 0, top: 0, background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#475569', cursor: 'pointer', padding: '0.4rem', borderRadius: '6px', display: 'flex' }}>
+                <button onClick={() => setSelectedViewPR(null)} className="aetherpc-no-print" style={{ position: 'absolute', right: 0, top: 0, background: '#f1f5f9', border: '1px solid #e3e8ef', color: '#475569', cursor: 'pointer', padding: '0.4rem', borderRadius: '6px', display: 'flex' }}>
                   <X size={18} />
                 </button>
-                <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                   CÔNG TY TNHH CÔNG NGHỆ AETHERPC — PHÒNG MUA HÀNG
                 </div>
                 <h2 style={{ margin: '0.4rem 0 0', fontSize: '1.3rem', fontWeight: 800, color: '#0f172a' }}>PHIẾU ĐỀ XUẤT MUA HÀNG</h2>
@@ -3328,43 +3347,20 @@ export default function Purchasing() {
                 )}
               </div>
 
-              {/* Signature blocks — bản in để lưu hồ sơ / trình ký giấy */}
-              <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px dashed #cbd5e1', tableLayout: 'fixed' }}>
-                <tbody>
-                  <tr>
-                    <td style={{ width: '50%', textAlign: 'center', padding: '0.5rem 0.5rem 0' }}>
-                      <strong style={{ fontSize: '0.8rem', color: '#0f172a' }}>NGƯỜI ĐỀ XUẤT</strong>
-                    </td>
-                    <td style={{ width: '50%', textAlign: 'center', padding: '0.5rem 0.5rem 0' }}>
-                      <strong style={{ fontSize: '0.8rem', color: '#0f172a' }}>QUẢN LÝ KHO DUYỆT</strong>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td style={{ textAlign: 'center', padding: '0.15rem 0.5rem 0' }}>
-                      <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>(Ký, ghi rõ họ tên)</div>
-                    </td>
-                    <td style={{ textAlign: 'center', padding: '0.15rem 0.5rem 0' }}>
-                      <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>(Ký, ghi rõ họ tên)</div>
-                    </td>
-                  </tr>
-                  <tr style={{ height: '60px' }}><td /><td /></tr>
-                  <tr>
-                    <td style={{ textAlign: 'center', padding: '0 0.5rem 0.5rem' }}>
-                      <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#0f172a' }}>{selectedViewPR.requestedBy || ''}</div>
-                    </td>
-                    <td style={{ textAlign: 'center', padding: '0 0.5rem 0.5rem' }}>
-                      <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#0f172a' }}>{selectedViewPR.approvedBy || ''}</div>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+              {/* Chữ ký điện tử — người đề xuất và quản lý kho duyệt */}
+              <SignatureRow>
+                <SignatureCell title="Người đề xuất" name={displaySigner(selectedViewPR.requestedBy)} signedAt={selectedViewPR.createdAt} docRef={selectedViewPR.prCode || selectedViewPR.id} />
+                <SignatureCell title="Quản lý kho duyệt" name={displaySigner(selectedViewPR.approvedBy)} signedAt={selectedViewPR.approvedAt}
+                  signed={!!selectedViewPR.approvedBy && selectedViewPR.status !== 'PENDING'} seal={selectedViewPR.status !== 'REJECTED'} sealLabel="ĐÃ DUYỆT"
+                  result={selectedViewPR.status === 'REJECTED' ? 'Từ chối' : 'Đã duyệt'} docRef={selectedViewPR.prCode || selectedViewPR.id} pendingText="Chờ duyệt" />
+              </SignatureRow>
             </div>
 
             {/* Footer */}
             <div className="aetherpc-no-print" style={{ padding: '1rem 1.5rem', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', backgroundColor: '#f8fafc' }}>
               <button
                 onClick={() => setSelectedViewPR(null)}
-                style={{ backgroundColor: '#ffffff', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.5rem 1rem', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}
+                style={{ backgroundColor: '#ffffff', color: '#475569', border: '1px solid #e3e8ef', borderRadius: '6px', padding: '0.5rem 1rem', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}
               >
                 Đóng
               </button>
@@ -3395,7 +3391,7 @@ export default function Purchasing() {
       {/* ================= MODAL XỬ LÝ YÊU CẦU MUA HÀNG (PR) ================= */}
       {selectedProcessPR && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(4px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1100, padding: '1.25rem' }}>
-          <div style={{ width: '100%', maxWidth: '640px', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)', overflow: 'hidden' }}>
+          <div style={{ width: '100%', maxWidth: '640px', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e3e8ef', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)', overflow: 'hidden' }}>
             {/* Modal Header */}
             <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#f8fafc' }}>
               <div>
@@ -3403,7 +3399,7 @@ export default function Purchasing() {
                   <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
                     Lập RFQ Từ Yêu Cầu Mua Hàng
                   </h3>
-                  <span style={{ backgroundColor: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', padding: '1px 8px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 700, fontFamily: 'monospace' }}>
+                  <span style={{ backgroundColor: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', padding: '1px 8px', borderRadius: '10px', fontSize: '0.8rem', fontWeight: 700, fontFamily: 'monospace' }}>
                     {selectedProcessPR.prCode}
                   </span>
                 </div>
@@ -3424,7 +3420,7 @@ export default function Purchasing() {
               
               {/* Product & Stock Summary Box */}
               <div style={{ backgroundColor: '#f8fafc', padding: '1rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600, textTransform: 'uppercase', marginBottom: '0.35rem' }}>
+                <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600, textTransform: 'uppercase', marginBottom: '0.35rem' }}>
                   Linh kiện đề xuất
                 </div>
                 <div style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a', lineHeight: 1.35 }}>
@@ -3432,7 +3428,7 @@ export default function Purchasing() {
                 </div>
                 {selectedProcessPR.sku && (
                   <div style={{ marginTop: '0.25rem' }}>
-                    <span style={{ fontSize: '0.72rem', color: '#475569', backgroundColor: '#e2e8f0', padding: '1px 6px', borderRadius: '4px', fontFamily: 'monospace' }}>
+                    <span style={{ fontSize: '0.77rem', color: '#475569', backgroundColor: '#e2e8f0', padding: '1px 6px', borderRadius: '4px', fontFamily: 'monospace' }}>
                       SKU: {selectedProcessPR.sku}
                     </span>
                   </div>
@@ -3440,14 +3436,14 @@ export default function Purchasing() {
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem', marginTop: '0.85rem' }}>
                   <div style={{ backgroundColor: '#ffffff', padding: '0.75rem', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
-                    <span style={{ fontSize: '0.72rem', color: '#64748b' }}>Tồn kho hiện tại:</span>
+                    <span style={{ fontSize: '0.77rem', color: '#64748b' }}>Tồn kho hiện tại:</span>
                     <div style={{ fontSize: '1.15rem', fontWeight: 800, color: selectedProcessPR.stock === 0 ? '#dc2626' : (selectedProcessPR.stock && selectedProcessPR.stock <= 5) ? '#d97706' : '#15803d' }}>
                       {selectedProcessPR.stock !== null && selectedProcessPR.stock !== undefined ? `${selectedProcessPR.stock} SP` : '-'}
                     </div>
                   </div>
 
                   <div style={{ backgroundColor: '#ffffff', padding: '0.75rem', borderRadius: '6px', border: '1px solid #bfdbfe' }}>
-                    <label style={{ fontSize: '0.72rem', color: '#2563eb', fontWeight: 700, display: 'block' }}>
+                    <label style={{ fontSize: '0.77rem', color: '#2563eb', fontWeight: 700, display: 'block' }}>
                       Số lượng đặt mua:
                     </label>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', marginTop: '0.2rem' }}>
@@ -3505,7 +3501,7 @@ export default function Purchasing() {
                         <div style={{ fontWeight: 800, color: '#1d4ed8', fontSize: '0.88rem' }}>
                           Chuyển Thành RFQ Khảo Sát Giá
                         </div>
-                        <div style={{ fontSize: '0.75rem', color: '#3b82f6', marginTop: '1px' }}>
+                        <div style={{ fontSize: '0.8rem', color: '#3b82f6', marginTop: '1px' }}>
                           Tự động tạo phiếu RFQ gửi đến các nhà cung cấp phân phối linh kiện này
                         </div>
                       </div>
@@ -3520,7 +3516,7 @@ export default function Purchasing() {
             <div style={{ padding: '1rem 1.5rem', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end', backgroundColor: '#f8fafc' }}>
               <button
                 onClick={() => setSelectedProcessPR(null)}
-                style={{ backgroundColor: '#ffffff', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.5rem 1.25rem', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}
+                style={{ backgroundColor: '#ffffff', color: '#475569', border: '1px solid #e3e8ef', borderRadius: '6px', padding: '0.5rem 1.25rem', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}
               >
                 Đóng
               </button>
@@ -3532,7 +3528,7 @@ export default function Purchasing() {
       {/* ================= MODAL TẠO YCBG (RFQ) ================= */}
       {showCreateModal && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(6px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '1.5rem' }}>
-          <div style={{ width: '100%', maxWidth: '850px', maxHeight: '90vh', overflowY: 'auto', padding: '2rem', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
+          <div style={{ width: '100%', maxWidth: '850px', maxHeight: '90vh', overflowY: 'auto', padding: '2rem', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e3e8ef', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                 <div style={{ padding: '0.6rem', background: '#eff6ff', borderRadius: '8px', color: '#2563eb' }}>
@@ -3543,7 +3539,7 @@ export default function Purchasing() {
                   <p style={{ fontSize: '0.8rem', color: '#64748b', margin: '0.15rem 0 0' }}>Khởi tạo phiếu yêu cầu chào giá gửi tới các nhà cung cấp</p>
                 </div>
               </div>
-              <button onClick={() => setShowCreateModal(false)} style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#475569', cursor: 'pointer', padding: '0.4rem', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <button onClick={() => setShowCreateModal(false)} style={{ background: '#f1f5f9', border: '1px solid #e3e8ef', color: '#475569', cursor: 'pointer', padding: '0.4rem', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <X size={18} />
               </button>
             </div>
@@ -3555,7 +3551,7 @@ export default function Purchasing() {
                   <BarChart2 size={18} style={{ color: '#2563eb' }} />
                   <div>
                     <strong style={{ fontSize: '0.85rem', color: '#1e40af', display: 'block' }}>Gửi Yêu Cầu Báo Giá Đồng Thời Cho Nhiều NCC</strong>
-                    <span style={{ fontSize: '0.75rem', color: '#3b82f6' }}>Tự động tạo các đơn RFQ phân tách cho từng đối tác để so sánh giá tối ưu</span>
+                    <span style={{ fontSize: '0.8rem', color: '#3b82f6' }}>Tự động tạo các đơn RFQ phân tách cho từng đối tác để so sánh giá tối ưu</span>
                   </div>
                 </div>
                 <input 
@@ -3582,13 +3578,13 @@ export default function Purchasing() {
                         <div style={{ height: '6px', backgroundColor: '#fef3c7', borderRadius: '3px', overflow: 'hidden', marginBottom: '0.3rem' }}>
                           <div style={{ height: '100%', width: `${pct}%`, backgroundColor: '#d97706' }} />
                         </div>
-                        <span style={{ fontSize: '0.72rem', color: '#b45309' }}>Đã dùng {formatCurrency(used)} / {formatCurrency(cap)} ({pct}%)</span>
+                        <span style={{ fontSize: '0.77rem', color: '#b45309' }}>Đã dùng {formatCurrency(used)} / {formatCurrency(cap)} ({pct}%)</span>
                       </>
                     )}
                     <button
                       type="button"
                       onClick={() => setPoBlanketRefId(null)}
-                      style={{ display: 'block', marginTop: '0.4rem', background: 'none', border: 'none', color: '#b45309', fontSize: '0.72rem', textDecoration: 'underline', cursor: 'pointer', padding: 0 }}
+                      style={{ display: 'block', marginTop: '0.4rem', background: 'none', border: 'none', color: '#b45309', fontSize: '0.77rem', textDecoration: 'underline', cursor: 'pointer', padding: 0 }}
                     >
                       Bỏ liên kết hợp đồng khung
                     </button>
@@ -3601,7 +3597,7 @@ export default function Purchasing() {
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <div>
                       <strong style={{ fontSize: '0.85rem', color: '#92400e', display: 'block' }}>Đây Là Hợp Đồng Khung</strong>
-                      <span style={{ fontSize: '0.75rem', color: '#b45309' }}>Đặt hạn mức tổng + thời hạn để tạo nhiều đơn mua lặp lại từ hợp đồng này sau này</span>
+                      <span style={{ fontSize: '0.8rem', color: '#b45309' }}>Đặt hạn mức tổng + thời hạn để tạo nhiều đơn mua lặp lại từ hợp đồng này sau này</span>
                     </div>
                     <input
                       type="checkbox"
@@ -3613,7 +3609,7 @@ export default function Purchasing() {
                   {poIsBlanket && (
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginTop: '0.85rem' }}>
                       <div>
-                        <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#92400e', marginBottom: '0.25rem' }}>Hạn Mức Tổng (đ)</label>
+                        <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#92400e', marginBottom: '0.25rem' }}>Hạn Mức Tổng (đ)</label>
                         <input
                           type="number"
                           min="0"
@@ -3624,7 +3620,7 @@ export default function Purchasing() {
                         />
                       </div>
                       <div>
-                        <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#92400e', marginBottom: '0.25rem' }}>Hiệu Lực Đến Ngày</label>
+                        <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#92400e', marginBottom: '0.25rem' }}>Hiệu Lực Đến Ngày</label>
                         <input
                           type="date"
                           value={poBlanketValidUntil}
@@ -3653,7 +3649,7 @@ export default function Purchasing() {
                             updated[idx] = e.target.value;
                             setSelectedSuppliersList(updated);
                           }}
-                          style={{ flex: 1, height: '38px', padding: '0 0.65rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px', color: '#0f172a', backgroundColor: '#ffffff' }}
+                          style={{ flex: 1, height: '38px', padding: '0 0.65rem', fontSize: '0.83rem', border: '1px solid #e3e8ef', borderRadius: '6px', color: '#0f172a', backgroundColor: '#ffffff' }}
                         >
                           <option value="">-- Chọn Nhà Cung Cấp #{idx + 1} --</option>
                           {suppliers.map(s => (
@@ -3692,7 +3688,7 @@ export default function Purchasing() {
                     <select
                       value={selectedSupplier}
                       onChange={(e) => setSelectedSupplier(e.target.value)}
-                      style={{ width: '100%', height: '38px', padding: '0 0.65rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px', color: '#0f172a', backgroundColor: '#ffffff' }}
+                      style={{ width: '100%', height: '38px', padding: '0 0.65rem', fontSize: '0.83rem', border: '1px solid #e3e8ef', borderRadius: '6px', color: '#0f172a', backgroundColor: '#ffffff' }}
                     >
                       <option value="">-- Chọn Nhà Cung Cấp --</option>
                       {suppliers.map(s => (
@@ -3709,7 +3705,7 @@ export default function Purchasing() {
                       type="date"
                       value={expectedDeliveryDate}
                       onChange={(e) => setExpectedDeliveryDate(e.target.value)}
-                      style={{ width: '100%', height: '38px', padding: '0 0.65rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px', color: '#0f172a', backgroundColor: '#ffffff', boxSizing: 'border-box' }}
+                      style={{ width: '100%', height: '38px', padding: '0 0.65rem', fontSize: '0.83rem', border: '1px solid #e3e8ef', borderRadius: '6px', color: '#0f172a', backgroundColor: '#ffffff', boxSizing: 'border-box' }}
                     />
                   </div>
                 </div>
@@ -3722,7 +3718,7 @@ export default function Purchasing() {
                 </h4>
                 <div style={{ display: 'grid', gridTemplateColumns: 'minmax(200px, 2fr) 100px 90px', gap: '0.65rem', alignItems: 'flex-end' }}>
                   <div style={{ position: 'relative' }} ref={searchComboboxRef}>
-                    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#475569', marginBottom: '0.25rem' }}>Chọn sản phẩm:</label>
+                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: '0.25rem' }}>Chọn sản phẩm:</label>
                     <input
                       type="text"
                       placeholder="Gõ tên hoặc SKU sản phẩm..."
@@ -3732,10 +3728,10 @@ export default function Purchasing() {
                         setShowSuggestions(true);
                       }}
                       onFocus={() => setShowSuggestions(true)}
-                      style={{ width: '100%', height: '36px', padding: '0 0.65rem', fontSize: '0.8rem', border: '1px solid #cbd5e1', borderRadius: '6px', boxSizing: 'border-box' }}
+                      style={{ width: '100%', height: '36px', padding: '0 0.65rem', fontSize: '0.8rem', border: '1px solid #e3e8ef', borderRadius: '6px', boxSizing: 'border-box' }}
                     />
                     {showSuggestions && (
-                      <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, maxHeight: '180px', overflowY: 'auto', backgroundColor: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', zIndex: 10, boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}>
+                      <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, maxHeight: '180px', overflowY: 'auto', backgroundColor: '#ffffff', border: '1px solid #e3e8ef', borderRadius: '6px', zIndex: 10, boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}>
                         {filteredProductsForModal.slice(0, 20).map(p => (
                           <div
                             key={p.productId || p.id}
@@ -3747,7 +3743,7 @@ export default function Purchasing() {
                             style={{ padding: '0.45rem 0.75rem', fontSize: '0.78rem', cursor: 'pointer', borderBottom: '1px solid #f1f5f9' }}
                           >
                             <div style={{ fontWeight: 700, color: '#0f172a' }}>{p.name}</div>
-                            <div style={{ fontSize: '0.7rem', color: '#64748b' }}>Phân nhóm: {p.category} | SKU: {p.sku || p.productId}</div>
+                            <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Phân nhóm: {p.category} | SKU: {p.sku || p.productId}</div>
                           </div>
                         ))}
                       </div>
@@ -3755,13 +3751,13 @@ export default function Purchasing() {
                   </div>
 
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#475569', marginBottom: '0.25rem' }}>Số lượng:</label>
+                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: '0.25rem' }}>Số lượng:</label>
                     <input
                       type="number"
                       min="1"
                       value={quantity}
                       onChange={(e) => setQuantity(e.target.value)}
-                      style={{ width: '100%', height: '36px', padding: '0 0.5rem', fontSize: '0.8rem', border: '1px solid #cbd5e1', borderRadius: '6px', boxSizing: 'border-box' }}
+                      style={{ width: '100%', height: '36px', padding: '0 0.5rem', fontSize: '0.8rem', border: '1px solid #e3e8ef', borderRadius: '6px', boxSizing: 'border-box' }}
                     />
                   </div>
 
@@ -3776,7 +3772,7 @@ export default function Purchasing() {
               </div>
 
               {/* Items List Table */}
-              <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', overflow: 'hidden', marginBottom: '1.25rem' }}>
+              <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', overflow: 'hidden', marginBottom: '1.25rem' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
                   <thead>
                     <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569', textAlign: 'left' }}>
@@ -3818,7 +3814,7 @@ export default function Purchasing() {
                 <button
                   type="button"
                   onClick={() => setShowCreateModal(false)}
-                  style={{ backgroundColor: '#ffffff', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.55rem 1.2rem', fontSize: '0.83rem', fontWeight: 700, cursor: 'pointer' }}
+                  style={{ backgroundColor: '#ffffff', color: '#475569', border: '1px solid #e3e8ef', borderRadius: '6px', padding: '0.55rem 1.2rem', fontSize: '0.83rem', fontWeight: 700, cursor: 'pointer' }}
                 >
                   Hủy Bỏ
                 </button>
@@ -3838,15 +3834,15 @@ export default function Purchasing() {
       {/* ================= MODAL XEM CHI TIẾT PO ================= */}
       {selectedPO && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(6px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '1.5rem' }}>
-          <div style={{ width: '100%', maxWidth: '750px', maxHeight: '90vh', overflowY: 'auto', padding: '2rem', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
+          <div style={{ width: '100%', maxWidth: '750px', maxHeight: '90vh', overflowY: 'auto', padding: '2rem', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e3e8ef', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
               <div>
-                <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#2563eb', textTransform: 'uppercase' }}>Chi Tiết Đơn Hàng</span>
+                <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#2563eb', textTransform: 'uppercase' }}>Chi Tiết Đơn Hàng</span>
                 <h3 style={{ fontSize: '1.35rem', fontWeight: 800, color: '#0f172a', margin: '0.1rem 0 0' }}>
                   {formatPurchaseReference(selectedPO)}
                 </h3>
               </div>
-              <button onClick={() => setSelectedPO(null)} style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#475569', cursor: 'pointer', padding: '0.4rem', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <button onClick={() => setSelectedPO(null)} style={{ background: '#f1f5f9', border: '1px solid #e3e8ef', color: '#475569', cursor: 'pointer', padding: '0.4rem', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <X size={18} />
               </button>
             </div>
@@ -3877,12 +3873,12 @@ export default function Purchasing() {
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: '84px' }}>
                           <div style={{
                             width: '26px', height: '26px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            backgroundColor: dotBg, border: `2px solid ${dotColor}`, color: dotColor, fontSize: '0.72rem', fontWeight: 800
+                            backgroundColor: dotBg, border: `2px solid ${dotColor}`, color: dotColor, fontSize: '0.77rem', fontWeight: 800
                           }}>
                             {isDone ? <Check size={13} /> : idx + 1}
                           </div>
                           <span style={{
-                            marginTop: '0.35rem', fontSize: '0.68rem', textAlign: 'center', lineHeight: 1.25,
+                            marginTop: '0.35rem', fontSize: '0.74rem', textAlign: 'center', lineHeight: 1.25,
                             color: isCurrent ? dotColor : (isDone ? '#334155' : '#94a3b8'),
                             fontWeight: isCurrent ? 800 : 600
                           }}>
@@ -3901,23 +3897,23 @@ export default function Purchasing() {
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', backgroundColor: '#f8fafc', padding: '1rem', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '1.25rem', fontSize: '0.83rem' }}>
               <div>
-                <span style={{ color: '#64748b', display: 'block', fontSize: '0.75rem' }}>Nhà Cung Cấp:</span>
+                <span style={{ color: '#64748b', display: 'block', fontSize: '0.8rem' }}>Nhà Cung Cấp:</span>
                 <strong style={{ color: '#0f172a' }}>{getSupplierName(selectedPO)}</strong>
               </div>
               <div>
-                <span style={{ color: '#64748b', display: 'block', fontSize: '0.75rem' }}>Trạng Thái:</span>
+                <span style={{ color: '#64748b', display: 'block', fontSize: '0.8rem' }}>Trạng Thái:</span>
                 <strong style={{ color: getStatusBadge(selectedPO.status).color }}>{getStatusText(selectedPO.status)}</strong>
               </div>
               <div>
-                <span style={{ color: '#64748b', display: 'block', fontSize: '0.75rem' }}>Ngày Lập:</span>
+                <span style={{ color: '#64748b', display: 'block', fontSize: '0.8rem' }}>Ngày Lập:</span>
                 <strong style={{ color: '#0f172a' }}>{formatDate(selectedPO.createdAt)}</strong>
               </div>
               <div>
-                <span style={{ color: '#64748b', display: 'block', fontSize: '0.75rem' }}>Hạn Giao Hàng:</span>
+                <span style={{ color: '#64748b', display: 'block', fontSize: '0.8rem' }}>Hạn Giao Hàng:</span>
                 <strong style={{ color: '#0f172a' }}>{formatDate(selectedPO.expectedDeliveryDate)}</strong>
               </div>
               <div>
-                <span style={{ color: '#64748b', display: 'block', fontSize: '0.75rem' }}>Công Nợ / Thanh Toán NCC:</span>
+                <span style={{ color: '#64748b', display: 'block', fontSize: '0.8rem' }}>Công Nợ / Thanh Toán NCC:</span>
                 {(() => {
                   const bill = (selectedPO.bills || [])[0];
                   if (!bill) {
@@ -3933,7 +3929,7 @@ export default function Purchasing() {
                         {info.label}{bill.amountDue > 0 ? ` — Còn nợ ${formatCurrency(bill.amountDue)}` : ''}
                       </strong>
                       {isAdjusted && (
-                        <div style={{ marginTop: '0.3rem', fontSize: '0.72rem', color: '#b45309', backgroundColor: '#fffbeb', border: '1px solid #fde68a', borderRadius: '4px', padding: '0.35rem 0.5rem' }}>
+                        <div style={{ marginTop: '0.3rem', fontSize: '0.77rem', color: '#b45309', backgroundColor: '#fffbeb', border: '1px solid #fde68a', borderRadius: '4px', padding: '0.35rem 0.5rem' }}>
                           Đã điều chỉnh theo tỷ lệ nghiệm thu QC: {((billTotal / poTotal) * 100).toFixed(1)}% — chênh lệch {formatCurrency(poTotal - billTotal)} so với PO gốc ({formatCurrency(poTotal)}).
                         </div>
                       )}
@@ -3993,7 +3989,7 @@ export default function Purchasing() {
             )}
 
             {/* Items Table */}
-            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', overflow: 'hidden', marginBottom: '1.25rem' }}>
+            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', overflow: 'hidden', marginBottom: '1.25rem' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.83rem' }}>
                 <thead>
                   <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', color: '#475569', textAlign: 'left' }}>
@@ -4019,11 +4015,11 @@ export default function Purchasing() {
                           <div style={{ fontWeight: 700, lineHeight: '1.4', fontSize: '0.85rem' }}>{itemName}</div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.35rem' }}>
                             {itemCategory && (
-                              <span style={{ fontSize: '0.68rem', backgroundColor: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', padding: '1px 6px', borderRadius: '4px', fontWeight: 600 }}>
+                              <span style={{ fontSize: '0.74rem', backgroundColor: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', padding: '1px 6px', borderRadius: '4px', fontWeight: 600 }}>
                                 {itemCategory}
                               </span>
                             )}
-                            {itemSku && <span style={{ fontSize: '0.7rem', color: '#64748b' }}>SKU: {itemSku}</span>}
+                            {itemSku && <span style={{ fontSize: '0.75rem', color: '#64748b' }}>SKU: {itemSku}</span>}
                           </div>
                         </td>
                         <td style={{ padding: '0.85rem 1rem', textAlign: 'center', fontWeight: 800, whiteSpace: 'nowrap', color: '#0f172a', verticalAlign: 'top', lineHeight: '1.4', fontSize: '0.85rem' }}>
@@ -4051,18 +4047,18 @@ export default function Purchasing() {
                 </strong>
               </div>
               {selectedPO.blanketRefId && selectedPO.blanketRef && (
-                <span style={{ fontSize: '0.75rem', color: '#b45309', marginTop: '0.25rem' }}>
+                <span style={{ fontSize: '0.8rem', color: '#b45309', marginTop: '0.25rem' }}>
                   Đơn mua theo Hợp Đồng Khung {selectedPO.blanketRef.poNumber}
                 </span>
               )}
               {/* RFQ và PO là 2 chứng từ khác nhau — hiển thị liên kết chéo giữa chúng. */}
               {selectedPO.sourceRfqId && selectedPO.sourceRfq && (
-                <span style={{ fontSize: '0.75rem', color: '#2563eb', marginTop: '0.25rem' }}>
+                <span style={{ fontSize: '0.8rem', color: '#2563eb', marginTop: '0.25rem' }}>
                   Lập từ báo giá {formatPurchaseReference(selectedPO.sourceRfq)}
                 </span>
               )}
               {selectedPO.status === 'CONVERTED' && selectedPO.derivedPOs?.[0] && (
-                <span style={{ fontSize: '0.75rem', color: '#16a34a', marginTop: '0.25rem' }}>
+                <span style={{ fontSize: '0.8rem', color: '#16a34a', marginTop: '0.25rem' }}>
                   Đã chọn — xem đơn PO chính thức {selectedPO.derivedPOs[0].poNumber}
                 </span>
               )}
@@ -4092,15 +4088,15 @@ export default function Purchasing() {
                       <div style={{ height: '6px', backgroundColor: '#fef3c7', borderRadius: '3px', overflow: 'hidden', marginBottom: '0.3rem' }}>
                         <div style={{ height: '100%', width: `${pct}%`, backgroundColor: '#d97706' }} />
                       </div>
-                      <span style={{ fontSize: '0.72rem', color: '#b45309' }}>
+                      <span style={{ fontSize: '0.77rem', color: '#b45309' }}>
                         Đã dùng {formatCurrency(used)} / {formatCurrency(cap)} ({pct}%) qua {(selectedPO.releases || []).length} đơn mua
                       </span>
                     </>
                   ) : (
-                    <span style={{ fontSize: '0.72rem', color: '#b45309' }}>Không giới hạn hạn mức — đã tạo {(selectedPO.releases || []).length} đơn mua từ hợp đồng này.</span>
+                    <span style={{ fontSize: '0.77rem', color: '#b45309' }}>Không giới hạn hạn mức — đã tạo {(selectedPO.releases || []).length} đơn mua từ hợp đồng này.</span>
                   )}
                   {selectedPO.blanketValidUntil && (
-                    <div style={{ fontSize: '0.72rem', color: '#b45309', marginTop: '0.2rem' }}>
+                    <div style={{ fontSize: '0.77rem', color: '#b45309', marginTop: '0.2rem' }}>
                       Hiệu lực đến: {formatDate(selectedPO.blanketValidUntil)}
                     </div>
                   )}
@@ -4136,28 +4132,28 @@ export default function Purchasing() {
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
                     <h4 style={{ margin: 0, fontSize: '0.85rem', color: '#0f172a', fontWeight: 800 }}>Biên Bản Kiểm Định QA/QC</h4>
                     {badge && (
-                      <span style={{ padding: '2px 10px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 800, backgroundColor: badge.bg, color: badge.color, border: `1px solid ${badge.border}` }}>
+                      <span style={{ padding: '2px 10px', borderRadius: '4px', fontSize: '0.77rem', fontWeight: 800, backgroundColor: badge.bg, color: badge.color, border: `1px solid ${badge.border}` }}>
                         {badge.text}
                       </span>
                     )}
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '0.75rem', fontSize: '0.82rem' }}>
                     <div>
-                      <span style={{ color: '#64748b', display: 'block', fontSize: '0.72rem' }}>Người Kiểm Định:</span>
+                      <span style={{ color: '#64748b', display: 'block', fontSize: '0.77rem' }}>Người Kiểm Định:</span>
                       <strong style={{ color: '#0f172a' }}>{inspectorName || 'Chưa rõ'}</strong>
                     </div>
                     <div>
-                      <span style={{ color: '#64748b', display: 'block', fontSize: '0.72rem' }}>Ngày Kiểm Định:</span>
+                      <span style={{ color: '#64748b', display: 'block', fontSize: '0.77rem' }}>Ngày Kiểm Định:</span>
                       <strong style={{ color: '#0f172a' }}>{inspectedAt || 'Chưa rõ'}</strong>
                     </div>
                     {dbInspection.sampleRate != null && (
                       <div>
-                        <span style={{ color: '#64748b', display: 'block', fontSize: '0.72rem' }}>Tỷ Lệ Lấy Mẫu:</span>
+                        <span style={{ color: '#64748b', display: 'block', fontSize: '0.77rem' }}>Tỷ Lệ Lấy Mẫu:</span>
                         <strong style={{ color: '#0f172a' }}>{dbInspection.sampleRate}%</strong>
                       </div>
                     )}
                     <div>
-                      <span style={{ color: '#64748b', display: 'block', fontSize: '0.72rem' }}>Số Lượng Đạt / Lỗi:</span>
+                      <span style={{ color: '#64748b', display: 'block', fontSize: '0.77rem' }}>Số Lượng Đạt / Lỗi:</span>
                       <strong>
                         <span style={{ color: '#16a34a' }}>{dbInspection.passedQuantity}</span>
                         <span style={{ color: '#94a3b8' }}> / </span>
@@ -4196,12 +4192,12 @@ export default function Purchasing() {
                         <div style={{ flex: 1, fontSize: '0.82rem' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                             <span style={{
-                              padding: '1px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 800,
+                              padding: '1px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 800,
                               color: badge.color, backgroundColor: badge.bg, border: `1px solid ${badge.border}`
                             }}>
                               {badge.text}
                             </span>
-                            <span style={{ color: '#94a3b8', fontSize: '0.75rem' }}>
+                            <span style={{ color: '#94a3b8', fontSize: '0.8rem' }}>
                               {h.timestamp ? new Date(h.timestamp).toLocaleString('vi-VN') : ''}
                             </span>
                           </div>
@@ -4225,7 +4221,7 @@ export default function Purchasing() {
             <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', borderTop: '1px solid #f1f5f9', paddingTop: '1rem', gap: '0.65rem' }}>
               <button
                 onClick={() => setSelectedPO(null)}
-                style={{ backgroundColor: '#ffffff', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.5rem 1rem', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
+                style={{ backgroundColor: '#ffffff', color: '#475569', border: '1px solid #e3e8ef', borderRadius: '6px', padding: '0.5rem 1rem', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
               >
                 Đóng
               </button>
@@ -4460,7 +4456,7 @@ export default function Purchasing() {
                 </span>
               )}
               {selectedPO.status === 'CONVERTED' && (
-                <span style={{ fontSize: '0.78rem', color: '#475569', fontWeight: 700, backgroundColor: '#f1f5f9', padding: '0.4rem 0.8rem', borderRadius: '6px', border: '1px solid #cbd5e1' }}>
+                <span style={{ fontSize: '0.78rem', color: '#475569', fontWeight: 700, backgroundColor: '#f1f5f9', padding: '0.4rem 0.8rem', borderRadius: '6px', border: '1px solid #e3e8ef' }}>
                   ✓ Đã chọn báo giá này — đơn PO chính thức được lập ở bản ghi riêng
                 </span>
               )}
@@ -4482,7 +4478,7 @@ export default function Purchasing() {
               step="0.1"
               value={evalForm[key]}
               onChange={(e) => setEvalForm(f => ({ ...f, [key]: e.target.value }))}
-              style={{ width: '100%', height: '38px', padding: '0 0.75rem', fontSize: '0.85rem', border: '1px solid #cbd5e1', borderRadius: '6px', boxSizing: 'border-box' }}
+              style={{ width: '100%', height: '38px', padding: '0 0.75rem', fontSize: '0.85rem', border: '1px solid #e3e8ef', borderRadius: '6px', boxSizing: 'border-box' }}
             />
           </div>
         );
@@ -4519,13 +4515,13 @@ export default function Purchasing() {
 
         return (
           <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(6px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '1.5rem' }}>
-            <div style={{ width: '100%', maxWidth: '420px', padding: '1.75rem', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
+            <div style={{ width: '100%', maxWidth: '420px', padding: '1.75rem', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e3e8ef', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.25rem' }}>
                 <div>
                   <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>Đánh Giá Nhà Cung Cấp</h3>
                   <p style={{ fontSize: '0.8rem', color: '#64748b', margin: '0.2rem 0 0' }}>{targetSup?.name || evalTargetSupplier}</p>
                 </div>
-                <button onClick={() => setEvalTargetSupplier(null)} style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#475569', cursor: 'pointer', padding: '0.35rem', borderRadius: '6px', display: 'flex' }}>
+                <button onClick={() => setEvalTargetSupplier(null)} style={{ background: '#f1f5f9', border: '1px solid #e3e8ef', color: '#475569', cursor: 'pointer', padding: '0.35rem', borderRadius: '6px', display: 'flex' }}>
                   <X size={16} />
                 </button>
               </div>
@@ -4537,7 +4533,7 @@ export default function Purchasing() {
                   placeholder="VD: 2026-Q3"
                   value={evalForm.period}
                   onChange={(e) => setEvalForm(f => ({ ...f, period: e.target.value }))}
-                  style={{ width: '100%', height: '38px', padding: '0 0.75rem', fontSize: '0.85rem', border: '1px solid #cbd5e1', borderRadius: '6px', boxSizing: 'border-box' }}
+                  style={{ width: '100%', height: '38px', padding: '0 0.75rem', fontSize: '0.85rem', border: '1px solid #e3e8ef', borderRadius: '6px', boxSizing: 'border-box' }}
                 />
               </div>
 
@@ -4555,7 +4551,7 @@ export default function Purchasing() {
                 <button
                   onClick={() => setEvalTargetSupplier(null)}
                   disabled={evalSubmitting}
-                  style={{ flex: 1, backgroundColor: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.6rem', fontSize: '0.83rem', fontWeight: 700, cursor: 'pointer' }}
+                  style={{ flex: 1, backgroundColor: '#f1f5f9', color: '#475569', border: '1px solid #e3e8ef', borderRadius: '6px', padding: '0.6rem', fontSize: '0.83rem', fontWeight: 700, cursor: 'pointer' }}
                 >
                   Hủy
                 </button>
@@ -4584,20 +4580,20 @@ export default function Purchasing() {
               placeholder={opts.placeholder}
               value={supplierForm[key]}
               onChange={(e) => setSupplierForm(f => ({ ...f, [key]: e.target.value }))}
-              style={{ width: '100%', height: '38px', padding: '0 0.75rem', fontSize: '0.85rem', border: '1px solid #cbd5e1', borderRadius: '6px', boxSizing: 'border-box', backgroundColor: opts.disabled ? '#f1f5f9' : '#ffffff', color: '#0f172a' }}
+              style={{ width: '100%', height: '38px', padding: '0 0.75rem', fontSize: '0.85rem', border: '1px solid #e3e8ef', borderRadius: '6px', boxSizing: 'border-box', backgroundColor: opts.disabled ? '#f1f5f9' : '#ffffff', color: '#0f172a' }}
             />
           </div>
         );
 
         return (
           <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(6px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '1.5rem' }}>
-            <div style={{ width: '100%', maxWidth: '460px', maxHeight: '90vh', overflowY: 'auto', padding: '1.75rem', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
+            <div style={{ width: '100%', maxWidth: '460px', maxHeight: '90vh', overflowY: 'auto', padding: '1.75rem', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e3e8ef', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.25rem' }}>
                 <div>
                   <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>{isEdit ? 'Sửa Hồ Sơ Nhà Cung Cấp' : 'Thêm Nhà Cung Cấp Mới'}</h3>
                   <p style={{ fontSize: '0.8rem', color: '#64748b', margin: '0.2rem 0 0' }}>{isEdit ? supplierForm.name : 'Nhập thông tin đối tác cung ứng'}</p>
                 </div>
-                <button onClick={() => setSupplierModal(null)} style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#475569', cursor: 'pointer', padding: '0.35rem', borderRadius: '6px', display: 'flex' }}>
+                <button onClick={() => setSupplierModal(null)} style={{ background: '#f1f5f9', border: '1px solid #e3e8ef', color: '#475569', cursor: 'pointer', padding: '0.35rem', borderRadius: '6px', display: 'flex' }}>
                   <X size={16} />
                 </button>
               </div>
@@ -4620,7 +4616,7 @@ export default function Purchasing() {
                 <button
                   onClick={() => setSupplierModal(null)}
                   disabled={supplierSubmitting}
-                  style={{ flex: 1, backgroundColor: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.6rem', fontSize: '0.83rem', fontWeight: 700, cursor: 'pointer' }}
+                  style={{ flex: 1, backgroundColor: '#f1f5f9', color: '#475569', border: '1px solid #e3e8ef', borderRadius: '6px', padding: '0.6rem', fontSize: '0.83rem', fontWeight: 700, cursor: 'pointer' }}
                 >
                   Hủy
                 </button>
@@ -4639,7 +4635,7 @@ export default function Purchasing() {
 
       {showCompareModal && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(6px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '1.5rem' }}>
-          <div style={{ width: '100%', maxWidth: '950px', maxHeight: '90vh', overflowY: 'auto', padding: '2rem', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
+          <div style={{ width: '100%', maxWidth: '950px', maxHeight: '90vh', overflowY: 'auto', padding: '2rem', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e3e8ef', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
               <div>
                 <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
@@ -4649,7 +4645,7 @@ export default function Purchasing() {
                   Đối soát báo giá giữa các đơn vị để tối ưu chi phí mua hàng
                 </p>
               </div>
-              <button onClick={() => setShowCompareModal(false)} style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#475569', cursor: 'pointer', padding: '0.4rem', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <button onClick={() => setShowCompareModal(false)} style={{ background: '#f1f5f9', border: '1px solid #e3e8ef', color: '#475569', cursor: 'pointer', padding: '0.4rem', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <X size={18} />
               </button>
             </div>
@@ -4686,12 +4682,12 @@ export default function Purchasing() {
                           <div key={po.id} style={{
                             backgroundColor: '#ffffff',
                             borderRadius: '8px',
-                            border: isCheapest && po.totalAmount > 0 ? '2px solid #10b981' : '1px solid #cbd5e1',
+                            border: isCheapest && po.totalAmount > 0 ? '2px solid #10b981' : '1px solid #e3e8ef',
                             padding: '1rem',
                             position: 'relative'
                           }}>
                             {isCheapest && po.totalAmount > 0 && (
-                              <span style={{ position: 'absolute', top: '-10px', right: '10px', backgroundColor: '#10b981', color: '#ffffff', fontSize: '0.65rem', fontWeight: 800, padding: '2px 8px', borderRadius: '10px' }}>
+                              <span style={{ position: 'absolute', top: '-10px', right: '10px', backgroundColor: '#10b981', color: '#ffffff', fontSize: '0.72rem', fontWeight: 800, padding: '2px 8px', borderRadius: '10px' }}>
                                 GIÁ RẺ NHẤT
                               </span>
                             )}
@@ -4699,10 +4695,10 @@ export default function Purchasing() {
                             <h4 style={{ margin: '0 0 0.35rem', fontSize: '0.95rem', fontWeight: 800, color: '#0f172a' }}>
                               {getSupplierName(po)}
                             </h4>
-                            <div style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.4rem' }}>
+                            <div style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '0.4rem' }}>
                               Mã: {formatPurchaseReference(po)}
                             </div>
-                            <div style={{ fontSize: '0.75rem', color: poAvgScore === null ? '#94a3b8' : '#b45309', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '3px', fontWeight: 700 }}>
+                            <div style={{ fontSize: '0.8rem', color: poAvgScore === null ? '#94a3b8' : '#b45309', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '3px', fontWeight: 700 }}>
                               <Star size={12} fill={poAvgScore === null ? 'none' : '#b45309'} />
                               {poAvgScore === null ? 'NCC chưa được đánh giá' : `Điểm đánh giá NCC: ${poAvgScore}/10`}
                             </div>
@@ -4814,12 +4810,12 @@ export default function Purchasing() {
                 .aetherpc-print-only { display: block !important; }
               }
             `}</style>
-            <div className="aetherpc-po-print" style={{ width: '100%', maxWidth: '680px', maxHeight: '90vh', display: 'flex', flexDirection: 'column', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.15)', overflow: 'hidden' }}>
+            <div className="aetherpc-po-print" style={{ width: '100%', maxWidth: '680px', maxHeight: '90vh', display: 'flex', flexDirection: 'column', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e3e8ef', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.15)', overflow: 'hidden' }}>
               {/* Header — trình bày như tiêu đề một chứng từ thật */}
               <div style={{ padding: '1.25rem 1.5rem', borderBottom: '2px solid #0f172a', flexShrink: 0, backgroundColor: '#ffffff' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    <div style={{ fontSize: '0.77rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                       CÔNG TY TNHH CÔNG NGHỆ AETHERPC — PHÒNG MUA HÀNG
                     </div>
                     <h2 style={{ margin: '0.3rem 0 0', fontSize: '1.25rem', fontWeight: 800, color: '#0f172a' }}>PHIẾU MUA HÀNG</h2>
@@ -4827,7 +4823,7 @@ export default function Purchasing() {
                       Lập từ báo giá {issuePOTarget.poNumber} — Người lập: {user?.fullname || user?.name || user?.code || '—'} — Ngày lập: {new Date().toLocaleDateString('vi-VN')}
                     </p>
                   </div>
-                  <button onClick={() => setIssuePOTarget(null)} className="aetherpc-no-print" style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#475569', cursor: 'pointer', padding: '0.4rem', borderRadius: '6px', display: 'flex' }}>
+                  <button onClick={() => setIssuePOTarget(null)} className="aetherpc-no-print" style={{ background: '#f1f5f9', border: '1px solid #e3e8ef', color: '#475569', cursor: 'pointer', padding: '0.4rem', borderRadius: '6px', display: 'flex' }}>
                     <X size={18} />
                   </button>
                 </div>
@@ -4837,19 +4833,19 @@ export default function Purchasing() {
                 {/* Bên Mua / Bên Bán — chứng từ mua hàng thật luôn thể hiện đủ 2 bên */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.25rem' }}>
                   <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.85rem 1rem' }}>
-                    <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#2563eb', textTransform: 'uppercase' }}>Bên Mua Hàng (Bên A)</span>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#2563eb', textTransform: 'uppercase' }}>Bên Mua Hàng (Bên A)</span>
                     <div style={{ fontSize: '0.85rem', color: '#0f172a', fontWeight: 700, marginTop: '0.3rem' }}>Công Ty TNHH Công Nghệ AetherPC</div>
-                    <div style={{ fontSize: '0.76rem', color: '#64748b', marginTop: '0.15rem' }}>175 Nguyễn Thị Minh Khai, Quận 1, TP. HCM</div>
+                    <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.15rem' }}>175 Nguyễn Thị Minh Khai, Quận 1, TP. HCM</div>
                   </div>
                   <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.85rem 1rem' }}>
-                    <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#b45309', textTransform: 'uppercase' }}>Bên Bán (Bên B — NCC)</span>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#b45309', textTransform: 'uppercase' }}>Bên Bán (Bên B — NCC)</span>
                     <div style={{ fontSize: '0.85rem', color: '#0f172a', fontWeight: 700, marginTop: '0.3rem' }}>{getSupplierName(issuePOTarget)}</div>
-                    <div style={{ fontSize: '0.76rem', color: '#64748b', marginTop: '0.15rem' }}>
+                    <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.15rem' }}>
                       Mã NCC: {issuePOTarget.supplierCode}
                       {supplierInfo.phone ? ` • ĐT: ${supplierInfo.phone}` : ''}
                     </div>
                     {supplierInfo.address && (
-                      <div style={{ fontSize: '0.76rem', color: '#64748b', marginTop: '0.1rem' }}>{supplierInfo.address}</div>
+                      <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.1rem' }}>{supplierInfo.address}</div>
                     )}
                   </div>
                 </div>
@@ -4893,7 +4889,7 @@ export default function Purchasing() {
                       type="date"
                       value={issuePOForm.expectedDeliveryDate}
                       onChange={(e) => setIssuePOForm(f => ({ ...f, expectedDeliveryDate: e.target.value }))}
-                      style={{ width: '100%', padding: '0.5rem 0.65rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.85rem', boxSizing: 'border-box' }}
+                      style={{ width: '100%', padding: '0.5rem 0.65rem', border: '1px solid #e3e8ef', borderRadius: '6px', fontSize: '0.85rem', boxSizing: 'border-box' }}
                     />
                   </div>
                   <div>
@@ -4903,7 +4899,7 @@ export default function Purchasing() {
                       value={issuePOForm.notes}
                       onChange={(e) => setIssuePOForm(f => ({ ...f, notes: e.target.value }))}
                       placeholder="VD: Điều khoản thanh toán, đóng gói, bảo hành..."
-                      style={{ width: '100%', padding: '0.5rem 0.65rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.85rem', boxSizing: 'border-box' }}
+                      style={{ width: '100%', padding: '0.5rem 0.65rem', border: '1px solid #e3e8ef', borderRadius: '6px', fontSize: '0.85rem', boxSizing: 'border-box' }}
                     />
                   </div>
                 </div>
@@ -4920,91 +4916,19 @@ export default function Purchasing() {
                   )}
                 </div>
 
-                {/* Chữ ký 3 bên — Chữ ký số theo tiến trình duyệt */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem', textAlign: 'center', marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px dashed #cbd5e1' }}>
-                  <div>
-                    <strong style={{ fontSize: '0.76rem', color: '#0f172a' }}>NGƯỜI LẬP PHIẾU</strong>
-                    <div style={{ fontSize: '0.68rem', color: '#94a3b8', marginTop: '0.2rem' }}>(Ký, ghi rõ họ tên)</div>
-                    <div style={{ minHeight: '62px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0.35rem 0' }}>
-                      <div style={{
-                        border: '1.5px dashed #2563eb',
-                        borderRadius: '6px',
-                        backgroundColor: '#eff6ff',
-                        padding: '0.3rem 0.5rem',
-                        maxWidth: '185px',
-                        width: '100%',
-                        boxSizing: 'border-box'
-                      }}>
-                        <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#1d4ed8', letterSpacing: '0.3px' }}>
-                          ✓ ĐÃ KÝ SỐ
-                        </div>
-                        <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#0f172a', marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {user?.fullname || user?.name || user?.code || 'Nhân Viên Mua Hàng'}
-                        </div>
-                        <div style={{ fontSize: '0.62rem', color: '#64748b', marginTop: '1px' }}>
-                          {formatDate(new Date())}
-                        </div>
-                      </div>
-                    </div>
-                    <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#0f172a' }}>{user?.fullname || user?.name || user?.code || 'Nhân Viên Mua Hàng'}</div>
-                  </div>
-                  <div>
-                    <strong style={{ fontSize: '0.76rem', color: '#0f172a' }}>TRƯỞNG PHÒNG MUA HÀNG</strong>
-                    <div style={{ fontSize: '0.68rem', color: '#94a3b8', marginTop: '0.2rem' }}>(Ký, ghi rõ họ tên)</div>
-                    <div style={{ minHeight: '62px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0.35rem 0' }}>
-                      <div style={{
-                        border: '1.5px dashed #059669',
-                        borderRadius: '6px',
-                        backgroundColor: '#ecfdf5',
-                        padding: '0.3rem 0.5rem',
-                        maxWidth: '185px',
-                        width: '100%',
-                        boxSizing: 'border-box'
-                      }}>
-                        <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#047857', letterSpacing: '0.3px' }}>
-                          ✓ ĐÃ KÝ SỐ
-                        </div>
-                        <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#0f172a', marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          Phòng Mua Hàng AetherPC
-                        </div>
-                        <div style={{ fontSize: '0.62rem', color: '#64748b', marginTop: '1px' }}>
-                          {formatDate(new Date())}
-                        </div>
-                      </div>
-                    </div>
-                    <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#0f172a' }}>Phòng Mua Hàng AetherPC</div>
-                  </div>
-                  <div>
-                    <strong style={{ fontSize: '0.76rem', color: '#0f172a' }}>GIÁM ĐỐC DUYỆT</strong>
-                    <div style={{ fontSize: '0.68rem', color: '#94a3b8', marginTop: '0.2rem' }}>(Ký, đóng dấu)</div>
-                    <div style={{ minHeight: '62px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0.35rem 0' }}>
-                      <div style={{
-                        border: '1px dashed #cbd5e1',
-                        borderRadius: '6px',
-                        backgroundColor: '#f8fafc',
-                        padding: '0.35rem 0.5rem',
-                        maxWidth: '185px',
-                        width: '100%',
-                        boxSizing: 'border-box'
-                      }}>
-                        <div style={{ fontSize: '0.68rem', color: '#94a3b8', fontStyle: 'italic' }}>
-                          (Chưa ký duyệt)
-                        </div>
-                        <div style={{ fontSize: '0.62rem', color: '#cbd5e1', marginTop: '2px' }}>
-                          Chờ Giám Đốc ký số
-                        </div>
-                      </div>
-                    </div>
-                    <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#0f172a' }}>Ban Giám Đốc</div>
-                  </div>
-                </div>
+                {/* Chữ ký điện tử — phiếu đang lập: các bên ký khi phiếu được trình duyệt và phê duyệt */}
+                <SignatureRow>
+                  <SignatureCell title="Người lập phiếu" signed={false} pendingText="Ký khi trình duyệt" />
+                  <SignatureCell title="Nhà cung cấp xác nhận" note="(Ký, đóng dấu)" signed={false} pendingText="Chờ NCC xác nhận" />
+                  <SignatureCell title="Giám đốc duyệt" note="(Ký, đóng dấu)" signed={false} pendingText="Chờ giám đốc duyệt" />
+                </SignatureRow>
               </div>
 
               <div className="aetherpc-no-print" style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem', padding: '1rem 1.5rem', borderTop: '1px solid #f1f5f9', flexShrink: 0, backgroundColor: '#ffffff' }}>
                 <button
                   onClick={() => setIssuePOTarget(null)}
                   disabled={issuingPO}
-                  style={{ backgroundColor: '#ffffff', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.5rem 1.25rem', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
+                  style={{ backgroundColor: '#ffffff', color: '#475569', border: '1px solid #e3e8ef', borderRadius: '6px', padding: '0.5rem 1.25rem', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
                 >
                   Hủy
                 </button>
@@ -5040,11 +4964,11 @@ export default function Purchasing() {
                 .aetherpc-no-print { display: none !important; }
               }
             `}</style>
-            <div className="aetherpc-quote-print" style={{ width: '100%', maxWidth: '680px', maxHeight: '90vh', overflowY: 'auto', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.15)' }}>
+            <div className="aetherpc-quote-print" style={{ width: '100%', maxWidth: '680px', maxHeight: '90vh', overflowY: 'auto', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e3e8ef', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.15)' }}>
               <div style={{ padding: '1.25rem 1.5rem', borderBottom: '2px solid #0f172a' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    <div style={{ fontSize: '0.77rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                       CÔNG TY TNHH CÔNG NGHỆ AETHERPC — PHÒNG MUA HÀNG
                     </div>
                     <h2 style={{ margin: '0.3rem 0 0', fontSize: '1.25rem', fontWeight: 800, color: '#0f172a' }}>PHIẾU BÁO GIÁ</h2>
@@ -5052,7 +4976,7 @@ export default function Purchasing() {
                       Số: {formatPurchaseReference(printQuoteTarget)} — Ngày lập: {formatDate(printQuoteTarget.createdAt)}
                     </p>
                   </div>
-                  <button onClick={() => setPrintQuoteTarget(null)} className="aetherpc-no-print" style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#475569', cursor: 'pointer', padding: '0.4rem', borderRadius: '6px', display: 'flex' }}>
+                  <button onClick={() => setPrintQuoteTarget(null)} className="aetherpc-no-print" style={{ background: '#f1f5f9', border: '1px solid #e3e8ef', color: '#475569', cursor: 'pointer', padding: '0.4rem', borderRadius: '6px', display: 'flex' }}>
                     <X size={18} />
                   </button>
                 </div>
@@ -5061,19 +4985,19 @@ export default function Purchasing() {
               <div style={{ padding: '1.25rem 1.5rem' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '1rem' }}>
                   <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.75rem' }}>
-                    <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#2563eb', textTransform: 'uppercase' }}>Bên Yêu Cầu Báo Giá</span>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#2563eb', textTransform: 'uppercase' }}>Bên Yêu Cầu Báo Giá</span>
                     <div style={{ fontSize: '0.85rem', color: '#0f172a', fontWeight: 700, marginTop: '0.25rem' }}>Công Ty TNHH Công Nghệ AetherPC</div>
-                    <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.1rem' }}>175 Nguyễn Thị Minh Khai, Quận 1, TP. HCM</div>
+                    <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.1rem' }}>175 Nguyễn Thị Minh Khai, Quận 1, TP. HCM</div>
                   </div>
                   <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.75rem' }}>
-                    <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#b45309', textTransform: 'uppercase' }}>Nhà Cung Cấp Báo Giá</span>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#b45309', textTransform: 'uppercase' }}>Nhà Cung Cấp Báo Giá</span>
                     <div style={{ fontSize: '0.85rem', color: '#0f172a', fontWeight: 700, marginTop: '0.25rem' }}>{getSupplierName(printQuoteTarget)}</div>
-                    <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.1rem' }}>
+                    <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.1rem' }}>
                       Mã NCC: {printQuoteTarget.supplierCode}
                       {supplierInfo.phone ? ` • ĐT: ${supplierInfo.phone}` : ''}
                     </div>
                     {supplierInfo.address && (
-                      <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.05rem' }}>{supplierInfo.address}</div>
+                      <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.05rem' }}>{supplierInfo.address}</div>
                     )}
                   </div>
                 </div>
@@ -5109,7 +5033,7 @@ export default function Purchasing() {
                   </tfoot>
                 </table>
                 {parseFloat(printQuoteTarget.totalAmount) > 0 && (
-                  <p style={{ fontSize: '0.76rem', color: '#64748b', fontStyle: 'italic', margin: '0 0 0.75rem' }}>
+                  <p style={{ fontSize: '0.8rem', color: '#64748b', fontStyle: 'italic', margin: '0 0 0.75rem' }}>
                     Bằng chữ: {formatCurrencyInWords(printQuoteTarget.totalAmount)}.
                   </p>
                 )}
@@ -5121,32 +5045,27 @@ export default function Purchasing() {
                   )}
                 </div>
 
-                {/* Chữ ký 3 bên — bản in để trình ký/lưu hồ sơ giấy */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem', textAlign: 'center', marginTop: '1rem', paddingTop: '0.75rem', borderTop: '1px dashed #cbd5e1' }}>
-                  <div>
-                    <strong style={{ fontSize: '0.74rem', color: '#0f172a' }}>NGƯỜI LẬP YÊU CẦU</strong>
-                    <div style={{ fontSize: '0.66rem', color: '#94a3b8', marginTop: '0.15rem' }}>(Ký, ghi rõ họ tên)</div>
-                    <div style={{ height: '48px' }} />
-                    <div style={{ fontSize: '0.76rem', fontWeight: 700, color: '#0f172a' }}>{printQuoteTarget.createdBy || ''}</div>
-                  </div>
-                  <div>
-                    <strong style={{ fontSize: '0.74rem', color: '#0f172a' }}>NHÀ CUNG CẤP BÁO GIÁ & XÁC NHẬN</strong>
-                    <div style={{ fontSize: '0.66rem', color: '#94a3b8', marginTop: '0.15rem' }}>(Ký, đóng dấu)</div>
-                    <div style={{ height: '48px' }} />
-                    <div style={{ fontSize: '0.76rem', fontWeight: 700, color: '#0f172a' }}>{getSupplierName(printQuoteTarget)}</div>
-                  </div>
-                  <div>
-                    <strong style={{ fontSize: '0.74rem', color: '#0f172a' }}>TRƯỞNG PHÒNG MUA HÀNG DUYỆT</strong>
-                    <div style={{ fontSize: '0.66rem', color: '#94a3b8', marginTop: '0.15rem' }}>(Ký, ghi rõ họ tên)</div>
-                    <div style={{ height: '48px' }} />
-                  </div>
-                </div>
+                {/* Chữ ký điện tử — người lập yêu cầu, nhà cung cấp báo giá, mua hàng duyệt chọn báo giá */}
+                {(() => {
+                  const quoted = historySigner(printQuoteTarget, ['QUOTED']);
+                  const chosen = historySigner(printQuoteTarget, ['PENDING_PO_DRAFT', 'CONVERTED']);
+                  const docRef = formatPurchaseReference(printQuoteTarget);
+                  return (
+                    <SignatureRow>
+                      <SignatureCell title="Người lập yêu cầu" name={displaySigner(printQuoteTarget.createdBy)} signedAt={printQuoteTarget.createdAt} docRef={docRef} />
+                      <SignatureCell title="Nhà cung cấp báo giá" note="(Ký, đóng dấu)" name={quoted.name ? getSupplierName(printQuoteTarget) : ''} signedAt={quoted.at}
+                        docRef={docRef} color="#334155" pendingText="Chờ NCC báo giá" />
+                      <SignatureCell title="Mua hàng duyệt báo giá" name={chosen.name} signedAt={chosen.at} seal sealLabel="ĐÃ DUYỆT"
+                        docRef={docRef} pendingText={printQuoteTarget.status === 'CANCELLED' ? 'Đã hủy' : 'Chờ duyệt'} />
+                    </SignatureRow>
+                  );
+                })()}
               </div>
 
               <div className="aetherpc-no-print" style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem', padding: '1rem 1.5rem', borderTop: '1px solid #f1f5f9' }}>
                 <button
                   onClick={() => setPrintQuoteTarget(null)}
-                  style={{ backgroundColor: '#ffffff', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.5rem 1.1rem', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
+                  style={{ backgroundColor: '#ffffff', color: '#475569', border: '1px solid #e3e8ef', borderRadius: '6px', padding: '0.5rem 1.1rem', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
                 >
                   Đóng
                 </button>
@@ -5181,7 +5100,7 @@ export default function Purchasing() {
 
         return (
           <div className="aetherpc-print-backdrop" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(6px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '1rem' }}>
-            <div className="aetherpc-po-doc-print" style={{ width: '100%', maxWidth: '720px', maxHeight: '92vh', overflowY: 'auto', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.15)', boxSizing: 'border-box' }}>
+            <div className="aetherpc-po-doc-print" style={{ width: '100%', maxWidth: '720px', maxHeight: '92vh', overflowY: 'auto', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e3e8ef', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.15)', boxSizing: 'border-box' }}>
               
               {/* VÙNG IN NGUYÊN BẢN — SẠCH SẼ & CÂN ĐỐI TRÊN KHỔ A4 */}
               <div id="aetherpc-po-printable-area">
@@ -5189,19 +5108,19 @@ export default function Purchasing() {
                 <div style={{ padding: '0.75rem 1.1rem 0.55rem', borderBottom: '2px solid #0f172a' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+                      <div style={{ fontSize: '0.74rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
                         CÔNG TY TNHH CÔNG NGHỆ AETHERPC — PHÒNG MUA HÀNG
                       </div>
                       <h2 style={{ margin: '0.15rem 0 0.1rem', fontSize: '1.18rem', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.3px' }}>
                         ĐƠN ĐẶT HÀNG (PURCHASE ORDER)
                       </h2>
-                      <p style={{ margin: '0', fontSize: '0.75rem', color: '#64748b', lineHeight: 1.3 }}>
+                      <p style={{ margin: '0', fontSize: '0.8rem', color: '#64748b', lineHeight: 1.3 }}>
                         Số PO: <strong style={{ color: '#0f172a' }}>{printPOTarget.poNumber || formatPurchaseReference(printPOTarget)}</strong>
                         {' • '}Ngày lập: <strong style={{ color: '#0f172a' }}>{formatDate(printPOTarget.createdAt || new Date())}</strong>
                         {' • '}Người lập: <strong style={{ color: '#0f172a' }}>{creatorSignerName}</strong>
                       </p>
                     </div>
-                    <button onClick={() => setPrintPOTarget(null)} className="aetherpc-no-print" style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#475569', cursor: 'pointer', padding: '0.35rem', borderRadius: '6px', display: 'flex' }}>
+                    <button onClick={() => setPrintPOTarget(null)} className="aetherpc-no-print" style={{ background: '#f1f5f9', border: '1px solid #e3e8ef', color: '#475569', cursor: 'pointer', padding: '0.35rem', borderRadius: '6px', display: 'flex' }}>
                       <X size={16} />
                     </button>
                   </div>
@@ -5215,22 +5134,22 @@ export default function Purchasing() {
                       <tr>
                         <td style={{ width: '50%', verticalAlign: 'top', paddingRight: '0.35rem' }}>
                           <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '0.4rem 0.65rem', boxSizing: 'border-box' }}>
-                            <span style={{ fontSize: '0.64rem', fontWeight: 800, color: '#2563eb', textTransform: 'uppercase' }}>Bên Mua Hàng (Bên A)</span>
+                            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#2563eb', textTransform: 'uppercase' }}>Bên Mua Hàng (Bên A)</span>
                             <div style={{ fontSize: '0.78rem', color: '#0f172a', fontWeight: 700, marginTop: '0.15rem' }}>Công Ty TNHH Công Nghệ AetherPC</div>
-                            <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '0.05rem', lineHeight: 1.3 }}>Địa chỉ: 175 Nguyễn Thị Minh Khai, Quận 1, TP. HCM</div>
-                            <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '0.03rem' }}>Email: purchasing@kltn-erp.vn • Hotline: 1900 6868</div>
+                            <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.05rem', lineHeight: 1.3 }}>Địa chỉ: 175 Nguyễn Thị Minh Khai, Quận 1, TP. HCM</div>
+                            <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.03rem' }}>Email: purchasing@kltn-erp.vn • Hotline: 1900 6868</div>
                           </div>
                         </td>
                         <td style={{ width: '50%', verticalAlign: 'top', paddingLeft: '0.35rem' }}>
                           <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '0.4rem 0.65rem', boxSizing: 'border-box' }}>
-                            <span style={{ fontSize: '0.64rem', fontWeight: 800, color: '#b45309', textTransform: 'uppercase' }}>Bên Bán (Bên B — Nhà Cung Cấp)</span>
+                            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#b45309', textTransform: 'uppercase' }}>Bên Bán (Bên B — Nhà Cung Cấp)</span>
                             <div style={{ fontSize: '0.78rem', color: '#0f172a', fontWeight: 700, marginTop: '0.15rem' }}>{getSupplierName(printPOTarget)}</div>
-                            <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '0.05rem', lineHeight: 1.3 }}>
+                            <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.05rem', lineHeight: 1.3 }}>
                               Mã NCC: {printPOTarget.supplierCode}
                               {supplierInfo.phone ? ` • ĐT: ${supplierInfo.phone}` : ''}
                             </div>
                             {supplierInfo.address && (
-                              <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '0.03rem', lineHeight: 1.3 }}>Địa chỉ: {supplierInfo.address}</div>
+                              <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.03rem', lineHeight: 1.3 }}>Địa chỉ: {supplierInfo.address}</div>
                             )}
                           </div>
                         </td>
@@ -5239,7 +5158,7 @@ export default function Purchasing() {
                   </table>
 
                   {/* Bảng danh sách hàng hóa — độ rộng cột rõ ràng, vừa khít 100% trang A4 */}
-                  <table style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse', marginBottom: '0.3rem', fontSize: '0.74rem' }}>
+                  <table style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse', marginBottom: '0.3rem', fontSize: '0.79rem' }}>
                     <thead>
                       <tr style={{ borderBottom: '2px solid #0f172a', backgroundColor: '#f8fafc' }}>
                         <th style={{ textAlign: 'center', padding: '0.32rem 0.25rem', color: '#475569', width: '34px' }}>STT</th>
@@ -5269,13 +5188,13 @@ export default function Purchasing() {
                   </table>
 
                   {parseFloat(printPOTarget.totalAmount) > 0 && (
-                    <p style={{ fontSize: '0.7rem', color: '#64748b', fontStyle: 'italic', margin: '0.1rem 0 0.4rem' }}>
+                    <p style={{ fontSize: '0.75rem', color: '#64748b', fontStyle: 'italic', margin: '0.1rem 0 0.4rem' }}>
                       Bằng chữ: <strong style={{ color: '#334155' }}>{formatCurrencyInWords(printPOTarget.totalAmount)}</strong>.
                     </p>
                   )}
 
                   {/* Thông tin điều khoản & giao nhận */}
-                  <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '0.35rem 0.65rem', marginBottom: '0.45rem', fontSize: '0.72rem', display: 'flex', flexDirection: 'column', gap: '0.15rem', lineHeight: 1.35 }}>
+                  <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '0.35rem 0.65rem', marginBottom: '0.45rem', fontSize: '0.77rem', display: 'flex', flexDirection: 'column', gap: '0.15rem', lineHeight: 1.35 }}>
                     <div>
                       <span style={{ color: '#64748b', fontWeight: 600 }}>Ngày giao hàng dự kiến: </span>
                       <strong style={{ color: '#0f172a' }}>
@@ -5292,7 +5211,7 @@ export default function Purchasing() {
                       <span style={{ color: '#64748b', fontWeight: 600 }}>Tình trạng phê duyệt: </span>
                       <span style={{
                         display: 'inline-block',
-                        fontSize: '0.68rem',
+                        fontSize: '0.74rem',
                         fontWeight: 700,
                         padding: '1px 6px',
                         borderRadius: '4px',
@@ -5305,115 +5224,22 @@ export default function Purchasing() {
                     </div>
                   </div>
 
-                  {/* Chữ ký 3 bên — DÙNG TABLE 3 CỘT ĐẢM BẢO 100% LUÔN THẲNG HÀNG NGANG, KHÔNG BAO GIỜ BỊ RỚT DÒNG */}
-                  <table style={{ width: '100%', borderCollapse: 'collapse', border: 'none', marginTop: '0.45rem', borderTop: '1px dashed #cbd5e1', paddingTop: '0.45rem' }}>
-                    <tbody>
-                      <tr>
-                        {/* CỘT 1: NGƯỜI LẬP PHIẾU */}
-                        <td style={{ width: '33.33%', textAlign: 'center', verticalAlign: 'top', padding: '0.35rem 0.2rem 0' }}>
-                          <strong style={{ fontSize: '0.72rem', color: '#0f172a', display: 'block' }}>NGƯỜI LẬP PHIẾU</strong>
-                          <div style={{ fontSize: '0.62rem', color: '#94a3b8', marginTop: '0.1rem' }}>(Ký, ghi rõ họ tên)</div>
-                          <div style={{ minHeight: '46px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0.2rem auto' }}>
-                            <div style={{
-                              border: '1.5px dashed #2563eb',
-                              borderRadius: '6px',
-                              backgroundColor: '#eff6ff',
-                              padding: '0.2rem 0.4rem',
-                              width: '100%',
-                              maxWidth: '155px',
-                              boxSizing: 'border-box'
-                            }}>
-                              <div style={{ fontSize: '0.62rem', fontWeight: 800, color: '#1d4ed8', letterSpacing: '0.2px' }}>
-                                ✓ ĐÃ KÝ SỐ
-                              </div>
-                              <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#0f172a', marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                {creatorSignerName}
-                              </div>
-                              <div style={{ fontSize: '0.58rem', color: '#64748b', marginTop: '1px' }}>
-                                {creatorSignDate}
-                              </div>
-                            </div>
-                          </div>
-                          <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#0f172a', marginTop: '2px' }}>{creatorSignerName}</div>
-                        </td>
-
-                        {/* CỘT 2: TRƯỞNG PHÒNG MUA HÀNG */}
-                        <td style={{ width: '33.33%', textAlign: 'center', verticalAlign: 'top', padding: '0.35rem 0.2rem 0' }}>
-                          <strong style={{ fontSize: '0.72rem', color: '#0f172a', display: 'block' }}>TRƯỞNG PHÒNG MUA HÀNG</strong>
-                          <div style={{ fontSize: '0.62rem', color: '#94a3b8', marginTop: '0.1rem' }}>(Ký, ghi rõ họ tên)</div>
-                          <div style={{ minHeight: '46px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0.2rem auto' }}>
-                            <div style={{
-                              border: '1.5px dashed #059669',
-                              borderRadius: '6px',
-                              backgroundColor: '#ecfdf5',
-                              padding: '0.2rem 0.4rem',
-                              width: '100%',
-                              maxWidth: '155px',
-                              boxSizing: 'border-box'
-                            }}>
-                              <div style={{ fontSize: '0.62rem', fontWeight: 800, color: '#047857', letterSpacing: '0.2px' }}>
-                                ✓ ĐÃ KÝ SỐ
-                              </div>
-                              <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#0f172a', marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                Phòng Mua Hàng AetherPC
-                              </div>
-                              <div style={{ fontSize: '0.58rem', color: '#64748b', marginTop: '1px' }}>
-                                {purchasingManagerDate}
-                              </div>
-                            </div>
-                          </div>
-                          <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#0f172a', marginTop: '2px' }}>Phòng Mua Hàng AetherPC</div>
-                        </td>
-
-                        {/* CỘT 3: GIÁM ĐỐC DUYỆT */}
-                        <td style={{ width: '33.33%', textAlign: 'center', verticalAlign: 'top', padding: '0.35rem 0.2rem 0' }}>
-                          <strong style={{ fontSize: '0.72rem', color: '#0f172a', display: 'block' }}>GIÁM ĐỐC DUYỆT</strong>
-                          <div style={{ fontSize: '0.62rem', color: '#94a3b8', marginTop: '0.1rem' }}>(Ký, đóng dấu)</div>
-                          <div style={{ minHeight: '46px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0.2rem auto' }}>
-                            {isCeoApproved ? (
-                              <div style={{
-                                border: '1.5px dashed #dc2626',
-                                borderRadius: '6px',
-                                backgroundColor: '#fef2f2',
-                                padding: '0.2rem 0.4rem',
-                                width: '100%',
-                                maxWidth: '155px',
-                                boxSizing: 'border-box'
-                              }}>
-                                <div style={{ fontSize: '0.62rem', fontWeight: 800, color: '#b91c1c', letterSpacing: '0.2px' }}>
-                                  ✓ ĐÃ KÝ SỐ (PHÊ DUYỆT)
-                                </div>
-                                <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#0f172a', marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                  {ceoSignerName}
-                                </div>
-                                <div style={{ fontSize: '0.58rem', color: '#64748b', marginTop: '1px' }}>
-                                  {ceoSignDate}
-                                </div>
-                              </div>
-                            ) : (
-                              <div style={{
-                                border: '1px dashed #cbd5e1',
-                                borderRadius: '6px',
-                                backgroundColor: '#f8fafc',
-                                padding: '0.25rem 0.4rem',
-                                width: '100%',
-                                maxWidth: '155px',
-                                boxSizing: 'border-box'
-                              }}>
-                                <div style={{ fontSize: '0.64rem', color: '#94a3b8', fontStyle: 'italic' }}>
-                                  (Chưa ký duyệt)
-                                </div>
-                                <div style={{ fontSize: '0.58rem', color: '#cbd5e1', marginTop: '2px' }}>
-                                  Chờ Giám Đốc ký số
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                          <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#0f172a', marginTop: '2px' }}>{isCeoApproved ? ceoSignerName : 'Ban Giám Đốc'}</div>
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
+                  {/* Chữ ký điện tử theo đúng các bước duyệt của đơn mua hàng (lấy từ lịch sử trạng thái) */}
+                  {(() => {
+                    const ceo = historySigner(printPOTarget, ['PO', 'APPROVED']);
+                    const supplierSign = historySigner(printPOTarget, ['CONFIRMED_BY_SUPPLIER']);
+                    const creator = displaySigner(printPOTarget.createdBy) || historySigner(printPOTarget, ['QUOTED_PENDING_CEO', 'PENDING_PO_DRAFT']).name;
+                    const docRef = printPOTarget.poNumber || printPOTarget.id;
+                    return (
+                      <SignatureRow>
+                        <SignatureCell title="Người lập phiếu" name={creator} signedAt={printPOTarget.createdAt} docRef={docRef} />
+                        <SignatureCell title="Nhà cung cấp xác nhận" note="(Ký, đóng dấu)" name={supplierSign.name ? (printPOTarget.supplier?.name || supplierSign.name) : ''}
+                          signedAt={supplierSign.at} docRef={docRef} color="#334155" pendingText={isCeoApproved ? 'Chờ NCC xác nhận' : 'Chưa gửi NCC'} />
+                        <SignatureCell title="Giám đốc duyệt" note="(Ký, đóng dấu)" name={ceo.name} signedAt={ceo.at} signed={isCeoApproved && !!ceo.name}
+                          seal sealLabel="ĐÃ PHÊ DUYỆT" docRef={docRef} pendingText={isPendingCeo ? 'Chờ giám đốc duyệt' : 'Chưa duyệt'} />
+                      </SignatureRow>
+                    );
+                  })()}
                 </div>
               </div>
 
@@ -5421,7 +5247,7 @@ export default function Purchasing() {
               <div className="aetherpc-no-print" style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem', padding: '0.75rem 1.1rem', borderTop: '1px solid #f1f5f9', backgroundColor: '#ffffff' }}>
                 <button
                   onClick={() => setPrintPOTarget(null)}
-                  style={{ backgroundColor: '#ffffff', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.45rem 1rem', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
+                  style={{ backgroundColor: '#ffffff', color: '#475569', border: '1px solid #e3e8ef', borderRadius: '6px', padding: '0.45rem 1rem', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
                 >
                   Đóng
                 </button>

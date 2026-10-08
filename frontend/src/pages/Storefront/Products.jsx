@@ -124,16 +124,61 @@ export default function Products() {
         {category ? <><Link to="/products">Sản phẩm</Link><span>/</span><span className="cur">{categoryLabel(category)}</span></> : <span className="cur">Sản phẩm</span>}
       </nav>
 
-      {/* Danh mục nhanh */}
-      <div className="sf-section-box" style={{ marginBottom: 12, padding: 12 }}>
-        <div className="sf-section-links" style={{ flexWrap: 'nowrap', overflowX: 'auto', scrollbarWidth: 'none' }}>
-          <button type="button" className={`sf-chip${!category ? ' is-active' : ''}`} onClick={() => update({ category: null, brand: null })}>Tất cả</button>
-          {SF_CATEGORIES.map(c => (
-            <button key={c.key} type="button" className={`sf-chip${category === c.key ? ' is-active' : ''}`}
-              onClick={() => update({ category: c.key, brand: null })}>
-              <c.icon size={15} /> {c.label}
-            </button>
-          ))}
+      {/* Danh mục nhanh có nút cuộn trái/phải & kéo trượt */}
+      <div className="sf-section-box" style={{ marginBottom: 12, padding: '8px 12px', position: 'relative' }}>
+        <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+          <button 
+            type="button" 
+            aria-label="Cuộn trái"
+            onClick={() => {
+              const el = document.getElementById('sf-cat-pills');
+              if (el) el.scrollBy({ left: -240, behavior: 'smooth' });
+            }}
+            style={{
+              position: 'absolute', left: -4, zIndex: 3, width: 30, height: 30, borderRadius: '50%',
+              background: '#fff', border: '1px solid #e2e8f0', boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#334155'
+            }}
+          >
+            <ChevronLeft size={18} />
+          </button>
+
+          <div 
+            id="sf-cat-pills"
+            className="sf-section-links" 
+            style={{ 
+              flexWrap: 'nowrap', 
+              overflowX: 'auto', 
+              scrollbarWidth: 'none', 
+              scrollBehavior: 'smooth',
+              padding: '4px 32px',
+              width: '100%'
+            }}
+          >
+            <button type="button" className={`sf-chip${!category ? ' is-active' : ''}`} onClick={() => update({ category: null, brand: null })}>Tất cả</button>
+            {SF_CATEGORIES.map(c => (
+              <button key={c.key} type="button" className={`sf-chip${category === c.key ? ' is-active' : ''}`}
+                onClick={() => update({ category: c.key, brand: null })}>
+                <c.icon size={15} /> {c.label}
+              </button>
+            ))}
+          </div>
+
+          <button 
+            type="button" 
+            aria-label="Cuộn phải"
+            onClick={() => {
+              const el = document.getElementById('sf-cat-pills');
+              if (el) el.scrollBy({ left: 240, behavior: 'smooth' });
+            }}
+            style={{
+              position: 'absolute', right: -4, zIndex: 3, width: 30, height: 30, borderRadius: '50%',
+              background: '#fff', border: '1px solid #e2e8f0', boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#334155'
+            }}
+          >
+            <ChevronRight size={18} />
+          </button>
         </div>
       </div>
 

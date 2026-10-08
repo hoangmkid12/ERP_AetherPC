@@ -3,7 +3,8 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const cookieParser = require('cookie-parser');
-const rateLimit = require('express-rate-limit');
+const jwt = require('jsonwebtoken');
+const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
 const { errorMiddleware } = require('./middlewares/error.middleware');
 const { isMaintenanceMode } = require('./services/maintenanceMode');
 const { UPLOAD_DIR } = require('./middlewares/upload.middleware');
@@ -28,16 +29,35 @@ app.use('/api/uploads/products', express.static(UPLOAD_DIR));
 
 // Rate limiting: a tight limit on auth endpoints (brute-force/credential
 // stuffing target), a looser one for the rest of the API.
+// Đếm theo người dùng thay vì theo IP: khi chạy sau Docker/nginx hay mạng nội bộ công ty, mọi nhân viên có chung
+// một IP, nên giới hạn theo IP làm cả công ty dùng chung một hạn mức và bị khóa ("Quá nhiều yêu cầu") khi
+// vài người cùng mở trang quản trị. Người dùng đã đăng nhập được tính theo tài khoản; khách tính theo IP.
+const ipKey = (req) => ipKeyGenerator(req.ip || '');
+const userOrIpKey = (req) => {
+  const header = req.headers.authorization;
+  const token = header && header.startsWith('Bearer ') ? header.slice(7) : req.cookies?.authToken;
+  if (token && process.env.JWT_SECRET) {
+    try {
+      const d = jwt.verify(token, process.env.JWT_SECRET);
+      return `u:${d.role}:${d.id}`;
+    } catch { /* token hỏng → tính theo IP */ }
+  }
+  return `ip:${ipKey(req)}`;
+};
+
+// Đăng nhập: đếm theo IP + tên đăng nhập để chặn dò mật khẩu từng tài khoản mà không khóa cả văn phòng.
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  limit: process.env.NODE_ENV === 'production' ? 100 : 2000,
+  limit: process.env.NODE_ENV === 'production' ? 30 : 2000,
+  keyGenerator: (req) => `${ipKey(req)}:${String(req.body?.username || req.body?.email || '').toLowerCase()}`,
   standardHeaders: true,
   legacyHeaders: false,
   message: { success: false, message: 'Quá nhiều yêu cầu đăng nhập, vui lòng thử lại sau ít phút.' }
 });
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  limit: process.env.NODE_ENV === 'production' ? 1000 : 10000,
+  limit: process.env.NODE_ENV === 'production' ? 3000 : 20000,
+  keyGenerator: userOrIpKey,
   standardHeaders: true,
   legacyHeaders: false,
   message: { success: false, message: 'Quá nhiều yêu cầu, vui lòng thử lại sau.' }

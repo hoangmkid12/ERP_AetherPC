@@ -265,7 +265,7 @@ export default function OriginAddressPicker({
               overflowY: 'auto'
             }}
           >
-            <div style={{ padding: '0.35rem 0.6rem', fontSize: '0.65rem', fontWeight: 800, color: 'var(--text-muted)', borderBottom: '1px solid var(--border-glass)', textTransform: 'uppercase' }}>
+            <div style={{ padding: '0.35rem 0.6rem', fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-muted)', borderBottom: '1px solid var(--border-glass)', textTransform: 'uppercase' }}>
               📍 Kết quả tìm kiếm phù hợp
             </div>
             {suggestions.map((item, idx) => (
@@ -283,11 +283,11 @@ export default function OriginAddressPicker({
               >
                 <MapPin size={14} style={{ color: '#2563eb', flexShrink: 0, marginTop: '2px' }} />
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: '0.76rem', fontWeight: 700, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {item.mainText}
                   </div>
                   {item.secondaryText && (
-                    <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '0.1rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', marginTop: '0.1rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {item.secondaryText}
                     </div>
                   )}
@@ -300,7 +300,7 @@ export default function OriginAddressPicker({
 
       {/* Quick preset badges */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', overflowX: 'auto', paddingBottom: '2px' }}>
-        <span style={{ fontSize: '0.66rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>Gợi ý nhanh:</span>
+        <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>Gợi ý nhanh:</span>
         {QUICK_PRESETS.map((p, idx) => (
           <button
             key={idx}
@@ -308,7 +308,7 @@ export default function OriginAddressPicker({
             onClick={() => handleSelectPreset(p)}
             style={{
               padding: '0.2rem 0.45rem',
-              fontSize: '0.65rem',
+              fontSize: '0.72rem',
               borderRadius: '999px',
               border: '1px solid var(--border-glass)',
               backgroundColor: 'var(--bg-secondary)',
@@ -350,7 +350,7 @@ export default function OriginAddressPicker({
         <div style={{
           position: 'absolute', top: 8, left: 8, zIndex: 10,
           backgroundColor: 'rgba(15,23,42,0.75)', backdropFilter: 'blur(4px)',
-          color: '#fff', fontSize: '0.65rem', fontWeight: 600,
+          color: '#fff', fontSize: '0.72rem', fontWeight: 600,
           padding: '0.25rem 0.5rem', borderRadius: '999px',
           display: 'flex', alignItems: 'center', gap: '0.3rem', pointerEvents: 'none'
         }}>
@@ -364,7 +364,7 @@ export default function OriginAddressPicker({
           display: 'flex', alignItems: 'center', gap: '0.45rem',
           padding: '0.4rem 0.6rem', borderRadius: 'var(--radius-sm)',
           backgroundColor: 'rgba(37,99,235,0.08)', border: '1px solid rgba(37,99,235,0.2)',
-          fontSize: '0.7rem', color: '#2563eb'
+          fontSize: '0.75rem', color: '#2563eb'
         }}>
           {reverseLoading ? (
             <Loader2 size={13} style={{ animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />

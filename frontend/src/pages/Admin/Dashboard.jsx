@@ -31,6 +31,7 @@ import { formatCurrencyInWords } from '../../utils/numberToWords';
 import OrderDetailModal from '../../components/OrderDetailModal';
 import { getRoleName } from '../../utils/rbacEngine';
 import { printDocument } from '../../utils/printDocument';
+import { SignatureRow, SignatureCell, displaySigner, historySigner } from '../../components/Signature/ESignature';
 
 // Register ChartJS modules
 ChartJS.register(
@@ -156,6 +157,7 @@ export default function Dashboard() {
   const updatePurchaseOrderStatus = useFinanceStore(state => state.updatePurchaseOrderStatus);
   const generalLedger = useFinanceStore(state => state.ledger) || [];
   const assemblyJobs = useUtilityStore(state => state.assemblyJobs) || [];
+  const sendSystemNotification = useUtilityStore(state => state.sendSystemNotification);
 
   // Active Tab from URL (?tab=overview|approvals|financials|kpi|supplychain)
   const activeTab = searchParams.get('tab') || 'overview';
@@ -685,6 +687,36 @@ export default function Dashboard() {
   const assemblingJobsCount = filteredAssemblyJobs.filter(j => j.status === 'ASSEMBLING').length;
   const completedJobsCount = filteredAssemblyJobs.filter(j => j.status === 'COMPLETED').length;
 
+  // Hiệu suất kỹ thuật viên lấy từ lệnh lắp ráp thật đã nghiệm thu trong kỳ (người nghiệm thu = completedBy);
+  // thưởng = số lệnh × đơn giá thưởng lắp ráp trong cấu hình nhân sự (cùng công thức với bảng lương).
+  const [assemblyBonusRate, setAssemblyBonusRate] = useState(null);
+  useEffect(() => {
+    api.get('/hr/settings')
+      .then(res => { const v = Number(res?.data?.assemblyBonus); if (Number.isFinite(v)) setAssemblyBonusRate(v); })
+      .catch(() => {});
+  }, []);
+  const technicianStats = useMemo(() => {
+    const map = new Map();
+    filteredAssemblyJobs.filter(j => j.status === 'COMPLETED').forEach(j => {
+      const name = (j.completedBy || '').trim() || 'Chưa ghi nhận người nghiệm thu';
+      const cur = map.get(name) || { name, completed: 0, minutes: [] };
+      cur.completed += 1;
+      if (j.completedAt && j.createdAt) {
+        const m = (new Date(j.completedAt) - new Date(j.createdAt)) / 60000;
+        if (Number.isFinite(m) && m >= 0) cur.minutes.push(m);
+      }
+      map.set(name, cur);
+    });
+    return [...map.values()].sort((x, y) => y.completed - x.completed);
+  }, [filteredAssemblyJobs]);
+  const fmtDuration = (mins) => {
+    if (!mins.length) return '—';
+    const m = mins.reduce((a, b) => a + b, 0) / mins.length;
+    if (m < 60) return `${Math.max(1, Math.round(m))} phút`;
+    if (m < 60 * 48) return `${(m / 60).toFixed(1).replace('.', ',')} giờ`;
+    return `${(m / 1440).toFixed(1).replace('.', ',')} ngày`;
+  };
+
   // Pending Approvals Count for CEO
   const pendingQuotedPOsCount = filteredQuotedOrders.length;
   // HR lập bảng lương ở trạng thái SUBMITTED_TO_ACCOUNTING (= "Chờ Ban Giám Đốc duyệt", xem
@@ -903,7 +935,7 @@ export default function Dashboard() {
   };
 
   return (
-    <div style={{ backgroundColor: '#f8fafc', minHeight: '100vh', padding: '1.5rem 2rem', maxWidth: '1400px', margin: '0 auto', fontFamily: 'Inter, sans-serif' }}>
+    <div style={{ backgroundColor: '#f8fafc', minHeight: '100vh', padding: '1.5rem 2rem', maxWidth: '1400px', margin: '0 auto', fontFamily: 'inherit' }}>
       
       {/* ========================================================================= */}
       {/* 1. TOP HEADER & DATE FILTER BAR */}
@@ -923,7 +955,7 @@ export default function Dashboard() {
         </div>
 
         {/* Integrated Date Filter Bar */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap', backgroundColor: '#ffffff', padding: '0.35rem 0.6rem', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap', backgroundColor: '#ffffff', padding: '0.35rem 0.6rem', borderRadius: '8px', border: '1px solid #e3e8ef' }}>
           <Calendar size={15} style={{ color: '#2563eb' }} />
           {[
             { key: 'ALL', label: 'Tất cả' },
@@ -940,7 +972,7 @@ export default function Dashboard() {
                 onClick={() => setDateFilterPeriod(p.key)}
                 style={{
                   padding: '0.3rem 0.6rem',
-                  fontSize: '0.75rem',
+                  fontSize: '0.8rem',
                   fontWeight: active ? 800 : 600,
                   borderRadius: '5px',
                   border: 'none',
@@ -992,7 +1024,7 @@ export default function Dashboard() {
                 <strong style={{ fontSize: '0.9rem', color: '#92400e' }}>
                   Ban Giám Đốc Có {totalPendingCeoApprovals} Nhiệm Vụ Cần Phê Duyệt
                 </strong>
-                <span style={{ backgroundColor: '#ef4444', color: '#ffffff', fontSize: '0.68rem', fontWeight: 800, padding: '2px 7px', borderRadius: '10px' }}>
+                <span style={{ backgroundColor: '#ef4444', color: '#ffffff', fontSize: '0.74rem', fontWeight: 800, padding: '2px 7px', borderRadius: '10px' }}>
                   Cần xử lý
                 </span>
               </div>
@@ -1037,7 +1069,7 @@ export default function Dashboard() {
                 style={{
                   backgroundColor: '#ffffff',
                   borderRadius: '10px',
-                  border: '1px solid #cbd5e1',
+                  border: '1px solid #e3e8ef',
                   padding: '1.1rem 1.25rem',
                   display: 'flex',
                   flexDirection: 'column',
@@ -1048,7 +1080,7 @@ export default function Dashboard() {
                 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
+                  <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
                     {st.label}
                   </span>
                   <div style={{ width: '36px', height: '36px', borderRadius: '8px', backgroundColor: st.bg, color: st.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -1060,7 +1092,7 @@ export default function Dashboard() {
                   <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={st.value}>
                     {st.value}
                   </div>
-                  <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.15rem' }}>
+                  <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.15rem' }}>
                     {st.change}
                   </div>
                 </div>
@@ -1072,18 +1104,18 @@ export default function Dashboard() {
           <div className="dash-charts-row" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 2fr) minmax(0, 1fr)', gap: '1rem', marginBottom: '1rem' }}>
 
             {/* Xu hướng doanh thu */}
-            <div style={{ backgroundColor: '#ffffff', borderRadius: '10px', border: '1px solid #cbd5e1', padding: '1.1rem 1.25rem', height: '360px', display: 'flex', flexDirection: 'column', boxShadow: '0 2px 8px rgba(15, 23, 42, 0.04)' }}>
+            <div style={{ backgroundColor: '#ffffff', borderRadius: '10px', border: '1px solid #e3e8ef', padding: '1.1rem 1.25rem', height: '360px', display: 'flex', flexDirection: 'column', boxShadow: '0 2px 8px rgba(15, 23, 42, 0.04)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.75rem', marginBottom: '0.5rem' }}>
                 <div>
                   <h3 style={{ fontSize: '0.92rem', fontWeight: 800, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                     <TrendingUp size={16} style={{ color: '#2563eb' }} />
                     <span>Doanh Thu & Lợi Nhuận Gộp</span>
                   </h3>
-                  <span style={{ fontSize: '0.72rem', color: '#64748b' }}>Tổng hợp {trendUnitLabel} · đơn vị triệu ₫</span>
+                  <span style={{ fontSize: '0.77rem', color: '#64748b' }}>Tổng hợp {trendUnitLabel} · đơn vị triệu ₫</span>
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0f172a' }}>{(totalRevenueVal / 1e6).toLocaleString('vi-VN', { maximumFractionDigits: 1 })} tr</div>
-                  <div style={{ fontSize: '0.72rem', color: '#16a34a', fontWeight: 700 }}>Lãi gộp {grossMarginPct.toFixed(1)}%</div>
+                  <div style={{ fontSize: '0.77rem', color: '#16a34a', fontWeight: 700 }}>Lãi gộp {grossMarginPct.toFixed(1)}%</div>
                 </div>
               </div>
               <div style={{ flex: 1, position: 'relative', minHeight: 0 }}>
@@ -1096,12 +1128,12 @@ export default function Dashboard() {
             </div>
 
             {/* Cơ cấu doanh số theo danh mục */}
-            <div style={{ backgroundColor: '#ffffff', borderRadius: '10px', border: '1px solid #cbd5e1', padding: '1.1rem 1.25rem', height: '360px', display: 'flex', flexDirection: 'column', boxShadow: '0 2px 8px rgba(15, 23, 42, 0.04)' }}>
+            <div style={{ backgroundColor: '#ffffff', borderRadius: '10px', border: '1px solid #e3e8ef', padding: '1.1rem 1.25rem', height: '360px', display: 'flex', flexDirection: 'column', boxShadow: '0 2px 8px rgba(15, 23, 42, 0.04)' }}>
               <h3 style={{ fontSize: '0.92rem', fontWeight: 800, color: '#0f172a', margin: '0 0 0.25rem 0', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                 <PieChart size={16} style={{ color: '#8b5cf6' }} />
                 <span>Cơ Cấu Doanh Số Theo Danh Mục</span>
               </h3>
-              <span style={{ fontSize: '0.72rem', color: '#64748b', marginBottom: '0.5rem' }}>Tỷ trọng tiền hàng của các đơn trong kỳ</span>
+              <span style={{ fontSize: '0.77rem', color: '#64748b', marginBottom: '0.5rem' }}>Tỷ trọng tiền hàng của các đơn trong kỳ</span>
               {categoryShare.length === 0 ? (
                 <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontSize: '0.82rem' }}>Chưa có dữ liệu.</div>
               ) : (
@@ -1139,12 +1171,12 @@ export default function Dashboard() {
           <div className="dash-bottom-row" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 2fr)', gap: '1rem', alignItems: 'stretch' }}>
             
             {/* Pending POs Preview */}
-            <div style={{ backgroundColor: '#ffffff', borderRadius: '10px', border: '1px solid #cbd5e1', padding: '1.1rem 1.25rem', boxShadow: '0 2px 8px rgba(15, 23, 42, 0.04)', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ backgroundColor: '#ffffff', borderRadius: '10px', border: '1px solid #e3e8ef', padding: '1.1rem 1.25rem', boxShadow: '0 2px 8px rgba(15, 23, 42, 0.04)', display: 'flex', flexDirection: 'column' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.85rem' }}>
                 <h3 style={{ fontSize: '0.9rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
                   Việc Chờ Ban Giám Đốc Duyệt
                 </h3>
-                <button onClick={() => setTab('approvals')} style={{ background: 'none', border: 'none', color: '#2563eb', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer' }}>
+                <button onClick={() => setTab('approvals')} style={{ background: 'none', border: 'none', color: '#2563eb', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}>
                   Xem tất cả →
                 </button>
               </div>
@@ -1158,7 +1190,7 @@ export default function Dashboard() {
                   <button key={x.label} type="button" onClick={() => setTab('approvals')}
                     style={{ border: '1px solid #e2e8f0', borderRadius: '8px', backgroundColor: '#f8fafc', padding: '0.55rem 0.4rem', cursor: 'pointer', textAlign: 'center' }}>
                     <div style={{ fontSize: '1.2rem', fontWeight: 800, color: x.n ? x.color : '#94a3b8' }}>{x.n}</div>
-                    <div style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 600 }}>{x.label}</div>
+                    <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>{x.label}</div>
                   </button>
                 ))}
               </div>
@@ -1172,13 +1204,13 @@ export default function Dashboard() {
                     <div key={po.id} style={{ padding: '0.75rem', borderRadius: '6px', border: '1px solid #e2e8f0', backgroundColor: '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div>
                         <strong style={{ fontSize: '0.82rem', color: '#2563eb' }}>{po.poNumber || `PO-${po.id}`}</strong>
-                        <span style={{ fontSize: '0.75rem', color: '#475569', display: 'block' }}>{getSupplierName(po)}</span>
+                        <span style={{ fontSize: '0.8rem', color: '#475569', display: 'block' }}>{getSupplierName(po)}</span>
                       </div>
                       <div style={{ textAlign: 'right' }}>
                         <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#16a34a', display: 'block' }}>{formatPrice(po.totalAmount)}</span>
                         <button
                           onClick={() => handleApproveQuotedPO(po.id, po.poNumber || po.id)}
-                          style={{ backgroundColor: '#16a34a', color: '#ffffff', border: 'none', borderRadius: '4px', padding: '2px 8px', fontSize: '0.7rem', fontWeight: 700, cursor: 'pointer', marginTop: '0.2rem' }}
+                          style={{ backgroundColor: '#16a34a', color: '#ffffff', border: 'none', borderRadius: '4px', padding: '2px 8px', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', marginTop: '0.2rem' }}
                         >
                           Duyệt Ngay
                         </button>
@@ -1190,12 +1222,12 @@ export default function Dashboard() {
             </div>
 
             {/* Orders in Fulfillment Flow */}
-            <div style={{ backgroundColor: '#ffffff', borderRadius: '10px', border: '1px solid #cbd5e1', padding: '1.1rem 1.25rem', boxShadow: '0 2px 8px rgba(15, 23, 42, 0.04)' }}>
+            <div style={{ backgroundColor: '#ffffff', borderRadius: '10px', border: '1px solid #e3e8ef', padding: '1.1rem 1.25rem', boxShadow: '0 2px 8px rgba(15, 23, 42, 0.04)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.85rem' }}>
                 <h3 style={{ fontSize: '0.9rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
                   Đơn Hàng Trong Luồng Giao Hàng & Lắp Ráp
                 </h3>
-                <button onClick={() => setTab('supplychain')} style={{ background: 'none', border: 'none', color: '#2563eb', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer' }}>
+                <button onClick={() => setTab('supplychain')} style={{ background: 'none', border: 'none', color: '#2563eb', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}>
                   Xem chuỗi cung ứng →
                 </button>
               </div>
@@ -1223,7 +1255,7 @@ export default function Dashboard() {
                           {formatPrice(o.totalAmount)}
                         </td>
                         <td style={{ padding: '0.5rem 0.65rem', textAlign: 'center' }}>
-                          <span style={{ backgroundColor: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', padding: '2px 8px', borderRadius: '10px', fontSize: '0.68rem', fontWeight: 700 }}>
+                          <span style={{ backgroundColor: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', padding: '2px 8px', borderRadius: '10px', fontSize: '0.74rem', fontWeight: 700 }}>
                             {getStatusLabel(ORDER_STATUS, o.status)}
                           </span>
                         </td>
@@ -1245,7 +1277,7 @@ export default function Dashboard() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
           
           {/* Section 1: Quoted POs Approval */}
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem' }}>
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1.25rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
                 <ShoppingBag size={18} style={{ color: '#2563eb', marginTop: '0.15rem', flexShrink: 0 }} />
@@ -1263,7 +1295,7 @@ export default function Dashboard() {
                 title="Xem lịch sử toàn bộ các lượt duyệt/chuyển trạng thái của mọi đơn mua hàng"
                 style={{
                   display: 'flex', alignItems: 'center', gap: '0.35rem', flexShrink: 0,
-                  backgroundColor: '#ffffff', color: '#334155', border: '1px solid #cbd5e1',
+                  backgroundColor: '#ffffff', color: '#334155', border: '1px solid #e3e8ef',
                   borderRadius: '6px', padding: '0.4rem 0.75rem', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer'
                 }}
               >
@@ -1312,13 +1344,13 @@ export default function Dashboard() {
                             <div style={{ display: 'flex', justifyContent: 'center', gap: '0.4rem' }}>
                               <button
                                 onClick={() => setSelectedDetailPO(po)}
-                                style={{ backgroundColor: '#ffffff', color: '#2563eb', border: '1px solid #bfdbfe', borderRadius: '4px', padding: '0.3rem 0.65rem', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer' }}
+                                style={{ backgroundColor: '#ffffff', color: '#2563eb', border: '1px solid #bfdbfe', borderRadius: '4px', padding: '0.3rem 0.65rem', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}
                               >
                                 Xem Báo Giá
                               </button>
                               <button
                                 onClick={() => handleApproveQuotedPO(po.id, po.poNumber || po.id)}
-                                style={{ backgroundColor: '#16a34a', color: '#ffffff', border: 'none', borderRadius: '4px', padding: '0.3rem 0.75rem', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                                style={{ backgroundColor: '#16a34a', color: '#ffffff', border: 'none', borderRadius: '4px', padding: '0.3rem 0.75rem', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
                               >
                                 <Check size={13} /> Duyệt PO
                               </button>
@@ -1334,7 +1366,7 @@ export default function Dashboard() {
           </div>
 
           {/* Section 2: Payroll Approval */}
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem' }}>
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1.25rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <DollarSign size={18} style={{ color: '#16a34a' }} />
@@ -1344,7 +1376,7 @@ export default function Dashboard() {
               </div>
               <button
                 onClick={() => setShowKPIDetailModal(true)}
-                style={{ backgroundColor: '#ffffff', color: '#2563eb', border: '1px solid #bfdbfe', borderRadius: '4px', padding: '0.3rem 0.65rem', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer' }}
+                style={{ backgroundColor: '#ffffff', color: '#2563eb', border: '1px solid #bfdbfe', borderRadius: '4px', padding: '0.3rem 0.65rem', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}
               >
                 Xem Chi Tiết Từng Nhân Viên
               </button>
@@ -1404,7 +1436,7 @@ export default function Dashboard() {
           </div>
 
           {/* Section 3: Leave Requests Approval */}
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem' }}>
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1.25rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <Users size={18} style={{ color: '#8b5cf6' }} />
@@ -1451,7 +1483,7 @@ export default function Dashboard() {
                             notify(`Duyệt đơn nghỉ phép thất bại: ${err.message || 'lỗi kết nối máy chủ'}.`, 'error');
                           }
                         }}
-                        style={{ backgroundColor: '#16a34a', color: '#ffffff', border: 'none', borderRadius: '4px', padding: '0.3rem 0.65rem', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}
+                        style={{ backgroundColor: '#16a34a', color: '#ffffff', border: 'none', borderRadius: '4px', padding: '0.3rem 0.65rem', fontSize: '0.77rem', fontWeight: 700, cursor: 'pointer' }}
                       >
                         Duyệt
                       </button>
@@ -1465,7 +1497,7 @@ export default function Dashboard() {
                             notify(`Từ chối đơn nghỉ phép thất bại: ${err.message || 'lỗi kết nối máy chủ'}.`, 'error');
                           }
                         }}
-                        style={{ backgroundColor: '#ffffff', color: '#ef4444', border: '1px solid #fca5a5', borderRadius: '4px', padding: '0.3rem 0.65rem', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}
+                        style={{ backgroundColor: '#ffffff', color: '#ef4444', border: '1px solid #fca5a5', borderRadius: '4px', padding: '0.3rem 0.65rem', fontSize: '0.77rem', fontWeight: 700, cursor: 'pointer' }}
                       >
                         Từ Chối
                       </button>
@@ -1487,7 +1519,7 @@ export default function Dashboard() {
         <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.8fr', gap: '1.25rem' }}>
           
           {/* Executive P&L Statement */}
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem' }}>
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1.25rem' }}>
             <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
               <FileText size={16} style={{ color: '#2563eb' }} />
               <span>Báo Cáo Lãi / Lỗ Tóm Tắt</span>
@@ -1532,7 +1564,7 @@ export default function Dashboard() {
           </div>
 
           {/* Cashflow Bar Chart & Ledger */}
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1.25rem', display: 'flex', flexDirection: 'column' }}>
             <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
               <TrendingUp size={16} style={{ color: '#16a34a' }} />
               <span>Dòng Tiền Thu Vào vs Chi Ra Theo Tháng</span>
@@ -1564,7 +1596,7 @@ export default function Dashboard() {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
           
           {/* Sales Leaderboard */}
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem' }}>
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1.25rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
               <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                 <Award size={16} style={{ color: '#f59e0b' }} />
@@ -1581,13 +1613,13 @@ export default function Dashboard() {
                 <div key={idx} style={{ padding: '0.85rem', borderRadius: '6px', border: '1px solid #e2e8f0', backgroundColor: idx === 0 ? '#eff6ff' : '#ffffff' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                      <span style={{ width: '22px', height: '22px', borderRadius: '50%', backgroundColor: idx === 0 ? '#2563eb' : '#94a3b8', color: '#ffffff', fontSize: '0.72rem', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <span style={{ width: '22px', height: '22px', borderRadius: '50%', backgroundColor: idx === 0 ? '#2563eb' : '#94a3b8', color: '#ffffff', fontSize: '0.77rem', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         {idx + 1}
                       </span>
                       <strong style={{ fontSize: '0.85rem', color: '#0f172a' }}>{s.name}</strong>
-                      <span style={{ fontSize: '0.72rem', color: '#64748b' }}>({getRoleName(s.role)})</span>
+                      <span style={{ fontSize: '0.77rem', color: '#64748b' }}>({getRoleName(s.role)})</span>
                     </div>
-                    <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#16a34a' }}>
+                    <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#16a34a' }}>
                       Hoa hồng: {formatPrice(s.commission)}
                     </span>
                   </div>
@@ -1602,7 +1634,7 @@ export default function Dashboard() {
           </div>
 
           {/* Assembly & Technician Performance */}
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem' }}>
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1.25rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
               <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                 <Wrench size={16} style={{ color: '#0ea5e9' }} />
@@ -1611,24 +1643,24 @@ export default function Dashboard() {
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              {[
-                { name: 'Phạm Văn D', role: 'Kỹ thuật viên Trưởng', completed: completedJobsCount || 8, bonus: (completedJobsCount || 8) * 150000, qaRate: '100%' },
-                { name: 'Trần Văn Hoàng', role: 'Kỹ thuật viên Ráp PC', completed: 5, bonus: 750000, qaRate: '100%' }
-              ].map((tech, tIdx) => (
-                <div key={tIdx} style={{ padding: '0.85rem', borderRadius: '6px', border: '1px solid #e2e8f0', backgroundColor: '#ffffff' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
-                    <div>
-                      <strong style={{ fontSize: '0.85rem', color: '#0f172a' }}>{tech.name}</strong>
-                      <span style={{ fontSize: '0.72rem', color: '#64748b', marginLeft: '0.4rem' }}>({getRoleName(tech.role)})</span>
-                    </div>
-                    <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#16a34a' }}>
-                      Thưởng ráp máy: {formatPrice(tech.bonus)}
-                    </span>
+              {technicianStats.length === 0 && (
+                <div style={{ padding: '1rem', textAlign: 'center', fontSize: '0.82rem', color: '#64748b', border: '1px dashed #e2e8f0', borderRadius: '6px' }}>
+                  Chưa có lệnh lắp ráp được nghiệm thu trong kỳ đã chọn.
+                </div>
+              )}
+              {technicianStats.map((tech) => (
+                <div key={tech.name} style={{ padding: '0.85rem', borderRadius: '6px', border: '1px solid #e2e8f0', backgroundColor: '#ffffff' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    <strong style={{ fontSize: '0.85rem', color: '#0f172a' }}>{tech.name}</strong>
+                    {assemblyBonusRate !== null && (
+                      <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#16a34a' }}>
+                        Thưởng lắp ráp: {formatPrice(tech.completed * assemblyBonusRate)}
+                      </span>
+                    )}
                   </div>
-
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: '#475569' }}>
-                    <span>Số máy ráp hoàn chỉnh: <strong>{tech.completed} bộ PC</strong></span>
-                    <span>Tỷ lệ Pass QA: <strong style={{ color: '#16a34a' }}>{tech.qaRate}</strong></span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: '#475569', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    <span>Số máy đã nghiệm thu: <strong>{tech.completed} bộ PC</strong></span>
+                    <span>Thời gian hoàn thành TB: <strong>{fmtDuration(tech.minutes)}</strong></span>
                   </div>
                 </div>
               ))}
@@ -1645,7 +1677,7 @@ export default function Dashboard() {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
           
           {/* Low stock alerts */}
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem' }}>
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1.25rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
               <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                 <AlertTriangle size={16} style={{ color: '#d97706' }} />
@@ -1658,9 +1690,9 @@ export default function Dashboard() {
                 <div key={idx} style={{ padding: '0.65rem 0.85rem', borderRadius: '6px', border: '1px solid #fde68a', backgroundColor: '#fffbeb', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem' }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <strong style={{ fontSize: '0.8rem', color: '#92400e', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name}</strong>
-                    <span style={{ fontSize: '0.72rem', color: '#b45309', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Phân nhóm: {item.category} | Ngưỡng an toàn: {item.threshold || 5}</span>
+                    <span style={{ fontSize: '0.77rem', color: '#b45309', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Phân nhóm: {item.category} | Ngưỡng an toàn: {item.threshold || 5}</span>
                   </div>
-                  <span style={{ backgroundColor: '#ef4444', color: '#ffffff', fontSize: '0.72rem', fontWeight: 800, padding: '2px 8px', borderRadius: '4px', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                  <span style={{ backgroundColor: '#ef4444', color: '#ffffff', fontSize: '0.77rem', fontWeight: 800, padding: '2px 8px', borderRadius: '4px', whiteSpace: 'nowrap', flexShrink: 0 }}>
                     Tồn: {item.stock || item.stockQuantity || 0} cái
                   </span>
                 </div>
@@ -1669,7 +1701,7 @@ export default function Dashboard() {
           </div>
 
           {/* Fulfillment Pipeline */}
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem' }}>
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1.25rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
               <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                 <Truck size={16} style={{ color: '#2563eb' }} />
@@ -1680,15 +1712,15 @@ export default function Dashboard() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.65rem', marginBottom: '1rem' }}>
               <div style={{ backgroundColor: '#eff6ff', padding: '0.75rem', borderRadius: '6px', textAlign: 'center', border: '1px solid #bfdbfe' }}>
                 <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#2563eb' }}>{filteredOrders.filter(o => o.status === 'CONFIRMED').length}</div>
-                <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 700 }}>Chờ Xuất Kho</div>
+                <div style={{ fontSize: '0.77rem', color: '#64748b', fontWeight: 700 }}>Chờ Xuất Kho</div>
               </div>
               <div style={{ backgroundColor: '#f0fdf4', padding: '0.75rem', borderRadius: '6px', textAlign: 'center', border: '1px solid #bbf7d0' }}>
                 <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#16a34a' }}>{readyToShipCount}</div>
-                <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 700 }}>Chờ Shipper Lấy</div>
+                <div style={{ fontSize: '0.77rem', color: '#64748b', fontWeight: 700 }}>Chờ Shipper Lấy</div>
               </div>
-              <div style={{ backgroundColor: '#f8fafc', padding: '0.75rem', borderRadius: '6px', textAlign: 'center', border: '1px solid #cbd5e1' }}>
+              <div style={{ backgroundColor: '#f8fafc', padding: '0.75rem', borderRadius: '6px', textAlign: 'center', border: '1px solid #e3e8ef' }}>
                 <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0f172a' }}>{filteredOrders.filter(o => o.status === 'SHIPPED').length}</div>
-                <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 700 }}>Đang Vận Chuyển</div>
+                <div style={{ fontSize: '0.77rem', color: '#64748b', fontWeight: 700 }}>Đang Vận Chuyển</div>
               </div>
             </div>
 
@@ -1713,7 +1745,7 @@ export default function Dashboard() {
                       <td style={{ padding: '0.4rem 0.5rem', color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{o.customerName || o.customer || 'Khách lẻ'}</td>
                       <td style={{ padding: '0.4rem 0.5rem', textAlign: 'right', fontWeight: 700, color: '#16a34a', whiteSpace: 'nowrap' }}>{formatPrice(o.totalAmount)}</td>
                       <td style={{ padding: '0.4rem 0.5rem', textAlign: 'center' }}>
-                        <span style={{ backgroundColor: '#eff6ff', color: '#2563eb', padding: '1px 6px', borderRadius: '8px', fontSize: '0.68rem', fontWeight: 700, display: 'inline-block', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', verticalAlign: 'middle' }}>
+                        <span style={{ backgroundColor: '#eff6ff', color: '#2563eb', padding: '1px 6px', borderRadius: '8px', fontSize: '0.74rem', fontWeight: 700, display: 'inline-block', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', verticalAlign: 'middle' }}>
                           {getStatusLabel(ORDER_STATUS, o.status)}
                         </span>
                       </td>
@@ -1730,7 +1762,7 @@ export default function Dashboard() {
       {/* ================= MODAL XEM CHI TIẾT BÁO GIÁ NCC ================= */}
       {selectedDetailPO && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(6px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '1.5rem' }}>
-          <div style={{ width: '100%', maxWidth: '750px', maxHeight: '90vh', overflowY: 'auto', padding: '2rem', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
+          <div style={{ width: '100%', maxWidth: '750px', maxHeight: '90vh', overflowY: 'auto', padding: '2rem', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e3e8ef', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                 <ShoppingBag size={22} style={{ color: '#2563eb' }} />
@@ -1738,7 +1770,7 @@ export default function Dashboard() {
                   Chi Tiết Báo Giá Mua Hàng: {formatPurchaseReference(selectedDetailPO)}
                 </h3>
               </div>
-              <button onClick={() => setSelectedDetailPO(null)} style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#475569', cursor: 'pointer', padding: '0.4rem', borderRadius: '6px' }}>
+              <button onClick={() => setSelectedDetailPO(null)} style={{ background: '#f1f5f9', border: '1px solid #e3e8ef', color: '#475569', cursor: 'pointer', padding: '0.4rem', borderRadius: '6px' }}>
                 <X size={18} />
               </button>
             </div>
@@ -1794,7 +1826,7 @@ export default function Dashboard() {
                           <strong style={{ color: '#0f172a' }}>{getStatusLabel(PO_STATUS, h.status)}</strong>
                           <span style={{ color: '#94a3b8' }}> — {h.changedBy || 'Hệ thống'}{h.changedByRole ? ` (${h.changedByRole})` : ''}</span>
                         </div>
-                        <div style={{ color: '#94a3b8', fontSize: '0.72rem' }}>
+                        <div style={{ color: '#94a3b8', fontSize: '0.77rem' }}>
                           {h.timestamp ? new Date(h.timestamp).toLocaleString('vi-VN') : ''}
                         </div>
                         {h.note && <div style={{ color: '#64748b', fontStyle: 'italic', marginTop: '0.1rem' }}>"{h.note}"</div>}
@@ -1808,7 +1840,7 @@ export default function Dashboard() {
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem', borderTop: '1px solid #f1f5f9', paddingTop: '1rem' }}>
               <button
                 onClick={() => setSelectedDetailPO(null)}
-                style={{ backgroundColor: '#ffffff', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.5rem 1rem', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
+                style={{ backgroundColor: '#ffffff', color: '#475569', border: '1px solid #e3e8ef', borderRadius: '6px', padding: '0.5rem 1rem', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
               >
                 Đóng
               </button>
@@ -1842,7 +1874,7 @@ export default function Dashboard() {
         const uniqueHistoryStatuses = [...new Set(approvalHistoryEntries.map(h => h.status).filter(Boolean))];
         return (
           <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(6px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '1.5rem' }}>
-            <div style={{ width: '100%', maxWidth: '1000px', maxHeight: '90vh', display: 'flex', flexDirection: 'column', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
+            <div style={{ width: '100%', maxWidth: '1000px', maxHeight: '90vh', display: 'flex', flexDirection: 'column', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e3e8ef', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
               <div style={{ padding: '1.5rem 1.5rem 0 1.5rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
@@ -1851,7 +1883,7 @@ export default function Dashboard() {
                       Lịch Sử Duyệt Toàn Bộ Đơn Mua Hàng
                     </h3>
                   </div>
-                  <button onClick={() => setShowApprovalHistory(false)} style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#475569', cursor: 'pointer', padding: '0.4rem', borderRadius: '6px' }}>
+                  <button onClick={() => setShowApprovalHistory(false)} style={{ background: '#f1f5f9', border: '1px solid #e3e8ef', color: '#475569', cursor: 'pointer', padding: '0.4rem', borderRadius: '6px' }}>
                     <X size={18} />
                   </button>
                 </div>
@@ -1863,12 +1895,12 @@ export default function Dashboard() {
                     placeholder="Tìm theo mã đơn, NCC, người thực hiện..."
                     value={historySearch}
                     onChange={(e) => setHistorySearch(e.target.value)}
-                    style={{ flex: '1 1 220px', padding: '0.5rem 0.75rem', fontSize: '0.82rem', border: '1px solid #cbd5e1', borderRadius: '6px' }}
+                    style={{ flex: '1 1 220px', padding: '0.5rem 0.75rem', fontSize: '0.82rem', border: '1px solid #e3e8ef', borderRadius: '6px' }}
                   />
                   <select
                     value={historyStatusFilter}
                     onChange={(e) => setHistoryStatusFilter(e.target.value)}
-                    style={{ padding: '0.5rem 0.75rem', fontSize: '0.82rem', border: '1px solid #cbd5e1', borderRadius: '6px' }}
+                    style={{ padding: '0.5rem 0.75rem', fontSize: '0.82rem', border: '1px solid #e3e8ef', borderRadius: '6px' }}
                   >
                     <option value="ALL">Tất cả trạng thái</option>
                     {uniqueHistoryStatuses.map(s => <option key={s} value={s}>{getStatusLabel(PO_STATUS, s)}</option>)}
@@ -1877,14 +1909,14 @@ export default function Dashboard() {
                     type="date"
                     value={historyFromDate}
                     onChange={(e) => setHistoryFromDate(e.target.value)}
-                    style={{ padding: '0.5rem 0.75rem', fontSize: '0.82rem', border: '1px solid #cbd5e1', borderRadius: '6px' }}
+                    style={{ padding: '0.5rem 0.75rem', fontSize: '0.82rem', border: '1px solid #e3e8ef', borderRadius: '6px' }}
                   />
                   <span style={{ alignSelf: 'center', color: '#94a3b8', fontSize: '0.8rem' }}>đến</span>
                   <input
                     type="date"
                     value={historyToDate}
                     onChange={(e) => setHistoryToDate(e.target.value)}
-                    style={{ padding: '0.5rem 0.75rem', fontSize: '0.82rem', border: '1px solid #cbd5e1', borderRadius: '6px' }}
+                    style={{ padding: '0.5rem 0.75rem', fontSize: '0.82rem', border: '1px solid #e3e8ef', borderRadius: '6px' }}
                   />
                   {(historySearch || historyStatusFilter !== 'ALL' || historyFromDate || historyToDate) && (
                     <button
@@ -1949,7 +1981,7 @@ export default function Dashboard() {
                             {activeGroup.po && (
                               <button
                                 onClick={() => { setShowApprovalHistory(false); setSelectedDetailPO(activeGroup.po); }}
-                                style={{ backgroundColor: '#ffffff', color: '#2563eb', border: '1px solid #bfdbfe', borderRadius: '4px', padding: '0.3rem 0.75rem', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer' }}
+                                style={{ backgroundColor: '#ffffff', color: '#2563eb', border: '1px solid #bfdbfe', borderRadius: '4px', padding: '0.3rem 0.75rem', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}
                               >
                                 Xem Chi Tiết
                               </button>
@@ -1967,7 +1999,7 @@ export default function Dashboard() {
                                 };
                                 setPrintPOTarget(resolvePODocument(rawPo));
                               }}
-                              style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '4px', padding: '0.3rem 0.75rem', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+                              style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '4px', padding: '0.3rem 0.75rem', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
                             >
                               <Printer size={13} /> In Phiếu Đơn
                             </button>
@@ -1990,7 +2022,7 @@ export default function Dashboard() {
                                 </td>
                                 <td style={{ padding: '0.6rem 0.75rem', textAlign: 'center' }}>
                                   <span style={{
-                                    padding: '1px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 800,
+                                    padding: '1px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 800,
                                     backgroundColor: getHistoryStatusBadge(h.status).bg, color: getHistoryStatusBadge(h.status).color, border: `1px solid ${getHistoryStatusBadge(h.status).border}`
                                   }}>
                                     {getStatusLabel(PO_STATUS, h.status)}
@@ -2052,7 +2084,7 @@ export default function Dashboard() {
                             </td>
                             <td style={{ padding: '0.65rem 0.75rem', textAlign: 'center' }}>
                               <span style={{
-                                padding: '1px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 800,
+                                padding: '1px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 800,
                                 backgroundColor: getHistoryStatusBadge(g.latestStatus).bg, color: getHistoryStatusBadge(g.latestStatus).color, border: `1px solid ${getHistoryStatusBadge(g.latestStatus).border}`
                               }}>
                                 {getStatusLabel(PO_STATUS, g.latestStatus)}
@@ -2089,7 +2121,7 @@ export default function Dashboard() {
                                   border: '1px solid #bfdbfe',
                                   borderRadius: '5px',
                                   padding: '0.3rem 0.65rem',
-                                  fontSize: '0.74rem',
+                                  fontSize: '0.79rem',
                                   fontWeight: 700,
                                   cursor: 'pointer'
                                 }}
@@ -2113,7 +2145,7 @@ export default function Dashboard() {
                 </span>
                 <button
                   onClick={() => setShowApprovalHistory(false)}
-                  style={{ backgroundColor: '#ffffff', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.5rem 1.25rem', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
+                  style={{ backgroundColor: '#ffffff', color: '#475569', border: '1px solid #e3e8ef', borderRadius: '6px', padding: '0.5rem 1.25rem', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
                 >
                   Đóng
                 </button>
@@ -2126,7 +2158,7 @@ export default function Dashboard() {
       {/* ================= MODAL XEM CHI TIẾT BẢNG LƯƠNG NHÂN SỰ ================= */}
       {showKPIDetailModal && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(6px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '1.5rem' }}>
-          <div style={{ width: '100%', maxWidth: '850px', maxHeight: '90vh', overflowY: 'auto', padding: '2rem', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
+          <div style={{ width: '100%', maxWidth: '850px', maxHeight: '90vh', overflowY: 'auto', padding: '2rem', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e3e8ef', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                 <DollarSign size={22} style={{ color: '#16a34a' }} />
@@ -2134,7 +2166,7 @@ export default function Dashboard() {
                   Bảng Lương & Thưởng Hoa Hồng Nhân Sự Toàn Doanh Nghiệp
                 </h3>
               </div>
-              <button onClick={() => setShowKPIDetailModal(false)} style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#475569', cursor: 'pointer', padding: '0.4rem', borderRadius: '6px' }}>
+              <button onClick={() => setShowKPIDetailModal(false)} style={{ background: '#f1f5f9', border: '1px solid #e3e8ef', color: '#475569', cursor: 'pointer', padding: '0.4rem', borderRadius: '6px' }}>
                 <X size={18} />
               </button>
             </div>
@@ -2152,18 +2184,17 @@ export default function Dashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {(payrolls.length > 0 ? payrolls : [
-                    { empId: 1, name: 'Trần Thị B', role: 'Nhân Viên Bán Hàng', base: 8500000, bonus: 1850000, netSalary: 10350000 },
-                    { empId: 2, name: 'Phạm Văn D', role: 'Kỹ Thuật Lắp Ráp', base: 9000000, bonus: 1200000, netSalary: 10200000 },
-                    { empId: 3, name: 'Lê Văn C', role: 'Quản Lý Kho', base: 9500000, bonus: 500000, netSalary: 10000000 }
-                  ]).map((p, pIdx) => (
+                  {payrolls.length === 0 && (
+                    <tr><td colSpan={5} style={{ padding: '1rem', textAlign: 'center', color: '#64748b' }}>Chưa có bảng lương trong kỳ.</td></tr>
+                  )}
+                  {payrolls.map((p, pIdx) => (
                     <tr key={pIdx} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                      <td style={{ padding: '0.5rem', fontWeight: 700, color: '#2563eb' }}>NV-{p.empId || pIdx + 1}</td>
-                      <td style={{ padding: '0.5rem', fontWeight: 600, color: '#0f172a' }}>{p.employeeName || p.name}</td>
+                      <td style={{ padding: '0.5rem', fontWeight: 700, color: '#2563eb' }}>{p.employee?.employeeCode || (p.employeeId ? `NV-${p.employeeId}` : '—')}</td>
+                      <td style={{ padding: '0.5rem', fontWeight: 600, color: '#0f172a' }}>{p.employeeName || p.employee?.fullName || p.name || '—'}</td>
                       <td style={{ padding: '0.5rem', color: '#64748b' }}>{getRoleName(p.role) || 'Nhân viên'}</td>
-                      <td style={{ padding: '0.5rem', textAlign: 'right' }}>{formatPrice(p.baseSalary || p.base || 8500000)}</td>
-                      <td style={{ padding: '0.5rem', textAlign: 'right', color: '#16a34a', fontWeight: 700 }}>+{formatPrice(p.bonus || p.commission || 1000000)}</td>
-                      <td style={{ padding: '0.5rem', textAlign: 'right', fontWeight: 800, color: '#0f172a' }}>{formatPrice(p.netSalary || 9500000)}</td>
+                      <td style={{ padding: '0.5rem', textAlign: 'right' }}>{formatPrice(Number(p.baseSalary ?? p.base ?? 0) || 0)}</td>
+                      <td style={{ padding: '0.5rem', textAlign: 'right', color: '#16a34a', fontWeight: 700 }}>+{formatPrice((Number(p.commission) || 0) + (Number(p.assemblyBonus) || 0) + (Number(p.otherBonus) || 0) + (Number(p.bonus) || 0))}</td>
+                      <td style={{ padding: '0.5rem', textAlign: 'right', fontWeight: 800, color: '#0f172a' }}>{formatPrice(Number(p.netSalary) || 0)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -2216,7 +2247,7 @@ export default function Dashboard() {
 
         return (
           <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(6px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1100, padding: '1rem' }}>
-            <div style={{ width: '100%', maxWidth: '720px', maxHeight: '92vh', overflowY: 'auto', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.15)', boxSizing: 'border-box' }}>
+            <div style={{ width: '100%', maxWidth: '720px', maxHeight: '92vh', overflowY: 'auto', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e3e8ef', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.15)', boxSizing: 'border-box' }}>
               
               {/* VÙNG IN NGUYÊN BẢN — SẠCH SẼ & CÂN ĐỐI TRÊN KHỔ A4 */}
               <div id="aetherpc-dashboard-po-print">
@@ -2224,19 +2255,19 @@ export default function Dashboard() {
                 <div style={{ padding: '0.75rem 1.1rem 0.55rem', borderBottom: '2px solid #0f172a' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+                      <div style={{ fontSize: '0.74rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
                         CÔNG TY TNHH CÔNG NGHỆ AETHERPC — PHÒNG MUA HÀNG
                       </div>
                       <h2 style={{ margin: '0.15rem 0 0.1rem', fontSize: '1.18rem', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.3px' }}>
                         ĐƠN ĐẶT HÀNG (PURCHASE ORDER)
                       </h2>
-                      <p style={{ margin: '0', fontSize: '0.75rem', color: '#64748b', lineHeight: 1.3 }}>
+                      <p style={{ margin: '0', fontSize: '0.8rem', color: '#64748b', lineHeight: 1.3 }}>
                         Số PO: <strong style={{ color: '#0f172a' }}>{printPOTarget.poNumber || formatPurchaseReference(printPOTarget)}</strong>
                         {' • '}Ngày lập: <strong style={{ color: '#0f172a' }}>{formatDate(printPOTarget.createdAt || new Date())}</strong>
                         {' • '}Người lập: <strong style={{ color: '#0f172a' }}>{creatorSignerName}</strong>
                       </p>
                     </div>
-                    <button onClick={() => setPrintPOTarget(null)} className="aetherpc-no-print" style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#475569', cursor: 'pointer', padding: '0.35rem', borderRadius: '6px', display: 'flex' }}>
+                    <button onClick={() => setPrintPOTarget(null)} className="aetherpc-no-print" style={{ background: '#f1f5f9', border: '1px solid #e3e8ef', color: '#475569', cursor: 'pointer', padding: '0.35rem', borderRadius: '6px', display: 'flex' }}>
                       <X size={16} />
                     </button>
                   </div>
@@ -2250,22 +2281,22 @@ export default function Dashboard() {
                       <tr>
                         <td style={{ width: '50%', verticalAlign: 'top', paddingRight: '0.35rem' }}>
                           <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '0.4rem 0.65rem', boxSizing: 'border-box' }}>
-                            <span style={{ fontSize: '0.64rem', fontWeight: 800, color: '#2563eb', textTransform: 'uppercase' }}>Bên Mua Hàng (Bên A)</span>
+                            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#2563eb', textTransform: 'uppercase' }}>Bên Mua Hàng (Bên A)</span>
                             <div style={{ fontSize: '0.78rem', color: '#0f172a', fontWeight: 700, marginTop: '0.15rem' }}>Công Ty TNHH Công Nghệ AetherPC</div>
-                            <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '0.05rem', lineHeight: 1.3 }}>Địa chỉ: 175 Nguyễn Thị Minh Khai, Quận 1, TP. HCM</div>
-                            <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '0.03rem' }}>Email: purchasing@kltn-erp.vn • Hotline: 1900 6868</div>
+                            <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.05rem', lineHeight: 1.3 }}>Địa chỉ: 175 Nguyễn Thị Minh Khai, Quận 1, TP. HCM</div>
+                            <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.03rem' }}>Email: purchasing@kltn-erp.vn • Hotline: 1900 6868</div>
                           </div>
                         </td>
                         <td style={{ width: '50%', verticalAlign: 'top', paddingLeft: '0.35rem' }}>
                           <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '0.4rem 0.65rem', boxSizing: 'border-box' }}>
-                            <span style={{ fontSize: '0.64rem', fontWeight: 800, color: '#b45309', textTransform: 'uppercase' }}>Bên Bán (Bên B — Nhà Cung Cấp)</span>
+                            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#b45309', textTransform: 'uppercase' }}>Bên Bán (Bên B — Nhà Cung Cấp)</span>
                             <div style={{ fontSize: '0.78rem', color: '#0f172a', fontWeight: 700, marginTop: '0.15rem' }}>{getSupplierName(printPOTarget)}</div>
-                            <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '0.05rem', lineHeight: 1.3 }}>
+                            <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.05rem', lineHeight: 1.3 }}>
                               Mã NCC: {printPOTarget.supplierCode || 'NCC-DEFAULT'}
                               {supplierInfo.phone ? ` • ĐT: ${supplierInfo.phone}` : ''}
                             </div>
                             {supplierInfo.address && (
-                              <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '0.03rem', lineHeight: 1.3 }}>Địa chỉ: {supplierInfo.address}</div>
+                              <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.03rem', lineHeight: 1.3 }}>Địa chỉ: {supplierInfo.address}</div>
                             )}
                           </div>
                         </td>
@@ -2274,7 +2305,7 @@ export default function Dashboard() {
                   </table>
 
                   {/* Bảng danh sách hàng hóa — độ rộng cột rõ ràng, vừa khít 100% trang A4 */}
-                  <table style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse', marginBottom: '0.3rem', fontSize: '0.74rem' }}>
+                  <table style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse', marginBottom: '0.3rem', fontSize: '0.79rem' }}>
                     <thead>
                       <tr style={{ borderBottom: '2px solid #0f172a', backgroundColor: '#f8fafc' }}>
                         <th style={{ textAlign: 'center', padding: '0.32rem 0.25rem', color: '#475569', width: '34px' }}>STT</th>
@@ -2310,13 +2341,13 @@ export default function Dashboard() {
                   </table>
 
                   {parseFloat(printPOTarget.totalAmount) > 0 && (
-                    <p style={{ fontSize: '0.7rem', color: '#64748b', fontStyle: 'italic', margin: '0.1rem 0 0.4rem' }}>
+                    <p style={{ fontSize: '0.75rem', color: '#64748b', fontStyle: 'italic', margin: '0.1rem 0 0.4rem' }}>
                       Bằng chữ: <strong style={{ color: '#334155' }}>{formatCurrencyInWords(printPOTarget.totalAmount)}</strong>.
                     </p>
                   )}
 
                   {/* Thông tin điều khoản & giao nhận */}
-                  <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '0.35rem 0.65rem', marginBottom: '0.45rem', fontSize: '0.72rem', display: 'flex', flexDirection: 'column', gap: '0.15rem', lineHeight: 1.35 }}>
+                  <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '0.35rem 0.65rem', marginBottom: '0.45rem', fontSize: '0.77rem', display: 'flex', flexDirection: 'column', gap: '0.15rem', lineHeight: 1.35 }}>
                     <div>
                       <span style={{ color: '#64748b', fontWeight: 600 }}>Ngày giao hàng dự kiến: </span>
                       <strong style={{ color: '#0f172a' }}>
@@ -2333,7 +2364,7 @@ export default function Dashboard() {
                       <span style={{ color: '#64748b', fontWeight: 600 }}>Tình trạng phê duyệt: </span>
                       <span style={{
                         display: 'inline-block',
-                        fontSize: '0.68rem',
+                        fontSize: '0.74rem',
                         fontWeight: 700,
                         padding: '1px 6px',
                         borderRadius: '4px',
@@ -2346,115 +2377,22 @@ export default function Dashboard() {
                     </div>
                   </div>
 
-                  {/* Chữ ký 3 bên — DÙNG TABLE 3 CỘT ĐẢM BẢO 100% LUÔN THẲNG HÀNG NGANG */}
-                  <table style={{ width: '100%', borderCollapse: 'collapse', border: 'none', marginTop: '0.45rem', borderTop: '1px dashed #cbd5e1', paddingTop: '0.45rem' }}>
-                    <tbody>
-                      <tr>
-                        {/* CỘT 1: NGƯỜI LẬP PHIẾU */}
-                        <td style={{ width: '33.33%', textAlign: 'center', verticalAlign: 'top', padding: '0.35rem 0.2rem 0' }}>
-                          <strong style={{ fontSize: '0.72rem', color: '#0f172a', display: 'block' }}>NGƯỜI LẬP PHIẾU</strong>
-                          <div style={{ fontSize: '0.62rem', color: '#94a3b8', marginTop: '0.1rem' }}>(Ký, ghi rõ họ tên)</div>
-                          <div style={{ minHeight: '46px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0.2rem auto' }}>
-                            <div style={{
-                              border: '1.5px dashed #2563eb',
-                              borderRadius: '6px',
-                              backgroundColor: '#eff6ff',
-                              padding: '0.2rem 0.4rem',
-                              width: '100%',
-                              maxWidth: '155px',
-                              boxSizing: 'border-box'
-                            }}>
-                              <div style={{ fontSize: '0.62rem', fontWeight: 800, color: '#1d4ed8', letterSpacing: '0.2px' }}>
-                                ✓ ĐÃ KÝ SỐ
-                              </div>
-                              <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#0f172a', marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                {creatorSignerName}
-                              </div>
-                              <div style={{ fontSize: '0.58rem', color: '#64748b', marginTop: '1px' }}>
-                                {creatorSignDate}
-                              </div>
-                            </div>
-                          </div>
-                          <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#0f172a', marginTop: '2px' }}>{creatorSignerName}</div>
-                        </td>
-
-                        {/* CỘT 2: TRƯỞNG PHÒNG MUA HÀNG */}
-                        <td style={{ width: '33.33%', textAlign: 'center', verticalAlign: 'top', padding: '0.35rem 0.2rem 0' }}>
-                          <strong style={{ fontSize: '0.72rem', color: '#0f172a', display: 'block' }}>TRƯỞNG PHÒNG MUA HÀNG</strong>
-                          <div style={{ fontSize: '0.62rem', color: '#94a3b8', marginTop: '0.1rem' }}>(Ký, ghi rõ họ tên)</div>
-                          <div style={{ minHeight: '46px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0.2rem auto' }}>
-                            <div style={{
-                              border: '1.5px dashed #059669',
-                              borderRadius: '6px',
-                              backgroundColor: '#ecfdf5',
-                              padding: '0.2rem 0.4rem',
-                              width: '100%',
-                              maxWidth: '155px',
-                              boxSizing: 'border-box'
-                            }}>
-                              <div style={{ fontSize: '0.62rem', fontWeight: 800, color: '#047857', letterSpacing: '0.2px' }}>
-                                ✓ ĐÃ KÝ SỐ
-                              </div>
-                              <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#0f172a', marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                Phòng Mua Hàng AetherPC
-                              </div>
-                              <div style={{ fontSize: '0.58rem', color: '#64748b', marginTop: '1px' }}>
-                                {purchasingManagerDate}
-                              </div>
-                            </div>
-                          </div>
-                          <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#0f172a', marginTop: '2px' }}>Phòng Mua Hàng AetherPC</div>
-                        </td>
-
-                        {/* CỘT 3: GIÁM ĐỐC DUYỆT */}
-                        <td style={{ width: '33.33%', textAlign: 'center', verticalAlign: 'top', padding: '0.35rem 0.2rem 0' }}>
-                          <strong style={{ fontSize: '0.72rem', color: '#0f172a', display: 'block' }}>GIÁM ĐỐC DUYỆT</strong>
-                          <div style={{ fontSize: '0.62rem', color: '#94a3b8', marginTop: '0.1rem' }}>(Ký, đóng dấu)</div>
-                          <div style={{ minHeight: '46px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0.2rem auto' }}>
-                            {isCeoApproved ? (
-                              <div style={{
-                                border: '1.5px dashed #dc2626',
-                                borderRadius: '6px',
-                                backgroundColor: '#fef2f2',
-                                padding: '0.2rem 0.4rem',
-                                width: '100%',
-                                maxWidth: '155px',
-                                boxSizing: 'border-box'
-                              }}>
-                                <div style={{ fontSize: '0.62rem', fontWeight: 800, color: '#b91c1c', letterSpacing: '0.2px' }}>
-                                  ✓ ĐÃ KÝ SỐ (PHÊ DUYỆT)
-                                </div>
-                                <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#0f172a', marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                  {ceoSignerName}
-                                </div>
-                                <div style={{ fontSize: '0.58rem', color: '#64748b', marginTop: '1px' }}>
-                                  {ceoSignDate}
-                                </div>
-                              </div>
-                            ) : (
-                              <div style={{
-                                border: '1px dashed #cbd5e1',
-                                borderRadius: '6px',
-                                backgroundColor: '#f8fafc',
-                                padding: '0.25rem 0.4rem',
-                                width: '100%',
-                                maxWidth: '155px',
-                                boxSizing: 'border-box'
-                              }}>
-                                <div style={{ fontSize: '0.64rem', color: '#94a3b8', fontStyle: 'italic' }}>
-                                  (Chưa ký duyệt)
-                                </div>
-                                <div style={{ fontSize: '0.58rem', color: '#cbd5e1', marginTop: '2px' }}>
-                                  Chờ Giám Đốc ký số
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                          <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#0f172a', marginTop: '2px' }}>{isCeoApproved ? ceoSignerName : 'Ban Giám Đốc'}</div>
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
+                  {/* Chữ ký điện tử theo đúng các bước duyệt của đơn mua hàng (lấy từ lịch sử trạng thái) */}
+                  {(() => {
+                    const ceo = historySigner(printPOTarget, ['PO', 'APPROVED']);
+                    const supplierSign = historySigner(printPOTarget, ['CONFIRMED_BY_SUPPLIER']);
+                    const creator = displaySigner(printPOTarget.createdBy) || historySigner(printPOTarget, ['QUOTED_PENDING_CEO', 'PENDING_PO_DRAFT']).name;
+                    const docRef = printPOTarget.poNumber || printPOTarget.id;
+                    return (
+                      <SignatureRow>
+                        <SignatureCell title="Người lập phiếu" name={creator} signedAt={printPOTarget.createdAt} docRef={docRef} />
+                        <SignatureCell title="Nhà cung cấp xác nhận" note="(Ký, đóng dấu)" name={supplierSign.name ? (printPOTarget.supplier?.name || supplierSign.name) : ''}
+                          signedAt={supplierSign.at} docRef={docRef} color="#334155" pendingText={isCeoApproved ? 'Chờ NCC xác nhận' : 'Chưa gửi NCC'} />
+                        <SignatureCell title="Giám đốc duyệt" note="(Ký, đóng dấu)" name={ceo.name} signedAt={ceo.at} signed={isCeoApproved && !!ceo.name}
+                          seal sealLabel="ĐÃ PHÊ DUYỆT" docRef={docRef} pendingText={isPendingCeo ? 'Chờ giám đốc duyệt' : 'Chưa duyệt'} />
+                      </SignatureRow>
+                    );
+                  })()}
                 </div>
               </div>
 
@@ -2462,7 +2400,7 @@ export default function Dashboard() {
               <div className="aetherpc-no-print" style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem', padding: '0.75rem 1.1rem', borderTop: '1px solid #f1f5f9', backgroundColor: '#ffffff' }}>
                 <button
                   onClick={() => setPrintPOTarget(null)}
-                  style={{ backgroundColor: '#ffffff', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.45rem 1rem', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
+                  style={{ backgroundColor: '#ffffff', color: '#475569', border: '1px solid #e3e8ef', borderRadius: '6px', padding: '0.45rem 1rem', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
                 >
                   Đóng
                 </button>

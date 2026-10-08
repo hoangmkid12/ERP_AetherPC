@@ -91,7 +91,7 @@ export default function ConfirmDialog({
               boxSizing: 'border-box',
               padding: '0.6rem 0.75rem',
               borderRadius: '8px',
-              border: '1px solid #cbd5e1',
+              border: '1px solid #e3e8ef',
               fontSize: '0.9rem',
               marginBottom: '1.5rem',
               fontFamily: 'inherit'
@@ -106,7 +106,7 @@ export default function ConfirmDialog({
             style={{
               padding: '0.55rem 1.1rem',
               borderRadius: '8px',
-              border: '1px solid #cbd5e1',
+              border: '1px solid #e3e8ef',
               backgroundColor: '#ffffff',
               color: '#334155',
               fontWeight: 600,

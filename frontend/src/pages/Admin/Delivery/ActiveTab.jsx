@@ -9,7 +9,7 @@ import { getDateFilterLabel } from './deliveryHelpers';
 const PAGE_SIZE = 25;
 
 const selectStyle = { width: '100%', padding: '0.55rem 0.65rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-glass)', fontSize: '0.8rem', backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)', fontWeight: 600, boxSizing: 'border-box' };
-const labelStyle = { display: 'block', fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.25rem' };
+const labelStyle = { display: 'block', fontSize: '0.77rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.25rem' };
 
 export default function ActiveTab({
   orders, fmt, getOrderTimeClassification, onOpenDetail, actions,
@@ -111,7 +111,7 @@ export default function ActiveTab({
 
       {/* Interactive Quick Time Filter Bar */}
       <div style={{
-        display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.72rem', color: 'var(--text-secondary)',
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.77rem', color: 'var(--text-secondary)',
         padding: '0.45rem 0.7rem', backgroundColor: 'var(--bg-primary)', border: '1px solid var(--border-glass)',
         borderRadius: 'var(--radius-md)', marginBottom: '0.85rem', flexWrap: 'wrap', gap: '0.4rem'
       }}>
@@ -127,7 +127,7 @@ export default function ActiveTab({
               border: orderDateFilter?.period === 'TODAY' && incidentFilter !== 'BACKLOG' ? '1px solid var(--primary)' : '1px solid transparent',
               borderRadius: '12px', padding: '2px 8px', cursor: 'pointer',
               color: orderDateFilter?.period === 'TODAY' && incidentFilter !== 'BACKLOG' ? 'var(--primary)' : 'var(--text-secondary)',
-              fontWeight: orderDateFilter?.period === 'TODAY' && incidentFilter !== 'BACKLOG' ? 700 : 500, fontSize: '0.72rem'
+              fontWeight: orderDateFilter?.period === 'TODAY' && incidentFilter !== 'BACKLOG' ? 700 : 500, fontSize: '0.77rem'
             }}
           >
             Hôm nay: <strong style={{ color: 'var(--primary)' }}>{todayCount}</strong> {newCount > 0 && <span style={{ color: '#ea580c' }}>(mới: {newCount})</span>}
@@ -145,7 +145,7 @@ export default function ActiveTab({
               border: incidentFilter === 'BACKLOG' ? '1px solid var(--warning)' : '1px solid transparent',
               borderRadius: '12px', padding: '2px 8px', cursor: 'pointer',
               color: incidentFilter === 'BACKLOG' ? 'var(--warning)' : 'var(--text-secondary)',
-              fontWeight: incidentFilter === 'BACKLOG' ? 700 : 500, fontSize: '0.72rem'
+              fontWeight: incidentFilter === 'BACKLOG' ? 700 : 500, fontSize: '0.77rem'
             }}
           >
             Tồn: <strong style={{ color: 'var(--warning)' }}>{backlogCount}</strong>
@@ -164,14 +164,14 @@ export default function ActiveTab({
               border: orderDateFilter?.period === 'ALL' && incidentFilter === 'ALL' ? '1px solid var(--text-muted)' : '1px solid transparent',
               borderRadius: '12px', padding: '2px 8px', cursor: 'pointer',
               color: 'var(--text-secondary)',
-              fontWeight: orderDateFilter?.period === 'ALL' && incidentFilter === 'ALL' ? 700 : 500, fontSize: '0.72rem'
+              fontWeight: orderDateFilter?.period === 'ALL' && incidentFilter === 'ALL' ? 700 : 500, fontSize: '0.77rem'
             }}
           >
             Tất cả: <strong>{activeOrdersList.length}</strong>
           </button>
         </div>
 
-        <span style={{ fontSize: '0.68rem', color: 'var(--primary)', fontWeight: 600 }}>
+        <span style={{ fontSize: '0.74rem', color: 'var(--primary)', fontWeight: 600 }}>
           Thời gian: {getDateFilterLabel(orderDateFilter)}
         </span>
       </div>
@@ -197,7 +197,7 @@ export default function ActiveTab({
             <div style={{ fontWeight: 800, fontSize: '0.85rem', color: 'var(--text-primary)' }}>
               Không tìm thấy đơn hàng nào phù hợp
             </div>
-            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '0.3rem 0 0.85rem' }}>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '0.3rem 0 0.85rem' }}>
               Hãy đổi bộ lọc hoặc sang tab "Chờ Nhận" để nhận thêm đơn.
             </p>
             <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', flexWrap: 'wrap' }}>
@@ -208,7 +208,7 @@ export default function ActiveTab({
                     if (setOrderDateFilter) setOrderDateFilter(prev => ({ ...prev, period: 'ALL' }));
                     setIncidentFilter('ALL');
                   }}
-                  style={{ padding: '0.45rem 0.9rem', fontSize: '0.76rem', fontWeight: 700, backgroundColor: 'var(--bg-tertiary)', color: 'var(--primary)', border: '1px solid var(--border-glass)', borderRadius: 'var(--radius-md)', cursor: 'pointer' }}
+                  style={{ padding: '0.45rem 0.9rem', fontSize: '0.8rem', fontWeight: 700, backgroundColor: 'var(--bg-tertiary)', color: 'var(--primary)', border: '1px solid var(--border-glass)', borderRadius: 'var(--radius-md)', cursor: 'pointer' }}
                 >
                   Xem Tất Cả ({activeOrdersList.length} đơn)
                 </button>
@@ -216,7 +216,7 @@ export default function ActiveTab({
               <button
                 type="button"
                 onClick={onGoToPending}
-                style={{ padding: '0.45rem 0.9rem', fontSize: '0.76rem', fontWeight: 700, backgroundColor: 'var(--primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-md)', cursor: 'pointer' }}
+                style={{ padding: '0.45rem 0.9rem', fontSize: '0.8rem', fontWeight: 700, backgroundColor: 'var(--primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-md)', cursor: 'pointer' }}
               >
                 Sang Tab Chờ Nhận
               </button>
@@ -274,7 +274,7 @@ export default function ActiveTab({
                 type="button"
                 onClick={() => handlePillClick(tab.id)}
                 style={{
-                  padding: '0.3rem 0.65rem', borderRadius: '999px', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer',
+                  padding: '0.3rem 0.65rem', borderRadius: '999px', fontSize: '0.77rem', fontWeight: 700, cursor: 'pointer',
                   border: (
                     incidentFilter === tab.id ||
                     (tab.id === 'TODAY' && (orderDateFilter?.period === 'TODAY' || (orderDateFilter?.customStartDate === todayStr && orderDateFilter?.customEndDate === todayStr)) && incidentFilter === 'ALL') ||

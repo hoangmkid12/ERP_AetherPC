@@ -10,6 +10,7 @@ import { notify } from '../../context/NotificationContext';
 import { api, normalizeProduct } from '../../services/api';
 import ProductCard, { ProductCarousel } from '../../components/Storefront/ProductCard';
 import { categoryLabel, discountOf, fmtVnd, isInStock, PLACEHOLDER_IMG, SHOP } from '../../components/Storefront/catalog';
+import { formatDescription, proseLength, fallbackOverview } from '../../components/Storefront/describe';
 
 const SPEC_LABEL_MAP = {
   socket: 'Socket', cores: 'Số nhân', threads: 'Số luồng', tdp: 'Điện năng tiêu thụ (TDP)', ram_slot: 'Số khe RAM',
@@ -23,27 +24,6 @@ function specLabel(key) {
   if (SPEC_LABEL_MAP[k]) return SPEC_LABEL_MAP[k];
   const t = String(key).replace(/_/g, ' ');
   return t.charAt(0).toUpperCase() + t.slice(1);
-}
-
-// Mô tả gốc được thu thập từ nhà phân phối: bỏ phần "Thông tin chung" (chính sách của nơi khác)
-// và thay tên cửa hàng cũ để nội dung khớp với AetherPC; tách theo tiêu đề "##".
-function cleanDescription(text, name = '') {
-  if (!text) return [];
-  let t = String(text).replace(/GEARVN|GearVN|Gearvn/g, 'AetherPC');
-  const firstHeading = t.indexOf('##');
-  if (/^Thông tin chung/i.test(t) && firstHeading > -1) t = t.slice(firstHeading);
-  return t.split(/##\s*/).map(x => x.trim()).filter(Boolean).map(block => {
-    // "Đánh giá chi tiết <tên sản phẩm> <nội dung>" → tách tiêu đề ngay sau tên sản phẩm
-    const at = name ? block.indexOf(name) : -1;
-    if (at > -1 && at < 80) {
-      const cut = at + name.length;
-      return { head: block.slice(0, cut).trim(), body: block.slice(cut).trim() };
-    }
-    const sentences = block.split(/(?<=[.!?])\s+/);
-    // Dòng đầu của mỗi khối là tiêu đề nếu ngắn
-    const head = sentences[0] && sentences[0].length < 120 && !/[.!?]$/.test(sentences[0]) ? sentences.shift() : null;
-    return { head, body: sentences.join(' ') };
-  });
 }
 
 function Stars({ value, size = 14, onChange }) {
@@ -106,7 +86,7 @@ export default function ProductDetail() {
     if (!product) return [];
     return [...new Set([product.image, ...(product.imageUrls || [])].filter(Boolean))];
   }, [product]);
-  const desc = useMemo(() => cleanDescription(product?.descriptionText, product?.name), [product]);
+  const desc = useMemo(() => formatDescription(product?.descriptionText, product?.name), [product]);
 
   if (loading) return (
     <div className="sf-container" style={{ padding: '80px 0', textAlign: 'center', color: 'var(--sf-muted)' }}>
@@ -268,23 +248,40 @@ export default function ProductDetail() {
       <div className="sf-pd-body">
         <div className="sf-box sf-pd-panel">
           <h2>Mô tả sản phẩm</h2>
-          {desc.length > 0 ? (
-            <>
-              <div className={`sf-desc${descOpen ? '' : ' is-clamped'}`}>
-                {desc.map((d, i) => (
-                  <div key={i} style={{ marginBottom: 14 }}>
-                    {d.head && <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--sf-text)', margin: '0 0 6px' }}>{d.head}</h3>}
-                    <p style={{ margin: 0 }}>{d.body}</p>
+          {(() => {
+            const prose = proseLength(desc);
+            const long = prose > 900;
+            const overview = prose < 200
+              ? fallbackOverview(product, { warranty: warrantyText, specEntries, specLabel })
+              : null;
+            return (
+              <>
+                <div className={`sf-desc${long && !descOpen ? ' is-clamped' : ''}`}>
+                  {overview && (
+                    <>
+                      <p className="sf-desc-lead">{overview.intro}</p>
+                      {overview.highlights.length > 0 && (
+                        <>
+                          <h3 className="sf-desc-h">Điểm nổi bật</h3>
+                          <ul className="sf-desc-points">
+                            {overview.highlights.map(([k, v]) => <li key={k}><span>{k}</span><b>{v}</b></li>)}
+                          </ul>
+                        </>
+                      )}
+                    </>
+                  )}
+                  {desc.map((d, i) => d.type === 'h'
+                    ? <h3 key={i} className={i === 0 ? 'sf-desc-title' : 'sf-desc-h'}>{d.text}</h3>
+                    : <p key={i}>{d.text}</p>)}
+                </div>
+                {long && (
+                  <div style={{ textAlign: 'center', marginTop: 12 }}>
+                    <button type="button" className="sf-btn sf-btn-outline" onClick={() => setDescOpen(o => !o)}>{descOpen ? 'Thu gọn' : 'Xem thêm nội dung'}</button>
                   </div>
-                ))}
-              </div>
-              <div style={{ textAlign: 'center', marginTop: 8 }}>
-                <button type="button" className="sf-btn sf-btn-outline" onClick={() => setDescOpen(o => !o)}>{descOpen ? 'Thu gọn' : 'Xem thêm nội dung'}</button>
-              </div>
-            </>
-          ) : (
-            <p className="sf-desc">{product.name} chính hãng {product.brand}, phân phối bởi AetherPC với đầy đủ hóa đơn và bảo hành {warrantyText}.</p>
-          )}
+                )}
+              </>
+            );
+          })()}
         </div>
 
         <div className="sf-box sf-pd-panel" style={{ position: 'sticky', top: 84 }}>

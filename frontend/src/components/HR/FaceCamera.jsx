@@ -134,7 +134,7 @@ export default function FaceCamera({ mode = 'verify', onCapture, submitLabel, co
       return;
     }
     try {
-      say('info', 'Đang tải mô hình nhận diện khuôn mặt (lần đầu khoảng 7MB)...');
+      say('info', 'Đang tải mô hình nhận diện khuôn mặt...');
       await loadFaceModels();
       say('info', 'Đang mở camera...');
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }, audio: false });
@@ -231,7 +231,7 @@ export default function FaceCamera({ mode = 'verify', onCapture, submitLabel, co
         <button
           type="button"
           onClick={start}
-          style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', padding: '0.6rem 1.25rem', borderRadius: '8px', border: '1px solid #cbd5e1', backgroundColor: '#ffffff', color: '#0f172a', fontWeight: 600, fontSize: '0.9rem', cursor: 'pointer' }}
+          style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', padding: '0.6rem 1.25rem', borderRadius: '8px', border: '1px solid #e3e8ef', backgroundColor: '#ffffff', color: '#0f172a', fontWeight: 600, fontSize: '0.9rem', cursor: 'pointer' }}
         >
           {phase === 'done' ? <Camera size={17} /> : <RefreshCw size={17} />}
           {phase === 'done' ? (submitLabel || 'Chấm công lần nữa') : 'Thử lại'}

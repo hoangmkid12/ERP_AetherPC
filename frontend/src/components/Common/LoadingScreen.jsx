@@ -92,7 +92,7 @@ export default function LoadingScreen({
         <span style={{ fontSize: '1.05rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', fontFamily: 'var(--font-title, inherit)' }}>
           AETHER PC
         </span>
-        <span style={{ fontSize: '0.68rem', fontWeight: 800, background: '#fef2f2', color: '#dc2626', padding: '1px 6px', borderRadius: '4px', border: '1px solid #fecaca' }}>
+        <span style={{ fontSize: '0.74rem', fontWeight: 800, background: '#fef2f2', color: '#dc2626', padding: '1px 6px', borderRadius: '4px', border: '1px solid #fecaca' }}>
           ERP
         </span>
       </div>

@@ -24,6 +24,7 @@ import {
   getDateFilterLabel,
   getDeliveryIncidentStatus
 } from './deliveryHelpers';
+import { SignatureRow, SignatureCell, displaySigner, historySigner } from '../../../components/Signature/ESignature';
 
 ChartJS.register(
   CategoryScale,
@@ -293,7 +294,7 @@ export default function OverviewTab({
               Thời Gian Thống Kê:
             </span>
             <span style={{
-              fontSize: '0.72rem',
+              fontSize: '0.77rem',
               fontWeight: 700,
               color: 'var(--primary)',
               backgroundColor: 'rgba(37,99,235,0.1)',
@@ -318,7 +319,7 @@ export default function OverviewTab({
         {stats.map((st, sIdx) => (
           <div key={sIdx} className="delivery-card" style={{ margin: 0, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '92px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '0.66rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+              <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
                 {st.label}
               </span>
               <div style={{ width: '30px', height: '30px', borderRadius: 'var(--radius-sm)', backgroundColor: st.bg, color: st.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -329,7 +330,7 @@ export default function OverviewTab({
               <div style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {st.value}
               </div>
-              <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '0.1rem' }}>
+              <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', marginTop: '0.1rem' }}>
                 {st.sub}
               </div>
             </div>
@@ -348,7 +349,7 @@ export default function OverviewTab({
               <h3 style={{ fontSize: '0.88rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
                 Bàn Giao & Đối Soát Tiền Mặt (COD)
               </h3>
-              <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
+              <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
                 Theo dõi tiền nộp ca & đối soát với Kế toán / Thủ quỹ
               </span>
             </div>
@@ -360,8 +361,8 @@ export default function OverviewTab({
             style={{
               display: 'inline-flex', alignItems: 'center', gap: '0.35rem',
               padding: '0.4rem 0.75rem', borderRadius: '6px',
-              border: '1px solid #cbd5e1', backgroundColor: '#ffffff',
-              color: '#2563eb', fontSize: '0.74rem', fontWeight: 700, cursor: 'pointer',
+              border: '1px solid #e3e8ef', backgroundColor: '#ffffff',
+              color: '#2563eb', fontSize: '0.79rem', fontWeight: 700, cursor: 'pointer',
               boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
             }}
           >
@@ -373,27 +374,27 @@ export default function OverviewTab({
         {/* 3 Metric Columns */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem', backgroundColor: '#f8fafc', padding: '0.75rem', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '0.75rem' }}>
           <div>
-            <span style={{ fontSize: '0.65rem', color: '#64748b', display: 'block', fontWeight: 700 }}>Tổng COD Đã Thu</span>
+            <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block', fontWeight: 700 }}>Tổng COD Đã Thu</span>
             <strong style={{ fontSize: '0.88rem', color: '#0f172a', display: 'block', marginTop: '2px' }}>
               {fmt(codAnalytics.totalCollected)}
             </strong>
-            <span style={{ fontSize: '0.62rem', color: '#94a3b8' }}>{codAnalytics.codOrders.length} đơn</span>
+            <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>{codAnalytics.codOrders.length} đơn</span>
           </div>
 
           <div>
-            <span style={{ fontSize: '0.65rem', color: '#15803d', display: 'block', fontWeight: 700 }}>Đã Nộp Kế Toán</span>
+            <span style={{ fontSize: '0.72rem', color: '#15803d', display: 'block', fontWeight: 700 }}>Đã Nộp Kế Toán</span>
             <strong style={{ fontSize: '0.88rem', color: '#16a34a', display: 'block', marginTop: '2px' }}>
               {fmt(codAnalytics.settledAmount)}
             </strong>
-            <span style={{ fontSize: '0.62rem', color: '#16a34a' }}>{codAnalytics.settledOrders.length} đơn đã duyệt</span>
+            <span style={{ fontSize: '0.7rem', color: '#16a34a' }}>{codAnalytics.settledOrders.length} đơn đã duyệt</span>
           </div>
 
           <div>
-            <span style={{ fontSize: '0.65rem', color: codAnalytics.pendingAmount > 0 ? '#b45309' : '#64748b', display: 'block', fontWeight: 700 }}>Còn Giữ (Cần Nộp)</span>
+            <span style={{ fontSize: '0.72rem', color: codAnalytics.pendingAmount > 0 ? '#b45309' : '#64748b', display: 'block', fontWeight: 700 }}>Còn Giữ (Cần Nộp)</span>
             <strong style={{ fontSize: '0.88rem', color: codAnalytics.pendingAmount > 0 ? '#dc2626' : '#16a34a', display: 'block', marginTop: '2px' }}>
               {fmt(codAnalytics.pendingAmount)}
             </strong>
-            <span style={{ fontSize: '0.62rem', color: codAnalytics.pendingAmount > 0 ? '#dc2626' : '#64748b' }}>
+            <span style={{ fontSize: '0.7rem', color: codAnalytics.pendingAmount > 0 ? '#dc2626' : '#64748b' }}>
               {codAnalytics.pendingOrders.length} đơn chưa nộp
             </span>
           </div>
@@ -401,7 +402,7 @@ export default function OverviewTab({
 
         {/* Progress Bar */}
         <div style={{ marginBottom: '0.65rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.68rem', marginBottom: '0.25rem', fontWeight: 700 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem', marginBottom: '0.25rem', fontWeight: 700 }}>
             <span style={{ color: '#475569' }}>Tiến độ nộp tiền về quầy:</span>
             <span style={{ color: codAnalytics.percentSettled === 100 ? '#16a34a' : '#2563eb' }}>
               {codAnalytics.percentSettled}% ({fmt(codAnalytics.settledAmount)} / {fmt(codAnalytics.totalCollected)})
@@ -422,19 +423,19 @@ export default function OverviewTab({
         {codAnalytics.pendingAmount > 0 ? (
           <div style={{ padding: '0.55rem 0.75rem', borderRadius: '6px', backgroundColor: '#fffbeb', border: '1px solid #fef3c7', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <AlertTriangle size={15} style={{ color: '#d97706', flexShrink: 0 }} />
-            <span style={{ fontSize: '0.72rem', color: '#92400e', lineHeight: 1.35 }}>
+            <span style={{ fontSize: '0.77rem', color: '#92400e', lineHeight: 1.35 }}>
               Bạn đang giữ <strong>{fmt(codAnalytics.pendingAmount)}</strong> tiền mặt. Vui lòng bàn giao cho Kế toán / Thủ quỹ khi kết thúc ca làm việc.
             </span>
           </div>
         ) : codAnalytics.totalCollected > 0 ? (
           <div style={{ padding: '0.55rem 0.75rem', borderRadius: '6px', backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <CheckCheck size={16} style={{ color: '#16a34a', flexShrink: 0 }} />
-            <span style={{ fontSize: '0.72rem', color: '#15803d', lineHeight: 1.35 }}>
+            <span style={{ fontSize: '0.77rem', color: '#15803d', lineHeight: 1.35 }}>
               <strong>ĐÃ HOÀN TẤT ĐỐI SOÁT 100% TIỀN COD — AN TOÀN KẾT CA!</strong> Kế toán đã xác nhận nhận đủ tiền ca của bạn.
             </span>
           </div>
         ) : (
-          <div style={{ padding: '0.55rem 0.75rem', borderRadius: '6px', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', fontSize: '0.72rem', color: '#64748b' }}>
+          <div style={{ padding: '0.55rem 0.75rem', borderRadius: '6px', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', fontSize: '0.77rem', color: '#64748b' }}>
             Chưa phát sinh đơn hàng thu tiền mặt COD trong khoảng thời gian được chọn.
           </div>
         )}
@@ -487,12 +488,12 @@ export default function OverviewTab({
             <div key={o.id || oIdx} style={{ padding: '0.6rem 0.7rem', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-app)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
               <div style={{ minWidth: 0 }}>
                 <strong style={{ fontSize: '0.78rem', color: 'var(--text-primary)', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>#{o.orderId || o.id} — {o.customerName}</strong>
-                <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{o.shippingAddress || 'Quận 1, TP. Hồ Chí Minh'}</span>
+                <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{o.shippingAddress || 'Quận 1, TP. Hồ Chí Minh'}</span>
               </div>
               {typeof onClaim === 'function' && (
                 <button
                   onClick={() => onClaim(o.orderId || o.id)}
-                  style={{ backgroundColor: 'var(--primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-sm)', padding: '0.35rem 0.7rem', fontSize: '0.7rem', fontWeight: 800, cursor: 'pointer', flexShrink: 0 }}
+                  style={{ backgroundColor: 'var(--primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-sm)', padding: '0.35rem 0.7rem', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer', flexShrink: 0 }}
                 >
                   Nhận
                 </button>
@@ -500,7 +501,7 @@ export default function OverviewTab({
             </div>
           ))}
           {orders.filter(o => o.status === 'READY_TO_SHIP').length === 0 && (
-            <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)', textAlign: 'center', padding: '0.5rem 0' }}>Không có đơn chờ nhận.</div>
+            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textAlign: 'center', padding: '0.5rem 0' }}>Không có đơn chờ nhận.</div>
           )}
         </div>
       </div>
@@ -514,18 +515,18 @@ export default function OverviewTab({
             <div key={r.id || rIdx} style={{ padding: '0.6rem 0.7rem', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-app)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
               <div style={{ minWidth: 0 }}>
                 <strong style={{ fontSize: '0.78rem', color: 'var(--text-primary)', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{formatRmaCode(r, rIdx + 1)} — {r.customerName}</strong>
-                <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>{r.phone}</span>
+                <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>{r.phone}</span>
               </div>
               <button
                 onClick={onGoToReturns}
-                style={{ backgroundColor: '#8b5cf6', color: '#fff', border: 'none', borderRadius: 'var(--radius-sm)', padding: '0.35rem 0.7rem', fontSize: '0.7rem', fontWeight: 800, cursor: 'pointer', flexShrink: 0 }}
+                style={{ backgroundColor: '#8b5cf6', color: '#fff', border: 'none', borderRadius: 'var(--radius-sm)', padding: '0.35rem 0.7rem', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer', flexShrink: 0 }}
               >
                 Xem
               </button>
             </div>
           ))}
           {periodReturns.length === 0 && (
-            <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)', textAlign: 'center', padding: '0.5rem 0' }}>Không có yêu cầu thu hồi trong khoảng thời gian này.</div>
+            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textAlign: 'center', padding: '0.5rem 0' }}>Không có yêu cầu thu hồi trong khoảng thời gian này.</div>
           )}
         </div>
       </div>
@@ -537,7 +538,7 @@ export default function OverviewTab({
           onClick={() => setShowHandoverModal(false)}
         >
           <div
-            style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', width: '100%', maxWidth: '640px', maxHeight: '88vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' }}
+            style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e3e8ef', width: '100%', maxWidth: '640px', maxHeight: '88vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' }}
             onClick={e => e.stopPropagation()}
           >
             {/* Modal Header */}
@@ -560,13 +561,13 @@ export default function OverviewTab({
               <div data-print-doc="cod-handover">
                 {/* Print Header */}
                 <div style={{ textAlign: 'center', borderBottom: '2px solid #0f172a', paddingBottom: '0.75rem', marginBottom: '1rem' }}>
-                  <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  <div style={{ fontSize: '0.77rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                     CÔNG TY TNHH CÔNG NGHỆ AETHERPC • PHÒNG VẬN HÀNH & GIAO HÀNG
                   </div>
                   <h2 style={{ fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', margin: '0.25rem 0' }}>
                     BIÊN BẢN BÀN GIAO TIỀN MẶT THU HỘ (COD)
                   </h2>
-                  <div style={{ fontSize: '0.74rem', color: '#64748b' }}>
+                  <div style={{ fontSize: '0.79rem', color: '#64748b' }}>
                     Mã biên bản: <code style={{ color: '#2563eb', fontWeight: 800 }}>#BG-COD-{Date.now().toString().slice(-8)}</code> • Thời gian xuất: {new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} - {new Date().toLocaleDateString('vi-VN')}
                   </div>
                 </div>
@@ -574,14 +575,14 @@ export default function OverviewTab({
                 {/* Shipper & Summary Info */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', backgroundColor: '#f8fafc', padding: '0.85rem', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '1rem', fontSize: '0.8rem' }}>
                   <div>
-                    <span style={{ color: '#64748b', display: 'block', fontSize: '0.72rem' }}>Nhân viên giao hàng:</span>
+                    <span style={{ color: '#64748b', display: 'block', fontSize: '0.77rem' }}>Nhân viên giao hàng:</span>
                     <strong style={{ color: '#0f172a' }}>{user?.fullname || user?.name || 'Shipper'}</strong>
-                    <span style={{ color: '#64748b', display: 'block', fontSize: '0.72rem', marginTop: '2px' }}>Khu vực: {user?.deliveryRegion || 'HCM_KV1'}</span>
+                    <span style={{ color: '#64748b', display: 'block', fontSize: '0.77rem', marginTop: '2px' }}>Khu vực: {user?.deliveryRegion || 'HCM_KV1'}</span>
                   </div>
                   <div>
-                    <span style={{ color: '#64748b', display: 'block', fontSize: '0.72rem' }}>Tổng tiền mặt cần nộp ca này:</span>
+                    <span style={{ color: '#64748b', display: 'block', fontSize: '0.77rem' }}>Tổng tiền mặt cần nộp ca này:</span>
                     <strong style={{ color: '#b45309', fontSize: '1.05rem', display: 'block' }}>{fmt(codAnalytics.pendingAmount)}</strong>
-                    <span style={{ color: '#64748b', display: 'block', fontSize: '0.72rem' }}>
+                    <span style={{ color: '#64748b', display: 'block', fontSize: '0.77rem' }}>
                       (Đã nộp: {fmt(codAnalytics.settledAmount)} / Tổng thu: {fmt(codAnalytics.totalCollected)})
                     </span>
                   </div>
@@ -592,9 +593,9 @@ export default function OverviewTab({
                   <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#0f172a', marginBottom: '0.4rem' }}>
                     Danh Sách Đơn Hàng COD ({codAnalytics.codOrders.length} đơn)
                   </div>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.76rem' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
                     <thead>
-                      <tr style={{ backgroundColor: '#f1f5f9', borderBottom: '1px solid #cbd5e1', textAlign: 'left', color: '#475569' }}>
+                      <tr style={{ backgroundColor: '#f1f5f9', borderBottom: '1px solid #e3e8ef', textAlign: 'left', color: '#475569' }}>
                         <th style={{ padding: '0.45rem 0.6rem' }}>Mã Đơn</th>
                         <th style={{ padding: '0.45rem 0.6rem' }}>Khách Hàng</th>
                         <th style={{ padding: '0.45rem 0.6rem' }}>Địa Chỉ Giao</th>
@@ -615,11 +616,11 @@ export default function OverviewTab({
                             </td>
                             <td style={{ padding: '0.45rem 0.6rem', textAlign: 'center' }}>
                               {isSettled ? (
-                                <span style={{ padding: '2px 6px', borderRadius: '4px', fontSize: '0.66rem', fontWeight: 800, backgroundColor: '#dcfce7', color: '#15803d' }}>
+                                <span style={{ padding: '2px 6px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 800, backgroundColor: '#dcfce7', color: '#15803d' }}>
                                   ĐÃ DUYỆT
                                 </span>
                               ) : (
-                                <span style={{ padding: '2px 6px', borderRadius: '4px', fontSize: '0.66rem', fontWeight: 800, backgroundColor: '#fef3c7', color: '#b45309' }}>
+                                <span style={{ padding: '2px 6px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 800, backgroundColor: '#fef3c7', color: '#b45309' }}>
                                   CHỜ NỘP
                                 </span>
                               )}
@@ -638,21 +639,12 @@ export default function OverviewTab({
                   </table>
                 </div>
 
-                {/* Signatures */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', marginTop: '1.5rem', textAlign: 'center', fontSize: '0.78rem' }}>
-                  <div>
-                    <strong style={{ display: 'block', color: '#0f172a' }}>NGƯỜI BÀN GIAO (SHIPPER)</strong>
-                    <span style={{ fontSize: '0.7rem', color: '#64748b' }}>(Ký và ghi rõ họ tên)</span>
-                    <div style={{ height: '50px' }} />
-                    <strong style={{ color: '#0f172a' }}>{user?.fullname || user?.name || 'Shipper'}</strong>
-                  </div>
-                  <div>
-                    <strong style={{ display: 'block', color: '#0f172a' }}>NGƯỜI NHẬN TIỀN (THỦ QUỸ / KẾ TOÁN)</strong>
-                    <span style={{ fontSize: '0.7rem', color: '#64748b' }}>(Ký và xác nhận nhận đủ tiền)</span>
-                    <div style={{ height: '50px' }} />
-                    <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>Chờ ký nhận tại quầy</span>
-                  </div>
-                </div>
+                {/* Chữ ký điện tử — nhân viên giao hàng ký khi lập biên bản; kế toán ký khi xác nhận đã nhận đủ tiền tại quầy */}
+                <SignatureRow>
+                  <SignatureCell title="Người bàn giao (shipper)" note="(Ký và ghi rõ họ tên)" name={user?.fullname || user?.name || ''}
+                    signedAt={new Date()} docRef={`BG-COD-${user?.id || ''}-${new Date().toISOString().slice(0, 10)}`} />
+                  <SignatureCell title="Người nhận tiền (thủ quỹ / kế toán)" note="(Ký và xác nhận nhận đủ tiền)" signed={false} pendingText="Chờ ký nhận tại quầy" />
+                </SignatureRow>
               </div>
             </div>
 
@@ -664,7 +656,7 @@ export default function OverviewTab({
                 style={{
                   display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
                   padding: '0.45rem 0.9rem', borderRadius: '6px',
-                  border: '1px solid #cbd5e1', backgroundColor: '#ffffff',
+                  border: '1px solid #e3e8ef', backgroundColor: '#ffffff',
                   color: '#0f172a', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer'
                 }}
               >

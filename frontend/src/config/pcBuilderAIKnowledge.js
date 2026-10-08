@@ -93,10 +93,10 @@ export const HARDWARE_KNOWLEDGE_BASE = {
         const estTotalTdp = cpuTdp + vgaTdp + 100; // 100W for MB, Fans, RAM, SSD
         const reqWattage = Math.ceil(estTotalTdp * 1.25);
         const psuWatts = psu.specs?.wattage || 0;
-        if (psuWatts > 0 && psuWatts < reqWatts) {
-          return { ok: false, reason: `Cấu hình cần tối thiểu ${reqWatts}W nhưng Nguồn chỉ có ${psuWatts}W` };
+        if (psuWatts > 0 && psuWatts < reqWattage) {
+          return { ok: false, reason: `Cấu hình cần tối thiểu ${reqWattage}W nhưng Nguồn chỉ có ${psuWatts}W` };
         }
-        return { ok: true, estTdp: estTotalTdp, reqWatts };
+        return { ok: true, estTdp: estTotalTdp, reqWatts: reqWattage };
       }
     }
   ]

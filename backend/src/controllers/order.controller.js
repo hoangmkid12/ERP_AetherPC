@@ -1855,6 +1855,12 @@ const getReturnRequests = async (req, res, next) => {
 
     let whereClause = {};
 
+    // Khách hàng chỉ xem yêu cầu đổi trả của chính mình (để theo dõi trạng thái trên trang Đơn hàng của tôi)
+    if (userRole === 'CUSTOMER') {
+      if (!userId) return res.json({ success: true, data: [] });
+      whereClause = { OR: [{ customerId: String(userId) }, { order: { customerId: String(userId) } }] };
+    }
+
     // Nếu là nhân viên giao hàng (DELIVERY), chỉ lấy các yêu cầu RMA thuộc đơn mà shipper này đã giao
     if (userRole === 'DELIVERY' && userId && !isNaN(Number(userId))) {
       whereClause = {

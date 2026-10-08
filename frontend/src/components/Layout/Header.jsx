@@ -395,7 +395,8 @@ export default function Header() {
                 onMouseEnter={() => setUserDropdownOpen(true)}
                 onMouseLeave={() => setUserDropdownOpen(false)}
               >
-                <button type="button" className="sf-hitem">
+                <button type="button" className="sf-hitem" aria-haspopup="menu" aria-expanded={userDropdownOpen}
+                  onClick={() => setUserDropdownOpen(o => !o)}>
                   <div style={{
                     width: '30px',
                     height: '30px',

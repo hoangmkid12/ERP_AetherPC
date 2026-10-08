@@ -46,7 +46,7 @@ export default function PendingTab({
             <div style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--text-primary)' }}>
               Hiện không có đơn hàng nào chờ nhận tại kho
             </div>
-            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '0.35rem 0 0.85rem' }}>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '0.35rem 0 0.85rem' }}>
               Các đơn đã nhận đang nằm trong tab "Đang Giao".
             </p>
             <button

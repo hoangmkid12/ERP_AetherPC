@@ -8,7 +8,7 @@ import { getReturnDateTime, matchesDateFilter, getDateFilterLabel, getDefaultDat
 const PAGE_SIZE = 25;
 
 const selectStyle = { width: '100%', padding: '0.55rem 0.65rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-glass)', fontSize: '0.8rem', backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)', fontWeight: 600, boxSizing: 'border-box' };
-const labelStyle = { display: 'block', fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.25rem' };
+const labelStyle = { display: 'block', fontSize: '0.77rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.25rem' };
 
 export default function ReturnsTab({
   fmt, orders, pendingReturns,
@@ -83,7 +83,7 @@ export default function ReturnsTab({
       </div>
 
       {/* Date Filter Indicator Bar with Quick Reset Buttons */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.4rem 0.6rem', backgroundColor: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)', marginBottom: '0.65rem', border: '1px solid var(--border-glass)', fontSize: '0.74rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.4rem 0.6rem', backgroundColor: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)', marginBottom: '0.65rem', border: '1px solid var(--border-glass)', fontSize: '0.79rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: 'var(--text-secondary)' }}>
           <Calendar size={13} style={{ color: 'var(--primary)' }} />
           <span>Thời gian: <strong style={{ color: 'var(--text-primary)' }}>{getDateFilterLabel(rmaDateFilter)}</strong></span>
@@ -93,7 +93,7 @@ export default function ReturnsTab({
             <button
               type="button"
               onClick={() => setRmaDateFilter && setRmaDateFilter(prev => ({ ...prev, period: 'ALL' }))}
-              style={{ background: 'none', border: 'none', color: 'var(--primary)', fontWeight: 700, fontSize: '0.72rem', cursor: 'pointer', textDecoration: 'underline' }}
+              style={{ background: 'none', border: 'none', color: 'var(--primary)', fontWeight: 700, fontSize: '0.77rem', cursor: 'pointer', textDecoration: 'underline' }}
             >
               Xem tất cả
             </button>
@@ -102,7 +102,7 @@ export default function ReturnsTab({
             <button
               type="button"
               onClick={() => setRmaDateFilter && setRmaDateFilter(getDefaultDateFilter())}
-              style={{ background: 'none', border: 'none', color: 'var(--success)', fontWeight: 700, fontSize: '0.72rem', cursor: 'pointer', textDecoration: 'underline' }}
+              style={{ background: 'none', border: 'none', color: 'var(--success)', fontWeight: 700, fontSize: '0.77rem', cursor: 'pointer', textDecoration: 'underline' }}
             >
               Hôm nay
             </button>
@@ -110,7 +110,7 @@ export default function ReturnsTab({
         </div>
       </div>
 
-      <p style={{ fontSize: '0.74rem', color: 'var(--text-muted)', margin: '0 0 0.75rem' }}>
+      <p style={{ fontSize: '0.79rem', color: 'var(--text-muted)', margin: '0 0 0.75rem' }}>
         Thu hồi kiện hàng lỗi về kho cho QC hoặc nhận hàng bị từ chối giao trả lại khách.
       </p>
 
@@ -158,9 +158,9 @@ export default function ReturnsTab({
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem', gap: '0.5rem' }}>
                   <div>
                     <strong style={{ fontSize: '0.88rem', color: '#7c3aed' }}>{formatRmaCode(ret, rIdx + 1)}</strong>
-                    <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Đơn: #{ret.orderId}</div>
+                    <div style={{ fontSize: '0.77rem', color: 'var(--text-muted)' }}>Đơn: #{ret.orderId}</div>
                   </div>
-                  <span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '0.68rem', fontWeight: 800, backgroundColor: statusBadge.bg, color: statusBadge.color, whiteSpace: 'nowrap' }}>
+                  <span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '0.74rem', fontWeight: 800, backgroundColor: statusBadge.bg, color: statusBadge.color, whiteSpace: 'nowrap' }}>
                     {statusBadge.text}
                   </span>
                 </div>
@@ -177,18 +177,18 @@ export default function ReturnsTab({
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.65rem' }}>
                   <span style={{
-                    padding: '1px 6px', borderRadius: '4px', fontSize: '0.68rem', fontWeight: 800,
+                    padding: '1px 6px', borderRadius: '4px', fontSize: '0.74rem', fontWeight: 800,
                     backgroundColor: ret.type === 'REFUND' ? 'rgba(22,163,74,0.1)' : 'rgba(37,99,235,0.1)',
                     color: ret.type === 'REFUND' ? 'var(--success)' : 'var(--primary)'
                   }}>
                     {ret.type === 'REFUND' ? 'Hoàn tiền 100%' : 'Đổi mới'}
                   </span>
-                  <span style={{ fontSize: '0.74rem', color: 'var(--text-secondary)' }}>{ret.reason || 'Lỗi sản phẩm'}</span>
+                  <span style={{ fontSize: '0.79rem', color: 'var(--text-secondary)' }}>{ret.reason || 'Lỗi sản phẩm'}</span>
                 </div>
 
                 {/* Hộp thông tin QC từ chối (hiển thị cho Shipper biết nguyên nhân để giải thích với khách khi trả hàng) */}
                 {(isRejectedByQc || isReturningToCustomer || isReturnedToCustomer) && (
-                  <div style={{ backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', padding: '0.5rem 0.65rem', marginBottom: '0.65rem', fontSize: '0.74rem' }}>
+                  <div style={{ backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', padding: '0.5rem 0.65rem', marginBottom: '0.65rem', fontSize: '0.79rem' }}>
                     <div style={{ fontWeight: 800, color: '#dc2626', marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
                       <span>⚠️ Lý do QC từ chối đổi trả:</span>
                     </div>

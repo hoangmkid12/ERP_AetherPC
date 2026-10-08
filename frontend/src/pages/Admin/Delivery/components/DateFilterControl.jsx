@@ -16,7 +16,7 @@ const selectStyle = {
 
 const labelStyle = {
   display: 'block',
-  fontSize: '0.72rem',
+  fontSize: '0.77rem',
   fontWeight: 700,
   color: 'var(--text-muted)',
   marginBottom: '0.25rem'
@@ -253,7 +253,7 @@ export default function DateFilterControl({
                   style={{
                     padding: '0.35rem 0.7rem',
                     borderRadius: '20px',
-                    fontSize: '0.74rem',
+                    fontSize: '0.79rem',
                     fontWeight: 700,
                     cursor: 'pointer',
                     transition: 'all 0.15s ease',
@@ -274,7 +274,7 @@ export default function DateFilterControl({
               style={{
                 padding: '0.35rem 0.7rem',
                 borderRadius: '20px',
-                fontSize: '0.74rem',
+                fontSize: '0.79rem',
                 fontWeight: 700,
                 cursor: 'pointer',
                 transition: 'all 0.15s ease',
@@ -307,14 +307,14 @@ export default function DateFilterControl({
             boxShadow: '0 4px 12px rgba(0,0,0,0.06)'
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+              <span style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
                 <Calendar size={13} style={{ color: 'var(--primary)' }} />
                 Chọn Khoảng Thời Gian
               </span>
               <button
                 type="button"
                 onClick={() => setShowCustomModal(false)}
-                style={{ background: 'none', border: 'none', fontSize: '0.72rem', color: 'var(--primary)', fontWeight: 700, cursor: 'pointer' }}
+                style={{ background: 'none', border: 'none', fontSize: '0.77rem', color: 'var(--primary)', fontWeight: 700, cursor: 'pointer' }}
               >
                 Đóng
               </button>
@@ -322,7 +322,7 @@ export default function DateFilterControl({
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
               <div>
-                <span style={{ display: 'block', fontSize: '0.68rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.2rem' }}>Từ ngày</span>
+                <span style={{ display: 'block', fontSize: '0.74rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.2rem' }}>Từ ngày</span>
                 <input
                   type="date"
                   value={currentRange.start}
@@ -331,7 +331,7 @@ export default function DateFilterControl({
                 />
               </div>
               <div>
-                <span style={{ display: 'block', fontSize: '0.68rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.2rem' }}>Đến ngày</span>
+                <span style={{ display: 'block', fontSize: '0.74rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.2rem' }}>Đến ngày</span>
                 <input
                   type="date"
                   value={currentRange.end}
@@ -350,7 +350,7 @@ export default function DateFilterControl({
                   style={{
                     padding: '0.2rem 0.55rem',
                     borderRadius: '999px',
-                    fontSize: '0.68rem',
+                    fontSize: '0.74rem',
                     fontWeight: 700,
                     cursor: 'pointer',
                     border: preset.isActive ? '1.5px solid var(--primary)' : '1px solid var(--border-glass)',
@@ -383,7 +383,7 @@ export default function DateFilterControl({
             style={{
               background: 'none',
               border: 'none',
-              fontSize: '0.72rem',
+              fontSize: '0.77rem',
               color: 'var(--primary)',
               fontWeight: 700,
               cursor: 'pointer',
@@ -398,7 +398,7 @@ export default function DateFilterControl({
       {/* Date Pickers: Từ ngày - Đến ngày */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
         <div>
-          <span style={{ display: 'block', fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.2rem' }}>
+          <span style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.2rem' }}>
             Từ ngày
           </span>
           <input
@@ -413,7 +413,7 @@ export default function DateFilterControl({
           />
         </div>
         <div>
-          <span style={{ display: 'block', fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.2rem' }}>
+          <span style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.2rem' }}>
             Đến ngày
           </span>
           <input
@@ -439,7 +439,7 @@ export default function DateFilterControl({
             style={{
               padding: '0.25rem 0.6rem',
               borderRadius: '999px',
-              fontSize: '0.72rem',
+              fontSize: '0.77rem',
               fontWeight: 700,
               cursor: 'pointer',
               transition: 'all 0.15s ease',

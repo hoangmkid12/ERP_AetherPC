@@ -2,6 +2,7 @@ import React from 'react';
 import { Printer, X, CheckCircle2, Truck, Calendar, Building2, FileCheck } from 'lucide-react';
 import { printDocument } from '../utils/printDocument';
 import { formatCurrencyInWords } from '../utils/numberToWords';
+import { HandSignature, historySigner, signatureCode } from './Signature/ESignature';
 
 export default function SupplierConfirmationModal({ order, onClose }) {
   if (!order) return null;
@@ -81,7 +82,7 @@ export default function SupplierConfirmationModal({ order, onClose }) {
           overflowY: 'auto',
           backgroundColor: '#ffffff',
           borderRadius: '14px',
-          border: '1px solid #cbd5e1',
+          border: '1px solid #e3e8ef',
           boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
           boxSizing: 'border-box'
         }}
@@ -100,7 +101,7 @@ export default function SupplierConfirmationModal({ order, onClose }) {
               <tbody>
                 <tr>
                   <td style={{ verticalAlign: 'top', paddingRight: '0.75rem', boxSizing: 'border-box' }}>
-                    <div style={{ fontSize: '0.66rem', fontWeight: 800, color: '#16a34a', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#16a34a', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                       NHÀ CUNG CẤP / SUPPLIER
                     </div>
                     <div style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a', textTransform: 'uppercase', marginTop: '0.12rem', lineHeight: 1.25 }}>
@@ -117,7 +118,7 @@ export default function SupplierConfirmationModal({ order, onClose }) {
                   </td>
 
                   <td style={{ verticalAlign: 'top', textAlign: 'right', boxSizing: 'border-box' }}>
-                    <div style={{ fontSize: '0.66rem', color: '#64748b', fontWeight: 700 }}>Mẫu số: PXN-NCC/2026</div>
+                    <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 700 }}>Mẫu số: PXN-NCC/2026</div>
                     <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#15803d', marginTop: '0.12rem' }}>
                       Số: PXN-{order.poNumber || order.code || 'PO'}
                     </div>
@@ -138,16 +139,16 @@ export default function SupplierConfirmationModal({ order, onClose }) {
             <h2 style={{ margin: '0', fontSize: '1.2rem', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.2px', textTransform: 'uppercase' }}>
               PHIẾU XÁC NHẬN ĐƠN HÀNG & LỊCH GIAO HÀNG
             </h2>
-            <div style={{ fontSize: '0.72rem', color: '#64748b', fontStyle: 'italic', marginTop: '0.12rem' }}>
+            <div style={{ fontSize: '0.77rem', color: '#64748b', fontStyle: 'italic', marginTop: '0.12rem' }}>
               (SUPPLIER ORDER & DELIVERY COMMITMENT CONFIRMATION)
             </div>
-            <div style={{ marginTop: '0.35rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem', backgroundColor: '#dcfce7', border: '1px solid #86efac', borderRadius: '999px', padding: '0.2rem 0.8rem', fontSize: '0.72rem', fontWeight: 800, color: '#15803d' }}>
+            <div style={{ marginTop: '0.35rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem', backgroundColor: '#dcfce7', border: '1px solid #86efac', borderRadius: '999px', padding: '0.2rem 0.8rem', fontSize: '0.77rem', fontWeight: 800, color: '#15803d' }}>
               <CheckCircle2 size={14} /> NCC ĐÃ XÁC NHẬN ĐƠN HÀNG VÀ CAM KẾT TIẾN ĐỘ
             </div>
           </div>
 
           {/* 3. Kính gửi */}
-          <div style={{ fontSize: '0.76rem', color: '#334155', marginBottom: '0.65rem', lineHeight: 1.45 }}>
+          <div style={{ fontSize: '0.8rem', color: '#334155', marginBottom: '0.65rem', lineHeight: 1.45 }}>
             <strong>Kính gửi:</strong> Phòng Mua Hàng & Bộ Phận Kiểm Định Chất Lượng (QC) — <strong>CÔNG TY TNHH CÔNG NGHỆ AETHERPC</strong>
           </div>
 
@@ -161,8 +162,8 @@ export default function SupplierConfirmationModal({ order, onClose }) {
               <tr>
                 {/* Cột Trái: Bên Nhận Hàng (AetherPC) */}
                 <td style={{ width: '50%', verticalAlign: 'top', paddingRight: '0.45rem', boxSizing: 'border-box' }}>
-                  <div style={{ backgroundColor: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '0.65rem 0.8rem', minHeight: '125px', boxSizing: 'border-box' }}>
-                    <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#2563eb', textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: '0.25rem' }}>
+                  <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e3e8ef', borderRadius: '8px', padding: '0.65rem 0.8rem', minHeight: '125px', boxSizing: 'border-box' }}>
+                    <div style={{ fontSize: '0.74rem', fontWeight: 800, color: '#2563eb', textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: '0.25rem' }}>
                       Bên Nhận Hàng (Bên A — Khách Hàng)
                     </div>
                     <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#0f172a' }}>
@@ -174,7 +175,7 @@ export default function SupplierConfirmationModal({ order, onClose }) {
                     <div style={{ fontSize: '0.71rem', color: '#475569', marginTop: '0.2rem' }}>
                       Bộ phận tiếp nhận: <strong style={{ color: '#0f172a' }}>Phòng Mua Hàng & Kiểm Định QC</strong>
                     </div>
-                    <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '0.2rem' }}>
+                    <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.2rem' }}>
                       Hotline: 1900 6868 • Email: purchasing@kltn-erp.vn
                     </div>
                   </div>
@@ -183,7 +184,7 @@ export default function SupplierConfirmationModal({ order, onClose }) {
                 {/* Cột Phải: Bên Giao Hàng (Nhà Cung Cấp) */}
                 <td style={{ width: '50%', verticalAlign: 'top', paddingLeft: '0.45rem', boxSizing: 'border-box' }}>
                   <div style={{ backgroundColor: '#f0fdf4', border: '1.5px solid #86efac', borderRadius: '8px', padding: '0.65rem 0.8rem', minHeight: '125px', boxSizing: 'border-box' }}>
-                    <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#16a34a', textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: '0.25rem' }}>
+                    <div style={{ fontSize: '0.74rem', fontWeight: 800, color: '#16a34a', textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: '0.25rem' }}>
                       Bên Giao Hàng (Bên B — Nhà Cung Cấp)
                     </div>
                     <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#0f172a' }}>
@@ -191,7 +192,7 @@ export default function SupplierConfirmationModal({ order, onClose }) {
                     </div>
 
                     <div style={{ marginTop: '0.3rem', padding: '0.3rem 0.6rem', backgroundColor: '#dcfce7', borderRadius: '6px', border: '1px solid #bbf7d0' }}>
-                      <div style={{ fontSize: '0.66rem', color: '#166534', fontWeight: 700, textTransform: 'uppercase' }}>
+                      <div style={{ fontSize: '0.72rem', color: '#166534', fontWeight: 700, textTransform: 'uppercase' }}>
                         CAM KẾT NGÀY GIAO HÀNG CHÍNH THỨC:
                       </div>
                       <div style={{ fontSize: '0.92rem', fontWeight: 800, color: '#15803d', marginTop: '0.08rem' }}>
@@ -213,14 +214,14 @@ export default function SupplierConfirmationModal({ order, onClose }) {
 
           {/* 5. Ghi chú của NCC (Nếu có) */}
           {(order.supplierNote || order.note) && (
-            <div style={{ backgroundColor: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px', padding: '0.45rem 0.75rem', marginBottom: '0.65rem', fontSize: '0.73rem', lineHeight: 1.4 }}>
-              <span style={{ fontWeight: 800, color: '#b45309', textTransform: 'uppercase', fontSize: '0.68rem' }}>GHI CHÚ / CAM KẾT CỦA NCC: </span>
+            <div style={{ backgroundColor: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px', padding: '0.45rem 0.75rem', marginBottom: '0.65rem', fontSize: '0.78rem', lineHeight: 1.4 }}>
+              <span style={{ fontWeight: 800, color: '#b45309', textTransform: 'uppercase', fontSize: '0.74rem' }}>GHI CHÚ / CAM KẾT CỦA NCC: </span>
               <span style={{ color: '#78350f', fontStyle: 'italic' }}>"{order.supplierNote || order.note}"</span>
             </div>
           )}
 
           {/* 6. Bảng Hàng Hóa Xác Nhận */}
-          <div style={{ fontSize: '0.76rem', fontWeight: 800, color: '#0f172a', marginBottom: '0.35rem', textTransform: 'uppercase', letterSpacing: '0.2px' }}>
+          <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#0f172a', marginBottom: '0.35rem', textTransform: 'uppercase', letterSpacing: '0.2px' }}>
             Danh mục linh kiện / hàng hóa xác nhận cung ứng:
           </div>
           <table style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse', marginBottom: '0.45rem', fontSize: '0.78rem' }}>
@@ -256,7 +257,7 @@ export default function SupplierConfirmationModal({ order, onClose }) {
                     <td style={{ padding: '0.45rem 0.5rem', textAlign: 'right', color: '#475569', whiteSpace: 'nowrap' }}>{formatPrice(itUnit)}</td>
                     <td style={{ padding: '0.45rem 0.5rem', textAlign: 'right', color: '#0f172a', fontWeight: 700, whiteSpace: 'nowrap' }}>{formatPrice(itTotal)}</td>
                     <td style={{ padding: '0.45rem 0.5rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
-                      <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#15803d', backgroundColor: '#dcfce7', padding: '2px 8px', borderRadius: '4px' }}>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#15803d', backgroundColor: '#dcfce7', padding: '2px 8px', borderRadius: '4px' }}>
                         ✓ Sẵn sàng giao
                       </span>
                     </td>
@@ -277,13 +278,13 @@ export default function SupplierConfirmationModal({ order, onClose }) {
           </table>
 
           {totalAmount > 0 && (
-            <p style={{ fontSize: '0.74rem', color: '#64748b', fontStyle: 'italic', margin: '0.2rem 0 0.6rem' }}>
+            <p style={{ fontSize: '0.79rem', color: '#64748b', fontStyle: 'italic', margin: '0.2rem 0 0.6rem' }}>
               Bằng chữ: <strong style={{ color: '#334155' }}>{formatCurrencyInWords(totalAmount)}</strong>.
             </p>
           )}
 
           {/* 7. Điều khoản cam kết pháp lý */}
-          <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '0.45rem 0.8rem', marginBottom: '0.65rem', fontSize: '0.73rem', color: '#475569', lineHeight: 1.45 }}>
+          <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '0.45rem 0.8rem', marginBottom: '0.65rem', fontSize: '0.78rem', color: '#475569', lineHeight: 1.45 }}>
             <strong style={{ color: '#0f172a' }}>Cam kết của Nhà Cung Cấp:</strong>
             <ul style={{ margin: '0.2rem 0 0 1rem', padding: 0 }}>
               <li>Hàng hóa được giao bảo đảm mới 100%, đúng quy cách kỹ thuật, nguyên niêm phong (seal) của hãng sản xuất.</li>
@@ -302,7 +303,7 @@ export default function SupplierConfirmationModal({ order, onClose }) {
               <tr>
                 {/* CỘT TRÁI: NƠI NHẬN CHỨNG TỪ */}
                 <td style={{ width: '45%', verticalAlign: 'top', padding: '0.45rem 0.5rem 0 0', boxSizing: 'border-box' }}>
-                  <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: '0.35rem' }}>
+                  <div style={{ fontSize: '0.77rem', fontWeight: 800, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: '0.35rem' }}>
                     Nơi nhận:
                   </div>
                   <div style={{ fontSize: '0.71rem', color: '#475569', lineHeight: 1.6 }}>
@@ -315,38 +316,31 @@ export default function SupplierConfirmationModal({ order, onClose }) {
 
                 {/* CỘT PHẢI: CHỮ KÝ XÁC NHẬN CỦA NHÀ CUNG CẤP */}
                 <td style={{ width: '55%', textAlign: 'center', verticalAlign: 'top', padding: '0.45rem 0 0 0.5rem', boxSizing: 'border-box' }}>
-                  <div style={{ fontSize: '0.7rem', color: '#64748b', fontStyle: 'italic', marginBottom: '0.2rem' }}>
+                  <div style={{ fontSize: '0.75rem', color: '#64748b', fontStyle: 'italic', marginBottom: '0.2rem' }}>
                     Ngày {new Date(order.updatedAt || Date.now()).getDate()} tháng {new Date(order.updatedAt || Date.now()).getMonth() + 1} năm {new Date(order.updatedAt || Date.now()).getFullYear()}
                   </div>
                   <strong style={{ fontSize: '0.78rem', color: '#0f172a', display: 'block', textTransform: 'uppercase' }}>
                     ĐẠI DIỆN NHÀ CUNG CẤP XÁC NHẬN
                   </strong>
-                  <div style={{ fontSize: '0.65rem', color: '#94a3b8', marginTop: '0.15rem' }}>
-                    (Ký số điện tử & cam kết thực hiện)
+                  <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '0.15rem' }}>
+                    (Ký điện tử & cam kết thực hiện)
                   </div>
 
-                  <div style={{ minHeight: '62px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0.35rem auto' }}>
-                    <div style={{
-                      border: '1.5px dashed #059669',
-                      borderRadius: '8px',
-                      backgroundColor: '#ecfdf5',
-                      padding: '0.4rem 1.1rem',
-                      display: 'inline-block',
-                      minWidth: '200px',
-                      maxWidth: '280px',
-                      boxSizing: 'border-box'
-                    }}>
-                      <div style={{ fontSize: '0.66rem', fontWeight: 800, color: '#047857', letterSpacing: '0.3px' }}>
-                        ✓ ĐÃ XÁC NHẬN ĐIỆN TỬ
+                  {(() => {
+                    const confirmed = historySigner(order, ['CONFIRMED_BY_SUPPLIER']);
+                    const at = confirmed.at || order.updatedAt;
+                    return (
+                      <div style={{ margin: '0.35rem auto 0' }}>
+                        <div style={{ height: 78, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <HandSignature name={supplierName} color="#334155" />
+                        </div>
+                        <div style={{ fontSize: '0.6rem', color: '#64748b', lineHeight: 1.35 }}>
+                          <div>Ký điện tử · {formatDateTime(at || new Date())}</div>
+                          <div>Mã xác thực: {signatureCode(order.poNumber || order.code, supplierName, at)}</div>
+                        </div>
                       </div>
-                      <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#0f172a', marginTop: '2px', wordBreak: 'break-word' }}>
-                        {supplierName}
-                      </div>
-                      <div style={{ fontSize: '0.62rem', color: '#64748b', marginTop: '2px' }}>
-                        Thời gian: {formatDateTime(order.updatedAt || new Date())}
-                      </div>
-                    </div>
-                  </div>
+                    );
+                  })()}
 
                   <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#0f172a', marginTop: '3px' }}>
                     {supplierName}

@@ -464,7 +464,7 @@ export default function RouteOptimizerPanel({
             padding: '0.3rem 0.7rem', borderRadius: '999px',
             border: '1px solid var(--border-glass)',
             backgroundColor: 'var(--bg-primary)',
-            color: 'var(--primary)', fontSize: '0.72rem', fontWeight: 700,
+            color: 'var(--primary)', fontSize: '0.77rem', fontWeight: 700,
             cursor: 'pointer', boxShadow: '0 1px 4px rgba(0,0,0,0.05)'
           }}
         >
@@ -509,7 +509,7 @@ export default function RouteOptimizerPanel({
           <div style={{ fontSize: '0.82rem', fontWeight: 800, color: 'var(--text-primary)' }}>
             Tối Ưu Lộ Trình (Tùy chọn)
           </div>
-          <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '0.05rem' }}>
+          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.05rem' }}>
             {status === 'idle' && 'Nhấn Tối Ưu để AI xếp tuyến, hoặc chọn giao tự do từng đơn bên dưới.'}
             {status === 'picking' && 'Chọn điểm xuất phát …'}
             {status === 'loading' && (
@@ -533,7 +533,7 @@ export default function RouteOptimizerPanel({
               style={{
                 padding: '0.45rem 0.85rem', borderRadius: 'var(--radius-md)', border: 'none', cursor: status === 'idle' ? 'pointer' : 'default',
                 background: 'linear-gradient(135deg, #2563eb, #7c3aed)',
-                color: '#fff', fontSize: '0.75rem', fontWeight: 700,
+                color: '#fff', fontSize: '0.8rem', fontWeight: 700,
                 display: 'flex', alignItems: 'center', gap: '0.3rem',
                 boxShadow: '0 2px 8px rgba(37,99,235,0.3)', whiteSpace: 'nowrap',
                 opacity: status === 'picking' ? 0.7 : 1
@@ -580,7 +580,7 @@ export default function RouteOptimizerPanel({
           <button
             type="button"
             onClick={handleOptimize}
-            style={{ padding: '0.35rem 0.7rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--danger)', background: 'transparent', cursor: 'pointer', color: 'var(--danger)', fontSize: '0.72rem', fontWeight: 700 }}
+            style={{ padding: '0.35rem 0.7rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--danger)', background: 'transparent', cursor: 'pointer', color: 'var(--danger)', fontSize: '0.77rem', fontWeight: 700 }}
           >
             Thử Lại
           </button>
@@ -595,7 +595,7 @@ export default function RouteOptimizerPanel({
           backgroundColor: 'var(--bg-secondary)',
           display: 'flex', flexDirection: 'column', gap: '0.6rem'
         }}>
-          <div style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+          <div style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-primary)' }}>
             📍 Chọn điểm xuất phát
           </div>
 
@@ -666,7 +666,7 @@ export default function RouteOptimizerPanel({
 
           {/* Error inside picker */}
           {errorMsg && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.72rem', color: 'var(--danger)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.77rem', color: 'var(--danger)' }}>
               <AlertCircle size={13} />
               {errorMsg}
             </div>
@@ -680,7 +680,7 @@ export default function RouteOptimizerPanel({
               style={{
                 flex: 1, padding: '0.55rem', borderRadius: 'var(--radius-sm)',
                 border: '1px solid var(--border-glass)', background: 'transparent',
-                color: 'var(--text-secondary)', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer'
+                color: 'var(--text-secondary)', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer'
               }}
             >
               Hủy
@@ -710,7 +710,7 @@ export default function RouteOptimizerPanel({
       {status === 'error' && errorMsg && (
         <div style={{
           display: 'flex', alignItems: 'flex-start', gap: '0.5rem',
-          padding: '0.7rem 0.85rem', fontSize: '0.75rem', color: 'var(--danger)',
+          padding: '0.7rem 0.85rem', fontSize: '0.8rem', color: 'var(--danger)',
           backgroundColor: 'rgba(220,38,38,0.06)'
         }}>
           <AlertCircle size={14} style={{ marginTop: '0.05rem', flexShrink: 0 }} />
@@ -738,7 +738,7 @@ export default function RouteOptimizerPanel({
               }}>
                 <Icon size={14} style={{ color: 'var(--primary)', marginBottom: '0.2rem' }} />
                 <div style={{ fontSize: '0.82rem', fontWeight: 800, color: 'var(--text-primary)' }}>{value}</div>
-                <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>{label}</div>
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{label}</div>
               </div>
             ))}
           </div>
@@ -751,7 +751,7 @@ export default function RouteOptimizerPanel({
               backgroundColor: 'rgba(22,163,74,0.08)', border: '1px solid rgba(22,163,74,0.2)'
             }}>
               <Locate size={13} style={{ color: 'var(--success)', flexShrink: 0 }} />
-              <span style={{ fontSize: '0.7rem', color: 'var(--success)', fontWeight: 700 }}>
+              <span style={{ fontSize: '0.75rem', color: 'var(--success)', fontWeight: 700 }}>
                 Điểm xuất phát: Vị trí GPS hiện tại của bạn
               </span>
             </div>
@@ -762,7 +762,7 @@ export default function RouteOptimizerPanel({
               backgroundColor: 'rgba(37,99,235,0.06)', border: '1px solid rgba(37,99,235,0.15)'
             }}>
               <span style={{ fontSize: '11px' }}>🏭</span>
-              <span style={{ fontSize: '0.7rem', color: 'var(--primary)', fontWeight: 700 }}>
+              <span style={{ fontSize: '0.75rem', color: 'var(--primary)', fontWeight: 700 }}>
                 Điểm xuất phát: {result.warehouse.name}
                 {gpsStatus === 'denied' && <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}> (GPS bị từ chối)</span>}
               </span>
@@ -779,7 +779,7 @@ export default function RouteOptimizerPanel({
                   : <span style={{ fontSize: '9px', fontWeight: 900, color: '#fff' }}>KHO</span>
                 }
               </div>
-              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: typeof gpsStatus === 'object' ? 'var(--success)' : 'var(--primary)' }}>
+              <span style={{ fontSize: '0.77rem', fontWeight: 700, color: typeof gpsStatus === 'object' ? 'var(--success)' : 'var(--primary)' }}>
                 Xuất phát: {result.warehouse.name}
               </span>
             </div>
@@ -789,7 +789,7 @@ export default function RouteOptimizerPanel({
                 {/* Connector line with duration */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.2rem 0.55rem' }}>
                   <div style={{ width: 2, height: 16, backgroundColor: SEQ_COLORS[idx % SEQ_COLORS.length], borderRadius: 2, marginLeft: '0.55rem', opacity: 0.4 }} />
-                  <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+                  <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600 }}>
                     ~{stop.durationFromPrevMinutes} phút · {stop.distanceFromPrevKm} km
                   </span>
                 </div>
@@ -810,7 +810,7 @@ export default function RouteOptimizerPanel({
                     width: 26, height: 26, borderRadius: '50%', flexShrink: 0,
                     background: SEQ_COLORS[idx % SEQ_COLORS.length],
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: '0.72rem', fontWeight: 900, color: '#fff',
+                    fontSize: '0.77rem', fontWeight: 900, color: '#fff',
                     boxShadow: `0 2px 6px ${SEQ_COLORS[idx % SEQ_COLORS.length]}55`,
                     marginLeft: '0.2rem'
                   }}>
@@ -822,23 +822,23 @@ export default function RouteOptimizerPanel({
                       <span style={{ fontSize: '0.78rem', fontWeight: 800, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {stop.customerName}
                       </span>
-                      <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', flexShrink: 0 }}>
                         ETA {formatEta(stop.estimatedArrival)}
                       </span>
                     </div>
-                    <div style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', marginTop: '0.1rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <div style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', marginTop: '0.1rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       <MapPin size={10} style={{ display: 'inline', marginRight: '0.2rem' }} />
                       {stop.shippingAddress}
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', marginTop: '0.25rem', flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: '0.7rem', fontWeight: 700, color: stop.paymentMethod === 'COD' ? '#ea580c' : 'var(--success)' }}>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 700, color: stop.paymentMethod === 'COD' ? '#ea580c' : 'var(--success)' }}>
                         {stop.paymentMethod === 'COD' ? `💵 COD ${formatCurrency(stop.totalAmount)}` : `✅ Đã TT`}
                       </span>
-                      <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>#{stop.orderId}</span>
+                      <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>#{stop.orderId}</span>
                       {isOrderRedelivery(stop) && (
                         <span style={{
                           display: 'inline-flex', alignItems: 'center', gap: '2px',
-                          padding: '1px 5px', borderRadius: '3px', fontSize: '0.62rem', fontWeight: 800,
+                          padding: '1px 5px', borderRadius: '3px', fontSize: '0.7rem', fontWeight: 800,
                           backgroundColor: 'rgba(234, 88, 12, 0.12)', color: '#ea580c', border: '1px solid rgba(234, 88, 12, 0.25)'
                         }}>
                           <RotateCcw size={9} /> Giao lại
@@ -847,7 +847,7 @@ export default function RouteOptimizerPanel({
                       {stop.appointmentAdherence && (
                         <span style={{
                           display: 'inline-flex', alignItems: 'center', gap: '3px',
-                          padding: '1px 5px', borderRadius: '3px', fontSize: '0.62rem', fontWeight: 800,
+                          padding: '1px 5px', borderRadius: '3px', fontSize: '0.7rem', fontWeight: 800,
                           backgroundColor: stop.appointmentAdherence.status === 'LATE' ? 'rgba(220,38,38,0.12)' : (stop.appointmentAdherence.status === 'ON_TIME' ? 'rgba(22,163,74,0.12)' : 'rgba(124,58,237,0.12)'),
                           color: stop.appointmentAdherence.color,
                           border: `1px solid ${stop.appointmentAdherence.color}40`
@@ -865,7 +865,7 @@ export default function RouteOptimizerPanel({
                           }}
                           style={{
                             padding: '1px 6px', borderRadius: '3px',
-                            fontSize: '0.62rem', fontWeight: 800, cursor: 'pointer',
+                            fontSize: '0.7rem', fontWeight: 800, cursor: 'pointer',
                             backgroundColor: 'rgba(37,99,235,0.08)', color: 'var(--primary)',
                             border: '1px solid rgba(37,99,235,0.25)', display: 'inline-flex', alignItems: 'center', gap: '2px'
                           }}
@@ -883,15 +883,15 @@ export default function RouteOptimizerPanel({
             {/* Kết thúc — quay về kho */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.2rem 0.55rem' }}>
               <div style={{ width: 2, height: 16, backgroundColor: '#6b7280', borderRadius: 2, marginLeft: '0.55rem', opacity: 0.3 }} />
-              <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 600 }}>Kết thúc ca giao</span>
+              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600 }}>Kết thúc ca giao</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.4rem 0.55rem', backgroundColor: 'rgba(22,163,74,0.08)', borderRadius: 'var(--radius-sm)' }}>
               <CheckCircle2 size={16} style={{ color: 'var(--success)', flexShrink: 0 }} />
               <div>
-                <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--success)' }}>
+                <div style={{ fontSize: '0.77rem', fontWeight: 700, color: 'var(--success)' }}>
                   Dự kiến hoàn thành: {formatEta(result.summary.estimatedFinish)}
                 </div>
-                <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
                   Tổng ~{result.summary.totalDistanceKm} km · ~{formatMinutes(result.summary.totalDurationMinutes)}
                 </div>
               </div>
@@ -905,7 +905,7 @@ export default function RouteOptimizerPanel({
             style={{
               width: '100%', padding: '0.4rem', borderRadius: 'var(--radius-sm)',
               border: '1px solid var(--border-glass)', background: 'var(--bg-tertiary)',
-              color: 'var(--text-secondary)', fontSize: '0.72rem', fontWeight: 600, cursor: 'pointer',
+              color: 'var(--text-secondary)', fontSize: '0.77rem', fontWeight: 600, cursor: 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem'
             }}
           >

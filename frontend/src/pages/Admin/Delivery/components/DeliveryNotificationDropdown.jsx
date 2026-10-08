@@ -97,7 +97,7 @@ export default function DeliveryNotificationDropdown({
           backgroundColor: '#ffffff',
           borderRadius: '16px',
           boxShadow: '0 18px 45px rgba(0, 0, 0, 0.22), 0 4px 14px rgba(0, 0, 0, 0.08)',
-          border: '1px solid #cbd5e1',
+          border: '1px solid #e3e8ef',
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
@@ -114,8 +114,8 @@ export default function DeliveryNotificationDropdown({
           width: '12px',
           height: '12px',
           backgroundColor: '#ffffff',
-          borderLeft: '1px solid #cbd5e1',
-          borderTop: '1px solid #cbd5e1',
+          borderLeft: '1px solid #e3e8ef',
+          borderTop: '1px solid #e3e8ef',
           transform: 'rotate(45deg)',
           zIndex: 12
         }} />
@@ -148,7 +148,7 @@ export default function DeliveryNotificationDropdown({
               </span>
               {unreadCount > 0 && (
                 <span style={{
-                  fontSize: '0.68rem', fontWeight: 800, color: '#ffffff',
+                  fontSize: '0.74rem', fontWeight: 800, color: '#ffffff',
                   backgroundColor: '#ef4444',
                   padding: '0.12rem 0.45rem', borderRadius: '999px',
                   whiteSpace: 'nowrap',
@@ -170,10 +170,10 @@ export default function DeliveryNotificationDropdown({
                 style={{
                   display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
                   padding: '0.35rem 0.65rem', borderRadius: '8px',
-                  border: '1px solid #cbd5e1',
+                  border: '1px solid #e3e8ef',
                   backgroundColor: '#f8fafc',
                   color: '#2563eb',
-                  fontSize: '0.74rem', fontWeight: 700, cursor: 'pointer',
+                  fontSize: '0.79rem', fontWeight: 700, cursor: 'pointer',
                   whiteSpace: 'nowrap', lineHeight: 1,
                   transition: 'background-color 0.15s'
                 }}
@@ -233,10 +233,10 @@ export default function DeliveryNotificationDropdown({
                   height: '28px',
                   padding: '0 0.7rem',
                   borderRadius: '999px',
-                  border: isSelected ? '1px solid #2563eb' : '1px solid #cbd5e1',
+                  border: isSelected ? '1px solid #2563eb' : '1px solid #e3e8ef',
                   backgroundColor: isSelected ? '#2563eb' : '#ffffff',
                   color: isSelected ? '#ffffff' : '#334155',
-                  fontSize: '0.74rem',
+                  fontSize: '0.79rem',
                   fontWeight: isSelected ? 800 : 600,
                   cursor: 'pointer',
                   whiteSpace: 'nowrap',
@@ -259,7 +259,7 @@ export default function DeliveryNotificationDropdown({
                     height: '18px',
                     padding: '0 4px',
                     borderRadius: '999px',
-                    fontSize: '0.64rem',
+                    fontSize: '0.72rem',
                     fontWeight: 800,
                     lineHeight: 1,
                     backgroundColor: isSelected ? 'rgba(255, 255, 255, 0.28)' : 'rgba(100, 116, 139, 0.15)',
@@ -297,7 +297,7 @@ export default function DeliveryNotificationDropdown({
               <strong style={{ fontSize: '0.9rem', color: '#0f172a' }}>
                 Không có thông báo nào
               </strong>
-              <p style={{ margin: 0, fontSize: '0.76rem', color: '#64748b', maxWidth: '240px', lineHeight: 1.4 }}>
+              <p style={{ margin: 0, fontSize: '0.8rem', color: '#64748b', maxWidth: '240px', lineHeight: 1.4 }}>
                 {activeTab === 'UNREAD'
                   ? 'Bạn đã đọc hết tất cả thông báo rồi!'
                   : 'Hệ thống sẽ tự động nhắc khi có đơn hẹn hoặc đơn mới.'}
@@ -353,14 +353,14 @@ export default function DeliveryNotificationDropdown({
                   <div style={{ flex: 1, minWidth: 0, paddingRight: notif.isRead ? 0 : '10px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.2rem' }}>
                       <span style={{
-                        fontSize: '0.64rem', fontWeight: 800,
+                        fontSize: '0.72rem', fontWeight: 800,
                         padding: '0.1rem 0.4rem', borderRadius: '4px',
                         backgroundColor: badge.bg, color: badge.text,
                         lineHeight: 1.2
                       }}>
                         {badge.label}
                       </span>
-                      <span style={{ fontSize: '0.68rem', color: '#64748b' }}>
+                      <span style={{ fontSize: '0.74rem', color: '#64748b' }}>
                         {notif.timeLabel || 'Hôm nay'}
                       </span>
                     </div>
@@ -374,7 +374,7 @@ export default function DeliveryNotificationDropdown({
                     </strong>
 
                     <p style={{
-                      margin: 0, fontSize: '0.75rem',
+                      margin: 0, fontSize: '0.8rem',
                       color: '#475569',
                       lineHeight: 1.45
                     }}>
@@ -384,7 +384,7 @@ export default function DeliveryNotificationDropdown({
                     <div style={{
                       marginTop: '0.4rem',
                       display: 'flex', alignItems: 'center', gap: '0.2rem',
-                      fontSize: '0.74rem', fontWeight: 700,
+                      fontSize: '0.79rem', fontWeight: 700,
                       color: isUrgent ? '#dc2626' : '#2563eb'
                     }}>
                       <span>{notif.actionText || 'Xem đơn hàng'}</span>
@@ -403,7 +403,7 @@ export default function DeliveryNotificationDropdown({
           backgroundColor: '#f8fafc',
           borderTop: '1px solid #e2e8f0',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          fontSize: '0.72rem', color: '#64748b'
+          fontSize: '0.77rem', color: '#64748b'
         }}>
           <span>Nhắc giờ hẹn & phân công</span>
           <button
@@ -412,7 +412,7 @@ export default function DeliveryNotificationDropdown({
             style={{
               padding: '0.35rem 0.85rem', borderRadius: '7px',
               border: 'none', backgroundColor: '#2563eb',
-              color: '#ffffff', fontSize: '0.74rem', fontWeight: 700, cursor: 'pointer',
+              color: '#ffffff', fontSize: '0.79rem', fontWeight: 700, cursor: 'pointer',
               lineHeight: 1,
               transition: 'background-color 0.15s'
             }}

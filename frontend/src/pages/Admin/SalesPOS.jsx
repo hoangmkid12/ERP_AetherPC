@@ -582,7 +582,8 @@ export default function SalesPOS() {
         const term = orderSearch.toLowerCase().trim();
         const matchSearch = !term || cust.includes(term) || phone.includes(term) || id.includes(term);
 
-        const matchStatus = orderStatusFilter === 'ALL' || o.status === orderStatusFilter;
+        const matchStatus = orderStatusFilter === 'ALL'
+          || (orderStatusFilter === 'NEED_ACTION' ? ['PENDING', 'WAITING_PAYMENT'].includes(o.status) : o.status === orderStatusFilter);
         const matchDate = isDateInRange(o.date || o.createdAt, orderStartDate, orderEndDate);
         return matchSearch && matchStatus && matchDate;
       })
@@ -667,7 +668,7 @@ export default function SalesPOS() {
   };
 
   return (
-    <div style={{ backgroundColor: '#f8fafc', minHeight: '100vh', padding: '1.5rem 2rem', maxWidth: '1400px', margin: '0 auto', fontFamily: 'Inter, sans-serif' }}>
+    <div style={{ backgroundColor: '#f8fafc', minHeight: '100vh', padding: '1.5rem 2rem', maxWidth: '1400px', margin: '0 auto', fontFamily: 'inherit' }}>
       
       {/* ========================================================================= */}
       {/* 1. TOP HEADER & SALES TASK CENTER BANNER */}
@@ -692,7 +693,7 @@ export default function SalesPOS() {
       {/* Sales Task Center Banner (Identical styling to Purchasing and Warehouse) */}
       <div style={{
         backgroundColor: '#ffffff',
-        border: '1px solid #cbd5e1',
+        border: '1px solid #e3e8ef',
         borderRadius: '8px',
         padding: '1rem 1.25rem',
         marginBottom: '0.85rem',
@@ -726,7 +727,7 @@ export default function SalesPOS() {
                   backgroundColor: '#fef3c7',
                   color: '#b45309',
                   border: '1px solid #fde68a',
-                  fontSize: '0.72rem',
+                  fontSize: '0.77rem',
                   fontWeight: 700,
                   padding: '2px 8px',
                   borderRadius: '12px'
@@ -766,7 +767,7 @@ export default function SalesPOS() {
 
           <button
             onClick={() => {
-              setOrderStatusFilter('ALL');
+              setOrderStatusFilter('NEED_ACTION'); // đúng nhóm đơn được đếm trên nút
               setTab('orders');
             }}
             style={{
@@ -795,39 +796,39 @@ export default function SalesPOS() {
       {activeTab === 'overview' && (
         <div>
           {/* 6 Odoo KPI Cards */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(175px, 1fr))', gap: '0.85rem', marginBottom: '1.25rem' }}>
-            <div style={{ backgroundColor: '#ffffff', padding: '0.85rem 0.65rem', borderRadius: '8px', border: '1px solid #cbd5e1', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '85px' }}>
-              <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#16a34a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.85rem', marginBottom: '1.25rem' }}>
+            <div style={{ backgroundColor: '#ffffff', padding: '1rem 0.75rem', borderRadius: '10px', border: '1px solid #e3e8ef', boxShadow: '0 1px 2px rgba(15,23,42,0.04)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '92px' }}>
+              <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#16a34a', whiteSpace: 'nowrap', letterSpacing: '-0.01em' }}>
                 {formatCurrency(totalRevenue)}
               </div>
-              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', marginTop: '0.25rem' }}>Tổng Doanh Thu</div>
+              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', marginTop: '0.25rem' }}>Tổng Doanh Thu</div>
             </div>
 
-            <div style={{ backgroundColor: '#fffbeb', padding: '0.85rem 0.65rem', borderRadius: '8px', border: '1px solid #fde68a', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '85px' }}>
+            <div style={{ backgroundColor: '#ffffff', padding: '1rem 0.75rem', borderRadius: '10px', border: '1px solid #e3e8ef', boxShadow: '0 1px 2px rgba(15,23,42,0.04)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '92px' }}>
               <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#d97706' }}>{pendingConfirmationCount}</div>
-              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#b45309', marginTop: '0.25rem' }}>Đơn Chờ Xác Nhận</div>
+              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', marginTop: '0.25rem' }}>Đơn Chờ Xác Nhận</div>
             </div>
 
-            <div style={{ backgroundColor: '#eff6ff', padding: '0.85rem 0.65rem', borderRadius: '8px', border: '1px solid #bfdbfe', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '85px' }}>
+            <div style={{ backgroundColor: '#ffffff', padding: '1rem 0.75rem', borderRadius: '10px', border: '1px solid #e3e8ef', boxShadow: '0 1px 2px rgba(15,23,42,0.04)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '92px' }}>
               <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#2563eb' }}>{pendingDeliveryCount}</div>
-              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#2563eb', marginTop: '0.25rem' }}>Đơn Đang Giao / Đóng Gói</div>
+              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', marginTop: '0.25rem' }}>Đơn Đang Giao / Đóng Gói</div>
             </div>
 
-            <div style={{ backgroundColor: '#f0fdf4', padding: '0.85rem 0.65rem', borderRadius: '8px', border: '1px solid #bbf7d0', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '85px' }}>
+            <div style={{ backgroundColor: '#ffffff', padding: '1rem 0.75rem', borderRadius: '10px', border: '1px solid #e3e8ef', boxShadow: '0 1px 2px rgba(15,23,42,0.04)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '92px' }}>
               <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#15803d' }}>{completedCount}</div>
-              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#15803d', marginTop: '0.25rem' }}>Đơn Giao Hoàn Tất</div>
+              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', marginTop: '0.25rem' }}>Đơn Giao Hoàn Tất</div>
             </div>
 
-            <div style={{ backgroundColor: '#ffffff', padding: '0.85rem 0.65rem', borderRadius: '8px', border: '1px solid #cbd5e1', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '85px' }}>
-              <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            <div style={{ backgroundColor: '#ffffff', padding: '1rem 0.75rem', borderRadius: '10px', border: '1px solid #e3e8ef', boxShadow: '0 1px 2px rgba(15,23,42,0.04)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '92px' }}>
+              <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0f172a', whiteSpace: 'nowrap', letterSpacing: '-0.01em' }}>
                 {formatCurrency(averageOrderValue)}
               </div>
-              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', marginTop: '0.25rem' }}>Giá Trị Đơn Trung Bình</div>
+              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', marginTop: '0.25rem' }}>Giá Trị Đơn Trung Bình</div>
             </div>
 
-            <div style={{ backgroundColor: '#ffffff', padding: '0.85rem 0.65rem', borderRadius: '8px', border: '1px solid #cbd5e1', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '85px' }}>
+            <div style={{ backgroundColor: '#ffffff', padding: '1rem 0.75rem', borderRadius: '10px', border: '1px solid #e3e8ef', boxShadow: '0 1px 2px rgba(15,23,42,0.04)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '92px' }}>
               <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#8b5cf6' }}>{derivedCustomers.length}</div>
-              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', marginTop: '0.25rem' }}>Khách Hàng Đã Mua</div>
+              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', marginTop: '0.25rem' }}>Khách Hàng Đã Mua</div>
             </div>
           </div>
 
@@ -835,7 +836,7 @@ export default function SalesPOS() {
           <div className="two-col-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
             
             {/* Recent Orders Box */}
-            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem' }}>
+            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1.25rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                 <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
                   Đơn Hàng Gần Đây Cần Xử Lý
@@ -858,11 +859,11 @@ export default function SalesPOS() {
                           <strong style={{ fontSize: '0.85rem', color: '#2563eb' }}>#{o.orderId || o.id}</strong>
                           <span style={{ fontSize: '0.8rem', color: '#0f172a', fontWeight: 600 }}>— {o.customerName || o.customer || 'Khách vãng lai'}</span>
                         </div>
-                        <span style={{ fontSize: '0.72rem', color: '#64748b' }}>{formatDate(o.date || o.createdAt)} | {o.phone || 'SĐT chưa có'}</span>
+                        <span style={{ fontSize: '0.77rem', color: '#64748b' }}>{formatDate(o.date || o.createdAt)} | {o.phone || 'SĐT chưa có'}</span>
                       </div>
                       <div style={{ textAlign: 'right' }}>
                         <div style={{ fontSize: '0.88rem', fontWeight: 800, color: '#16a34a' }}>{formatCurrency(o.totalAmount || o.total)}</div>
-                        <span style={{ fontSize: '0.68rem', fontWeight: 700, padding: '1px 6px', borderRadius: '4px', backgroundColor: badge.bg, color: badge.color, border: `1px solid ${badge.border}` }}>
+                        <span style={{ fontSize: '0.74rem', fontWeight: 700, padding: '1px 6px', borderRadius: '4px', backgroundColor: badge.bg, color: badge.color, border: `1px solid ${badge.border}` }}>
                           {badge.text}
                         </span>
                       </div>
@@ -873,7 +874,7 @@ export default function SalesPOS() {
             </div>
 
             {/* Quick POS Launch Box */}
-            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1.25rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
               <div>
                 <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', margin: '0 0 0.5rem' }}>
                   Quầy Bán Hàng Nhanh
@@ -886,7 +887,7 @@ export default function SalesPOS() {
                     <ShieldCheck size={16} />
                     <span>Hệ Thống Đồng Bộ Kho Tự Động</span>
                   </div>
-                  <p style={{ fontSize: '0.75rem', color: '#3b82f6', margin: '0.25rem 0 0' }}>
+                  <p style={{ fontSize: '0.8rem', color: '#3b82f6', margin: '0.25rem 0 0' }}>
                     Mỗi đơn hàng POS sau khi thanh toán sẽ lập tức trừ tồn kho thực tế trong phân hệ Quản Lý Kho.
                   </p>
                 </div>
@@ -924,7 +925,7 @@ export default function SalesPOS() {
       {/* TAB 2: POS (ĐIỂM BÁN HÀNG TẠI QUẦY) */}
       {/* ========================================================================= */}
       {activeTab === 'pos' && !canPosCheckout && (
-        <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '3.5rem 2rem', textAlign: 'center' }}>
+        <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '3.5rem 2rem', textAlign: 'center' }}>
           <div style={{ width: '56px', height: '56px', borderRadius: '50%', backgroundColor: '#fef2f2', color: '#dc2626', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.25rem' }}>
             <Lock size={28} />
           </div>
@@ -947,7 +948,7 @@ export default function SalesPOS() {
         <div className="pos-layout-grid" style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '1.25rem', alignItems: 'start' }}>
           
           {/* Left Column: Products Catalog */}
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem' }}>
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1.25rem' }}>
             
             {/* Filter toolbar */}
             <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '0.75rem', marginBottom: '1rem' }}>
@@ -956,13 +957,13 @@ export default function SalesPOS() {
                 placeholder="Tìm linh kiện theo tên, SKU..."
                 value={posSearch}
                 onChange={(e) => { setPosSearch(e.target.value); setPosPage(1); }}
-                style={{ width: '100%', height: '38px', padding: '0 0.85rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px', boxSizing: 'border-box' }}
+                style={{ width: '100%', height: '38px', padding: '0 0.85rem', fontSize: '0.83rem', border: '1px solid #e3e8ef', borderRadius: '6px', boxSizing: 'border-box' }}
               />
 
               <select
                 value={posCategoryFilter}
                 onChange={(e) => { setPosCategoryFilter(e.target.value); setPosPage(1); }}
-                style={{ width: '100%', height: '38px', padding: '0 0.65rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px', color: '#0f172a', boxSizing: 'border-box', backgroundColor: '#ffffff', cursor: 'pointer' }}
+                style={{ width: '100%', height: '38px', padding: '0 0.65rem', fontSize: '0.83rem', border: '1px solid #e3e8ef', borderRadius: '6px', color: '#0f172a', boxSizing: 'border-box', backgroundColor: '#ffffff', cursor: 'pointer' }}
               >
                 <option value="ALL">Tất cả phân nhóm</option>
                 <option value="CPU">CPU</option>
@@ -1001,13 +1002,13 @@ export default function SalesPOS() {
                     }}
                   >
                     <div>
-                      <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#2563eb', backgroundColor: '#eff6ff', padding: '1px 5px', borderRadius: '3px' }}>
+                      <span style={{ fontSize: '0.74rem', fontWeight: 600, color: '#2563eb', backgroundColor: '#eff6ff', padding: '1px 5px', borderRadius: '3px' }}>
                         {prod.category || getCategoryUpper(prod)}
                       </span>
                       <h4 style={{ fontSize: '0.82rem', fontWeight: 700, color: '#0f172a', margin: '0.35rem 0', lineHeight: 1.3, height: '2.4em', overflow: 'hidden' }}>
                         {prod.name}
                       </h4>
-                      {prod.sku && <span style={{ fontSize: '0.68rem', color: '#64748b', display: 'block' }}>SKU: {prod.sku}</span>}
+                      {prod.sku && <span style={{ fontSize: '0.74rem', color: '#64748b', display: 'block' }}>SKU: {prod.sku}</span>}
                     </div>
 
                     <div style={{ marginTop: '0.75rem', borderTop: '1px solid #f1f5f9', paddingTop: '0.5rem' }}>
@@ -1015,7 +1016,7 @@ export default function SalesPOS() {
                         <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#16a34a' }}>
                           {formatCurrency(prod.price)}
                         </span>
-                        <span style={{ fontSize: '0.7rem', fontWeight: 700, color: isOutOfStock ? '#ef4444' : '#64748b' }}>
+                        <span style={{ fontSize: '0.75rem', fontWeight: 700, color: isOutOfStock ? '#ef4444' : '#64748b' }}>
                           Tồn: {stockQty}
                         </span>
                       </div>
@@ -1030,7 +1031,7 @@ export default function SalesPOS() {
                           border: 'none',
                           borderRadius: '4px',
                           padding: '0.4rem',
-                          fontSize: '0.75rem',
+                          fontSize: '0.8rem',
                           fontWeight: 700,
                           cursor: isOutOfStock ? 'not-allowed' : 'pointer'
                         }}
@@ -1053,7 +1054,7 @@ export default function SalesPOS() {
                   <button
                     disabled={posPage <= 1}
                     onClick={() => setPosPage(p => Math.max(p - 1, 1))}
-                    style={{ padding: '0.25rem 0.5rem', backgroundColor: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: posPage <= 1 ? 'not-allowed' : 'pointer' }}
+                    style={{ padding: '0.25rem 0.5rem', backgroundColor: '#ffffff', border: '1px solid #e3e8ef', borderRadius: '4px', cursor: posPage <= 1 ? 'not-allowed' : 'pointer' }}
                   >
                     <ChevronLeft size={14} />
                   </button>
@@ -1061,7 +1062,7 @@ export default function SalesPOS() {
                   <button
                     disabled={posPage >= totalPosPages}
                     onClick={() => setPosPage(p => Math.min(p + 1, totalPosPages))}
-                    style={{ padding: '0.25rem 0.5rem', backgroundColor: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: posPage >= totalPosPages ? 'not-allowed' : 'pointer' }}
+                    style={{ padding: '0.25rem 0.5rem', backgroundColor: '#ffffff', border: '1px solid #e3e8ef', borderRadius: '4px', cursor: posPage >= totalPosPages ? 'not-allowed' : 'pointer' }}
                   >
                     <ChevronRight size={14} />
                   </button>
@@ -1071,7 +1072,7 @@ export default function SalesPOS() {
           </div>
 
           {/* Right Column: POS Cart & Checkout */}
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem' }}>
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1.25rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.75rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <ShoppingCart size={18} style={{ color: '#2563eb' }} />
@@ -1082,7 +1083,7 @@ export default function SalesPOS() {
               {posCart.length > 0 && (
                 <button
                   onClick={() => setPosCart([])}
-                  style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer' }}
+                  style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}
                 >
                   Xóa giỏ
                 </button>
@@ -1100,20 +1101,20 @@ export default function SalesPOS() {
                   <div key={item.product.productId || item.product.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.5rem', backgroundColor: '#f8fafc', borderRadius: '6px', border: '1px solid #f1f5f9' }}>
                     <div style={{ flex: 1, paddingRight: '0.5rem' }}>
                       <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#0f172a', lineHeight: 1.3 }}>{item.product.name}</div>
-                      <span style={{ fontSize: '0.72rem', color: '#16a34a', fontWeight: 700 }}>{formatCurrency(item.unitPrice)}</span>
+                      <span style={{ fontSize: '0.77rem', color: '#16a34a', fontWeight: 700 }}>{formatCurrency(item.unitPrice)}</span>
                     </div>
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                       <button
                         onClick={() => handleUpdateCartQty(item.product.productId || item.product.id, -1)}
-                        style={{ width: '24px', height: '24px', borderRadius: '4px', border: '1px solid #cbd5e1', backgroundColor: '#ffffff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                        style={{ width: '24px', height: '24px', borderRadius: '4px', border: '1px solid #e3e8ef', backgroundColor: '#ffffff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                       >
                         <Minus size={12} />
                       </button>
                       <span style={{ fontSize: '0.82rem', fontWeight: 800, minWidth: '20px', textAlign: 'center' }}>{item.quantity}</span>
                       <button
                         onClick={() => handleUpdateCartQty(item.product.productId || item.product.id, 1)}
-                        style={{ width: '24px', height: '24px', borderRadius: '4px', border: '1px solid #cbd5e1', backgroundColor: '#ffffff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                        style={{ width: '24px', height: '24px', borderRadius: '4px', border: '1px solid #e3e8ef', backgroundColor: '#ffffff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                       >
                         <Plus size={12} />
                       </button>
@@ -1132,34 +1133,34 @@ export default function SalesPOS() {
             {/* Customer Inputs */}
             <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '0.85rem', marginBottom: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               <div>
-                <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '0.2rem' }}>Tên Khách Hàng:</label>
+                <label style={{ fontSize: '0.8rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '0.2rem' }}>Tên Khách Hàng:</label>
                 <input
                   type="text"
                   placeholder="Khách vãng lai / Tên khách..."
                   value={posCustomerName}
                   onChange={(e) => setPosCustomerName(e.target.value)}
-                  style={{ width: '100%', height: '34px', padding: '0 0.65rem', fontSize: '0.8rem', border: '1px solid #cbd5e1', borderRadius: '4px', boxSizing: 'border-box' }}
+                  style={{ width: '100%', height: '34px', padding: '0 0.65rem', fontSize: '0.8rem', border: '1px solid #e3e8ef', borderRadius: '4px', boxSizing: 'border-box' }}
                 />
               </div>
 
               <div>
-                <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '0.2rem' }}>Số Điện Thoại:</label>
+                <label style={{ fontSize: '0.8rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '0.2rem' }}>Số Điện Thoại:</label>
                 <input
                   type="text"
                   placeholder="Số điện thoại liên hệ..."
                   value={posCustomerPhone}
                   onChange={(e) => setPosCustomerPhone(e.target.value)}
-                  style={{ width: '100%', height: '34px', padding: '0 0.65rem', fontSize: '0.8rem', border: '1px solid #cbd5e1', borderRadius: '4px', boxSizing: 'border-box' }}
+                  style={{ width: '100%', height: '34px', padding: '0 0.65rem', fontSize: '0.8rem', border: '1px solid #e3e8ef', borderRadius: '4px', boxSizing: 'border-box' }}
                 />
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
                 <div>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '0.2rem' }}>Phương thức:</label>
+                  <label style={{ fontSize: '0.8rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '0.2rem' }}>Phương thức:</label>
                   <select
                     value={posPaymentMethod}
                     onChange={(e) => setPosPaymentMethod(e.target.value)}
-                    style={{ width: '100%', height: '34px', padding: '0 0.5rem', fontSize: '0.78rem', border: '1px solid #cbd5e1', borderRadius: '4px', boxSizing: 'border-box', backgroundColor: '#ffffff' }}
+                    style={{ width: '100%', height: '34px', padding: '0 0.5rem', fontSize: '0.78rem', border: '1px solid #e3e8ef', borderRadius: '4px', boxSizing: 'border-box', backgroundColor: '#ffffff' }}
                   >
                     <option value="CASH">Tiền mặt</option>
                     <option value="BANK">Chuyển khoản QR</option>
@@ -1168,7 +1169,7 @@ export default function SalesPOS() {
                 </div>
 
                 <div>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '0.2rem' }}>Chiết khấu (%):</label>
+                  <label style={{ fontSize: '0.8rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '0.2rem' }}>Chiết khấu (%):</label>
                   <input
                     type="number"
                     min="0"
@@ -1183,7 +1184,7 @@ export default function SalesPOS() {
                       }
                       setPosDiscountPercent(Math.min(num, 50));
                     }}
-                    style={{ width: '100%', height: '34px', padding: '0 0.5rem', fontSize: '0.78rem', border: '1px solid #cbd5e1', borderRadius: '4px', boxSizing: 'border-box' }}
+                    style={{ width: '100%', height: '34px', padding: '0 0.5rem', fontSize: '0.78rem', border: '1px solid #e3e8ef', borderRadius: '4px', boxSizing: 'border-box' }}
                   />
                 </div>
               </div>
@@ -1245,7 +1246,7 @@ export default function SalesPOS() {
             backgroundColor: '#ffffff',
             padding: '1rem',
             borderRadius: '8px',
-            border: '1px solid #cbd5e1',
+            border: '1px solid #e3e8ef',
             marginBottom: '1.25rem',
             display: 'flex',
             flexDirection: 'column',
@@ -1262,16 +1263,19 @@ export default function SalesPOS() {
                 placeholder="Tìm theo mã đơn, khách hàng, số điện thoại..."
                 value={orderSearch}
                 onChange={(e) => setOrderSearch(e.target.value)}
-                style={{ width: '100%', height: '38px', padding: '0 0.85rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px', boxSizing: 'border-box' }}
+                style={{ width: '100%', height: '38px', padding: '0 0.85rem', fontSize: '0.83rem', border: '1px solid #e3e8ef', borderRadius: '6px', boxSizing: 'border-box' }}
               />
 
               <select
                 value={orderStatusFilter}
                 onChange={(e) => setOrderStatusFilter(e.target.value)}
-                style={{ width: '100%', height: '38px', padding: '0 0.65rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px', color: '#0f172a', boxSizing: 'border-box', backgroundColor: '#ffffff', cursor: 'pointer' }}
+                style={{ width: '100%', height: '38px', padding: '0 0.65rem', fontSize: '0.83rem', border: '1px solid #e3e8ef', borderRadius: '6px', color: '#0f172a', boxSizing: 'border-box', backgroundColor: '#ffffff', cursor: 'pointer' }}
               >
                 <option value="ALL">Tất cả trạng thái ({orders.length})</option>
+                <option value="NEED_ACTION">Cần xử lý ({pendingConfirmationCount})</option>
                 <option value="PENDING">Chờ xác nhận</option>
+                <option value="WAITING_PAYMENT">Chờ thanh toán</option>
+                <option value="PROCESSING">Đang chuẩn bị hàng</option>
                 <option value="CONFIRMED">Đã xác nhận (Chờ xuất kho)</option>
                 <option value="READY_TO_SHIP">Đã đóng gói (Chờ giao)</option>
                 <option value="SHIPPED">Đang vận chuyển</option>
@@ -1293,7 +1297,7 @@ export default function SalesPOS() {
           </div>
 
           {/* Orders Table */}
-          <div className="table-responsive" style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', overflowX: 'auto' }}>
+          <div className="table-responsive" style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.83rem' }}>
               <thead>
                 <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569' }}>
@@ -1325,14 +1329,14 @@ export default function SalesPOS() {
                         </td>
                         <td style={{ padding: '0.75rem 1rem', color: '#0f172a' }}>
                           <div style={{ fontWeight: 700 }}>{o.customerName || o.customer || 'Khách vãng lai'}</div>
-                          <span style={{ fontSize: '0.72rem', color: '#64748b' }}>{o.phone || o.customerPhone || 'SĐT chưa có'}</span>
+                          <span style={{ fontSize: '0.77rem', color: '#64748b' }}>{o.phone || o.customerPhone || 'SĐT chưa có'}</span>
                         </td>
                         <td style={{ padding: '0.75rem 0.85rem', whiteSpace: 'nowrap' }}>
                           <span style={{
                             backgroundColor: isPosOrder ? '#eff6ff' : '#f0fdf4',
                             color: isPosOrder ? '#2563eb' : '#15803d',
                             border: `1px solid ${isPosOrder ? '#bfdbfe' : '#bbf7d0'}`,
-                            fontSize: '0.7rem',
+                            fontSize: '0.75rem',
                             fontWeight: 700,
                             padding: '2px 6px',
                             borderRadius: '4px'
@@ -1350,7 +1354,7 @@ export default function SalesPOS() {
                           <span style={{
                             display: 'inline-block',
                             padding: '0.2rem 0.65rem',
-                            fontSize: '0.72rem',
+                            fontSize: '0.77rem',
                             fontWeight: 700,
                             color: badge.color,
                             backgroundColor: badge.bg,
@@ -1364,7 +1368,7 @@ export default function SalesPOS() {
                           <div style={{ display: 'flex', gap: '0.35rem', justifyContent: 'center' }}>
                             <button
                               onClick={() => setSelectedDetailOrder(o)}
-                              style={{ backgroundColor: '#ffffff', color: '#2563eb', border: '1px solid #cbd5e1', borderRadius: '4px', padding: '0.3rem 0.6rem', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer' }}
+                              style={{ backgroundColor: '#ffffff', color: '#2563eb', border: '1px solid #e3e8ef', borderRadius: '4px', padding: '0.3rem 0.6rem', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}
                             >
                               Chi Tiết
                             </button>
@@ -1378,7 +1382,7 @@ export default function SalesPOS() {
                                   border: 'none',
                                   borderRadius: '4px',
                                   padding: '0.3rem 0.6rem',
-                                  fontSize: '0.75rem',
+                                  fontSize: '0.8rem',
                                   fontWeight: 700,
                                   cursor: updatingOrderId === (o.orderId || o.id) ? 'not-allowed' : 'pointer',
                                   display: 'flex', alignItems: 'center', gap: '0.3rem'
@@ -1396,7 +1400,7 @@ export default function SalesPOS() {
                               <button
                                 onClick={() => handleCancelOrder(o.orderId || o.id)}
                                 disabled={orderActionBusyId === (o.orderId || o.id)}
-                                style={{ backgroundColor: '#ffffff', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '4px', padding: '0.3rem 0.6rem', fontSize: '0.75rem', fontWeight: 700, cursor: orderActionBusyId === (o.orderId || o.id) ? 'not-allowed' : 'pointer', opacity: orderActionBusyId === (o.orderId || o.id) ? 0.6 : 1 }}
+                                style={{ backgroundColor: '#ffffff', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '4px', padding: '0.3rem 0.6rem', fontSize: '0.8rem', fontWeight: 700, cursor: orderActionBusyId === (o.orderId || o.id) ? 'not-allowed' : 'pointer', opacity: orderActionBusyId === (o.orderId || o.id) ? 0.6 : 1 }}
                               >
                                 {orderActionBusyId === (o.orderId || o.id) ? 'Đang hủy...' : 'Hủy Đơn'}
                               </button>
@@ -1446,7 +1450,7 @@ export default function SalesPOS() {
             backgroundColor: '#ffffff',
             padding: '0.85rem 1rem',
             borderRadius: '8px',
-            border: '1px solid #cbd5e1',
+            border: '1px solid #e3e8ef',
             marginBottom: '1.25rem',
             display: 'grid',
             gridTemplateColumns: 'minmax(220px, 2fr) minmax(160px, 1fr) minmax(160px, 1fr)',
@@ -1458,12 +1462,12 @@ export default function SalesPOS() {
               placeholder="Tìm theo tên, SĐT, email, tên đăng nhập..."
               value={customerSearch}
               onChange={(e) => { setCustomerPage(1); setCustomerSearch(e.target.value); }}
-              style={{ width: '100%', height: '38px', padding: '0 0.85rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px', boxSizing: 'border-box' }}
+              style={{ width: '100%', height: '38px', padding: '0 0.85rem', fontSize: '0.83rem', border: '1px solid #e3e8ef', borderRadius: '6px', boxSizing: 'border-box' }}
             />
             <select
               value={customerTierFilter}
               onChange={(e) => setCustomerTierFilter(e.target.value)}
-              style={{ width: '100%', height: '38px', padding: '0 0.65rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px', color: '#0f172a', boxSizing: 'border-box', backgroundColor: '#ffffff', cursor: 'pointer' }}
+              style={{ width: '100%', height: '38px', padding: '0 0.65rem', fontSize: '0.83rem', border: '1px solid #e3e8ef', borderRadius: '6px', color: '#0f172a', boxSizing: 'border-box', backgroundColor: '#ffffff', cursor: 'pointer' }}
             >
               <option value="ALL">Tất cả hạng thành viên</option>
               <option value="BRONZE">Hạng Đồng</option>
@@ -1474,7 +1478,7 @@ export default function SalesPOS() {
             <select
               value={customerStatusFilter}
               onChange={(e) => { setCustomerPage(1); setCustomerStatusFilter(e.target.value); }}
-              style={{ width: '100%', height: '38px', padding: '0 0.65rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px', color: '#0f172a', boxSizing: 'border-box', backgroundColor: '#ffffff', cursor: 'pointer' }}
+              style={{ width: '100%', height: '38px', padding: '0 0.65rem', fontSize: '0.83rem', border: '1px solid #e3e8ef', borderRadius: '6px', color: '#0f172a', boxSizing: 'border-box', backgroundColor: '#ffffff', cursor: 'pointer' }}
             >
               <option value="ALL">Tất cả trạng thái</option>
               <option value="ACTIVE">Đang hoạt động</option>
@@ -1487,7 +1491,7 @@ export default function SalesPOS() {
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.25rem' }}>
               {filteredCustomerAccounts.length === 0 ? (
-                <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '3rem', color: '#94a3b8', backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
+                <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '3rem', color: '#94a3b8', backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef' }}>
                   Không tìm thấy khách hàng nào phù hợp với bộ lọc.
                 </div>
               ) : filteredCustomerAccounts.map((cust) => {
@@ -1504,14 +1508,14 @@ export default function SalesPOS() {
                           </div>
                           <div>
                             <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: '#0f172a' }}>{cust.name}</h4>
-                            <span style={{ fontSize: '0.72rem', color: '#64748b' }}>Tham gia: {formatDate(cust.createdAt)}</span>
+                            <span style={{ fontSize: '0.77rem', color: '#64748b' }}>Tham gia: {formatDate(cust.createdAt)}</span>
                           </div>
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', alignItems: 'flex-end' }}>
-                          <span style={{ fontSize: '0.68rem', fontWeight: 800, padding: '2px 8px', borderRadius: '10px', backgroundColor: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe' }}>
+                          <span style={{ fontSize: '0.74rem', fontWeight: 800, padding: '2px 8px', borderRadius: '10px', backgroundColor: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe' }}>
                             {cust.tier ? getStatusLabel(CUSTOMER_TIER, cust.tier) : 'Khách Thường'}
                           </span>
-                          <span style={{ fontSize: '0.68rem', fontWeight: 800, padding: '2px 8px', borderRadius: '10px', backgroundColor: isInactive ? '#fef2f2' : '#f0fdf4', color: isInactive ? '#dc2626' : '#16a34a', border: `1px solid ${isInactive ? '#fecaca' : '#bbf7d0'}` }}>
+                          <span style={{ fontSize: '0.74rem', fontWeight: 800, padding: '2px 8px', borderRadius: '10px', backgroundColor: isInactive ? '#fef2f2' : '#f0fdf4', color: isInactive ? '#dc2626' : '#16a34a', border: `1px solid ${isInactive ? '#fecaca' : '#bbf7d0'}` }}>
                             {isInactive ? 'Đã vô hiệu hóa' : 'Đang hoạt động'}
                           </span>
                         </div>
@@ -1524,18 +1528,18 @@ export default function SalesPOS() {
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                           <MapPin size={13} style={{ color: '#64748b' }} /> {cust.address || cust.city || 'Chưa cập nhật'}
                         </div>
-                        <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{cust.email}</div>
+                        <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>{cust.email}</div>
                       </div>
                     </div>
 
                     <div>
                       <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '0.75rem', marginBottom: '0.85rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <div>
-                          <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block' }}>Giao dịch</span>
+                          <span style={{ fontSize: '0.77rem', color: '#64748b', display: 'block' }}>Giao dịch</span>
                           <strong style={{ fontSize: '0.85rem', color: '#0f172a' }}>{cust.orderCount} Đơn Hàng</strong>
                         </div>
                         <div style={{ textAlign: 'right' }}>
-                          <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block' }}>Tổng Tích Lũy</span>
+                          <span style={{ fontSize: '0.77rem', color: '#64748b', display: 'block' }}>Tổng Tích Lũy</span>
                           <strong style={{ fontSize: '0.85rem', color: '#16a34a' }}>{formatCurrency(cust.totalSpent)}</strong>
                         </div>
                       </div>
@@ -1557,21 +1561,21 @@ export default function SalesPOS() {
                           <button
                             disabled={isBusy}
                             onClick={() => openEditCustomerModal(cust)}
-                            style={{ backgroundColor: '#f8fafc', color: '#334155', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.4rem', fontSize: '0.75rem', fontWeight: 700, cursor: isBusy ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem' }}
+                            style={{ backgroundColor: '#f8fafc', color: '#334155', border: '1px solid #e3e8ef', borderRadius: '6px', padding: '0.4rem', fontSize: '0.8rem', fontWeight: 700, cursor: isBusy ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem' }}
                           >
                             <FileText size={13} /> Sửa
                           </button>
                           <button
                             disabled={isBusy}
                             onClick={() => handleToggleCustomerStatus(cust)}
-                            style={{ backgroundColor: isInactive ? '#f0fdf4' : '#fff7ed', color: isInactive ? '#16a34a' : '#c2410c', border: `1px solid ${isInactive ? '#bbf7d0' : '#fed7aa'}`, borderRadius: '6px', padding: '0.4rem', fontSize: '0.75rem', fontWeight: 700, cursor: isBusy ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem' }}
+                            style={{ backgroundColor: isInactive ? '#f0fdf4' : '#fff7ed', color: isInactive ? '#16a34a' : '#c2410c', border: `1px solid ${isInactive ? '#bbf7d0' : '#fed7aa'}`, borderRadius: '6px', padding: '0.4rem', fontSize: '0.8rem', fontWeight: 700, cursor: isBusy ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem' }}
                           >
                             <Lock size={13} /> {isInactive ? 'Kích hoạt' : 'Vô hiệu hóa'}
                           </button>
                           <button
                             disabled={isBusy}
                             onClick={() => handleResetCustomerPassword(cust)}
-                            style={{ backgroundColor: '#f8fafc', color: '#334155', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.4rem', fontSize: '0.75rem', fontWeight: 700, cursor: isBusy ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem' }}
+                            style={{ backgroundColor: '#f8fafc', color: '#334155', border: '1px solid #e3e8ef', borderRadius: '6px', padding: '0.4rem', fontSize: '0.8rem', fontWeight: 700, cursor: isBusy ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem' }}
                           >
                             <RefreshCw size={13} /> Reset MK
                           </button>
@@ -1579,7 +1583,7 @@ export default function SalesPOS() {
                             disabled={isBusy || cust.orderCount > 0}
                             title={cust.orderCount > 0 ? 'Khách đã có đơn hàng — vô hiệu hóa thay vì xóa' : 'Xóa vĩnh viễn'}
                             onClick={() => handleDeleteCustomer(cust)}
-                            style={{ backgroundColor: cust.orderCount > 0 ? '#f8fafc' : '#fef2f2', color: cust.orderCount > 0 ? '#94a3b8' : '#dc2626', border: `1px solid ${cust.orderCount > 0 ? '#e2e8f0' : '#fecaca'}`, borderRadius: '6px', padding: '0.4rem', fontSize: '0.75rem', fontWeight: 700, cursor: (isBusy || cust.orderCount > 0) ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem' }}
+                            style={{ backgroundColor: cust.orderCount > 0 ? '#f8fafc' : '#fef2f2', color: cust.orderCount > 0 ? '#94a3b8' : '#dc2626', border: `1px solid ${cust.orderCount > 0 ? '#e2e8f0' : '#fecaca'}`, borderRadius: '6px', padding: '0.4rem', fontSize: '0.8rem', fontWeight: 700, cursor: (isBusy || cust.orderCount > 0) ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem' }}
                           >
                             <Trash2 size={13} /> Xóa
                           </button>
@@ -1600,7 +1604,7 @@ export default function SalesPOS() {
                 <button
                   disabled={customerPage <= 1}
                   onClick={() => setCustomerPage(p => Math.max(p - 1, 1))}
-                  style={{ padding: '0.25rem 0.5rem', backgroundColor: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: customerPage <= 1 ? 'not-allowed' : 'pointer' }}
+                  style={{ padding: '0.25rem 0.5rem', backgroundColor: '#ffffff', border: '1px solid #e3e8ef', borderRadius: '4px', cursor: customerPage <= 1 ? 'not-allowed' : 'pointer' }}
                 >
                   <ChevronLeft size={14} />
                 </button>
@@ -1608,7 +1612,7 @@ export default function SalesPOS() {
                 <button
                   disabled={customerPage >= customerTotalPages}
                   onClick={() => setCustomerPage(p => Math.min(p + 1, customerTotalPages))}
-                  style={{ padding: '0.25rem 0.5rem', backgroundColor: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: customerPage >= customerTotalPages ? 'not-allowed' : 'pointer' }}
+                  style={{ padding: '0.25rem 0.5rem', backgroundColor: '#ffffff', border: '1px solid #e3e8ef', borderRadius: '4px', cursor: customerPage >= customerTotalPages ? 'not-allowed' : 'pointer' }}
                 >
                   <ChevronRight size={14} />
                 </button>
@@ -1654,22 +1658,22 @@ export default function SalesPOS() {
               placeholder="Tìm theo tên sản phẩm..."
               value={catalogSearch}
               onChange={(e) => setCatalogSearch(e.target.value)}
-              style={{ flex: '1 1 260px', height: '38px', padding: '0 0.85rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px', boxSizing: 'border-box' }}
+              style={{ flex: '1 1 260px', height: '38px', padding: '0 0.85rem', fontSize: '0.83rem', border: '1px solid #e3e8ef', borderRadius: '6px', boxSizing: 'border-box' }}
             />
-            <select value={catalogCategoryFilter} onChange={(e) => setCatalogCategoryFilter(e.target.value)} style={{ height: '38px', padding: '0 0.65rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px', backgroundColor: '#ffffff', cursor: 'pointer' }}>
+            <select value={catalogCategoryFilter} onChange={(e) => setCatalogCategoryFilter(e.target.value)} style={{ height: '38px', padding: '0 0.65rem', fontSize: '0.83rem', border: '1px solid #e3e8ef', borderRadius: '6px', backgroundColor: '#ffffff', cursor: 'pointer' }}>
               <option value="ALL">Tất cả phân nhóm</option>
               {Object.keys(CATEGORY_MAP_VI).map(cat => (
                 <option key={cat} value={cat}>{CATEGORY_MAP_VI[cat] || cat}</option>
               ))}
             </select>
-            <select value={catalogVisibilityFilter} onChange={(e) => setCatalogVisibilityFilter(e.target.value)} style={{ height: '38px', padding: '0 0.65rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px', backgroundColor: '#ffffff', cursor: 'pointer' }}>
+            <select value={catalogVisibilityFilter} onChange={(e) => setCatalogVisibilityFilter(e.target.value)} style={{ height: '38px', padding: '0 0.65rem', fontSize: '0.83rem', border: '1px solid #e3e8ef', borderRadius: '6px', backgroundColor: '#ffffff', cursor: 'pointer' }}>
               <option value="ALL">Tất cả trạng thái</option>
               <option value="VISIBLE">Đang hiển thị</option>
               <option value="HIDDEN">Đang ẩn</option>
             </select>
           </div>
 
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', overflow: 'hidden' }}>
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', overflow: 'hidden' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.83rem' }}>
               <thead>
                 <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569' }}>
@@ -1700,7 +1704,7 @@ export default function SalesPOS() {
                         <td style={{ padding: '0.75rem 0.85rem', textAlign: 'center', fontWeight: 700 }}>{Number(p.stock) || 0}</td>
                         <td style={{ padding: '0.75rem 0.85rem', textAlign: 'center' }}>
                           <span style={{
-                            display: 'inline-flex', alignItems: 'center', gap: '0.3rem', padding: '0.2rem 0.6rem', fontSize: '0.72rem', fontWeight: 700, borderRadius: '12px',
+                            display: 'inline-flex', alignItems: 'center', gap: '0.3rem', padding: '0.2rem 0.6rem', fontSize: '0.77rem', fontWeight: 700, borderRadius: '12px',
                             color: isVisible ? '#15803d' : '#dc2626',
                             backgroundColor: isVisible ? '#f0fdf4' : '#fef2f2',
                             border: `1px solid ${isVisible ? '#bbf7d0' : '#fecaca'}`
@@ -1715,7 +1719,7 @@ export default function SalesPOS() {
                               onClick={() => handleToggleCatalogVisibility(p)}
                               disabled={isToggling}
                               style={{
-                                padding: '0.35rem 0.85rem', fontSize: '0.75rem', fontWeight: 700, borderRadius: '6px', cursor: isToggling ? 'default' : 'pointer',
+                                padding: '0.35rem 0.85rem', fontSize: '0.8rem', fontWeight: 700, borderRadius: '6px', cursor: isToggling ? 'default' : 'pointer',
                                 border: `1px solid ${isVisible ? '#fecaca' : '#bbf7d0'}`,
                                 color: isVisible ? '#dc2626' : '#15803d',
                                 backgroundColor: isVisible ? '#fef2f2' : '#f0fdf4',
@@ -1774,13 +1778,13 @@ export default function SalesPOS() {
                 const isActive = promo.status === 'ACTIVE' && !isExpired;
                 const busy = promoActionBusyId === promo.id;
                 return (
-                  <div key={promo.id} style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem', position: 'relative' }}>
+                  <div key={promo.id} style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1.25rem', position: 'relative' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
                       <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#2563eb', backgroundColor: '#eff6ff', border: '1px dashed #bfdbfe', padding: '3px 8px', borderRadius: '4px' }}>
                         {promo.code}
                       </span>
                       <span style={{
-                        fontSize: '0.7rem', fontWeight: 800, padding: '2px 6px', borderRadius: '10px',
+                        fontSize: '0.75rem', fontWeight: 800, padding: '2px 6px', borderRadius: '10px',
                         color: isActive ? '#16a34a' : '#94a3b8',
                         backgroundColor: isActive ? '#f0fdf4' : '#f1f5f9',
                         border: `1px solid ${isActive ? '#bbf7d0' : '#e2e8f0'}`
@@ -1829,14 +1833,14 @@ export default function SalesPOS() {
                       <div style={{ display: 'flex', gap: '0.5rem' }}>
                         <button
                           onClick={() => openEditPromoModal(promo)}
-                          style={{ flex: 1, backgroundColor: '#ffffff', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.4rem', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer' }}
+                          style={{ flex: 1, backgroundColor: '#ffffff', color: '#475569', border: '1px solid #e3e8ef', borderRadius: '6px', padding: '0.4rem', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}
                         >
                           Sửa
                         </button>
                         <button
                           onClick={() => handleDeletePromo(promo)}
                           disabled={busy}
-                          style={{ flex: 1, backgroundColor: '#ffffff', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '6px', padding: '0.4rem', fontSize: '0.75rem', fontWeight: 700, cursor: busy ? 'not-allowed' : 'pointer', opacity: busy ? 0.6 : 1 }}
+                          style={{ flex: 1, backgroundColor: '#ffffff', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '6px', padding: '0.4rem', fontSize: '0.8rem', fontWeight: 700, cursor: busy ? 'not-allowed' : 'pointer', opacity: busy ? 0.6 : 1 }}
                         >
                           {busy ? 'Đang xóa...' : 'Xóa'}
                         </button>
@@ -1865,7 +1869,7 @@ export default function SalesPOS() {
                     value={promoFormData.code || ''}
                     onChange={(e) => setPromoFormData(prev => ({ ...prev, code: e.target.value.toUpperCase() }))}
                     placeholder="VD: SUMMER2026"
-                    style={{ width: '100%', padding: '0.55rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.85rem', boxSizing: 'border-box' }}
+                    style={{ width: '100%', padding: '0.55rem', border: '1px solid #e3e8ef', borderRadius: '6px', fontSize: '0.85rem', boxSizing: 'border-box' }}
                   />
                 </div>
               )}
@@ -1874,7 +1878,7 @@ export default function SalesPOS() {
                 <input
                   value={promoFormData.title || ''}
                   onChange={(e) => setPromoFormData(prev => ({ ...prev, title: e.target.value }))}
-                  style={{ width: '100%', padding: '0.55rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.85rem', boxSizing: 'border-box' }}
+                  style={{ width: '100%', padding: '0.55rem', border: '1px solid #e3e8ef', borderRadius: '6px', fontSize: '0.85rem', boxSizing: 'border-box' }}
                 />
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
@@ -1883,7 +1887,7 @@ export default function SalesPOS() {
                   <select
                     value={promoFormData.type || 'PERCENT'}
                     onChange={(e) => setPromoFormData(prev => ({ ...prev, type: e.target.value }))}
-                    style={{ width: '100%', padding: '0.55rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.85rem', boxSizing: 'border-box' }}
+                    style={{ width: '100%', padding: '0.55rem', border: '1px solid #e3e8ef', borderRadius: '6px', fontSize: '0.85rem', boxSizing: 'border-box' }}
                   >
                     <option value="PERCENT">Theo % (Phần trăm)</option>
                     <option value="FIXED">Số Tiền Cố Định (VNĐ)</option>
@@ -1895,7 +1899,7 @@ export default function SalesPOS() {
                     type="number"
                     value={promoFormData.discount ?? ''}
                     onChange={(e) => setPromoFormData(prev => ({ ...prev, discount: e.target.value }))}
-                    style={{ width: '100%', padding: '0.55rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.85rem', boxSizing: 'border-box' }}
+                    style={{ width: '100%', padding: '0.55rem', border: '1px solid #e3e8ef', borderRadius: '6px', fontSize: '0.85rem', boxSizing: 'border-box' }}
                   />
                 </div>
               </div>
@@ -1905,7 +1909,7 @@ export default function SalesPOS() {
                   type="number"
                   value={promoFormData.minSpend ?? ''}
                   onChange={(e) => setPromoFormData(prev => ({ ...prev, minSpend: e.target.value }))}
-                  style={{ width: '100%', padding: '0.55rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.85rem', boxSizing: 'border-box' }}
+                  style={{ width: '100%', padding: '0.55rem', border: '1px solid #e3e8ef', borderRadius: '6px', fontSize: '0.85rem', boxSizing: 'border-box' }}
                 />
               </div>
               <div>
@@ -1914,7 +1918,7 @@ export default function SalesPOS() {
                   type="date"
                   value={promoFormData.expiresAt || ''}
                   onChange={(e) => setPromoFormData(prev => ({ ...prev, expiresAt: e.target.value }))}
-                  style={{ width: '100%', padding: '0.55rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.85rem', boxSizing: 'border-box' }}
+                  style={{ width: '100%', padding: '0.55rem', border: '1px solid #e3e8ef', borderRadius: '6px', fontSize: '0.85rem', boxSizing: 'border-box' }}
                 />
               </div>
               {editingPromo && (
@@ -1923,7 +1927,7 @@ export default function SalesPOS() {
                   <select
                     value={promoFormData.status || editingPromo.status || 'ACTIVE'}
                     onChange={(e) => setPromoFormData(prev => ({ ...prev, status: e.target.value }))}
-                    style={{ width: '100%', padding: '0.55rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.85rem', boxSizing: 'border-box' }}
+                    style={{ width: '100%', padding: '0.55rem', border: '1px solid #e3e8ef', borderRadius: '6px', fontSize: '0.85rem', boxSizing: 'border-box' }}
                   >
                     <option value="ACTIVE">Đang Áp Dụng</option>
                     <option value="INACTIVE">Tắt</option>
@@ -1934,7 +1938,7 @@ export default function SalesPOS() {
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem', marginTop: '1.4rem' }}>
               <button
                 onClick={() => setShowPromoFormModal(false)}
-                style={{ backgroundColor: '#ffffff', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.5rem 1rem', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
+                style={{ backgroundColor: '#ffffff', color: '#475569', border: '1px solid #e3e8ef', borderRadius: '6px', padding: '0.5rem 1rem', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
               >
                 Hủy
               </button>
@@ -2031,12 +2035,12 @@ export default function SalesPOS() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem', marginBottom: '1.25rem' }}>
               
               {/* Category Sales Share */}
-              <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem' }}>
+              <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1.25rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                   <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
                     Cơ Cấu Doanh Thu Theo Phân Nhóm Linh Kiện
                   </h3>
-                  <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Tỷ trọng danh mục</span>
+                  <span style={{ fontSize: '0.8rem', color: '#64748b' }}>Tỷ trọng danh mục</span>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', maxHeight: '360px', overflowY: 'auto' }}>
                   {catRevEntries.map((cat, idx) => {
@@ -2059,28 +2063,28 @@ export default function SalesPOS() {
               </div>
 
               {/* Sales Channels Breakdown */}
-              <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem' }}>
+              <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1.25rem' }}>
                 <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', margin: '0 0 1rem' }}>
                   Hiệu Suất Kênh Bán & Trạng Thái Giao
                 </h3>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                   <div style={{ backgroundColor: '#f8fafc', padding: '1rem', borderRadius: '6px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
                     <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#2563eb' }}>{reportOrders.length}</div>
-                    <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700, marginTop: '0.2rem' }}>Tổng Số Đơn Bán</div>
+                    <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 700, marginTop: '0.2rem' }}>Tổng Số Đơn Bán</div>
                   </div>
                   <div style={{ backgroundColor: '#f8fafc', padding: '1rem', borderRadius: '6px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
                     <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#16a34a' }}>
-                      {reportOrders.length > 0 ? `${Math.round((reportCompletedCount / reportOrders.length) * 100)}%` : '100%'}
+                      {reportOrders.length > 0 ? `${Math.round((reportCompletedCount / reportOrders.length) * 100)}%` : '—'}
                     </div>
-                    <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700, marginTop: '0.2rem' }}>Tỷ Lệ Giao Thành Công</div>
+                    <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 700, marginTop: '0.2rem' }}>Tỷ Lệ Giao Thành Công</div>
                   </div>
                   <div style={{ backgroundColor: '#f8fafc', padding: '1rem', borderRadius: '6px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
                     <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#d97706' }}>{pendingConfirmationCount}</div>
-                    <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700, marginTop: '0.2rem' }}>Đơn Mới Cần Duyệt</div>
+                    <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 700, marginTop: '0.2rem' }}>Đơn Mới Cần Duyệt</div>
                   </div>
                   <div style={{ backgroundColor: '#f8fafc', padding: '1rem', borderRadius: '6px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
                     <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#8b5cf6' }}>{derivedCustomers.length}</div>
-                    <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700, marginTop: '0.2rem' }}>Tổng Khách Hàng CRM</div>
+                    <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 700, marginTop: '0.2rem' }}>Tổng Khách Hàng CRM</div>
                   </div>
                 </div>
               </div>
@@ -2088,7 +2092,7 @@ export default function SalesPOS() {
             </div>
 
             {/* Top Best Selling Items Table */}
-            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem' }}>
+            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1.25rem' }}>
               <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', margin: '0 0 1rem' }}>
                 Top 5 Linh Kiện Bán Chạy Nhất
               </h3>
@@ -2108,12 +2112,12 @@ export default function SalesPOS() {
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                             <span>#{idx + 1}. {item.name}</span>
                             {item.category && (
-                              <span style={{ fontSize: '0.68rem', backgroundColor: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', padding: '1px 6px', borderRadius: '4px' }}>
+                              <span style={{ fontSize: '0.74rem', backgroundColor: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', padding: '1px 6px', borderRadius: '4px' }}>
                                 {item.category}
                               </span>
                             )}
                           </div>
-                          {item.sku && <span style={{ fontSize: '0.7rem', color: '#64748b' }}>SKU: {item.sku}</span>}
+                          {item.sku && <span style={{ fontSize: '0.75rem', color: '#64748b' }}>SKU: {item.sku}</span>}
                         </td>
                         <td style={{ padding: '0.65rem 0.85rem', textAlign: 'center', fontWeight: 800, color: '#2563eb' }}>
                           {item.totalQty} chiếc
@@ -2134,40 +2138,40 @@ export default function SalesPOS() {
       {/* ================= MODAL CHI TIẾT ĐƠN HÀNG (BALANCED & ALIGNED) ================= */}
       {selectedDetailOrder && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(6px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '1.5rem' }}>
-          <div style={{ width: '100%', maxWidth: '850px', maxHeight: '90vh', overflowY: 'auto', padding: '2rem', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
+          <div style={{ width: '100%', maxWidth: '850px', maxHeight: '90vh', overflowY: 'auto', padding: '2rem', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e3e8ef', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
               <div>
-                <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#2563eb', textTransform: 'uppercase' }}>Chi Tiết Đơn Hàng Bán Lẻ</span>
+                <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#2563eb', textTransform: 'uppercase' }}>Chi Tiết Đơn Hàng Bán Lẻ</span>
                 <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', margin: '0.2rem 0 0' }}>
                   #{selectedDetailOrder.orderId || selectedDetailOrder.id}
                 </h3>
               </div>
-              <button onClick={() => setSelectedDetailOrder(null)} style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#475569', cursor: 'pointer', padding: '0.4rem', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <button onClick={() => setSelectedDetailOrder(null)} style={{ background: '#f1f5f9', border: '1px solid #e3e8ef', color: '#475569', cursor: 'pointer', padding: '0.4rem', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <X size={18} />
               </button>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', backgroundColor: '#f8fafc', padding: '1rem', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '1.25rem', fontSize: '0.83rem' }}>
               <div>
-                <span style={{ color: '#64748b', display: 'block', fontSize: '0.75rem' }}>Khách Hàng:</span>
+                <span style={{ color: '#64748b', display: 'block', fontSize: '0.8rem' }}>Khách Hàng:</span>
                 <strong style={{ color: '#0f172a' }}>{selectedDetailOrder.customerName || selectedDetailOrder.customer || 'Khách vãng lai'}</strong>
               </div>
               <div>
-                <span style={{ color: '#64748b', display: 'block', fontSize: '0.75rem' }}>Trạng Thái Đơn:</span>
+                <span style={{ color: '#64748b', display: 'block', fontSize: '0.8rem' }}>Trạng Thái Đơn:</span>
                 <strong style={{ color: getStatusBadge(selectedDetailOrder.status).color }}>{getStatusBadge(selectedDetailOrder.status).text}</strong>
               </div>
               <div>
-                <span style={{ color: '#64748b', display: 'block', fontSize: '0.75rem' }}>Số Điện Thoại:</span>
+                <span style={{ color: '#64748b', display: 'block', fontSize: '0.8rem' }}>Số Điện Thoại:</span>
                 <strong style={{ color: '#0f172a' }}>{selectedDetailOrder.phone || selectedDetailOrder.customerPhone || 'Chưa cập nhật'}</strong>
               </div>
               <div>
-                <span style={{ color: '#64748b', display: 'block', fontSize: '0.75rem' }}>Ngày Đặt Hàng:</span>
+                <span style={{ color: '#64748b', display: 'block', fontSize: '0.8rem' }}>Ngày Đặt Hàng:</span>
                 <strong style={{ color: '#0f172a' }}>{formatDate(selectedDetailOrder.date || selectedDetailOrder.createdAt)}</strong>
               </div>
             </div>
 
             {/* Items Table with Vertical Align Top & Clean Row Alignment */}
-            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', overflow: 'hidden', marginBottom: '1.25rem' }}>
+            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', overflow: 'hidden', marginBottom: '1.25rem' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.83rem' }}>
                 <thead>
                   <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', color: '#475569', textAlign: 'left' }}>
@@ -2195,11 +2199,11 @@ export default function SalesPOS() {
                           <div style={{ fontWeight: 700, lineHeight: '1.4', fontSize: '0.85rem' }}>{itemName}</div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.35rem' }}>
                             {itemCategory && (
-                              <span style={{ fontSize: '0.68rem', backgroundColor: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', padding: '1px 6px', borderRadius: '4px', fontWeight: 600 }}>
+                              <span style={{ fontSize: '0.74rem', backgroundColor: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', padding: '1px 6px', borderRadius: '4px', fontWeight: 600 }}>
                                 {itemCategory}
                               </span>
                             )}
-                            {itemSku && <span style={{ fontSize: '0.7rem', color: '#64748b' }}>SKU: {itemSku}</span>}
+                            {itemSku && <span style={{ fontSize: '0.75rem', color: '#64748b' }}>SKU: {itemSku}</span>}
                           </div>
                         </td>
                         <td style={{ padding: '0.85rem 1rem', textAlign: 'center', fontWeight: 800, whiteSpace: 'nowrap', color: '#0f172a', verticalAlign: 'top', lineHeight: '1.4', fontSize: '0.85rem' }}>
@@ -2232,7 +2236,7 @@ export default function SalesPOS() {
             <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', borderTop: '1px solid #f1f5f9', paddingTop: '1rem', gap: '0.65rem' }}>
               <button
                 onClick={() => setSelectedDetailOrder(null)}
-                style={{ backgroundColor: '#ffffff', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.5rem 1rem', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
+                style={{ backgroundColor: '#ffffff', color: '#475569', border: '1px solid #e3e8ef', borderRadius: '6px', padding: '0.5rem 1rem', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
               >
                 Đóng
               </button>
@@ -2285,12 +2289,12 @@ export default function SalesPOS() {
       {/* ================= MODAL IN HÓA ĐƠN POS ================= */}
       {showReceiptModal && printedReceipt && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(6px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '1.5rem' }}>
-          <div data-print-doc style={{ width: '100%', maxWidth: '480px', maxHeight: '90vh', overflowY: 'auto', padding: '2rem', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
+          <div data-print-doc style={{ width: '100%', maxWidth: '480px', maxHeight: '90vh', overflowY: 'auto', padding: '2rem', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e3e8ef', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
             <div style={{ textAlign: 'center', borderBottom: '2px dashed #e2e8f0', paddingBottom: '1rem', marginBottom: '1rem' }}>
               <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#0f172a' }}>HỆ THỐNG AETHERPC ERP</h3>
               <p style={{ margin: '0.2rem 0', fontSize: '0.78rem', color: '#64748b' }}>Cửa Hàng Linh Kiện Máy Tính Cao Cấp</p>
               <h4 style={{ margin: '0.5rem 0 0', fontSize: '1rem', fontWeight: 800, color: '#2563eb' }}>PHIẾU THANH TOÁN BÁN LẺ</h4>
-              <span style={{ fontSize: '0.75rem', color: '#475569' }}>Mã: #{printedReceipt.orderId}</span>
+              <span style={{ fontSize: '0.8rem', color: '#475569' }}>Mã: #{printedReceipt.orderId}</span>
             </div>
 
             <div style={{ fontSize: '0.78rem', color: '#475569', display: 'flex', flexDirection: 'column', gap: '0.25rem', marginBottom: '1rem' }}>
@@ -2306,7 +2310,7 @@ export default function SalesPOS() {
                 <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', padding: '0.25rem 0' }}>
                   <div style={{ flex: 1, paddingRight: '0.5rem' }}>
                     <div style={{ fontWeight: 700, color: '#0f172a' }}>{item.product.name}</div>
-                    <span style={{ fontSize: '0.72rem', color: '#64748b' }}>{item.quantity} x {formatCurrency(item.unitPrice)}</span>
+                    <span style={{ fontSize: '0.77rem', color: '#64748b' }}>{item.quantity} x {formatCurrency(item.unitPrice)}</span>
                   </div>
                   <div style={{ fontWeight: 800, color: '#0f172a' }}>{formatCurrency(item.quantity * item.unitPrice)}</div>
                 </div>
@@ -2330,7 +2334,7 @@ export default function SalesPOS() {
               </div>
             </div>
 
-            <div style={{ textAlign: 'center', fontSize: '0.72rem', color: '#64748b', marginBottom: '1.25rem' }}>
+            <div style={{ textAlign: 'center', fontSize: '0.77rem', color: '#64748b', marginBottom: '1.25rem' }}>
               Cảm ơn quý khách và hẹn gặp lại!<br />
               Đổi trả miễn phí trong vòng 7 ngày nếu có lỗi từ NSX.
             </div>
@@ -2345,7 +2349,7 @@ export default function SalesPOS() {
               </button>
               <button
                 onClick={() => setShowReceiptModal(false)}
-                style={{ flex: 1, backgroundColor: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.6rem', fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer' }}
+                style={{ flex: 1, backgroundColor: '#f1f5f9', color: '#475569', border: '1px solid #e3e8ef', borderRadius: '6px', padding: '0.6rem', fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer' }}
               >
                 Đóng
               </button>
@@ -2357,12 +2361,12 @@ export default function SalesPOS() {
       {/* ================= MODAL THÊM / SỬA TÀI KHOẢN KHÁCH HÀNG ================= */}
       {showCustomerFormModal && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(6px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '1.5rem' }}>
-          <div style={{ width: '100%', maxWidth: '480px', maxHeight: '90vh', overflowY: 'auto', padding: '2rem', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
+          <div style={{ width: '100%', maxWidth: '480px', maxHeight: '90vh', overflowY: 'auto', padding: '2rem', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e3e8ef', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
               <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
                 {editingCustomer ? 'Chỉnh Sửa Khách Hàng' : 'Thêm Khách Hàng Mới'}
               </h3>
-              <button onClick={() => setShowCustomerFormModal(false)} style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#475569', cursor: 'pointer', padding: '0.4rem', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <button onClick={() => setShowCustomerFormModal(false)} style={{ background: '#f1f5f9', border: '1px solid #e3e8ef', color: '#475569', cursor: 'pointer', padding: '0.4rem', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <X size={18} />
               </button>
             </div>
@@ -2374,7 +2378,7 @@ export default function SalesPOS() {
                   type="text"
                   value={customerFormData.name || ''}
                   onChange={(e) => setCustomerFormData(f => ({ ...f, name: e.target.value }))}
-                  style={{ width: '100%', height: '38px', padding: '0 0.75rem', fontSize: '0.85rem', border: '1px solid #cbd5e1', borderRadius: '6px', boxSizing: 'border-box' }}
+                  style={{ width: '100%', height: '38px', padding: '0 0.75rem', fontSize: '0.85rem', border: '1px solid #e3e8ef', borderRadius: '6px', boxSizing: 'border-box' }}
                 />
               </div>
               <div>
@@ -2383,7 +2387,7 @@ export default function SalesPOS() {
                   type="email"
                   value={customerFormData.email || ''}
                   onChange={(e) => setCustomerFormData(f => ({ ...f, email: e.target.value }))}
-                  style={{ width: '100%', height: '38px', padding: '0 0.75rem', fontSize: '0.85rem', border: '1px solid #cbd5e1', borderRadius: '6px', boxSizing: 'border-box' }}
+                  style={{ width: '100%', height: '38px', padding: '0 0.75rem', fontSize: '0.85rem', border: '1px solid #e3e8ef', borderRadius: '6px', boxSizing: 'border-box' }}
                 />
               </div>
               {!editingCustomer && (
@@ -2395,7 +2399,7 @@ export default function SalesPOS() {
                       placeholder="Tự động nếu để trống"
                       value={customerFormData.username || ''}
                       onChange={(e) => setCustomerFormData(f => ({ ...f, username: e.target.value }))}
-                      style={{ width: '100%', height: '38px', padding: '0 0.75rem', fontSize: '0.85rem', border: '1px solid #cbd5e1', borderRadius: '6px', boxSizing: 'border-box' }}
+                      style={{ width: '100%', height: '38px', padding: '0 0.75rem', fontSize: '0.85rem', border: '1px solid #e3e8ef', borderRadius: '6px', boxSizing: 'border-box' }}
                     />
                   </div>
                   <div>
@@ -2405,7 +2409,7 @@ export default function SalesPOS() {
                       placeholder="Mặc định: 123456"
                       value={customerFormData.password || ''}
                       onChange={(e) => setCustomerFormData(f => ({ ...f, password: e.target.value }))}
-                      style={{ width: '100%', height: '38px', padding: '0 0.75rem', fontSize: '0.85rem', border: '1px solid #cbd5e1', borderRadius: '6px', boxSizing: 'border-box' }}
+                      style={{ width: '100%', height: '38px', padding: '0 0.75rem', fontSize: '0.85rem', border: '1px solid #e3e8ef', borderRadius: '6px', boxSizing: 'border-box' }}
                     />
                   </div>
                 </div>
@@ -2417,7 +2421,7 @@ export default function SalesPOS() {
                     type="text"
                     value={customerFormData.phone || ''}
                     onChange={(e) => setCustomerFormData(f => ({ ...f, phone: e.target.value }))}
-                    style={{ width: '100%', height: '38px', padding: '0 0.75rem', fontSize: '0.85rem', border: '1px solid #cbd5e1', borderRadius: '6px', boxSizing: 'border-box' }}
+                    style={{ width: '100%', height: '38px', padding: '0 0.75rem', fontSize: '0.85rem', border: '1px solid #e3e8ef', borderRadius: '6px', boxSizing: 'border-box' }}
                   />
                 </div>
                 <div>
@@ -2425,7 +2429,7 @@ export default function SalesPOS() {
                   <select
                     value={customerFormData.tier || 'BRONZE'}
                     onChange={(e) => setCustomerFormData(f => ({ ...f, tier: e.target.value }))}
-                    style={{ width: '100%', height: '38px', padding: '0 0.65rem', fontSize: '0.85rem', border: '1px solid #cbd5e1', borderRadius: '6px', backgroundColor: '#ffffff', cursor: 'pointer', boxSizing: 'border-box' }}
+                    style={{ width: '100%', height: '38px', padding: '0 0.65rem', fontSize: '0.85rem', border: '1px solid #e3e8ef', borderRadius: '6px', backgroundColor: '#ffffff', cursor: 'pointer', boxSizing: 'border-box' }}
                   >
                     <option value="BRONZE">Hạng Đồng</option>
                     <option value="SILVER">Hạng Bạc</option>
@@ -2440,7 +2444,7 @@ export default function SalesPOS() {
                   type="text"
                   value={customerFormData.address || ''}
                   onChange={(e) => setCustomerFormData(f => ({ ...f, address: e.target.value }))}
-                  style={{ width: '100%', height: '38px', padding: '0 0.75rem', fontSize: '0.85rem', border: '1px solid #cbd5e1', borderRadius: '6px', boxSizing: 'border-box' }}
+                  style={{ width: '100%', height: '38px', padding: '0 0.75rem', fontSize: '0.85rem', border: '1px solid #e3e8ef', borderRadius: '6px', boxSizing: 'border-box' }}
                 />
               </div>
               <div>
@@ -2449,7 +2453,7 @@ export default function SalesPOS() {
                   type="text"
                   value={customerFormData.city || ''}
                   onChange={(e) => setCustomerFormData(f => ({ ...f, city: e.target.value }))}
-                  style={{ width: '100%', height: '38px', padding: '0 0.75rem', fontSize: '0.85rem', border: '1px solid #cbd5e1', borderRadius: '6px', boxSizing: 'border-box' }}
+                  style={{ width: '100%', height: '38px', padding: '0 0.75rem', fontSize: '0.85rem', border: '1px solid #e3e8ef', borderRadius: '6px', boxSizing: 'border-box' }}
                 />
               </div>
             </div>
@@ -2457,7 +2461,7 @@ export default function SalesPOS() {
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.65rem', marginTop: '1.5rem', borderTop: '1px solid #f1f5f9', paddingTop: '1rem' }}>
               <button
                 onClick={() => setShowCustomerFormModal(false)}
-                style={{ backgroundColor: '#ffffff', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.55rem 1.1rem', fontSize: '0.83rem', fontWeight: 700, cursor: 'pointer' }}
+                style={{ backgroundColor: '#ffffff', color: '#475569', border: '1px solid #e3e8ef', borderRadius: '6px', padding: '0.55rem 1.1rem', fontSize: '0.83rem', fontWeight: 700, cursor: 'pointer' }}
               >
                 Hủy
               </button>

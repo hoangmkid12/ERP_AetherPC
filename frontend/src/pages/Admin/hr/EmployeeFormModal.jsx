@@ -73,7 +73,7 @@ export default function EmployeeFormModal({ employee, onClose, onSubmit }) {
   };
 
   const grid2 = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.65rem' };
-  const section = { fontSize: '0.72rem', fontWeight: 800, color: '#2563eb', textTransform: 'uppercase', margin: '0.4rem 0 -0.2rem' };
+  const section = { fontSize: '0.77rem', fontWeight: 800, color: '#2563eb', textTransform: 'uppercase', margin: '0.4rem 0 -0.2rem' };
 
   return (
     <div style={overlay}>
@@ -121,7 +121,7 @@ export default function EmployeeFormModal({ employee, onClose, onSubmit }) {
 
           <div style={{ ...section, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span>Lương & phụ cấp (VNĐ/tháng)</span>
-            <button type="button" onClick={() => applySuggestion(f.role)} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', border: 'none', background: 'none', color: '#d97706', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer', textTransform: 'none' }}>
+            <button type="button" onClick={() => applySuggestion(f.role)} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', border: 'none', background: 'none', color: '#d97706', fontSize: '0.77rem', fontWeight: 700, cursor: 'pointer', textTransform: 'none' }}>
               <Lightbulb size={13} /> Áp khung lương gợi ý
             </button>
           </div>
@@ -130,7 +130,7 @@ export default function EmployeeFormModal({ employee, onClose, onSubmit }) {
             <div><label style={label}>PC chức vụ (đóng BH)</label><input type="number" style={input} value={f.responsibilityAllowance} onChange={set('responsibilityAllowance')} /></div>
             <div><label style={label}>PC ăn trưa, xăng xe</label><input type="number" style={input} value={f.allowance} onChange={set('allowance')} /></div>
           </div>
-          <div style={{ fontSize: '0.72rem', color: '#64748b', backgroundColor: '#f8fafc', borderRadius: '6px', padding: '0.45rem 0.6rem' }}>
+          <div style={{ fontSize: '0.77rem', color: '#64748b', backgroundColor: '#f8fafc', borderRadius: '6px', padding: '0.45rem 0.6rem' }}>
             Thu nhập cố định: <strong>{fmtMoney(Number(f.baseSalary) + Number(f.responsibilityAllowance) + Number(f.allowance))}đ</strong> ·
             Lương đóng BHXH: <strong>{fmtMoney(Number(f.baseSalary) + Number(f.responsibilityAllowance))}đ</strong> ·
             Lương cơ bản không được thấp hơn lương tối thiểu vùng.
@@ -150,7 +150,7 @@ export default function EmployeeFormModal({ employee, onClose, onSubmit }) {
             <div><label style={label}>Số tài khoản</label><input style={input} value={f.bankAccount} onChange={set('bankAccount')} /></div>
           </div>
 
-          {isNew && <div style={{ fontSize: '0.74rem', color: '#64748b' }}>Mật khẩu mặc định: <code>123456</code> — nhân viên nên đổi sau lần đăng nhập đầu tiên.</div>}
+          {isNew && <div style={{ fontSize: '0.79rem', color: '#64748b' }}>Mật khẩu mặc định: <code>123456</code> — nhân viên nên đổi sau lần đăng nhập đầu tiên.</div>}
           {error && <div style={{ fontSize: '0.8rem', color: '#dc2626', backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px', padding: '0.5rem 0.65rem' }}>{error}</div>}
 
           <div style={{ display: 'flex', gap: '0.6rem', justifyContent: 'flex-end', marginTop: '0.3rem' }}>

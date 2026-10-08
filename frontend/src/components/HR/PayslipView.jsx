@@ -14,7 +14,7 @@ const Row = ({ label, value, strong, color, sub }) => (
   <tr>
     <td style={{ padding: '0.4rem 0.6rem', color: '#475569', borderBottom: '1px solid #f1f5f9' }}>
       {label}
-      {sub && <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>{sub}</div>}
+      {sub && <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{sub}</div>}
     </td>
     <td style={{ padding: '0.4rem 0.6rem', textAlign: 'right', fontWeight: strong ? 800 : 600, color: color || '#0f172a', borderBottom: '1px solid #f1f5f9', whiteSpace: 'nowrap' }}>
       {value}
@@ -24,7 +24,7 @@ const Row = ({ label, value, strong, color, sub }) => (
 
 const Section = ({ title, children }) => (
   <div style={{ border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden' }}>
-    <div style={{ backgroundColor: '#f8fafc', padding: '0.45rem 0.6rem', fontSize: '0.75rem', fontWeight: 800, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em' }}>{title}</div>
+    <div style={{ backgroundColor: '#f8fafc', padding: '0.45rem 0.6rem', fontSize: '0.8rem', fontWeight: 800, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em' }}>{title}</div>
     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}><tbody>{children}</tbody></table>
   </div>
 );
@@ -57,17 +57,17 @@ export default function PayslipView({ p, showEmployerCost = false, companyName =
       <div ref={ref}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', marginBottom: '0.85rem', flexWrap: 'wrap' }}>
           <div>
-            <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748b' }}>{companyName}</div>
+            <div style={{ fontSize: '0.77rem', fontWeight: 700, color: '#64748b' }}>{companyName}</div>
             <h2 style={{ fontSize: '1.15rem', fontWeight: 800, margin: '0.15rem 0' }}>PHIẾU LƯƠNG {periodLabel(p.period).toUpperCase()}</h2>
             <div style={{ fontSize: '0.8rem', color: '#334155' }}>
               <strong>{p.empName || emp.fullName}</strong>
               {emp.employeeCode ? ` · ${emp.employeeCode}` : ''} · {emp.jobTitle || getRoleName(emp.role)}{emp.department ? ` · ${emp.department}` : ''}
             </div>
             {(emp.bankAccount || emp.bankName) && (
-              <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.15rem' }}>Tài khoản nhận lương: {emp.bankAccount || '—'} {emp.bankName ? `(${emp.bankName})` : ''}</div>
+              <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.15rem' }}>Tài khoản nhận lương: {emp.bankAccount || '—'} {emp.bankName ? `(${emp.bankName})` : ''}</div>
             )}
           </div>
-          <span style={{ padding: '3px 10px', borderRadius: '10px', fontSize: '0.72rem', fontWeight: 800, backgroundColor: st.bg, color: st.color }}>
+          <span style={{ padding: '3px 10px', borderRadius: '10px', fontSize: '0.77rem', fontWeight: 800, backgroundColor: st.bg, color: st.color }}>
             {getStatusLabel(PAYROLL_STATUS, p.status)}
           </span>
         </div>
@@ -124,14 +124,14 @@ export default function PayslipView({ p, showEmployerCost = false, companyName =
         </div>
 
         {showEmployerCost && detailed && (
-          <div style={{ marginTop: '0.5rem', fontSize: '0.75rem', color: '#64748b' }}>
+          <div style={{ marginTop: '0.5rem', fontSize: '0.8rem', color: '#64748b' }}>
             Chi phí doanh nghiệp: BH phần công ty đóng (21,5%) {fmtVnd(p.employerInsurance)} · Tổng chi phí nhân sự {fmtVnd(Number(p.grossSalary) + Number(p.employerInsurance))}
           </div>
         )}
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.85rem' }}>
-        <button type="button" onClick={handlePrint} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', padding: '0.4rem 0.9rem', borderRadius: '6px', border: '1px solid #cbd5e1', backgroundColor: '#ffffff', fontWeight: 700, fontSize: '0.78rem', cursor: 'pointer' }}>
+        <button type="button" onClick={handlePrint} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', padding: '0.4rem 0.9rem', borderRadius: '6px', border: '1px solid #e3e8ef', backgroundColor: '#ffffff', fontWeight: 700, fontSize: '0.78rem', cursor: 'pointer' }}>
           <Printer size={14} /> In phiếu lương
         </button>
       </div>

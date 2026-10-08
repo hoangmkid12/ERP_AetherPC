@@ -115,7 +115,7 @@ export default function ReturnProofModal({ order: ord, onClose, onConfirm }) {
               )}
               <div>
                 <strong style={{ fontSize: '0.9rem', color: 'var(--text-primary)' }}>Hoàn Kho #{ord.orderId || ord.id}</strong>
-                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Chụp ảnh minh chứng kiện hàng trước khi bàn giao kho</div>
+                <div style={{ fontSize: '0.77rem', color: 'var(--text-muted)' }}>Chụp ảnh minh chứng kiện hàng trước khi bàn giao kho</div>
               </div>
             </div>
             <button type="button" onClick={onClose} className="delivery-icon-btn"><X size={18} /></button>
@@ -146,7 +146,7 @@ export default function ReturnProofModal({ order: ord, onClose, onConfirm }) {
                   <div style={{
                     position: 'absolute', bottom: '90px', left: '10px',
                     backgroundColor: 'rgba(15, 23, 42, 0.85)', color: '#fff',
-                    padding: '4px 10px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 800,
+                    padding: '4px 10px', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 800,
                     display: 'flex', alignItems: 'center', gap: '0.4rem',
                     border: '1px solid rgba(245, 158, 11, 0.6)'
                   }}>
@@ -165,7 +165,7 @@ export default function ReturnProofModal({ order: ord, onClose, onConfirm }) {
                   <button
                     type="button"
                     onClick={startCamera}
-                    style={{ marginTop: '0.6rem', padding: '0.4rem 0.85rem', fontSize: '0.75rem', fontWeight: 700, backgroundColor: 'var(--primary)', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                    style={{ marginTop: '0.6rem', padding: '0.4rem 0.85rem', fontSize: '0.8rem', fontWeight: 700, backgroundColor: 'var(--primary)', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
                   >
                     Thử Mở Lại Camera
                   </button>
@@ -192,7 +192,7 @@ export default function ReturnProofModal({ order: ord, onClose, onConfirm }) {
                 type="button"
                 className="delivery-tap-target"
                 onClick={() => onConfirm({ returnProofPhoto: '', returnNote: returnNote.trim(), returnedAt: new Date().toISOString() })}
-                style={{ width: '100%', marginTop: '0.5rem', padding: '0.55rem', fontSize: '0.76rem', fontWeight: 700, backgroundColor: 'transparent', color: 'var(--text-muted)', border: '1px solid var(--border-glass)', borderRadius: 'var(--radius-md)', cursor: 'pointer' }}
+                style={{ width: '100%', marginTop: '0.5rem', padding: '0.55rem', fontSize: '0.8rem', fontWeight: 700, backgroundColor: 'transparent', color: 'var(--text-muted)', border: '1px solid var(--border-glass)', borderRadius: 'var(--radius-md)', cursor: 'pointer' }}
               >
                 Bỏ Qua Chụp Ảnh, Hoàn Kho Ngay
               </button>
@@ -204,13 +204,13 @@ export default function ReturnProofModal({ order: ord, onClose, onConfirm }) {
             <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.9rem', fontSize: '0.82rem' }}>
               <div style={{ position: 'relative', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
                 <img src={proofPhoto} alt="Return Proof" style={{ width: '100%', height: '180px', objectFit: 'cover', display: 'block' }} />
-                <span style={{ position: 'absolute', top: '8px', right: '8px', backgroundColor: 'rgba(217,119,6,0.9)', color: '#fff', padding: '3px 8px', borderRadius: '4px', fontSize: '0.68rem', fontWeight: 800 }}>
+                <span style={{ position: 'absolute', top: '8px', right: '8px', backgroundColor: 'rgba(217,119,6,0.9)', color: '#fff', padding: '3px 8px', borderRadius: '4px', fontSize: '0.74rem', fontWeight: 800 }}>
                   ẢNH HOÀN KHO
                 </span>
                 <button
                   type="button"
                   onClick={retakePhoto}
-                  style={{ position: 'absolute', bottom: '8px', right: '8px', backgroundColor: 'rgba(15,23,42,0.75)', color: '#fff', border: 'none', borderRadius: '4px', padding: '0.35rem 0.6rem', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+                  style={{ position: 'absolute', bottom: '8px', right: '8px', backgroundColor: 'rgba(15,23,42,0.75)', color: '#fff', border: 'none', borderRadius: '4px', padding: '0.35rem 0.6rem', fontSize: '0.77rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
                 >
                   <RefreshCw size={13} /> Chụp Lại
                 </button>

@@ -431,7 +431,7 @@ export default function CustomerService() {
   const activeChat = liveChatSessions.find(s => s.id === activeSessionId) || sortedChatSessions[0];
 
   return (
-    <div style={{ backgroundColor: '#f8fafc', minHeight: '100vh', padding: '1.5rem 2rem', maxWidth: '1400px', margin: '0 auto', fontFamily: 'Inter, sans-serif' }}>
+    <div style={{ backgroundColor: '#f8fafc', minHeight: '100vh', padding: '1.5rem 2rem', maxWidth: '1400px', margin: '0 auto', fontFamily: 'inherit' }}>
       
       {/* ========================================================================= */}
       {/* 1. TOP HEADER */}
@@ -488,7 +488,7 @@ export default function CustomerService() {
                 style={{
                   backgroundColor: '#ffffff',
                   borderRadius: '10px',
-                  border: '1px solid #cbd5e1',
+                  border: '1px solid #e3e8ef',
                   padding: '1.1rem 1.25rem',
                   display: 'flex',
                   flexDirection: 'column',
@@ -499,7 +499,7 @@ export default function CustomerService() {
                 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
+                  <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
                     {st.label}
                   </span>
                   <div style={{ width: '36px', height: '36px', borderRadius: '8px', backgroundColor: st.bg, color: st.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -511,7 +511,7 @@ export default function CustomerService() {
                   <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {st.value}
                   </div>
-                  <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.15rem' }}>
+                  <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.15rem' }}>
                     {st.change}
                   </div>
                 </div>
@@ -521,7 +521,7 @@ export default function CustomerService() {
 
           {/* Charts Row */}
           <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.8fr', gap: '1.25rem', marginBottom: '1.25rem' }}>
-            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem', height: '320px', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1.25rem', height: '320px', display: 'flex', flexDirection: 'column' }}>
               <h3 style={{ fontSize: '0.92rem', fontWeight: 800, color: '#0f172a', margin: '0 0 1rem 0' }}>
                 Phân Loại Nguyên Nhân Khiếu Nại
               </h3>
@@ -537,7 +537,7 @@ export default function CustomerService() {
               </div>
             </div>
 
-            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem', height: '320px', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1.25rem', height: '320px', display: 'flex', flexDirection: 'column' }}>
               <h3 style={{ fontSize: '0.92rem', fontWeight: 800, color: '#0f172a', margin: '0 0 1rem 0' }}>
                 Lưu Lượng Tiếp Nhận & Giải Quyết Trong Tuần
               </h3>
@@ -560,7 +560,7 @@ export default function CustomerService() {
 
           {/* Quick Hub: Pending Complaints & Livechat */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
-            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem' }}>
+            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1.25rem' }}>
               <h3 style={{ fontSize: '0.9rem', fontWeight: 800, color: '#0f172a', margin: '0 0 0.85rem 0' }}>
                 Khiếu Nại Cần Xử Lý Gấp (Ưu Tiên Cao)
               </h3>
@@ -569,9 +569,9 @@ export default function CustomerService() {
                   <div key={comp.id || cIdx} style={{ padding: '0.65rem 0.85rem', borderRadius: '6px', border: '1px solid #e2e8f0', backgroundColor: '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
                       <strong style={{ fontSize: '0.82rem', color: '#0f172a' }}>{comp.title || 'Hỗ trợ bảo hành mainboard'}</strong>
-                      <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block' }}>Khách: {comp.customerName} — Đơn #{comp.orderId}</span>
+                      <span style={{ fontSize: '0.77rem', color: '#64748b', display: 'block' }}>Khách: {comp.customerName} — Đơn #{comp.orderId}</span>
                     </div>
-                    <span style={{ backgroundColor: '#fef2f2', color: '#ef4444', border: '1px solid #fecaca', padding: '2px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 800 }}>
+                    <span style={{ backgroundColor: '#fef2f2', color: '#ef4444', border: '1px solid #fecaca', padding: '2px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 800 }}>
                       Khẩn cấp
                     </span>
                   </div>
@@ -579,7 +579,7 @@ export default function CustomerService() {
               </div>
             </div>
 
-            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem' }}>
+            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1.25rem' }}>
               <h3 style={{ fontSize: '0.9rem', fontWeight: 800, color: '#0f172a', margin: '0 0 0.85rem 0' }}>
                 Khách Đang Chờ Chat Trực Tuyến
               </h3>
@@ -588,11 +588,11 @@ export default function CustomerService() {
                   <div key={s.id || sIdx} style={{ padding: '0.65rem 0.85rem', borderRadius: '6px', border: '1px solid #e2e8f0', backgroundColor: '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
                       <strong style={{ fontSize: '0.82rem', color: '#0f172a' }}>{s.customerName}</strong>
-                      <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block' }}>SĐT: {s.phone}</span>
+                      <span style={{ fontSize: '0.77rem', color: '#64748b', display: 'block' }}>SĐT: {s.phone}</span>
                     </div>
                     <button
                       onClick={() => setTab('livechat')}
-                      style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '4px', padding: '0.35rem 0.75rem', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}
+                      style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', borderRadius: '4px', padding: '0.35rem 0.75rem', fontSize: '0.77rem', fontWeight: 700, cursor: 'pointer' }}
                     >
                       Vào Chat
                     </button>
@@ -609,7 +609,7 @@ export default function CustomerService() {
       {/* TAB 2: COMPLAINTS (XỬ LÝ KHIẾU NẠI) */}
       {/* ========================================================================= */}
       {activeTab === 'complaints' && (
-        <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem' }}>
+        <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1.25rem' }}>
           
           {/* Filters */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1.25rem' }}>
@@ -619,7 +619,7 @@ export default function CustomerService() {
                 placeholder="Tìm khách hàng, số điện thoại, mã đơn..."
                 value={search}
                 onChange={e => setSearch(e.target.value)}
-                style={{ width: '100%', padding: '0.45rem 0.65rem 0.45rem 2rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem' }}
+                style={{ width: '100%', padding: '0.45rem 0.65rem 0.45rem 2rem', borderRadius: '6px', border: '1px solid #e3e8ef', fontSize: '0.82rem' }}
               />
               <Search size={15} style={{ position: 'absolute', left: '0.6rem', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
             </div>
@@ -629,7 +629,7 @@ export default function CustomerService() {
               <select
                 value={statusFilter}
                 onChange={e => setStatusFilter(e.target.value)}
-                style={{ padding: '0.4rem 0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.78rem', color: '#0f172a' }}
+                style={{ padding: '0.4rem 0.65rem', borderRadius: '6px', border: '1px solid #e3e8ef', fontSize: '0.78rem', color: '#0f172a' }}
               >
                 <option value="ALL">Tất cả trạng thái</option>
                 <option value="OPEN">Mới tiếp nhận</option>
@@ -704,12 +704,12 @@ export default function CustomerService() {
                         </td>
                         <td style={{ padding: '0.75rem 0.85rem', whiteSpace: 'nowrap' }}>
                           <strong style={{ display: 'block', color: '#0f172a', fontWeight: 700 }}>{comp.customerName}</strong>
-                          <span style={{ fontSize: '0.74rem', color: '#64748b' }}>{comp.phone || 'Chưa có SĐT'}</span>
+                          <span style={{ fontSize: '0.79rem', color: '#64748b' }}>{comp.phone || 'Chưa có SĐT'}</span>
                         </td>
                         <td style={{ padding: '0.75rem 0.85rem' }}>
                           <div style={{ fontWeight: 600, color: '#0f172a', lineHeight: 1.4 }}>{comp.title}</div>
                           {comp.description && (
-                            <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '0.2rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '420px' }} title={comp.description}>
+                            <div style={{ fontSize: '0.79rem', color: '#64748b', marginTop: '0.2rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '420px' }} title={comp.description}>
                               {comp.description}
                             </div>
                           )}
@@ -720,7 +720,7 @@ export default function CustomerService() {
                               {comp.orderId}
                             </code>
                           ) : (
-                            <span style={{ color: '#94a3b8', fontSize: '0.75rem' }}>N/A</span>
+                            <span style={{ color: '#94a3b8', fontSize: '0.8rem' }}>N/A</span>
                           )}
                         </td>
                         <td style={{ padding: '0.75rem 0.85rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
@@ -728,7 +728,7 @@ export default function CustomerService() {
                             display: 'inline-block',
                             padding: '3px 12px',
                             borderRadius: '999px',
-                            fontSize: '0.72rem',
+                            fontSize: '0.77rem',
                             fontWeight: 800,
                             backgroundColor: `${statusInfo.color}15`,
                             color: statusInfo.color,
@@ -748,7 +748,7 @@ export default function CustomerService() {
                               border: '1px solid #bfdbfe',
                               borderRadius: '6px',
                               padding: '0.35rem 0.75rem',
-                              fontSize: '0.75rem',
+                              fontSize: '0.8rem',
                               fontWeight: 700,
                               cursor: 'pointer',
                               display: 'inline-flex',
@@ -785,13 +785,13 @@ export default function CustomerService() {
       {/* TAB 3: LIVECHAT (CHAT TƯ VẤN THỜI GIAN THỰC) */}
       {/* ========================================================================= */}
       {activeTab === 'livechat' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '300px minmax(0, 1fr)', gap: '1rem', backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', height: '620px', overflow: 'hidden', boxSizing: 'border-box' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '300px minmax(0, 1fr)', gap: '1rem', backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', height: '620px', overflow: 'hidden', boxSizing: 'border-box' }}>
           
           {/* Left: Chat Session List */}
           <div style={{ borderRight: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0 }}>
             <div style={{ padding: '0.85rem 1rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h3 style={{ fontSize: '0.88rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>Hội Thoại Trực Tuyến</h3>
-              <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#2563eb', backgroundColor: '#eff6ff', padding: '2px 8px', borderRadius: '10px' }}>
+              <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#2563eb', backgroundColor: '#eff6ff', padding: '2px 8px', borderRadius: '10px' }}>
                 {liveChatSessions.filter(s => s.status === 'ONLINE' || s.isOnline).length} Online
               </span>
             </div>
@@ -830,7 +830,7 @@ export default function CustomerService() {
                               borderRadius: '9px',
                               backgroundColor: '#ef4444',
                               color: '#ffffff',
-                              fontSize: '0.68rem',
+                              fontSize: '0.74rem',
                               fontWeight: 800,
                               display: 'flex',
                               alignItems: 'center',
@@ -856,7 +856,7 @@ export default function CustomerService() {
                           }}
                           title={isOnline ? 'Đang trực tuyến' : 'Ngoại tuyến'}
                         />
-                        <span style={{ fontSize: '0.68rem', fontWeight: 700, color: isOnline ? '#16a34a' : '#94a3b8' }}>
+                        <span style={{ fontSize: '0.74rem', fontWeight: 700, color: isOnline ? '#16a34a' : '#94a3b8' }}>
                           {isOnline ? 'Online' : 'Offline'}
                         </span>
                       </div>
@@ -871,8 +871,8 @@ export default function CustomerService() {
                         <Trash2 size={13} />
                       </button>
                     </div>
-                    {s.phone && <span style={{ fontSize: '0.7rem', color: '#64748b', display: 'block' }}>{s.phone}</span>}
-                    <p style={{ fontSize: '0.73rem', color: '#475569', margin: '0.25rem 0 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {s.phone && <span style={{ fontSize: '0.75rem', color: '#64748b', display: 'block' }}>{s.phone}</span>}
+                    <p style={{ fontSize: '0.78rem', color: '#475569', margin: '0.25rem 0 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {attachmentPreviewText(s.messages[s.messages.length - 1]) || 'Bắt đầu cuộc trò chuyện...'}
                     </p>
                   </div>
@@ -898,7 +898,7 @@ export default function CustomerService() {
             <div style={{ padding: '0.75rem 1.25rem', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#f8fafc', flexShrink: 0 }}>
               <div>
                 <strong style={{ fontSize: '0.9rem', color: '#0f172a' }}>{activeChat.customerName}</strong>
-                <div style={{ fontSize: '0.74rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '0.6rem', marginTop: '0.2rem' }}>
+                <div style={{ fontSize: '0.79rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '0.6rem', marginTop: '0.2rem' }}>
                   {activeChat.phone && <span>SĐT: {activeChat.phone} •</span>}
                   <span>Trạng thái: </span>
                   {activeChat.status === 'ONLINE' || activeChat.isOnline ? (
@@ -918,7 +918,7 @@ export default function CustomerService() {
                 type="button"
                 onClick={() => handleDeleteSession(activeChat.id, activeChat.customerName)}
                 title="Xóa cuộc trò chuyện này"
-                style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.4rem 0.7rem', border: '1px solid #fecaca', borderRadius: '6px', backgroundColor: '#fff', color: '#ef4444', fontSize: '0.74rem', fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}
+                style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.4rem 0.7rem', border: '1px solid #fecaca', borderRadius: '6px', backgroundColor: '#fff', color: '#ef4444', fontSize: '0.79rem', fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}
               >
                 <Trash2 size={13} /> Xóa Chat
               </button>
@@ -943,7 +943,7 @@ export default function CustomerService() {
                       {m.attachment && <ChatAttachment attachment={m.attachment} />}
                       {m.text && <div style={{ marginTop: m.attachment ? '0.4rem' : 0 }}>{m.text}</div>}
                     </div>
-                    <span style={{ fontSize: '0.68rem', color: '#94a3b8', display: 'block', marginTop: '0.2rem', textAlign: isStaff ? 'right' : 'left' }}>
+                    <span style={{ fontSize: '0.74rem', color: '#94a3b8', display: 'block', marginTop: '0.2rem', textAlign: isStaff ? 'right' : 'left' }}>
                       {m.time}
                       {isStaff && ` · ${getStaffMessageStatus(m, activeChat)}`}
                     </span>
@@ -962,7 +962,7 @@ export default function CustomerService() {
                 <button
                   key={tIdx}
                   onClick={() => handleSendStaffMessage(tmpl)}
-                  style={{ backgroundColor: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '4px', padding: '0.25rem 0.55rem', fontSize: '0.7rem', color: '#475569', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
+                  style={{ backgroundColor: '#ffffff', border: '1px solid #e3e8ef', borderRadius: '4px', padding: '0.25rem 0.55rem', fontSize: '0.75rem', color: '#475569', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
                 >
                   {tmpl}
                 </button>
@@ -977,7 +977,7 @@ export default function CustomerService() {
                 value={staffInputMsg}
                 onChange={e => setStaffInputMsg(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleSendStaffMessage()}
-                style={{ flex: 1, minWidth: 0, padding: '0.5rem 0.75rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem', boxSizing: 'border-box' }}
+                style={{ flex: 1, minWidth: 0, padding: '0.5rem 0.75rem', borderRadius: '6px', border: '1px solid #e3e8ef', fontSize: '0.82rem', boxSizing: 'border-box' }}
               />
               <button
                 onClick={() => handleSendStaffMessage()}
@@ -1026,7 +1026,7 @@ export default function CustomerService() {
         });
 
         return (
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem' }}>
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1.25rem' }}>
             {/* Top Title & Controls */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem', marginBottom: '1rem' }}>
               <div>
@@ -1060,17 +1060,17 @@ export default function CustomerService() {
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                     <Zap size={15} style={{ color: autoApproveReturns ? '#16a34a' : '#64748b' }} />
-                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#334155' }}>
+                    <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#334155' }}>
                       Chế độ Auto Duyệt:
                     </span>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                     {autoApproveReturns ? (
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.2rem', padding: '2px 7px', borderRadius: '12px', fontSize: '0.7rem', fontWeight: 800, backgroundColor: '#dcfce7', color: '#15803d' }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.2rem', padding: '2px 7px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 800, backgroundColor: '#dcfce7', color: '#15803d' }}>
                         <CheckCheck size={12} /> BẬT (Tự Động)
                       </span>
                     ) : (
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.2rem', padding: '2px 7px', borderRadius: '12px', fontSize: '0.7rem', fontWeight: 700, backgroundColor: '#f1f5f9', color: '#64748b' }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.2rem', padding: '2px 7px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 700, backgroundColor: '#f1f5f9', color: '#64748b' }}>
                         TẮT (Duyệt Thủ Công)
                       </span>
                     )}
@@ -1128,7 +1128,7 @@ export default function CustomerService() {
                     style={{
                       padding: '0.35rem 0.75rem',
                       borderRadius: '20px',
-                      fontSize: '0.74rem',
+                      fontSize: '0.79rem',
                       fontWeight: returnStatusFilter === tab.id ? 800 : 600,
                       cursor: 'pointer',
                       border: returnStatusFilter === tab.id ? `1.5px solid ${tab.color}` : '1px solid #e2e8f0',
@@ -1147,7 +1147,7 @@ export default function CustomerService() {
                     <span style={{
                       padding: '1px 5px',
                       borderRadius: '10px',
-                      fontSize: '0.68rem',
+                      fontSize: '0.74rem',
                       fontWeight: 800,
                       backgroundColor: returnStatusFilter === tab.id ? tab.color : '#f1f5f9',
                       color: returnStatusFilter === tab.id ? '#ffffff' : '#64748b'
@@ -1170,7 +1170,7 @@ export default function CustomerService() {
                     padding: '0.4rem 0.65rem 0.4rem 2rem',
                     fontSize: '0.78rem',
                     borderRadius: '6px',
-                    border: '1px solid #cbd5e1',
+                    border: '1px solid #e3e8ef',
                     boxSizing: 'border-box'
                   }}
                 />
@@ -1250,14 +1250,14 @@ export default function CustomerService() {
                           </td>
                           <td style={{ padding: '0.65rem 0.85rem' }}>
                             <strong style={{ color: '#0f172a', display: 'block' }}>{ret.customerName}</strong>
-                            <span style={{ fontSize: '0.72rem', color: '#64748b' }}>{ret.phone}</span>
+                            <span style={{ fontSize: '0.77rem', color: '#64748b' }}>{ret.phone}</span>
                           </td>
                           <td style={{ padding: '0.65rem 0.85rem', color: '#475569' }}>
                             <span style={{
                               display: 'inline-block',
                               padding: '1px 6px',
                               borderRadius: '4px',
-                              fontSize: '0.7rem',
+                              fontSize: '0.75rem',
                               fontWeight: 800,
                               backgroundColor: ret.type === 'REFUND' ? '#ecfdf5' : '#eff6ff',
                               color: ret.type === 'REFUND' ? '#15803d' : '#1d4ed8',
@@ -1266,13 +1266,13 @@ export default function CustomerService() {
                             }}>
                               {ret.type === 'REFUND' ? 'Hoàn tiền 100%' : 'Đổi mới 1-1'}
                             </span>
-                            <div style={{ fontSize: '0.76rem', color: '#334155' }}>{ret.reason || 'Lỗi không lên màn hình'}</div>
+                            <div style={{ fontSize: '0.8rem', color: '#334155' }}>{ret.reason || 'Lỗi không lên màn hình'}</div>
                           </td>
                           <td style={{ padding: '0.65rem 0.85rem' }}>
                             <span style={{
                               padding: '3px 9px',
                               borderRadius: '12px',
-                              fontSize: '0.7rem',
+                              fontSize: '0.75rem',
                               fontWeight: 800,
                               backgroundColor: `${getStatusInfo(RETURN_STATUS, ret.status).color}18`,
                               color: getStatusInfo(RETURN_STATUS, ret.status).color,
@@ -1299,7 +1299,7 @@ export default function CustomerService() {
                                       border: 'none',
                                       borderRadius: '5px',
                                       padding: '0.32rem 0.65rem',
-                                      fontSize: '0.72rem',
+                                      fontSize: '0.77rem',
                                       fontWeight: 800,
                                       cursor: isLoading ? 'wait' : 'pointer',
                                       display: 'inline-flex',
@@ -1321,7 +1321,7 @@ export default function CustomerService() {
                                       border: '1px solid #f87171',
                                       borderRadius: '5px',
                                       padding: '0.32rem 0.55rem',
-                                      fontSize: '0.72rem',
+                                      fontSize: '0.77rem',
                                       fontWeight: 700,
                                       cursor: isLoading ? 'wait' : 'pointer',
                                       display: 'inline-flex',
@@ -1344,7 +1344,7 @@ export default function CustomerService() {
                                   border: '1px solid #ddd6fe',
                                   borderRadius: '5px',
                                   padding: '0.32rem 0.65rem',
-                                  fontSize: '0.72rem',
+                                  fontSize: '0.77rem',
                                   fontWeight: 700,
                                   cursor: 'pointer',
                                   display: 'inline-flex',
@@ -1374,7 +1374,7 @@ export default function CustomerService() {
         <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.8fr', gap: '1.25rem' }}>
           
           {/* Summary CSAT */}
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem' }}>
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1.25rem' }}>
             <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
               <Award size={18} style={{ color: '#eab308' }} />
               <span>Chỉ Số Hài Lòng Khách Hàng</span>
@@ -1409,7 +1409,7 @@ export default function CustomerService() {
           </div>
 
           {/* Customer Feedback Feed */}
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '1.25rem' }}>
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1.25rem' }}>
             <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', marginBottom: '1rem' }}>
               Đánh Giá & Phản Hồi Mới Nhất Từ Khách Hàng
             </h3>
@@ -1428,7 +1428,7 @@ export default function CustomerService() {
                     </div>
                   </div>
                   <p style={{ fontSize: '0.78rem', color: '#475569', margin: '0 0 0.3rem 0' }}>"{fb.comment}"</p>
-                  <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>{fb.date}</span>
+                  <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{fb.date}</span>
                 </div>
               ))}
             </div>
@@ -1440,7 +1440,7 @@ export default function CustomerService() {
       {/* ================= MODAL: TẠO TICKET KHIẾU NẠI MỚI ================= */}
       {showAddTicket && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(6px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', width: '100%', maxWidth: '480px', padding: '1.75rem', maxHeight: '90vh', overflowY: 'auto' }}>
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e3e8ef', width: '100%', maxWidth: '480px', padding: '1.75rem', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
               <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>Tạo Ticket Hỗ Trợ Khách Hàng</h3>
               <button onClick={() => setShowAddTicket(false)} style={{ background: '#f1f5f9', border: 'none', padding: '0.4rem', borderRadius: '6px', cursor: 'pointer' }}><X size={18} /></button>
@@ -1454,7 +1454,7 @@ export default function CustomerService() {
                   placeholder="Ví dụ: Hoàng Anh Quân"
                   value={newTicketForm.customerName}
                   onChange={e => setNewTicketForm(p => ({ ...p, customerName: e.target.value }))}
-                  style={{ width: '100%', padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
+                  style={{ width: '100%', padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid #e3e8ef', boxSizing: 'border-box' }}
                 />
               </div>
 
@@ -1465,7 +1465,7 @@ export default function CustomerService() {
                   placeholder="Ví dụ: 0988777666"
                   value={newTicketForm.phone}
                   onChange={e => setNewTicketForm(p => ({ ...p, phone: e.target.value }))}
-                  style={{ width: '100%', padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
+                  style={{ width: '100%', padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid #e3e8ef', boxSizing: 'border-box' }}
                 />
               </div>
 
@@ -1476,7 +1476,7 @@ export default function CustomerService() {
                   placeholder="Ví dụ: ORD-2026-081"
                   value={newTicketForm.orderId}
                   onChange={e => setNewTicketForm(p => ({ ...p, orderId: e.target.value }))}
-                  style={{ width: '100%', padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
+                  style={{ width: '100%', padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid #e3e8ef', boxSizing: 'border-box' }}
                 />
               </div>
 
@@ -1487,7 +1487,7 @@ export default function CustomerService() {
                   placeholder="Ví dụ: PC không lên nguồn sau khi nhận hàng"
                   value={newTicketForm.title}
                   onChange={e => setNewTicketForm(p => ({ ...p, title: e.target.value }))}
-                  style={{ width: '100%', padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
+                  style={{ width: '100%', padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid #e3e8ef', boxSizing: 'border-box' }}
                 />
               </div>
 
@@ -1495,7 +1495,7 @@ export default function CustomerService() {
                 <button
                   type="button"
                   onClick={() => setShowAddTicket(false)}
-                  style={{ backgroundColor: '#ffffff', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.45rem 1rem', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}
+                  style={{ backgroundColor: '#ffffff', color: '#475569', border: '1px solid #e3e8ef', borderRadius: '6px', padding: '0.45rem 1rem', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}
                 >
                   Hủy
                 </button>
@@ -1526,7 +1526,7 @@ export default function CustomerService() {
       {/* ================= MODAL: XỬ LÝ TICKET ================= */}
       {selectedTicket && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(6px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', width: '100%', maxWidth: '520px', padding: '1.75rem', maxHeight: '90vh', overflowY: 'auto' }}>
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e3e8ef', width: '100%', maxWidth: '520px', padding: '1.75rem', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
               <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>Xử Lý Ticket #{selectedTicket.id}</h3>
               <button onClick={() => setSelectedTicket(null)} style={{ background: '#f1f5f9', border: 'none', padding: '0.4rem', borderRadius: '6px', cursor: 'pointer' }}><X size={18} /></button>
@@ -1535,7 +1535,7 @@ export default function CustomerService() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', fontSize: '0.82rem' }}>
               <div style={{ padding: '0.75rem', backgroundColor: '#f8fafc', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
                 <strong style={{ color: '#0f172a' }}>{selectedTicket.title}</strong>
-                <span style={{ fontSize: '0.75rem', color: '#64748b', display: 'block', marginTop: '0.2rem' }}>Khách: {selectedTicket.customerName} ({selectedTicket.phone})</span>
+                <span style={{ fontSize: '0.8rem', color: '#64748b', display: 'block', marginTop: '0.2rem' }}>Khách: {selectedTicket.customerName} ({selectedTicket.phone})</span>
               </div>
 
               {/* Ticket Attached Evidence Photo If Any */}
@@ -1545,12 +1545,12 @@ export default function CustomerService() {
                 return (
                   <div>
                     <strong style={{ display: 'block', fontSize: '0.78rem', color: '#0f172a', marginBottom: '0.35rem' }}>Minh Chứng Khách Gửi Kèm:</strong>
-                    <div style={{ position: 'relative', borderRadius: '8px', overflow: 'hidden', border: '1px solid #cbd5e1', backgroundColor: '#0f172a', textAlign: 'center' }}>
+                    <div style={{ position: 'relative', borderRadius: '8px', overflow: 'hidden', border: '1px solid #e3e8ef', backgroundColor: '#0f172a', textAlign: 'center' }}>
                       <img src={ticketProof} alt="Minh chứng ticket" style={{ width: '100%', maxHeight: '220px', objectFit: 'contain', display: 'block', margin: '0 auto' }} />
                       <button
                         type="button"
                         onClick={() => window.open(ticketProof, '_blank')}
-                        style={{ position: 'absolute', bottom: '8px', right: '8px', backgroundColor: 'rgba(15,23,42,0.85)', backdropFilter: 'blur(4px)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '6px', padding: '3px 8px', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                        style={{ position: 'absolute', bottom: '8px', right: '8px', backgroundColor: 'rgba(15,23,42,0.85)', backdropFilter: 'blur(4px)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '6px', padding: '3px 8px', fontSize: '0.77rem', fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
                       >
                         <ExternalLink size={12} /> Xem ảnh lớn
                       </button>
@@ -1566,7 +1566,7 @@ export default function CustomerService() {
                   placeholder="Nhập ghi chú hướng dẫn khách hàng hoặc phương án xử lý..."
                   value={resolution}
                   onChange={e => setResolution(e.target.value)}
-                  style={{ width: '100%', padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
+                  style={{ width: '100%', padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid #e3e8ef', boxSizing: 'border-box' }}
                 />
               </div>
 
@@ -1611,7 +1611,7 @@ export default function CustomerService() {
       {/* ================= MODAL: CHI TIẾT YÊU CẦU ĐỔI TRẢ (RMA) ================= */}
       {selectedReturnDetail && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(6px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', width: '100%', maxWidth: '580px', padding: '1.75rem', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e3e8ef', width: '100%', maxWidth: '580px', padding: '1.75rem', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
             
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.75rem' }}>
               <div>
@@ -1619,7 +1619,7 @@ export default function CustomerService() {
                   <RefreshCw size={20} style={{ color: '#8b5cf6' }} />
                   <span>Hồ Sơ Đổi Trả {formatRmaCode(selectedReturnDetail)}</span>
                 </h3>
-                <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Đơn hàng gốc: <strong style={{ color: '#2563eb' }}>{selectedReturnDetail.orderId}</strong></span>
+                <span style={{ fontSize: '0.8rem', color: '#64748b' }}>Đơn hàng gốc: <strong style={{ color: '#2563eb' }}>{selectedReturnDetail.orderId}</strong></span>
               </div>
               <button onClick={() => setSelectedReturnDetail(null)} style={{ background: '#f1f5f9', border: 'none', padding: '0.4rem', borderRadius: '6px', cursor: 'pointer' }}>
                 <X size={18} />
@@ -1631,7 +1631,7 @@ export default function CustomerService() {
               {/* Status Banner */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem 1rem', backgroundColor: `${getStatusInfo(RETURN_STATUS, selectedReturnDetail.status).color}15`, borderRadius: '8px', border: `1px solid ${getStatusInfo(RETURN_STATUS, selectedReturnDetail.status).color}30` }}>
                 <span style={{ fontWeight: 700, color: '#0f172a' }}>Trạng Thái Thẩm Định:</span>
-                <span style={{ padding: '3px 10px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 800, backgroundColor: getStatusInfo(RETURN_STATUS, selectedReturnDetail.status).color, color: '#ffffff' }}>
+                <span style={{ padding: '3px 10px', borderRadius: '12px', fontSize: '0.8rem', fontWeight: 800, backgroundColor: getStatusInfo(RETURN_STATUS, selectedReturnDetail.status).color, color: '#ffffff' }}>
                   {getStatusLabel(RETURN_STATUS, selectedReturnDetail.status)}
                 </span>
               </div>
@@ -1645,12 +1645,12 @@ export default function CustomerService() {
               </div>
 
               {/* Defect Details */}
-              <div style={{ padding: '0.85rem 1rem', backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+              <div style={{ padding: '0.85rem 1rem', backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
                 <strong style={{ fontSize: '0.85rem', color: '#0f172a' }}>Mô Tả Lỗi Từ Khách Hàng:</strong>
                 <p style={{ margin: '0.2rem 0', color: '#475569', lineHeight: '1.45' }}>
                   "{selectedReturnDetail.reason || 'Sản phẩm xuất hiện sọc màn hình khi chơi game nặng, quạt kêu to bất thường.'}"
                 </p>
-                <div style={{ marginTop: '0.4rem', padding: '0.5rem', backgroundColor: '#f0fdf4', borderRadius: '6px', border: '1px solid #bbf7d0', color: '#15803d', fontSize: '0.75rem' }}>
+                <div style={{ marginTop: '0.4rem', padding: '0.5rem', backgroundColor: '#f0fdf4', borderRadius: '6px', border: '1px solid #bbf7d0', color: '#15803d', fontSize: '0.8rem' }}>
                   ✓ Đã kiểm tra bảo hành: Thiết bị thuộc diện <strong>Bảo Hành 36 Tháng 1 Đổi 1</strong> của AetherPC.
                 </div>
               </div>
@@ -1664,7 +1664,7 @@ export default function CustomerService() {
                   const proofImg = selectedReturnDetail.evidenceUrl || selectedReturnDetail.evidence_url || selectedReturnDetail.evidence || selectedReturnDetail.image || selectedReturnDetail.proofImage;
                   if (proofImg) {
                     return (
-                      <div style={{ position: 'relative', borderRadius: '8px', overflow: 'hidden', border: '1px solid #cbd5e1', backgroundColor: '#0f172a' }}>
+                      <div style={{ position: 'relative', borderRadius: '8px', overflow: 'hidden', border: '1px solid #e3e8ef', backgroundColor: '#0f172a' }}>
                         <img
                           src={proofImg}
                           alt="Minh chứng từ khách hàng"
@@ -1681,7 +1681,7 @@ export default function CustomerService() {
                               border: '1px solid rgba(255,255,255,0.25)',
                               borderRadius: '6px',
                               padding: '5px 12px',
-                              fontSize: '0.74rem',
+                              fontSize: '0.79rem',
                               fontWeight: 700,
                               cursor: 'pointer',
                               display: 'inline-flex',
@@ -1700,7 +1700,7 @@ export default function CustomerService() {
                     <div style={{ padding: '1.25rem', textAlign: 'center', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px dashed #cbd5e1', color: '#64748b' }}>
                       <Camera size={24} style={{ color: '#94a3b8', margin: '0 auto 0.35rem' }} />
                       <div style={{ fontSize: '0.82rem', fontWeight: 600 }}>Khách hàng không đính kèm ảnh bằng chứng</div>
-                      <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '0.2rem' }}>CSKH có thể liên hệ khách hàng qua SĐT để yêu cầu gửi ảnh bổ sung qua Zalo / LiveChat.</div>
+                      <div style={{ fontSize: '0.77rem', color: '#94a3b8', marginTop: '0.2rem' }}>CSKH có thể liên hệ khách hàng qua SĐT để yêu cầu gửi ảnh bổ sung qua Zalo / LiveChat.</div>
                     </div>
                   );
                 })()}
@@ -1711,7 +1711,7 @@ export default function CustomerService() {
                 <button
                   type="button"
                   onClick={() => setSelectedReturnDetail(null)}
-                  style={{ backgroundColor: '#ffffff', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.5rem 1rem', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}
+                  style={{ backgroundColor: '#ffffff', color: '#475569', border: '1px solid #e3e8ef', borderRadius: '6px', padding: '0.5rem 1rem', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}
                 >
                   Đóng
                 </button>
@@ -1774,7 +1774,7 @@ export default function CustomerService() {
       {/* ================= MODAL: TỪ CHỐI YÊU CẦU ĐỔI TRẢ ================= */}
       {rejectModal && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(6px)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #cbd5e1', width: '100%', maxWidth: '480px', padding: '1.5rem', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.15)' }}>
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e3e8ef', width: '100%', maxWidth: '480px', padding: '1.5rem', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.15)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid #f1f5f9', paddingBottom: '0.5rem' }}>
               <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#e11d48', margin: 0, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                 <X size={20} />
@@ -1788,7 +1788,7 @@ export default function CustomerService() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', fontSize: '0.82rem' }}>
               <div style={{ padding: '0.75rem', backgroundColor: '#fff1f2', borderRadius: '6px', border: '1px solid #fecdd3', color: '#9f1239' }}>
                 Khách hàng: <strong>{rejectModal.returnItem?.customerName}</strong> - Đơn: <strong>{rejectModal.returnItem?.orderId}</strong>
-                <div style={{ fontSize: '0.75rem', marginTop: '0.2rem', color: '#be123c' }}>
+                <div style={{ fontSize: '0.8rem', marginTop: '0.2rem', color: '#be123c' }}>
                   Hành động này sẽ từ chối hỗ trợ thu hồi sản phẩm và lưu lý do vào hồ sơ đơn hàng.
                 </div>
               </div>
@@ -1826,7 +1826,7 @@ export default function CustomerService() {
                   placeholder="Nhập chi tiết lý do từ chối để phản hồi đến khách hàng..."
                   value={rejectModal.reason}
                   onChange={(e) => setRejectModal(prev => ({ ...prev, reason: e.target.value }))}
-                  style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem', boxSizing: 'border-box' }}
+                  style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #e3e8ef', fontSize: '0.82rem', boxSizing: 'border-box' }}
                 />
               </div>
 
@@ -1834,7 +1834,7 @@ export default function CustomerService() {
                 <button
                   type="button"
                   onClick={() => setRejectModal(null)}
-                  style={{ backgroundColor: '#ffffff', color: '#64748b', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.45rem 0.9rem', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}
+                  style={{ backgroundColor: '#ffffff', color: '#64748b', border: '1px solid #e3e8ef', borderRadius: '6px', padding: '0.45rem 0.9rem', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}
                 >
                   Hủy
                 </button>

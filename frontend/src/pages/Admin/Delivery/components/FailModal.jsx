@@ -55,7 +55,7 @@ export default function FailModal({ order: failModal, onClose, onConfirm }) {
             <h3 style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--danger)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
               <AlertTriangle size={18} /> Báo Sự Cố #{failModal.orderId || failModal.id}
             </h3>
-            <span style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>{failModal.customerName} · {failModal.phone}</span>
+            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{failModal.customerName} · {failModal.phone}</span>
           </div>
           <button type="button" onClick={onClose} className="delivery-icon-btn"><X size={16} /></button>
         </div>
@@ -67,7 +67,7 @@ export default function FailModal({ order: failModal, onClose, onConfirm }) {
           <div style={{ fontWeight: 800, fontSize: '0.8rem', color: isMaxAttempt ? 'var(--danger)' : 'var(--warning)' }}>
             Giao Thất Bại Lần {attemptCount} / 3
           </div>
-          <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '0.15rem' }}>
+          <div style={{ fontSize: '0.77rem', color: 'var(--text-secondary)', marginTop: '0.15rem' }}>
             {isMaxAttempt
               ? 'Đơn đã thất bại 3 lần. Hệ thống sẽ tự động CHUYỂN HOÀN VỀ KHO.'
               : 'Quy chuẩn cho phép giao tối đa 3 lần trước khi hoàn kho.'}
@@ -111,7 +111,7 @@ export default function FailModal({ order: failModal, onClose, onConfirm }) {
 
               {/* Chọn Ngày */}
               <div>
-                <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>
+                <label style={{ display: 'block', fontSize: '0.77rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>
                   <Calendar size={12} style={{ display: 'inline', marginRight: '3px' }} />
                   Ngày hẹn giao lại
                 </label>
@@ -126,7 +126,7 @@ export default function FailModal({ order: failModal, onClose, onConfirm }) {
                       type="button"
                       onClick={() => setAppointDateType(d.id)}
                       style={{
-                        padding: '0.3rem 0.65rem', borderRadius: '20px', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer',
+                        padding: '0.3rem 0.65rem', borderRadius: '20px', fontSize: '0.77rem', fontWeight: 700, cursor: 'pointer',
                         border: appointDateType === d.id ? '1.5px solid #7c3aed' : '1px solid var(--border-glass)',
                         backgroundColor: appointDateType === d.id ? '#7c3aed' : 'var(--bg-primary)',
                         color: appointDateType === d.id ? '#fff' : 'var(--text-secondary)'
@@ -149,7 +149,7 @@ export default function FailModal({ order: failModal, onClose, onConfirm }) {
 
               {/* Chọn Khung Giờ */}
               <div>
-                <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>
+                <label style={{ display: 'block', fontSize: '0.77rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>
                   <Clock size={12} style={{ display: 'inline', marginRight: '3px' }} />
                   Khung giờ hẹn giao
                 </label>
@@ -167,7 +167,7 @@ export default function FailModal({ order: failModal, onClose, onConfirm }) {
                       type="button"
                       onClick={() => setAppointTimeSlot(slot.value)}
                       style={{
-                        padding: '0.4rem 0.45rem', borderRadius: '6px', fontSize: '0.7rem', fontWeight: 700, cursor: 'pointer', textAlign: 'center',
+                        padding: '0.4rem 0.45rem', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', textAlign: 'center',
                         border: appointTimeSlot === slot.value ? '1.5px solid #7c3aed' : '1px solid var(--border-glass)',
                         backgroundColor: appointTimeSlot === slot.value ? 'rgba(124,58,237,0.12)' : 'var(--bg-primary)',
                         color: appointTimeSlot === slot.value ? '#7c3aed' : 'var(--text-secondary)'
@@ -179,7 +179,7 @@ export default function FailModal({ order: failModal, onClose, onConfirm }) {
                 </div>
                 {appointTimeSlot === 'EXACT' && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.4rem' }}>
-                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600 }}>Khách hẹn lúc:</span>
+                    <span style={{ fontSize: '0.77rem', color: 'var(--text-muted)', fontWeight: 600 }}>Khách hẹn lúc:</span>
                     <input
                       type="time"
                       value={exactTime}

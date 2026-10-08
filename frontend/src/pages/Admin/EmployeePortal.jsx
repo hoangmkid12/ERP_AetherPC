@@ -32,7 +32,7 @@ const LEAVE_TYPES = [
 
 const WEEKDAYS = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
 const card = { backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', padding: '1.25rem', boxShadow: '0 1px 3px rgba(15,23,42,0.04)' };
-const input = { width: '100%', padding: '0.6rem 0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem', boxSizing: 'border-box' };
+const input = { width: '100%', padding: '0.6rem 0.75rem', borderRadius: '8px', border: '1px solid #e3e8ef', fontSize: '0.9rem', boxSizing: 'border-box' };
 const label = { display: 'block', fontSize: '0.84rem', fontWeight: 600, color: '#334155', marginBottom: '0.35rem' };
 const btn = (bg, color = '#ffffff') => ({ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', backgroundColor: bg, color, border: 'none', borderRadius: '8px', padding: '0.6rem 1.15rem', fontSize: '0.9rem', fontWeight: 600, cursor: 'pointer' });
 const th = { padding: '0.7rem 0.8rem', textAlign: 'left', fontSize: '0.82rem', fontWeight: 600, color: '#475569', whiteSpace: 'nowrap' };
@@ -343,7 +343,7 @@ function LeavesTab({ balance, leaves, onChanged }) {
             <div key={t} style={{ ...card, padding: '0.75rem', textAlign: 'center' }}>
               <div style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 700 }}>{t}</div>
               <div style={{ fontSize: '1.6rem', fontWeight: 700, color: c }}>{v ?? '-'}</div>
-              <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>ngày phép năm</div>
+              <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>ngày phép năm</div>
             </div>
           ))}
         </div>
@@ -493,7 +493,7 @@ function DocsTab() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '0.65rem' }}>
         {filtered.map(d => (
           <button key={d.id} type="button" onClick={() => setOpen(d)} style={{ textAlign: 'left', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.75rem', backgroundColor: '#ffffff', cursor: 'pointer' }}>
-            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#2563eb', textTransform: 'uppercase' }}>{DOC_CATEGORIES[d.category] || d.category}</div>
+            <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#2563eb', textTransform: 'uppercase' }}>{DOC_CATEGORIES[d.category] || d.category}</div>
             <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#0f172a', margin: '0.2rem 0' }}>{d.title}</div>
             <div style={{ fontSize: '0.82rem', color: '#64748b', lineHeight: 1.4 }}>{(d.summary || d.content || '').slice(0, 130)}{(d.summary || d.content || '').length > 130 ? '…' : ''}</div>
           </button>

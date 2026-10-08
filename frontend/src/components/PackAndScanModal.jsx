@@ -142,7 +142,7 @@ export default function PackAndScanModal({ show, onClose, order, onConfirmPack }
           flexDirection: 'column',
           maxHeight: 'calc(100vh - 2rem)',
           boxShadow: '0 25px 50px rgba(0,0,0,0.25)',
-          border: '1px solid #cbd5e1'
+          border: '1px solid #e3e8ef'
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -158,7 +158,7 @@ export default function PackAndScanModal({ show, onClose, order, onConfirmPack }
           </div>
           <button
             onClick={onClose}
-            style={{ background: 'none', border: '1px solid #cbd5e1', borderRadius: '4px', padding: '0.25rem 0.6rem', cursor: 'pointer', color: '#475569', fontWeight: 600, fontSize: '0.8rem' }}
+            style={{ background: 'none', border: '1px solid #e3e8ef', borderRadius: '4px', padding: '0.25rem 0.6rem', cursor: 'pointer', color: '#475569', fontWeight: 600, fontSize: '0.8rem' }}
           >
             Đóng
           </button>
@@ -171,7 +171,7 @@ export default function PackAndScanModal({ show, onClose, order, onConfirmPack }
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#eff6ff', padding: '0.85rem 1.25rem', borderRadius: '8px', border: '1px solid #bfdbfe' }}>
             <div>
               <div style={{ fontWeight: 800, fontSize: '0.88rem', color: '#1e40af' }}>Tiện Ích Đối Soát Nhanh</div>
-              <div style={{ fontSize: '0.75rem', color: '#3b82f6', marginTop: '0.1rem' }}>
+              <div style={{ fontSize: '0.8rem', color: '#3b82f6', marginTop: '0.1rem' }}>
                 Quét mã vạch trực tiếp từ súng quét hoặc bấm Gán Mã Nhanh để hoàn tất tự động.
               </div>
             </div>
@@ -206,7 +206,7 @@ export default function PackAndScanModal({ show, onClose, order, onConfirmPack }
                 placeholder="Đặt con trỏ vào đây và quét máy quét mã vạch..."
                 value={barcodeInput}
                 onChange={e => setBarcodeInput(e.target.value)}
-                style={{ flex: 1, padding: '0.55rem 0.85rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.85rem' }}
+                style={{ flex: 1, padding: '0.55rem 0.85rem', borderRadius: '6px', border: '1px solid #e3e8ef', fontSize: '0.85rem' }}
               />
               <button
                 type="submit"
@@ -250,7 +250,7 @@ export default function PackAndScanModal({ show, onClose, order, onConfirmPack }
                         <div style={{ fontWeight: 800, fontSize: '0.88rem', color: '#0f172a' }}>
                           {item.name || item.productName || 'Linh Kiện Máy Tính'}
                         </div>
-                        <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.15rem' }}>
+                        <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.15rem' }}>
                           Mã định danh SP: <strong>#{pId}</strong> | Yêu cầu đóng gói: <strong>{reqQty} cái</strong>
                         </div>
                       </div>
@@ -258,7 +258,7 @@ export default function PackAndScanModal({ show, onClose, order, onConfirmPack }
                         <span style={{
                           padding: '3px 10px',
                           borderRadius: '4px',
-                          fontSize: '0.75rem',
+                          fontSize: '0.8rem',
                           fontWeight: 800,
                           backgroundColor: isFulfilled ? '#dcfce7' : '#fff7ed',
                           color: isFulfilled ? '#15803d' : '#c2410c',
@@ -283,7 +283,7 @@ export default function PackAndScanModal({ show, onClose, order, onConfirmPack }
                               backgroundColor: '#dbeafe',
                               color: '#1e40af',
                               borderRadius: '4px',
-                              fontSize: '0.75rem',
+                              fontSize: '0.8rem',
                               fontWeight: 700,
                               border: '1px solid #bfdbfe'
                             }}
@@ -313,7 +313,7 @@ export default function PackAndScanModal({ show, onClose, order, onConfirmPack }
           <button 
             type="button"
             onClick={onClose} 
-            style={{ padding: '0.55rem 1.15rem', fontSize: '0.82rem', backgroundColor: '#ffffff', border: '1px solid #cbd5e1', color: '#475569', borderRadius: '6px', fontWeight: 600, cursor: 'pointer' }}
+            style={{ padding: '0.55rem 1.15rem', fontSize: '0.82rem', backgroundColor: '#ffffff', border: '1px solid #e3e8ef', color: '#475569', borderRadius: '6px', fontWeight: 600, cursor: 'pointer' }}
           >
             Hủy Bỏ
           </button>

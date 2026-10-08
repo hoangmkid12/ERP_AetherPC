@@ -9,12 +9,12 @@ export default function DeliveryProgressStepper({ status }) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1.5rem', padding: '0.75rem 0' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#64748b' }}>
-          <div style={{ width: '22px', height: '22px', borderRadius: '50%', backgroundColor: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem' }}>✓</div>
+          <div style={{ width: '22px', height: '22px', borderRadius: '50%', backgroundColor: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.8rem' }}>✓</div>
           <span>Đặt hàng</span>
         </div>
         <div style={{ width: '80px', height: '2px', backgroundColor: '#ef4444' }} />
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#ef4444' }}>
-          <div style={{ width: '22px', height: '22px', borderRadius: '50%', backgroundColor: 'rgba(239,68,68,0.15)', border: '1.5px solid #ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 'bold' }}>✕</div>
+          <div style={{ width: '22px', height: '22px', borderRadius: '50%', backgroundColor: 'rgba(239,68,68,0.15)', border: '1.5px solid #ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.8rem', fontWeight: 'bold' }}>✕</div>
           <strong style={{ fontSize: '0.85rem' }}>Đã hủy đơn</strong>
         </div>
       </div>
@@ -64,12 +64,12 @@ export default function DeliveryProgressStepper({ status }) {
                 height: '30px',
                 borderRadius: '50%',
                 backgroundColor: isDone ? '#2563eb' : isActive ? '#eff6ff' : '#f8fafc',
-                border: isActive ? '2px solid #2563eb' : isDone ? '2px solid #2563eb' : '1px solid #cbd5e1',
+                border: isActive ? '2px solid #2563eb' : isDone ? '2px solid #2563eb' : '1px solid #e3e8ef',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 color: isDone ? '#ffffff' : isActive ? '#2563eb' : '#64748b',
-                fontSize: '0.75rem',
+                fontSize: '0.8rem',
                 fontWeight: 800,
                 boxShadow: isActive ? '0 0 10px rgba(37,99,235,0.3)' : 'none',
                 transition: 'all 0.3s ease'
@@ -77,7 +77,7 @@ export default function DeliveryProgressStepper({ status }) {
                 {isDone ? '✓' : idx + 1}
               </div>
               <span style={{
-                fontSize: '0.7rem',
+                fontSize: '0.75rem',
                 color: isDone || isActive ? '#0f172a' : '#64748b',
                 marginTop: '0.4rem',
                 textAlign: 'center',

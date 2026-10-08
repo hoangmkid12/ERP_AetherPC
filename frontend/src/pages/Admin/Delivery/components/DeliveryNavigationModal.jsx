@@ -477,7 +477,7 @@ export default function DeliveryNavigationModal({
               Lộ Trình Giao Hàng #{orderId}
             </h3>
           </div>
-          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+          <span style={{ fontSize: '0.77rem', color: 'var(--text-muted)' }}>
             Đề xuất tuyến đường giao hàng tối ưu và định vị GPS thực tế
           </span>
         </div>
@@ -587,7 +587,7 @@ export default function DeliveryNavigationModal({
             textDecoration: 'none',
             padding: '7px 12px',
             borderRadius: '999px',
-            fontSize: '0.74rem',
+            fontSize: '0.79rem',
             fontWeight: 800,
             display: 'flex',
             alignItems: 'center',
@@ -621,7 +621,7 @@ export default function DeliveryNavigationModal({
               height: '40px',
               backgroundColor: followHeading ? '#1d4ed8' : '#ffffff',
               color: followHeading ? '#ffffff' : '#1e293b',
-              border: followHeading ? '2px solid #60a5fa' : '1px solid #cbd5e1',
+              border: followHeading ? '2px solid #60a5fa' : '1px solid #e3e8ef',
               borderRadius: '50%',
               cursor: 'pointer',
               boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
@@ -654,7 +654,7 @@ export default function DeliveryNavigationModal({
               height: '40px',
               backgroundColor: '#ffffff',
               color: '#2563eb',
-              border: '1px solid #cbd5e1',
+              border: '1px solid #e3e8ef',
               borderRadius: '50%',
               cursor: 'pointer',
               boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
@@ -676,7 +676,7 @@ export default function DeliveryNavigationModal({
               height: '40px',
               backgroundColor: '#ffffff',
               color: '#5f6368',
-              border: '1px solid #cbd5e1',
+              border: '1px solid #e3e8ef',
               borderRadius: '50%',
               cursor: 'pointer',
               boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
@@ -711,7 +711,7 @@ export default function DeliveryNavigationModal({
               color: '#ffffff',
               padding: '6px 12px',
               borderRadius: '999px',
-              fontSize: '0.74rem',
+              fontSize: '0.79rem',
               fontWeight: 700,
               display: 'flex',
               alignItems: 'center',
@@ -735,7 +735,7 @@ export default function DeliveryNavigationModal({
             color: '#ffffff',
             padding: '5px 10px',
             borderRadius: '999px',
-            fontSize: '0.72rem',
+            fontSize: '0.77rem',
             fontWeight: 700,
             display: 'flex',
             alignItems: 'center',
@@ -820,7 +820,7 @@ export default function DeliveryNavigationModal({
           padding: '0.45rem 1rem',
           backgroundColor: '#fffbeb',
           color: '#b45309',
-          fontSize: '0.75rem',
+          fontSize: '0.8rem',
           display: 'flex',
           alignItems: 'center',
           gap: '0.4rem',
