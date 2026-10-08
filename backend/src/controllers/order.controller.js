@@ -179,7 +179,7 @@ const createOrder = async (req, res, next) => {
 
       // Tính toán chiết khấu hạng thành viên & voucher
       const memberDiscount = Math.round(subtotal * tierDiscountPercent);
-      const couponDiscount = Math.max(0, parseFloat(req.body.couponDiscount || req.body.discountAmount || 0));
+      let couponDiscount = Math.max(0, parseFloat(req.body.couponDiscount || req.body.discountAmount || 0));
 
       // Hạn mức chiết khấu bán lẻ tại quầy (POS) — trước đây chỉ chặn ở UI
       // (SalesPOS.jsx), nhân viên Sales có thể gọi thẳng API để vượt hạn mức
@@ -191,6 +191,17 @@ const createOrder = async (req, res, next) => {
           const error = new Error('Mức chiết khấu vượt quá 10% cần được Quản Lý Bán Hàng hoặc CEO duyệt (quyền "Duyệt chiết khấu bán lẻ vượt hạn mức" trong Ma Trận Phân Quyền).');
           error.statusCode = 403;
           throw error;
+        }
+      }
+
+      // Phòng trường hợp client cũ gửi couponDiscount gộp cả memberDiscount:
+      // Nếu tổng tiền client gửi lên (totalAmount) khớp với (subtotal - couponDiscount),
+      // chứng tỏ couponDiscount gửi lên đã bao gồm cả memberDiscount. Ta tách ra để không cộng trùng lặp.
+      if (req.body.totalAmount !== undefined && memberDiscount > 0 && couponDiscount >= memberDiscount) {
+        const expectedWithOnlyCoupon = subtotal - couponDiscount;
+        const requestedTotal = parseFloat(req.body.totalAmount);
+        if (Math.abs(expectedWithOnlyCoupon - requestedTotal) < 1) {
+          couponDiscount = Math.max(0, couponDiscount - memberDiscount);
         }
       }
 
