@@ -7,7 +7,7 @@ import { ASSEMBLY_STATUS, getStatusInfo } from '../../utils/statusLabels';
 import { 
   Wrench, Play, CheckCircle2, ShieldCheck, ClipboardList, Plus, AlertCircle, 
   Truck, XCircle, Search, Cpu, HardDrive, Zap, Layers, Check, X, Printer,
-  Eye, Calendar, User, Package, Award, TrendingUp, BarChart2, ShieldAlert, Sparkles
+  Eye, Calendar, User, Package, Award, TrendingUp, BarChart2, ShieldAlert, Sparkles, Clock
 } from 'lucide-react';
 import { printDocument } from '../../utils/printDocument';
 import PeriodFilterBar, { isDateInPeriod } from '../../components/Common/PeriodFilterBar';
@@ -437,37 +437,92 @@ export default function Assembly() {
       {/* ========================================================================= */}
       {activeTab === 'overview' && (
         <div>
-          {/* 6 Odoo KPI Cards */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.85rem', marginBottom: '1.25rem' }}>
-            <div className="erp-stat" style={{ backgroundColor: '#ffffff', padding: '1rem 0.75rem', borderRadius: '10px', border: '1px solid #e3e8ef', boxShadow: '0 1px 2px rgba(15,23,42,0.04)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '92px' }}>
-              <div className="erp-stat-value" style={{ fontSize: '1.5rem', fontWeight: 800, color: '#d97706' }}>{pendingJobs.length}</div>
-              <div className="erp-stat-label" style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', marginTop: '0.25rem' }}>Chờ Tiếp Nhận</div>
-            </div>
+          {/* 6 Balanced KPI Cards in 2 Rows x 3 Columns (CEO style) */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem', marginBottom: '1.25rem' }}>
+            {[
+              {
+                label: 'Chờ Tiếp Nhận',
+                value: `${pendingJobs.length} lệnh`,
+                change: 'Chờ nhận linh kiện ráp máy',
+                icon: <Clock size={20} />,
+                color: '#d97706',
+                bg: '#fffbeb'
+              },
+              {
+                label: 'Đang Lắp Ráp & Test',
+                value: `${assemblingJobs.length} lệnh`,
+                change: 'Kỹ thuật viên đang build & benchmark',
+                icon: <Wrench size={20} />,
+                color: '#2563eb',
+                bg: '#eff6ff'
+              },
+              {
+                label: 'Hoàn Thành Hôm Nay',
+                value: `${completedToday.length} máy`,
+                change: 'Máy ráp xong trong ngày hôm nay',
+                icon: <CheckCircle2 size={20} />,
+                color: '#16a34a',
+                bg: '#f0fdf4'
+              },
+              {
+                label: 'Tổng Máy Đã Xuất Xưởng',
+                value: `${totalCompleted.length} máy`,
+                change: 'Toàn bộ đơn ráp xong trong kỳ',
+                icon: <Package size={20} />,
+                color: '#0f172a',
+                bg: '#f8fafc'
+              },
+              {
+                label: 'Tỷ Lệ Nghiệm Thu Thành Công',
+                value: acceptanceRateLabel,
+                change: 'Đạt chuẩn 4 bước kiểm thử QA',
+                icon: <ShieldCheck size={20} />,
+                color: '#10b981',
+                bg: '#ecfdf5'
+              },
+              {
+                label: 'Thời Gian Hoàn Thành TB',
+                value: avgCompletionLabel,
+                change: 'Thời gian bình quân hoàn tất / máy',
+                icon: <Sparkles size={20} />,
+                color: '#8b5cf6',
+                bg: '#f5f3ff'
+              }
+            ].map((st, sIdx) => (
+              <div
+                key={sIdx}
+                style={{
+                  backgroundColor: '#ffffff',
+                  borderRadius: '10px',
+                  border: '1px solid #e3e8ef',
+                  padding: '1.1rem 1.25rem',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  minHeight: '102px',
+                  boxSizing: 'border-box',
+                  boxShadow: '0 2px 8px rgba(15, 23, 42, 0.04)'
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
+                    {st.label}
+                  </span>
+                  <div style={{ width: '36px', height: '36px', borderRadius: '8px', backgroundColor: st.bg, color: st.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    {st.icon}
+                  </div>
+                </div>
 
-            <div className="erp-stat" style={{ backgroundColor: '#ffffff', padding: '1rem 0.75rem', borderRadius: '10px', border: '1px solid #e3e8ef', boxShadow: '0 1px 2px rgba(15,23,42,0.04)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '92px' }}>
-              <div className="erp-stat-value" style={{ fontSize: '1.5rem', fontWeight: 800, color: '#2563eb' }}>{assemblingJobs.length}</div>
-              <div className="erp-stat-label" style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', marginTop: '0.25rem' }}>Đang Lắp Ráp & Test</div>
-            </div>
-
-            <div className="erp-stat" style={{ backgroundColor: '#ffffff', padding: '1rem 0.75rem', borderRadius: '10px', border: '1px solid #e3e8ef', boxShadow: '0 1px 2px rgba(15,23,42,0.04)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '92px' }}>
-              <div className="erp-stat-value" style={{ fontSize: '1.5rem', fontWeight: 800, color: '#16a34a' }}>{completedToday.length}</div>
-              <div className="erp-stat-label" style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', marginTop: '0.25rem' }}>Hoàn Thành Hôm Nay</div>
-            </div>
-
-            <div className="erp-stat" style={{ backgroundColor: '#ffffff', padding: '1rem 0.75rem', borderRadius: '10px', border: '1px solid #e3e8ef', boxShadow: '0 1px 2px rgba(15,23,42,0.04)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '92px' }}>
-              <div className="erp-stat-value" style={{ fontSize: '1.5rem', fontWeight: 800, color: '#0f172a' }}>{totalCompleted.length}</div>
-              <div className="erp-stat-label" style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', marginTop: '0.25rem' }}>Tổng Máy Đã Xuất Xưởng</div>
-            </div>
-
-            <div className="erp-stat" style={{ backgroundColor: '#ffffff', padding: '1rem 0.75rem', borderRadius: '10px', border: '1px solid #e3e8ef', boxShadow: '0 1px 2px rgba(15,23,42,0.04)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '92px' }}>
-              <div className="erp-stat-value" style={{ fontSize: '1.5rem', fontWeight: 800, color: '#10b981' }}>{acceptanceRateLabel}</div>
-              <div className="erp-stat-label" style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', marginTop: '0.25rem' }}>Tỷ Lệ Nghiệm Thu Thành Công</div>
-            </div>
-
-            <div className="erp-stat" style={{ backgroundColor: '#ffffff', padding: '1rem 0.75rem', borderRadius: '10px', border: '1px solid #e3e8ef', boxShadow: '0 1px 2px rgba(15,23,42,0.04)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '92px' }}>
-              <div className="erp-stat-value" style={{ fontSize: '1.5rem', fontWeight: 800, color: '#8b5cf6' }}>{avgCompletionLabel}</div>
-              <div className="erp-stat-label" style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', marginTop: '0.25rem' }}>Thời Gian Hoàn Thành TB</div>
-            </div>
+                <div style={{ marginTop: '0.45rem' }}>
+                  <div className="erp-kpi-value" style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={st.value}>
+                    {st.value}
+                  </div>
+                  <div className="erp-kpi-sub" style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.15rem' }}>
+                    {st.change}
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
 
           {/* Ongoing Jobs Queue */}

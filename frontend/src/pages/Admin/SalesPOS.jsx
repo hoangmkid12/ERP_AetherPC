@@ -14,7 +14,7 @@ import {
   Search, ShoppingCart, Plus, Minus, Trash2, Printer, FileText,
   BarChart2, DollarSign, Users, Award, ClipboardList, TrendingUp, Truck, X, Check,
   Eye, EyeOff, MapPin, Phone, User, Package, Calendar, Tag, ChevronLeft, ChevronRight,
-  CreditCard, ShieldCheck, CheckCircle2, ArrowRight, RefreshCw, AlertCircle, Lock
+  CreditCard, ShieldCheck, CheckCircle2, ArrowRight, RefreshCw, AlertCircle, Lock, Clock
 } from 'lucide-react';
 import { formatCompactVnd } from '../../utils/formatCompact';
 
@@ -604,7 +604,7 @@ export default function SalesPOS() {
     return orders.filter(o => isDateInPeriod(o.date || o.createdAt, overviewPeriod));
   }, [orders, overviewPeriod]);
 
-  const activeOrdersInPeriod = ordersInPeriod.filter(o => o.status !== 'CANCELLED');
+  const activeOrdersInPeriod = ordersInPeriod.filter(o => !['CANCELLED', 'FAILED_DELIVERY'].includes(o.status));
   const totalRevenue = activeOrdersInPeriod.reduce((sum, o) => sum + (parseFloat(o.totalAmount || o.total) || 0), 0);
   const pendingConfirmationCount = ordersInPeriod.filter(o => ['PENDING', 'WAITING_PAYMENT'].includes(o.status)).length;
   const pendingDeliveryCount = ordersInPeriod.filter(o => ['CONFIRMED', 'PROCESSING', 'READY_TO_SHIP', 'SHIPPED'].includes(o.status)).length;
@@ -821,41 +821,94 @@ export default function SalesPOS() {
       {/* ========================================================================= */}
       {activeTab === 'overview' && (
         <div>
-          {/* 6 Odoo KPI Cards */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.85rem', marginBottom: '1.25rem' }}>
-            <div className="erp-stat" style={{ backgroundColor: '#ffffff', padding: '1rem 0.75rem', borderRadius: '10px', border: '1px solid #e3e8ef', boxShadow: '0 1px 2px rgba(15,23,42,0.04)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '92px', boxSizing: 'border-box' }}>
-              <div className="erp-stat-value" style={{ fontSize: '1.15rem', fontWeight: 800, color: '#16a34a', whiteSpace: 'nowrap', letterSpacing: '-0.01em' }} title={formatCurrency(totalRevenue)}>
-                {formatCompactVnd(totalRevenue)}
+          {/* 6 Balanced KPI Cards in 2 Rows x 3 Columns (CEO style) */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem', marginBottom: '1.25rem' }}>
+            {[
+              {
+                label: 'Tổng Doanh Thu',
+                value: formatCompactVnd(totalRevenue),
+                full: formatCurrency(totalRevenue),
+                change: 'Cả trực tuyến & tại quầy',
+                icon: <DollarSign size={20} />,
+                color: '#16a34a',
+                bg: '#f0fdf4'
+              },
+              {
+                label: 'Chờ Xác Nhận',
+                value: `${pendingConfirmationCount} đơn`,
+                change: 'Cần nhân viên trực ban xử lý',
+                icon: <Clock size={20} />,
+                color: '#d97706',
+                bg: '#fffbeb'
+              },
+              {
+                label: 'Đang Vận Chuyển',
+                value: `${pendingDeliveryCount} đơn`,
+                change: 'Đang đóng gói & giao hàng',
+                icon: <Truck size={20} />,
+                color: '#2563eb',
+                bg: '#eff6ff'
+              },
+              {
+                label: 'Giao Hoàn Tất',
+                value: `${completedCount} đơn`,
+                change: 'Đơn giao hàng thành công',
+                icon: <CheckCircle2 size={20} />,
+                color: '#15803d',
+                bg: '#f0fdf4'
+              },
+              {
+                label: 'Đơn Trung Bình',
+                value: formatCompactVnd(averageOrderValue),
+                full: formatCurrency(averageOrderValue),
+                change: 'Giá trị bình quân / đơn hợp lệ',
+                icon: <TrendingUp size={20} />,
+                color: '#0f172a',
+                bg: '#f8fafc'
+              },
+              {
+                label: 'Khách Mua Hàng',
+                value: `${customersInPeriodCount} khách`,
+                change: 'Khách phát sinh mua trong kỳ',
+                icon: <Users size={20} />,
+                color: '#8b5cf6',
+                bg: '#f5f3ff'
+              }
+            ].map((st, sIdx) => (
+              <div
+                key={sIdx}
+                style={{
+                  backgroundColor: '#ffffff',
+                  borderRadius: '10px',
+                  border: '1px solid #e3e8ef',
+                  padding: '1.1rem 1.25rem',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  minHeight: '102px',
+                  boxSizing: 'border-box',
+                  boxShadow: '0 2px 8px rgba(15, 23, 42, 0.04)'
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
+                    {st.label}
+                  </span>
+                  <div style={{ width: '36px', height: '36px', borderRadius: '8px', backgroundColor: st.bg, color: st.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    {st.icon}
+                  </div>
+                </div>
+
+                <div style={{ marginTop: '0.45rem' }}>
+                  <div className="erp-kpi-value" style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={st.full || st.value}>
+                    {st.value}
+                  </div>
+                  <div className="erp-kpi-sub" style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.15rem' }}>
+                    {st.change}
+                  </div>
+                </div>
               </div>
-              <div className="erp-stat-label" style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', marginTop: '0.25rem', whiteSpace: 'nowrap' }}>Tổng Doanh Thu</div>
-            </div>
-
-            <div className="erp-stat" style={{ backgroundColor: '#ffffff', padding: '1rem 0.75rem', borderRadius: '10px', border: '1px solid #e3e8ef', boxShadow: '0 1px 2px rgba(15,23,42,0.04)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '92px', boxSizing: 'border-box' }}>
-              <div className="erp-stat-value" style={{ fontSize: '1.45rem', fontWeight: 800, color: '#d97706', whiteSpace: 'nowrap' }}>{pendingConfirmationCount}</div>
-              <div className="erp-stat-label" style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', marginTop: '0.25rem', whiteSpace: 'nowrap' }}>Chờ Xác Nhận</div>
-            </div>
-
-            <div className="erp-stat" style={{ backgroundColor: '#ffffff', padding: '1rem 0.75rem', borderRadius: '10px', border: '1px solid #e3e8ef', boxShadow: '0 1px 2px rgba(15,23,42,0.04)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '92px', boxSizing: 'border-box' }}>
-              <div className="erp-stat-value" style={{ fontSize: '1.45rem', fontWeight: 800, color: '#2563eb', whiteSpace: 'nowrap' }}>{pendingDeliveryCount}</div>
-              <div className="erp-stat-label" style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', marginTop: '0.25rem', whiteSpace: 'nowrap' }}>Đang Vận Chuyển</div>
-            </div>
-
-            <div className="erp-stat" style={{ backgroundColor: '#ffffff', padding: '1rem 0.75rem', borderRadius: '10px', border: '1px solid #e3e8ef', boxShadow: '0 1px 2px rgba(15,23,42,0.04)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '92px', boxSizing: 'border-box' }}>
-              <div className="erp-stat-value" style={{ fontSize: '1.45rem', fontWeight: 800, color: '#15803d', whiteSpace: 'nowrap' }}>{completedCount}</div>
-              <div className="erp-stat-label" style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', marginTop: '0.25rem', whiteSpace: 'nowrap' }}>Giao Hoàn Tất</div>
-            </div>
-
-            <div className="erp-stat" style={{ backgroundColor: '#ffffff', padding: '1rem 0.75rem', borderRadius: '10px', border: '1px solid #e3e8ef', boxShadow: '0 1px 2px rgba(15,23,42,0.04)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '92px', boxSizing: 'border-box' }}>
-              <div className="erp-stat-value" style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', whiteSpace: 'nowrap', letterSpacing: '-0.01em' }} title={formatCurrency(averageOrderValue)}>
-                {formatCompactVnd(averageOrderValue)}
-              </div>
-              <div className="erp-stat-label" style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', marginTop: '0.25rem', whiteSpace: 'nowrap' }}>Đơn Trung Bình</div>
-            </div>
-
-            <div className="erp-stat" style={{ backgroundColor: '#ffffff', padding: '1rem 0.75rem', borderRadius: '10px', border: '1px solid #e3e8ef', boxShadow: '0 1px 2px rgba(15,23,42,0.04)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '92px', boxSizing: 'border-box' }}>
-              <div className="erp-stat-value" style={{ fontSize: '1.45rem', fontWeight: 800, color: '#8b5cf6', whiteSpace: 'nowrap' }}>{customersInPeriodCount}</div>
-              <div className="erp-stat-label" style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', marginTop: '0.25rem', whiteSpace: 'nowrap' }}>Khách Mua Hàng</div>
-            </div>
+            ))}
           </div>
 
           {/* Quick Actions & Recent Orders Grid */}

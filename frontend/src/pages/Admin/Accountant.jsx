@@ -1075,7 +1075,6 @@ export default function Accountant() {
       {/* ========================================================================= */}
       {activeTab === 'overview' && (
         <div>
-          <ActorNotificationBar />
           {/* 6 Balanced KPI Cards (2 Rows x 3 Columns) */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem', marginBottom: '1.25rem' }}>
             {stats.map((st, sIdx) => (

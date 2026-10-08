@@ -14,15 +14,11 @@ export const parsePeriodDate = (val) => {
   }
   if (typeof val === 'string') {
     const trimmed = val.trim();
-    if (trimmed.includes('/')) {
-      const parts = trimmed.split('/');
-      if (parts.length === 3) {
-        const day = parseInt(parts[0], 10);
-        const month = parseInt(parts[1], 10) - 1;
-        const year = parseInt(parts[2], 10);
-        const d = new Date(year, month, day);
-        if (!isNaN(d.getTime())) return d;
-      }
+    // Khớp DD/MM/YYYY hoặc DD/MM/YYYY HH:mm
+    const vn = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    if (vn) {
+      const d = new Date(Number(vn[3]), Number(vn[2]) - 1, Number(vn[1]));
+      if (!isNaN(d.getTime())) return d;
     }
     const d = new Date(trimmed);
     if (!isNaN(d.getTime())) return d;
@@ -33,48 +29,40 @@ export const parsePeriodDate = (val) => {
 export const isDateInPeriod = (dateVal, period) => {
   if (!period || period === 'ALL') return true;
   const d = parsePeriodDate(dateVal);
-  if (!d) return true;
+  if (!d) return false;
 
   const now = new Date();
 
-  const toYMD = (dateObj) => {
-    const yyyy = dateObj.getFullYear();
-    const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
-    const dd = String(dateObj.getDate()).padStart(2, '0');
-    return `${yyyy}-${mm}-${dd}`;
-  };
-
-  const itemYMD = toYMD(d);
-  const todayYMD = toYMD(now);
+  // So sánh theo ngày (bỏ qua giờ phút giây)
+  const itemDate = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
   if (period === 'TODAY') {
-    return itemYMD === todayYMD;
+    return itemDate.getTime() === today.getTime();
   }
 
   if (period === 'THIS_WEEK') {
-    const day = now.getDay();
-    const diffToMon = day === 0 ? -6 : 1 - day;
-    const monday = new Date(now);
-    monday.setDate(now.getDate() + diffToMon);
-    monday.setHours(0, 0, 0, 0);
+    const day = today.getDay();
+    const diffToMon = day === 0 ? -6 : 1 - day; // Thứ 2 là đầu tuần
+    const monday = new Date(today);
+    monday.setDate(today.getDate() + diffToMon);
     const sunday = new Date(monday);
     sunday.setDate(monday.getDate() + 6);
-    sunday.setHours(23, 59, 59, 999);
-    return d >= monday && d <= sunday;
+    return itemDate >= monday && itemDate <= sunday;
   }
 
   if (period === 'THIS_MONTH') {
-    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+    return itemDate.getFullYear() === today.getFullYear() && itemDate.getMonth() === today.getMonth();
   }
 
   if (period === 'THIS_QUARTER') {
-    const currentQuarter = Math.floor(now.getMonth() / 3);
-    const itemQuarter = Math.floor(d.getMonth() / 3);
-    return itemQuarter === currentQuarter && d.getFullYear() === now.getFullYear();
+    const currentQuarter = Math.floor(today.getMonth() / 3);
+    const itemQuarter = Math.floor(itemDate.getMonth() / 3);
+    return itemDate.getFullYear() === today.getFullYear() && itemQuarter === currentQuarter;
   }
 
   if (period === 'THIS_YEAR') {
-    return d.getFullYear() === now.getFullYear();
+    return itemDate.getFullYear() === today.getFullYear();
   }
 
   return true;
@@ -91,12 +79,26 @@ export const PERIOD_OPTIONS = [
 
 /**
  * Thanh nút bấm lọc kỳ thời gian chuẩn Odoo / ERP AetherPC
+ * Hỗ trợ linh hoạt cả các prop: selectedPeriod/period và onSelectPeriod/onChange
  */
 export default function PeriodFilterBar({
-  period = 'ALL',
+  period,
+  selectedPeriod,
   onChange,
+  onSelectPeriod,
   style = {}
 }) {
+  const activeKey = selectedPeriod || period || 'ALL';
+
+  const handleClick = (key) => {
+    if (typeof onSelectPeriod === 'function') {
+      onSelectPeriod(key);
+    }
+    if (typeof onChange === 'function') {
+      onChange(key);
+    }
+  };
+
   return (
     <div
       style={{
@@ -114,12 +116,12 @@ export default function PeriodFilterBar({
     >
       <Calendar size={15} style={{ color: '#2563eb', marginRight: '0.15rem' }} />
       {PERIOD_OPTIONS.map(p => {
-        const active = period === p.key;
+        const active = activeKey === p.key;
         return (
           <button
             key={p.key}
             type="button"
-            onClick={() => onChange && onChange(p.key)}
+            onClick={() => handleClick(p.key)}
             style={{
               padding: '0.28rem 0.6rem',
               fontSize: '0.78rem',

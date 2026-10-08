@@ -30,8 +30,9 @@ import {
 import { formatCurrencyInWords } from '../../utils/numberToWords';
 import OrderDetailModal from '../../components/OrderDetailModal';
 import { getRoleName } from '../../utils/rbacEngine';
-import { printDocument } from '../../utils/printDocument';
 import { SignatureRow, SignatureCell, displaySigner, historySigner } from '../../components/Signature/ESignature';
+import { formatCompactVnd } from '../../utils/formatCompact';
+import PeriodFilterBar from '../../components/Common/PeriodFilterBar';
 
 // Register ChartJS modules
 ChartJS.register(
@@ -730,10 +731,10 @@ export default function Dashboard() {
 
   // 6 Balanced Executive KPI Cards
   const stats = [
-    { label: 'Tổng Doanh Thu', value: formatPrice(totalRevenueVal), change: 'Cả trực tuyến & tại quầy', icon: <DollarSign size={20} />, color: '#16a34a', bg: '#f0fdf4' },
-    { label: 'Lợi Nhuận Gộp', value: formatPrice(grossProfit), change: `Tỷ suất lợi nhuận ${grossMarginPct.toFixed(1)}%`, icon: <TrendingUp size={20} />, color: '#2563eb', bg: '#eff6ff' },
-    { label: 'Giá Trị Tồn Kho', value: formatPrice(totalInventoryAsset), change: `${inventory.length} mã linh kiện lưu kho`, icon: <Package size={20} />, color: '#8b5cf6', bg: '#f5f3ff' },
-    { label: 'Quỹ Lương Nhân Sự', value: formatPrice(totalPayrollCost), change: `${employees.length} nhân sự toàn công ty`, icon: <Users size={20} />, color: '#0ea5e9', bg: '#f0f9ff' },
+    { label: 'Tổng Doanh Thu', value: formatCompactVnd(totalRevenueVal), full: formatPrice(totalRevenueVal), change: 'Cả trực tuyến & tại quầy', icon: <DollarSign size={20} />, color: '#16a34a', bg: '#f0fdf4' },
+    { label: 'Lợi Nhuận Gộp', value: formatCompactVnd(grossProfit), full: formatPrice(grossProfit), change: `Tỷ suất lợi nhuận ${grossMarginPct.toFixed(1)}%`, icon: <TrendingUp size={20} />, color: '#2563eb', bg: '#eff6ff' },
+    { label: 'Giá Trị Tồn Kho', value: formatCompactVnd(totalInventoryAsset), full: formatPrice(totalInventoryAsset), change: `${inventory.length} mã linh kiện lưu kho`, icon: <Package size={20} />, color: '#8b5cf6', bg: '#f5f3ff' },
+    { label: 'Quỹ Lương Nhân Sự', value: formatCompactVnd(totalPayrollCost), full: formatPrice(totalPayrollCost), change: `${employees.length} nhân sự toàn công ty`, icon: <Users size={20} />, color: '#0ea5e9', bg: '#f0f9ff' },
     { label: 'Cảnh Báo Tồn Kho Thấp', value: `${lowStockCount} linh kiện`, change: 'Cần duyệt thêm RFQ/PO', icon: <AlertTriangle size={20} />, color: '#d97706', bg: '#fffbeb' },
     { label: 'Chờ CEO Phê Duyệt', value: `${totalPendingCeoApprovals} nhiệm vụ`, change: 'PO, Bảng lương, Nghỉ phép', icon: <Bell size={20} />, color: '#ef4444', bg: '#fef2f2' }
   ];
@@ -955,38 +956,7 @@ export default function Dashboard() {
         </div>
 
         {/* Integrated Date Filter Bar */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap', backgroundColor: '#ffffff', padding: '0.35rem 0.6rem', borderRadius: '8px', border: '1px solid #e3e8ef' }}>
-          <Calendar size={15} style={{ color: '#2563eb' }} />
-          {[
-            { key: 'ALL', label: 'Tất cả' },
-            { key: 'TODAY', label: 'Hôm nay' },
-            { key: 'THIS_WEEK', label: 'Tuần này' },
-            { key: 'THIS_MONTH', label: 'Tháng này' },
-            { key: 'THIS_QUARTER', label: 'Quý này' },
-            { key: 'THIS_YEAR', label: 'Năm nay' }
-          ].map(p => {
-            const active = dateFilterPeriod === p.key;
-            return (
-              <button
-                key={p.key}
-                onClick={() => setDateFilterPeriod(p.key)}
-                style={{
-                  padding: '0.3rem 0.6rem',
-                  fontSize: '0.8rem',
-                  fontWeight: active ? 800 : 600,
-                  borderRadius: '5px',
-                  border: 'none',
-                  backgroundColor: active ? '#2563eb' : 'transparent',
-                  color: active ? '#ffffff' : '#475569',
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease'
-                }}
-              >
-                {p.label}
-              </button>
-            );
-          })}
-        </div>
+        <PeriodFilterBar selectedPeriod={dateFilterPeriod} onSelectPeriod={setDateFilterPeriod} />
       </div>
 
       {/* ========================================================================= */}
@@ -1089,10 +1059,10 @@ export default function Dashboard() {
                 </div>
 
                 <div style={{ marginTop: '0.45rem' }}>
-                  <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={st.value}>
+                  <div className="erp-kpi-value" style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={st.full || st.value}>
                     {st.value}
                   </div>
-                  <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.15rem' }}>
+                  <div className="erp-kpi-sub" style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.15rem' }}>
                     {st.change}
                   </div>
                 </div>
