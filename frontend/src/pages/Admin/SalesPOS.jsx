@@ -9,12 +9,14 @@ import { api } from '../../services/api';
 import { ORDER_STATUS, getStatusInfo, CUSTOMER_TIER, getStatusLabel } from '../../utils/statusLabels';
 import ActorNotificationBar from '../../components/ActorNotificationBar';
 import DateRangeFilter from '../../components/Common/DateRangeFilter';
+import PeriodFilterBar, { isDateInPeriod } from '../../components/Common/PeriodFilterBar';
 import { 
   Search, ShoppingCart, Plus, Minus, Trash2, Printer, FileText,
   BarChart2, DollarSign, Users, Award, ClipboardList, TrendingUp, Truck, X, Check,
   Eye, EyeOff, MapPin, Phone, User, Package, Calendar, Tag, ChevronLeft, ChevronRight,
   CreditCard, ShieldCheck, CheckCircle2, ArrowRight, RefreshCw, AlertCircle, Lock
 } from 'lucide-react';
+import { formatCompactVnd } from '../../utils/formatCompact';
 
 const CATEGORY_MAP_VI = {
   CPU: 'Bộ Vi Xử Lý (CPU)',
@@ -594,13 +596,32 @@ export default function SalesPOS() {
       });
   }, [orders, orderSearch, orderStatusFilter, orderStartDate, orderEndDate]);
 
-  // KPI Metrics Calculation
-  const activeOrders = orders.filter(o => o.status !== 'CANCELLED');
-  const totalRevenue = activeOrders.reduce((sum, o) => sum + (parseFloat(o.totalAmount || o.total) || 0), 0);
-  const pendingConfirmationCount = orders.filter(o => ['PENDING', 'WAITING_PAYMENT'].includes(o.status)).length;
-  const pendingDeliveryCount = orders.filter(o => ['CONFIRMED', 'PROCESSING', 'READY_TO_SHIP', 'SHIPPED'].includes(o.status)).length;
-  const completedCount = orders.filter(o => ['DELIVERED', 'DONE', 'COMPLETED'].includes(o.status)).length;
-  const averageOrderValue = activeOrders.length > 0 ? Math.round(totalRevenue / activeOrders.length) : 0;
+  // Overview Period Filter
+  const [overviewPeriod, setOverviewPeriod] = useState('ALL');
+
+  // KPI Metrics Calculation filtered by overview period
+  const ordersInPeriod = useMemo(() => {
+    return orders.filter(o => isDateInPeriod(o.date || o.createdAt, overviewPeriod));
+  }, [orders, overviewPeriod]);
+
+  const activeOrdersInPeriod = ordersInPeriod.filter(o => o.status !== 'CANCELLED');
+  const totalRevenue = activeOrdersInPeriod.reduce((sum, o) => sum + (parseFloat(o.totalAmount || o.total) || 0), 0);
+  const pendingConfirmationCount = ordersInPeriod.filter(o => ['PENDING', 'WAITING_PAYMENT'].includes(o.status)).length;
+  const pendingDeliveryCount = ordersInPeriod.filter(o => ['CONFIRMED', 'PROCESSING', 'READY_TO_SHIP', 'SHIPPED'].includes(o.status)).length;
+  const completedCount = ordersInPeriod.filter(o => ['DELIVERED', 'DONE', 'COMPLETED'].includes(o.status)).length;
+  const averageOrderValue = activeOrdersInPeriod.length > 0 ? Math.round(totalRevenue / activeOrdersInPeriod.length) : 0;
+
+  const customersInPeriodCount = useMemo(() => {
+    const custMap = new Set();
+    ordersInPeriod.forEach(o => {
+      const phoneKey = o.phone || o.customerPhone || o.customerName;
+      if (phoneKey) custMap.add(phoneKey);
+    });
+    return custMap.size;
+  }, [ordersInPeriod]);
+
+  const posOrdersInPeriodCount = ordersInPeriod.filter(o => o.channel === 'POS' || o.source === 'POS' || o.orderType === 'POS').length;
+  const onlineOrdersInPeriodCount = ordersInPeriod.length - posOrdersInPeriodCount;
 
   // Customers calculation for Tab 'customers'
   const derivedCustomers = useMemo(() => {
@@ -675,19 +696,24 @@ export default function SalesPOS() {
       {/* ========================================================================= */}
       
       {/* Dynamic Title for Active Tab */}
-      <div style={{ marginBottom: '1.25rem' }}>
-        <h2 style={{ fontSize: '1.35rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
-          {activeTab === 'overview' && 'Tổng Quan Phân Hệ Bán Hàng & Doanh Thu'}
-          {activeTab === 'pos' && 'Điểm Bán Hàng Trực Tiếp Tại Quầy'}
-          {activeTab === 'orders' && 'Quản Lý Đơn Hàng Bán Lẻ & Online'}
-          {activeTab === 'customers' && 'Danh Bạ & Hồ Sơ Khách Hàng'}
-          {activeTab === 'catalog' && 'Danh Mục Sản Phẩm & Hiển Thị Trang Bán Hàng'}
-          {activeTab === 'promotions' && 'Chương Trình Khuyến Mãi & Bảng Giá Ưu Đãi'}
-          {activeTab === 'reports' && 'Báo Cáo Doanh Thu & Hiệu Suất Kinh Doanh'}
-        </h2>
-        <p style={{ color: '#64748b', fontSize: '0.85rem', margin: '0.25rem 0 0' }}>
-          Quản lý toàn diện quy trình bán lẻ, tư vấn báo giá, xuất hóa đơn POS và theo dõi đơn hàng
-        </p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.25rem' }}>
+        <div>
+          <h2 style={{ fontSize: '1.35rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+            {activeTab === 'overview' && 'Tổng Quan Phân Hệ Bán Hàng & Doanh Thu'}
+            {activeTab === 'pos' && 'Điểm Bán Hàng Trực Tiếp Tại Quầy'}
+            {activeTab === 'orders' && 'Quản Lý Đơn Hàng Bán Lẻ & Online'}
+            {activeTab === 'customers' && 'Danh Bạ & Hồ Sơ Khách Hàng'}
+            {activeTab === 'catalog' && 'Danh Mục Sản Phẩm & Hiển Thị Trang Bán Hàng'}
+            {activeTab === 'promotions' && 'Chương Trình Khuyến Mãi & Bảng Giá Ưu Đãi'}
+            {activeTab === 'reports' && 'Báo Cáo Doanh Thu & Hiệu Suất Kinh Doanh'}
+          </h2>
+          <p style={{ color: '#64748b', fontSize: '0.85rem', margin: '0.25rem 0 0' }}>
+            Quản lý toàn diện quy trình bán lẻ, tư vấn báo giá, xuất hóa đơn POS và theo dõi đơn hàng
+          </p>
+        </div>
+        {activeTab === 'overview' && (
+          <PeriodFilterBar selectedPeriod={overviewPeriod} onSelectPeriod={setOverviewPeriod} />
+        )}
       </div>
 
       {/* Sales Task Center Banner (Identical styling to Purchasing and Warehouse) */}
@@ -797,46 +823,46 @@ export default function SalesPOS() {
         <div>
           {/* 6 Odoo KPI Cards */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.85rem', marginBottom: '1.25rem' }}>
-            <div style={{ backgroundColor: '#ffffff', padding: '1rem 0.75rem', borderRadius: '10px', border: '1px solid #e3e8ef', boxShadow: '0 1px 2px rgba(15,23,42,0.04)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '92px' }}>
-              <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#16a34a', whiteSpace: 'nowrap', letterSpacing: '-0.01em' }}>
-                {formatCurrency(totalRevenue)}
+            <div className="erp-stat" style={{ backgroundColor: '#ffffff', padding: '1rem 0.75rem', borderRadius: '10px', border: '1px solid #e3e8ef', boxShadow: '0 1px 2px rgba(15,23,42,0.04)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '92px', boxSizing: 'border-box' }}>
+              <div className="erp-stat-value" style={{ fontSize: '1.15rem', fontWeight: 800, color: '#16a34a', whiteSpace: 'nowrap', letterSpacing: '-0.01em' }} title={formatCurrency(totalRevenue)}>
+                {formatCompactVnd(totalRevenue)}
               </div>
-              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', marginTop: '0.25rem' }}>Tổng Doanh Thu</div>
+              <div className="erp-stat-label" style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', marginTop: '0.25rem', whiteSpace: 'nowrap' }}>Tổng Doanh Thu</div>
             </div>
 
-            <div style={{ backgroundColor: '#ffffff', padding: '1rem 0.75rem', borderRadius: '10px', border: '1px solid #e3e8ef', boxShadow: '0 1px 2px rgba(15,23,42,0.04)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '92px' }}>
-              <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#d97706' }}>{pendingConfirmationCount}</div>
-              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', marginTop: '0.25rem' }}>Đơn Chờ Xác Nhận</div>
+            <div className="erp-stat" style={{ backgroundColor: '#ffffff', padding: '1rem 0.75rem', borderRadius: '10px', border: '1px solid #e3e8ef', boxShadow: '0 1px 2px rgba(15,23,42,0.04)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '92px', boxSizing: 'border-box' }}>
+              <div className="erp-stat-value" style={{ fontSize: '1.45rem', fontWeight: 800, color: '#d97706', whiteSpace: 'nowrap' }}>{pendingConfirmationCount}</div>
+              <div className="erp-stat-label" style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', marginTop: '0.25rem', whiteSpace: 'nowrap' }}>Chờ Xác Nhận</div>
             </div>
 
-            <div style={{ backgroundColor: '#ffffff', padding: '1rem 0.75rem', borderRadius: '10px', border: '1px solid #e3e8ef', boxShadow: '0 1px 2px rgba(15,23,42,0.04)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '92px' }}>
-              <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#2563eb' }}>{pendingDeliveryCount}</div>
-              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', marginTop: '0.25rem' }}>Đơn Đang Giao / Đóng Gói</div>
+            <div className="erp-stat" style={{ backgroundColor: '#ffffff', padding: '1rem 0.75rem', borderRadius: '10px', border: '1px solid #e3e8ef', boxShadow: '0 1px 2px rgba(15,23,42,0.04)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '92px', boxSizing: 'border-box' }}>
+              <div className="erp-stat-value" style={{ fontSize: '1.45rem', fontWeight: 800, color: '#2563eb', whiteSpace: 'nowrap' }}>{pendingDeliveryCount}</div>
+              <div className="erp-stat-label" style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', marginTop: '0.25rem', whiteSpace: 'nowrap' }}>Đang Vận Chuyển</div>
             </div>
 
-            <div style={{ backgroundColor: '#ffffff', padding: '1rem 0.75rem', borderRadius: '10px', border: '1px solid #e3e8ef', boxShadow: '0 1px 2px rgba(15,23,42,0.04)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '92px' }}>
-              <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#15803d' }}>{completedCount}</div>
-              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', marginTop: '0.25rem' }}>Đơn Giao Hoàn Tất</div>
+            <div className="erp-stat" style={{ backgroundColor: '#ffffff', padding: '1rem 0.75rem', borderRadius: '10px', border: '1px solid #e3e8ef', boxShadow: '0 1px 2px rgba(15,23,42,0.04)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '92px', boxSizing: 'border-box' }}>
+              <div className="erp-stat-value" style={{ fontSize: '1.45rem', fontWeight: 800, color: '#15803d', whiteSpace: 'nowrap' }}>{completedCount}</div>
+              <div className="erp-stat-label" style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', marginTop: '0.25rem', whiteSpace: 'nowrap' }}>Giao Hoàn Tất</div>
             </div>
 
-            <div style={{ backgroundColor: '#ffffff', padding: '1rem 0.75rem', borderRadius: '10px', border: '1px solid #e3e8ef', boxShadow: '0 1px 2px rgba(15,23,42,0.04)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '92px' }}>
-              <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0f172a', whiteSpace: 'nowrap', letterSpacing: '-0.01em' }}>
-                {formatCurrency(averageOrderValue)}
+            <div className="erp-stat" style={{ backgroundColor: '#ffffff', padding: '1rem 0.75rem', borderRadius: '10px', border: '1px solid #e3e8ef', boxShadow: '0 1px 2px rgba(15,23,42,0.04)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '92px', boxSizing: 'border-box' }}>
+              <div className="erp-stat-value" style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', whiteSpace: 'nowrap', letterSpacing: '-0.01em' }} title={formatCurrency(averageOrderValue)}>
+                {formatCompactVnd(averageOrderValue)}
               </div>
-              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', marginTop: '0.25rem' }}>Giá Trị Đơn Trung Bình</div>
+              <div className="erp-stat-label" style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', marginTop: '0.25rem', whiteSpace: 'nowrap' }}>Đơn Trung Bình</div>
             </div>
 
-            <div style={{ backgroundColor: '#ffffff', padding: '1rem 0.75rem', borderRadius: '10px', border: '1px solid #e3e8ef', boxShadow: '0 1px 2px rgba(15,23,42,0.04)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '92px' }}>
-              <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#8b5cf6' }}>{derivedCustomers.length}</div>
-              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', marginTop: '0.25rem' }}>Khách Hàng Đã Mua</div>
+            <div className="erp-stat" style={{ backgroundColor: '#ffffff', padding: '1rem 0.75rem', borderRadius: '10px', border: '1px solid #e3e8ef', boxShadow: '0 1px 2px rgba(15,23,42,0.04)', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '92px', boxSizing: 'border-box' }}>
+              <div className="erp-stat-value" style={{ fontSize: '1.45rem', fontWeight: 800, color: '#8b5cf6', whiteSpace: 'nowrap' }}>{customersInPeriodCount}</div>
+              <div className="erp-stat-label" style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', marginTop: '0.25rem', whiteSpace: 'nowrap' }}>Khách Mua Hàng</div>
             </div>
           </div>
 
           {/* Quick Actions & Recent Orders Grid */}
-          <div className="two-col-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
+          <div className="two-col-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))', gap: '1.25rem' }}>
             
             {/* Recent Orders Box */}
-            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1.25rem' }}>
+            <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1.25rem', display: 'flex', flexDirection: 'column' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                 <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
                   Đơn Hàng Gần Đây Cần Xử Lý
@@ -849,21 +875,21 @@ export default function SalesPOS() {
                 </button>
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
-                {orders.slice(0, 5).map((o, idx) => {
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', flex: 1 }}>
+                {(ordersInPeriod.length > 0 ? ordersInPeriod : orders).slice(0, 5).map((o, idx) => {
                   const badge = getStatusBadge(o.status);
                   return (
                     <div key={idx} style={{ padding: '0.75rem', borderRadius: '6px', border: '1px solid #f1f5f9', backgroundColor: '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <div style={{ overflow: 'hidden', paddingRight: '0.5rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                           <strong style={{ fontSize: '0.85rem', color: '#2563eb' }}>#{o.orderId || o.id}</strong>
                           <span style={{ fontSize: '0.8rem', color: '#0f172a', fontWeight: 600 }}>— {o.customerName || o.customer || 'Khách vãng lai'}</span>
                         </div>
-                        <span style={{ fontSize: '0.77rem', color: '#64748b' }}>{formatDate(o.date || o.createdAt)} | {o.phone || 'SĐT chưa có'}</span>
+                        <span style={{ fontSize: '0.75rem', color: '#64748b' }}>{formatDate(o.date || o.createdAt)} | {o.phone || 'SĐT chưa có'}</span>
                       </div>
-                      <div style={{ textAlign: 'right' }}>
+                      <div style={{ textAlign: 'right', flexShrink: 0 }}>
                         <div style={{ fontSize: '0.88rem', fontWeight: 800, color: '#16a34a' }}>{formatCurrency(o.totalAmount || o.total)}</div>
-                        <span style={{ fontSize: '0.74rem', fontWeight: 700, padding: '1px 6px', borderRadius: '4px', backgroundColor: badge.bg, color: badge.color, border: `1px solid ${badge.border}` }}>
+                        <span style={{ fontSize: '0.72rem', fontWeight: 700, padding: '1px 6px', borderRadius: '4px', backgroundColor: badge.bg, color: badge.color, border: `1px solid ${badge.border}` }}>
                           {badge.text}
                         </span>
                       </div>
@@ -873,48 +899,92 @@ export default function SalesPOS() {
               </div>
             </div>
 
-            {/* Quick POS Launch Box */}
+            {/* Quick POS & Operations Box (Balanced height with Left Box) */}
             <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1.25rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
               <div>
-                <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', margin: '0 0 0.5rem' }}>
-                  Quầy Bán Hàng Nhanh
-                </h3>
-                <p style={{ fontSize: '0.82rem', color: '#64748b', lineHeight: 1.4, margin: '0 0 1rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                  <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                    Quầy Bán Hàng & Vận Hành
+                  </h3>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#2563eb', backgroundColor: '#eff6ff', padding: '2px 8px', borderRadius: '10px', border: '1px solid #bfdbfe' }}>
+                    Realtime POS
+                  </span>
+                </div>
+                <p style={{ fontSize: '0.8rem', color: '#64748b', lineHeight: 1.4, margin: '0 0 0.85rem' }}>
                   Tạo đơn hàng tức thời cho khách mua linh kiện tại cửa hàng, tra cứu tồn kho thực tế, áp dụng chiết khấu và in phiếu thu.
                 </p>
-                <div style={{ backgroundColor: '#eff6ff', borderRadius: '6px', border: '1px solid #bfdbfe', padding: '0.85rem', marginBottom: '1rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#1e40af', fontWeight: 700, fontSize: '0.82rem' }}>
+
+                {/* Sales Channels Ratio Summary */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.65rem', marginBottom: '0.85rem' }}>
+                  <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '0.6rem 0.75rem' }}>
+                    <div style={{ fontSize: '0.73rem', fontWeight: 700, color: '#64748b' }}>Bán Tại Quầy (POS)</div>
+                    <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', marginTop: '0.2rem' }}>
+                      {posOrdersInPeriodCount} <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b' }}>đơn</span>
+                    </div>
+                  </div>
+                  <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '0.6rem 0.75rem' }}>
+                    <div style={{ fontSize: '0.73rem', fontWeight: 700, color: '#64748b' }}>Đặt Trực Tuyến (Online)</div>
+                    <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#2563eb', marginTop: '0.2rem' }}>
+                      {onlineOrdersInPeriodCount} <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b' }}>đơn</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ backgroundColor: '#eff6ff', borderRadius: '6px', border: '1px solid #bfdbfe', padding: '0.75rem', marginBottom: '1rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#1e40af', fontWeight: 700, fontSize: '0.8rem' }}>
                     <ShieldCheck size={16} />
                     <span>Hệ Thống Đồng Bộ Kho Tự Động</span>
                   </div>
-                  <p style={{ fontSize: '0.8rem', color: '#3b82f6', margin: '0.25rem 0 0' }}>
+                  <p style={{ fontSize: '0.76rem', color: '#3b82f6', margin: '0.25rem 0 0', lineHeight: 1.35 }}>
                     Mỗi đơn hàng POS sau khi thanh toán sẽ lập tức trừ tồn kho thực tế trong phân hệ Quản Lý Kho.
                   </p>
                 </div>
               </div>
 
-              {canPosCheckout && (
+              <div style={{ display: 'flex', gap: '0.65rem', flexWrap: 'wrap' }}>
+                {canPosCheckout && (
+                  <button
+                    onClick={() => setTab('pos')}
+                    style={{
+                      flex: 1,
+                      backgroundColor: '#2563eb',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: '6px',
+                      padding: '0.65rem',
+                      fontSize: '0.84rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '0.45rem'
+                    }}
+                  >
+                    <ShoppingCart size={16} />
+                    <span>Mở Quầy POS Ngay</span>
+                  </button>
+                )}
                 <button
-                  onClick={() => setTab('pos')}
+                  onClick={() => setTab('reports')}
                   style={{
-                    backgroundColor: '#2563eb',
-                    color: '#ffffff',
-                    border: 'none',
+                    backgroundColor: '#ffffff',
+                    color: '#475569',
+                    border: '1px solid #cbd5e1',
                     borderRadius: '6px',
-                    padding: '0.75rem',
-                    fontSize: '0.88rem',
+                    padding: '0.65rem 0.95rem',
+                    fontSize: '0.84rem',
                     fontWeight: 700,
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '0.5rem'
+                    gap: '0.4rem'
                   }}
                 >
-                  <ShoppingCart size={18} />
-                  <span>Mở Màn Hình POS Bán Lẻ Ngay</span>
+                  <BarChart2 size={15} />
+                  <span>Báo Cáo</span>
                 </button>
-              )}
+              </div>
             </div>
 
           </div>
@@ -2068,23 +2138,23 @@ export default function SalesPOS() {
                   Hiệu Suất Kênh Bán & Trạng Thái Giao
                 </h3>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                  <div style={{ backgroundColor: '#f8fafc', padding: '1rem', borderRadius: '6px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
-                    <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#2563eb' }}>{reportOrders.length}</div>
-                    <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 700, marginTop: '0.2rem' }}>Tổng Số Đơn Bán</div>
+                  <div className="erp-stat" style={{ backgroundColor: '#f8fafc', padding: '1rem', borderRadius: '6px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
+                    <div className="erp-stat-value" style={{ fontSize: '1.5rem', fontWeight: 800, color: '#2563eb' }}>{reportOrders.length}</div>
+                    <div className="erp-stat-label" style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 700, marginTop: '0.2rem' }}>Tổng Số Đơn Bán</div>
                   </div>
-                  <div style={{ backgroundColor: '#f8fafc', padding: '1rem', borderRadius: '6px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
-                    <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#16a34a' }}>
+                  <div className="erp-stat" style={{ backgroundColor: '#f8fafc', padding: '1rem', borderRadius: '6px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
+                    <div className="erp-stat-value" style={{ fontSize: '1.5rem', fontWeight: 800, color: '#16a34a' }}>
                       {reportOrders.length > 0 ? `${Math.round((reportCompletedCount / reportOrders.length) * 100)}%` : '—'}
                     </div>
-                    <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 700, marginTop: '0.2rem' }}>Tỷ Lệ Giao Thành Công</div>
+                    <div className="erp-stat-label" style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 700, marginTop: '0.2rem' }}>Tỷ Lệ Giao Thành Công</div>
                   </div>
-                  <div style={{ backgroundColor: '#f8fafc', padding: '1rem', borderRadius: '6px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
-                    <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#d97706' }}>{pendingConfirmationCount}</div>
-                    <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 700, marginTop: '0.2rem' }}>Đơn Mới Cần Duyệt</div>
+                  <div className="erp-stat" style={{ backgroundColor: '#f8fafc', padding: '1rem', borderRadius: '6px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
+                    <div className="erp-stat-value" style={{ fontSize: '1.5rem', fontWeight: 800, color: '#d97706' }}>{pendingConfirmationCount}</div>
+                    <div className="erp-stat-label" style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 700, marginTop: '0.2rem' }}>Đơn Mới Cần Duyệt</div>
                   </div>
-                  <div style={{ backgroundColor: '#f8fafc', padding: '1rem', borderRadius: '6px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
-                    <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#8b5cf6' }}>{derivedCustomers.length}</div>
-                    <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 700, marginTop: '0.2rem' }}>Tổng Khách Hàng CRM</div>
+                  <div className="erp-stat" style={{ backgroundColor: '#f8fafc', padding: '1rem', borderRadius: '6px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
+                    <div className="erp-stat-value" style={{ fontSize: '1.5rem', fontWeight: 800, color: '#8b5cf6' }}>{derivedCustomers.length}</div>
+                    <div className="erp-stat-label" style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 700, marginTop: '0.2rem' }}>Tổng Khách Hàng CRM</div>
                   </div>
                 </div>
               </div>

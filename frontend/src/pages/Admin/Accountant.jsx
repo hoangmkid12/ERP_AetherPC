@@ -28,7 +28,9 @@ import {
 } from 'chart.js';
 import { printDocument } from '../../utils/printDocument';
 import DateRangeFilter, { isDateInRange } from '../../components/Common/DateRangeFilter';
+import PeriodFilterBar, { isDateInPeriod } from '../../components/Common/PeriodFilterBar';
 import TransferRefunds from '../../components/Accounting/TransferRefunds';
+import { formatCompactVnd } from '../../utils/formatCompact';
 
 ChartJS.register(
   CategoryScale, 
@@ -252,6 +254,8 @@ export default function Accountant() {
     return !bill || bill.status !== 'PAID';
   };
 
+  const [overviewPeriod, setOverviewPeriod] = useState('ALL');
+
   // Financial Metric Calculations
   // Doanh thu = tổng Order.totalAmount thật, KHÔNG lấy từ bút toán INCOME trên sổ
   // cái — hiện chưa có luồng backend nào tự ghi INCOME cho đơn hàng bán ra, nên
@@ -259,65 +263,48 @@ export default function Accountant() {
   // "Thêm Phiếu Thu". Đơn đã HỦY/giao thất bại không tính là doanh thu.
   const totalRevenue = (orders || [])
     .filter(o => o && !['CANCELLED', 'FAILED_DELIVERY'].includes(o.status))
+    .filter(o => isDateInPeriod(o.createdAt || o.date, overviewPeriod))
     .reduce((sum, o) => sum + (Number(o.totalAmount) || 0), 0);
 
   const effectivePOs = allPOs.length > 0 ? allPOs : purchaseOrders;
-  const unpaidPOs = effectivePOs.filter(po => po && isPoAwaitingAccounting(po));
+  const unpaidPOs = effectivePOs
+    .filter(po => po && isPoAwaitingAccounting(po))
+    .filter(po => isDateInPeriod(po.createdAt || po.date, overviewPeriod));
   const unpaidPOAmount = unpaidPOs.reduce((sum, po) => {
     const bill = getPoBill(po);
     return sum + (Number((bill ? bill.amountDue : po.totalAmount) || 0) || 0);
   }, 0);
 
-  // GET /hr/payrolls returns EVERY payroll record ever created (no period or
-  // status filter on the backend) — summing all of them directly used to make
-  // "Quỹ Lương Chờ Chi Trả" and the P&L's payroll expense line grow forever
-  // across every past period, and count payrolls already PAID as if they were
-  // still pending. Split into the two real concepts:
-  //  - payrollReadyFund: what's actually APPROVED_BY_CEO and will really be
-  //    disbursed if "Chi Lương Toàn Doanh Nghiệp" is clicked right now (must
-  //    match the backend's disburse-all eligibility filter exactly).
-  //  - payrollExpensePaid: netSalary of payrolls with status PAID — money that
-  //    has actually left the company for salaries. (Not sourced from ledger
-  //    PAYROLL-{id} entries: 45 of the seeded demo payrolls were inserted
-  //    directly as PAID by prisma/seed.js without a matching LedgerEntry, so
-  //    a ledger-only sum would silently drop that real historical cost.)
   // Chỉ tính bảng lương thật đã được duyệt — không ước lượng từ lương cơ bản khi chưa có bảng lương.
   const payrollReadyFund = payrolls
     .filter(p => p.status === 'APPROVED_BY_CEO')
+    .filter(p => isDateInPeriod(p.createdAt || p.period, overviewPeriod))
     .reduce((sum, p) => sum + (Number(p.netSalary || 0) || 0), 0);
 
   const payrollExpensePaid = payrolls
     .filter(p => p && p.status === 'PAID')
+    .filter(p => isDateInPeriod(p.disbursedAt || p.createdAt || p.period, overviewPeriod))
     .reduce((sum, p) => sum + (Number(p.netSalary || 0) || 0), 0);
 
-  // Giá vốn hàng bán (COGS) = tổng các bút toán COGS thật do backend tự ghi mỗi
-  // khi một đơn hàng thực sự xuất kho (referenceId `COGS-{orderId}`), tính theo
-  // giá bình quân gia quyền (Product.averageCost) tại thời điểm bán — xem
-  // orderApprovalService.js / order.controller.js. KHÔNG dùng tổng tiền mua NCC
-  // (VendorBill.amountTotal) như trước — đó là chi phí NHẬP hàng trong kỳ, không
-  // phải chi phí của phần hàng đã thực sự BÁN ra trong kỳ (mua 1000 SP, bán 10 SP
-  // vẫn chỉ tính giá vốn cho 10 SP đã bán). Đơn bị hủy/giao thất bại sẽ tự động bị
-  // xóa bút toán COGS tương ứng (xem updateOrderStatus), khớp với việc doanh thu
-  // của đơn đó cũng bị loại khỏi totalRevenue.
+  // Giá vốn hàng bán (COGS) = tổng các bút toán COGS thật
   const cogsAmount = (ledger || [])
     .filter(tx => tx && tx.type === 'EXPENSE' && typeof tx.referenceId === 'string' && tx.referenceId.startsWith('COGS-'))
+    .filter(tx => isDateInPeriod(tx.date || tx.createdAt, overviewPeriod))
     .reduce((sum, tx) => sum + (Number(tx.amount || 0) || 0), 0);
 
-  // Chi phí vận hành = các bút toán chi thủ công thật (Thêm Phiếu Thu/Chi) — nhận
-  // diện qua việc không có referenceId (mọi bút toán hệ thống tự ghi — thanh toán
-  // NCC, chi lương, hoàn tiền — đều luôn có referenceId). Trước đây là số hardcode
-  // "5.000.000 ₫" cố định, không phản ánh chi phí thật.
+  // Chi phí vận hành = các bút toán chi thủ công thật (Thêm Phiếu Thu/Chi)
   const operatingExpense = (ledger || [])
     .filter(tx => tx && tx.type === 'EXPENSE' && !tx.referenceId)
+    .filter(tx => isDateInPeriod(tx.date || tx.createdAt, overviewPeriod))
     .reduce((sum, tx) => sum + (Number(tx.amount || 0) || 0), 0);
 
-  // Tiền hoàn cho khách (REFUND) cũng là một khoản chi thật, phải trừ vào lợi nhuận.
+  // Tiền hoàn cho khách (REFUND)
   const refundAmount = (ledger || [])
     .filter(tx => tx && tx.type === 'REFUND')
+    .filter(tx => isDateInPeriod(tx.date || tx.createdAt, overviewPeriod))
     .reduce((sum, tx) => sum + (Number(tx.amount || 0) || 0), 0);
 
-  // Tổng chi phí = đúng bằng tổng 4 dòng chi trong P&L bên dưới — không tính lại
-  // riêng từ ledger nữa để tránh 2 nơi ra 2 con số khác nhau cho cùng 1 khái niệm.
+  // Tổng chi phí = đúng bằng tổng 4 dòng chi trong P&L bên dưới
   const totalExpense = cogsAmount + payrollExpensePaid + operatingExpense + refundAmount;
 
   const netProfit = totalRevenue - totalExpense;
@@ -365,12 +352,12 @@ export default function Accountant() {
   const cashBalance = netProfit;
 
   const stats = [
-    { label: 'Tổng Doanh Thu Bán Hàng', value: fmt(totalRevenue), change: 'Bao gồm POS & Website Online', icon: <ArrowUpRight size={20} />, color: '#16a34a', bg: '#f0fdf4' },
-    { label: 'Tổng Chi Phí Hoạt Động', value: fmt(totalExpense), change: 'Giá vốn, lương & mua linh kiện', icon: <ArrowDownLeft size={20} />, color: '#ef4444', bg: '#fef2f2' },
-    { label: 'Lợi Nhuận Ròng', value: fmt(netProfit), change: netProfit >= 0 ? 'Tỷ suất lợi nhuận dương' : 'Cần tối ưu chi phí', icon: <DollarSign size={20} />, color: netProfit >= 0 ? '#16a34a' : '#ef4444', bg: netProfit >= 0 ? '#f0fdf4' : '#fef2f2' },
-    { label: 'Lợi Nhuận Ròng Lũy Kế', value: fmt(cashBalance), change: 'Chưa gồm vốn góp ban đầu (không có module vốn chủ sở hữu)', icon: <CreditCard size={20} />, color: '#2563eb', bg: '#eff6ff' },
-    { label: 'Đơn PO Chờ Thanh Toán NCC', value: `${unpaidPOs.length} đơn (${fmt(unpaidPOAmount)})`, change: 'Cần giải ngân cho Nhà Cung Cấp', icon: <ShoppingBag size={20} />, color: '#f59e0b', bg: '#fffbeb' },
-    { label: 'Quỹ Lương Chờ Chi Trả', value: fmt(payrollReadyFund), change: 'Đã CEO duyệt, sẵn sàng giải ngân', icon: <Users size={20} />, color: '#8b5cf6', bg: '#f5f3ff' }
+    { label: 'Tổng Doanh Thu Bán Hàng', value: formatCompactVnd(totalRevenue), full: fmt(totalRevenue), change: 'Bao gồm POS & Website Online', icon: <ArrowUpRight size={20} />, color: '#16a34a', bg: '#f0fdf4' },
+    { label: 'Tổng Chi Phí Hoạt Động', value: formatCompactVnd(totalExpense), full: fmt(totalExpense), change: 'Giá vốn, lương & mua linh kiện', icon: <ArrowDownLeft size={20} />, color: '#ef4444', bg: '#fef2f2' },
+    { label: 'Lợi Nhuận Ròng', value: formatCompactVnd(netProfit), full: fmt(netProfit), change: netProfit >= 0 ? 'Tỷ suất lợi nhuận dương' : 'Cần tối ưu chi phí', icon: <DollarSign size={20} />, color: netProfit >= 0 ? '#16a34a' : '#ef4444', bg: netProfit >= 0 ? '#f0fdf4' : '#fef2f2' },
+    { label: 'Lợi Nhuận Ròng Lũy Kế', value: formatCompactVnd(cashBalance), full: fmt(cashBalance), change: 'Chưa gồm vốn góp ban đầu', icon: <CreditCard size={20} />, color: '#2563eb', bg: '#eff6ff' },
+    { label: 'Đơn PO Chờ Thanh Toán NCC', value: `${unpaidPOs.length} đơn`, full: `${unpaidPOs.length} đơn — ${fmt(unpaidPOAmount)}`, change: `Trị giá ${formatCompactVnd(unpaidPOAmount)} · cần giải ngân`, icon: <ShoppingBag size={20} />, color: '#f59e0b', bg: '#fffbeb' },
+    { label: 'Quỹ Lương Chờ Chi Trả', value: formatCompactVnd(payrollReadyFund), full: fmt(payrollReadyFund), change: 'Đã CEO duyệt, sẵn sàng giải ngân', icon: <Users size={20} />, color: '#8b5cf6', bg: '#f5f3ff' }
   ];
 
   // Chart 1: Income vs Expense Doughnut
@@ -751,6 +738,10 @@ export default function Accountant() {
           </p>
         </div>
 
+        {activeTab === 'overview' && (
+          <PeriodFilterBar period={overviewPeriod} onChange={setOverviewPeriod} />
+        )}
+
         {activeTab === 'ledger' && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <button
@@ -817,58 +808,6 @@ export default function Accountant() {
             <span>In Báo Cáo Tài Chính</span>
           </button>
         )}
-      </div>
-
-      {/* Tab Navigation Bar */}
-      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.25rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.75rem', overflowX: 'auto' }}>
-        {[
-          { key: 'overview', label: 'Tổng Quan Tài Chính' },
-          { key: 'refunds', label: 'Chi Hoàn Tiền RMA', badge: pendingRefunds.length },
-          { key: 'transfer_refunds', label: 'Hoàn Tiền Chuyển Khoản', badge: transferRefundCount },
-          { key: 'ledger', label: 'Sổ Cái Kế Toán' },
-          { key: 'po_payments', label: 'Thanh Toán PO NCC', badge: unpaidPOs.length },
-          { key: 'cod_settlement', label: 'Đối Soát COD Shipper', badge: codGroups.length },
-          { key: 'payroll_disbursement', label: 'Chi Trả Lương' },
-          { key: 'reports', label: 'Báo Cáo P&L & VAT' }
-        ].map(tabItem => {
-          const isActive = activeTab === tabItem.key;
-          return (
-            <button
-              key={tabItem.key}
-              type="button"
-              onClick={() => setTab(tabItem.key)}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.4rem',
-                padding: '0.5rem 1rem',
-                borderRadius: '6px',
-                fontSize: '0.82rem',
-                fontWeight: 700,
-                cursor: 'pointer',
-                border: isActive ? '1px solid #2563eb' : '1px solid #e3e8ef',
-                backgroundColor: isActive ? '#2563eb' : '#ffffff',
-                color: isActive ? '#ffffff' : '#334155',
-                whiteSpace: 'nowrap',
-                transition: 'all 0.15s ease'
-              }}
-            >
-              <span>{tabItem.label}</span>
-              {tabItem.badge > 0 && (
-                <span style={{
-                  padding: '1px 6px',
-                  borderRadius: '10px',
-                  fontSize: '0.75rem',
-                  fontWeight: 800,
-                  backgroundColor: isActive ? '#ffffff' : (['refunds', 'transfer_refunds'].includes(tabItem.key) ? '#dc2626' : '#d97706'),
-                  color: isActive ? '#2563eb' : '#ffffff'
-                }}>
-                  {tabItem.badge}
-                </span>
-              )}
-            </button>
-          );
-        })}
       </div>
 
       {/* ========================================================================= */}
@@ -1165,10 +1104,10 @@ export default function Accountant() {
                 </div>
 
                 <div style={{ marginTop: '0.45rem' }}>
-                  <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  <div className="erp-kpi-value" style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={st.full || st.value}>
                     {st.value}
                   </div>
-                  <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.15rem' }}>
+                  <div className="erp-kpi-sub" style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.15rem' }}>
                     {st.change}
                   </div>
                 </div>
