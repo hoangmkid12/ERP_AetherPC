@@ -99,7 +99,11 @@ const toRequestBody = (productData) => {
     } else if (key === 'imageFiles') {
       (value || []).forEach(f => { if (f instanceof File) formData.append('images', f); });
     } else if (value !== undefined && value !== null) {
-      formData.append(key, value);
+      if (typeof value === 'object' && !(value instanceof File)) {
+        formData.append(key, JSON.stringify(value));
+      } else {
+        formData.append(key, value);
+      }
     }
   });
   return formData;
@@ -206,6 +210,11 @@ export const useInventoryStore = create((set, get) => ({
           ? row.locations.map(l => `${l.zone}-${l.shelf}-${l.bin}`).join(', ')
           : 'Chưa xếp kệ',
         price: row.product?.price ?? row.price ?? 0,
+        originalPrice: row.product?.originalPrice ?? row.product?.price ?? row.price ?? 0,
+        discountPercent: row.product?.discountPercent ?? 0,
+        brand: row.product?.brand?.name || (typeof row.product?.brand === 'string' ? row.product.brand : 'Khác'),
+        warranty: row.product?.warranty || '36 tháng',
+        specs: row.product?.specs || {},
         available: row.product?.available ?? true,
         status: row.product?.status || 'ACTIVE',
         image: row.product?.primaryImage || null,
@@ -309,10 +318,14 @@ export const useInventoryStore = create((set, get) => ({
               ...i,
               ...(productData.name !== undefined && { name: productData.name }),
               ...(productData.price !== undefined && { price: productData.price }),
+              ...(productData.originalPrice !== undefined && { originalPrice: productData.originalPrice }),
+              ...(productData.brand !== undefined && { brand: productData.brand }),
+              ...(productData.warranty !== undefined && { warranty: productData.warranty }),
+              ...(productData.specs !== undefined && { specs: productData.specs }),
               ...(productData.stock !== undefined && { stock: productData.stock }),
               ...(productData.available !== undefined && { available: productData.available }),
               ...(productData.description !== undefined && { description: productData.description }),
-              ...(updated?.primaryImage && { image: updated.primaryImage }),
+              ...((updated?.primaryImage || productData.imageUrl) && { image: updated?.primaryImage || productData.imageUrl }),
               ...(updated?.images && { gallery: updated.images }),
               ...(updated?.defaultSupplier?.name && { supplier: updated.defaultSupplier.name })
             }

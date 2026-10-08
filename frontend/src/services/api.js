@@ -102,7 +102,8 @@ export const normalizeProduct = (p) => {
     imageUrls: dbUrls.length > 0 ? dbUrls : [p.primaryImage || p.image || ''],
     available: p.available ?? true,
     stockQuantity: p.stockQuantity !== undefined ? p.stockQuantity : (p.stock_quantity || 0),
-    descriptionText: p.descriptionText || p.description || ''
+    descriptionText: p.descriptionText || p.description || '',
+    warranty: p.warranty || '36 tháng'
   };
 };
 

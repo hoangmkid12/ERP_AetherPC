@@ -90,24 +90,240 @@ const cleanStaffName = (name) => {
 };
 
 const MAX_GALLERY_IMAGES = 8;
+const GALLERY_THUMB_SIZE = 88;
 
-// Shared cover-photo + gallery editor for the Add/Edit Product forms — matches how the
-// storefront itself presents a product (Product.primaryImage as the cover shown in
-// listings, ProductImage rows as the secondary photo strip on the detail page; see
-// ProductDetail.jsx's productImages = [cover, ...imageUrls]). `existingImages` (already
-// saved, id+url — deletable one at a time via onDeleteExistingImage) and `pendingFiles`
-// (chosen this session, not yet uploaded — removable locally, no id yet) render as one
-// continuous thumbnail strip so Kho staff see the final gallery order they're building.
-const GALLERY_THUMB_SIZE = 88; // same size as the cover box — keeps the two rows visually level
+const PLACEHOLDER_IMG = 'data:image/svg+xml;utf8,' + encodeURIComponent(
+  `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">
+    <rect width="200" height="200" fill="#f1f5f9"/>
+    <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-size="14" fill="#94a3b8">Chưa có ảnh</text>
+  </svg>`
+);
 
-const ProductGalleryField = ({ coverFile, coverUrl, onCoverSelect, existingImages, pendingFiles, onAddFiles, onRemovePendingFile, onDeleteExistingImage, deletingImageId }) => {
-  const coverPreview = coverFile ? URL.createObjectURL(coverFile) : coverUrl;
-  const totalGalleryCount = (existingImages || []).length + (pendingFiles || []).length;
+const CATEGORY_SPEC_PRESETS = {
+  CPU: [
+    { key: 'socket', label: 'Socket (Chân cắm)', placeholder: 'LGA1700, AM5...' },
+    { key: 'cores', label: 'Số nhân', placeholder: 'VD: 16 hoặc 24' },
+    { key: 'threads', label: 'Số luồng', placeholder: 'VD: 32' },
+    { key: 'speed', label: 'Xung nhịp', placeholder: 'VD: 3.4 GHz - 5.4 GHz' },
+    { key: 'cache', label: 'Bộ nhớ đệm', placeholder: 'VD: 30MB' },
+    { key: 'tdp', label: 'Điện năng (TDP)', placeholder: 'VD: 125W' },
+  ],
+  VGA: [
+    { key: 'chipset', label: 'Chipset GPU', placeholder: 'RTX 4070 Ti Super...' },
+    { key: 'vram', label: 'Dung lượng VRAM', placeholder: '16GB GDDR6X...' },
+    { key: 'wattage', label: 'Nguồn đề nghị', placeholder: '750W...' },
+    { key: 'size', label: 'Kích thước', placeholder: '305mm...' },
+  ],
+  RAM: [
+    { key: 'ram_type', label: 'Loại RAM', placeholder: 'DDR4 hoặc DDR5' },
+    { key: 'capacity', label: 'Dung lượng', placeholder: '32GB (2x16GB)...' },
+    { key: 'bus', label: 'Tốc độ Bus', placeholder: '6000MHz...' },
+    { key: 'timing', label: 'Độ trễ (Timing)', placeholder: 'CL30...' },
+  ],
+  STORAGE: [
+    { key: 'type', label: 'Chuẩn giao tiếp', placeholder: 'M.2 NVMe PCIe 4.0...' },
+    { key: 'capacity', label: 'Dung lượng', placeholder: '1TB hoặc 2TB...' },
+    { key: 'speed_read', label: 'Tốc độ đọc', placeholder: '7400 MB/s...' },
+    { key: 'write_speed', label: 'Tốc độ ghi', placeholder: '6500 MB/s...' },
+  ],
+  MAINBOARD: [
+    { key: 'chipset', label: 'Chipset', placeholder: 'Z790, B760, X670...' },
+    { key: 'socket', label: 'Socket', placeholder: 'LGA1700, AM5...' },
+    { key: 'size_format', label: 'Chuẩn kích thước', placeholder: 'ATX, Micro-ATX...' },
+    { key: 'ram_slots', label: 'Số khe RAM', placeholder: '4 x DDR5...' },
+  ],
+  PSU: [
+    { key: 'wattage', label: 'Công suất', placeholder: '750W, 850W...' },
+    { key: 'rating', label: 'Chuẩn hiệu suất', placeholder: '80 Plus Gold...' },
+    { key: 'modular', label: 'Chuẩn cáp', placeholder: 'Full-Modular...' },
+  ],
+  COOLER: [
+    { key: 'cooling_type', label: 'Loại tản nhiệt', placeholder: 'Tản nước AIO 360mm...' },
+    { key: 'fan_size', label: 'Kích thước quạt', placeholder: '3x 120mm...' },
+    { key: 'socket', label: 'Socket tương thích', placeholder: 'LGA1700 / AM5...' },
+  ],
+  CASE: [
+    { key: 'size_format', label: 'Chuẩn Mainboard', placeholder: 'ATX, M-ATX, ITX' },
+    { key: 'max_vga_length', label: 'Hỗ trợ VGA tối đa', placeholder: '400mm...' },
+    { key: 'color', label: 'Màu sắc', placeholder: 'Đen / Trắng...' },
+  ],
+  MONITOR: [
+    { key: 'size', label: 'Kích thước', placeholder: '27 inch...' },
+    { key: 'resolution', label: 'Độ phân giải', placeholder: '2K (2560 x 1440)...' },
+    { key: 'speed', label: 'Tần số quét', placeholder: '180Hz...' },
+    { key: 'panel', label: 'Tấm nền', placeholder: 'Fast IPS...' },
+  ]
+};
 
-  // The delete "×" badge sits half outside each thumbnail (top/right: -7px) so it reads
-  // as an overlay rather than crowding the photo — the scroll strip needs matching
-  // padding on those same sides, or that overlap gets clipped by the strip's own
-  // overflow-x: auto (which computes overflow-y to auto too, clipping the badge's top).
+const ProductSpecsEditor = ({ category, specs = {}, onChange }) => {
+  const currentEntries = Object.entries(specs || {});
+  const [newKey, setNewKey] = useState('');
+  const [newVal, setNewVal] = useState('');
+
+  const updateSpecKey = (oldKey, newKeyName, val) => {
+    const updated = { ...specs };
+    if (oldKey !== newKeyName) {
+      delete updated[oldKey];
+    }
+    updated[newKeyName] = val;
+    onChange(updated);
+  };
+
+  const updateSpecVal = (key, val) => {
+    onChange({ ...specs, [key]: val });
+  };
+
+  const removeSpecKey = (key) => {
+    const updated = { ...specs };
+    delete updated[key];
+    onChange(updated);
+  };
+
+  const addCustomSpec = () => {
+    if (!newKey.trim()) return;
+    onChange({ ...specs, [newKey.trim()]: newVal.trim() });
+    setNewKey('');
+    setNewVal('');
+  };
+
+  const applyCategoryPresets = () => {
+    const presets = CATEGORY_SPEC_PRESETS[category] || [];
+    const merged = { ...specs };
+    presets.forEach(p => {
+      if (merged[p.key] === undefined) {
+        merged[p.key] = '';
+      }
+    });
+    onChange(merged);
+  };
+
+  return (
+    <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.85rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem' }}>
+        <div>
+          <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#1e293b' }}>Thông Số Kỹ Thuật (Specs)</span>
+          <span style={{ fontSize: '0.74rem', color: '#64748b', marginLeft: '0.5rem' }}>({currentEntries.length} thông số)</span>
+        </div>
+        {CATEGORY_SPEC_PRESETS[category] && (
+          <button
+            type="button"
+            onClick={applyCategoryPresets}
+            style={{
+              padding: '0.25rem 0.6rem',
+              fontSize: '0.74rem',
+              fontWeight: 600,
+              backgroundColor: '#eff6ff',
+              color: '#2563eb',
+              border: '1px solid #bfdbfe',
+              borderRadius: '5px',
+              cursor: 'pointer'
+            }}
+          >
+            ⚡ Nạp mẫu gợi ý ({category})
+          </button>
+        )}
+      </div>
+
+      {currentEntries.length === 0 ? (
+        <div style={{ padding: '0.8rem', textAlign: 'center', backgroundColor: '#ffffff', borderRadius: '6px', border: '1px dashed #cbd5e1', fontSize: '0.78rem', color: '#64748b', marginBottom: '0.6rem' }}>
+          Chưa có thông số kỹ thuật nào. Bấm nút nạp mẫu gợi ý phía trên hoặc thêm từng thông số bên dưới.
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', marginBottom: '0.6rem', maxHeight: '200px', overflowY: 'auto' }}>
+          {currentEntries.map(([k, v], idx) => (
+            <div key={`${k}-${idx}`} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+              <input
+                type="text"
+                placeholder="Thuộc tính (vd: socket, cores...)"
+                value={k}
+                onChange={(e) => updateSpecKey(k, e.target.value, v)}
+                style={{ flex: '1', padding: '0.4rem 0.6rem', fontSize: '0.78rem', border: '1px solid #cbd5e1', borderRadius: '4px', backgroundColor: '#ffffff' }}
+              />
+              <input
+                type="text"
+                placeholder="Giá trị (vd: LGA1700, 16 nhân...)"
+                value={v}
+                onChange={(e) => updateSpecVal(k, e.target.value)}
+                style={{ flex: '1.5', padding: '0.4rem 0.6rem', fontSize: '0.78rem', border: '1px solid #cbd5e1', borderRadius: '4px', backgroundColor: '#ffffff' }}
+              />
+              <button
+                type="button"
+                onClick={() => removeSpecKey(k)}
+                title="Xoá thông số này"
+                style={{ width: '26px', height: '26px', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: '4px', cursor: 'pointer', flexShrink: 0 }}
+              >
+                <X size={13} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+        <input
+          type="text"
+          placeholder="+ Tên thông số mới..."
+          value={newKey}
+          onChange={(e) => setNewKey(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addCustomSpec(); } }}
+          style={{ flex: '1', padding: '0.4rem 0.6rem', fontSize: '0.78rem', border: '1px dashed #cbd5e1', borderRadius: '4px', backgroundColor: '#ffffff' }}
+        />
+        <input
+          type="text"
+          placeholder="Giá trị..."
+          value={newVal}
+          onChange={(e) => setNewVal(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addCustomSpec(); } }}
+          style={{ flex: '1.5', padding: '0.4rem 0.6rem', fontSize: '0.78rem', border: '1px dashed #cbd5e1', borderRadius: '4px', backgroundColor: '#ffffff' }}
+        />
+        <button
+          type="button"
+          onClick={addCustomSpec}
+          disabled={!newKey.trim()}
+          style={{
+            padding: '0.4rem 0.75rem',
+            fontSize: '0.76rem',
+            fontWeight: 700,
+            backgroundColor: newKey.trim() ? '#2563eb' : '#e2e8f0',
+            color: newKey.trim() ? '#ffffff' : '#94a3b8',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: newKey.trim() ? 'pointer' : 'default',
+            flexShrink: 0
+          }}
+        >
+          Thêm
+        </button>
+      </div>
+    </div>
+  );
+};
+
+const ProductGalleryField = ({
+  coverFile,
+  coverUrl,
+  coverImageUrl,
+  onCoverSelect,
+  onCoverImageUrlChange,
+  existingImages = [],
+  pendingFiles = [],
+  galleryUrls = [],
+  onAddFiles,
+  onRemovePendingFile,
+  onDeleteExistingImage,
+  deletingImageId,
+  onAddGalleryUrl,
+  onRemoveGalleryUrl
+}) => {
+  const [newGalleryUrlInput, setNewGalleryUrlInput] = useState('');
+
+  const coverPreview = (coverImageUrl && coverImageUrl.trim())
+    ? coverImageUrl.trim()
+    : coverFile
+      ? URL.createObjectURL(coverFile)
+      : coverUrl;
+
+  const totalGalleryCount = (existingImages || []).length + (pendingFiles || []).length + (galleryUrls || []).length;
   const thumbWrapStyle = { position: 'relative', flexShrink: 0, width: GALLERY_THUMB_SIZE, height: GALLERY_THUMB_SIZE };
   const badgeStyle = (bg) => ({
     position: 'absolute', top: '-7px', right: '-7px', width: '20px', height: '20px', borderRadius: '50%',
@@ -115,91 +331,183 @@ const ProductGalleryField = ({ coverFile, coverUrl, onCoverSelect, existingImage
     display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0
   });
 
+  const handleAddUrl = () => {
+    const trimmed = newGalleryUrlInput.trim();
+    if (trimmed && onAddGalleryUrl) {
+      onAddGalleryUrl(trimmed);
+      setNewGalleryUrlInput('');
+    }
+  };
+
   return (
-    <div>
-      <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: '0.6rem', color: '#1e293b' }}>Hình Ảnh Sản Phẩm</label>
-      <div style={{ display: 'flex', gap: '1.1rem', alignItems: 'flex-start' }}>
-        {/* Cover photo */}
-        <div style={{ flexShrink: 0, width: GALLERY_THUMB_SIZE }}>
-          <label
-            htmlFor="product-cover-input"
-            style={{
-              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-              width: GALLERY_THUMB_SIZE, height: GALLERY_THUMB_SIZE, borderRadius: '8px', cursor: 'pointer', overflow: 'hidden',
-              border: coverPreview ? '1px solid #e3e8ef' : '2px dashed #cbd5e1',
-              backgroundColor: coverPreview ? 'transparent' : '#f8fafc'
-            }}
-          >
-            {coverPreview ? (
-              <img src={coverPreview} alt="Ảnh bìa" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-            ) : (
-              <>
-                <Image size={20} style={{ color: '#94a3b8' }} />
-                <span style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '0.25rem', textAlign: 'center', padding: '0 0.3rem' }}>Chọn ảnh</span>
-              </>
-            )}
-          </label>
-          <input id="product-cover-input" type="file" accept="image/jpeg,image/png,image/webp,image/gif" onChange={(e) => onCoverSelect(e.target.files?.[0] || null)} style={{ display: 'none' }} />
-          <div style={{ fontSize: '0.74rem', fontWeight: 600, color: '#64748b', textAlign: 'center', marginTop: '0.4rem' }}>Ảnh Bìa</div>
-        </div>
-
-        {/* Divider between cover and gallery — makes the "one main photo, several extra
-            photos" grouping visually obvious instead of one undifferentiated row. */}
-        <div style={{ width: '1px', alignSelf: 'stretch', backgroundColor: '#e2e8f0', flexShrink: 0 }} />
-
-        {/* Gallery strip */}
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: 'flex', gap: '0.6rem', overflowX: 'auto', padding: '7px 7px 0.3rem 2px', margin: '-7px -7px 0 -2px' }}>
-            {(existingImages || []).map(img => (
-              <div key={img.id} style={thumbWrapStyle}>
-                <img src={img.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '6px', border: '1px solid #e3e8ef' }} />
-                <button
-                  type="button"
-                  disabled={deletingImageId === img.id}
-                  onClick={() => onDeleteExistingImage(img.id)}
-                  title="Xoá ảnh này"
-                  style={{ ...badgeStyle('#dc2626'), cursor: deletingImageId === img.id ? 'default' : 'pointer', opacity: deletingImageId === img.id ? 0.6 : 1 }}
-                >
-                  <X size={12} />
-                </button>
-              </div>
-            ))}
-            {(pendingFiles || []).map((file, idx) => (
-              <div key={`pending-${idx}`} style={thumbWrapStyle}>
-                <img src={URL.createObjectURL(file)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '6px', border: '1px solid #93c5fd' }} />
-                <button type="button" onClick={() => onRemovePendingFile(idx)} title="Bỏ ảnh này" style={badgeStyle('#475569')}>
-                  <X size={12} />
-                </button>
-              </div>
-            ))}
-            {totalGalleryCount < MAX_GALLERY_IMAGES && (
-              <label
-                htmlFor="product-gallery-input"
-                title="Thêm ảnh phụ"
-                style={{
-                  flexShrink: 0, width: GALLERY_THUMB_SIZE, height: GALLERY_THUMB_SIZE, borderRadius: '6px', border: '2px dashed #cbd5e1',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', backgroundColor: '#f8fafc'
-                }}
-              >
-                <Plus size={20} style={{ color: '#94a3b8' }} />
-              </label>
-            )}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+      <div>
+        <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: '0.4rem', color: '#1e293b' }}>
+          Hình Ảnh Sản Phẩm
+        </label>
+        
+        {/* Direct Image URL input for Cover */}
+        <div style={{ marginBottom: '0.65rem' }}>
+          <div style={{ fontSize: '0.77rem', fontWeight: 600, color: '#475569', marginBottom: '0.25rem' }}>
+            🔗 Link URL Ảnh Bìa (Khuyên dùng - Lưu vĩnh viễn):
           </div>
           <input
-            id="product-gallery-input"
-            type="file"
-            accept="image/jpeg,image/png,image/webp,image/gif"
-            multiple
-            onChange={(e) => { if (e.target.files?.length) onAddFiles(e.target.files); e.target.value = ''; }}
-            style={{ display: 'none' }}
+            type="url"
+            placeholder="Dán link ảnh trực tiếp (VD: https://product.hstatic.net/...)"
+            value={coverImageUrl || ''}
+            onChange={(e) => onCoverImageUrlChange && onCoverImageUrlChange(e.target.value)}
+            style={{ width: '100%', padding: '0.45rem 0.75rem', fontSize: '0.82rem', border: '1px solid #cbd5e1', borderRadius: '6px', boxSizing: 'border-box' }}
           />
-          <div style={{ fontSize: '0.74rem', fontWeight: 600, color: '#64748b', marginTop: '0.4rem' }}>Ảnh Phụ ({totalGalleryCount}/{MAX_GALLERY_IMAGES})</div>
+        </div>
+
+        <div style={{ display: 'flex', gap: '1.1rem', alignItems: 'flex-start' }}>
+          {/* Cover photo preview + file picker */}
+          <div style={{ flexShrink: 0, width: GALLERY_THUMB_SIZE }}>
+            <label
+              htmlFor="product-cover-input"
+              style={{
+                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                width: GALLERY_THUMB_SIZE, height: GALLERY_THUMB_SIZE, borderRadius: '8px', cursor: 'pointer', overflow: 'hidden',
+                border: coverPreview ? '1px solid #e3e8ef' : '2px dashed #cbd5e1',
+                backgroundColor: coverPreview ? 'transparent' : '#f8fafc'
+              }}
+            >
+              {coverPreview ? (
+                <img
+                  src={coverPreview}
+                  alt="Ảnh bìa"
+                  onError={(e) => { e.currentTarget.src = PLACEHOLDER_IMG; }}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                />
+              ) : (
+                <>
+                  <Image size={20} style={{ color: '#94a3b8' }} />
+                  <span style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '0.25rem', textAlign: 'center', padding: '0 0.3rem' }}>Tải tệp ảnh</span>
+                </>
+              )}
+            </label>
+            <input id="product-cover-input" type="file" accept="image/jpeg,image/png,image/webp,image/gif" onChange={(e) => onCoverSelect(e.target.files?.[0] || null)} style={{ display: 'none' }} />
+            <div style={{ fontSize: '0.74rem', fontWeight: 600, color: '#64748b', textAlign: 'center', marginTop: '0.4rem' }}>Ảnh Bìa</div>
+          </div>
+
+          <div style={{ width: '1px', alignSelf: 'stretch', backgroundColor: '#e2e8f0', flexShrink: 0 }} />
+
+          {/* Gallery strip */}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            {/* Direct URL input for adding gallery images */}
+            {totalGalleryCount < MAX_GALLERY_IMAGES && onAddGalleryUrl && (
+              <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '0.5rem' }}>
+                <input
+                  type="url"
+                  placeholder="Thêm link URL ảnh phụ (https://...)"
+                  value={newGalleryUrlInput}
+                  onChange={(e) => setNewGalleryUrlInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddUrl(); } }}
+                  style={{ flex: 1, padding: '0.35rem 0.6rem', fontSize: '0.76rem', border: '1px solid #cbd5e1', borderRadius: '4px', boxSizing: 'border-box' }}
+                />
+                <button
+                  type="button"
+                  onClick={handleAddUrl}
+                  disabled={!newGalleryUrlInput.trim()}
+                  style={{
+                    padding: '0.35rem 0.65rem',
+                    fontSize: '0.76rem',
+                    fontWeight: 600,
+                    backgroundColor: newGalleryUrlInput.trim() ? '#2563eb' : '#e2e8f0',
+                    color: newGalleryUrlInput.trim() ? '#ffffff' : '#94a3b8',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: newGalleryUrlInput.trim() ? 'pointer' : 'default',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  + Thêm URL
+                </button>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: '0.6rem', overflowX: 'auto', padding: '7px 7px 0.3rem 2px', margin: '-7px -7px 0 -2px' }}>
+              {(existingImages || []).map(img => (
+                <div key={img.id} style={thumbWrapStyle}>
+                  <img
+                    src={img.url}
+                    alt=""
+                    onError={(e) => { e.currentTarget.src = PLACEHOLDER_IMG; }}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '6px', border: '1px solid #e3e8ef' }}
+                  />
+                  <button
+                    type="button"
+                    disabled={deletingImageId === img.id}
+                    onClick={() => onDeleteExistingImage(img.id)}
+                    title="Xoá ảnh này"
+                    style={{ ...badgeStyle('#dc2626'), cursor: deletingImageId === img.id ? 'default' : 'pointer', opacity: deletingImageId === img.id ? 0.6 : 1 }}
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+              ))}
+              {(galleryUrls || []).map((url, idx) => (
+                <div key={`url-${idx}`} style={thumbWrapStyle}>
+                  <img
+                    src={url}
+                    alt=""
+                    onError={(e) => { e.currentTarget.src = PLACEHOLDER_IMG; }}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '6px', border: '1px solid #93c5fd' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => onRemoveGalleryUrl && onRemoveGalleryUrl(idx)}
+                    title="Bỏ URL này"
+                    style={badgeStyle('#dc2626')}
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+              ))}
+              {(pendingFiles || []).map((file, idx) => (
+                <div key={`pending-${idx}`} style={thumbWrapStyle}>
+                  <img
+                    src={URL.createObjectURL(file)}
+                    alt=""
+                    onError={(e) => { e.currentTarget.src = PLACEHOLDER_IMG; }}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '6px', border: '1px solid #93c5fd' }}
+                  />
+                  <button type="button" onClick={() => onRemovePendingFile(idx)} title="Bỏ ảnh này" style={badgeStyle('#475569')}>
+                    <X size={12} />
+                  </button>
+                </div>
+              ))}
+              {totalGalleryCount < MAX_GALLERY_IMAGES && (
+                <label
+                  htmlFor="product-gallery-input"
+                  title="Tải tệp ảnh phụ từ máy"
+                  style={{
+                    flexShrink: 0, width: GALLERY_THUMB_SIZE, height: GALLERY_THUMB_SIZE, borderRadius: '6px', border: '2px dashed #cbd5e1',
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', backgroundColor: '#f8fafc'
+                  }}
+                >
+                  <Plus size={18} style={{ color: '#94a3b8' }} />
+                  <span style={{ fontSize: '0.68rem', color: '#94a3b8', marginTop: '2px' }}>Tệp máy</span>
+                </label>
+              )}
+            </div>
+            <input
+              id="product-gallery-input"
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif"
+              multiple
+              onChange={(e) => { if (e.target.files?.length) onAddFiles(e.target.files); e.target.value = ''; }}
+              style={{ display: 'none' }}
+            />
+            <div style={{ fontSize: '0.74rem', fontWeight: 600, color: '#64748b', marginTop: '0.4rem' }}>
+              Ảnh Phụ ({totalGalleryCount}/{MAX_GALLERY_IMAGES})
+            </div>
+          </div>
         </div>
       </div>
     </div>
   );
 };
-
 
 const parseDateVal = (val) => {
   if (!val) return null;
@@ -3125,7 +3433,41 @@ export default function Warehouse() {
 
   // Add Product Modal
   const [showAddProduct, setShowAddProduct] = useState(false);
-  const [newProdForm, setNewProdForm] = useState({ name: '', category: 'CPU', stock: '', price: '', supplier: 'Intel Vietnam', supplierCode: '', threshold: '5', location: 'ZONE-A/SHELF-01/BIN-01', available: true, description: '', imageFile: null, imageFiles: [] });
+  const [newProdForm, setNewProdForm] = useState({
+    name: '',
+    category: 'CPU',
+    brand: '',
+    warranty: '36 tháng',
+    stock: '',
+    price: '',
+    originalPrice: '',
+    supplier: 'Intel Vietnam',
+    supplierCode: '',
+    threshold: '5',
+    location: 'ZONE-A/SHELF-01/BIN-01',
+    available: true,
+    description: '',
+    imageUrl: '',
+    imageFile: null,
+    imageFiles: [],
+    galleryUrls: [],
+    specs: {}
+  });
+
+  const openProductModal = (p, isReadOnly = false) => {
+    setEditingProd({
+      ...p,
+      originalPrice: p.originalPrice !== undefined ? p.originalPrice : (p.price || 0),
+      brand: p.brand || '',
+      warranty: p.warranty || '36 tháng',
+      specs: (typeof p.specs === 'object' && p.specs !== null) ? p.specs : {},
+      imageUrl: (typeof p.image === 'string' && (p.image.startsWith('http://') || p.image.startsWith('https://'))) ? p.image : '',
+      galleryUrls: [],
+      imageFile: null,
+      imageFiles: []
+    });
+    setProductViewOnly(isReadOnly);
+  };
 
   // Edit Product Modal — opened either read-only (clicking the product name: "xem chi
   // tiết") or editable (the Hành Động button, managers only: "chỉnh sửa"). Same modal,
@@ -3683,21 +4025,34 @@ export default function Warehouse() {
     }
 
     try {
+      const priceVal = parseFloat(newProdForm.price) || 0;
+      const origVal = parseFloat(newProdForm.originalPrice) || priceVal;
+
       await createProduct({
         name: newProdForm.name.trim(),
         category: newProdForm.category,
+        brand: newProdForm.brand?.trim() || '',
+        warranty: newProdForm.warranty?.trim() || '36 tháng',
         stockQuantity: parseInt(newProdForm.stock, 10) || 0,
         threshold: parseInt(newProdForm.threshold, 10) || 5,
-        price: parseFloat(newProdForm.price) || 0,
+        price: priceVal,
+        originalPrice: origVal,
         available: newProdForm.available !== false,
         description: newProdForm.description || '',
+        imageUrl: newProdForm.imageUrl?.trim() || '',
+        galleryUrls: newProdForm.galleryUrls || [],
+        specs: newProdForm.specs || {},
         ...(newProdForm.imageFile && { imageFile: newProdForm.imageFile }),
         ...(newProdForm.imageFiles?.length > 0 && { imageFiles: newProdForm.imageFiles }),
         ...(newProdForm.supplierCode && { supplierCode: newProdForm.supplierCode })
       });
 
       setShowAddProduct(false);
-      setNewProdForm({ name: '', category: 'CPU', stock: '', price: '', supplier: 'Intel Vietnam', supplierCode: '', threshold: '5', location: 'ZONE-A/SHELF-01/BIN-01', available: true, description: '', imageFile: null, imageFiles: [] });
+      setNewProdForm({
+        name: '', category: 'CPU', brand: '', warranty: '36 tháng', stock: '', price: '', originalPrice: '',
+        supplier: 'Intel Vietnam', supplierCode: '', threshold: '5', location: 'ZONE-A/SHELF-01/BIN-01',
+        available: true, description: '', imageUrl: '', imageFile: null, imageFiles: [], galleryUrls: [], specs: {}
+      });
       notify(`Đã thêm sản phẩm ${newProdForm.name.trim()} vào cơ sở dữ liệu thành công!`, 'success');
     } catch (err) {
       notify(err?.message || 'Không thể lưu sản phẩm mới vào cơ sở dữ liệu. Vui lòng thử lại.', 'error');
@@ -3714,20 +4069,25 @@ export default function Warehouse() {
     }
 
     const targetId = editingProd.id;
-    // name/price/stock/supplierCode are real Product columns the backend persists
-    // (see product.controller.js updateProduct); category/location/threshold live in
-    // Inventory/WarehouseLocation and aren't accepted by that endpoint yet, so they
-    // still only update local state below, same as before this fix.
+    const priceVal = editingProd.price !== undefined ? (parseFloat(editingProd.price) || 0) : 0;
+    const origVal = editingProd.originalPrice !== undefined ? (parseFloat(editingProd.originalPrice) || 0) : priceVal;
+
     const fieldsToUpdate = {
       name: editingProd.name,
       category: editingProd.category,
+      brand: editingProd.brand?.trim() || '',
+      warranty: editingProd.warranty?.trim() || '36 tháng',
       supplier: editingProd.supplier,
       location: editingProd.location,
       stock: editingProd.stock !== undefined ? (parseInt(editingProd.stock, 10) || 0) : 0,
-      price: editingProd.price !== undefined ? (parseFloat(editingProd.price) || 0) : 0,
+      price: priceVal,
+      originalPrice: origVal,
       threshold: editingProd.threshold !== undefined ? (parseInt(editingProd.threshold, 10) || 5) : 5,
       available: editingProd.available !== false,
       description: editingProd.description || '',
+      imageUrl: editingProd.imageUrl?.trim() || '',
+      galleryUrls: editingProd.galleryUrls || [],
+      specs: editingProd.specs || {},
       ...(editingProd.imageFile && { imageFile: editingProd.imageFile }),
       ...(editingProd.imageFiles?.length > 0 && { imageFiles: editingProd.imageFiles }),
       ...(editingProd.supplierCode && { supplierCode: editingProd.supplierCode })
@@ -3748,9 +4108,6 @@ export default function Warehouse() {
     }
   };
 
-  // Delete one already-saved gallery photo — separate from the Lưu Cập Nhật save
-  // action above, takes effect immediately (matches the trash icon's implied "this is
-  // permanent now" affordance rather than queuing it behind the next full form save).
   const [deletingGalleryImageId, setDeletingGalleryImageId] = useState(null);
   const handleDeleteGalleryImage = async (imageId) => {
     if (!editingProd) return;
@@ -6705,7 +7062,7 @@ export default function Warehouse() {
                       <tr key={p.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
                         <td
                           title={`${p.name} — Nhấn để xem chi tiết`}
-                          onClick={() => { setEditingProd(p); setProductViewOnly(true); }}
+                          onClick={() => openProductModal(p, true)}
                           style={{ padding: '0.75rem 1rem', fontWeight: 700, color: '#2563eb', cursor: 'pointer', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
                         >
                           {p.name}
@@ -6763,7 +7120,7 @@ export default function Warehouse() {
                         </td>
                         <td style={{ padding: '0.75rem 0.5rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
                           <button
-                            onClick={() => { setEditingProd(p); setProductViewOnly(false); }}
+                            onClick={() => openProductModal(p, false)}
                             style={{
                               width: '100%',
                               boxSizing: 'border-box',
@@ -7263,21 +7620,22 @@ export default function Warehouse() {
       {/* Add Product Modal */}
       {showAddProduct && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.65)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000, padding: '1rem' }}>
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', maxWidth: '600px', width: '100%', maxHeight: '90vh', border: '1px solid #e3e8ef', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', maxWidth: '680px', width: '100%', maxHeight: '92vh', border: '1px solid #e3e8ef', boxShadow: '0 20px 40px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
             <div style={{ padding: '1.25rem 1.5rem', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
               <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#0f172a' }}>Thêm Sản Phẩm Mới Vào Sổ Kho</h3>
-              <button onClick={() => setShowAddProduct(false)} style={{ background: 'none', border: '1px solid #e3e8ef', borderRadius: '4px', padding: '0.2rem 0.5rem', cursor: 'pointer' }}>Đóng</button>
+              <button onClick={() => setShowAddProduct(false)} style={{ background: 'none', border: '1px solid #e3e8ef', borderRadius: '4px', padding: '0.2rem 0.5rem', cursor: 'pointer', color: '#475569', fontWeight: 600 }}>Đóng</button>
             </div>
             <form onSubmit={handleAddProductSubmit} style={{ padding: '1.5rem', overflowY: 'auto', flex: 1, minHeight: 0 }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: '0.35rem' }}>Tên Sản Phẩm *</label>
-                  <input type="text" required value={newProdForm.name} onChange={(e) => setNewProdForm({ ...newProdForm, name: e.target.value })} style={{ width: '100%', padding: '0.55rem 0.85rem', border: '1px solid #e3e8ef', borderRadius: '6px' }} />
+                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: '0.35rem', color: '#1e293b' }}>Tên Sản Phẩm *</label>
+                  <input type="text" required value={newProdForm.name} onChange={(e) => setNewProdForm({ ...newProdForm, name: e.target.value })} placeholder="VD: CPU Intel Core i7 14700K..." style={{ width: '100%', padding: '0.55rem 0.85rem', border: '1px solid #cbd5e1', borderRadius: '6px', boxSizing: 'border-box' }} />
                 </div>
+
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: '0.35rem' }}>Phân Nhóm</label>
-                    <select value={newProdForm.category} onChange={(e) => setNewProdForm({ ...newProdForm, category: e.target.value })} style={{ width: '100%', padding: '0.55rem 0.85rem', border: '1px solid #e3e8ef', borderRadius: '6px' }}>
+                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: '0.35rem', color: '#1e293b' }}>Phân Nhóm</label>
+                    <select value={newProdForm.category} onChange={(e) => setNewProdForm({ ...newProdForm, category: e.target.value })} style={{ width: '100%', padding: '0.55rem 0.85rem', border: '1px solid #cbd5e1', borderRadius: '6px', boxSizing: 'border-box' }}>
                       <option value="CPU">CPU</option>
                       <option value="VGA">VGA</option>
                       <option value="MAINBOARD">Mainboard</option>
@@ -7285,67 +7643,117 @@ export default function Warehouse() {
                       <option value="STORAGE">Storage</option>
                       <option value="PSU">PSU</option>
                       <option value="CASE">Case</option>
+                      <option value="COOLER">Tản nhiệt (Cooler)</option>
+                      <option value="MONITOR">Màn hình</option>
                     </select>
                   </div>
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: '0.35rem' }}>Số Lượng Tồn Kho *</label>
-                    <input type="number" required min="0" value={newProdForm.stock} onChange={(e) => setNewProdForm({ ...newProdForm, stock: e.target.value })} style={{ width: '100%', padding: '0.55rem 0.85rem', border: '1px solid #e3e8ef', borderRadius: '6px' }} />
+                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: '0.35rem', color: '#1e293b' }}>Thương Hiệu (Brand)</label>
+                    <input type="text" value={newProdForm.brand} onChange={(e) => setNewProdForm({ ...newProdForm, brand: e.target.value })} placeholder="VD: ASUS, Intel, Corsair..." style={{ width: '100%', padding: '0.55rem 0.85rem', border: '1px solid #cbd5e1', borderRadius: '6px', boxSizing: 'border-box' }} />
                   </div>
                 </div>
+
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: '0.35rem' }}>Đơn Giá (VNĐ)</label>
-                    <input type="number" min="0" value={newProdForm.price} onChange={(e) => setNewProdForm({ ...newProdForm, price: e.target.value })} style={{ width: '100%', padding: '0.55rem 0.85rem', border: '1px solid #e3e8ef', borderRadius: '6px' }} />
+                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: '0.35rem', color: '#1e293b' }}>Giá Gốc Niêm Yết (VNĐ)</label>
+                    <input type="number" min="0" value={newProdForm.originalPrice} onChange={(e) => setNewProdForm({ ...newProdForm, originalPrice: e.target.value })} placeholder="Giá gạch ngang (VD: 11000000)" style={{ width: '100%', padding: '0.55rem 0.85rem', border: '1px solid #cbd5e1', borderRadius: '6px', boxSizing: 'border-box' }} />
                   </div>
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: '0.35rem' }}>Ngưỡng An Toàn</label>
-                    <input type="number" min="1" value={newProdForm.threshold} onChange={(e) => setNewProdForm({ ...newProdForm, threshold: e.target.value })} style={{ width: '100%', padding: '0.55rem 0.85rem', border: '1px solid #e3e8ef', borderRadius: '6px' }} />
+                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: '0.35rem', color: '#1e293b' }}>Đơn Giá Bán Khuyến Mãi (VNĐ)</label>
+                    <input type="number" min="0" value={newProdForm.price} onChange={(e) => setNewProdForm({ ...newProdForm, price: e.target.value })} placeholder="Giá thực tế bán (VD: 9890000)" style={{ width: '100%', padding: '0.55rem 0.85rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontWeight: 700, color: '#16a34a', boxSizing: 'border-box' }} />
                   </div>
                 </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: '0.35rem' }}>Nhà Cung Cấp</label>
-                  <select value={newProdForm.supplierCode} onChange={(e) => { const sup = realSuppliers.find(s => s.code === e.target.value); setNewProdForm({ ...newProdForm, supplierCode: e.target.value, supplier: sup ? sup.name : newProdForm.supplier }); }} style={{ width: '100%', padding: '0.55rem 0.85rem', border: '1px solid #e3e8ef', borderRadius: '6px' }}>
-                    <option value="">-- Chọn Nhà Cung Cấp (không bắt buộc) --</option>
-                    {realSuppliers.map(s => (
-                      <option key={s.code} value={s.code}>{s.name}</option>
-                    ))}
-                  </select>
+
+                {/* Live Discount Calculator Preview */}
+                {(() => {
+                  const orig = parseFloat(newProdForm.originalPrice) || 0;
+                  const curr = parseFloat(newProdForm.price) || 0;
+                  if (orig > curr && curr > 0) {
+                    const pct = Math.round((1 - curr / orig) * 100);
+                    return (
+                      <div style={{ backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '6px', padding: '0.45rem 0.75rem', fontSize: '0.78rem', color: '#15803d', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <span style={{ fontWeight: 800, backgroundColor: '#dcfce7', padding: '0.1rem 0.45rem', borderRadius: '4px' }}>-{pct}%</span>
+                        <span>Khách hàng sẽ thấy giá gốc <strong>{safeFormatPrice(orig)}</strong> bị gạch ngang và giảm còn <strong>{safeFormatPrice(curr)}</strong> (tiết kiệm {safeFormatPrice(orig - curr)})</span>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: '0.35rem', color: '#1e293b' }}>Số Lượng Tồn Kho *</label>
+                    <input type="number" required min="0" value={newProdForm.stock} onChange={(e) => setNewProdForm({ ...newProdForm, stock: e.target.value })} style={{ width: '100%', padding: '0.55rem 0.85rem', border: '1px solid #cbd5e1', borderRadius: '6px', boxSizing: 'border-box' }} />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: '0.35rem', color: '#1e293b' }}>Ngưỡng An Toàn</label>
+                    <input type="number" min="1" value={newProdForm.threshold} onChange={(e) => setNewProdForm({ ...newProdForm, threshold: e.target.value })} style={{ width: '100%', padding: '0.55rem 0.85rem', border: '1px solid #cbd5e1', borderRadius: '6px', boxSizing: 'border-box' }} />
+                  </div>
                 </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: '0.35rem', color: '#1e293b' }}>Nhà Cung Cấp</label>
+                    <select value={newProdForm.supplierCode} onChange={(e) => { const sup = realSuppliers.find(s => s.code === e.target.value); setNewProdForm({ ...newProdForm, supplierCode: e.target.value, supplier: sup ? sup.name : newProdForm.supplier }); }} style={{ width: '100%', padding: '0.55rem 0.85rem', border: '1px solid #cbd5e1', borderRadius: '6px', boxSizing: 'border-box' }}>
+                      <option value="">-- Chọn Nhà Cung Cấp --</option>
+                      {realSuppliers.map(s => (
+                        <option key={s.code} value={s.code}>{s.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: '0.35rem', color: '#1e293b' }}>Thời Hạn Bảo Hành</label>
+                    <input type="text" value={newProdForm.warranty} onChange={(e) => setNewProdForm({ ...newProdForm, warranty: e.target.value })} placeholder="VD: 36 tháng" style={{ width: '100%', padding: '0.55rem 0.85rem', border: '1px solid #cbd5e1', borderRadius: '6px', boxSizing: 'border-box' }} />
+                  </div>
+                </div>
+
                 <ProductGalleryField
                   coverFile={newProdForm.imageFile}
                   coverUrl={null}
+                  coverImageUrl={newProdForm.imageUrl}
+                  onCoverImageUrlChange={(url) => setNewProdForm({ ...newProdForm, imageUrl: url })}
                   onCoverSelect={(file) => setNewProdForm({ ...newProdForm, imageFile: file })}
                   existingImages={[]}
                   pendingFiles={newProdForm.imageFiles || []}
+                  galleryUrls={newProdForm.galleryUrls || []}
+                  onAddGalleryUrl={(url) => setNewProdForm({ ...newProdForm, galleryUrls: [...(newProdForm.galleryUrls || []), url] })}
+                  onRemoveGalleryUrl={(idx) => setNewProdForm({ ...newProdForm, galleryUrls: (newProdForm.galleryUrls || []).filter((_, i) => i !== idx) })}
                   onAddFiles={(fileList) => {
-                    const room = MAX_GALLERY_IMAGES - (newProdForm.imageFiles || []).length;
+                    const room = MAX_GALLERY_IMAGES - (newProdForm.imageFiles || []).length - (newProdForm.galleryUrls || []).length;
                     setNewProdForm({ ...newProdForm, imageFiles: [...(newProdForm.imageFiles || []), ...Array.from(fileList).slice(0, room)] });
                   }}
                   onRemovePendingFile={(idx) => setNewProdForm({ ...newProdForm, imageFiles: (newProdForm.imageFiles || []).filter((_, i) => i !== idx) })}
                   onDeleteExistingImage={() => {}}
                   deletingImageId={null}
                 />
+
+                <ProductSpecsEditor
+                  category={newProdForm.category}
+                  specs={newProdForm.specs || {}}
+                  onChange={(specs) => setNewProdForm({ ...newProdForm, specs })}
+                />
+
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: '0.35rem' }}>Mô Tả Sản Phẩm</label>
-                  <textarea rows={3} value={newProdForm.description || ''} onChange={(e) => setNewProdForm({ ...newProdForm, description: e.target.value })} style={{ width: '100%', padding: '0.55rem 0.85rem', border: '1px solid #e3e8ef', borderRadius: '6px', fontFamily: 'inherit', fontSize: '0.83rem', resize: 'vertical', boxSizing: 'border-box' }} />
+                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: '0.35rem', color: '#1e293b' }}>Mô Tả Sản Phẩm</label>
+                  <textarea rows={3} value={newProdForm.description || ''} onChange={(e) => setNewProdForm({ ...newProdForm, description: e.target.value })} placeholder="Mô tả tóm tắt tính năng nổi bật..." style={{ width: '100%', padding: '0.55rem 0.85rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontFamily: 'inherit', fontSize: '0.83rem', resize: 'vertical', boxSizing: 'border-box' }} />
                 </div>
+
                 <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.83rem', fontWeight: 600, color: '#334155', cursor: 'pointer' }}>
                   <input type="checkbox" checked={newProdForm.available !== false} onChange={(e) => setNewProdForm({ ...newProdForm, available: e.target.checked })} />
-                  Hiển thị trên trang bán hàng
+                  Hiển thị trên trang bán hàng (Storefront)
                 </label>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
-                <button type="button" onClick={() => setShowAddProduct(false)} style={{ padding: '0.5rem 1rem', border: '1px solid #e3e8ef', borderRadius: '6px', background: '#fff' }}>Hủy</button>
-                <button type="submit" style={{ padding: '0.5rem 1.25rem', border: 'none', borderRadius: '6px', background: '#2563eb', color: '#fff', fontWeight: 700 }}>Lưu Sản Phẩm</button>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', borderTop: '1px solid #e2e8f0', paddingTop: '1rem' }}>
+                <button type="button" onClick={() => setShowAddProduct(false)} style={{ padding: '0.5rem 1rem', border: '1px solid #e3e8ef', borderRadius: '6px', background: '#fff', cursor: 'pointer' }}>Hủy</button>
+                <button type="submit" style={{ padding: '0.5rem 1.25rem', border: 'none', borderRadius: '6px', background: '#2563eb', color: '#fff', fontWeight: 700, cursor: 'pointer' }}>Lưu Sản Phẩm</button>
               </div>
             </form>
           </div>
         </div>
       )}
 
-      {/* Enhanced Edit Product Modal — read-only ("Xem Chi Tiết", opened from the
-          product name) unless the viewer is a manager AND explicitly chose to edit
-          (the Hành Động button, or the "Chỉnh Sửa" button inside the read-only view). */}
+      {/* Enhanced Edit Product Modal */}
       {editingProd && (() => {
         const isReadOnlyView = !isManager || productViewOnly;
         const closeModal = () => { setEditingProd(null); setProductViewOnly(false); };
@@ -7356,40 +7764,59 @@ export default function Warehouse() {
           : stockNum <= threshNum
             ? { label: 'Cảnh báo tồn', color: '#b45309', bg: '#fffbeb', border: '#fde68a' }
             : { label: 'Còn hàng', color: '#15803d', bg: '#f0fdf4', border: '#bbf7d0' };
-        // Plain label/value row for the simple read-only detail view — not a form
-        // field, just static text, so this reads as "product info" rather than an
-        // edit form with its inputs greyed out.
+
         const infoRow = (label, value) => (
           <div key={label}>
             <div style={{ fontSize: '0.77rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.03em', marginBottom: '0.3rem' }}>{label}</div>
             <div style={{ fontSize: '0.92rem', fontWeight: 700, color: '#0f172a' }}>{value}</div>
           </div>
         );
+
         return (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.65)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000, padding: '1rem' }}>
-          <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', maxWidth: '560px', width: '100%', maxHeight: '90vh', border: '1px solid #e3e8ef', boxShadow: '0 20px 40px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', maxWidth: '680px', width: '100%', maxHeight: '92vh', border: '1px solid #e3e8ef', boxShadow: '0 20px 40px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
             <div style={{ padding: '1.25rem 1.5rem', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
               <div>
-                <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#0f172a' }}>{isReadOnlyView ? 'Thông Tin Sản Phẩm' : 'Chỉnh Sửa Thông Tin Sản Phẩm'}</h3>
+                <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#0f172a' }}>{isReadOnlyView ? 'Thông Tin Chi Tiết Sản Phẩm' : 'Chỉnh Sửa Thông Tin Sản Phẩm'}</h3>
                 <span style={{ fontSize: '0.78rem', color: '#64748b' }}>Mã định danh: <strong style={{ color: '#2563eb' }}>#{editingProd.id}</strong></span>
               </div>
               <button onClick={closeModal} style={{ background: 'none', border: '1px solid #e3e8ef', borderRadius: '4px', padding: '0.2rem 0.6rem', cursor: 'pointer', color: '#475569', fontWeight: 600, flexShrink: 0 }}>Đóng</button>
             </div>
 
             {isReadOnlyView ? (
-              // Simple read-only detail card — plain text, no form controls.
               <div style={{ padding: '1.5rem', overflowY: 'auto', flex: 1, minHeight: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', marginBottom: '1.1rem' }}>
-                  {editingProd.image && (
-                    <img src={editingProd.image} alt={editingProd.name} style={{ width: '56px', height: '56px', objectFit: 'cover', borderRadius: '6px', border: '1px solid #e3e8ef', flexShrink: 0 }} />
+                  {editingProd.image ? (
+                    <img src={editingProd.image} alt={editingProd.name} onError={(e) => { e.currentTarget.src = PLACEHOLDER_IMG; }} style={{ width: '64px', height: '64px', objectFit: 'cover', borderRadius: '6px', border: '1px solid #e3e8ef', flexShrink: 0 }} />
+                  ) : (
+                    <div style={{ width: '64px', height: '64px', borderRadius: '6px', backgroundColor: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: '#94a3b8' }}>
+                      <Box size={24} />
+                    </div>
                   )}
-                  <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0f172a' }}>{editingProd.name}</div>
+                  <div>
+                    <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0f172a' }}>{editingProd.name}</div>
+                    <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.2rem' }}>Thương hiệu: <strong style={{ color: '#0f172a' }}>{editingProd.brand || 'Khác'}</strong> • Bảo hành: <strong style={{ color: '#0f172a' }}>{editingProd.warranty || '36 tháng'}</strong></div>
+                  </div>
                 </div>
+
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.1rem', marginBottom: '1.1rem' }}>
                   {infoRow('Phân Nhóm', editingProd.category)}
                   {infoRow('Nhà Cung Cấp', editingProd.supplier || 'Chưa rõ')}
                   {infoRow('Vị Trí Kệ', editingProd.location || 'Chưa xếp kệ')}
-                  {infoRow('Đơn Giá Niêm Yết', safeFormatPrice(editingProd.price))}
+                  {infoRow('Thời Hạn Bảo Hành', editingProd.warranty || '36 tháng')}
+                  {infoRow('Đơn Giá Bán Khuyến Mãi', safeFormatPrice(editingProd.price))}
+                  {infoRow('Giá Gốc Niêm Yết', (
+                    <span>
+                      {editingProd.originalPrice && editingProd.originalPrice > editingProd.price ? (
+                        <>
+                          <span style={{ textDecoration: 'line-through', color: '#94a3b8', marginRight: '0.5rem' }}>{safeFormatPrice(editingProd.originalPrice)}</span>
+                          <span style={{ fontSize: '0.78rem', color: '#15803d', backgroundColor: '#dcfce7', padding: '0.1rem 0.4rem', borderRadius: '4px' }}>
+                            -{Math.round((1 - editingProd.price / editingProd.originalPrice) * 100)}%
+                          </span>
+                        </>
+                      ) : safeFormatPrice(editingProd.originalPrice || editingProd.price)}
+                    </span>
+                  ))}
                   {infoRow('Ngưỡng An Toàn', `${threshNum} sản phẩm`)}
                   {infoRow('Trên Trang Bán Hàng', editingProd.available !== false
                     ? <span style={{ color: '#15803d' }}>Đang hiển thị</span>
@@ -7402,28 +7829,50 @@ export default function Warehouse() {
                     </div>
                   </div>
                 </div>
+
+                {editingProd.specs && Object.keys(editingProd.specs).length > 0 && (
+                  <div style={{ marginBottom: '1.1rem' }}>
+                    <div style={{ fontSize: '0.77rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.03em', marginBottom: '0.4rem' }}>Thông Số Kỹ Thuật (Specs)</div>
+                    <div style={{ border: '1px solid #e2e8f0', borderRadius: '6px', overflow: 'hidden' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+                        <tbody>
+                          {Object.entries(editingProd.specs).map(([k, v], idx) => (
+                            <tr key={k} style={{ backgroundColor: idx % 2 === 0 ? '#f8fafc' : '#ffffff', borderBottom: '1px solid #f1f5f9' }}>
+                              <td style={{ padding: '0.45rem 0.75rem', fontWeight: 600, color: '#475569', width: '35%' }}>{k}</td>
+                              <td style={{ padding: '0.45rem 0.75rem', color: '#0f172a' }}>{Array.isArray(v) ? v.join(', ') : String(v)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
                 {editingProd.gallery?.length > 0 && (
                   <div style={{ marginBottom: '1.1rem' }}>
                     <div style={{ fontSize: '0.77rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.03em', marginBottom: '0.3rem' }}>Ảnh Phụ ({editingProd.gallery.length})</div>
                     <div style={{ display: 'flex', gap: '0.5rem', overflowX: 'auto', paddingBottom: '0.2rem' }}>
                       {editingProd.gallery.map(img => (
-                        <img key={img.id} src={img.url} alt="" style={{ width: '56px', height: '56px', objectFit: 'cover', borderRadius: '6px', border: '1px solid #e3e8ef', flexShrink: 0 }} />
+                        <img key={img.id} src={img.url} alt="" onError={(e) => { e.currentTarget.src = PLACEHOLDER_IMG; }} style={{ width: '56px', height: '56px', objectFit: 'cover', borderRadius: '6px', border: '1px solid #e3e8ef', flexShrink: 0 }} />
                       ))}
                     </div>
                   </div>
                 )}
+
                 {editingProd.description && (
                   <div style={{ marginBottom: '1.1rem' }}>
                     <div style={{ fontSize: '0.77rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.03em', marginBottom: '0.3rem' }}>Mô Tả Sản Phẩm</div>
                     <div style={{ fontSize: '0.85rem', color: '#334155', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{editingProd.description}</div>
                   </div>
                 )}
+
                 {!isManager && (
                   <div style={{ backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '8px', padding: '0.65rem 0.9rem', display: 'flex', alignItems: 'center', gap: '0.6rem', fontSize: '0.78rem', color: '#1e40af', fontWeight: 600 }}>
                     <AlertCircle size={15} style={{ flexShrink: 0 }} />
                     Chỉ Quản Lý Kho mới được chỉnh sửa giá/tồn kho/vị trí.
                   </div>
                 )}
+
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', borderTop: '1px solid #e2e8f0', paddingTop: '1rem', marginTop: '1.1rem' }}>
                   <button type="button" onClick={closeModal} style={{ padding: '0.5rem 1.15rem', fontSize: '0.82rem', fontWeight: 600, border: '1px solid #e3e8ef', borderRadius: '6px', background: '#ffffff', color: '#475569', cursor: 'pointer' }}>Đóng</button>
                   {isManager && (
@@ -7432,18 +7881,17 @@ export default function Warehouse() {
                 </div>
               </div>
             ) : (
-              // Edit form — only reachable by a manager who explicitly chose to edit.
               <form onSubmit={handleEditProductSubmit} style={{ padding: '1.5rem', overflowY: 'auto', flex: 1, minHeight: 0 }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem', marginBottom: '1.5rem' }}>
                   <div>
                     <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.35rem' }}>Tên Linh Kiện / Sản Phẩm *</label>
-                    <input type="text" required value={editingProd.name || ''} onChange={(e) => setEditingProd({ ...editingProd, name: e.target.value })} style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.85rem', border: '1px solid #e3e8ef', borderRadius: '6px', backgroundColor: '#ffffff', color: '#0f172a' }} />
+                    <input type="text" required value={editingProd.name || ''} onChange={(e) => setEditingProd({ ...editingProd, name: e.target.value })} style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.85rem', border: '1px solid #cbd5e1', borderRadius: '6px', backgroundColor: '#ffffff', color: '#0f172a', boxSizing: 'border-box' }} />
                   </div>
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.35rem' }}>Phân Nhóm Danh Mục</label>
-                      <select value={editingProd.category || 'CPU'} onChange={(e) => setEditingProd({ ...editingProd, category: e.target.value })} style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.83rem', border: '1px solid #e3e8ef', borderRadius: '6px', backgroundColor: '#ffffff', color: '#0f172a' }}>
+                      <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.35rem' }}>Phân Nhóm</label>
+                      <select value={editingProd.category || 'CPU'} onChange={(e) => setEditingProd({ ...editingProd, category: e.target.value })} style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px', backgroundColor: '#ffffff', color: '#0f172a', boxSizing: 'border-box' }}>
                         <option value="CPU">CPU</option>
                         <option value="VGA">VGA</option>
                         <option value="MAINBOARD">Mainboard</option>
@@ -7456,6 +7904,22 @@ export default function Warehouse() {
                       </select>
                     </div>
                     <div>
+                      <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.35rem' }}>Thương Hiệu (Brand)</label>
+                      <input type="text" value={editingProd.brand || ''} onChange={(e) => setEditingProd({ ...editingProd, brand: e.target.value })} placeholder="VD: ASUS, MSI, Intel..." style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px', backgroundColor: '#ffffff', color: '#0f172a', boxSizing: 'border-box' }} />
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.35rem' }}>Vị Trí Kệ Lưu Kho</label>
+                      <select value={editingProd.location || 'ZONE-A/SHELF-01/BIN-01'} onChange={(e) => setEditingProd({ ...editingProd, location: e.target.value })} style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px', backgroundColor: '#ffffff', color: '#0f172a', boxSizing: 'border-box' }}>
+                        <option value="Chưa xếp kệ">Chưa xếp kệ</option>
+                        {PREDEFINED_LOCATIONS.map(loc => (
+                          <option key={loc} value={loc}>{loc}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
                       <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.35rem' }}>Nhà Cung Cấp</label>
                       <select
                         value={editingProd.supplierCode || realSuppliers.find(s => s.name === editingProd.supplier)?.code || ''}
@@ -7463,7 +7927,7 @@ export default function Warehouse() {
                           const sup = realSuppliers.find(s => s.code === e.target.value);
                           setEditingProd({ ...editingProd, supplierCode: e.target.value, supplier: sup ? sup.name : editingProd.supplier });
                         }}
-                        style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.83rem', border: '1px solid #e3e8ef', borderRadius: '6px', backgroundColor: '#ffffff', color: '#0f172a' }}
+                        style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px', backgroundColor: '#ffffff', color: '#0f172a', boxSizing: 'border-box' }}
                       >
                         <option value="">-- Chọn Nhà Cung Cấp --</option>
                         {realSuppliers.map(s => (
@@ -7475,53 +7939,84 @@ export default function Warehouse() {
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.35rem' }}>Vị Trí Kệ Lưu Kho</label>
-                      <select value={editingProd.location || 'ZONE-A/SHELF-01/BIN-01'} onChange={(e) => setEditingProd({ ...editingProd, location: e.target.value })} style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.83rem', border: '1px solid #e3e8ef', borderRadius: '6px', backgroundColor: '#ffffff', color: '#0f172a' }}>
-                        <option value="Chưa xếp kệ">Chưa xếp kệ</option>
-                        {PREDEFINED_LOCATIONS.map(loc => (
-                          <option key={loc} value={loc}>{loc}</option>
-                        ))}
-                      </select>
+                      <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.35rem' }}>Giá Gốc Niêm Yết (VNĐ)</label>
+                      <input type="number" min="0" value={editingProd.originalPrice !== undefined ? editingProd.originalPrice : (editingProd.price || 0)} onChange={(e) => setEditingProd({ ...editingProd, originalPrice: parseFloat(e.target.value) || 0 })} placeholder="Giá gạch ngang" style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.85rem', border: '1px solid #cbd5e1', borderRadius: '6px', backgroundColor: '#ffffff', boxSizing: 'border-box' }} />
                     </div>
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.35rem' }}>Đơn Giá Niêm Yết (VNĐ)</label>
-                      <input type="number" min="0" value={editingProd.price !== undefined ? editingProd.price : 0} onChange={(e) => setEditingProd({ ...editingProd, price: parseFloat(e.target.value) || 0 })} style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.85rem', fontWeight: 700, color: '#16a34a', border: '1px solid #e3e8ef', borderRadius: '6px', backgroundColor: '#ffffff' }} />
+                      <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.35rem' }}>Đơn Giá Bán Khuyến Mãi (VNĐ)</label>
+                      <input type="number" min="0" value={editingProd.price !== undefined ? editingProd.price : 0} onChange={(e) => setEditingProd({ ...editingProd, price: parseFloat(e.target.value) || 0 })} style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.85rem', fontWeight: 700, color: '#16a34a', border: '1px solid #cbd5e1', borderRadius: '6px', backgroundColor: '#ffffff', boxSizing: 'border-box' }} />
+                    </div>
+                  </div>
+
+                  {/* Live Discount Calculator Preview */}
+                  {(() => {
+                    const orig = parseFloat(editingProd.originalPrice) || 0;
+                    const curr = parseFloat(editingProd.price) || 0;
+                    if (orig > curr && curr > 0) {
+                      const pct = Math.round((1 - curr / orig) * 100);
+                      return (
+                        <div style={{ backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '6px', padding: '0.45rem 0.75rem', fontSize: '0.78rem', color: '#15803d', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <span style={{ fontWeight: 800, backgroundColor: '#dcfce7', padding: '0.1rem 0.45rem', borderRadius: '4px' }}>-{pct}%</span>
+                          <span>Khách hàng sẽ thấy giá gốc <strong>{safeFormatPrice(orig)}</strong> gạch ngang và giảm còn <strong>{safeFormatPrice(curr)}</strong> (tiết kiệm {safeFormatPrice(orig - curr)})</span>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.35rem' }}>Số Lượng Tồn Kho Thực Tế</label>
+                      <input type="number" required min="0" value={editingProd.stock !== undefined ? editingProd.stock : 0} onChange={(e) => setEditingProd({ ...editingProd, stock: parseInt(e.target.value, 10) || 0 })} style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.85rem', fontWeight: 700, border: '1px solid #cbd5e1', borderRadius: '6px', backgroundColor: '#ffffff', color: '#0f172a', boxSizing: 'border-box' }} />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.35rem' }}>Ngưỡng An Toàn</label>
+                      <input type="number" min="1" value={editingProd.threshold || 5} onChange={(e) => setEditingProd({ ...editingProd, threshold: parseInt(e.target.value, 10) || 5 })} style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.85rem', border: '1px solid #cbd5e1', borderRadius: '6px', backgroundColor: '#ffffff', color: '#0f172a', boxSizing: 'border-box' }} />
                     </div>
                   </div>
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.35rem' }}>Số Lượng Tồn Kho Thực Tế</label>
-                      <input type="number" required min="0" value={editingProd.stock !== undefined ? editingProd.stock : 0} onChange={(e) => setEditingProd({ ...editingProd, stock: parseInt(e.target.value, 10) || 0 })} style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.85rem', fontWeight: 700, border: '1px solid #e3e8ef', borderRadius: '6px', backgroundColor: '#ffffff', color: '#0f172a' }} />
+                      <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.35rem' }}>Thời Hạn Bảo Hành</label>
+                      <input type="text" value={editingProd.warranty || ''} onChange={(e) => setEditingProd({ ...editingProd, warranty: e.target.value })} placeholder="VD: 36 tháng" style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.83rem', border: '1px solid #cbd5e1', borderRadius: '6px', backgroundColor: '#ffffff', color: '#0f172a', boxSizing: 'border-box' }} />
                     </div>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.35rem' }}>Ngưỡng An Toàn</label>
-                      <input type="number" min="1" value={editingProd.threshold || 5} onChange={(e) => setEditingProd({ ...editingProd, threshold: parseInt(e.target.value, 10) || 5 })} style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.85rem', border: '1px solid #e3e8ef', borderRadius: '6px', backgroundColor: '#ffffff', color: '#0f172a' }} />
-                    </div>
+                    <div />
                   </div>
 
                   <ProductGalleryField
                     coverFile={editingProd.imageFile}
                     coverUrl={editingProd.image}
+                    coverImageUrl={editingProd.imageUrl}
+                    onCoverImageUrlChange={(url) => setEditingProd({ ...editingProd, imageUrl: url })}
                     onCoverSelect={(file) => setEditingProd({ ...editingProd, imageFile: file })}
                     existingImages={editingProd.gallery || []}
                     pendingFiles={editingProd.imageFiles || []}
+                    galleryUrls={editingProd.galleryUrls || []}
+                    onAddGalleryUrl={(url) => setEditingProd({ ...editingProd, galleryUrls: [...(editingProd.galleryUrls || []), url] })}
+                    onRemoveGalleryUrl={(idx) => setEditingProd({ ...editingProd, galleryUrls: (editingProd.galleryUrls || []).filter((_, i) => i !== idx) })}
                     onAddFiles={(fileList) => {
-                      const room = MAX_GALLERY_IMAGES - (editingProd.gallery || []).length - (editingProd.imageFiles || []).length;
+                      const room = MAX_GALLERY_IMAGES - (editingProd.gallery || []).length - (editingProd.imageFiles || []).length - (editingProd.galleryUrls || []).length;
                       setEditingProd({ ...editingProd, imageFiles: [...(editingProd.imageFiles || []), ...Array.from(fileList).slice(0, room)] });
                     }}
                     onRemovePendingFile={(idx) => setEditingProd({ ...editingProd, imageFiles: (editingProd.imageFiles || []).filter((_, i) => i !== idx) })}
                     onDeleteExistingImage={handleDeleteGalleryImage}
                     deletingImageId={deletingGalleryImageId}
                   />
+
+                  <ProductSpecsEditor
+                    category={editingProd.category || 'CPU'}
+                    specs={editingProd.specs || {}}
+                    onChange={(specs) => setEditingProd({ ...editingProd, specs })}
+                  />
+
                   <div>
                     <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.35rem' }}>Mô Tả Sản Phẩm</label>
-                    <textarea rows={3} value={editingProd.description || ''} onChange={(e) => setEditingProd({ ...editingProd, description: e.target.value })} style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.85rem', border: '1px solid #e3e8ef', borderRadius: '6px', backgroundColor: '#ffffff', color: '#0f172a', fontFamily: 'inherit', resize: 'vertical', boxSizing: 'border-box' }} />
+                    <textarea rows={3} value={editingProd.description || ''} onChange={(e) => setEditingProd({ ...editingProd, description: e.target.value })} style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.85rem', border: '1px solid #cbd5e1', borderRadius: '6px', backgroundColor: '#ffffff', color: '#0f172a', fontFamily: 'inherit', resize: 'vertical', boxSizing: 'border-box' }} />
                   </div>
 
                   <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.83rem', fontWeight: 600, color: '#334155', cursor: 'pointer' }}>
                     <input type="checkbox" checked={editingProd.available !== false} onChange={(e) => setEditingProd({ ...editingProd, available: e.target.checked })} />
-                    Hiển thị trên trang bán hàng
+                    Hiển thị trên trang bán hàng (Storefront)
                   </label>
                 </div>
 
