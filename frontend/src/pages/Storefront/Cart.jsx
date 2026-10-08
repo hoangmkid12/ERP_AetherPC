@@ -492,7 +492,7 @@ export default function Cart() {
               <CheckCircle size={40} />
             </div>
             <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#0f172a', fontFamily: 'var(--font-title)', marginBottom: '0.5rem' }}>
-              {isPaidOnline ? 'Đặt Hàng & Thanh Toán Thành Công!' : 'Đặt Hàng Thành Công!'}
+              {isPaidOnline ? 'Thanh Toán Thành Công!' : 'Đặt Hàng Thành Công!'}
             </h2>
             <p style={{ color: '#64748b', fontSize: '0.95rem' }}>
               Mã đơn hàng: <strong style={{ color: '#2563eb' }}>#{invoice.orderId}</strong> — Cảm ơn quý khách đã mua hàng tại AetherPC.
@@ -511,7 +511,7 @@ export default function Cart() {
                 marginTop: '0.65rem',
                 border: '1px solid #a7f3d0'
               }}>
-                <CheckCircle size={15} /> ĐÃ XÁC NHẬN THANH TOÁN (SEPAY VIETQR)
+                <CheckCircle size={15} /> ĐÃ XÁC NHẬN THANH TOÁN
               </div>
             )}
           </div>
@@ -521,7 +521,7 @@ export default function Cart() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem', fontSize: '0.85rem', color: '#475569' }}>
               <div><strong>Người nhận:</strong> {invoice.customerName} ({invoice.phone})</div>
               <div><strong>Địa chỉ giao:</strong> {invoice.address}</div>
-              <div><strong>Phương thức thanh toán:</strong> {invoice.paymentMethod === 'BANK_TRANSFER' ? 'Chuyển khoản VietQR qua SePay' : 'Tiền mặt khi nhận hàng (COD)'}</div>
+              <div><strong>Phương thức thanh toán:</strong> {invoice.paymentMethod === 'BANK_TRANSFER' ? 'Chuyển khoản VietQR' : 'Tiền mặt khi nhận hàng (COD)'}</div>
               <div><strong>Trạng thái thanh toán:</strong> <strong style={{ color: isPaidOnline ? '#16a34a' : '#d97706' }}>{isPaidOnline ? '✓ Đã thanh toán thành công' : 'Chờ thanh toán khi nhận hàng (COD)'}</strong></div>
               <div><strong>Tổng tiền thanh toán:</strong> <strong style={{ color: '#dc2626', fontSize: '1.1rem' }}>{formatPrice(invoice.totalAmount)}</strong></div>
             </div>
@@ -1108,7 +1108,7 @@ export default function Cart() {
                         <QrCode size={20} color={paymentMethod === 'BANK_TRANSFER' ? '#2563eb' : '#64748b'} />
                         <div>
                           <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                            Chuyển khoản SePay VietQR <span style={{ backgroundColor: '#16a34a', color: '#fff', fontSize: '0.6rem', padding: '1px 5px', borderRadius: '4px', textTransform: 'uppercase' }}>Tự động</span>
+                            Chuyển khoản VietQR <span style={{ backgroundColor: '#16a34a', color: '#fff', fontSize: '0.6rem', padding: '1px 5px', borderRadius: '4px', textTransform: 'uppercase' }}>Tự động</span>
                           </div>
                           <div style={{ fontSize: '0.72rem', color: '#64748b' }}>Quét mã QR ngân hàng tự động nhận diện thanh toán</div>
                         </div>
@@ -1310,7 +1310,7 @@ export default function Cart() {
               gap: '0.5rem'
             }}>
               <QrCode size={16} />
-              <span>Vui lòng quét mã QR bên dưới. Sau khi hệ thống SePay xác nhận chuyển khoản thành công, đơn hàng sẽ tự động chuyển sang trạng thái <strong>Đã đặt hàng</strong>.</span>
+              <span>Vui lòng quét mã QR bên dưới. Sau khi hệ thống xác nhận chuyển khoản thành công, đơn hàng sẽ tự động chuyển sang trạng thái <strong>Đã đặt hàng</strong>.</span>
             </div>
 
             {/* Sepay Payment Component */}

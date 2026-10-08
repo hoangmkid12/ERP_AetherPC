@@ -3,6 +3,7 @@ const {
   getReceivingAccount, transferContentOf, buildQrUrl, findOrderByTransfer, verifyWebhookAuth,
 } = require('../services/sepay');
 const { approveOrderIfReady } = require('../services/orderApprovalService');
+const { sendOrderConfirmationEmail } = require('../services/emailService');
 
 const STAFF_ROLES = ['SALES', 'SALES_MANAGER', 'CSKH', 'ACCOUNTANT', 'CEO', 'ADMIN'];
 const fmt = (n) => `${Math.round(Number(n) || 0).toLocaleString('vi-VN')}đ`;
@@ -186,6 +187,36 @@ const sepayWebhook = async (req, res, next) => {
     });
 
     console.log(`[SePay] Giao dịch ${sepayId}: ${fmt(amount)} → đơn ${result.orderId} (${result.outcome})`);
+
+    // Gửi email xác nhận đơn hàng khi thanh toán online thành công
+    if (result.outcome === 'PAID') {
+      try {
+        const fullOrder = await prisma.order.findUnique({
+          where: { orderId: result.orderId },
+          include: {
+            customer: true,
+            items: { include: { product: true } }
+          }
+        });
+        if (fullOrder?.customer?.email) {
+          sendOrderConfirmationEmail({
+            toEmail: fullOrder.customer.email,
+            customerName: fullOrder.customer.name,
+            orderId: fullOrder.orderId,
+            items: fullOrder.items,
+            subtotal: fullOrder.subtotal,
+            discount: fullOrder.discount,
+            shippingFee: fullOrder.shippingFee,
+            totalAmount: fullOrder.totalAmount,
+            paymentMethod: fullOrder.paymentMethod,
+            shippingAddress: fullOrder.shippingAddress
+          }).catch(err => console.warn('[Email] Lỗi gửi email xác nhận sau thanh toán online:', err.message));
+        }
+      } catch (mailErr) {
+        console.warn('[Email] Lỗi tìm đơn hàng để gửi email xác nhận sau thanh toán:', mailErr.message);
+      }
+    }
+
     res.json({ success: true, data: result });
   } catch (err) {
     next(err);
