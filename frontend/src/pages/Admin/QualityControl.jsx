@@ -358,7 +358,10 @@ export default function QualityControl() {
     return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price || 0);
   };
 
-  const PENDING_QA_STATUSES = ['CONFIRMED_BY_SUPPLIER', 'PO', 'APPROVED', 'PENDING_QA', 'SHIPPED', 'DELIVERED', 'RFQ_SENT', 'SENT'];
+  // Backend chỉ cho QC kiểm định đơn ở CONFIRMED_BY_SUPPLIER (purchase.controller.js). Các trạng thái trước đó
+  // (đang báo giá, chờ duyệt, đã phát hành PO nhưng NCC chưa xác nhận giao) là hàng CHƯA VỀ — không thuộc việc của QC.
+  const PENDING_QA_STATUSES = ['CONFIRMED_BY_SUPPLIER', 'PENDING_QA'];
+  const NOT_ARRIVED_STATUSES = ['RFQ', 'RFQ_SENT', 'SENT', 'QUOTED', 'PENDING_PO_DRAFT', 'QUOTED_PENDING_CEO', 'PO', 'APPROVED', 'CONVERTED', 'CANCELLED'];
   const PASSED_QA_STATUSES = ['QA_PASSED', 'DONE', 'COMPLETED', 'RECEIVED'];
   const REJECTED_QA_STATUSES = ['QA_REJECTED', 'QA_PARTIAL'];
 
@@ -387,6 +390,9 @@ export default function QualityControl() {
     if (PENDING_QA_STATUSES.includes(po.status)) {
       return 'PENDING';
     }
+    if (NOT_ARRIVED_STATUSES.includes(po.status)) {
+      return 'NOT_ARRIVED';
+    }
     if (po.status === 'QA_PASSED' || po.decision === 'ACCEPT_ALL' || PASSED_QA_STATUSES.includes(po.status)) {
       return 'PASSED';
     }
@@ -409,7 +415,7 @@ export default function QualityControl() {
   const rejectedQaPOs = orders.filter(po => getPoQaStatus(po) === 'REJECTED');
 
   const totalInspected = passedQaPOs.length + partialQaPOs.length + rejectedQaPOs.length;
-  const passRate = totalInspected > 0 ? Math.round(((passedQaPOs.length + partialQaPOs.length * 0.8) / totalInspected) * 100) : 98;
+  const passRate = totalInspected > 0 ? Math.round(((passedQaPOs.length + partialQaPOs.length * 0.8) / totalInspected) * 100) : null;
 
   // 6 Balanced KPI Cards (2 Rows x 3 Columns)
   const stats = [
@@ -417,7 +423,7 @@ export default function QualityControl() {
     { label: 'Đạt Chuẩn Nhập Kho 100%', value: `${passedQaPOs.length} lô hàng`, change: 'Cho phép nhập kho toàn bộ', icon: <CheckCircle size={20} />, color: '#16a34a', bg: '#f0fdf4' },
     { label: 'Nghiệm Thu Một Phần', value: `${partialQaPOs.length} lô hàng`, change: 'Nhận SP đạt & Trả SP lỗi', icon: <AlertTriangle size={20} />, color: '#ea580c', bg: '#fff7ed' },
     { label: 'Hoàn Trả NCC 100%', value: `${rejectedQaPOs.length} lô hàng`, change: 'Từ chối toàn bộ do lỗi nặng', icon: <XCircle size={20} />, color: '#ef4444', bg: '#fef2f2' },
-    { label: 'Tỷ Lệ Đạt Chuẩn QA', value: `${passRate}%`, change: 'Mục tiêu kiểm định >= 95%', icon: <Award size={20} />, color: '#2563eb', bg: '#eff6ff' },
+    { label: 'Tỷ Lệ Đạt Chuẩn QA', value: passRate === null ? '—' : `${passRate}%`, change: 'Mục tiêu kiểm định >= 95%', icon: <Award size={20} />, color: '#2563eb', bg: '#eff6ff' },
     { label: 'Đổi Trả Khách (RMA)', value: `${returnRequests.length || 3} yêu cầu`, change: 'Thẩm định lỗi phần cứng', icon: <ShieldAlert size={20} />, color: '#8b5cf6', bg: '#f5f3ff' }
   ];
 
@@ -1361,6 +1367,7 @@ export default function QualityControl() {
                   .filter(po => {
                     const matchesSearch = !searchTerm || (po.poNumber || '').toLowerCase().includes(searchTerm.toLowerCase()) || (po.supplier?.name || po.supplierCode || '').toLowerCase().includes(searchTerm.toLowerCase());
                     const qaStatus = getPoQaStatus(po);
+                    if (qaStatus === 'NOT_ARRIVED') return false; // hàng chưa về, chưa thuộc việc kiểm định
                     let matchesStatus = true;
                     if (statusFilter === 'PENDING') matchesStatus = qaStatus === 'PENDING';
                     if (statusFilter === 'PASSED') matchesStatus = qaStatus === 'PASSED';
@@ -1376,7 +1383,7 @@ export default function QualityControl() {
                     const isPartial = qaStatus === 'PARTIAL';
                     const formattedDate = po.createdAt 
                       ? new Date(po.createdAt).toLocaleDateString('vi-VN') 
-                      : (po.date || po.orderDate || '18/08/2026');
+                      : (po.date || po.orderDate || '—');
 
                     return (
                       <tr key={po.id || po.poNumber} style={{ borderBottom: '1px solid #f1f5f9' }}>

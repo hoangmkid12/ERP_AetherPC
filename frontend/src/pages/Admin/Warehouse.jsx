@@ -3983,7 +3983,8 @@ export default function Warehouse() {
   const readyReceipts = effectiveReceipts.filter(r => r.status === 'READY');
   // Shared with the Delivery tab's default "PENDING" filter (below) so the
   // Overview KPI card always matches the count the linked tab actually shows.
-  const PENDING_DELIVERY_STATUSES = ['CONFIRMED', 'READY_TO_SHIP', 'PACKED', 'PENDING', 'PROCESSING', 'AWAITING_SHIP'];
+  // Đơn 'PENDING' còn chờ bán hàng xác nhận (chưa trừ tồn) — chưa thuộc việc của kho.
+  const PENDING_DELIVERY_STATUSES = ['CONFIRMED', 'READY_TO_SHIP', 'PACKED', 'PROCESSING', 'AWAITING_SHIP'];
   // Đơn còn lệnh lắp ráp chưa xong (assemblyPending — backend gắn từ assembly_jobs) là việc của
   // Lắp Ráp: khi lắp xong hệ thống tự chuyển đơn sang READY_TO_SHIP, lúc đó Kho mới xuất.
   const isAwaitingKhoExport = (o) => PENDING_DELIVERY_STATUSES.includes(o.status) && !o.assemblyPending;

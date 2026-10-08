@@ -5,6 +5,7 @@ import { usePermission } from '../../hooks/usePermission';
 import { useInventoryStore, useSalesStore, useFinanceStore, useHRStore, useUtilityStore } from '../../stores';
 import { notify } from '../../context/NotificationContext';
 import { api } from '../../services/api';
+import { useMenuBadges } from '../../hooks/useRoleTasks';
 import { LEAVE_STATUS, getStatusInfo, getStatusLabel } from '../../utils/statusLabels';
 import { 
   BarChart2, 
@@ -36,6 +37,8 @@ import {
 
 export default function Sidebar({ isOpen = false, onClose }) {
   const { user, logout, isCEO, isSales, isSalesManager, isWarehouse, isWarehouseManager, isAssembly, isHR, isAccountant, isPurchasing, isAdmin } = useAuth();
+  // Số trên menu = số việc VAI TRÒ ĐANG ĐĂNG NHẬP cần làm ở mục đó — cùng nguồn với Trung Tâm Nhiệm Vụ đầu trang.
+  const { badges: menuBadges, tasks: roleTasks } = useMenuBadges();
   const { can, canDo, canRead } = usePermission();
   const inventory = useInventoryStore(state => state.inventory) || [];
   const orders = useSalesStore(state => state.orders) || [];
@@ -46,19 +49,6 @@ export default function Sidebar({ isOpen = false, onClose }) {
   const leaveRequests = useHRStore(state => state.leaveRequests) || [];
   const assemblyJobs = useUtilityStore(state => state.assemblyJobs) || [];
   const customNotifs = useUtilityStore(state => state.customNotifs) || [];
-  // Không có store dùng chung nào giữ danh sách phiếu nhập kho (Warehouse.jsx tự
-  // fetch cục bộ cho tab GRN) — badge "Phiếu Nhập Kho" trước đây đọc từ mảng
-  // rỗng cố định `[]` nên luôn rơi vào nhánh fallback (từng là số giả "2").
-  // Tự lấy dữ liệu thật ở đây, chỉ cho vai trò thực sự thấy mục này.
-  const [receipts, setReceipts] = useState([]);
-  useEffect(() => {
-    if (!isWarehouse && !isWarehouseManager && !isAdmin && !isCEO) return;
-    let cancelled = false;
-    api.get('/warehouse/receipts')
-      .then(res => { if (!cancelled && res?.success) setReceipts(res.data || []); })
-      .catch(() => {});
-    return () => { cancelled = true; };
-  }, [isWarehouse, isWarehouseManager, isAdmin, isCEO]);
   const isCskh = user?.role === 'CSKH';
   const isDelivery = user?.role === 'DELIVERY';
   const navigate = useNavigate();
@@ -154,6 +144,7 @@ export default function Sidebar({ isOpen = false, onClose }) {
     { tab: 'po_payments', label: 'Thanh Toán Đơn PO', badgeKey: 'pendingQuotedPOs' },
     { tab: 'cod_settlement', label: 'Đối Soát COD Shipper' },
     { tab: 'payroll_disbursement', label: 'Chi Trả Bảng Lương', badgeKey: 'pendingPayrollApproval' },
+    { tab: 'refunds', label: 'Chi Hoàn Tiền Đổi Trả', badgeKey: 'refunds' },
     { tab: 'reports', label: 'Báo Cáo P&L & VAT' }
   ];
 
@@ -187,32 +178,6 @@ export default function Sidebar({ isOpen = false, onClose }) {
     { tab: 'categories', label: 'Danh Mục Sản Phẩm' }
   ];
 
-  const isItemDiscontinued = (item) => {
-    return !item || item.available === false || item.isAvailable === false || item.status === 'DISCONTINUED' || item.status === 'INACTIVE' || item.available === 'false';
-  };
-
-  const activeInventory = (inventory || []).filter(item => !isItemDiscontinued(item));
-  const lowStockCount = activeInventory.filter(item => Number(item.stock || 0) <= Number(item.threshold || 0)).length;
-  const backordersCount = (orders || []).filter(o => o && o.status === 'AWAITING_STOCK').length;
-  // Không dùng fallback số giả (trước là "2" khi receipts rỗng/chưa tải xong)
-  // — badge phải phản ánh đúng dữ liệu thật, kể cả khi đó là 0.
-  const pendingReceipts = (receipts || []).filter(r => r && r.status === 'READY').length;
-  const pendingExportCount = (orders || []).filter(o => o && o.status === 'CONFIRMED').length;
-  // Danh sách trạng thái RETURN_STATUS đã hoàn tất (xem utils/statusLabels.js) —
-  // trước đây thiếu REFUNDED/COMPLETED/RETURNED_TO_CUSTOMER (3 trạng thái kết
-  // thúc thật) và chứa 3 giá trị không tồn tại trong enum (APPROVED/EXCHANGE_NEW/
-  // REJECT_RMA), khiến yêu cầu đã hoàn tiền/hoàn tất vẫn bị đếm là "đang chờ".
-  const pendingReturnsCount = (returnRequests || []).filter(r => r && ![
-    'QC_PASSED', 'RESTOCKED', 'EXCHANGED', 'VENDOR_WARRANTY', 'INSPECTED_SCRAP',
-    'REFUNDED', 'COMPLETED', 'REJECTED', 'RETURNED_TO_CUSTOMER'
-  ].includes(r.status)).length;
-  const pendingQuotedPOs = (purchaseOrders || []).filter(p => p && p.status === 'QUOTED_PENDING_CEO').length;
-  // Bảng lương HR đã trình, đang chờ Ban Giám Đốc duyệt (backend ghi SUBMITTED_TO_ACCOUNTING).
-  const pendingPayrollApproval = (payrolls || []).some(p => p && ['SUBMITTED_TO_ACCOUNTING', 'SUBMITTED_TO_CEO'].includes(p.status)) ? 1 : 0;
-  const pendingLeaveApproval = (leaveRequests || []).filter(l => l && (l.status === 'PENDING_CEO' || l.status === 'PENDING')).length;
-  const pendingCeoApprovals = pendingQuotedPOs + pendingPayrollApproval + pendingLeaveApproval;
-  const pendingQaCount = (purchaseOrders || []).filter(p => p && ['CONFIRMED_BY_SUPPLIER', 'PO', 'APPROVED', 'PENDING_QA', 'SHIPPED', 'DELIVERED'].includes(p.status)).length;
-  const openComplaintsCount = (complaints || []).filter(c => c && ['OPEN', 'IN_PROGRESS'].includes(c.status)).length;
 
   const handleLogout = () => {
     logout();
@@ -351,279 +316,21 @@ export default function Sidebar({ isOpen = false, onClose }) {
     const list = [];
     const role = user?.role || '';
 
-    // 1. BAN GIÁM ĐỐC (CEO): Chỉ nhận nhiệm vụ phê duyệt cấp cao & báo cáo tổng quan
-    if (['CEO', 'ADMIN'].includes(role)) {
-      // Phê duyệt bảng lương nhân sự toàn công ty
-      const submittedPayrolls = (payrolls || []).filter(p => ['SUBMITTED_TO_ACCOUNTING', 'SUBMITTED_TO_CEO'].includes(p.status));
-      if (submittedPayrolls.length > 0) {
-        const totalFund = submittedPayrolls.reduce((sum, p) => sum + (Number(p.netSalary) || 0), 0);
-        list.push({
-          id: 'NOTIF-CEO-PAYROLL',
-          title: `Phê duyệt Bảng lương nhân sự`,
-          desc: `Bộ phận HR đã trình duyệt Bảng lương cho ${submittedPayrolls.length} nhân sự (Tổng quỹ lương: ${new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(totalFund)}). Cần CEO xem xét phê duyệt.`,
-          link: '/admin/dashboard',
-          badge: 'Ban Giám Đốc',
-          badgeColor: '#dc2626',
-          category: 'URGENT',
-          actionText: 'Phê Duyệt Lương',
-          time: 'Chờ duyệt'
-        });
-      }
-
-      // Phê duyệt đơn mua hàng PO giá trị lớn (Mua Hàng đã đối soát & xác nhận)
-      const quotedPOs = (purchaseOrders || []).filter(po => po.status === 'QUOTED_PENDING_CEO');
-      quotedPOs.forEach(po => {
-        list.push({
-          id: `NOTIF-CEO-${po.id || po.poNumber}`,
-          title: `Phê duyệt Đơn mua hàng PO #${po.poNumber || po.id}`,
-          desc: `Nhà cung cấp: ${po.supplier?.name || po.supplierCode || 'NCC'} — Giá trị đơn: ${new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(po.totalAmount || 0)}. Cần CEO duyệt để tiến hành ký kết.`,
-          link: '/admin/purchasing',
-          badge: 'Ban Giám Đốc',
-          badgeColor: '#d97706',
-          category: 'URGENT',
-          actionText: 'Duyệt PO',
-          time: 'Chờ duyệt'
-        });
-      });
-    }
-
-    // 2. KẾ TOÁN (ACCOUNTANT): Chỉ nhận đơn mua hàng cần chi trả & bảng lương giải ngân
-    if (['ACCOUNTANT', 'ADMIN'].includes(role)) {
-      // Chi trả NCC cho các đơn PO đã xác nhận
-      const payablePOs = (purchaseOrders || []).filter(po => po.status === 'PO' || po.status === 'UNPAID');
-      payablePOs.forEach(po => {
-        list.push({
-          id: `NOTIF-ACC-${po.id || po.poNumber}`,
-          title: `Thanh toán Đơn mua hàng PO #${po.poNumber || po.id}`,
-          desc: `Nhà cung cấp: ${po.supplier?.name || po.supplierName || 'NCC'} — Số tiền cần chi: ${new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(po.totalAmount || po.totalCost || 0)}.`,
-          link: '/admin/accounting?tab=po_payments',
-          badge: 'Kế Toán',
-          badgeColor: '#16a34a',
-          category: 'URGENT',
-          actionText: 'Chi Trả',
-          time: 'Chờ thanh toán'
-        });
-      });
-
-      // Giải ngân bảng lương tháng
-      const approvedPayrolls = (payrolls || []).filter(p => p.status === 'CEO_APPROVED' || p.status === 'PENDING_PAYMENT');
-      if (approvedPayrolls.length > 0) {
-        list.push({
-          id: 'NOTIF-ACC-PAYROLL',
-          title: `Giải ngân Bảng lương tháng đã duyệt`,
-          desc: `CEO đã phê duyệt bảng lương cho ${approvedPayrolls.length} nhân sự. Kế toán tiến hành chi trả giải ngân tài khoản.`,
-          link: '/admin/accounting?tab=payroll_disbursement',
-          badge: 'Kế Toán',
-          badgeColor: '#16a34a',
-          category: 'URGENT',
-          actionText: 'Giải Ngân',
-          time: 'Đã duyệt'
-        });
-      }
-    }
-
-    // 3. KHO HÀNG (WAREHOUSE/WAREHOUSE_MANAGER): Cảnh báo tồn kho & đơn hàng cần xuất kho
-    // — quản lý kho trước đây không nằm trong danh sách này nên không nhận được
-    // cảnh báo gì dù cùng chịu trách nhiệm vận hành kho với thủ kho.
-    if (['WAREHOUSE', 'WAREHOUSE_MANAGER', 'ADMIN'].includes(role)) {
-      const lowStock = (inventory || []).filter(item => Number(item.stock) <= Number(item.threshold));
-      if (lowStock.length > 0) {
-        list.push({
-          id: 'NOTIF-WH-LOWSTOCK',
-          title: `Cảnh báo ${lowStock.length} linh kiện dưới ngưỡng an toàn`,
-          desc: `Tồn kho các mã linh kiện chạm hoặc dưới mức tối thiểu (Min-Max Rule). Kho cần kiểm tra và gửi đề xuất mua hàng.`,
-          link: '/admin/warehouse?tab=lowstock',
-          badge: 'Kho Hàng',
-          badgeColor: '#d97706',
-          category: 'WARNING',
-          actionText: 'Kiểm Tra Kho',
-          time: 'Hệ thống'
-        });
-      }
-
-      // Đơn hàng bán lẻ cần đóng gói xuất kho
-      const pendingShip = (orders || []).filter(o => o.status === 'CONFIRMED' || o.status === 'PROCESSING');
-      if (pendingShip.length > 0) {
-        list.push({
-          id: 'NOTIF-WH-ORDERS',
-          title: `Đóng gói & xuất kho ${pendingShip.length} đơn hàng`,
-          desc: `Các đơn hàng bán lẻ đã xác nhận thanh toán đang chờ kho đóng gói và in phiếu xuất kho.`,
-          link: '/admin/warehouse?tab=delivery',
-          badge: 'Kho Hàng',
-          badgeColor: '#2563eb',
-          category: 'URGENT',
-          actionText: 'Xuất Kho',
-          time: 'Mới'
-        });
-      }
-    }
-
-    // 4. MUA HÀNG (PURCHASING): Chỉ nhận cảnh báo hết hàng cần lập RFQ & theo dõi NCC
-    if (['PURCHASING', 'ADMIN'].includes(role)) {
-      const outOfStockList = (inventory || []).filter(item => Number(item.stock) === 0 && item.available !== false);
-      if (outOfStockList.length > 0) {
-        list.push({
-          id: 'NOTIF-PURCHASE-OUT',
-          title: `Cần lập RFQ: ${outOfStockList.length} linh kiện đã hết tồn kho`,
-          desc: `Linh kiện có số lượng tồn kho = 0. Bộ phận Mua hàng cần liên hệ NCC và lập phiếu yêu cầu báo giá gấp.`,
-          link: '/admin/purchasing?tab=rfq',
-          navState: { openCreateRFQ: true, timestamp: Date.now() },
-          badge: 'Mua Hàng',
-          badgeColor: '#dc2626',
-          category: 'URGENT',
-          actionText: 'Lập RFQ',
-          time: 'Khẩn cấp'
-        });
-      }
-
-      const lowStockList = (inventory || []).filter(item => Number(item.stock) > 0 && Number(item.stock) <= Number(item.threshold));
-      if (lowStockList.length > 0) {
-        list.push({
-          id: 'NOTIF-PURCHASE-LOW',
-          title: `Đề xuất bổ sung ${lowStockList.length} linh kiện sắp hết`,
-          desc: `Tồn kho chạm ngưỡng cảnh báo. Đề xuất khảo sát giá NCC để lên kế hoạch nhập hàng.`,
-          link: '/admin/purchasing?tab=products',
-          navState: { filterLowStock: true, timestamp: Date.now() },
-          badge: 'Mua Hàng',
-          badgeColor: '#d97706',
-          category: 'WARNING',
-          actionText: 'Khảo Sát Giá',
-          time: 'Định kỳ'
-        });
-      }
-    }
-
-    // 5. GIAO VẬN (DELIVERY): Nhận đơn hàng đã bàn giao & đơn chờ nhận tại kho
-    if (['DELIVERY', 'ADMIN'].includes(role)) {
-      const uName = String(user?.fullname || user?.name || '').toLowerCase();
-      const uUser = String(user?.username || '').toLowerCase();
-      const uPhone = String(user?.phone || '').replace(/\D/g, '');
-
-      // Đơn hàng đã bàn giao cho shipper này
-      const myAssignedOrders = (orders || []).filter(o => {
-        if (!o || o.status !== 'SHIPPED') return false;
-        const s = String(o.assignedShipper || '').toLowerCase();
-        return (uName && s.includes(uName)) || (uUser && s.includes(uUser)) || (uPhone && s.includes(uPhone)) || String(o.assignedShipperId) === String(user?.id);
-      });
-
-      if (myAssignedOrders.length > 0) {
-        list.push({
-          id: 'NOTIF-DELIVERY-ASSIGNED',
-          title: `Có ${myAssignedOrders.length} đơn hàng mới đã bàn giao cho bạn`,
-          desc: `Thủ kho đã hoàn tất đóng gói và bàn giao ${myAssignedOrders.length} kiện hàng. Bạn tiến hành xuất phát giao hàng và thu tiền COD.`,
-          link: '/admin/delivery?tab=pending',
-          badge: 'Giao Vận',
-          badgeColor: '#16a34a',
-          category: 'URGENT',
-          actionText: 'Xem Đơn Ngay',
-          time: 'Vừa giao'
-        });
-      }
-
-      const readyOrders = (orders || []).filter(o => o.status === 'READY_TO_SHIP');
-      if (readyOrders.length > 0) {
-        list.push({
-          id: 'NOTIF-DELIVERY-READY',
-          title: `Có ${readyOrders.length} đơn hàng đóng gói xong chờ lấy tại kho`,
-          desc: `Kho đã niêm phong xong ${readyOrders.length} đơn. Shipper có thể đến kho nhận chuyến và đi giao.`,
-          link: '/admin/delivery?tab=pending',
-          badge: 'Kho Chờ Giao',
-          badgeColor: '#2563eb',
-          category: 'INFO',
-          actionText: 'Nhận Chuyến',
-          time: 'Chờ nhận'
-        });
-      }
-    }
-
-    // 6. NHÂN SỰ (HR): Nhắc nhở chấm công & tổng hợp bảng lương
-    if (['HR', 'ADMIN'].includes(role)) {
+    // Việc cần làm của vai trò đang đăng nhập — cùng định nghĩa với số trên menu và Trung Tâm Nhiệm Vụ
+    // (hooks/useRoleTasks.js), mỗi việc còn tồn đọng là một thông báo.
+    roleTasks.filter(t => Number(t.count) > 0).forEach(t => {
       list.push({
-        id: 'NOTIF-HR-TIMESHEET',
-        title: `Tổng hợp Chấm công & Bảng lương tháng`,
-        desc: `Kiểm tra dữ liệu điểm danh, ngày phép và hoa hồng doanh số của toàn bộ nhân sự để lập Bảng lương trình CEO.`,
-        link: '/admin/hr?tab=payroll',
-        badge: 'Nhân Sự',
-        badgeColor: '#7c3aed',
-        category: 'INFO',
-        actionText: 'Xem Bảng Lương',
-        time: 'Hàng tháng'
+        id: `TASK-${role}-${t.key}`,
+        title: `${t.count} ${t.label}`,
+        desc: `Mở mục tương ứng để ${String(t.action || 'xử lý').toLowerCase()}.`,
+        link: t.path,
+        badge: 'Việc cần làm',
+        badgeColor: t.urgent ? '#d97706' : '#2563eb',
+        category: t.urgent ? 'URGENT' : 'WARNING',
+        actionText: t.action || 'Xử Lý',
+        time: 'Đang chờ'
       });
-    }
-
-    // 7. CHĂM SÓC KHÁCH HÀNG: mã vai trò thật là 'CSKH' (không phải
-    // 'CUSTOMER_SERVICE' — giá trị đó không tồn tại trong hệ thống), nên khối
-    // này trước đây không bao giờ khớp và CSKH không hề nhận được thông báo.
-    // SALES_MANAGER cũng được cấp quyền cskh_handle_tickets nên gộp chung.
-    if (['CSKH', 'SALES_MANAGER', 'ADMIN'].includes(role)) {
-      const pendingRMA = (returnRequests || []).filter(r => r.status === 'PENDING' || r.status === 'NEW');
-      if (pendingRMA.length > 0) {
-        list.push({
-          id: 'NOTIF-CSKH-RMA',
-          title: `Tiếp nhận ${pendingRMA.length} hồ sơ Đổi trả / Bảo hành (RMA)`,
-          desc: `Khách hàng gửi yêu cầu hỗ trợ lỗi linh kiện. CSKH cần đối chiếu hóa đơn và hướng dẫn thu hồi.`,
-          link: '/admin/cskh?tab=returns',
-          badge: 'CSKH & Bảo Hành',
-          badgeColor: '#ea580c',
-          category: 'URGENT',
-          actionText: 'Xử Lý RMA',
-          time: 'Mới nhận'
-        });
-      }
-    }
-
-    // 8. KIỂM ĐỊNH CHẤT LƯỢNG: mã vai trò thật là 'QC' (không phải 'QA_QC' —
-    // cũng không tồn tại), nên khối này trước đây không bao giờ khớp. Đồng
-    // thời đổi từ 1 thông báo hiển thị cố định (luôn hiện bất kể có việc hay
-    // không) sang dựa trên số liệu thật (pendingQaCount/pendingReturnsCount,
-    // đã tính sẵn ở trên cho badge sidebar) để đúng "chỉ xem thông báo liên
-    // quan" — QC rảnh việc thì không nên thấy thông báo khẩn cấp giả.
-    if (['QC', 'ADMIN'].includes(role)) {
-      if (pendingQaCount > 0) {
-        list.push({
-          id: 'NOTIF-QC-INSPECTION',
-          title: `Kiểm định chất lượng ${pendingQaCount} lô hàng PO mới về`,
-          desc: `Lô hàng linh kiện từ NCC đã về kho. QC cần lấy mẫu ngẫu nhiên kiểm tra tiêu chuẩn AQL trước khi nhập kho.`,
-          link: '/admin/quality-control?tab=inbound',
-          badge: 'Kiểm Định QA/QC',
-          badgeColor: '#0284c7',
-          category: 'URGENT',
-          actionText: 'Nghiệm Thu',
-          time: 'Chờ kiểm định'
-        });
-      }
-      if (pendingReturnsCount > 0) {
-        list.push({
-          id: 'NOTIF-QC-RMA',
-          title: `Thẩm định ${pendingReturnsCount} hồ sơ đổi trả/bảo hành`,
-          desc: `CSKH đã chuyển hồ sơ RMA — QC cần kiểm tra lỗi kỹ thuật thực tế để kết luận Đạt/Lỗi.`,
-          link: '/admin/quality-control?tab=returns',
-          badge: 'Kiểm Định QA/QC',
-          badgeColor: '#0284c7',
-          category: 'URGENT',
-          actionText: 'Thẩm Định',
-          time: 'Chờ xử lý'
-        });
-      }
-    }
-
-    // 9. LẮP RÁP (ASSEMBLY): Lệnh lắp ráp đang chờ/đang xử lý được bàn giao
-    if (['ASSEMBLY', 'ADMIN'].includes(role)) {
-      const myAssemblyJobs = (assemblyJobs || []).filter(j => j && ['PENDING', 'ASSEMBLING'].includes(j.status));
-      if (myAssemblyJobs.length > 0) {
-        list.push({
-          id: 'NOTIF-ASSEMBLY-JOBS',
-          title: `Có ${myAssemblyJobs.length} lệnh lắp ráp đang chờ xử lý`,
-          desc: `Kho đã bàn giao linh kiện — tiến hành lắp ráp, chạy stress test và dán tem niêm phong trước khi xuất xưởng.`,
-          link: '/admin/assembly?tab=jobs',
-          badge: 'Lắp Ráp',
-          badgeColor: '#0ea5e9',
-          category: 'URGENT',
-          actionText: 'Xem Lệnh Lắp Ráp',
-          time: 'Đang chờ'
-        });
-      }
-    }
+    });
 
     // Helper for formatting notification timestamp
     const formatNotifTime = (dateVal, defaultText) => {
@@ -812,10 +519,7 @@ export default function Sidebar({ isOpen = false, onClose }) {
                       const currentTab = new URLSearchParams(location.search).get('tab') || 'overview';
                       const isSubActive = currentTab === sub.tab;
                       
-                      let badgeVal = 0;
-                      if (sub.badgeKey === 'pendingCeoApprovals') {
-                        badgeVal = pendingCeoApprovals;
-                      }
+                      const badgeVal = menuBadges[`/admin/dashboard?tab=${sub.tab}`] || 0;
 
                       return (
                         <NavLink
@@ -876,10 +580,7 @@ export default function Sidebar({ isOpen = false, onClose }) {
                       const currentTab = new URLSearchParams(location.search).get('tab') || 'overview';
                       const isSubActive = currentTab === sub.tab;
                       
-                      let badgeVal = 0;
-                      if (sub.badgeKey === 'pendingOrders') {
-                        badgeVal = (orders || []).filter(o => ['PENDING', 'WAITING_PAYMENT', 'CONFIRMED'].includes(o.status)).length;
-                      }
+                      const badgeVal = menuBadges[`/admin/sales?tab=${sub.tab}`] || 0;
 
                       return (
                         <NavLink
@@ -932,12 +633,7 @@ export default function Sidebar({ isOpen = false, onClose }) {
                       const currentTab = new URLSearchParams(location.search).get('tab') || 'overview';
                       const isSubActive = currentTab === sub.tab;
                       
-                      let badgeVal = 0;
-                      if (sub.badgeKey === 'backordersCount') badgeVal = backordersCount;
-                      if (sub.badgeKey === 'pendingReceipts') badgeVal = pendingReceipts;
-                      if (sub.badgeKey === 'pendingExportCount') badgeVal = pendingExportCount;
-                      if (sub.badgeKey === 'lowStockCount') badgeVal = lowStockCount;
-                      if (sub.badgeKey === 'pendingReturnsCount') badgeVal = pendingReturnsCount;
+                      const badgeVal = menuBadges[`/admin/warehouse?tab=${sub.tab}`] || 0;
 
                       return (
                         <NavLink
@@ -998,20 +694,7 @@ export default function Sidebar({ isOpen = false, onClose }) {
                       const currentTab = new URLSearchParams(location.search).get('tab') || 'overview';
                       const isSubActive = currentTab === sub.tab;
                       
-                      let badgeVal = 0;
-                      if (sub.badgeKey === 'prCount') {
-                        try {
-                          const rawAlerts = JSON.parse(localStorage.getItem('erp_rfq_alert_logs') || '[]');
-                          const unhandled = rawAlerts.filter(a => !a.handled && a.status !== 'HANDLED' && a.status !== 'DONE').length;
-                          badgeVal = unhandled > 0 ? unhandled : 0;
-                        } catch (_) {}
-                      }
-                      if (sub.badgeKey === 'rfqCount') {
-                        badgeVal = (purchaseOrders || []).filter(p => ['RFQ', 'RFQ_SENT', 'QUOTED', 'QUOTED_PENDING_CEO'].includes(p.status)).length;
-                      }
-                      if (sub.badgeKey === 'quotedPoCount') {
-                        badgeVal = (purchaseOrders || []).filter(p => ['PO', 'CONFIRMED_BY_SUPPLIER', 'APPROVED', 'APPROVED_BY_CEO'].includes(p.status)).length;
-                      }
+                      const badgeVal = menuBadges[`/admin/purchasing?tab=${sub.tab}`] || 0;
 
                       return (
                         <NavLink
@@ -1064,9 +747,7 @@ export default function Sidebar({ isOpen = false, onClose }) {
                       const currentTab = new URLSearchParams(location.search).get('tab') || 'overview';
                       const isSubActive = currentTab === sub.tab;
                       
-                      let badgeVal = 0;
-                      if (sub.badgeKey === 'pendingQaCount') badgeVal = pendingQaCount;
-                      if (sub.badgeKey === 'pendingReturnsCount') badgeVal = pendingReturnsCount;
+                      const badgeVal = menuBadges[`/admin/quality-control?tab=${sub.tab}`] || 0;
 
                       return (
                         <NavLink
@@ -1124,10 +805,7 @@ export default function Sidebar({ isOpen = false, onClose }) {
                       const currentTab = new URLSearchParams(location.search).get('tab') || 'overview';
                       const isSubActive = currentTab === sub.tab;
                       
-                      let badgeVal = 0;
-                      if (sub.badgeKey === 'pendingAssemblyJobs') {
-                        badgeVal = (assemblyJobs || []).filter(j => ['PENDING', 'ASSEMBLING'].includes(j.status)).length;
-                      }
+                      const badgeVal = menuBadges[`/admin/assembly?tab=${sub.tab}`] || 0;
 
                       return (
                         <NavLink
@@ -1180,8 +858,7 @@ export default function Sidebar({ isOpen = false, onClose }) {
                       const currentTab = new URLSearchParams(location.search).get('tab') || 'overview';
                       const isSubActive = currentTab === sub.tab;
 
-                      let badgeVal = 0;
-                      if (sub.badgeKey === 'pendingLeaveApproval') badgeVal = pendingLeaveApproval;
+                      const badgeVal = menuBadges[`/admin/hr?tab=${sub.tab}`] || 0;
 
                       return (
                         <NavLink
@@ -1225,9 +902,7 @@ export default function Sidebar({ isOpen = false, onClose }) {
                       const currentTab = new URLSearchParams(location.search).get('tab') || 'overview';
                       const isSubActive = currentTab === sub.tab;
 
-                      let badgeVal = 0;
-                      if (sub.badgeKey === 'pendingQuotedPOs') badgeVal = pendingQuotedPOs;
-                      if (sub.badgeKey === 'pendingPayrollApproval') badgeVal = pendingPayrollApproval;
+                      const badgeVal = menuBadges[`/admin/accounting?tab=${sub.tab}`] || 0;
 
                       return (
                         <NavLink
@@ -1274,9 +949,7 @@ export default function Sidebar({ isOpen = false, onClose }) {
                       // 'onlineChatCount' vẫn bỏ trống — không có nguồn dữ liệu nào
                       // (store/API) đang giữ số phiên chat online để tính, khác với
                       // openComplaintsCount/pendingReturnsCount đã có sẵn dữ liệu thật.
-                      let badgeVal = 0;
-                      if (sub.badgeKey === 'openComplaintsCount') badgeVal = openComplaintsCount;
-                      if (sub.badgeKey === 'pendingReturnsCount') badgeVal = pendingReturnsCount;
+                      const badgeVal = menuBadges[`/admin/cskh?tab=${sub.tab}`] || 0;
 
                       return (
                         <NavLink
