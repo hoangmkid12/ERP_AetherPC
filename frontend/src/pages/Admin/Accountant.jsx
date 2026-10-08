@@ -141,6 +141,7 @@ export default function Accountant() {
 
   // Manual Entry Modal
   const [showManualModal, setShowManualModal] = useState(false);
+  const [expandedAccountantKpi, setExpandedAccountantKpi] = useState({});
   const [manualForm, setManualForm] = useState({
     type: 'EXPENSE',
     amount: '',
@@ -1077,41 +1078,74 @@ export default function Accountant() {
         <div>
           {/* 6 Balanced KPI Cards (2 Rows x 3 Columns) */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem', marginBottom: '1.25rem' }}>
-            {stats.map((st, sIdx) => (
-              <div
-                key={sIdx}
-                style={{
-                  backgroundColor: '#ffffff',
-                  borderRadius: '10px',
-                  border: '1px solid #e3e8ef',
-                  padding: '1.1rem 1.25rem',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'space-between',
-                  minHeight: '102px',
-                  boxSizing: 'border-box',
-                  boxShadow: '0 2px 8px rgba(15, 23, 42, 0.04)'
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
-                    {st.label}
-                  </span>
-                  <div style={{ width: '36px', height: '36px', borderRadius: '8px', backgroundColor: st.bg, color: st.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    {st.icon}
-                  </div>
-                </div>
+            {stats.map((st, sIdx) => {
+              const isExpanded = !!expandedAccountantKpi[sIdx];
+              const displayVal = (isExpanded && st.full) ? st.full : st.value;
+              const hasToggle = Boolean(st.full && st.full !== st.value);
 
-                <div style={{ marginTop: '0.45rem' }}>
-                  <div className="erp-kpi-value" style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={st.full || st.value}>
-                    {st.value}
+              return (
+                <div
+                  key={sIdx}
+                  onClick={() => {
+                    if (hasToggle) {
+                      setExpandedAccountantKpi(prev => ({ ...prev, [sIdx]: !prev[sIdx] }));
+                    }
+                  }}
+                  style={{
+                    backgroundColor: '#ffffff',
+                    borderRadius: '10px',
+                    border: isExpanded ? '1px solid #93c5fd' : '1px solid #e3e8ef',
+                    padding: '1.1rem 1.25rem',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    minHeight: '102px',
+                    boxSizing: 'border-box',
+                    boxShadow: isExpanded ? '0 4px 12px rgba(37, 99, 235, 0.08)' : '0 2px 8px rgba(15, 23, 42, 0.04)',
+                    cursor: hasToggle ? 'pointer' : 'default',
+                    userSelect: 'none',
+                    transition: 'all 0.15s ease'
+                  }}
+                  title={hasToggle ? `${st.full} • Nhấn chuột để ${isExpanded ? 'thu gọn' : 'hiện đủ số'}` : st.value}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
+                        {st.label}
+                      </span>
+                      {hasToggle && (
+                        <span style={{ fontSize: '0.68rem', color: isExpanded ? '#2563eb' : '#94a3b8', fontWeight: 700, backgroundColor: isExpanded ? '#eff6ff' : '#f1f5f9', padding: '1px 5px', borderRadius: '4px' }}>
+                          {isExpanded ? 'đầy đủ' : 'rút gọn'}
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ width: '36px', height: '36px', borderRadius: '8px', backgroundColor: st.bg, color: st.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      {st.icon}
+                    </div>
                   </div>
-                  <div className="erp-kpi-sub" style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.15rem' }}>
-                    {st.change}
+
+                  <div style={{ marginTop: '0.45rem' }}>
+                    <div
+                      className="erp-kpi-value"
+                      style={{
+                        fontSize: isExpanded ? '1.12rem' : '1.3rem',
+                        fontWeight: 800,
+                        color: isExpanded ? '#1e40af' : '#0f172a',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        transition: 'font-size 0.15s ease, color 0.15s ease'
+                      }}
+                    >
+                      {displayVal}
+                    </div>
+                    <div className="erp-kpi-sub" style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.15rem' }}>
+                      {st.change}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {/* Charts Row */}
