@@ -99,24 +99,39 @@ export function HandSignature({ name, color = '#1e3a8a', height = 46 }) {
   );
 }
 
-/** Mộc tròn đỏ của công ty (đặt chồng lên chữ ký người duyệt cuối). */
-export function CompanySeal({ size = 74, label }) {
+/** Thông tin mộc của một tổ chức: tên chạy quanh vòng, tên thương hiệu ở giữa. */
+export function orgSeal(name) {
+  const full = String(name || '').replace(/\([^)]*\)/g, ' ').replace(/\s+/g, ' ').trim().toUpperCase();
+  const brand = (signatureText(name) || full).toUpperCase();
+  // Chữ giữa mộc: tên thương hiệu; quá dài thì giữ trọn từ đầu tiên thay vì cắt ngang chữ
+  const center = brand.length > 11 ? brand.split(' ')[0].slice(0, 11) : brand;
+  return { ring: full, center, sub: '' };
+}
+
+/** Mộc tròn đỏ. Mặc định là mộc AetherPC; truyền ring/center/sub để đóng mộc của tổ chức khác (nhà cung cấp). */
+export function CompanySeal({ size = 74, ring, center, sub }) {
   const uid = useId().replace(/:/g, '');
   const red = '#d0202e';
+  const isOwn = !ring;
+  // Chữ quanh vòng luôn kín một vòng tròn: lặp tên khi quá ngắn, co giãn khi quá dài (textLength)
+  let ringText = isOwn ? `${COMPANY.ring} ★ ${COMPANY.city} ★` : `${ring} ★`;
+  while (ringText.length < 34) ringText = `${ringText} ${isOwn ? '' : ring + ' ★'}`.trim();
+  const centerText = isOwn ? COMPANY.center : center;
+  const subText = isOwn ? COMPANY.sub : sub;
+  const centerSize = Math.max(8.5, Math.min(14, 96 / Math.max(4, (centerText || '').length)));
   return (
-    <svg viewBox="0 0 120 120" width={size} height={size} aria-label="Mộc xác nhận công ty"
+    <svg viewBox="0 0 120 120" width={size} height={size} aria-label={`Mộc ${isOwn ? 'AetherPC' : ring}`}
       style={{ opacity: 0.86, mixBlendMode: 'multiply', transform: 'rotate(-12deg)' }}>
       <defs>
         <path id={`ring-${uid}`} d="M 60 60 m -44 0 a 44 44 0 1 1 88 0 a 44 44 0 1 1 -88 0" />
       </defs>
       <circle cx="60" cy="60" r="56" fill="none" stroke={red} strokeWidth="3.2" />
       <circle cx="60" cy="60" r="35" fill="none" stroke={red} strokeWidth="1.4" />
-      <text fill={red} style={{ fontFamily: "'Be Vietnam Pro', Arial, sans-serif", fontSize: 10.5, fontWeight: 800, letterSpacing: 1.2 }}>
-        <textPath href={`#ring-${uid}`} startOffset="0">{`★ ${COMPANY.ring} ★ ${COMPANY.city} `}</textPath>
+      <text fill={red} style={{ fontFamily: "'Be Vietnam Pro', Arial, sans-serif", fontSize: 10, fontWeight: 800 }}>
+        <textPath href={`#ring-${uid}`} startOffset="0" textLength="268" lengthAdjust="spacingAndGlyphs">{ringText}</textPath>
       </text>
-      <text x="60" y="56" textAnchor="middle" fill={red} style={{ fontFamily: "'Be Vietnam Pro', Arial, sans-serif", fontSize: 13, fontWeight: 900 }}>{COMPANY.center}</text>
-      <text x="60" y="68" textAnchor="middle" fill={red} style={{ fontFamily: "'Be Vietnam Pro', Arial, sans-serif", fontSize: 6.2, fontWeight: 700 }}>{COMPANY.sub}</text>
-      {label && <text x="60" y="80" textAnchor="middle" fill={red} style={{ fontFamily: "'Be Vietnam Pro', Arial, sans-serif", fontSize: 7, fontWeight: 900 }}>{label}</text>}
+      <text x="60" y={subText ? 57 : 64} textAnchor="middle" fill={red} style={{ fontFamily: "'Be Vietnam Pro', Arial, sans-serif", fontSize: centerSize, fontWeight: 900 }}>{centerText}</text>
+      {subText && <text x="60" y="69" textAnchor="middle" fill={red} style={{ fontFamily: "'Be Vietnam Pro', Arial, sans-serif", fontSize: 6.2, fontWeight: 700 }}>{subText}</text>}
     </svg>
   );
 }
@@ -134,18 +149,18 @@ const S = {
 };
 
 /**
- * Một ô ký trên phiếu.
- * @param title      chức danh ô ký (vd "Thủ kho tiếp nhận")
+ * Một ô ký trên phiếu (chữ ký + mộc). sealName: tên nhà cung cấp → đóng mộc của chính nhà cung cấp đó.
+ * @param title      người ký (vd "Thủ kho", "Giám đốc")
  * @param note       ghi chú dưới chức danh, mặc định "(Ký, ghi rõ họ tên)"
- * @param name       họ tên người ký (đã thực hiện bước tương ứng)
- * @param signedAt   thời điểm thực hiện bước (từ lịch sử chứng từ)
+ * @param name       họ tên người ký (người đã thực hiện bước tương ứng)
  * @param signed     false → bước chưa thực hiện, hiển thị "Chưa ký"
- * @param seal       true → đóng mộc công ty (người duyệt cuối / đại diện công ty)
- * @param docRef     mã chứng từ để tạo mã xác thực
- * @param result     nhãn kết quả ngắn hiển thị cạnh chữ "Ký điện tử" (vd "Đạt", "Không đạt")
+ * @param seal       true → đóng mộc AetherPC
+ * @param supplier   true → ô của nhà cung cấp, đóng mộc mang tên nhà cung cấp
  */
-export function SignatureCell({ title, note = '(Ký, ghi rõ họ tên)', name, signedAt, signed = true, seal = false, sealLabel, docRef, result, pendingText = 'Chưa ký', color }) {
+export function SignatureCell({ title, note = '(Ký, ghi rõ họ tên)', name, signed = true, seal = false, supplier = false, sealName, pendingText = 'Chưa ký', color }) {
   const isSigned = signed && !!name;
+  const supplierSeal = (sealName || (supplier && name)) ? orgSeal(sealName || name) : null;
+  const hasSeal = isSigned && (seal || !!supplierSeal);
   return (
     <div style={S.cell}>
       <div style={S.title}>{title}</div>
@@ -153,20 +168,12 @@ export function SignatureCell({ title, note = '(Ký, ghi rõ họ tên)', name, 
       <div style={S.area}>
         {isSigned ? (
           <>
-            <div style={seal ? S.sealSig : undefined}><HandSignature name={name} color={color} /></div>
-            {seal && <div style={S.seal}><CompanySeal label={sealLabel} /></div>}
+            <div style={hasSeal ? S.sealSig : undefined}><HandSignature name={name} color={color} /></div>
+            {hasSeal && <div style={S.seal}>{supplierSeal ? <CompanySeal {...supplierSeal} /> : <CompanySeal />}</div>}
           </>
         ) : (
           <span style={S.pending}>{pendingText}</span>
         )}
-      </div>
-      <div style={S.meta}>
-        {isSigned ? (
-          <>
-            <div>Ký điện tử{result ? ` · ${result}` : ''}{signedAt ? ` · ${fmt(signedAt)}` : ''}</div>
-            <div>Mã xác thực: {signatureCode(docRef, name, signedAt)}</div>
-          </>
-        ) : <div>&nbsp;</div>}
       </div>
       <div style={S.name}>{isSigned ? name : ' '}</div>
     </div>

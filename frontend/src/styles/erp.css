@@ -135,3 +135,11 @@
 
 /* Sidebar: liên kết rê chuột */
 .erp-root .admin-sidebar-drawer nav a:hover { background-color: #f1f5f9; color: #0f172a !important; }
+
+/* Nút sổ xuống chức năng của từng phân hệ trên thanh điều hướng */
+.erp-root .admin-sidebar-drawer .sidebar-module-toggle { cursor: pointer; transition: background-color .15s ease, color .15s ease; }
+.erp-root .admin-sidebar-drawer .sidebar-module-toggle:hover { background-color: #e2e8f0; color: #0f172a !important; }
+.erp-root .admin-sidebar-drawer .sidebar-module-toggle:focus-visible { outline: 2px solid #dc2626; outline-offset: 1px; }
+@media (max-width: 768px) {
+  .erp-root .admin-sidebar-drawer .sidebar-module-toggle { width: 34px !important; height: 34px !important; }
+}

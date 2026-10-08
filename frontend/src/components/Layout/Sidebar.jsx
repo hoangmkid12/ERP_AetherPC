@@ -23,6 +23,7 @@ import {
   Bell,
   X,
   ChevronRight,
+  ChevronDown,
   AlertCircle,
   CheckCircle2,
   Clock,
@@ -39,6 +40,19 @@ export default function Sidebar({ isOpen = false, onClose }) {
   const { user, logout, isCEO, isSales, isSalesManager, isWarehouse, isWarehouseManager, isAssembly, isHR, isAccountant, isPurchasing, isAdmin } = useAuth();
   // Số trên menu = số việc VAI TRÒ ĐANG ĐĂNG NHẬP cần làm ở mục đó — cùng nguồn với Trung Tâm Nhiệm Vụ đầu trang.
   const { badges: menuBadges, tasks: roleTasks } = useMenuBadges();
+  // Phân hệ đang được sổ xuống (bấm mũi tên bên phải). Mặc định thu gọn hết: vừa đăng nhập chỉ thấy các phân hệ lớn.
+  const [openModules, setOpenModules] = useState(() => new Set());
+  const toggleModule = (path) => setOpenModules(prev => {
+    const next = new Set(prev);
+    if (next.has(path)) next.delete(path); else next.add(path);
+    return next;
+  });
+  const MODULES_WITH_SUBMENU = ['/admin/dashboard', '/admin/sales', '/admin/warehouse', '/admin/purchasing', '/admin/quality-control',
+    '/admin/assembly', '/admin/hr', '/admin/accounting', '/admin/cskh', '/admin/delivery', '/admin/system'];
+  // Tổng số việc của cả phân hệ — hiện cạnh tên khi phân hệ đang thu gọn
+  const moduleBadgeTotal = (path) => Object.entries(menuBadges)
+    .filter(([k]) => k.startsWith(path + '?'))
+    .reduce((sum, [, v]) => sum + (Number(v) || 0), 0);
   const { can, canDo, canRead } = usePermission();
   const inventory = useInventoryStore(state => state.inventory) || [];
   const orders = useSalesStore(state => state.orders) || [];
@@ -480,7 +494,6 @@ export default function Sidebar({ isOpen = false, onClose }) {
           .filter(item => item.visible)
           .map(item => {
             const isWarehouseRoute = item.path === '/admin/warehouse';
-            const isOnWarehousePage = location.pathname.startsWith('/admin/warehouse');
 
             return (
               <React.Fragment key={item.path}>
@@ -509,11 +522,39 @@ export default function Sidebar({ isOpen = false, onClose }) {
                   }}
                 >
                   {item.icon}
-                  <span>{item.label}</span>
+                  <span style={{ flex: 1, minWidth: 0 }}>{item.label}</span>
+                  {MODULES_WITH_SUBMENU.includes(item.path) && (() => {
+                    const expanded = openModules.has(item.path);
+                    const total = expanded ? 0 : moduleBadgeTotal(item.path);
+                    return (
+                      <>
+                        {total > 0 && (
+                          <span style={{ backgroundColor: '#dc2626', color: '#fff', fontSize: '0.68rem', fontWeight: 800, borderRadius: '9999px', minWidth: 18, height: 18, padding: '0 5px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                            {total > 99 ? '99+' : total}
+                          </span>
+                        )}
+                        <span
+                          role="button"
+                          tabIndex={0}
+                          aria-label={expanded ? `Thu gọn ${item.label}` : `Xem chức năng ${item.label}`}
+                          aria-expanded={expanded}
+                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleModule(item.path); }}
+                          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); toggleModule(item.path); } }}
+                          className="sidebar-module-toggle"
+                          style={{
+                            marginLeft: 'auto', width: 26, height: 26, borderRadius: 6, flexShrink: 0,
+                            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: '#64748b'
+                          }}
+                        >
+                          <ChevronDown size={16} style={{ transition: 'transform 0.2s ease', transform: expanded ? 'rotate(180deg)' : 'none' }} />
+                        </span>
+                      </>
+                    );
+                  })()}
                 </NavLink>
 
                 {/* Render sub-items directly under Trang Tổng Quan (CEO Dashboard) in main sidebar */}
-                {item.path === '/admin/dashboard' && location.pathname.startsWith('/admin/dashboard') && (
+                {item.path === '/admin/dashboard' && openModules.has('/admin/dashboard') && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', paddingLeft: '1rem', marginTop: '0.25rem', marginBottom: '0.5rem' }}>
                     {ceoSubItems.map(sub => {
                       const currentTab = new URLSearchParams(location.search).get('tab') || 'overview';
@@ -566,7 +607,7 @@ export default function Sidebar({ isOpen = false, onClose }) {
                 )}
 
                 {/* Render sub-items directly under Quản Lý Bán Hàng in main sidebar */}
-                {item.path === '/admin/sales' && location.pathname.startsWith('/admin/sales') && (
+                {item.path === '/admin/sales' && openModules.has('/admin/sales') && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', paddingLeft: '1rem', marginTop: '0.25rem', marginBottom: '0.5rem' }}>
                     {[
                       { tab: 'overview', label: 'Tổng Quan Bán Hàng' },
@@ -627,7 +668,7 @@ export default function Sidebar({ isOpen = false, onClose }) {
                 )}
 
                 {/* Render sub-items directly under Quản Lý Kho in main sidebar */}
-                {isWarehouseRoute && isOnWarehousePage && (
+                {isWarehouseRoute && openModules.has('/admin/warehouse') && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', paddingLeft: '1rem', marginTop: '0.25rem', marginBottom: '0.5rem' }}>
                     {warehouseSubItems.map(sub => {
                       const currentTab = new URLSearchParams(location.search).get('tab') || 'overview';
@@ -680,7 +721,7 @@ export default function Sidebar({ isOpen = false, onClose }) {
                 )}
 
                 {/* Render sub-items directly under Quản Lý Mua Hàng in main sidebar */}
-                {item.path === '/admin/purchasing' && location.pathname.startsWith('/admin/purchasing') && (
+                {item.path === '/admin/purchasing' && openModules.has('/admin/purchasing') && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', paddingLeft: '1rem', marginTop: '0.25rem', marginBottom: '0.5rem' }}>
                     {[
                       { tab: 'overview', label: 'Tổng Quan Mua Hàng' },
@@ -741,7 +782,7 @@ export default function Sidebar({ isOpen = false, onClose }) {
                 )}
 
                 {/* Render sub-items directly under Kiểm Định Chất Lượng (QA/QC) in main sidebar */}
-                {item.path === '/admin/quality-control' && location.pathname.startsWith('/admin/quality-control') && (
+                {item.path === '/admin/quality-control' && openModules.has('/admin/quality-control') && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', paddingLeft: '1rem', marginTop: '0.25rem', marginBottom: '0.5rem' }}>
                     {qcSubItems.map(sub => {
                       const currentTab = new URLSearchParams(location.search).get('tab') || 'overview';
@@ -794,7 +835,7 @@ export default function Sidebar({ isOpen = false, onClose }) {
                 )}
 
                 {/* Render sub-items directly under Quản Lý Lắp Ráp in main sidebar */}
-                {item.path === '/admin/assembly' && location.pathname.startsWith('/admin/assembly') && (
+                {item.path === '/admin/assembly' && openModules.has('/admin/assembly') && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', paddingLeft: '1rem', marginTop: '0.25rem', marginBottom: '0.5rem' }}>
                     {[
                       { tab: 'overview', label: 'Tổng Quan Lắp Ráp' },
@@ -852,7 +893,7 @@ export default function Sidebar({ isOpen = false, onClose }) {
                 )}
 
                 {/* Render sub-items directly under Quản Lý Nhân Sự in main sidebar */}
-                {item.path === '/admin/hr' && location.pathname.startsWith('/admin/hr') && (
+                {item.path === '/admin/hr' && openModules.has('/admin/hr') && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', paddingLeft: '1rem', marginTop: '0.25rem', marginBottom: '0.5rem' }}>
                     {hrSubItems.map(sub => {
                       const currentTab = new URLSearchParams(location.search).get('tab') || 'overview';
@@ -896,7 +937,7 @@ export default function Sidebar({ isOpen = false, onClose }) {
                 )}
 
                 {/* Render sub-items directly under Kế Toán Tài Chính in main sidebar */}
-                {item.path === '/admin/accounting' && location.pathname.startsWith('/admin/accounting') && (
+                {item.path === '/admin/accounting' && openModules.has('/admin/accounting') && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', paddingLeft: '1rem', marginTop: '0.25rem', marginBottom: '0.5rem' }}>
                     {accountingSubItems.map(sub => {
                       const currentTab = new URLSearchParams(location.search).get('tab') || 'overview';
@@ -940,7 +981,7 @@ export default function Sidebar({ isOpen = false, onClose }) {
                 )}
 
                 {/* Render sub-items directly under Chăm Sóc Khách Hàng in main sidebar */}
-                {item.path === '/admin/cskh' && location.pathname.startsWith('/admin/cskh') && (
+                {item.path === '/admin/cskh' && openModules.has('/admin/cskh') && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', paddingLeft: '1rem', marginTop: '0.25rem', marginBottom: '0.5rem' }}>
                     {cskhSubItems.map(sub => {
                       const currentTab = new URLSearchParams(location.search).get('tab') || 'overview';
@@ -987,7 +1028,7 @@ export default function Sidebar({ isOpen = false, onClose }) {
                 )}
 
                 {/* Render sub-items directly under Quản Lý Giao Hàng in main sidebar */}
-                {item.path === '/admin/delivery' && location.pathname.startsWith('/admin/delivery') && (
+                {item.path === '/admin/delivery' && openModules.has('/admin/delivery') && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', paddingLeft: '1rem', marginTop: '0.25rem', marginBottom: '0.5rem' }}>
                     {deliverySubItems.map(sub => {
                       const currentTab = new URLSearchParams(location.search).get('tab') || 'overview';
@@ -1020,7 +1061,7 @@ export default function Sidebar({ isOpen = false, onClose }) {
                 )}
 
                 {/* Render sub-items directly under Quản Trị Hệ Thống in main sidebar */}
-                {item.path === '/admin/system' && location.pathname.startsWith('/admin/system') && (
+                {item.path === '/admin/system' && openModules.has('/admin/system') && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', paddingLeft: '1rem', marginTop: '0.25rem', marginBottom: '0.5rem' }}>
                     {adminSubItems.map(sub => {
                       const currentTab = new URLSearchParams(location.search).get('tab') || 'overview';

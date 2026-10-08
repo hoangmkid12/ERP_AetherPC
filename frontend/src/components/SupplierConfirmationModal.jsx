@@ -2,7 +2,7 @@ import React from 'react';
 import { Printer, X, CheckCircle2, Truck, Calendar, Building2, FileCheck } from 'lucide-react';
 import { printDocument } from '../utils/printDocument';
 import { formatCurrencyInWords } from '../utils/numberToWords';
-import { HandSignature, historySigner, signatureCode } from './Signature/ESignature';
+import { HandSignature, CompanySeal, orgSeal } from './Signature/ESignature';
 
 export default function SupplierConfirmationModal({ order, onClose }) {
   if (!order) return null;
@@ -320,27 +320,19 @@ export default function SupplierConfirmationModal({ order, onClose }) {
                     Ngày {new Date(order.updatedAt || Date.now()).getDate()} tháng {new Date(order.updatedAt || Date.now()).getMonth() + 1} năm {new Date(order.updatedAt || Date.now()).getFullYear()}
                   </div>
                   <strong style={{ fontSize: '0.78rem', color: '#0f172a', display: 'block', textTransform: 'uppercase' }}>
-                    ĐẠI DIỆN NHÀ CUNG CẤP XÁC NHẬN
+                    NHÀ CUNG CẤP
                   </strong>
                   <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '0.15rem' }}>
-                    (Ký điện tử & cam kết thực hiện)
+                    (Ký, đóng dấu)
                   </div>
 
-                  {(() => {
-                    const confirmed = historySigner(order, ['CONFIRMED_BY_SUPPLIER']);
-                    const at = confirmed.at || order.updatedAt;
-                    return (
-                      <div style={{ margin: '0.35rem auto 0' }}>
-                        <div style={{ height: 78, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <HandSignature name={supplierName} color="#334155" />
-                        </div>
-                        <div style={{ fontSize: '0.6rem', color: '#64748b', lineHeight: 1.35 }}>
-                          <div>Ký điện tử · {formatDateTime(at || new Date())}</div>
-                          <div>Mã xác thực: {signatureCode(order.poNumber || order.code, supplierName, at)}</div>
-                        </div>
-                      </div>
-                    );
-                  })()}
+                  {/* Chữ ký và mộc của chính nhà cung cấp */}
+                  <div style={{ position: 'relative', height: 80, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0.35rem auto 0' }}>
+                    <div style={{ transform: 'translateX(-22%)' }}><HandSignature name={supplierName} color="#334155" /></div>
+                    <div style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-6%, -50%)', pointerEvents: 'none' }}>
+                      <CompanySeal {...orgSeal(supplierName)} />
+                    </div>
+                  </div>
 
                   <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#0f172a', marginTop: '3px' }}>
                     {supplierName}

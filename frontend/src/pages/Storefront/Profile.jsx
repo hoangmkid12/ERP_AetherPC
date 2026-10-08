@@ -252,9 +252,9 @@ export default function Profile() {
           <strong style={{ color: '#0f172a' }}>{TEXT.account}</strong>
         </div>
 
-        <div style={{ display: 'flex', gap: '1.75rem', alignItems: 'flex-start' }}>
+        <div className="sf-profile-layout" style={{ display: 'flex', gap: '1.75rem', alignItems: 'flex-start' }}>
           {/* Left Sidebar */}
-          <aside style={{
+          <aside className="sf-profile-aside" style={{
             width: '280px',
             flexShrink: 0,
             background: '#ffffff',

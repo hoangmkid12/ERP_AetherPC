@@ -11,6 +11,7 @@ import { api, normalizeProduct } from '../../services/api';
 import ProductCard, { ProductCarousel } from '../../components/Storefront/ProductCard';
 import { categoryLabel, discountOf, fmtVnd, isInStock, PLACEHOLDER_IMG, SHOP } from '../../components/Storefront/catalog';
 import { formatDescription, proseLength, fallbackOverview } from '../../components/Storefront/describe';
+import BundleDeals from '../../components/Storefront/BundleDeals';
 
 const SPEC_LABEL_MAP = {
   socket: 'Socket', cores: 'Số nhân', threads: 'Số luồng', tdp: 'Điện năng tiêu thụ (TDP)', ram_slot: 'Số khe RAM',
@@ -243,6 +244,9 @@ export default function ProductDetail() {
           </div>
         </div>
       </div>
+
+      {/* Mua kèm giá sốc */}
+      <BundleDeals product={product} qty={qty} disabled={!inStock} />
 
       {/* Mô tả + thông số */}
       <div className="sf-pd-body">

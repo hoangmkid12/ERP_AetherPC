@@ -3451,12 +3451,11 @@ export default function QualityControl() {
                     const supplier = viewingLog.supplierName && !['Nhà Cung Cấp', 'Đại diện NCC'].includes(viewingLog.supplierName) ? viewingLog.supplierName : '';
                     return (
                       <SignatureRow>
-                        <SignatureCell title="Đại diện giao hàng (NCC)" name={supplier} signedAt={at} docRef={viewingLog.poNumber} result="Đã bàn giao" color="#334155" />
-                        <SignatureCell title="Kiểm định viên QA/QC" name={viewingLog.inspector} signedAt={at} docRef={viewingLog.poNumber}
-                          result={isRejected ? 'Không đạt' : (viewingLog.status === 'QA_PARTIAL' || viewingLog.decision === 'ACCEPT_PARTIAL') ? 'Đạt một phần' : 'Đạt'}
+                        <SignatureCell supplier title="Nhà cung cấp" note="(Ký, đóng dấu)" name={supplier} color="#334155" />
+                        <SignatureCell title="Kiểm định viên" name={viewingLog.inspector}
                           color={isRejected ? '#b91c1c' : undefined} />
-                        <SignatureCell title="Thủ kho tiếp nhận" name={keeper.name} signedAt={keeper.at} signed={!isRejected && !!keeper.name}
-                          seal sealLabel="ĐÃ NHẬP KHO" docRef={viewingLog.poNumber} pendingText={isRejected ? 'Không nhập kho' : 'Chờ nhập kho'} />
+                        <SignatureCell title="Thủ kho" name={keeper.name} signed={!isRejected && !!keeper.name}
+                          seal />
                       </SignatureRow>
                     );
                   })()}

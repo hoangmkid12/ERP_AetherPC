@@ -853,7 +853,7 @@ export default function MyOrders() {
 
     return (
       <div className="order-stepper-container">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative', width: '100%', minWidth: '400px', padding: '0.5rem 0' }}>
+        <div className="order-stepper" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative', width: '100%', minWidth: '400px', padding: '0.5rem 0' }}>
           {steps.map((stepName, idx) => {
             const isDone = idx < activeIdx || (idx === activeIdx && (status === 'DELIVERED' || status === 'COMPLETED'));
             const isActive = idx === activeIdx && !isDone;

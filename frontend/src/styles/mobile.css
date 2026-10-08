@@ -1,0 +1,92 @@
+/* ==========================================================================
+   Giao diện điện thoại (≤ 768px) cho cả web bán hàng (.sf-root) và phân hệ ERP (.erp-root).
+   Mọi quy tắc nằm trong media query nên giao diện máy tính không thay đổi.
+   ========================================================================== */
+@media (max-width: 768px) {
+  /* ---------- Chung ---------- */
+  .sf-root img, .erp-root img { max-width: 100%; }
+  /* Phần tử con của lưới/flex được phép co nhỏ hơn nội dung — tránh đẩy khung ra ngoài màn hình */
+  .sf-root [style*="display: grid"] > *, .erp-root main [style*="display: grid"] > * { min-width: 0; }
+
+  /* Lưới tự giãn có cột tối thiểu lớn hơn bề ngang điện thoại → 1 cột */
+  .sf-root [style*="minmax(300px"], .sf-root [style*="minmax(320px"], .sf-root [style*="minmax(340px"], .sf-root [style*="minmax(360px"], .sf-root [style*="minmax(380px"], .sf-root [style*="minmax(400px"],
+  .erp-root main [style*="minmax(300px"], .erp-root main [style*="minmax(320px"], .erp-root main [style*="minmax(340px"], .erp-root main [style*="minmax(360px"], .erp-root main [style*="minmax(380px"], .erp-root main [style*="minmax(400px"] {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+  /* Lưới tự giãn cột 200–280px: tối đa 2 cột vừa màn hình */
+  .sf-root [style*="minmax(200px"], .sf-root [style*="minmax(210px"], .sf-root [style*="minmax(220px"], .sf-root [style*="minmax(240px"], .sf-root [style*="minmax(250px"], .sf-root [style*="minmax(260px"], .sf-root [style*="minmax(280px"],
+  .erp-root main [style*="minmax(200px"], .erp-root main [style*="minmax(210px"], .erp-root main [style*="minmax(220px"], .erp-root main [style*="minmax(240px"], .erp-root main [style*="minmax(250px"], .erp-root main [style*="minmax(260px"], .erp-root main [style*="minmax(280px"] {
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 160px), 1fr)) !important;
+  }
+
+  /* ---------- Web bán hàng ---------- */
+  /* Thanh menu ngang: căn trái để cuộn được tới mục đầu tiên (căn giữa khi tràn làm mất phần bên trái) */
+  .sf-subnav-inner { justify-content: flex-start; padding: 0 12px; scroll-padding: 12px; }
+
+  /* Băng quảng cáo trang chủ: chữ dùng hết bề ngang (ảnh sản phẩm đã ẩn trên điện thoại), không bị cắt trên/dưới */
+  .sf-hero-main { min-height: 320px; }
+  .sf-slide-body { max-width: 100%; padding: 0 18px; }
+  .sf-slide h2 { font-size: 24px; margin: 10px 0 8px; }
+  .sf-slide p { font-size: 13.5px; margin-bottom: 14px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .sf-slide .sf-btn { padding: 9px 14px; font-size: 13.5px; }
+
+  /* Nút trò chuyện nổi gọn hơn, không che nút trên thẻ sản phẩm */
+  .sf-chat-fab-wrap { bottom: 14px !important; right: 12px !important; }
+  .sf-chat-fab { width: 48px !important; height: 48px !important; }
+  .sf-chat-fab svg { width: 22px; height: 22px; }
+
+  /* Trang hồ sơ: cột trái xếp lên trên, nội dung chiếm hết bề ngang */
+  .sf-profile-layout { flex-direction: column; gap: 1rem !important; }
+  .sf-profile-aside { width: 100% !important; box-sizing: border-box; padding: 1rem !important; }
+  .sf-profile-layout > :not(aside) { width: 100%; min-width: 0; }
+  .sf-root [style*="grid-template-columns: 160px 1fr"] { grid-template-columns: 1fr !important; row-gap: 0.35rem !important; }
+
+  /* Đơn hàng của tôi: danh sách đơn và chi tiết xếp dọc, không vượt màn hình */
+  .my-orders-grid { grid-template-columns: minmax(0, 1fr) !important; }
+  .my-orders-grid > * { min-width: 0; max-width: 100%; }
+  .order-stepper { min-width: 0 !important; }
+  .my-orders-container { padding: 1rem 0.75rem 3rem !important; }
+
+  /* Tự build PC: ô mô tả nhu cầu và nút gợi ý xuống dòng gọn gàng */
+  .pcb-ai-row { flex-wrap: wrap; }
+  .pcb-ai-row input { flex: 1 1 100% !important; min-width: 0; }
+  .pcb-ai-row button { flex: 1 1 100%; justify-content: center; }
+
+  /* Tiêu đề lớn của các trang nội dung (không áp cho băng quảng cáo trang chủ) */
+  .sf-main > div > h1, .sf-root .sf-page-title { font-size: clamp(20px, 6vw, 26px); line-height: 1.25; }
+
+  /* ---------- Phân hệ ERP ---------- */
+  /* Nút trợ lý AI thu thành nút tròn, không che nội dung giữa màn hình */
+  .copilot-fab { padding: 8px !important; bottom: 14px !important; right: 12px !important; gap: 0 !important; }
+  .copilot-fab-text { display: none; }
+
+  /* Khoảng đệm nội dung vừa phải, chừa chỗ cho nút nổi ở đáy */
+  .erp-root main { padding-left: 10px !important; padding-right: 10px !important; padding-bottom: 72px !important; }
+  .erp-root main h1, .erp-root .admin-page-title { font-size: 1.15rem !important; line-height: 1.3; }
+  .erp-root main h2 { font-size: 1.05rem !important; }
+
+  /* Hàng nút/bộ lọc tự xuống dòng thay vì tràn */
+  .erp-root main [style*="display: flex"][style*="justify-content: space-between"] { flex-wrap: wrap; row-gap: 8px; }
+
+  /* Ô chọn ngày: co theo khung, cặp "từ – đến" tự xuống dòng khi chật */
+  .erp-root main input[type="date"], .erp-root main input[type="month"] { min-width: 0 !important; flex: 1 1 128px; width: auto; }
+  .erp-root main div:has(> input[type="date"]) { flex-wrap: wrap; }
+
+  /* Bảng: luôn cuộn ngang trong khung riêng, chữ không bị dồn chồng lên nhau */
+  .erp-root main table { min-width: 640px; }
+  .erp-root main table.erp-compact { min-width: 0; }
+  .erp-root main div:has(> table) { overflow-x: auto; -webkit-overflow-scrolling: touch; max-width: 100%; }
+  .erp-root main table td, .erp-root main table th { white-space: normal; }
+
+  /* Hộp thoại (modal) vừa màn hình */
+  .erp-root [style*="position: fixed"][style*="inset: 0"] > div,
+  .erp-root [style*="position: fixed"][style*="top: 0"][style*="bottom: 0"] > div { max-width: calc(100vw - 16px) !important; }
+
+  /* Khung ký trên phiếu: 3 cột → xếp gọn 2 cột / 1 cột */
+  .esign-row { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)) !important; row-gap: 12px !important; }
+}
+
+@media (max-width: 400px) {
+  .sf-grid, .sf-grid-4 { gap: 6px; }
+  .esign-row { grid-template-columns: 1fr !important; }
+}

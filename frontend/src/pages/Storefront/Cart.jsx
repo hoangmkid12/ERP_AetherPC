@@ -14,6 +14,7 @@ import { api } from '../../services/api';
 
 import { VIETNAM_PROVINCES, removeAccents, buildStandardAddress, cleanProvinceName } from '../../utils/vietnamProvinces';
 import SearchableSelect from '../../components/Common/SearchableSelect';
+import { effectiveUnitPrice } from '../../components/Storefront/bundleRules';
 
 const formatPrice = (price) => {
   return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price || 0);
@@ -109,7 +110,7 @@ export default function Cart() {
   const selectedCartItems = validCartItems.filter((item) => selectedKeys[getItemKey(item)]);
   const selectedCartCount = selectedCartItems.reduce((sum, item) => sum + (item.quantity || 1), 0);
   const selectedCartTotal = selectedCartItems.reduce((sum, item) => {
-    const price = item?.product?.price || 0;
+    const price = effectiveUnitPrice(item, selectedCartItems);
     return sum + price * (item.quantity || 1);
   }, 0);
 
@@ -382,7 +383,8 @@ export default function Cart() {
       const itemsForERP = selectedCartItems.map(item => ({
         productId: item.product.id,
         quantity: item.quantity,
-        price: item.product.price,
+        price: effectiveUnitPrice(item, selectedCartItems),
+        bundleWith: item.selectedSpec?.bundleWith,
         category: item.product.category,
         name: item.product.name,
         selectedSpec: item.selectedSpec
@@ -658,8 +660,12 @@ export default function Cart() {
                   const pId = getProductId(item.product);
                   const itemKey = getItemKey(item);
                   const isChecked = !!selectedKeys[itemKey];
-                  const price = item.product.price ?? item.product.unitPrice ?? 0;
+                  const listPrice = Number(item.product.price ?? item.product.unitPrice ?? 0);
                   const qty = item.quantity || 1;
+                  // Dòng mua kèm: giá sốc chỉ tính khi sản phẩm chính cũng được chọn thanh toán
+                  const isBundle = !!item.selectedSpec?.bundleWith;
+                  const price = isChecked ? effectiveUnitPrice(item, selectedCartItems) : effectiveUnitPrice(item, validCartItems);
+                  const bundleApplied = isBundle && price < listPrice;
 
                   return (
                     <div
@@ -706,6 +712,13 @@ export default function Cart() {
                           </h4>
                         </Link>
                         <span style={{ fontSize: '0.8rem', color: '#64748b' }}>Thương hiệu: <strong style={{ color: '#334155' }}>{item.product.brand || item.product.brandName || 'Chính hãng'}</strong></span>
+                        {isBundle && (
+                          <div style={{ marginTop: '0.3rem', fontSize: '0.76rem', fontWeight: 600, color: bundleApplied ? '#b91c1c' : '#92400e' }}>
+                            {bundleApplied
+                              ? <>Mua kèm giá sốc · tiết kiệm {formatPrice((listPrice - price) * qty)}</>
+                              : <>Giá mua kèm cần chọn cả sản phẩm chính, số lượng không vượt quá sản phẩm chính</>}
+                          </div>
+                        )}
                       </div>
 
                       {/* Quantity modifier */}
@@ -726,6 +739,9 @@ export default function Cart() {
                       {/* Item Total Price */}
                       <div style={{ fontSize: '1.08rem', fontWeight: 900, color: '#dc2626', textDecoration: 'none', whiteSpace: 'nowrap', minWidth: '100px', textAlign: 'right', flexShrink: 0 }}>
                         {formatPrice(price * qty)}
+                        {bundleApplied && (
+                          <div style={{ fontSize: '0.78rem', fontWeight: 500, color: '#94a3b8', textDecoration: 'line-through' }}>{formatPrice(listPrice * qty)}</div>
+                        )}
                       </div>
 
                       {/* Delete button */}

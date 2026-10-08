@@ -773,10 +773,12 @@ export default function Chatbot() {
   };
 
   return (
-    <div style={{ position: 'fixed', bottom: '2rem', right: '2rem', zIndex: 9999 }}>
+    <div className="sf-chat-fab-wrap" style={{ position: 'fixed', bottom: '2rem', right: '2rem', zIndex: 9999 }}>
       {/* Floating Chat Button */}
       {!isOpen && (
         <button
+          className="sf-chat-fab"
+          aria-label="Mở trò chuyện hỗ trợ"
           onClick={() => setIsOpen(true)}
           style={{
             width: '62px',
