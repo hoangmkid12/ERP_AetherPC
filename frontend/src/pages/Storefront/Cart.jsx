@@ -432,6 +432,8 @@ export default function Cart() {
         {
           shippingFee,
           discount: (couponDiscount || 0) + (memberDiscountAmount || 0),
+          couponDiscount: couponDiscount || 0,
+          memberDiscount: memberDiscountAmount || 0,
           shippingCity: selectedProvince
         }
       );

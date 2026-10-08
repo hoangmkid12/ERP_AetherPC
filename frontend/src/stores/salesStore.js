@@ -308,6 +308,10 @@ export const useSalesStore = create((set, get) => ({
     // không trừ kho thật, không vào được luồng lắp ráp/kho/vận chuyển, và
     // không gắn soldById nên hoa hồng Sales trong bảng lương luôn bằng 0.
     const endpoint = type === 'POS' ? '/orders/pos' : '/orders';
+    const couponDiscountToSend = options.couponDiscount !== undefined
+      ? Number(options.couponDiscount || 0)
+      : (type === 'POS' ? discount : 0);
+
     let persistedOrder = null;
     try {
       const res = await api.post(endpoint, {
@@ -320,7 +324,8 @@ export const useSalesStore = create((set, get) => ({
         shippingAddress: shippingAddress || (type === 'POS' ? 'Bán tại cửa hàng (POS)' : 'Hồ Chí Minh'),
         shippingCity: inferredCity,
         shippingFee,
-        couponDiscount: discount,
+        couponDiscount: couponDiscountToSend,
+        memberDiscount: options.memberDiscount !== undefined ? Number(options.memberDiscount || 0) : undefined,
         totalAmount,
         notes: type === 'POS' ? 'Đơn bán lẻ tại quầy (POS)' : 'Đặt hàng online (Đồng bộ)',
         type
@@ -332,8 +337,17 @@ export const useSalesStore = create((set, get) => ({
     }
 
     const finalOrderId = persistedOrder?.orderId || newOrderId;
+    const finalDiscount = persistedOrder?.discount !== undefined ? Number(persistedOrder.discount) : discount;
+    const finalTotalAmount = persistedOrder?.totalAmount !== undefined ? Number(persistedOrder.totalAmount) : totalAmount;
     set(state => {
-      const orders = [{ ...newOrder, orderId: finalOrderId, status: persistedOrder?.status || newOrder.status }, ...state.orders];
+      const orders = [{
+        ...newOrder,
+        ...(persistedOrder || {}),
+        orderId: finalOrderId,
+        discount: finalDiscount,
+        totalAmount: finalTotalAmount,
+        status: persistedOrder?.status || newOrder.status
+      }, ...state.orders];
       try {
         localStorage.setItem(STORAGE_KEYS.orders, JSON.stringify(orders));
       } catch (e) {}
