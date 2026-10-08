@@ -87,6 +87,18 @@ export default function ProductDetail() {
     if (!product) return [];
     return [...new Set([product.image, ...(product.imageUrls || [])].filter(Boolean))];
   }, [product]);
+
+  useEffect(() => {
+    if (images.length > 0) {
+      images.forEach(src => {
+        if (src) {
+          const img = new Image();
+          img.src = src;
+        }
+      });
+    }
+  }, [images]);
+
   const desc = useMemo(() => formatDescription(product?.descriptionText, product?.name), [product]);
 
   if (loading) return (
@@ -149,13 +161,17 @@ export default function ProductDetail() {
 
       <div className="sf-box sf-pd">
         {/* Thư viện ảnh */}
-        <div>
+        <div className="sf-gallery-col">
           <div className="sf-gallery-main">
             <div className="sf-card-tags" style={{ top: 12, left: 12 }}>
               {off > 0 && <span className="sf-tag sf-tag-hot">-{off}%</span>}
               {inStock && <span className="sf-tag sf-tag-soft">Có sẵn tại kho</span>}
             </div>
-            <img src={curImg} alt={product.name} onError={e => { e.currentTarget.src = PLACEHOLDER_IMG; }} />
+            <img
+              src={curImg}
+              alt={product.name}
+              onError={e => { e.currentTarget.src = PLACEHOLDER_IMG; }}
+            />
             {images.length > 1 && <>
               <button type="button" className="sf-gallery-nav prev" onClick={() => setImgIdx(i => (i - 1 + images.length) % images.length)} aria-label="Ảnh trước"><ChevronLeft size={18} /></button>
               <button type="button" className="sf-gallery-nav next" onClick={() => setImgIdx(i => (i + 1) % images.length)} aria-label="Ảnh sau"><ChevronRight size={18} /></button>
@@ -164,7 +180,13 @@ export default function ProductDetail() {
           {images.length > 1 && (
             <div className="sf-gallery-thumbs">
               {images.map((u, i) => (
-                <button key={u} type="button" className={i === imgIdx ? 'is-on' : ''} onClick={() => setImgIdx(i)} aria-label={`Ảnh ${i + 1}`}>
+                <button
+                  key={`${u}-${i}`}
+                  type="button"
+                  className={i === imgIdx ? 'is-on' : ''}
+                  onClick={() => setImgIdx(i)}
+                  aria-label={`Ảnh ${i + 1}`}
+                >
                   <img src={u} alt="" loading="lazy" />
                 </button>
               ))}
