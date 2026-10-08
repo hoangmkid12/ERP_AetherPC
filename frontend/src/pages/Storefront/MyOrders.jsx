@@ -10,6 +10,7 @@ import { REGION_COORDS, detectDeliveryRegion, getAddressCoordinates } from '../.
 import ReturnRequestModal from '../../components/ReturnRequestModal';
 import DeliveryMap from '../../components/DeliveryMap';
 import SepayPayment from '../../components/Storefront/SepayPayment';
+import { PLACEHOLDER_IMG } from '../../components/Storefront/catalog';
 
 export default function MyOrders() {
   const orders = useSalesStore(state => state.orders) || [];
@@ -25,19 +26,20 @@ export default function MyOrders() {
   const complaints = useSalesStore(state => state.complaints) || [];
   const assemblyJobs = useUtilityStore(state => state.assemblyJobs) || [];
   const products = useInventoryStore(state => state.products) || [];
+  const getProducts = useInventoryStore(state => state.getProducts);
   const { user } = useAuth() || {};
   const { addNotification } = useNotification() || {};
   const [phoneQuery, setPhoneQuery] = useState('');
   const [searched, setSearched] = useState(false);
   const [selectedOrderId, setSelectedOrderId] = useState(null);
-  // Đơn vừa thanh toán SePay xong: giữ khung thanh toán để hiện "Thanh toán thành công" sau khi đơn rời trạng thái chờ
-  const [justPaidOrderId, setJustPaidOrderId] = useState(null);
   const [confirmingReceivedId, setConfirmingReceivedId] = useState(null);
+  const [justPaidOrderId, setJustPaidOrderId] = useState(null);
 
   useEffect(() => {
     if (typeof getOrders === 'function') getOrders().catch(() => { });
     if (typeof getReturnRequests === 'function') getReturnRequests().catch(() => { });
-  }, [getOrders, getReturnRequests]);
+    if (typeof getProducts === 'function' && (!products || products.length === 0)) getProducts().catch(() => { });
+  }, [getOrders, getReturnRequests, getProducts]);
 
   // Tự động kiểm tra các đơn đã giao (DELIVERED) quá 48h -> tự động chuyển COMPLETED (nhận thành công)
   useEffect(() => {
@@ -856,7 +858,7 @@ export default function MyOrders() {
 
     return (
       <div className="order-stepper-container">
-        <div className="order-stepper" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative', width: '100%', minWidth: '400px', padding: '0.5rem 0' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative', width: '100%', minWidth: '400px', padding: '0.5rem 0' }}>
           {steps.map((stepName, idx) => {
             const isDone = idx < activeIdx || (idx === activeIdx && (status === 'DELIVERED' || status === 'COMPLETED'));
             const isActive = idx === activeIdx && !isDone;
@@ -1231,22 +1233,47 @@ export default function MyOrders() {
                       {hasItems && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                           {orderItems.map((item, idx) => {
-                            const productInfo = products?.find(p => p.id === item.productId || p.productId === item.productId);
-                            const displayImage = item.image || item.primaryImage || productInfo?.image || productInfo?.primaryImage || productInfo?.imageUrls?.[0];
+                            const productInfo = products?.find(p =>
+                              (p.id !== undefined && (p.id === item.productId || String(p.id) === String(item.productId))) ||
+                              (p.productId !== undefined && (p.productId === item.productId || String(p.productId) === String(item.productId))) ||
+                              (p.name && item.name && p.name.trim().toLowerCase() === item.name.trim().toLowerCase())
+                            );
+                            const rawImage =
+                              item.image ||
+                              item.primaryImage ||
+                              item.product?.primaryImage ||
+                              item.product?.image ||
+                              item.product?.imageUrl ||
+                              item.imageUrl ||
+                              productInfo?.image ||
+                              productInfo?.primaryImage ||
+                              productInfo?.imageUrls?.[0];
+
+                            const displayImage = rawImage && typeof rawImage === 'string' && rawImage.trim() ? rawImage.trim() : null;
 
                             return (
                               <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.75rem 1rem', borderRadius: '10px', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', fontSize: '0.875rem', alignItems: 'center', gap: '1rem' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', minWidth: 0, flex: 1 }}>
-                                  <div style={{ width: '48px', height: '48px', borderRadius: '8px', overflow: 'hidden', backgroundColor: '#e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                  <div style={{ width: '56px', height: '56px', borderRadius: '10px', overflow: 'hidden', backgroundColor: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, border: '1px solid #cbd5e1', padding: '2px', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
                                     {displayImage ? (
-                                      <img src={displayImage} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                      <img
+                                        src={displayImage}
+                                        alt={item.name}
+                                        onError={(e) => {
+                                          e.currentTarget.onerror = null;
+                                          e.currentTarget.src = PLACEHOLDER_IMG;
+                                        }}
+                                        style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                                      />
                                     ) : (
-                                      <Package size={24} color="#94a3b8" />
+                                      <Package size={26} color="#94a3b8" />
                                     )}
                                   </div>
                                   <div style={{ minWidth: 0 }}>
-                                    <span className="badge badge-info" style={{ fontSize: '0.65rem', marginBottom: '0.2rem', display: 'inline-block', fontWeight: 700 }}>{item.category || 'LINH KIỆN'}</span>
-                                    <Link to={`/product/${item.productId}`} style={{ textDecoration: 'none', color: '#0f172a', minWidth: 0 }}>
+                                    <span className="badge badge-info" style={{ fontSize: '0.65rem', marginBottom: '0.2rem', display: 'inline-block', fontWeight: 700 }}>
+                                      {item.category || item.product?.category?.name || productInfo?.category || 'LINH KIỆN'}
+                                    </span>
+                                    <Link to={`/product/${item.productId || productInfo?.id || productInfo?.productId || ''}`} style={{ textDecoration: 'none', color: '#0f172a', minWidth: 0 }}>
                                       <strong style={{ cursor: 'pointer', transition: 'color 0.2s', display: 'block', wordBreak: 'break-word', color: '#1e293b' }}
                                         onMouseEnter={e => e.currentTarget.style.color = '#2563eb'}
                                         onMouseLeave={e => e.currentTarget.style.color = '#1e293b'}
@@ -1254,7 +1281,9 @@ export default function MyOrders() {
                                         {item.name}
                                       </strong>
                                     </Link>
-                                    <span style={{ fontSize: '0.75rem', color: '#64748b', display: 'block', marginTop: '0.2rem' }}>Bảo hành 36 tháng</span>
+                                    <span style={{ fontSize: '0.75rem', color: '#64748b', display: 'block', marginTop: '0.2rem' }}>
+                                      Bảo hành {item.warranty || productInfo?.warranty || '36 tháng'}
+                                    </span>
                                   </div>
                                 </div>
                                 <span style={{ color: '#2563eb', whiteSpace: 'nowrap', flexShrink: 0, fontWeight: 800 }}>x{item.quantity || 1} - {formatPrice(item.price)}</span>
