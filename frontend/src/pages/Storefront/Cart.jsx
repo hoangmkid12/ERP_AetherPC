@@ -6,7 +6,7 @@ import { useNotification, confirm } from '../../context/NotificationContext';
 import { 
   ShoppingCart, ShoppingBag, Trash2, ArrowLeft, CreditCard, Sparkles, 
   MapPin, User, Phone, Lock, LogIn, UserPlus, CheckCircle, 
-  ShieldCheck, Truck, RotateCcw, AlertCircle, Copy, Check, QrCode, Banknote, Mail,
+  ShieldCheck, Truck, RotateCcw, AlertCircle, QrCode, Banknote, Mail,
   ChevronDown, Search
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
@@ -15,6 +15,7 @@ import { api } from '../../services/api';
 import { VIETNAM_PROVINCES, removeAccents, buildStandardAddress, cleanProvinceName } from '../../utils/vietnamProvinces';
 import SearchableSelect from '../../components/Common/SearchableSelect';
 import { effectiveUnitPrice } from '../../components/Storefront/bundleRules';
+import SepayPayment from '../../components/Storefront/SepayPayment';
 
 const formatPrice = (price) => {
   return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price || 0);
@@ -146,7 +147,6 @@ export default function Cart() {
 
   // Invoice / Success state
   const [invoice, setInvoice] = useState(null);
-  const [copiedField, setCopiedField] = useState(null);
 
   // Coupon states
   const [couponCode, setCouponCode] = useState('');
@@ -261,12 +261,6 @@ export default function Cart() {
     if (!selectedProvince) return false;
     return p.name === selectedProvince || p.name.includes(selectedProvince) || selectedProvince.includes(p.name) || p.code === selectedProvince;
   }) || { districts: [] };
-
-  const handleCopy = (text, field) => {
-    navigator.clipboard.writeText(text);
-    setCopiedField(field);
-    setTimeout(() => setCopiedField(null), 2000);
-  };
 
   // Helper: Only Hà Nội & TP. Hồ Chí Minh qualify for Freeship
   const isFreeShipCity = (provinceName) => {
@@ -448,7 +442,6 @@ export default function Cart() {
   // Invoice Success Screen
   if (invoice) {
     const isQrPay = invoice.paymentMethod === 'BANK_TRANSFER';
-    const qrUrl = `https://qr.sepay.vn/img?acc=22633181&bank=MB&amount=${invoice.totalAmount}&des=AetherPC%20${invoice.orderId}&template=compact`;
 
     return (
       <div className="container" style={{ padding: '3.5rem 1.5rem', display: 'flex', justifyContent: 'center' }}>
@@ -487,44 +480,8 @@ export default function Cart() {
           </div>
 
           {isQrPay ? (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', alignItems: 'center', borderTop: '1px solid #f1f5f9', paddingTop: '1.5rem' }}>
-              {/* QR Code Column */}
-              <div style={{ textAlign: 'center', backgroundColor: '#f8fafc', padding: '1.5rem', borderRadius: '16px', border: '1px solid #e2e8f0', position: 'relative', overflow: 'hidden' }}>
-                <div className="scanner-line" />
-                <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#2563eb', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '0.75rem' }}>
-                  Quét Mã VietQR Chuyển Khoản Nhanh
-                </div>
-                <img src={qrUrl} alt="QR Thanh Toán" style={{ width: '210px', height: '210px', borderRadius: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }} />
-                <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.75rem', fontWeight: 500 }}>
-                  Tự động điền số tiền &amp; nội dung chuyển khoản
-                </div>
-              </div>
-
-              {/* Bank Details Column */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-                <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#0f172a', borderBottom: '2px solid #2563eb', paddingBottom: '0.35rem', width: 'fit-content' }}>
-                  Thông Tin Tài Khoản Ngân Hàng
-                </div>
-                {[
-                  { label: 'Ngân hàng', val: 'MBBank (MB)' },
-                  { label: 'Số tài khoản', val: '22633181', field: 'acc' },
-                  { label: 'Chủ tài khoản', val: 'NGUYEN HOANG KHANG' },
-                  { label: 'Số tiền', val: formatPrice(invoice.totalAmount), isMoney: true },
-                  { label: 'Nội dung CK', val: `AetherPC ${invoice.orderId}`, field: 'des' },
-                ].map((item, i) => (
-                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem', backgroundColor: '#ffffff', padding: '0.6rem 0.85rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                    <span style={{ color: '#64748b', fontWeight: 500 }}>{item.label}:</span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                      <strong style={{ color: item.isMoney ? '#dc2626' : '#0f172a', fontSize: item.isMoney ? '1.05rem' : '0.85rem' }}>{item.val}</strong>
-                      {item.field && (
-                        <button onClick={() => handleCopy(item.val, item.field)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#2563eb', padding: '2px' }} title="Sao chép">
-                          {copiedField === item.field ? <Check size={14} color="#16a34a"/> : <Copy size={14}/>}
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
+            <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '1.5rem', marginBottom: '1.5rem' }}>
+              <SepayPayment orderId={invoice.orderId} />
             </div>
           ) : (
             <div style={{ backgroundColor: '#f8fafc', padding: '1.5rem', borderRadius: '14px', border: '1px solid #e2e8f0', marginBottom: '1.5rem' }}>

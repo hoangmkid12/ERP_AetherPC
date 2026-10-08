@@ -159,6 +159,7 @@ export default function Sidebar({ isOpen = false, onClose }) {
     { tab: 'cod_settlement', label: 'Đối Soát COD Shipper' },
     { tab: 'payroll_disbursement', label: 'Chi Trả Bảng Lương', badgeKey: 'pendingPayrollApproval' },
     { tab: 'refunds', label: 'Chi Hoàn Tiền Đổi Trả', badgeKey: 'refunds' },
+    { tab: 'transfer_refunds', label: 'Hoàn Tiền Chuyển Khoản' },
     { tab: 'reports', label: 'Báo Cáo P&L & VAT' }
   ];
 

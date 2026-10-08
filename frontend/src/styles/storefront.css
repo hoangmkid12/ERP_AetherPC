@@ -754,3 +754,33 @@
   .sf-bundle-note { padding: 0 12px 12px; }
   .sf-bundle-foot .actions, .sf-bundle-foot .actions .sf-btn { width: 100%; justify-content: center; }
 }
+
+/* ---------- Thanh toán chuyển khoản SePay ---------- */
+.sf-sepay { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 20px; align-items: start; font-size: 14px; color: #0f172a; }
+.sf-sepay.is-compact { grid-template-columns: 230px minmax(0, 1fr); gap: 16px; }
+.sf-sepay-qr { text-align: center; padding: 14px; border: 1px solid #e2e8f0; border-radius: 14px; background: #fff; }
+.sf-sepay-qr .cap { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 800; color: #2563eb; text-transform: uppercase; letter-spacing: .03em; margin-bottom: 8px; }
+.sf-sepay-qr img { display: block; width: 100%; max-width: 220px; height: auto; aspect-ratio: 1; margin: 0 auto; border-radius: 10px; }
+.sf-sepay-qr .hint { margin-top: 8px; font-size: 12px; color: #64748b; }
+.sf-sepay-info { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.sf-sepay-info .row { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 9px 12px; border: 1px solid #e2e8f0; border-radius: 9px; background: #fff; }
+.sf-sepay-info .row > span:first-child { color: #64748b; white-space: nowrap; }
+.sf-sepay-info .v { display: inline-flex; align-items: center; gap: 6px; min-width: 0; text-align: right; }
+.sf-sepay-info .v b { overflow-wrap: anywhere; }
+.sf-sepay-info .v b.money { color: #dc2626; font-size: 16px; }
+.sf-sepay-info .v b.code { color: #1d4ed8; letter-spacing: .02em; }
+.sf-sepay-info .v button { flex-shrink: 0; display: inline-flex; padding: 4px; border: 0; border-radius: 6px; background: #eff6ff; color: #2563eb; cursor: pointer; }
+.sf-sepay-status { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 10px 12px; border-radius: 9px; background: #eff6ff; color: #1e40af; font-size: 13px; font-weight: 600; }
+.sf-sepay-status button { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; padding: 4px 10px; border: 1px solid #93c5fd; border-radius: 7px; background: #fff; color: #1d4ed8; font-weight: 700; cursor: pointer; }
+.sf-sepay-note { margin: 0; font-size: 12px; color: #64748b; }
+.sf-sepay .spin { animation: sfSepaySpin 1s linear infinite; flex-shrink: 0; }
+@keyframes sfSepaySpin { to { transform: rotate(360deg); } }
+.sf-sepay-msg { display: flex; align-items: center; gap: 8px; grid-template-columns: none; padding: 14px; border-radius: 10px; background: #f8fafc; color: #475569; }
+.sf-sepay-done { display: flex; align-items: center; gap: 14px; padding: 16px 18px; border-radius: 12px; background: #ecfdf5; border: 1px solid #a7f3d0; color: #047857; }
+.sf-sepay-done div { display: flex; flex-direction: column; gap: 2px; }
+.sf-sepay-done b { font-size: 16px; }
+.sf-sepay-done span { color: #065f46; font-size: 13.5px; }
+@media (max-width: 640px) {
+  .sf-sepay, .sf-sepay.is-compact { grid-template-columns: minmax(0, 1fr); }
+}
+.sf-sepay-partial { display: flex; flex-direction: column; gap: 4px; padding: 9px 12px; border-radius: 9px; background: #fffbeb; border: 1px solid #fde68a; color: #92400e; font-size: 13px; line-height: 1.5; }
