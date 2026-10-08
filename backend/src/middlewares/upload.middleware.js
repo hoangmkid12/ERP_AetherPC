@@ -12,14 +12,7 @@ fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, UPLOAD_DIR),
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase() || '.jpg';
-    const safeExt = ALLOWED_MIME_TYPES.includes(file.mimetype) ? ext : '.jpg';
-    cb(null, `${Date.now()}-${Math.round(Math.random() * 1e9)}${safeExt}`);
-  }
-});
+const storage = multer.memoryStorage();
 
 const fileFilter = (req, file, cb) => {
   if (!ALLOWED_MIME_TYPES.includes(file.mimetype)) {

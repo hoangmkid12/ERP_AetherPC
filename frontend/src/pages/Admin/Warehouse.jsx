@@ -302,28 +302,19 @@ const ProductSpecsEditor = ({ category, specs = {}, onChange }) => {
 const ProductGalleryField = ({
   coverFile,
   coverUrl,
-  coverImageUrl,
   onCoverSelect,
-  onCoverImageUrlChange,
   existingImages = [],
   pendingFiles = [],
-  galleryUrls = [],
   onAddFiles,
   onRemovePendingFile,
   onDeleteExistingImage,
-  deletingImageId,
-  onAddGalleryUrl,
-  onRemoveGalleryUrl
+  deletingImageId
 }) => {
-  const [newGalleryUrlInput, setNewGalleryUrlInput] = useState('');
+  const coverPreview = coverFile
+    ? URL.createObjectURL(coverFile)
+    : coverUrl;
 
-  const coverPreview = (coverImageUrl && coverImageUrl.trim())
-    ? coverImageUrl.trim()
-    : coverFile
-      ? URL.createObjectURL(coverFile)
-      : coverUrl;
-
-  const totalGalleryCount = (existingImages || []).length + (pendingFiles || []).length + (galleryUrls || []).length;
+  const totalGalleryCount = (existingImages || []).length + (pendingFiles || []).length;
   const thumbWrapStyle = { position: 'relative', flexShrink: 0, width: GALLERY_THUMB_SIZE, height: GALLERY_THUMB_SIZE };
   const badgeStyle = (bg) => ({
     position: 'absolute', top: '-7px', right: '-7px', width: '20px', height: '20px', borderRadius: '50%',
@@ -331,177 +322,103 @@ const ProductGalleryField = ({
     display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0
   });
 
-  const handleAddUrl = () => {
-    const trimmed = newGalleryUrlInput.trim();
-    if (trimmed && onAddGalleryUrl) {
-      onAddGalleryUrl(trimmed);
-      setNewGalleryUrlInput('');
-    }
-  };
-
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-      <div>
-        <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: '0.4rem', color: '#1e293b' }}>
-          Hình Ảnh Sản Phẩm
-        </label>
-        
-        {/* Direct Image URL input for Cover */}
-        <div style={{ marginBottom: '0.65rem' }}>
-          <div style={{ fontSize: '0.77rem', fontWeight: 600, color: '#475569', marginBottom: '0.25rem' }}>
-            🔗 Link URL Ảnh Bìa (Khuyên dùng - Lưu vĩnh viễn):
-          </div>
-          <input
-            type="url"
-            placeholder="Dán link ảnh trực tiếp (VD: https://product.hstatic.net/...)"
-            value={coverImageUrl || ''}
-            onChange={(e) => onCoverImageUrlChange && onCoverImageUrlChange(e.target.value)}
-            style={{ width: '100%', padding: '0.45rem 0.75rem', fontSize: '0.82rem', border: '1px solid #cbd5e1', borderRadius: '6px', boxSizing: 'border-box' }}
-          />
+    <div>
+      <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, marginBottom: '0.5rem', color: '#1e293b' }}>
+        Hình Ảnh Sản Phẩm (Tải tệp từ thiết bị và lưu vĩnh viễn vào CSDL)
+      </label>
+
+      <div style={{ display: 'flex', gap: '1.1rem', alignItems: 'flex-start' }}>
+        {/* Cover photo preview + file picker */}
+        <div style={{ flexShrink: 0, width: GALLERY_THUMB_SIZE }}>
+          <label
+            htmlFor="product-cover-input"
+            style={{
+              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+              width: GALLERY_THUMB_SIZE, height: GALLERY_THUMB_SIZE, borderRadius: '8px', cursor: 'pointer', overflow: 'hidden',
+              border: coverPreview ? '1px solid #e3e8ef' : '2px dashed #cbd5e1',
+              backgroundColor: coverPreview ? 'transparent' : '#f8fafc'
+            }}
+          >
+            {coverPreview ? (
+              <img
+                src={coverPreview}
+                alt="Ảnh bìa"
+                onError={(e) => { e.currentTarget.src = PLACEHOLDER_IMG; }}
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              />
+            ) : (
+              <>
+                <Image size={20} style={{ color: '#94a3b8' }} />
+                <span style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '0.25rem', textAlign: 'center', padding: '0 0.3rem' }}>Chọn ảnh</span>
+              </>
+            )}
+          </label>
+          <input id="product-cover-input" type="file" accept="image/jpeg,image/png,image/webp,image/gif" onChange={(e) => onCoverSelect(e.target.files?.[0] || null)} style={{ display: 'none' }} />
+          <div style={{ fontSize: '0.74rem', fontWeight: 600, color: '#64748b', textAlign: 'center', marginTop: '0.4rem' }}>Ảnh Bìa</div>
         </div>
 
-        <div style={{ display: 'flex', gap: '1.1rem', alignItems: 'flex-start' }}>
-          {/* Cover photo preview + file picker */}
-          <div style={{ flexShrink: 0, width: GALLERY_THUMB_SIZE }}>
-            <label
-              htmlFor="product-cover-input"
-              style={{
-                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                width: GALLERY_THUMB_SIZE, height: GALLERY_THUMB_SIZE, borderRadius: '8px', cursor: 'pointer', overflow: 'hidden',
-                border: coverPreview ? '1px solid #e3e8ef' : '2px dashed #cbd5e1',
-                backgroundColor: coverPreview ? 'transparent' : '#f8fafc'
-              }}
-            >
-              {coverPreview ? (
+        <div style={{ width: '1px', alignSelf: 'stretch', backgroundColor: '#e2e8f0', flexShrink: 0 }} />
+
+        {/* Gallery strip */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', gap: '0.6rem', overflowX: 'auto', padding: '7px 7px 0.3rem 2px', margin: '-7px -7px 0 -2px' }}>
+            {(existingImages || []).map(img => (
+              <div key={img.id} style={thumbWrapStyle}>
                 <img
-                  src={coverPreview}
-                  alt="Ảnh bìa"
+                  src={img.url}
+                  alt=""
                   onError={(e) => { e.currentTarget.src = PLACEHOLDER_IMG; }}
-                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                />
-              ) : (
-                <>
-                  <Image size={20} style={{ color: '#94a3b8' }} />
-                  <span style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '0.25rem', textAlign: 'center', padding: '0 0.3rem' }}>Tải tệp ảnh</span>
-                </>
-              )}
-            </label>
-            <input id="product-cover-input" type="file" accept="image/jpeg,image/png,image/webp,image/gif" onChange={(e) => onCoverSelect(e.target.files?.[0] || null)} style={{ display: 'none' }} />
-            <div style={{ fontSize: '0.74rem', fontWeight: 600, color: '#64748b', textAlign: 'center', marginTop: '0.4rem' }}>Ảnh Bìa</div>
-          </div>
-
-          <div style={{ width: '1px', alignSelf: 'stretch', backgroundColor: '#e2e8f0', flexShrink: 0 }} />
-
-          {/* Gallery strip */}
-          <div style={{ flex: 1, minWidth: 0 }}>
-            {/* Direct URL input for adding gallery images */}
-            {totalGalleryCount < MAX_GALLERY_IMAGES && onAddGalleryUrl && (
-              <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '0.5rem' }}>
-                <input
-                  type="url"
-                  placeholder="Thêm link URL ảnh phụ (https://...)"
-                  value={newGalleryUrlInput}
-                  onChange={(e) => setNewGalleryUrlInput(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddUrl(); } }}
-                  style={{ flex: 1, padding: '0.35rem 0.6rem', fontSize: '0.76rem', border: '1px solid #cbd5e1', borderRadius: '4px', boxSizing: 'border-box' }}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '6px', border: '1px solid #e3e8ef' }}
                 />
                 <button
                   type="button"
-                  onClick={handleAddUrl}
-                  disabled={!newGalleryUrlInput.trim()}
-                  style={{
-                    padding: '0.35rem 0.65rem',
-                    fontSize: '0.76rem',
-                    fontWeight: 600,
-                    backgroundColor: newGalleryUrlInput.trim() ? '#2563eb' : '#e2e8f0',
-                    color: newGalleryUrlInput.trim() ? '#ffffff' : '#94a3b8',
-                    border: 'none',
-                    borderRadius: '4px',
-                    cursor: newGalleryUrlInput.trim() ? 'pointer' : 'default',
-                    whiteSpace: 'nowrap'
-                  }}
+                  disabled={deletingImageId === img.id}
+                  onClick={() => onDeleteExistingImage(img.id)}
+                  title="Xoá ảnh này"
+                  style={{ ...badgeStyle('#dc2626'), cursor: deletingImageId === img.id ? 'default' : 'pointer', opacity: deletingImageId === img.id ? 0.6 : 1 }}
                 >
-                  + Thêm URL
+                  <X size={12} />
                 </button>
               </div>
+            ))}
+            {(pendingFiles || []).map((file, idx) => (
+              <div key={`pending-${idx}`} style={thumbWrapStyle}>
+                <img
+                  src={URL.createObjectURL(file)}
+                  alt=""
+                  onError={(e) => { e.currentTarget.src = PLACEHOLDER_IMG; }}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '6px', border: '1px solid #93c5fd' }}
+                />
+                <button type="button" onClick={() => onRemovePendingFile(idx)} title="Bỏ ảnh này" style={badgeStyle('#475569')}>
+                  <X size={12} />
+                </button>
+              </div>
+            ))}
+            {totalGalleryCount < MAX_GALLERY_IMAGES && (
+              <label
+                htmlFor="product-gallery-input"
+                title="Tải tệp ảnh phụ từ máy"
+                style={{
+                  flexShrink: 0, width: GALLERY_THUMB_SIZE, height: GALLERY_THUMB_SIZE, borderRadius: '6px', border: '2px dashed #cbd5e1',
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', backgroundColor: '#f8fafc'
+                }}
+              >
+                <Plus size={20} style={{ color: '#94a3b8' }} />
+                <span style={{ fontSize: '0.68rem', color: '#94a3b8', marginTop: '2px' }}>Thêm ảnh</span>
+              </label>
             )}
-
-            <div style={{ display: 'flex', gap: '0.6rem', overflowX: 'auto', padding: '7px 7px 0.3rem 2px', margin: '-7px -7px 0 -2px' }}>
-              {(existingImages || []).map(img => (
-                <div key={img.id} style={thumbWrapStyle}>
-                  <img
-                    src={img.url}
-                    alt=""
-                    onError={(e) => { e.currentTarget.src = PLACEHOLDER_IMG; }}
-                    style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '6px', border: '1px solid #e3e8ef' }}
-                  />
-                  <button
-                    type="button"
-                    disabled={deletingImageId === img.id}
-                    onClick={() => onDeleteExistingImage(img.id)}
-                    title="Xoá ảnh này"
-                    style={{ ...badgeStyle('#dc2626'), cursor: deletingImageId === img.id ? 'default' : 'pointer', opacity: deletingImageId === img.id ? 0.6 : 1 }}
-                  >
-                    <X size={12} />
-                  </button>
-                </div>
-              ))}
-              {(galleryUrls || []).map((url, idx) => (
-                <div key={`url-${idx}`} style={thumbWrapStyle}>
-                  <img
-                    src={url}
-                    alt=""
-                    onError={(e) => { e.currentTarget.src = PLACEHOLDER_IMG; }}
-                    style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '6px', border: '1px solid #93c5fd' }}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => onRemoveGalleryUrl && onRemoveGalleryUrl(idx)}
-                    title="Bỏ URL này"
-                    style={badgeStyle('#dc2626')}
-                  >
-                    <X size={12} />
-                  </button>
-                </div>
-              ))}
-              {(pendingFiles || []).map((file, idx) => (
-                <div key={`pending-${idx}`} style={thumbWrapStyle}>
-                  <img
-                    src={URL.createObjectURL(file)}
-                    alt=""
-                    onError={(e) => { e.currentTarget.src = PLACEHOLDER_IMG; }}
-                    style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '6px', border: '1px solid #93c5fd' }}
-                  />
-                  <button type="button" onClick={() => onRemovePendingFile(idx)} title="Bỏ ảnh này" style={badgeStyle('#475569')}>
-                    <X size={12} />
-                  </button>
-                </div>
-              ))}
-              {totalGalleryCount < MAX_GALLERY_IMAGES && (
-                <label
-                  htmlFor="product-gallery-input"
-                  title="Tải tệp ảnh phụ từ máy"
-                  style={{
-                    flexShrink: 0, width: GALLERY_THUMB_SIZE, height: GALLERY_THUMB_SIZE, borderRadius: '6px', border: '2px dashed #cbd5e1',
-                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', backgroundColor: '#f8fafc'
-                  }}
-                >
-                  <Plus size={18} style={{ color: '#94a3b8' }} />
-                  <span style={{ fontSize: '0.68rem', color: '#94a3b8', marginTop: '2px' }}>Tệp máy</span>
-                </label>
-              )}
-            </div>
-            <input
-              id="product-gallery-input"
-              type="file"
-              accept="image/jpeg,image/png,image/webp,image/gif"
-              multiple
-              onChange={(e) => { if (e.target.files?.length) onAddFiles(e.target.files); e.target.value = ''; }}
-              style={{ display: 'none' }}
-            />
-            <div style={{ fontSize: '0.74rem', fontWeight: 600, color: '#64748b', marginTop: '0.4rem' }}>
-              Ảnh Phụ ({totalGalleryCount}/{MAX_GALLERY_IMAGES})
-            </div>
+          </div>
+          <input
+            id="product-gallery-input"
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/gif"
+            multiple
+            onChange={(e) => { if (e.target.files?.length) onAddFiles(e.target.files); e.target.value = ''; }}
+            style={{ display: 'none' }}
+          />
+          <div style={{ fontSize: '0.74rem', fontWeight: 600, color: '#64748b', marginTop: '0.4rem' }}>
+            Ảnh Phụ ({totalGalleryCount}/{MAX_GALLERY_IMAGES})
           </div>
         </div>
       </div>
@@ -3447,10 +3364,8 @@ export default function Warehouse() {
     location: 'ZONE-A/SHELF-01/BIN-01',
     available: true,
     description: '',
-    imageUrl: '',
     imageFile: null,
     imageFiles: [],
-    galleryUrls: [],
     specs: {}
   });
 
@@ -3461,8 +3376,6 @@ export default function Warehouse() {
       brand: p.brand || '',
       warranty: p.warranty || '36 tháng',
       specs: (typeof p.specs === 'object' && p.specs !== null) ? p.specs : {},
-      imageUrl: (typeof p.image === 'string' && (p.image.startsWith('http://') || p.image.startsWith('https://'))) ? p.image : '',
-      galleryUrls: [],
       imageFile: null,
       imageFiles: []
     });
@@ -4039,8 +3952,6 @@ export default function Warehouse() {
         originalPrice: origVal,
         available: newProdForm.available !== false,
         description: newProdForm.description || '',
-        imageUrl: newProdForm.imageUrl?.trim() || '',
-        galleryUrls: newProdForm.galleryUrls || [],
         specs: newProdForm.specs || {},
         ...(newProdForm.imageFile && { imageFile: newProdForm.imageFile }),
         ...(newProdForm.imageFiles?.length > 0 && { imageFiles: newProdForm.imageFiles }),
@@ -4051,7 +3962,7 @@ export default function Warehouse() {
       setNewProdForm({
         name: '', category: 'CPU', brand: '', warranty: '36 tháng', stock: '', price: '', originalPrice: '',
         supplier: 'Intel Vietnam', supplierCode: '', threshold: '5', location: 'ZONE-A/SHELF-01/BIN-01',
-        available: true, description: '', imageUrl: '', imageFile: null, imageFiles: [], galleryUrls: [], specs: {}
+        available: true, description: '', imageFile: null, imageFiles: [], specs: {}
       });
       notify(`Đã thêm sản phẩm ${newProdForm.name.trim()} vào cơ sở dữ liệu thành công!`, 'success');
     } catch (err) {
@@ -4085,8 +3996,6 @@ export default function Warehouse() {
       threshold: editingProd.threshold !== undefined ? (parseInt(editingProd.threshold, 10) || 5) : 5,
       available: editingProd.available !== false,
       description: editingProd.description || '',
-      imageUrl: editingProd.imageUrl?.trim() || '',
-      galleryUrls: editingProd.galleryUrls || [],
       specs: editingProd.specs || {},
       ...(editingProd.imageFile && { imageFile: editingProd.imageFile }),
       ...(editingProd.imageFiles?.length > 0 && { imageFiles: editingProd.imageFiles }),
@@ -7710,16 +7619,11 @@ export default function Warehouse() {
                 <ProductGalleryField
                   coverFile={newProdForm.imageFile}
                   coverUrl={null}
-                  coverImageUrl={newProdForm.imageUrl}
-                  onCoverImageUrlChange={(url) => setNewProdForm({ ...newProdForm, imageUrl: url })}
                   onCoverSelect={(file) => setNewProdForm({ ...newProdForm, imageFile: file })}
                   existingImages={[]}
                   pendingFiles={newProdForm.imageFiles || []}
-                  galleryUrls={newProdForm.galleryUrls || []}
-                  onAddGalleryUrl={(url) => setNewProdForm({ ...newProdForm, galleryUrls: [...(newProdForm.galleryUrls || []), url] })}
-                  onRemoveGalleryUrl={(idx) => setNewProdForm({ ...newProdForm, galleryUrls: (newProdForm.galleryUrls || []).filter((_, i) => i !== idx) })}
                   onAddFiles={(fileList) => {
-                    const room = MAX_GALLERY_IMAGES - (newProdForm.imageFiles || []).length - (newProdForm.galleryUrls || []).length;
+                    const room = MAX_GALLERY_IMAGES - (newProdForm.imageFiles || []).length;
                     setNewProdForm({ ...newProdForm, imageFiles: [...(newProdForm.imageFiles || []), ...Array.from(fileList).slice(0, room)] });
                   }}
                   onRemovePendingFile={(idx) => setNewProdForm({ ...newProdForm, imageFiles: (newProdForm.imageFiles || []).filter((_, i) => i !== idx) })}
@@ -7986,16 +7890,11 @@ export default function Warehouse() {
                   <ProductGalleryField
                     coverFile={editingProd.imageFile}
                     coverUrl={editingProd.image}
-                    coverImageUrl={editingProd.imageUrl}
-                    onCoverImageUrlChange={(url) => setEditingProd({ ...editingProd, imageUrl: url })}
                     onCoverSelect={(file) => setEditingProd({ ...editingProd, imageFile: file })}
                     existingImages={editingProd.gallery || []}
                     pendingFiles={editingProd.imageFiles || []}
-                    galleryUrls={editingProd.galleryUrls || []}
-                    onAddGalleryUrl={(url) => setEditingProd({ ...editingProd, galleryUrls: [...(editingProd.galleryUrls || []), url] })}
-                    onRemoveGalleryUrl={(idx) => setEditingProd({ ...editingProd, galleryUrls: (editingProd.galleryUrls || []).filter((_, i) => i !== idx) })}
                     onAddFiles={(fileList) => {
-                      const room = MAX_GALLERY_IMAGES - (editingProd.gallery || []).length - (editingProd.imageFiles || []).length - (editingProd.galleryUrls || []).length;
+                      const room = MAX_GALLERY_IMAGES - (editingProd.gallery || []).length - (editingProd.imageFiles || []).length;
                       setEditingProd({ ...editingProd, imageFiles: [...(editingProd.imageFiles || []), ...Array.from(fileList).slice(0, room)] });
                     }}
                     onRemovePendingFile={(idx) => setEditingProd({ ...editingProd, imageFiles: (editingProd.imageFiles || []).filter((_, i) => i !== idx) })}

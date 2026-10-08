@@ -8,6 +8,7 @@ const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
 const { errorMiddleware } = require('./middlewares/error.middleware');
 const { isMaintenanceMode } = require('./services/maintenanceMode');
 const { UPLOAD_DIR } = require('./middlewares/upload.middleware');
+const { getProductImageBlob } = require('./controllers/product.controller');
 
 const app = express();
 
@@ -21,10 +22,12 @@ app.use(cors({
   credentials: true // Allow credentials (cookies)
 }));
 
-// Uploaded product photos (Kho's Add/Edit Product form — see upload.middleware.js).
-// Mounted at /api/uploads (not /uploads) so it rides the frontend's existing /api Vite
-// proxy without needing a second proxy rule; kept outside /api/v1 so it isn't subject
-// to apiLimiter or the maintenance-mode write-lock, since it's just static file reads.
+// Uploaded product photos:
+// 1. Dữ liệu ảnh lưu trực tiếp trong PostgreSQL (bảng product_image_blobs) -> không bao giờ bị mất
+app.get('/api/uploads/products/blobs/:id', getProductImageBlob);
+app.get('/api/v1/products/blobs/:id', getProductImageBlob);
+
+// 2. Tệp ảnh tĩnh cục bộ (nếu có)
 app.use('/api/uploads/products', express.static(UPLOAD_DIR));
 
 // Rate limiting: a tight limit on auth endpoints (brute-force/credential

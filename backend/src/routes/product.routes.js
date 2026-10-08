@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { getProducts, getProductById, getAIRecommendations, getBestSellers, getPersonalizedRecommendations, getProductReviews, addProductReview, createProduct, updateProduct, updateProductVisibility, deleteProductImage, deleteProduct } = require('../controllers/product.controller');
+const { getProducts, getProductById, getAIRecommendations, getBestSellers, getPersonalizedRecommendations, getProductReviews, addProductReview, createProduct, updateProduct, updateProductVisibility, deleteProductImage, deleteProduct, getProductImageBlob } = require('../controllers/product.controller');
 const { authMiddleware, optionalAuthMiddleware } = require('../middlewares/auth.middleware');
 const { uploadProductImage } = require('../middlewares/upload.middleware');
 
@@ -8,9 +8,13 @@ const { uploadProductImage } = require('../middlewares/upload.middleware');
 // @desc    Query products list with pagination & filters
 router.get('/', getProducts);
 
-// Các route path cố định (best-sellers, personalized) PHẢI khai báo TRƯỚC
+// Các route path cố định (best-sellers, personalized, blobs) PHẢI khai báo TRƯỚC
 // route động '/:id' bên dưới — Express khớp theo thứ tự đăng ký, nếu để sau
-// thì '/:id' sẽ "nuốt" mất, coi "best-sellers"/"personalized" như 1 productId.
+// thì '/:id' sẽ "nuốt" mất, coi "best-sellers"/"personalized"/"blobs" như 1 productId.
+
+// @route   GET /api/v1/products/blobs/:id
+// @desc    Serve product image binary directly from PostgreSQL database
+router.get('/blobs/:id', getProductImageBlob);
 
 // @route   GET /api/v1/products/best-sellers
 // @desc    Top sản phẩm bán chạy thật (tính từ OrderItem, không phải số giả)

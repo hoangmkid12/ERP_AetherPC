@@ -352,16 +352,14 @@ export default function Cart() {
 
   const handleQrPaid = (paymentData) => {
     addNotification(`Thanh toán thành công cho đơn hàng #${qrModalOrder?.orderId}!`, 'success', '/my-orders');
-    setTimeout(() => {
-      if (qrModalOrder) {
-        setInvoice({
-          ...qrModalOrder,
-          isPaid: true,
-          paidData: paymentData,
-        });
-        setQrModalOrder(null);
-      }
-    }, 1200);
+    if (qrModalOrder) {
+      setInvoice({
+        ...qrModalOrder,
+        isPaid: true,
+        paidData: paymentData,
+      });
+      setQrModalOrder(null);
+    }
   };
 
   const handleCloseQrModal = () => {

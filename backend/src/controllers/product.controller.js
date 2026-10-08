@@ -483,9 +483,22 @@ const createProduct = async (req, res, next) => {
       parsedSpecs['Bảo hành'] = warrantyStr;
     }
 
-    const coverFile = req.files?.image?.[0];
-    const directCover = (imageUrl || req.body.primaryImage) ? String(imageUrl || req.body.primaryImage).trim() : null;
-    const resolvedCover = coverFile ? `/api/uploads/products/${coverFile.filename}` : directCover;
+    let resolvedCover = directCover;
+    if (coverFile) {
+      if (coverFile.buffer) {
+        const blob = await prisma.productImageBlob.create({
+          data: {
+            filename: String(coverFile.originalname || 'cover.jpg').slice(0, 255),
+            mimeType: coverFile.mimetype || 'image/jpeg',
+            size: coverFile.size || coverFile.buffer.length,
+            data: coverFile.buffer
+          }
+        });
+        resolvedCover = `/api/v1/products/blobs/${blob.id}`;
+      } else if (coverFile.filename) {
+        resolvedCover = `/api/uploads/products/${coverFile.filename}`;
+      }
+    }
 
     const galleryFiles = req.files?.images || [];
     let parsedGalleryUrls = [];
@@ -500,8 +513,26 @@ const createProduct = async (req, res, next) => {
         parsedGalleryUrls = galleryUrls.split(',').map(u => u.trim()).filter(Boolean);
       }
     }
+
+    const savedGalleryUrls = [];
+    for (const file of galleryFiles) {
+      if (file.buffer) {
+        const blob = await prisma.productImageBlob.create({
+          data: {
+            filename: String(file.originalname || 'gallery.jpg').slice(0, 255),
+            mimeType: file.mimetype || 'image/jpeg',
+            size: file.size || file.buffer.length,
+            data: file.buffer
+          }
+        });
+        savedGalleryUrls.push(`/api/v1/products/blobs/${blob.id}`);
+      } else if (file.filename) {
+        savedGalleryUrls.push(`/api/uploads/products/${file.filename}`);
+      }
+    }
+
     const allGalleryItems = [
-      ...galleryFiles.map(file => `/api/uploads/products/${file.filename}`),
+      ...savedGalleryUrls,
       ...parsedGalleryUrls
     ];
 
@@ -646,9 +677,22 @@ const updateProduct = async (req, res, next) => {
     }
 
     // Cover image
-    const coverFile = req.files?.image?.[0];
-    const directCover = (imageUrl || req.body.primaryImage) ? String(imageUrl || req.body.primaryImage).trim() : undefined;
-    const resolvedCover = coverFile ? `/api/uploads/products/${coverFile.filename}` : directCover;
+    let resolvedCover = directCover;
+    if (coverFile) {
+      if (coverFile.buffer) {
+        const blob = await prisma.productImageBlob.create({
+          data: {
+            filename: String(coverFile.originalname || 'cover.jpg').slice(0, 255),
+            mimeType: coverFile.mimetype || 'image/jpeg',
+            size: coverFile.size || coverFile.buffer.length,
+            data: coverFile.buffer
+          }
+        });
+        resolvedCover = `/api/v1/products/blobs/${blob.id}`;
+      } else if (coverFile.filename) {
+        resolvedCover = `/api/uploads/products/${coverFile.filename}`;
+      }
+    }
 
     // Gallery images
     const galleryFiles = req.files?.images || [];
@@ -664,8 +708,26 @@ const updateProduct = async (req, res, next) => {
         parsedGalleryUrls = galleryUrls.split(',').map(u => u.trim()).filter(Boolean);
       }
     }
+
+    const savedNewGalleryUrls = [];
+    for (const file of galleryFiles) {
+      if (file.buffer) {
+        const blob = await prisma.productImageBlob.create({
+          data: {
+            filename: String(file.originalname || 'gallery.jpg').slice(0, 255),
+            mimeType: file.mimetype || 'image/jpeg',
+            size: file.size || file.buffer.length,
+            data: file.buffer
+          }
+        });
+        savedNewGalleryUrls.push(`/api/v1/products/blobs/${blob.id}`);
+      } else if (file.filename) {
+        savedNewGalleryUrls.push(`/api/uploads/products/${file.filename}`);
+      }
+    }
+
     const allNewGalleryItems = [
-      ...galleryFiles.map(file => `/api/uploads/products/${file.filename}`),
+      ...savedNewGalleryUrls,
       ...parsedGalleryUrls
     ];
 
@@ -786,6 +848,14 @@ const deleteProductImage = async (req, res, next) => {
     if (image.url && image.url.startsWith('/api/uploads/products/')) {
       fs.unlink(path.join(UPLOAD_DIR, path.basename(image.url)), () => {});
     }
+    if (image.url && image.url.includes('/api/v1/products/blobs/')) {
+      const match = image.url.match(/\/api\/v1\/products\/blobs\/(\d+)/);
+      if (match && match[1]) {
+        try {
+          await prisma.productImageBlob.delete({ where: { id: parseInt(match[1], 10) } });
+        } catch (_) {}
+      }
+    }
 
     res.json({ success: true, message: 'Đã xoá ảnh.' });
   } catch (err) {
@@ -806,4 +876,30 @@ const deleteProduct = async (req, res, next) => {
   }
 };
 
-Object.assign(module.exports, { createProduct, updateProduct, updateProductVisibility, deleteProductImage, deleteProduct });
+// GET /api/v1/products/blobs/:id
+// Phục vụ dữ liệu ảnh trực tiếp từ CSDL PostgreSQL (bảng product_image_blobs)
+// Đảm bảo không bao giờ bị mất hoặc 404 khi container khởi động lại
+const getProductImageBlob = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (!id || isNaN(id)) {
+      return res.status(404).json({ success: false, message: 'Ảnh không tồn tại' });
+    }
+    const blob = await prisma.productImageBlob.findUnique({
+      where: { id }
+    });
+    if (!blob || !blob.data) {
+      return res.status(404).json({ success: false, message: 'Ảnh không tồn tại' });
+    }
+    res.setHeader('Content-Type', blob.mimeType || 'image/jpeg');
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    res.setHeader('Content-Length', blob.size || blob.data.length);
+    res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(blob.filename || 'image.jpg')}"`);
+    return res.end(blob.data);
+  } catch (err) {
+    console.error('Lỗi khi tải ảnh từ CSDL:', err);
+    return res.status(500).json({ success: false, message: 'Lỗi khi tải ảnh từ CSDL' });
+  }
+};
+
+Object.assign(module.exports, { createProduct, updateProduct, updateProductVisibility, deleteProductImage, deleteProduct, getProductImageBlob });

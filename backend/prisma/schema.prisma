@@ -1291,3 +1291,14 @@ model AiFeedback {
   @@index([userId, chatLogId])
   @@map("ai_feedback")
 }
+
+model ProductImageBlob {
+  id        Int      @id @default(autoincrement())
+  filename  String   @db.VarChar(255)
+  mimeType  String   @map("mime_type") @db.VarChar(100)
+  size      Int
+  data      Bytes
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  @@map("product_image_blobs")
+}
