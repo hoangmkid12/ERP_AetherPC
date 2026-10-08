@@ -115,9 +115,11 @@ export default function SepayPayment({ orderId, onPaid, compact = false }) {
   return (
     <div className={`sf-sepay${compact ? ' is-compact' : ''}`}>
       <div className="sf-sepay-qr">
-        <div className="cap"><QrCode size={15} /> Quét mã bằng app ngân hàng</div>
+        <div className="cap" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', textAlign: 'center', lineHeight: 1.3 }}>
+          <QrCode size={16} style={{ flexShrink: 0 }} />
+          <span>Quét mã bằng<br />app ngân hàng</span>
+        </div>
         <img src={info.qrUrl} alt={`Mã VietQR thanh toán đơn ${info.orderId}`} width="220" height="220" />
-        <div className="hint">Số tiền và nội dung đã được điền sẵn</div>
       </div>
 
       <div className="sf-sepay-info">

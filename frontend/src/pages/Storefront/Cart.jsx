@@ -1325,7 +1325,7 @@ export default function Cart() {
             <div style={{
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'space-between',
+              justifyContent: 'flex-end',
               flexWrap: 'wrap',
               gap: '0.75rem',
               paddingTop: '1rem',
@@ -1333,9 +1333,6 @@ export default function Cart() {
               fontSize: '0.82rem',
               color: '#64748b'
             }}>
-              <div>
-                💡 <em>Hệ thống tự động kiểm tra trạng thái chuyển khoản mỗi vài giây.</em>
-              </div>
               <button
                 type="button"
                 onClick={handleCloseQrModal}
