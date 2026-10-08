@@ -2,6 +2,7 @@ import React from 'react';
 import { Printer, X, CheckCircle2, Truck, Calendar, Building2, FileCheck } from 'lucide-react';
 import { printDocument } from '../utils/printDocument';
 import { formatCurrencyInWords } from '../utils/numberToWords';
+import { HandSignature, historySigner, signatureCode } from './Signature/ESignature';
 
 export default function SupplierConfirmationModal({ order, onClose }) {
   if (!order) return null;
@@ -322,31 +323,24 @@ export default function SupplierConfirmationModal({ order, onClose }) {
                     ĐẠI DIỆN NHÀ CUNG CẤP XÁC NHẬN
                   </strong>
                   <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '0.15rem' }}>
-                    (Ký số điện tử & cam kết thực hiện)
+                    (Ký điện tử & cam kết thực hiện)
                   </div>
 
-                  <div style={{ minHeight: '62px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0.35rem auto' }}>
-                    <div style={{
-                      border: '1.5px dashed #059669',
-                      borderRadius: '8px',
-                      backgroundColor: '#ecfdf5',
-                      padding: '0.4rem 1.1rem',
-                      display: 'inline-block',
-                      minWidth: '200px',
-                      maxWidth: '280px',
-                      boxSizing: 'border-box'
-                    }}>
-                      <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#047857', letterSpacing: '0.3px' }}>
-                        ✓ ĐÃ XÁC NHẬN ĐIỆN TỬ
+                  {(() => {
+                    const confirmed = historySigner(order, ['CONFIRMED_BY_SUPPLIER']);
+                    const at = confirmed.at || order.updatedAt;
+                    return (
+                      <div style={{ margin: '0.35rem auto 0' }}>
+                        <div style={{ height: 78, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <HandSignature name={supplierName} color="#334155" />
+                        </div>
+                        <div style={{ fontSize: '0.6rem', color: '#64748b', lineHeight: 1.35 }}>
+                          <div>Ký điện tử · {formatDateTime(at || new Date())}</div>
+                          <div>Mã xác thực: {signatureCode(order.poNumber || order.code, supplierName, at)}</div>
+                        </div>
                       </div>
-                      <div style={{ fontSize: '0.79rem', fontWeight: 700, color: '#0f172a', marginTop: '2px', wordBreak: 'break-word' }}>
-                        {supplierName}
-                      </div>
-                      <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '2px' }}>
-                        Thời gian: {formatDateTime(order.updatedAt || new Date())}
-                      </div>
-                    </div>
-                  </div>
+                    );
+                  })()}
 
                   <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#0f172a', marginTop: '3px' }}>
                     {supplierName}

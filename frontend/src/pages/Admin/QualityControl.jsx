@@ -30,6 +30,7 @@ import {
 import { printDocument } from '../../utils/printDocument';
 import SupplierConfirmationModal from '../../components/SupplierConfirmationModal';
 import DateRangeFilter, { isDateInRange } from '../../components/Common/DateRangeFilter';
+import { SignatureRow, SignatureCell, displaySigner, historySigner } from '../../components/Signature/ESignature';
 
 // Register ChartJS modules
 ChartJS.register(
@@ -1466,7 +1467,8 @@ export default function QualityControl() {
                                     setViewingLog({
                                       ...log,
                                       items: (log.items && log.items.length > 0) ? log.items : poItems,
-                                      productName: log.productName || primaryName
+                                      productName: log.productName || primaryName,
+                                      poRecord: po
                                     });
                                   } else {
                                     const totalQty = poItems.reduce((s, i) => s + (parseInt(i.quantity) || 1), 0) || po.quantity || 1;
@@ -1477,14 +1479,17 @@ export default function QualityControl() {
                                     // receipts[].qcInspections[]) trước khi phải đoán.
                                     const dbInsp = (po.receipts || []).flatMap(r => r.qcInspections || [])[0];
                                     const hasDbInsp = dbInsp && Number.isFinite(dbInsp.passedQuantity);
-                                    const guessedPassed = isRejected ? 0 : (isPartial ? Math.max(1, totalQty - 2) : totalQty);
-                                    const guessedFailed = isRejected ? totalQty : (isPartial ? 2 : 0);
+                                    // Không có biên bản trong DB: chỉ dùng số liệu đơn đang lưu, không tự đặt số lượng lỗi.
+                                    const guessedPassed = Number.isFinite(Number(po.passedQty)) && po.passedQty !== null ? Number(po.passedQty) : (isRejected ? 0 : totalQty);
+                                    const guessedFailed = Number.isFinite(Number(po.failedQty)) && po.failedQty !== null ? Number(po.failedQty) : (isRejected ? totalQty : 0);
                                     setViewingLog({
                                       id: `QA-LOG-${targetPoNum}`,
                                       type: 'INBOUND_PO',
                                       poNumber: targetPoNum,
                                       supplierName: po.supplier?.name || po.supplierCode || po.supplierName || 'Nhà Cung Cấp',
-                                      inspector: dbInsp?.inspector?.fullName || user?.fullname || 'Chuyên viên QA/QC',
+                                      inspector: dbInsp?.inspector?.fullName || '',
+                                      inspectedAt: dbInsp?.inspectedAt || null,
+                                      poRecord: po,
                                       date: dbInsp?.inspectedAt ? new Date(dbInsp.inspectedAt).toLocaleDateString('vi-VN') : (po.createdAt ? new Date(po.createdAt).toLocaleDateString('vi-VN') : new Date().toLocaleDateString('vi-VN')),
                                       totalQty: totalQty,
                                       passedQty: hasDbInsp ? dbInsp.passedQuantity : guessedPassed,
@@ -3438,102 +3443,23 @@ export default function QualityControl() {
                     </div>
                   </div>
 
-                  {/* Section 4: Signatures Block (Dùng table 3 cột 33.33% song song tuyệt đối trên 1 trang A4) */}
-                  <table style={{ width: '100%', borderCollapse: 'collapse', border: 'none', marginTop: '0.3rem', borderTop: '1px dashed #cbd5e1', paddingTop: '0.5rem' }}>
-                    <tbody>
-                      <tr>
-                        {/* CỘT 1: ĐẠI DIỆN GIAO HÀNG (NCC) */}
-                        <td style={{ width: '33.33%', textAlign: 'center', verticalAlign: 'top', padding: '0.35rem 0.25rem 0' }}>
-                          <strong style={{ fontSize: '0.79rem', color: '#0f172a', display: 'block' }}>ĐẠI DIỆN GIAO HÀNG (NCC)</strong>
-                          <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '0.1rem' }}>(Ký, ghi rõ họ tên)</div>
-                          <div style={{ minHeight: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0.2rem auto' }}>
-                            <div style={{
-                              border: '1.5px dashed #64748b',
-                              borderRadius: '6px',
-                              backgroundColor: '#f8fafc',
-                              padding: '0.2rem 0.45rem',
-                              width: '100%',
-                              maxWidth: '160px',
-                              boxSizing: 'border-box'
-                            }}>
-                              <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', letterSpacing: '0.2px' }}>
-                                ✓ ĐÃ BÀN GIAO HÀNG
-                              </div>
-                              <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#0f172a', marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                {viewingLog.supplierName || 'Đại diện NCC'}
-                              </div>
-                              <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '1px' }}>
-                                {viewingLog.date}
-                              </div>
-                            </div>
-                          </div>
-                          <div style={{ fontSize: '0.79rem', fontWeight: 700, color: '#0f172a', marginTop: '2px' }}>
-                            {viewingLog.supplierName || 'Đại diện NCC'}
-                          </div>
-                        </td>
-
-                        {/* CỘT 2: KIỂM ĐỊNH VIÊN QA/QC */}
-                        <td style={{ width: '33.33%', textAlign: 'center', verticalAlign: 'top', padding: '0.35rem 0.25rem 0' }}>
-                          <strong style={{ fontSize: '0.79rem', color: '#0f172a', display: 'block' }}>KIỂM ĐỊNH VIÊN QA/QC</strong>
-                          <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '0.1rem' }}>(Ký, ghi rõ họ tên)</div>
-                          <div style={{ minHeight: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0.2rem auto' }}>
-                            <div style={{
-                              border: isRejected ? '1.5px dashed #dc2626' : '1.5px dashed #2563eb',
-                              borderRadius: '6px',
-                              backgroundColor: isRejected ? '#fef2f2' : '#eff6ff',
-                              padding: '0.2rem 0.45rem',
-                              width: '100%',
-                              maxWidth: '160px',
-                              boxSizing: 'border-box'
-                            }}>
-                              <div style={{ fontSize: '0.72rem', fontWeight: 800, color: isRejected ? '#dc2626' : '#1d4ed8', letterSpacing: '0.2px' }}>
-                                {isRejected ? '✓ ĐÃ LẬP BIÊN BẢN LỖI' : '✓ ĐÃ KÝ SỐ (ĐẠT CHUẨN)'}
-                              </div>
-                              <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#0f172a', marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                {viewingLog.inspector || 'Kiểm Định Viên QA/QC'}
-                              </div>
-                              <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '1px' }}>
-                                {viewingLog.date}
-                              </div>
-                            </div>
-                          </div>
-                          <div style={{ fontSize: '0.79rem', fontWeight: 700, color: '#2563eb', marginTop: '2px' }}>
-                            {viewingLog.inspector || 'Kiểm Định Viên QA/QC'}
-                          </div>
-                        </td>
-
-                        {/* CỘT 3: THỦ KHO TIẾP NHẬN */}
-                        <td style={{ width: '33.33%', textAlign: 'center', verticalAlign: 'top', padding: '0.35rem 0.25rem 0' }}>
-                          <strong style={{ fontSize: '0.79rem', color: '#0f172a', display: 'block' }}>THỦ KHO TIẾP NHẬN</strong>
-                          <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '0.1rem' }}>(Ký, ghi rõ họ tên)</div>
-                          <div style={{ minHeight: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0.2rem auto' }}>
-                            <div style={{
-                              border: '1.5px dashed #059669',
-                              borderRadius: '6px',
-                              backgroundColor: '#ecfdf5',
-                              padding: '0.2rem 0.45rem',
-                              width: '100%',
-                              maxWidth: '160px',
-                              boxSizing: 'border-box'
-                            }}>
-                              <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#047857', letterSpacing: '0.2px' }}>
-                                ✓ ĐÃ TIẾP NHẬN KHO
-                              </div>
-                              <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#0f172a', marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                Thủ Kho AetherPC
-                              </div>
-                              <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '1px' }}>
-                                {viewingLog.date}
-                              </div>
-                            </div>
-                          </div>
-                          <div style={{ fontSize: '0.79rem', fontWeight: 700, color: '#0f172a', marginTop: '2px' }}>
-                            Thủ Kho AetherPC
-                          </div>
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
+                  {/* Chữ ký điện tử 3 bên — kiểm định viên và thủ kho thật, lấy từ biên bản và lịch sử đơn mua */}
+                  {(() => {
+                    const poRec = viewingLog.poRecord || (orders || []).find(o => matchesPoRef(o.poNumber, viewingLog.poNumber) || String(o.id) === String(viewingLog.poNumber));
+                    const keeper = historySigner(poRec, ['RECEIVED', 'DONE']);
+                    const at = viewingLog.inspectedAt || viewingLog.date;
+                    const supplier = viewingLog.supplierName && !['Nhà Cung Cấp', 'Đại diện NCC'].includes(viewingLog.supplierName) ? viewingLog.supplierName : '';
+                    return (
+                      <SignatureRow>
+                        <SignatureCell title="Đại diện giao hàng (NCC)" name={supplier} signedAt={at} docRef={viewingLog.poNumber} result="Đã bàn giao" color="#334155" />
+                        <SignatureCell title="Kiểm định viên QA/QC" name={viewingLog.inspector} signedAt={at} docRef={viewingLog.poNumber}
+                          result={isRejected ? 'Không đạt' : (viewingLog.status === 'QA_PARTIAL' || viewingLog.decision === 'ACCEPT_PARTIAL') ? 'Đạt một phần' : 'Đạt'}
+                          color={isRejected ? '#b91c1c' : undefined} />
+                        <SignatureCell title="Thủ kho tiếp nhận" name={keeper.name} signedAt={keeper.at} signed={!isRejected && !!keeper.name}
+                          seal sealLabel="ĐÃ NHẬP KHO" docRef={viewingLog.poNumber} pendingText={isRejected ? 'Không nhập kho' : 'Chờ nhập kho'} />
+                      </SignatureRow>
+                    );
+                  })()}
 
                   {/* Dòng ghi chú chân trang biên bản điện tử */}
                   <div style={{ marginTop: '0.8rem', borderTop: '1px solid #f1f5f9', paddingTop: '0.4rem', fontSize: '0.72rem', color: '#94a3b8', textAlign: 'center', fontStyle: 'italic' }}>

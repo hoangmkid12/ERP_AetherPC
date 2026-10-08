@@ -24,6 +24,7 @@ import {
   getDateFilterLabel,
   getDeliveryIncidentStatus
 } from './deliveryHelpers';
+import { SignatureRow, SignatureCell, displaySigner, historySigner } from '../../../components/Signature/ESignature';
 
 ChartJS.register(
   CategoryScale,
@@ -638,21 +639,12 @@ export default function OverviewTab({
                   </table>
                 </div>
 
-                {/* Signatures */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', marginTop: '1.5rem', textAlign: 'center', fontSize: '0.78rem' }}>
-                  <div>
-                    <strong style={{ display: 'block', color: '#0f172a' }}>NGƯỜI BÀN GIAO (SHIPPER)</strong>
-                    <span style={{ fontSize: '0.75rem', color: '#64748b' }}>(Ký và ghi rõ họ tên)</span>
-                    <div style={{ height: '50px' }} />
-                    <strong style={{ color: '#0f172a' }}>{user?.fullname || user?.name || 'Shipper'}</strong>
-                  </div>
-                  <div>
-                    <strong style={{ display: 'block', color: '#0f172a' }}>NGƯỜI NHẬN TIỀN (THỦ QUỸ / KẾ TOÁN)</strong>
-                    <span style={{ fontSize: '0.75rem', color: '#64748b' }}>(Ký và xác nhận nhận đủ tiền)</span>
-                    <div style={{ height: '50px' }} />
-                    <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>Chờ ký nhận tại quầy</span>
-                  </div>
-                </div>
+                {/* Chữ ký điện tử — nhân viên giao hàng ký khi lập biên bản; kế toán ký khi xác nhận đã nhận đủ tiền tại quầy */}
+                <SignatureRow>
+                  <SignatureCell title="Người bàn giao (shipper)" note="(Ký và ghi rõ họ tên)" name={user?.fullname || user?.name || ''}
+                    signedAt={new Date()} docRef={`BG-COD-${user?.id || ''}-${new Date().toISOString().slice(0, 10)}`} />
+                  <SignatureCell title="Người nhận tiền (thủ quỹ / kế toán)" note="(Ký và xác nhận nhận đủ tiền)" signed={false} pendingText="Chờ ký nhận tại quầy" />
+                </SignatureRow>
               </div>
             </div>
 

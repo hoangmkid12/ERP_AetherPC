@@ -14,6 +14,7 @@ import PackAndScanModal from '../../components/PackAndScanModal';
 import OrderDetailModal from '../../components/OrderDetailModal';
 import { printDocument } from '../../utils/printDocument';
 import { numberToVietnameseWords } from '../../utils/numberToWords';
+import { SignatureRow, SignatureCell, displaySigner, historySigner } from '../../components/Signature/ESignature';
 
 // Nút hành động dùng chung cho bảng "Hoạt Động / Lệnh Giao Hàng" — style cố định
 // để các nút cùng loại (vd "Xem Gói Hàng") luôn thẳng hàng nhau giữa các dòng.
@@ -2128,7 +2129,7 @@ function WarehouseQcCertificateModal({ target, onClose, purchaseOrders = [] }) {
     || receipt?.po?.poNumber 
     || receipt?.poId 
     || receipt?.receiptNumber?.replace('GRN-', '') 
-    || 'PO-260925-4187';
+    || '—';
 
   if (!qaLog) {
     try {
@@ -2205,7 +2206,8 @@ function WarehouseQcCertificateModal({ target, onClose, purchaseOrders = [] }) {
 
   const inspector = target.dbInspection?.inspector?.fullName 
     || qaLog?.inspector 
-    || 'Đặng Văn Kiểm (QA/QC)';
+    || '';
+  const inspectedAt = target.dbInspection?.inspectedAt || qaLog?.inspectedAt || qaLog?.date || null;
 
   const dateStr = target.dbInspection?.inspectedAt
     ? new Date(target.dbInspection.inspectedAt).toLocaleDateString('vi-VN')
@@ -2449,56 +2451,16 @@ function WarehouseQcCertificateModal({ target, onClose, purchaseOrders = [] }) {
               </div>
             </div>
 
-            {/* Signatures Block (3 columns) */}
-            <table style={{ width: '100%', borderCollapse: 'collapse', border: 'none', marginTop: '0.3rem', borderTop: '1px dashed #cbd5e1', paddingTop: '0.5rem' }}>
-              <tbody>
-                <tr>
-                  {/* Column 1: NCC */}
-                  <td style={{ width: '33.33%', textAlign: 'center', verticalAlign: 'top', padding: '0.35rem 0.25rem 0' }}>
-                    <strong style={{ fontSize: '0.79rem', color: '#0f172a', display: 'block' }}>ĐẠI DIỆN GIAO HÀNG (NCC)</strong>
-                    <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '0.1rem' }}>(Ký, ghi rõ họ tên)</div>
-                    <div style={{ minHeight: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0.2rem auto' }}>
-                      <div style={{ border: '1.5px dashed #64748b', borderRadius: '6px', backgroundColor: '#f8fafc', padding: '0.2rem 0.45rem', width: '100%', maxWidth: '160px', boxSizing: 'border-box' }}>
-                        <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', letterSpacing: '0.2px' }}>✓ ĐÃ BÀN GIAO HÀNG</div>
-                        <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#0f172a', marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{supplierName}</div>
-                        <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '1px' }}>{dateStr}</div>
-                      </div>
-                    </div>
-                    <div style={{ fontSize: '0.79rem', fontWeight: 700, color: '#0f172a', marginTop: '2px' }}>{supplierName}</div>
-                  </td>
-
-                  {/* Column 2: QA Inspector */}
-                  <td style={{ width: '33.33%', textAlign: 'center', verticalAlign: 'top', padding: '0.35rem 0.25rem 0' }}>
-                    <strong style={{ fontSize: '0.79rem', color: '#0f172a', display: 'block' }}>KIỂM ĐỊNH VIÊN QA/QC</strong>
-                    <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '0.1rem' }}>(Ký, ghi rõ họ tên)</div>
-                    <div style={{ minHeight: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0.2rem auto' }}>
-                      <div style={{ border: isRejected ? '1.5px dashed #dc2626' : '1.5px dashed #2563eb', borderRadius: '6px', backgroundColor: isRejected ? '#fef2f2' : '#eff6ff', padding: '0.2rem 0.45rem', width: '100%', maxWidth: '160px', boxSizing: 'border-box' }}>
-                        <div style={{ fontSize: '0.72rem', fontWeight: 800, color: isRejected ? '#dc2626' : '#1d4ed8', letterSpacing: '0.2px' }}>
-                          {isRejected ? '✓ ĐÃ LẬP BIÊN BẢN LỖI' : '✓ ĐÃ KÝ SỐ (ĐẠT CHUẨN)'}
-                        </div>
-                        <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#0f172a', marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{inspector}</div>
-                        <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '1px' }}>{dateStr}</div>
-                      </div>
-                    </div>
-                    <div style={{ fontSize: '0.79rem', fontWeight: 700, color: '#2563eb', marginTop: '2px' }}>{inspector}</div>
-                  </td>
-
-                  {/* Column 3: Warehouse Keeper */}
-                  <td style={{ width: '33.33%', textAlign: 'center', verticalAlign: 'top', padding: '0.35rem 0.25rem 0' }}>
-                    <strong style={{ fontSize: '0.79rem', color: '#0f172a', display: 'block' }}>THỦ KHO TIẾP NHẬN</strong>
-                    <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '0.1rem' }}>(Ký, ghi rõ họ tên)</div>
-                    <div style={{ minHeight: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0.2rem auto' }}>
-                      <div style={{ border: '1.5px dashed #059669', borderRadius: '6px', backgroundColor: '#ecfdf5', padding: '0.2rem 0.45rem', width: '100%', maxWidth: '160px', boxSizing: 'border-box' }}>
-                        <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#047857', letterSpacing: '0.2px' }}>✓ ĐÃ TIẾP NHẬN KHO</div>
-                        <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#0f172a', marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Thủ Kho AetherPC</div>
-                        <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '1px' }}>{dateStr}</div>
-                      </div>
-                    </div>
-                    <div style={{ fontSize: '0.79rem', fontWeight: 700, color: '#0f172a', marginTop: '2px' }}>Thủ Kho AetherPC</div>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+            {/* Chữ ký điện tử 3 bên — người ký và thời điểm lấy từ biên bản kiểm định và phiếu nhập thật */}
+            <SignatureRow>
+              <SignatureCell title="Đại diện giao hàng (NCC)" name={supplierName !== 'Chưa xác định nhà cung cấp' ? supplierName : ''}
+                signedAt={inspectedAt} docRef={poNumber} result="Đã bàn giao" color="#334155" />
+              <SignatureCell title="Kiểm định viên QA/QC" name={inspector} signedAt={inspectedAt} docRef={poNumber}
+                result={isRejected ? 'Không đạt' : isPartial ? 'Đạt một phần' : 'Đạt'} color={isRejected ? '#b91c1c' : undefined} />
+              <SignatureCell title="Thủ kho tiếp nhận" name={displaySigner(receipt.receivedBy)} signedAt={receipt.receivedDate}
+                signed={!isRejected && (receipt.status === 'DONE' || !!receipt.receivedDate)} seal sealLabel="ĐÃ NHẬP KHO"
+                docRef={poNumber} pendingText={isRejected ? 'Không nhập kho' : 'Chờ nhập kho'} />
+            </SignatureRow>
           </div>
         </div>
 
@@ -2751,71 +2713,12 @@ function GoodsReceiptSuccessModal({ doc, onClose, formatPrice }) {
                 : 'Lô hàng trên đã được kiểm đếm đủ số lượng thực tế, đối soát đạt chuẩn kỹ thuật 100% từ biên bản QA/QC, các mã Serial đã được ghi nhận vào kho dữ liệu ERP AetherPC và cập nhật tức thì vào sổ cái tồn kho.'}
             </div>
 
-            {/* Signatures block - 3 columns with Warehouse Keeper Official Stamp */}
-            <table style={{ width: '100%', borderCollapse: 'collapse', border: 'none', marginTop: '0.3rem', borderTop: '1px dashed #cbd5e1', paddingTop: '0.5rem' }}>
-              <tbody>
-                <tr>
-                  {/* Column 1: NCC */}
-                  <td style={{ width: '33.33%', textAlign: 'center', verticalAlign: 'top', padding: '0.35rem 0.25rem 0' }}>
-                    <strong style={{ fontSize: '0.79rem', color: '#0f172a', display: 'block' }}>ĐẠI DIỆN GIAO HÀNG (NCC)</strong>
-                    <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '0.1rem' }}>(Ký, ghi rõ họ tên)</div>
-                    <div style={{ minHeight: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0.2rem auto' }}>
-                      <div style={{ border: '1.5px dashed #64748b', borderRadius: '6px', backgroundColor: '#f8fafc', padding: '0.2rem 0.45rem', width: '100%', maxWidth: '170px', boxSizing: 'border-box' }}>
-                        <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', letterSpacing: '0.2px' }}>✓ ĐÃ BÀN GIAO HÀNG</div>
-                        <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#0f172a', marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc.supplierName}</div>
-                        <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '1px' }}>{doc.intakeDate?.split(' ')[1] || doc.intakeDate}</div>
-                      </div>
-                    </div>
-                    <div style={{ fontSize: '0.79rem', fontWeight: 700, color: '#0f172a', marginTop: '2px' }}>{doc.supplierName}</div>
-                  </td>
-
-                  {/* Column 2: QA Inspector */}
-                  <td style={{ width: '33.33%', textAlign: 'center', verticalAlign: 'top', padding: '0.35rem 0.25rem 0' }}>
-                    <strong style={{ fontSize: '0.79rem', color: '#0f172a', display: 'block' }}>QA KIỂM ĐỊNH</strong>
-                    <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '0.1rem' }}>(Ký, ghi rõ họ tên)</div>
-                    <div style={{ minHeight: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0.2rem auto' }}>
-                      <div style={{ border: '1.5px dashed #2563eb', borderRadius: '6px', backgroundColor: '#eff6ff', padding: '0.2rem 0.45rem', width: '100%', maxWidth: '170px', boxSizing: 'border-box' }}>
-                        <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#1d4ed8', letterSpacing: '0.2px' }}>✓ ĐÃ ĐỐI SOÁT ĐẠT CHUẨN</div>
-                        <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#0f172a', marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc.qaInspector}</div>
-                        <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '1px' }}>{doc.intakeDate?.split(' ')[1] || doc.intakeDate}</div>
-                      </div>
-                    </div>
-                    <div style={{ fontSize: '0.79rem', fontWeight: 700, color: '#2563eb', marginTop: '2px' }}>{doc.qaInspector}</div>
-                  </td>
-
-                  {/* Column 3: Warehouse Keeper Signature (CHỮ KÝ THỦ KHO) */}
-                  <td style={{ width: '33.33%', textAlign: 'center', verticalAlign: 'top', padding: '0.35rem 0.25rem 0' }}>
-                    <strong style={{ fontSize: '0.79rem', color: '#0f172a', display: 'block' }}>THỦ KHO</strong>
-                    <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '0.1rem' }}>(Ký, ghi rõ họ tên)</div>
-                    <div style={{ minHeight: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0.2rem auto' }}>
-                      <div style={{
-                        border: '2px solid #059669',
-                        borderRadius: '8px',
-                        backgroundColor: '#ecfdf5',
-                        padding: '0.3rem 0.5rem',
-                        width: '100%',
-                        maxWidth: '185px',
-                        boxSizing: 'border-box',
-                        boxShadow: '0 1px 3px rgba(5,150,105,0.15)'
-                      }}>
-                        <div style={{ fontSize: '0.72rem', fontWeight: 900, color: '#047857', letterSpacing: '0.3px', textTransform: 'uppercase' }}>
-                          ✓ ĐÃ XÁC NHẬN NHẬP KHO
-                        </div>
-                        <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#065f46', marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {cleanStaffName(doc.warehouseStaff)}
-                        </div>
-                        <div style={{ fontSize: '0.7rem', color: '#047857', marginTop: '1px', fontWeight: 600 }}>
-                          {doc.intakeDate}
-                        </div>
-                      </div>
-                    </div>
-                    <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#047857', marginTop: '2px' }}>
-                      {cleanStaffName(doc.warehouseStaff)}
-                    </div>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+            {/* Chữ ký điện tử 3 bên — thủ kho xác nhận nhập kho kèm mộc công ty */}
+            <SignatureRow>
+              <SignatureCell title="Đại diện giao hàng (NCC)" name={doc.supplierName} signedAt={doc.intakeDate} docRef={doc.receiptNumber} result="Đã bàn giao" color="#334155" />
+              <SignatureCell title="QA kiểm định" name={doc.qaInspector} signedAt={doc.intakeDate} docRef={doc.receiptNumber} result={isPartialIntake ? 'Đạt một phần' : 'Đạt'} />
+              <SignatureCell title="Thủ kho" name={cleanStaffName(doc.warehouseStaff)} signedAt={doc.intakeDate} docRef={doc.receiptNumber} seal sealLabel="ĐÃ NHẬP KHO" />
+            </SignatureRow>
           </div>
         </div>
 
@@ -5941,36 +5844,13 @@ export default function Warehouse() {
                     )}
                   </div>
 
-                  {/* Signature blocks — bản in để lưu hồ sơ / trình ký giấy */}
-                  <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px dashed #cbd5e1', tableLayout: 'fixed' }}>
-                    <tbody>
-                      <tr>
-                        <td style={{ width: '50%', textAlign: 'center', padding: '0.5rem 0.5rem 0' }}>
-                          <strong style={{ fontSize: '0.8rem', color: '#0f172a' }}>NGƯỜI ĐỀ XUẤT</strong>
-                        </td>
-                        <td style={{ width: '50%', textAlign: 'center', padding: '0.5rem 0.5rem 0' }}>
-                          <strong style={{ fontSize: '0.8rem', color: '#0f172a' }}>QUẢN LÝ KHO DUYỆT</strong>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td style={{ textAlign: 'center', padding: '0.15rem 0.5rem 0' }}>
-                          <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>(Ký, ghi rõ họ tên)</div>
-                        </td>
-                        <td style={{ textAlign: 'center', padding: '0.15rem 0.5rem 0' }}>
-                          <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>(Ký, ghi rõ họ tên)</div>
-                        </td>
-                      </tr>
-                      <tr style={{ height: '60px' }}><td /><td /></tr>
-                      <tr>
-                        <td style={{ textAlign: 'center', padding: '0 0.5rem 0.5rem' }}>
-                          <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#0f172a' }}>{viewingPR.requestedBy || ''}</div>
-                        </td>
-                        <td style={{ textAlign: 'center', padding: '0 0.5rem 0.5rem' }}>
-                          <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#0f172a' }}>{viewingPR.approvedBy || ''}</div>
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
+                  {/* Chữ ký điện tử — người đề xuất và quản lý kho duyệt */}
+                  <SignatureRow>
+                    <SignatureCell title="Người đề xuất" name={displaySigner(viewingPR.requestedBy)} signedAt={viewingPR.createdAt || viewingPR.requestedAt} docRef={viewingPR.prCode || viewingPR.id} />
+                    <SignatureCell title="Quản lý kho duyệt" name={displaySigner(viewingPR.approvedBy)} signedAt={viewingPR.approvedAt}
+                      signed={!!viewingPR.approvedBy && viewingPR.status !== 'PENDING'} seal={viewingPR.status !== 'REJECTED'} sealLabel="ĐÃ DUYỆT"
+                      result={viewingPR.status === 'REJECTED' ? 'Từ chối' : 'Đã duyệt'} docRef={viewingPR.prCode || viewingPR.id} pendingText="Chờ duyệt" />
+                  </SignatureRow>
                 </div>
 
                 <div className="aetherpc-no-print" style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem', padding: '1.25rem 1.75rem', borderTop: '1px solid #f1f5f9' }}>

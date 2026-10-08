@@ -12,6 +12,7 @@ import { useNavigate } from 'react-router-dom';
 import { formatCurrencyInWords } from '../../utils/numberToWords';
 import { printDocument } from '../../utils/printDocument';
 import SupplierConfirmationModal from '../../components/SupplierConfirmationModal';
+import { SignatureRow, SignatureCell, displaySigner, historySigner } from '../../components/Signature/ESignature';
 
 export default function SupplierPortal() {
   const { user, logout } = useAuth();
@@ -2075,114 +2076,22 @@ export default function SupplierPortal() {
                     </div>
                   </div>
 
-                  {/* Chữ ký 3 bên — DÙNG TABLE 3 CỘT ĐẢM BẢO 100% LUÔN THẲNG HÀNG NGANG */}
-                  <table style={{ width: '100%', borderCollapse: 'collapse', border: 'none', marginTop: '0.45rem', borderTop: '1px dashed #cbd5e1', paddingTop: '0.45rem' }}>
-                    <tbody>
-                      <tr>
-                        {/* CỘT 1: NGƯỜI LẬP PHIẾU */}
-                        <td style={{ width: '33.33%', textAlign: 'center', verticalAlign: 'top', padding: '0.35rem 0.2rem 0' }}>
-                          <strong style={{ fontSize: '0.72rem', color: '#0f172a', display: 'block' }}>NGƯỜI LẬP PHIẾU</strong>
-                          <div style={{ fontSize: '0.62rem', color: '#94a3b8', marginTop: '0.1rem' }}>(Ký, ghi rõ họ tên)</div>
-                          <div style={{ minHeight: '46px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0.2rem auto' }}>
-                            <div style={{
-                              border: '1.5px dashed #2563eb',
-                              borderRadius: '6px',
-                              backgroundColor: '#eff6ff',
-                              padding: '0.2rem 0.4rem',
-                              width: '100%',
-                              maxWidth: '155px',
-                              boxSizing: 'border-box'
-                            }}>
-                              <div style={{ fontSize: '0.62rem', fontWeight: 800, color: '#1d4ed8', letterSpacing: '0.2px' }}>
-                                ✓ ĐÃ KÝ SỐ
-                              </div>
-                              <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#0f172a', marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                {creatorSignerName}
-                              </div>
-                              <div style={{ fontSize: '0.58rem', color: '#64748b', marginTop: '1px' }}>
-                                {creatorSignDate}
-                              </div>
-                            </div>
-                          </div>
-                          <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#0f172a', marginTop: '2px' }}>{creatorSignerName}</div>
-                        </td>
-
-                        {/* CỘT 2: TRƯỞNG PHÒNG MUA HÀNG */}
-                        <td style={{ width: '33.33%', textAlign: 'center', verticalAlign: 'top', padding: '0.35rem 0.2rem 0' }}>
-                          <strong style={{ fontSize: '0.72rem', color: '#0f172a', display: 'block' }}>TRƯỞNG PHÒNG MUA HÀNG</strong>
-                          <div style={{ fontSize: '0.62rem', color: '#94a3b8', marginTop: '0.1rem' }}>(Ký, ghi rõ họ tên)</div>
-                          <div style={{ minHeight: '46px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0.2rem auto' }}>
-                            <div style={{
-                              border: '1.5px dashed #059669',
-                              borderRadius: '6px',
-                              backgroundColor: '#ecfdf5',
-                              padding: '0.2rem 0.4rem',
-                              width: '100%',
-                              maxWidth: '155px',
-                              boxSizing: 'border-box'
-                            }}>
-                              <div style={{ fontSize: '0.62rem', fontWeight: 800, color: '#047857', letterSpacing: '0.2px' }}>
-                                ✓ ĐÃ KÝ SỐ
-                              </div>
-                              <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#0f172a', marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                Phòng Mua Hàng AetherPC
-                              </div>
-                              <div style={{ fontSize: '0.58rem', color: '#64748b', marginTop: '1px' }}>
-                                {purchasingManagerDate}
-                              </div>
-                            </div>
-                          </div>
-                          <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#0f172a', marginTop: '2px' }}>Phòng Mua Hàng AetherPC</div>
-                        </td>
-
-                        {/* CỘT 3: GIÁM ĐỐC DUYỆT */}
-                        <td style={{ width: '33.33%', textAlign: 'center', verticalAlign: 'top', padding: '0.35rem 0.2rem 0' }}>
-                          <strong style={{ fontSize: '0.72rem', color: '#0f172a', display: 'block' }}>GIÁM ĐỐC DUYỆT</strong>
-                          <div style={{ fontSize: '0.62rem', color: '#94a3b8', marginTop: '0.1rem' }}>(Ký, đóng dấu)</div>
-                          <div style={{ minHeight: '46px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0.2rem auto' }}>
-                            {isCeoApproved ? (
-                              <div style={{
-                                border: '1.5px dashed #dc2626',
-                                borderRadius: '6px',
-                                backgroundColor: '#fef2f2',
-                                padding: '0.2rem 0.4rem',
-                                width: '100%',
-                                maxWidth: '155px',
-                                boxSizing: 'border-box'
-                              }}>
-                                <div style={{ fontSize: '0.62rem', fontWeight: 800, color: '#b91c1c', letterSpacing: '0.2px' }}>
-                                  ✓ ĐÃ KÝ SỐ (PHÊ DUYỆT)
-                                </div>
-                                <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#0f172a', marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                  {ceoSignerName}
-                                </div>
-                                <div style={{ fontSize: '0.58rem', color: '#64748b', marginTop: '1px' }}>
-                                  {ceoSignDate}
-                                </div>
-                              </div>
-                            ) : (
-                              <div style={{
-                                border: '1px dashed #cbd5e1',
-                                borderRadius: '6px',
-                                backgroundColor: '#f8fafc',
-                                padding: '0.25rem 0.4rem',
-                                width: '100%',
-                                maxWidth: '155px',
-                                boxSizing: 'border-box'
-                              }}>
-                                <div style={{ fontSize: '0.64rem', color: '#94a3b8', fontStyle: 'italic' }}>
-                                  {isPendingCeo ? 'Chờ Giám Đốc Phê Duyệt' : 'Chưa Phê Duyệt'}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                          <div style={{ fontSize: '0.72rem', fontWeight: 700, color: isCeoApproved ? '#0f172a' : '#94a3b8', marginTop: '2px' }}>
-                            {isCeoApproved ? ceoSignerName : 'Ban Giám Đốc AetherPC'}
-                          </div>
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
+                  {/* Chữ ký điện tử theo đúng các bước duyệt của đơn mua hàng (lấy từ lịch sử trạng thái) */}
+                  {(() => {
+                    const ceo = historySigner(printPOTarget, ['PO', 'APPROVED']);
+                    const supplierSign = historySigner(printPOTarget, ['CONFIRMED_BY_SUPPLIER']);
+                    const creator = displaySigner(printPOTarget.createdBy) || historySigner(printPOTarget, ['QUOTED_PENDING_CEO', 'PENDING_PO_DRAFT']).name;
+                    const docRef = printPOTarget.poNumber || printPOTarget.id;
+                    return (
+                      <SignatureRow>
+                        <SignatureCell title="Người lập phiếu" name={creator} signedAt={printPOTarget.createdAt} docRef={docRef} />
+                        <SignatureCell title="Nhà cung cấp xác nhận" note="(Ký, đóng dấu)" name={supplierSign.name ? (printPOTarget.supplier?.name || supplierSign.name) : ''}
+                          signedAt={supplierSign.at} docRef={docRef} color="#334155" pendingText={isCeoApproved ? 'Chờ NCC xác nhận' : 'Chưa gửi NCC'} />
+                        <SignatureCell title="Giám đốc duyệt" note="(Ký, đóng dấu)" name={ceo.name} signedAt={ceo.at} signed={isCeoApproved && !!ceo.name}
+                          seal sealLabel="ĐÃ PHÊ DUYỆT" docRef={docRef} pendingText={isPendingCeo ? 'Chờ giám đốc duyệt' : 'Chưa duyệt'} />
+                      </SignatureRow>
+                    );
+                  })()}
                 </div>
               </div>
 
