@@ -15,6 +15,7 @@ import DepartmentPanel from './hr/DepartmentPanel';
 import EmployeeFormModal from './hr/EmployeeFormModal';
 import FaceAdminModal from './hr/FaceAdminModal';
 import DateRangeFilter, { isDateInRange } from '../../components/Common/DateRangeFilter';
+import PeriodFilterBar, { isDateInPeriod } from '../../components/Common/PeriodFilterBar';
 import { 
   Users, UserPlus, CheckCircle, Clock, XCircle, DollarSign, CalendarCheck, 
   Key, Eye, EyeOff, Search, FileEdit, Award, Sparkles, Check, X, Calendar, 
@@ -247,7 +248,13 @@ export default function HRManager() {
     ? Math.round(((presentCount + lateCount) / totalEmployees) * 100)
     : 0;
 
-  const pendingLeavesCount = (leaveRequests || []).filter(r => r && (r.status === 'PENDING' || r.status === 'PENDING_CEO')).length;
+  const [hrPeriod, setHrPeriod] = useState('ALL');
+
+  const leaveRequestsInPeriod = useMemo(() => {
+    return (leaveRequests || []).filter(r => isDateInPeriod(r.startDate || r.createdAt, hrPeriod));
+  }, [leaveRequests, hrPeriod]);
+
+  const pendingLeavesCount = leaveRequestsInPeriod.filter(r => r && (r.status === 'PENDING' || r.status === 'PENDING_CEO')).length;
 
   // Quỹ lương cố định = lương cơ bản + phụ cấp chức vụ + phụ cấp ăn trưa/đi lại của nhân viên đang làm việc.
   const activeEmployees = (employees || []).filter(e => e.status !== 'INACTIVE');
@@ -338,6 +345,10 @@ export default function HRManager() {
             Quản trị nhân sự, theo dõi chấm công, phê duyệt nghỉ phép và tính toán chế độ đãi ngộ
           </p>
         </div>
+
+        {activeTab === 'overview' && (
+          <PeriodFilterBar selectedPeriod={hrPeriod} onSelectPeriod={setHrPeriod} />
+        )}
 
         {activeTab === 'employees' && (
           <button

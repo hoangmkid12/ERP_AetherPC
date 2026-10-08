@@ -14,6 +14,7 @@ import PackAndScanModal from '../../components/PackAndScanModal';
 import OrderDetailModal from '../../components/OrderDetailModal';
 import { printDocument } from '../../utils/printDocument';
 import { numberToVietnameseWords } from '../../utils/numberToWords';
+import PeriodFilterBar, { isDateInPeriod } from '../../components/Common/PeriodFilterBar';
 import { SignatureRow, SignatureCell, displaySigner, historySigner } from '../../components/Signature/ESignature';
 
 // Nút hành động dùng chung cho bảng "Hoạt Động / Lệnh Giao Hàng" — style cố định
@@ -2973,6 +2974,9 @@ export default function Warehouse() {
     setSearchParams({ tab: t });
   };
 
+  // Period Filter for Warehouse Overview Tab
+  const [warehousePeriod, setWarehousePeriod] = useState('ALL');
+
   const { user, isCEO, isWarehouseManager, isWarehouse, isAdmin } = useAuth();
   // Khớp phân quyền đọc ở backend (warehouse.routes.js, purchase.routes.js): vai trò chỉ được xem tồn kho
   // (vd. Quản lý bán hàng) không gọi các API bị từ chối, tránh 403 làm hỏng cả lượt tải dữ liệu.
@@ -4426,94 +4430,104 @@ export default function Warehouse() {
       </div>
 
       {/* 1. VIEW: TỔNG QUAN TỒN KHO */}
-      {activeTab === 'overview' && (
-        <div>
-          <div style={{ marginBottom: '1.25rem' }}>
-            <h2 style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
-              Tổng Quan Tồn Kho
-            </h2>
-          </div>
+      {activeTab === 'overview' && (() => {
+        const receiptsInPeriod = receipts.filter(r => isDateInPeriod(r.receivedDate || r.createdAt || r.date, warehousePeriod));
+        const ordersInPeriod = orders.filter(o => isDateInPeriod(o.createdAt || o.date, warehousePeriod));
 
-          {/* Cards Grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.25rem' }}>
-            
-            {/* Card 1: Phiếu nhập kho */}
-            <div style={{
-              backgroundColor: '#ffffff',
-              borderRadius: '8px',
-              border: '1px solid #e3e8ef',
-              padding: '1.25rem',
-              boxShadow: '0 2px 6px rgba(0,0,0,0.03)',
-              display: 'flex',
-              flexDirection: 'column',
-              justify: 'space-between'
-            }}>
+        return (
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.25rem' }}>
               <div>
-                <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0284c7', margin: '0 0 1rem 0' }}>
-                  Phiếu nhập kho
-                </h3>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <button
-                    onClick={() => setActiveTab('grn')}
-                    style={{
-                      backgroundColor: '#2563eb',
-                      color: '#ffffff',
-                      border: 'none',
-                      borderRadius: '6px',
-                      padding: '0.5rem 1.25rem',
-                      fontSize: '0.88rem',
-                      fontWeight: 700,
-                      cursor: 'pointer'
-                    }}
-                  >
-                    {readyReceipts.length} Cần nhập
-                  </button>
-                  <div style={{ fontSize: '0.82rem', color: '#475569', textAlign: 'right' }}>
-                    <div>Trễ: <strong style={{ color: '#0f172a' }}>0</strong></div>
-                    <div>Hoạt động: <strong style={{ color: '#0f172a' }}>{receipts.length}</strong></div>
+                <h2 style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                  Tổng Quan Tồn Kho
+                </h2>
+                <p style={{ color: '#64748b', fontSize: '0.85rem', margin: '0.25rem 0 0' }}>
+                  Theo dõi hoạt động luân chuyển kho, nhập hàng, xuất hàng và điều phối nội bộ
+                </p>
+              </div>
+              <PeriodFilterBar selectedPeriod={warehousePeriod} onSelectPeriod={setWarehousePeriod} />
+            </div>
+
+            {/* Cards Grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.25rem' }}>
+              
+              {/* Card 1: Phiếu nhập kho */}
+              <div style={{
+                backgroundColor: '#ffffff',
+                borderRadius: '8px',
+                border: '1px solid #e3e8ef',
+                padding: '1.25rem',
+                boxShadow: '0 2px 6px rgba(0,0,0,0.03)',
+                display: 'flex',
+                flexDirection: 'column',
+                justify: 'space-between'
+              }}>
+                <div>
+                  <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0284c7', margin: '0 0 1rem 0' }}>
+                    Phiếu nhập kho
+                  </h3>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <button
+                      onClick={() => setActiveTab('grn')}
+                      style={{
+                        backgroundColor: '#2563eb',
+                        color: '#ffffff',
+                        border: 'none',
+                        borderRadius: '6px',
+                        padding: '0.5rem 1.25rem',
+                        fontSize: '0.88rem',
+                        fontWeight: 700,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {readyReceipts.length} Cần nhập
+                    </button>
+                    <div style={{ fontSize: '0.82rem', color: '#475569', textAlign: 'right' }}>
+                      <div>Trễ: <strong style={{ color: '#0f172a' }}>0</strong></div>
+                      <div>Hoạt động: <strong style={{ color: '#0f172a' }}>{receiptsInPeriod.length}</strong></div>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
 
-            {/* Card 2: Lệnh giao hàng */}
-            <div style={{
-              backgroundColor: '#ffffff',
-              borderRadius: '8px',
-              border: '1px solid #e3e8ef',
-              padding: '1.25rem',
-              boxShadow: '0 2px 6px rgba(0,0,0,0.03)',
-              display: 'flex',
-              flexDirection: 'column',
-              justify: 'space-between'
-            }}>
-              <div>
-                <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0284c7', margin: '0 0 1rem 0' }}>
-                  Lệnh giao hàng
-                </h3>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <button
-                    onClick={() => setActiveTab('delivery')}
-                    style={{
-                      backgroundColor: '#2563eb',
-                      color: '#ffffff',
-                      border: 'none',
-                      borderRadius: '6px',
-                      padding: '0.5rem 1.25rem',
-                      fontSize: '0.88rem',
-                      fontWeight: 700,
-                      cursor: 'pointer'
-                    }}
-                  >
-                    {pendingDeliveriesCount} Cần xuất
-                  </button>
-                  <div style={{ fontSize: '0.82rem', color: '#475569', textAlign: 'right' }}>
-                    <div>Trễ: <strong style={{ color: '#0f172a' }}>0</strong></div>
-                    <div>Hoạt động: <strong style={{ color: '#0f172a' }}>{orders.length}</strong></div>
+              {/* Card 2: Lệnh giao hàng */}
+              <div style={{
+                backgroundColor: '#ffffff',
+                borderRadius: '8px',
+                border: '1px solid #e3e8ef',
+                padding: '1.25rem',
+                boxShadow: '0 2px 6px rgba(0,0,0,0.03)',
+                display: 'flex',
+                flexDirection: 'column',
+                justify: 'space-between'
+              }}>
+                <div>
+                  <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0284c7', margin: '0 0 1rem 0' }}>
+                    Lệnh giao hàng
+                  </h3>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <button
+                      onClick={() => setActiveTab('delivery')}
+                      style={{
+                        backgroundColor: '#2563eb',
+                        color: '#ffffff',
+                        border: 'none',
+                        borderRadius: '6px',
+                        padding: '0.5rem 1.25rem',
+                        fontSize: '0.88rem',
+                        fontWeight: 700,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {pendingDeliveriesCount} Cần xuất
+                    </button>
+                    <div style={{ fontSize: '0.82rem', color: '#475569', textAlign: 'right' }}>
+                      <div>Trễ: <strong style={{ color: '#0f172a' }}>0</strong></div>
+                      <div>Hoạt động: <strong style={{ color: '#0f172a' }}>{ordersInPeriod.length}</strong></div>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
 
             {/* Card 3: Nhập kho trực tiếp */}
             <div style={{
@@ -4670,7 +4684,8 @@ export default function Warehouse() {
 
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* ========================================================================= */}
       {/* VIEW: QUẢN LÝ ĐƠN HÀNG CHỜ NHẬP KHO (BACKORDERS) - CLEAN ENTERPRISE UI */}
