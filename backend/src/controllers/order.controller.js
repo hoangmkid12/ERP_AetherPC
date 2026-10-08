@@ -439,6 +439,170 @@ const autoCompleteDeliveredOrders = async () => {
   }
 };
 
+const cancelSingleOrderInternal = async (orderId, reason = 'Khách hàng yêu cầu hủy đơn', changedBy = 'Khách hàng') => {
+  return await prisma.$transaction(async (tx) => {
+    const existingOrder = await tx.order.findUnique({
+      where: { orderId },
+      include: { items: true }
+    });
+
+    if (!existingOrder) {
+      throw new Error(`Không tìm thấy đơn hàng ${orderId} trong hệ thống`);
+    }
+
+    if (existingOrder.status === 'CANCELLED') {
+      return existingOrder;
+    }
+
+    // Xử lý hoàn kho nếu đơn này trước đó đã từng trừ kho
+    const existingOutMovement = await tx.stockMovement.findFirst({
+      where: {
+        referenceId: orderId,
+        type: 'OUT'
+      }
+    });
+
+    const existingInMovement = await tx.stockMovement.findFirst({
+      where: {
+        referenceId: orderId,
+        type: 'IN',
+        note: {
+          contains: 'Hoàn kho'
+        }
+      }
+    });
+
+    if (existingOutMovement && !existingInMovement) {
+      await adjustLoyaltyForOrder(tx, existingOrder.customerId, existingOrder.totalAmount, 'subtract');
+
+      for (const item of existingOrder.items) {
+        await tx.product.update({
+          where: { productId: item.productId },
+          data: {
+            stockQuantity: {
+              increment: item.quantity
+            }
+          }
+        });
+
+        await restockInventory(tx, item.productId, item.quantity, {
+          referenceId: orderId,
+          note: `Hoàn kho tự động cho Đơn Hàng ${orderId} (Đã Hủy)`
+        });
+      }
+
+      await tx.serialNumber.updateMany({
+        where: { orderId, status: 'USED' },
+        data: { status: 'AVAILABLE', orderId: null }
+      });
+
+      await tx.ledgerEntry.deleteMany({ where: { referenceId: `COGS-${orderId}` } });
+    }
+
+    const updated = await tx.order.update({
+      where: { orderId },
+      data: {
+        status: 'CANCELLED',
+        notes: existingOrder.notes ? `${existingOrder.notes} | Lý do hủy: ${reason}` : `Lý do hủy: ${reason}`
+      }
+    });
+
+    await tx.orderStatusHistory.create({
+      data: {
+        orderId,
+        status: 'CANCELLED',
+        note: reason,
+        changedBy
+      }
+    });
+
+    return updated;
+  });
+};
+
+const autoCancelUnpaidOrders = async () => {
+  try {
+    const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000);
+    const expiredUnpaidOrders = await prisma.order.findMany({
+      where: {
+        status: 'WAITING_PAYMENT',
+        paymentStatus: { not: 'PAID' },
+        createdAt: {
+          lte: thirtyMinutesAgo
+        }
+      },
+      select: { orderId: true }
+    });
+
+    if (expiredUnpaidOrders && expiredUnpaidOrders.length > 0) {
+      for (const ord of expiredUnpaidOrders) {
+        try {
+          await cancelSingleOrderInternal(
+            ord.orderId,
+            'Hệ thống tự động hủy do quá 30 phút chưa hoàn tất thanh toán chuyển khoản.',
+            'Hệ Thống Tự Động'
+          );
+        } catch (err) {
+          console.warn(`[AutoCancel] Không thể tự động hủy đơn ${ord.orderId}:`, err.message);
+        }
+      }
+    }
+  } catch (e) {
+    // quiet catch
+  }
+};
+
+const customerCancelOrder = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+
+    const existingOrder = await prisma.order.findUnique({
+      where: { orderId: id },
+      include: { customer: true }
+    });
+
+    if (!existingOrder) {
+      return res.status(404).json({ success: false, message: `Không tìm thấy đơn hàng ${id}` });
+    }
+
+    if (existingOrder.status === 'CANCELLED') {
+      return res.json({ success: true, message: `Đơn hàng #${id} đã được hủy trước đó.`, data: existingOrder });
+    }
+
+    const isStaff = ['SALES', 'SALES_MANAGER', 'WAREHOUSE', 'WAREHOUSE_MANAGER', 'CEO', 'ADMIN', 'CSKH'].includes(req.user?.role);
+    if (req.user && !isStaff) {
+      const isOwner = (existingOrder.customerId === req.user.id) ||
+                      (existingOrder.customer?.phone && req.user.phone && existingOrder.customer.phone === req.user.phone) ||
+                      (existingOrder.customer?.email && req.user.email && existingOrder.customer.email === req.user.email);
+      if (!isOwner) {
+        return res.status(403).json({ success: false, message: 'Bạn không có quyền hủy đơn hàng này.' });
+      }
+    }
+
+    const CANCELLABLE_STATUSES = ['PENDING', 'WAITING_PAYMENT', 'AWAITING_STOCK'];
+    if (!CANCELLABLE_STATUSES.includes(existingOrder.status) && !isStaff) {
+      return res.status(400).json({
+        success: false,
+        message: `Đơn hàng đang ở trạng thái "${existingOrder.status}", đã được tiếp nhận xử lý nên không thể tự hủy. Vui lòng liên hệ CSKH AetherPC!`
+      });
+    }
+
+    const cancelReason = reason ? String(reason).trim() : 'Khách hàng yêu cầu hủy đơn';
+    const changedBy = req.user?.name || req.user?.fullname || req.user?.email || 'Khách hàng';
+
+    const updated = await cancelSingleOrderInternal(id, cancelReason, changedBy);
+
+    res.json({
+      success: true,
+      message: `Đơn hàng #${id} đã được hủy thành công!`,
+      data: updated
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 const confirmReceivedOrder = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -491,6 +655,8 @@ const getCustomerOrders = async (req, res, next) => {
   try {
     // Tự động kiểm tra và chuyển các đơn đã giao quá 48h sang COMPLETED
     await autoCompleteDeliveredOrders();
+    // Tự động hủy các đơn WAITING_PAYMENT quá 30 phút chưa thanh toán
+    await autoCancelUnpaidOrders();
 
     const role = (req.user?.role || '').toUpperCase();
     const isCustomer = role === 'CUSTOMER';
@@ -2211,5 +2377,8 @@ module.exports = {
   updateDeliveryLocationHttp,
   getDeliveryTracking,
   getDeliveryLocationHistory,
-  confirmReceivedOrder
+  confirmReceivedOrder,
+  customerCancelOrder,
+  cancelSingleOrderInternal,
+  autoCancelUnpaidOrders
 };

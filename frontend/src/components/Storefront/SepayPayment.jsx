@@ -97,6 +97,13 @@ export default function SepayPayment({ orderId, onPaid, compact = false }) {
   }
 
   if (!info.qrUrl) {
+    if (info.orderStatus === 'CANCELLED') {
+      return (
+        <div className="sf-sepay sf-sepay-msg" style={{ color: '#ef4444', backgroundColor: '#fef2f2', borderColor: '#fca5a5' }}>
+          <AlertTriangle size={18} /> Đơn hàng #{info.orderId} đã được hủy.
+        </div>
+      );
+    }
     return (
       <div className="sf-sepay sf-sepay-msg">
         <AlertTriangle size={18} /> Đơn #{info.orderId} không ở trạng thái chờ chuyển khoản.

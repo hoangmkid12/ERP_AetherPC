@@ -414,6 +414,43 @@ export const useSalesStore = create((set, get) => ({
   },
 
   /**
+   * Khách hàng hoặc nhân viên hủy đơn hàng (PENDING, WAITING_PAYMENT, AWAITING_STOCK)
+   */
+  cancelOrder: async (orderId, reason = '', extraData = {}) => {
+    try {
+      const res = await api.post(`/orders/${orderId}/cancel`, {
+        reason,
+        ...extraData
+      });
+      const updatedOrder = res?.data || res;
+
+      set(state => {
+        const orders = (state.orders || []).map(o => {
+          if (o.orderId === orderId || o.id === orderId) {
+            return {
+              ...o,
+              status: 'CANCELLED',
+              lastNote: reason ? `Hủy bởi Khách hàng: ${reason}` : (o.lastNote || 'Đã hủy đơn')
+            };
+          }
+          return o;
+        });
+
+        try {
+          localStorage.setItem(STORAGE_KEYS.orders, JSON.stringify(orders));
+        } catch (e) {}
+
+        return { orders };
+      });
+
+      return { success: true, data: updatedOrder };
+    } catch (err) {
+      console.error(`[SalesStore] Failed to cancel order #${orderId}:`, err);
+      throw err;
+    }
+  },
+
+  /**
    * Update order status with notes and extra data (including POD, payment method, bankRefCode)
    */
   updateOrderStatus: async (orderId, newStatus, note = null, extraData = {}) => {
@@ -431,8 +468,21 @@ export const useSalesStore = create((set, get) => ({
         ...extraData
       });
     } catch (err) {
-      console.error(`[SalesStore] Failed to update order #${orderId} status:`, err.message);
-      throw err;
+      // Nếu 403 Forbidden do là khách hàng hủy đơn, tự động dùng route /cancel của khách
+      if (newStatus === 'CANCELLED') {
+        try {
+          await api.post(`/orders/${orderId}/cancel`, {
+            reason: note,
+            ...extraData
+          });
+        } catch (innerErr) {
+          console.error(`[SalesStore] Failed to cancel order #${orderId}:`, innerErr.message);
+          throw innerErr;
+        }
+      } else {
+        console.error(`[SalesStore] Failed to update order #${orderId} status:`, err.message);
+        throw err;
+      }
     }
 
     set(state => {

@@ -21,7 +21,8 @@ const {
   updateDeliveryLocationHttp,
   getDeliveryTracking,
   getDeliveryLocationHistory,
-  confirmReceivedOrder
+  confirmReceivedOrder,
+  customerCancelOrder
 } = require('../controllers/order.controller');
 const { authMiddleware, optionalAuthMiddleware } = require('../middlewares/auth.middleware');
 const { getEmailLogs } = require('../services/emailService');
@@ -35,6 +36,11 @@ router.post('/pos', authMiddleware(['SALES', 'SALES_MANAGER', 'CEO', 'ADMIN']), 
 // @route   GET /api/v1/orders
 // @desc    Lấy danh sách đơn hàng (Khách hàng xem đơn của mình, Nhân viên/Shipper xem danh sách phân công)
 router.get('/', authMiddleware(['CUSTOMER', 'DELIVERY', 'SALES', 'SALES_MANAGER', 'WAREHOUSE', 'WAREHOUSE_MANAGER', 'CEO', 'ADMIN', 'CSKH', 'ACCOUNTANT']), getCustomerOrders);
+
+// @route   POST & PATCH /api/v1/orders/:id/cancel
+// @desc    Khách hàng / Nhân viên hủy đơn hàng (PENDING, WAITING_PAYMENT, AWAITING_STOCK)
+router.post('/:id/cancel', optionalAuthMiddleware, customerCancelOrder);
+router.patch('/:id/cancel', optionalAuthMiddleware, customerCancelOrder);
 
 // @route   PATCH /api/v1/orders/:id/status
 // @desc    Cập nhật trạng thái đơn hàng (Nhân viên Sale / Kho / Delivery / Admin)
@@ -69,7 +75,7 @@ router.post('/:orderId/location', authMiddleware(['DELIVERY', 'CEO', 'ADMIN']), 
 
 // @route   GET /api/v1/orders/returns
 // @desc    Lấy danh sách các đơn đổi trả (Shipper / QC / Kho / Kế toán / CSKH)
-router.get('/returns', authMiddleware(['CUSTOMER', 'SALES', 'SALES_MANAGER', 'CEO', 'ADMIN', 'CSKH', 'WAREHOUSE', 'WAREHOUSE_MANAGER', 'ACCOUNTANT', 'DELIVERY', ...QC_ROLES]), getReturnRequests);
+router.get('/returns', authMiddleware(['SALES', 'SALES_MANAGER', 'CEO', 'ADMIN', 'CSKH', 'WAREHOUSE', 'WAREHOUSE_MANAGER', 'ACCOUNTANT', 'DELIVERY', ...QC_ROLES]), getReturnRequests);
 
 // @route   GET/PUT /api/v1/orders/returns/settings
 // @desc    Lấy & Cập nhật cấu hình Tự Động Duyệt (Auto-Approve) đổi trả
