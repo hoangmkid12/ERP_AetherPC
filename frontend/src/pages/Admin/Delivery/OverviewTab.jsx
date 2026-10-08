@@ -641,9 +641,8 @@ export default function OverviewTab({
 
                 {/* Chữ ký điện tử — nhân viên giao hàng ký khi lập biên bản; kế toán ký khi xác nhận đã nhận đủ tiền tại quầy */}
                 <SignatureRow>
-                  <SignatureCell title="Người bàn giao (shipper)" note="(Ký và ghi rõ họ tên)" name={user?.fullname || user?.name || ''}
-                    signedAt={new Date()} docRef={`BG-COD-${user?.id || ''}-${new Date().toISOString().slice(0, 10)}`} />
-                  <SignatureCell title="Người nhận tiền (thủ quỹ / kế toán)" note="(Ký và xác nhận nhận đủ tiền)" signed={false} pendingText="Chờ ký nhận tại quầy" />
+                  <SignatureCell title="Nhân viên giao hàng" note="(Ký, ghi rõ họ tên)" name={user?.fullname || user?.name || ''} />
+                  <SignatureCell title="Kế toán" note="(Ký, ghi rõ họ tên)" signed={false} />
                 </SignatureRow>
               </div>
             </div>

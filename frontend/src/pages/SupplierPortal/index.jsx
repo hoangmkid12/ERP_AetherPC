@@ -2084,11 +2084,10 @@ export default function SupplierPortal() {
                     const docRef = printPOTarget.poNumber || printPOTarget.id;
                     return (
                       <SignatureRow>
-                        <SignatureCell title="Người lập phiếu" name={creator} signedAt={printPOTarget.createdAt} docRef={docRef} />
-                        <SignatureCell title="Nhà cung cấp xác nhận" note="(Ký, đóng dấu)" name={supplierSign.name ? (printPOTarget.supplier?.name || supplierSign.name) : ''}
-                          signedAt={supplierSign.at} docRef={docRef} color="#334155" pendingText={isCeoApproved ? 'Chờ NCC xác nhận' : 'Chưa gửi NCC'} />
-                        <SignatureCell title="Giám đốc duyệt" note="(Ký, đóng dấu)" name={ceo.name} signedAt={ceo.at} signed={isCeoApproved && !!ceo.name}
-                          seal sealLabel="ĐÃ PHÊ DUYỆT" docRef={docRef} pendingText={isPendingCeo ? 'Chờ giám đốc duyệt' : 'Chưa duyệt'} />
+                        <SignatureCell title="Người lập phiếu" name={creator} />
+                        <SignatureCell supplier title="Nhà cung cấp" note="(Ký, đóng dấu)" name={supplierSign.name ? (printPOTarget.supplier?.name || supplierSign.name) : ''} color="#334155" />
+                        <SignatureCell title="Giám đốc" note="(Ký, đóng dấu)" name={ceo.name} signed={isCeoApproved && !!ceo.name}
+                          seal />
                       </SignatureRow>
                     );
                   })()}

@@ -3349,10 +3349,9 @@ export default function Purchasing() {
 
               {/* Chữ ký điện tử — người đề xuất và quản lý kho duyệt */}
               <SignatureRow>
-                <SignatureCell title="Người đề xuất" name={displaySigner(selectedViewPR.requestedBy)} signedAt={selectedViewPR.createdAt} docRef={selectedViewPR.prCode || selectedViewPR.id} />
-                <SignatureCell title="Quản lý kho duyệt" name={displaySigner(selectedViewPR.approvedBy)} signedAt={selectedViewPR.approvedAt}
-                  signed={!!selectedViewPR.approvedBy && selectedViewPR.status !== 'PENDING'} seal={selectedViewPR.status !== 'REJECTED'} sealLabel="ĐÃ DUYỆT"
-                  result={selectedViewPR.status === 'REJECTED' ? 'Từ chối' : 'Đã duyệt'} docRef={selectedViewPR.prCode || selectedViewPR.id} pendingText="Chờ duyệt" />
+                <SignatureCell title="Người đề xuất" name={displaySigner(selectedViewPR.requestedBy)} />
+                <SignatureCell title="Quản lý kho" name={displaySigner(selectedViewPR.approvedBy)}
+                  signed={!!selectedViewPR.approvedBy && selectedViewPR.status !== 'PENDING'} seal={selectedViewPR.status !== 'REJECTED'} />
               </SignatureRow>
             </div>
 
@@ -4918,9 +4917,9 @@ export default function Purchasing() {
 
                 {/* Chữ ký điện tử — phiếu đang lập: các bên ký khi phiếu được trình duyệt và phê duyệt */}
                 <SignatureRow>
-                  <SignatureCell title="Người lập phiếu" signed={false} pendingText="Ký khi trình duyệt" />
-                  <SignatureCell title="Nhà cung cấp xác nhận" note="(Ký, đóng dấu)" signed={false} pendingText="Chờ NCC xác nhận" />
-                  <SignatureCell title="Giám đốc duyệt" note="(Ký, đóng dấu)" signed={false} pendingText="Chờ giám đốc duyệt" />
+                  <SignatureCell title="Người lập phiếu" signed={false} />
+                  <SignatureCell supplier title="Nhà cung cấp" note="(Ký, đóng dấu)" signed={false} />
+                  <SignatureCell title="Giám đốc" note="(Ký, đóng dấu)" signed={false} />
                 </SignatureRow>
               </div>
 
@@ -5052,11 +5051,9 @@ export default function Purchasing() {
                   const docRef = formatPurchaseReference(printQuoteTarget);
                   return (
                     <SignatureRow>
-                      <SignatureCell title="Người lập yêu cầu" name={displaySigner(printQuoteTarget.createdBy)} signedAt={printQuoteTarget.createdAt} docRef={docRef} />
-                      <SignatureCell title="Nhà cung cấp báo giá" note="(Ký, đóng dấu)" name={quoted.name ? getSupplierName(printQuoteTarget) : ''} signedAt={quoted.at}
-                        docRef={docRef} color="#334155" pendingText="Chờ NCC báo giá" />
-                      <SignatureCell title="Mua hàng duyệt báo giá" name={chosen.name} signedAt={chosen.at} seal sealLabel="ĐÃ DUYỆT"
-                        docRef={docRef} pendingText={printQuoteTarget.status === 'CANCELLED' ? 'Đã hủy' : 'Chờ duyệt'} />
+                      <SignatureCell title="Người lập yêu cầu" name={displaySigner(printQuoteTarget.createdBy)} />
+                      <SignatureCell supplier title="Nhà cung cấp" note="(Ký, đóng dấu)" name={quoted.name ? getSupplierName(printQuoteTarget) : ''} color="#334155" />
+                      <SignatureCell title="Nhân viên mua hàng" name={chosen.name} seal />
                     </SignatureRow>
                   );
                 })()}
@@ -5232,11 +5229,10 @@ export default function Purchasing() {
                     const docRef = printPOTarget.poNumber || printPOTarget.id;
                     return (
                       <SignatureRow>
-                        <SignatureCell title="Người lập phiếu" name={creator} signedAt={printPOTarget.createdAt} docRef={docRef} />
-                        <SignatureCell title="Nhà cung cấp xác nhận" note="(Ký, đóng dấu)" name={supplierSign.name ? (printPOTarget.supplier?.name || supplierSign.name) : ''}
-                          signedAt={supplierSign.at} docRef={docRef} color="#334155" pendingText={isCeoApproved ? 'Chờ NCC xác nhận' : 'Chưa gửi NCC'} />
-                        <SignatureCell title="Giám đốc duyệt" note="(Ký, đóng dấu)" name={ceo.name} signedAt={ceo.at} signed={isCeoApproved && !!ceo.name}
-                          seal sealLabel="ĐÃ PHÊ DUYỆT" docRef={docRef} pendingText={isPendingCeo ? 'Chờ giám đốc duyệt' : 'Chưa duyệt'} />
+                        <SignatureCell title="Người lập phiếu" name={creator} />
+                        <SignatureCell supplier title="Nhà cung cấp" note="(Ký, đóng dấu)" name={supplierSign.name ? (printPOTarget.supplier?.name || supplierSign.name) : ''} color="#334155" />
+                        <SignatureCell title="Giám đốc" note="(Ký, đóng dấu)" name={ceo.name} signed={isCeoApproved && !!ceo.name}
+                          seal />
                       </SignatureRow>
                     );
                   })()}

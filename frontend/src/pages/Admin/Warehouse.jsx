@@ -2453,13 +2453,10 @@ function WarehouseQcCertificateModal({ target, onClose, purchaseOrders = [] }) {
 
             {/* Chữ ký điện tử 3 bên — người ký và thời điểm lấy từ biên bản kiểm định và phiếu nhập thật */}
             <SignatureRow>
-              <SignatureCell title="Đại diện giao hàng (NCC)" name={supplierName !== 'Chưa xác định nhà cung cấp' ? supplierName : ''}
-                signedAt={inspectedAt} docRef={poNumber} result="Đã bàn giao" color="#334155" />
-              <SignatureCell title="Kiểm định viên QA/QC" name={inspector} signedAt={inspectedAt} docRef={poNumber}
-                result={isRejected ? 'Không đạt' : isPartial ? 'Đạt một phần' : 'Đạt'} color={isRejected ? '#b91c1c' : undefined} />
-              <SignatureCell title="Thủ kho tiếp nhận" name={displaySigner(receipt.receivedBy)} signedAt={receipt.receivedDate}
-                signed={!isRejected && (receipt.status === 'DONE' || !!receipt.receivedDate)} seal sealLabel="ĐÃ NHẬP KHO"
-                docRef={poNumber} pendingText={isRejected ? 'Không nhập kho' : 'Chờ nhập kho'} />
+              <SignatureCell supplier title="Nhà cung cấp" note="(Ký, đóng dấu)" name={supplierName !== 'Chưa xác định nhà cung cấp' ? supplierName : ''} color="#334155" />
+              <SignatureCell title="Kiểm định viên" name={inspector} color={isRejected ? '#b91c1c' : undefined} />
+              <SignatureCell title="Thủ kho" name={displaySigner(receipt.receivedBy)}
+                signed={!isRejected && (receipt.status === 'DONE' || !!receipt.receivedDate)} seal />
             </SignatureRow>
           </div>
         </div>
@@ -2715,9 +2712,9 @@ function GoodsReceiptSuccessModal({ doc, onClose, formatPrice }) {
 
             {/* Chữ ký điện tử 3 bên — thủ kho xác nhận nhập kho kèm mộc công ty */}
             <SignatureRow>
-              <SignatureCell title="Đại diện giao hàng (NCC)" name={doc.supplierName} signedAt={doc.intakeDate} docRef={doc.receiptNumber} result="Đã bàn giao" color="#334155" />
-              <SignatureCell title="QA kiểm định" name={doc.qaInspector} signedAt={doc.intakeDate} docRef={doc.receiptNumber} result={isPartialIntake ? 'Đạt một phần' : 'Đạt'} />
-              <SignatureCell title="Thủ kho" name={cleanStaffName(doc.warehouseStaff)} signedAt={doc.intakeDate} docRef={doc.receiptNumber} seal sealLabel="ĐÃ NHẬP KHO" />
+              <SignatureCell supplier title="Nhà cung cấp" note="(Ký, đóng dấu)" name={doc.supplierName} color="#334155" />
+              <SignatureCell title="Kiểm định viên" name={doc.qaInspector} />
+              <SignatureCell title="Thủ kho" name={cleanStaffName(doc.warehouseStaff)} seal />
             </SignatureRow>
           </div>
         </div>
@@ -5846,10 +5843,9 @@ export default function Warehouse() {
 
                   {/* Chữ ký điện tử — người đề xuất và quản lý kho duyệt */}
                   <SignatureRow>
-                    <SignatureCell title="Người đề xuất" name={displaySigner(viewingPR.requestedBy)} signedAt={viewingPR.createdAt || viewingPR.requestedAt} docRef={viewingPR.prCode || viewingPR.id} />
-                    <SignatureCell title="Quản lý kho duyệt" name={displaySigner(viewingPR.approvedBy)} signedAt={viewingPR.approvedAt}
-                      signed={!!viewingPR.approvedBy && viewingPR.status !== 'PENDING'} seal={viewingPR.status !== 'REJECTED'} sealLabel="ĐÃ DUYỆT"
-                      result={viewingPR.status === 'REJECTED' ? 'Từ chối' : 'Đã duyệt'} docRef={viewingPR.prCode || viewingPR.id} pendingText="Chờ duyệt" />
+                    <SignatureCell title="Người đề xuất" name={displaySigner(viewingPR.requestedBy)} />
+                    <SignatureCell title="Quản lý kho" name={displaySigner(viewingPR.approvedBy)}
+                      signed={!!viewingPR.approvedBy && viewingPR.status !== 'PENDING'} seal={viewingPR.status !== 'REJECTED'} />
                   </SignatureRow>
                 </div>
 
