@@ -201,7 +201,11 @@ async function request(endpoint, options = {}) {
     
     return data;
   } catch (error) {
-    console.error('API Request Error:', error);
+    // Lỗi 4xx (chưa đăng nhập, sai dữ liệu, không có quyền…) là phản hồi bình thường mà nơi gọi tự
+    // xử lý — chỉ ghi log lỗi mạng / lỗi máy chủ để console không đầy 401 khi khách chưa đăng nhập.
+    if (!error.status || error.status >= 500) {
+      console.error('API Request Error:', error);
+    }
     throw error;
   }
 }

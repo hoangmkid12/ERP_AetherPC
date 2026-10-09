@@ -143,3 +143,57 @@
 @media (max-width: 768px) {
   .erp-root .admin-sidebar-drawer .sidebar-module-toggle { width: 34px !important; height: 34px !important; }
 }
+
+/* ---------- Khung chỉ số căn giữa (Bán hàng, Lắp ráp, Mua hàng, Kho, Hệ thống) ----------
+   Con số luôn cùng cỡ, cùng độ cao ở đầu khung (không bị đẩy lên khi nhãn dài xuống 2 dòng),
+   chữ số đều nhau; nhãn bên dưới cùng cỡ, chia dòng cân đối. */
+.erp-root .erp-stat {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center;
+  justify-content: flex-start !important;
+  text-align: center;
+  min-width: 0;
+}
+.erp-root .erp-stat-value {
+  font-size: 1.5rem !important;
+  line-height: 1.25 !important;
+  font-weight: 800 !important;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.erp-root .erp-stat-label {
+  font-size: 0.8rem !important;
+  line-height: 1.35 !important;
+  margin-top: 0.3rem !important;
+  font-weight: 700 !important;
+  text-wrap: balance;
+}
+@media (max-width: 768px) {
+  .erp-root .erp-stat-value { font-size: 1.3rem !important; }
+}
+
+/* ---------- Khung chỉ số kiểu thẻ (Tổng quan CEO, Kế toán, CSKH, Kiểm định, Hệ thống) ----------
+   Con số cùng cỡ với khung căn giữa, luôn nằm ngay dưới tiêu đề (không bị đẩy khi mô tả dài),
+   mô tả tối đa 2 dòng. */
+.erp-root div:has(> div > .erp-kpi-value) { justify-content: flex-start !important; }
+.erp-root .erp-kpi-value {
+  font-size: 1.5rem !important;
+  line-height: 1.25 !important;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+.erp-root .erp-kpi-sub {
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+@media (max-width: 768px) {
+  .erp-root .erp-kpi-value { font-size: 1.3rem !important; }
+}

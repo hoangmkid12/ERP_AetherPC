@@ -158,143 +158,173 @@ export const parseCustomerPrompt = (promptText) => {
   };
 };
 
+// CPU có nhân đồ họa tích hợp không (cấu hình văn phòng không mua card rời thì bắt buộc phải có).
+// Intel hậu tố F/KF không có iGPU; Ryzen AM4 chỉ dòng G có; Ryzen 7000/9000 (AM5) có, trừ hậu tố F.
+export const hasIntegratedGraphics = (cpu) => {
+  const name = String(cpu?.name || '').toUpperCase();
+  if (/\d{4,5}K?F\b/.test(name)) return false;
+  if (name.includes('RYZEN')) {
+    if (/\d{4}G/.test(name)) return true;
+    return /\b[79]\d{3}(X3D|X)?\b/.test(name);
+  }
+  return true;
+};
+
 /**
- * Thuật toán AI Phân Tích & Lựa Chọn Cấu Hình Tối Ưu Nhất Từ Kho Hàng Thực Tế
+ * Thuật toán AI Phân Tích & Lựa Chọn Cấu Hình Tối Ưu Nhất Từ Kho Hàng Thực Tế.
+ * availableProducts cần có specs.socket / specs.ram_type / specs.wattage đã chuẩn hóa
+ * (PCBuilder.jsx suy ra từ tên sản phẩm khi CSDL thiếu thông số).
+ * Nguyên tắc: chỉ chọn linh kiện tương thích — không có lựa chọn tương thích thì để trống
+ * và ghi rõ trong missing[], không "lấy đại" món gần giá; tổng tiền giữ trong ngân sách.
  */
 export const runAIOptimizer = ({ promptText, budgetInput, workloadInput, brandInput, gpuBrandInput, mfgBrandInput, availableProducts }) => {
   const parsed = parseCustomerPrompt(promptText);
-  
+
   const finalBudget = parsed.budget || budgetInput || 25000000;
-  const finalWorkload = parsed.workload || workloadInput || 'GAMING';
-  const finalBrand = parsed.brand !== 'all' ? parsed.brand : (brandInput !== 'all' ? brandInput : 'all');
+  const promptWorkload = promptText && promptText.trim() ? parsed.workload : null;
+  const finalWorkload = promptWorkload || workloadInput || 'GAMING';
+  const finalBrand = parsed.brand !== 'all' ? parsed.brand : (brandInput && brandInput !== 'all' ? brandInput : 'all');
 
   const profile = HARDWARE_KNOWLEDGE_BASE.workloadProfiles[finalWorkload] || HARDWARE_KNOWLEDGE_BASE.workloadProfiles.GAMING;
   const alloc = profile.allocation;
+  const needsVGA = (alloc.VGA || 0) > 0;
+  const lower = (v) => String(v || '').toLowerCase();
+  const upName = (p) => `${p.brand || ''} ${p.name || ''}`.toUpperCase();
 
-  // Separate products by category
-  const getCatList = (cat) => availableProducts.filter(p => (p.category || '').toUpperCase() === cat);
-
-  const cpuList = getCatList('CPU');
-  const mbList = getCatList('MAINBOARD');
-  const ramList = getCatList('RAM');
-  const vgaList = getCatList('VGA');
-  const psuList = getCatList('PSU');
-  const storageList = getCatList('STORAGE');
-  const caseList = getCatList('CASE');
-  const coolerList = getCatList('COOLER');
-
-  // Budget targets
-  const targetCPU = finalBudget * alloc.CPU;
-  const targetMB = finalBudget * alloc.MAINBOARD;
-  const targetRAM = finalBudget * alloc.RAM;
-  const targetVGA = finalBudget * alloc.VGA;
-  const targetPSU = finalBudget * alloc.PSU;
-  const targetStorage = finalBudget * alloc.STORAGE;
-  const targetCase = finalBudget * alloc.CASE;
-
-  const findBestFit = (list, targetPrice, filterFn = () => true) => {
-    let candidates = list.filter(filterFn);
-
-    // If manufacturer brand filter (e.g. ASUS, MSI, GIGABYTE, Corsair) is selected, prioritize candidates from that brand
-    if (mfgBrandInput && mfgBrandInput !== 'all') {
-      const brandCandidates = candidates.filter(p => 
-        (p.brand || '').toUpperCase().includes(mfgBrandInput.toUpperCase()) ||
-        (p.name || '').toUpperCase().includes(mfgBrandInput.toUpperCase())
-      );
-      if (brandCandidates.length > 0) {
-        candidates = brandCandidates;
-      }
-    }
-
-    if (candidates.length === 0) {
-      return list.length > 0 ? list.reduce((best, item) => Math.abs(item.price - targetPrice) < Math.abs(best.price - targetPrice) ? item : best) : null;
-    }
-    return candidates.reduce((best, item) => Math.abs(item.price - targetPrice) < Math.abs(best.price - targetPrice) ? item : best);
+  const getCatList = (cat) => availableProducts.filter(p => (p.category || '').toUpperCase() === cat && Number(p.price) > 0);
+  const lists = {
+    CPU: getCatList('CPU'),
+    MAINBOARD: getCatList('MAINBOARD'),
+    RAM: getCatList('RAM'),
+    VGA: getCatList('VGA'),
+    PSU: getCatList('PSU'),
+    STORAGE: getCatList('STORAGE'),
+    CASE: getCatList('CASE'),
+    COOLER: getCatList('COOLER')
   };
 
-  // 1. Pick CPU based on Brand preference & target price
-  let cpuFilter = () => true;
-  if (finalBrand === 'intel') cpuFilter = p => (p.brand || '').toUpperCase().includes('INTEL');
-  if (finalBrand === 'amd') cpuFilter = p => (p.brand || '').toUpperCase().includes('AMD');
-  const selectedCPU = findBestFit(cpuList, targetCPU, cpuFilter);
+  const preferMfg = (candidates) => {
+    if (!mfgBrandInput || mfgBrandInput === 'all') return candidates;
+    const key = mfgBrandInput.toUpperCase();
+    const branded = candidates.filter(p => upName(p).includes(key));
+    return branded.length > 0 ? branded : candidates;
+  };
 
-  const cpuSocket = selectedCPU?.specs?.socket;
+  // Món tương thích đắt nhất mà không vượt mức giá mục tiêu; nếu mọi món đều đắt hơn mục tiêu
+  // thì lấy món rẻ nhất. Không có món tương thích → null (không lấy đại món khác loại).
+  const findBestFit = (list, targetPrice, filterFn = () => true) => {
+    const candidates = preferMfg(list.filter(filterFn));
+    if (candidates.length === 0) return null;
+    const under = candidates.filter(p => Number(p.price) <= targetPrice);
+    if (under.length > 0) return under.reduce((best, p) => (Number(p.price) > Number(best.price) ? p : best));
+    return candidates.reduce((best, p) => (Number(p.price) < Number(best.price) ? p : best));
+  };
 
-  // 2. Pick Mainboard compatible with CPU socket
-  const selectedMB = findBestFit(mbList, targetMB, p => {
-    const mbSock = p.specs?.socket;
-    return cpuSocket && mbSock && mbSock.toLowerCase() === cpuSocket.toLowerCase();
-  });
+  // Bộ lọc tương thích từng vị trí — dùng cả khi chọn ban đầu và khi hạ cấp cho vừa ngân sách
+  const filters = {};
+  filters.CPU = (p) => {
+    if (finalBrand === 'intel' && !upName(p).includes('INTEL')) return false;
+    if (finalBrand === 'amd' && !/AMD|RYZEN/.test(upName(p))) return false;
+    if (!p.specs?.socket) return false;
+    if (!needsVGA && !hasIntegratedGraphics(p)) return false;
+    return true;
+  };
 
-  const mbRamType = selectedMB?.specs?.ram_type;
+  const build = {};
+  build.CPU = findBestFit(lists.CPU, finalBudget * alloc.CPU, filters.CPU);
+  const cpuSocket = build.CPU?.specs?.socket || '';
 
-  // 3. Pick RAM compatible with Mainboard RAM type
-  const selectedRAM = findBestFit(ramList, targetRAM, p => {
-    const rType = p.specs?.ram_type;
-    return mbRamType && rType && rType.toLowerCase() === mbRamType.toLowerCase();
-  });
+  filters.MAINBOARD = (p) => Boolean(cpuSocket) && lower(p.specs?.socket) === lower(cpuSocket) && Boolean(p.specs?.ram_type);
+  build.MAINBOARD = findBestFit(lists.MAINBOARD, finalBudget * alloc.MAINBOARD, filters.MAINBOARD);
+  const mbRamType = build.MAINBOARD?.specs?.ram_type || '';
 
-  // 4. Pick VGA based on Workload priority or GPU brand preference
-  let selectedVGA = null;
-  if (targetVGA > 0 || finalWorkload !== 'OFFICE_STUDENT') {
-    let vgaFilter = () => true;
-    if (gpuBrandInput === 'nvidia') {
-      vgaFilter = p => (p.brand || '').toUpperCase().includes('NVIDIA') || (p.name || '').toUpperCase().includes('RTX') || (p.name || '').toUpperCase().includes('GTX');
-    } else if (gpuBrandInput === 'amd') {
-      vgaFilter = p => (p.brand || '').toUpperCase().includes('AMD') || (p.name || '').toUpperCase().includes('RADEON') || (p.name || '').toUpperCase().includes('RX');
-    } else if (finalWorkload === 'AI_DEEP_LEARNING' || finalWorkload === 'RENDER_3D') {
-      vgaFilter = p => (p.brand || '').toUpperCase().includes('NVIDIA') || (p.name || '').toUpperCase().includes('RTX');
-    }
-    selectedVGA = findBestFit(vgaList, targetVGA, vgaFilter);
+  filters.RAM = (p) => Boolean(mbRamType) && lower(p.specs?.ram_type) === lower(mbRamType) && p.specs?.form_factor !== 'SODIMM';
+  build.RAM = findBestFit(lists.RAM, finalBudget * alloc.RAM, filters.RAM);
+
+  build.VGA = null;
+  if (needsVGA) {
+    filters.VGA = () => true;
+    if (gpuBrandInput === 'nvidia') filters.VGA = p => /NVIDIA|RTX|GTX/.test(upName(p));
+    else if (gpuBrandInput === 'amd') filters.VGA = p => /RADEON|\bRX\s?\d/.test(upName(p));
+    else if (finalWorkload === 'AI_DEEP_LEARNING' || finalWorkload === 'RENDER_3D') filters.VGA = p => /NVIDIA|RTX/.test(upName(p));
+    build.VGA = findBestFit(lists.VGA, finalBudget * alloc.VGA, filters.VGA);
   }
 
-  // 5. Pick PSU based on required wattage + safety factor
-  const cpuTdp = selectedCPU?.specs?.tdp || 65;
-  const vgaTdp = selectedVGA?.specs?.tdp || (selectedVGA ? 150 : 0);
-  const totalTdp = cpuTdp + vgaTdp + 100;
-  const requiredWatts = Math.ceil(totalTdp * 1.25);
+  const estimateTdp = () => (Number(build.CPU?.specs?.tdp) || 65) + (Number(build.VGA?.specs?.tdp) || (build.VGA ? 200 : 0)) + 100;
+  let totalTdp = estimateTdp();
+  let requiredWatts = Math.ceil(totalTdp * 1.25);
 
-  const selectedPSU = findBestFit(psuList, targetPSU, p => {
-    const pWatts = p.specs?.wattage || 0;
-    return pWatts >= requiredWatts;
-  });
-
-  // 6. Pick Storage, Case, Cooler
-  const selectedStorage = findBestFit(storageList, targetStorage);
-  const selectedCase = findBestFit(caseList, targetCase);
-  const selectedCooler = findBestFit(coolerList, finalBudget * 0.03, p => {
+  filters.PSU = (p) => (Number(p.specs?.wattage) || 0) >= requiredWatts;
+  build.PSU = findBestFit(lists.PSU, finalBudget * alloc.PSU, filters.PSU);
+  build.STORAGE = findBestFit(lists.STORAGE, finalBudget * alloc.STORAGE);
+  build.CASE = findBestFit(lists.CASE, finalBudget * alloc.CASE);
+  filters.COOLER = (p) => {
     const support = p.specs?.socket_support;
-    if (Array.isArray(support) && support.length > 0 && cpuSocket) {
-      return support.some(s => s.toLowerCase() === cpuSocket.toLowerCase());
-    }
+    if (Array.isArray(support) && support.length > 0 && cpuSocket) return support.some(s => lower(s) === lower(cpuSocket));
     return true;
-  });
-
-  const build = {
-    CPU: selectedCPU,
-    MAINBOARD: selectedMB,
-    RAM: selectedRAM,
-    VGA: selectedVGA,
-    PSU: selectedPSU,
-    STORAGE: selectedStorage,
-    CASE: selectedCase,
-    COOLER: selectedCooler
   };
+  build.COOLER = findBestFit(lists.COOLER, finalBudget * 0.03, filters.COOLER);
 
-  const totalPrice = Object.values(build).reduce((sum, item) => sum + (item ? item.price : 0), 0);
+  const priceOf = (item) => (item ? Number(item.price) || 0 : 0);
+  const sumBuild = () => Object.values(build).reduce((sum, item) => sum + priceOf(item), 0);
 
-  // Generate AI Explanation Summary
-  const aiExplanation = `Dựa trên phân tích yêu cầu "${promptText || profile.name}", AI AetherPC đã tối ưu cấu hình trong ngân sách ${Number(finalBudget).toLocaleString('vi-VN')} đ:
-• Nhu cầu cốt lõi: ${profile.keyPriority}.
-• CPU (${selectedCPU?.name || 'N/A'}) & Mainboard (${selectedMB?.name || 'N/A'}) đạt chuẩn chân cắm Socket ${cpuSocket || 'khớp 100%'}.
-• Công suất nguồn (${selectedPSU?.specs?.wattage || 650}W) dư tải an toàn 25% cho hệ thống chạy ổn định 24/7.`;
+  // Vượt ngân sách → hạ cấp dần linh kiện cho tiết kiệm nhiều nhất mà vẫn giữ tương thích.
+  // CPU/Bo mạch chủ giữ nguyên socket và loại RAM đã chọn nên các ràng buộc khác không bị phá.
+  const downgradeFilters = {
+    ...filters,
+    CPU: (p) => filters.CPU(p) && lower(p.specs?.socket) === lower(cpuSocket),
+    MAINBOARD: (p) => filters.MAINBOARD(p) && lower(p.specs?.ram_type) === lower(mbRamType)
+  };
+  for (let guard = 0; guard < 80 && sumBuild() > finalBudget; guard++) {
+    let bestSlot = null;
+    let bestItem = null;
+    for (const slot of ['VGA', 'CPU', 'MAINBOARD', 'RAM', 'STORAGE', 'CASE', 'COOLER', 'PSU']) {
+      const current = build[slot];
+      if (!current) continue;
+      const filterFn = downgradeFilters[slot] || (() => true);
+      const cheaper = lists[slot].filter(p => filterFn(p) && Number(p.price) < priceOf(current));
+      if (cheaper.length === 0) continue;
+      const next = cheaper.reduce((best, p) => (Number(p.price) > Number(best.price) ? p : best));
+      if (!bestItem || priceOf(current) - priceOf(next) > priceOf(build[bestSlot]) - priceOf(bestItem)) {
+        bestSlot = slot;
+        bestItem = next;
+      }
+    }
+    if (!bestSlot) break;
+    build[bestSlot] = bestItem;
+  }
+  totalTdp = estimateTdp();
+  requiredWatts = Math.ceil(totalTdp * 1.25);
+
+  const SLOT_VI = { CPU: 'CPU', MAINBOARD: 'Bo mạch chủ', RAM: 'RAM', VGA: 'Card đồ họa', PSU: 'Nguồn', STORAGE: 'Ổ cứng', CASE: 'Vỏ case', COOLER: 'Tản nhiệt CPU' };
+  const missing = Object.keys(SLOT_VI)
+    .filter(slot => !build[slot] && !(slot === 'VGA' && !needsVGA))
+    .map(slot => SLOT_VI[slot]);
+
+  const totalPrice = sumBuild();
+  const withinBudget = totalPrice <= finalBudget;
+
+  const lines = [
+    `Dựa trên yêu cầu "${promptText || profile.name}" với ngân sách ${Number(finalBudget).toLocaleString('vi-VN')} đ:`,
+    `• Nhu cầu cốt lõi: ${profile.keyPriority}.`
+  ];
+  if (build.CPU && build.MAINBOARD) lines.push(`• CPU (${build.CPU.name}) và Bo mạch chủ (${build.MAINBOARD.name}) cùng Socket ${cpuSocket}; RAM chọn theo chuẩn ${mbRamType}.`);
+  if (!needsVGA && build.CPU) lines.push('• Không lắp card đồ họa rời — CPU được chọn có nhân đồ họa tích hợp.');
+  if (build.PSU) lines.push(`• Nguồn ${Number(build.PSU.specs?.wattage) || '?'}W đáp ứng mức đề xuất ${requiredWatts}W (tải ước tính ${totalTdp}W × 1,25).`);
+  lines.push(withinBudget
+    ? `• Tổng ${totalPrice.toLocaleString('vi-VN')} đ — nằm trong ngân sách.`
+    : `• Tổng ${totalPrice.toLocaleString('vi-VN')} đ — VƯỢT ngân sách ${(totalPrice - finalBudget).toLocaleString('vi-VN')} đ: kho hiện không có lựa chọn tương thích rẻ hơn, bạn có thể tăng ngân sách hoặc tự đổi linh kiện.`);
+  if (missing.length) lines.push(`• Chưa tìm được linh kiện tương thích trong kho cho: ${missing.join(', ')} — vui lòng chọn thủ công hoặc liên hệ tư vấn.`);
 
   return {
     parsedPrompt: parsed,
     profile,
     build,
     totalPrice,
-    aiExplanation,
+    budget: finalBudget,
+    withinBudget,
+    missing,
+    aiExplanation: lines.join('\n'),
     estimatedTdp: totalTdp,
     requiredWatts
   };

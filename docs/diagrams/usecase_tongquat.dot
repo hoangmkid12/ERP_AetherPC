@@ -31,12 +31,10 @@ digraph UseCaseAetherPC {
     uc_xemsp    [label="Xem Và Tìm\nSản Phẩm"];
     uc_dangky   [label="Đăng Ký\nTài Khoản"];
     uc_buildpc  [label="Tự Cấu Hình\nMáy Tính"];
-    // Khách Hàng (8 — thêm "Chọn PT & Xác Nhận Thanh Toán": order.controller.js
-    // dòng ~136 rẽ nhánh initialStatus=WAITING_PAYMENT khi paymentMethod là
-    // BANK_TRANSFER/ONLINE_GATEWAY — có thật trong code, nhưng KHÔNG có cổng
-    // thanh toán bên thứ 3 (VNPAY...) thật nào được tích hợp, chỉ là 1 field +
-    // cờ isPaid do client tự báo — nên KHÔNG vẽ actor «system» Cổng Thanh Toán,
-    // chỉ là 1 UC mở rộng của Đặt Hàng do chính Khách Hàng thực hiện.)
+    // Khách Hàng (8 — "Chọn PT & Xác Nhận Thanh Toán": đơn BANK_TRANSFER tạo ở
+    // WAITING_PAYMENT; nhánh feat/thanh-toan-sepay tích hợp cổng SePay thật
+    // (payment.controller.js sepayWebhook) nên vẽ thêm actor «system» Cổng
+    // Thanh Toán SePay (a20) nối nét đứt với uc_thanhtoan, cùng quy ước a17.)
     uc_dathang  [label="Đặt Hàng"];
     // Đổi tên từ "Sửa / Hủy Đơn Hàng": order.routes.js dòng 32 — CUSTOMER
     // KHÔNG có trong danh sách role được phép PATCH /:id/status, tức khách
@@ -253,6 +251,7 @@ digraph UseCaseAetherPC {
   a11 [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="2"><TR><TD><IMG SRC="actor_icon.png"/></TD></TR><TR><TD>Nhân Viên<BR/>Lắp Ráp</TD></TR></TABLE>>];
   a12 [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="2"><TR><TD><IMG SRC="actor_icon.png"/></TD></TR><TR><TD>Nhân Viên<BR/>Giao Hàng</TD></TR></TABLE>>];
   a17 [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="2"><TR><TD><IMG SRC="actor_icon.png"/></TD></TR><TR><TD>«system»<BR/>Hệ Thống Email</TD></TR></TABLE>>];
+  a20 [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="2"><TR><TD><IMG SRC="actor_icon.png"/></TD></TR><TR><TD>«system»<BR/>Cổng Thanh Toán SePay</TD></TR></TABLE>>];
   a13 [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="2"><TR><TD><IMG SRC="actor_icon.png"/></TD></TR><TR><TD>Nhân Viên<BR/>Kế Toán</TD></TR></TABLE>>];
   a14 [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="2"><TR><TD><IMG SRC="actor_icon.png"/></TD></TR><TR><TD>Nhân Viên<BR/>Nhân Sự</TD></TR></TABLE>>];
   a15 [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="2"><TR><TD><IMG SRC="actor_icon.png"/></TD></TR><TR><TD>Quản Trị Viên</TD></TR></TABLE>>];
@@ -352,6 +351,7 @@ digraph UseCaseAetherPC {
   // ngắn, sạch, không cắt ngang sơ đồ — nên dùng sơ đồ vệ tinh đó làm bằng
   // chứng trực quan, sơ đồ tổng quát chỉ cần đúng ở tầng ghi chú.
   uc_xuatkho -> a17 [style=dashed];
+  uc_thanhtoan -> a20 [style=dashed];
   uc_giaohang -> a17 [style=dashed];
 
   // ============================================================

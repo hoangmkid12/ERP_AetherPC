@@ -1,4 +1,5 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { api } from '../../services/api';
 import { Link } from 'react-router-dom';
 import { ChevronRight, Copy, Check, Ticket, BadgePercent } from 'lucide-react';
 import { notify } from '../../context/NotificationContext';
@@ -6,11 +7,19 @@ import ProductCard, { ProductCarousel } from '../../components/Storefront/Produc
 import useCatalog from '../../components/Storefront/useCatalog';
 import { SF_CATEGORIES, discountOf, isInStock } from '../../components/Storefront/catalog';
 
-// Mã giảm giá đang được giỏ hàng chấp nhận (xem handleApplyCoupon trong Cart.jsx)
-const COUPONS = [
-  { code: 'AETHER10', value: '10%', unit: 'GIẢM', title: 'Giảm 10% tổng đơn hàng', cond: 'Áp dụng cho đơn từ 2.000.000₫' },
-  { code: 'NEWPC200K', value: '200K', unit: 'GIẢM', title: 'Giảm 200.000₫ cho đơn hàng lớn', cond: 'Áp dụng cho đơn từ 5.000.000₫' },
-];
+// Mã giảm giá lấy từ bảng promotions (Quản lý bán hàng cấu hình) — cùng nguồn máy chủ dùng khi tạo đơn
+const toCoupon = (p) => {
+  const fixed = p.type === 'FIXED';
+  const v = Number(p.discount) || 0;
+  return {
+    code: p.code,
+    value: fixed ? (v >= 1000000 ? `${(v / 1000000).toLocaleString('vi-VN')}TR` : `${Math.round(v / 1000)}K`) : `${v}%`,
+    unit: 'GIẢM',
+    title: p.title,
+    cond: [Number(p.minSpend) > 0 ? `Áp dụng cho đơn từ ${Number(p.minSpend).toLocaleString('vi-VN')}₫` : 'Áp dụng cho mọi đơn hàng',
+      p.expiry ? `hết hạn ${p.expiry}` : null].filter(Boolean).join(', '),
+  };
+};
 
 function Coupon({ c }) {
   const [copied, setCopied] = useState(false);
@@ -61,6 +70,11 @@ export default function Promotions() {
     { to: '/member-tier', tone: 'violet', k: 'Thành viên', t: 'Tích điểm, giảm thêm theo hạng', c: 'Xem quyền lợi', p: img('MONITOR') },
   ];
 
+  const [coupons, setCoupons] = useState([]);
+  useEffect(() => {
+    api.get('/promotions/active').then(r => setCoupons((r.data || []).map(toCoupon))).catch(() => setCoupons([]));
+  }, []);
+
   return (
     <div className="sf-container">
       <nav className="sf-breadcrumb"><Link to="/">Trang chủ</Link><span>/</span><span className="cur">Khuyến mãi</span></nav>
@@ -73,7 +87,9 @@ export default function Promotions() {
 
       <section className="sf-section">
         <div className="sf-section-head"><h2 className="sf-section-title"><Ticket size={22} color="#d70018" /> Mã giảm giá</h2></div>
-        <div className="sf-coupons">{COUPONS.map(c => <Coupon key={c.code} c={c} />)}</div>
+        {coupons.length > 0
+          ? <div className="sf-coupons">{coupons.map(c => <Coupon key={c.code} c={c} />)}</div>
+          : <p style={{ color: '#64748b' }}>Hiện chưa có mã giảm giá nào đang hiệu lực.</p>}
       </section>
 
       <section className="sf-section">

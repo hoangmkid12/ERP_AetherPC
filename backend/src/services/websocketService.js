@@ -34,6 +34,19 @@ const authenticateConnection = (request) => {
   return auth;
 };
 
+// Kết nối có được phát vị trí cho đơn này không: shipper được Kho phân công, hoặc quản lý.
+// Kết quả lưu trên kết nối (_verifiedOrderId) để không truy vấn CSDL ở mỗi lần gửi vị trí.
+const canBroadcastLocation = async (ws, orderId) => {
+  if (ws._verifiedOrderId === orderId) return true;
+  const allowedRoles = ['DELIVERY', 'CEO', 'ADMIN', 'SALES_MANAGER', 'WAREHOUSE_MANAGER', 'WAREHOUSE'];
+  if (!allowedRoles.includes(ws._userRole)) return false;
+  const order = await prisma.order.findUnique({ where: { orderId }, select: { assignedShipperId: true } });
+  if (!order) return false;
+  if (ws._userRole === 'DELIVERY' && (!order.assignedShipperId || Number(order.assignedShipperId) !== Number(ws._userId))) return false;
+  ws._verifiedOrderId = orderId;
+  return true;
+};
+
 const initWebSocket = async (server) => {
   // ws@8's WebSocketServer, when given {server, path}, does NOT skip
   // non-matching requests — it unconditionally calls handleUpgrade() on every
@@ -420,17 +433,10 @@ const handleTrackingMessage = async (ws, data) => {
         return ws.send(JSON.stringify({ type: 'ERROR', message: `Không tìm thấy đơn hàng: ${orderId}` }));
       }
 
-      // Nếu shipper đăng nhập và đơn chưa gán ai, tự động liên kết đơn cho shipper
-      if (ws._userRole === 'DELIVERY') {
-        if (!order.assignedShipperId && ws._userId) {
-          await prisma.order.update({
-            where: { orderId: String(orderId) },
-            data: { assignedShipperId: Number(ws._userId) }
-          }).catch(() => {});
-        } else if (order.assignedShipperId && Number(order.assignedShipperId) !== Number(ws._userId) && !['CEO', 'ADMIN'].includes(ws._userRole)) {
-          ws._shipperOrderId = null;
-          return ws.send(JSON.stringify({ type: 'ERROR', message: 'Bạn không phải Shipper được giao đơn này.' }));
-        }
+      // Shipper chỉ phát vị trí cho đơn Kho đã phân công cho chính mình (không tự nhận đơn chưa phân công)
+      if (ws._userRole === 'DELIVERY' && (!order.assignedShipperId || Number(order.assignedShipperId) !== Number(ws._userId))) {
+        ws._shipperOrderId = null;
+        return ws.send(JSON.stringify({ type: 'ERROR', message: 'Bạn không phải Shipper được giao đơn này.' }));
       }
 
       if (originType || originCoord) {
@@ -448,9 +454,11 @@ const handleTrackingMessage = async (ws, data) => {
     else if (type === 'SHIPPER_UPDATE_LOCATION') {
       const { orderId, lat, lng, speed, heading, originType, originCoord } = payload || {};
       if (!orderId || typeof lat !== 'number' || typeof lng !== 'number') return;
-      if (!ws._shipperOrderId) {
-        ws._shipperOrderId = String(orderId);
+      // Chỉ kết nối đã SHIPPER_JOIN_DELIVERY hợp lệ cho đúng đơn này mới được cập nhật vị trí
+      if (!(await canBroadcastLocation(ws, String(orderId)))) {
+        return ws.send(JSON.stringify({ type: 'ERROR', message: 'Bạn không được phát vị trí cho đơn này.' }));
       }
+      ws._shipperOrderId = String(orderId);
       await updateDeliveryLocation(String(orderId), { lat, lng, speed, heading, shipperName: ws._userName, originType, originCoord });
     }
     else if (type === 'SHIPPER_LEAVE_DELIVERY') {
@@ -463,9 +471,11 @@ const handleTrackingMessage = async (ws, data) => {
         where: { orderId: String(orderId) },
         select: { customerId: true, lastLat: true, lastLng: true, locationUpdatedAt: true }
       });
-      if (!order) return ws.send(JSON.stringify({ type: 'ERROR', message: `Không tìm thấy đơn hàng: ${orderId}` }));
+      // Chỉ chủ đơn hoặc nhân viên nội bộ được nhận vị trí shipper theo thời gian thực
+      const internal = ws._userRole && !['CUSTOMER', 'SUPPLIER'].includes(ws._userRole);
+      const canTrack = order && (internal || (ws._userRole === 'CUSTOMER' && order.customerId === ws._userId));
+      if (!canTrack) return ws.send(JSON.stringify({ type: 'ERROR', message: 'Không tìm thấy đơn hàng hoặc bạn không có quyền theo dõi đơn này.' }));
 
-      // Cho phép theo dõi vị trí trực tiếp theo mã đơn hàng hợp lệ
       ws._trackingOrderId = String(orderId);
       const live = activeDeliveries.get(String(orderId));
       const lat = live?.lat ?? order.lastLat;

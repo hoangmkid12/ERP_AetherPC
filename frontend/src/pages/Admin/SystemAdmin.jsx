@@ -1467,7 +1467,7 @@ export default function SystemAdmin() {
     { label: 'Tài Khoản Nhân Sự', value: `${employees.length} tài khoản`, change: 'Đang hoạt động trên hệ thống', icon: <Users size={20} />, color: '#2563eb', bg: '#eff6ff' },
     { label: 'Vai Trò Định Danh', value: `${ROLES.length} Roles`, change: 'Phân quyền độc lập theo Actor', icon: <Shield size={20} />, color: '#8b5cf6', bg: '#f5f3ff' },
     { label: 'Nhật Ký Kiểm Toán', value: `${auditLogs.length} sự kiện`, change: `${failedSecurityCount} cảnh báo thất bại (đăng nhập sai...)`, icon: <Activity size={20} />, color: failedSecurityCount > 0 ? '#ef4444' : '#16a34a', bg: failedSecurityCount > 0 ? '#fef2f2' : '#f0fdf4' },
-    { label: 'Cơ Sở Dữ Liệu PostgreSQL', value: dbStatusLabel, change: 'Docker Container kltn_postgres', icon: <Database size={20} />, color: dbStatusColor, bg: '#f0f9ff' },
+    { label: 'Cơ Sở Dữ Liệu PostgreSQL', value: dbStatusLabel, change: serverStatus === 'ok' ? 'Máy chủ phản hồi kiểm tra kết nối' : 'Kiểm tra qua API sức khỏe máy chủ', icon: <Database size={20} />, color: dbStatusColor, bg: '#f0f9ff' },
     { label: 'Dữ Liệu Vận Hành', value: `${orders.length + inventory.length + purchaseOrders.length} bản ghi`, change: 'Đơn hàng, linh kiện kho & PO', icon: <HardDrive size={20} />, color: '#d97706', bg: '#fffbeb' }
   ];
 
@@ -1767,10 +1767,10 @@ export default function SystemAdmin() {
                 </div>
 
                 <div style={{ marginTop: '0.45rem' }}>
-                  <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  <div className="erp-kpi-value" style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {st.value}
                   </div>
-                  <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.15rem' }}>
+                  <div className="erp-kpi-sub" style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.15rem' }}>
                     {st.change}
                   </div>
                 </div>

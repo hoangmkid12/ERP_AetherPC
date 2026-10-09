@@ -240,6 +240,17 @@ export default function Cart() {
     fetchWardsForDistrict(address.city || '', address.district || '');
   };
 
+  // Tự điền địa chỉ mặc định (hoặc địa chỉ mới nhất) một lần khi danh sách tải xong, nếu khách chưa nhập
+  // địa chỉ — trước đây phải bấm chọn thủ công, không thì Quận/Phường bị để trống.
+  const autoFilledAddressRef = useRef(false);
+  useEffect(() => {
+    if (autoFilledAddressRef.current || savedAddresses.length === 0) return;
+    if (streetAddress.trim() || selectedProvince) return;
+    autoFilledAddressRef.current = true;
+    useSavedAddress(savedAddresses[0]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [savedAddresses]);
+
   // Update district, ward & fetch live communes when province changes
   const handleProvinceChange = (val) => {
     const provName = typeof val === 'string' ? val : val?.target?.value;
@@ -264,42 +275,30 @@ export default function Cart() {
     return p.name === selectedProvince || p.name.includes(selectedProvince) || selectedProvince.includes(p.name) || p.code === selectedProvince;
   }) || { districts: [] };
 
-  // Helper: Only Hà Nội & TP. Hồ Chí Minh qualify for Freeship
-  const isFreeShipCity = (provinceName) => {
-    if (!provinceName) return false;
-    const p = removeAccents(provinceName);
-    return p.includes('ho chi minh') || p.includes('ha noi');
-  };
 
   // Shipping calculation: 100% Miễn phí vận chuyển toàn quốc cho mọi đơn hàng
   const shippingFee = 0;
 
-  const handleApplyCoupon = (e) => {
+  // Mã khuyến mãi lấy từ bảng promotions qua máy chủ (không viết cứng ở trình duyệt).
+  // Khi đặt hàng chỉ gửi MÃ — máy chủ tự tính lại tiền giảm.
+  const [availablePromos, setAvailablePromos] = useState([]);
+  useEffect(() => {
+    api.get('/promotions/active').then(r => setAvailablePromos(r.data || [])).catch(() => setAvailablePromos([]));
+  }, []);
+
+  const handleApplyCoupon = async (e) => {
     e.preventDefault();
     setCouponError('');
     setCouponSuccess('');
     const code = couponCode.trim().toUpperCase();
     if (!code) return;
-
-    if (code === 'AETHER10') {
-      if (selectedCartTotal < 2000000) {
-        setCouponError('Mã AETHER10 chỉ áp dụng cho đơn hàng từ 2.000.000đ.');
-        return;
-      }
-      setActiveCoupon({ code, type: 'percent' });
-      setCouponSuccess('Áp dụng mã AETHER10 giảm 10% thành công!');
-    } else if (code === 'NEWPC200K') {
-      if (selectedCartTotal < 5000000) {
-        setCouponError('Mã NEWPC200K chỉ áp dụng cho đơn hàng từ 5.000.000đ.');
-        return;
-      }
-      setActiveCoupon({ code, type: 'flat' });
-      setCouponSuccess('Áp dụng mã NEWPC200K giảm 200.000đ thành công!');
-    } else if (code === 'FREESHIP') {
-      setActiveCoupon({ code, type: 'freeship' });
-      setCouponSuccess('Áp dụng mã FREESHIP miễn phí vận chuyển thành công!');
-    } else {
-      setCouponError('Mã giảm giá không chính xác hoặc đã hết hạn.');
+    try {
+      const res = await api.get(`/promotions/check?code=${encodeURIComponent(code)}&subtotal=${Math.round(selectedCartTotal)}`);
+      const p = res.data;
+      setActiveCoupon({ code: p.code, type: p.type, value: Number(p.discount) || 0, minSpend: Number(p.minSpend) || 0, title: p.title });
+      setCouponSuccess(`Áp dụng mã ${p.code} (${p.title}) thành công!`);
+    } catch (err) {
+      setCouponError(err?.message || 'Mã giảm giá không chính xác hoặc đã hết hạn.');
     }
   };
 
@@ -312,18 +311,9 @@ export default function Cart() {
 
   const couponDiscount = (() => {
     if (!activeCoupon) return 0;
-    if (activeCoupon.code === 'AETHER10') {
-      if (selectedCartTotal < 2000000) return 0;
-      return Math.round(selectedCartTotal * 0.1);
-    }
-    if (activeCoupon.code === 'NEWPC200K') {
-      if (selectedCartTotal < 5000000) return 0;
-      return 200000;
-    }
-    if (activeCoupon.code === 'FREESHIP') {
-      return 30000;
-    }
-    return 0;
+    if (selectedCartTotal < activeCoupon.minSpend) return 0;
+    const raw = activeCoupon.type === 'FIXED' ? activeCoupon.value : (selectedCartTotal * activeCoupon.value) / 100;
+    return Math.min(selectedCartTotal, Math.round(raw));
   })();
 
   // Member Tier discount calculation
@@ -339,7 +329,7 @@ export default function Cart() {
     memberTierName = 'Vàng';
   } else if (memberTier.toUpperCase() === 'PLATINUM') {
     memberDiscountPercent = 0.10;
-    memberTierName = 'Kim Cương';
+    memberTierName = 'Bạch Kim';
   }
 
   const memberDiscountAmount = Math.round(selectedCartTotal * memberDiscountPercent);
@@ -432,7 +422,7 @@ export default function Cart() {
         {
           shippingFee,
           discount: (couponDiscount || 0) + (memberDiscountAmount || 0),
-          couponDiscount: couponDiscount || 0,
+          couponCode: activeCoupon && couponDiscount > 0 ? activeCoupon.code : undefined,
           memberDiscount: memberDiscountAmount || 0,
           shippingCity: selectedProvince
         }
@@ -821,7 +811,7 @@ export default function Cart() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem', marginTop: '1.5rem' }}>
               {[
                 { icon: <ShieldCheck size={20} color="#2563eb" />, title: 'Chính Hãng 100%', desc: 'Bảo hành 24-36 tháng' },
-                { icon: <Truck size={20} color="#16a34a" />, title: 'Giao Siêu Tốc', desc: 'Freeship HN & TP.HCM' },
+                { icon: <Truck size={20} color="#16a34a" />, title: 'Giao Siêu Tốc', desc: 'Miễn phí vận chuyển toàn quốc' },
                 { icon: <RotateCcw size={20} color="#d97706" />, title: 'Đổi Trả 30 Ngày', desc: 'Nhanh chóng & dễ dàng' },
               ].map((item, i) => (
                 <div key={i} style={{ backgroundColor: '#ffffff', padding: '1rem', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
@@ -1119,7 +1109,7 @@ export default function Cart() {
                   {/* Coupon Code Section */}
                   <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '0.85rem' }}>
                     <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#64748b', marginBottom: '0.35rem' }}>
-                      Mã giảm giá (Coupon): <span style={{ color: '#2563eb', fontWeight: 800 }}>AETHER10</span>, <span style={{ color: '#2563eb', fontWeight: 800 }}>FREESHIP</span>
+                      Mã giảm giá (Coupon){availablePromos.length > 0 && ': '}{availablePromos.slice(0, 3).map((p, i) => (<span key={p.code} style={{ color: '#2563eb', fontWeight: 800 }}>{i > 0 ? ', ' : ''}{p.code}</span>))}
                     </label>
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
                       <input
@@ -1155,9 +1145,7 @@ export default function Cart() {
                       <div style={{ display: 'flex', flexDirection: 'column' }}>
                         <span>Phí vận chuyển:</span>
                         <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 500, marginTop: '1px' }}>
-                          {selectedProvince && isFreeShipCity(selectedProvince)
-                            ? '(✓ Miễn phí HN & TP.HCM)'
-                            : (selectedProvince ? '(Giao tỉnh: 30.000đ)' : '(Freeship HN & TP.HCM, 30k tỉnh khác)')}
+                          (✓ Miễn phí vận chuyển toàn quốc)
                         </span>
                       </div>
                       <span style={{ fontWeight: 700, color: shippingFee === 0 ? '#16a34a' : '#0f172a' }}>

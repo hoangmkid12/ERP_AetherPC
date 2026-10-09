@@ -34,7 +34,12 @@ export default function TrackOrder() {
           setError('Không tìm thấy đơn hàng này.');
         }
       })
-      .catch(() => { if (!cancelled) setError('Không tìm thấy đơn hàng này.'); })
+      .catch((err) => {
+        if (cancelled) return;
+        // Lộ trình chỉ hiển thị cho chủ đơn đã đăng nhập (máy chủ trả lời 401/404 cho người khác)
+        const msg = String(err?.message || '');
+        setError(/đăng nhập/i.test(msg) ? 'Vui lòng đăng nhập bằng tài khoản đã đặt đơn để theo dõi đơn hàng này.' : 'Không tìm thấy đơn hàng này trong tài khoản của bạn.');
+      })
       .finally(() => { if (!cancelled) setLoading(false); });
 
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';

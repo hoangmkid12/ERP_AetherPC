@@ -1,5 +1,11 @@
 const express = require('express');
+const { verifyOrderLink } = require('../utils/signedLink');
 const router = express.Router();
+
+// Hủy đơn / xác nhận đã nhận hàng bắt buộc đăng nhập (trước đây khách vãng lai hủy được đơn của người khác).
+// Khách hàng chỉ thao tác trên đơn của mình — kiểm tra trong controller.
+const CANCEL_ROLES = ['CUSTOMER', 'SALES', 'SALES_MANAGER', 'CSKH', 'CEO', 'ADMIN'];
+const RECEIVE_ROLES = ['CUSTOMER', 'CSKH', 'SALES_MANAGER', 'CEO', 'ADMIN'];
 const {
   createOrder,
   createPosOrder,
@@ -39,8 +45,8 @@ router.get('/', authMiddleware(['CUSTOMER', 'DELIVERY', 'SALES', 'SALES_MANAGER'
 
 // @route   POST & PATCH /api/v1/orders/:id/cancel
 // @desc    Khách hàng / Nhân viên hủy đơn hàng (PENDING, WAITING_PAYMENT, AWAITING_STOCK)
-router.post('/:id/cancel', optionalAuthMiddleware, customerCancelOrder);
-router.patch('/:id/cancel', optionalAuthMiddleware, customerCancelOrder);
+router.post('/:id/cancel', authMiddleware(CANCEL_ROLES), customerCancelOrder);
+router.patch('/:id/cancel', authMiddleware(CANCEL_ROLES), customerCancelOrder);
 
 // @route   PATCH /api/v1/orders/:id/status
 // @desc    Cập nhật trạng thái đơn hàng (Nhân viên Sale / Kho / Delivery / Admin)
@@ -48,8 +54,8 @@ router.patch('/:id/status', authMiddleware(['SALES', 'SALES_MANAGER', 'WAREHOUSE
 
 // @route   POST & PATCH /api/v1/orders/:id/confirm-received
 // @desc    Khách hàng xác nhận đã nhận được hàng -> chuyển sang COMPLETED
-router.post('/:id/confirm-received', optionalAuthMiddleware, confirmReceivedOrder);
-router.patch('/:id/confirm-received', optionalAuthMiddleware, confirmReceivedOrder);
+router.post('/:id/confirm-received', authMiddleware(RECEIVE_ROLES), confirmReceivedOrder);
+router.patch('/:id/confirm-received', authMiddleware(RECEIVE_ROLES), confirmReceivedOrder);
 
 // @route   PATCH /api/v1/orders/:id/details
 // @desc    Khách hàng tự cập nhật thông tin đơn hàng PENDING
@@ -118,15 +124,22 @@ router.patch('/returns/:id/refund', authMiddleware(['ACCOUNTANT', 'CEO', 'ADMIN'
 router.post('/:id/return/refund', authMiddleware(['ACCOUNTANT', 'CEO', 'ADMIN']), processRefund);
 
 // @route   GET /api/v1/orders/:id/proof-photo
-// @desc    Lấy ảnh minh chứng giao hàng (Công khai để email client như Gmail tải hiển thị)
-router.get('/:id/proof-photo', async (req, res) => {
+// @desc    Lấy ảnh minh chứng giao hàng. Email gửi khách dùng đường dẫn có chữ ký (?sig=) để Gmail tải
+//          được ảnh; ngoài ra chỉ chủ đơn hoặc nhân viên đã đăng nhập mới xem được.
+router.get('/:id/proof-photo', optionalAuthMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
     const prisma = require('../config/database');
     const order = await prisma.order.findUnique({
       where: { orderId: id },
-      select: { proofPhoto: true, paymentProofPhoto: true }
+      select: { proofPhoto: true, paymentProofPhoto: true, customerId: true }
     });
+    const role = req.user?.role;
+    const isStaff = role && !['CUSTOMER', 'SUPPLIER'].includes(role);
+    const isOwner = role === 'CUSTOMER' && order?.customerId === req.user.id;
+    if (!verifyOrderLink(id, req.query.sig) && !isStaff && !isOwner) {
+      return res.status(403).send('Bạn không có quyền xem ảnh này.');
+    }
     const photo = order?.proofPhoto || order?.paymentProofPhoto;
     if (!photo) {
       return res.status(404).send('Không tìm thấy ảnh minh chứng giao hàng.');

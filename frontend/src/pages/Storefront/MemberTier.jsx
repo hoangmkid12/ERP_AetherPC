@@ -1,8 +1,11 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { api } from '../../services/api';
 import { Award, Star, Gift, ShieldCheck, TrendingUp, LogIn, UserPlus, Info, Search, HelpCircle, ArrowLeft } from 'lucide-react';
 
+// Khớp quy tắc ở máy chủ (order.controller.js): 10.000đ = 1 điểm; hạng theo tổng điểm
+// (Bạc 1.000, Vàng 5.000, Bạch Kim 10.000); chiết khấu hạng trừ trực tiếp vào mỗi đơn.
 const TIER_CONFIGS = {
   BRONZE: {
     label: 'Hạng Đồng (Bronze)',
@@ -12,7 +15,8 @@ const TIER_CONFIGS = {
     pointsRequired: 0,
     nextTier: 'SILVER',
     nextPoints: 1000,
-    perks: ['Tích lũy 1% giá trị đơn hàng', 'Được nhận tin khuyến mãi sớm nhất']
+    discount: 0,
+    perks: ['Tích 1 điểm cho mỗi 10.000đ thanh toán', 'Nhận tin khuyến mãi sớm nhất']
   },
   SILVER: {
     label: 'Hạng Bạc (Silver)',
@@ -22,7 +26,8 @@ const TIER_CONFIGS = {
     pointsRequired: 1000,
     nextTier: 'GOLD',
     nextPoints: 5000,
-    perks: ['Tích lũy 2% giá trị đơn hàng', 'Miễn phí vận chuyển đơn hàng từ 1 triệu', 'Quà tặng thăng hạng']
+    discount: 2,
+    perks: ['Giảm 2% mọi đơn hàng', 'Tích 1 điểm cho mỗi 10.000đ thanh toán']
   },
   GOLD: {
     label: 'Hạng Vàng (Gold)',
@@ -31,28 +36,20 @@ const TIER_CONFIGS = {
     glow: 'rgba(245, 158, 11, 0.35)',
     pointsRequired: 5000,
     nextTier: 'PLATINUM',
-    nextPoints: 15000,
-    perks: ['Tích lũy 3% giá trị đơn hàng', 'Miễn phí vận chuyển mọi đơn hàng', 'Quà tặng sinh nhật đặc biệt', 'Giảm 10% phí lắp ráp PC theo yêu cầu']
+    nextPoints: 10000,
+    discount: 5,
+    perks: ['Giảm 5% mọi đơn hàng', 'Tích 1 điểm cho mỗi 10.000đ thanh toán']
   },
   PLATINUM: {
     label: 'Hạng Bạch Kim (Platinum)',
-    color: '#06b6d4',
-    bgColor: 'rgba(6, 182, 212, 0.15)',
-    glow: 'rgba(6, 182, 212, 0.35)',
-    pointsRequired: 15000,
-    nextTier: 'DIAMOND',
-    nextPoints: 30000,
-    perks: ['Tích lũy 5% giá trị đơn hàng', 'Miễn phí vận chuyển mọi đơn hàng', 'Quà tặng sinh nhật & dịp lễ lớn', 'Đường dây hỗ trợ kỹ thuật ưu tiên 24/7', 'Được đặt trước linh kiện HOT độc quyền']
-  },
-  DIAMOND: {
-    label: 'Hạng Kim Cương (Diamond)',
     color: '#d946ef',
     bgColor: 'rgba(217, 70, 239, 0.15)',
     glow: 'rgba(217, 70, 239, 0.4)',
-    pointsRequired: 30000,
+    pointsRequired: 10000,
     nextTier: null,
     nextPoints: null,
-    perks: ['Tích lũy 7% giá trị đơn hàng', 'Miễn phí vận chuyển & giao hàng hỏa tốc', 'Hỗ trợ lắp đặt & modding phần cứng miễn phí tại nhà', 'Chuyên viên kỹ thuật riêng hỗ trợ trọn đời', 'Trải nghiệm phòng chờ VIP & sự kiện công nghệ của AetherPC']
+    discount: 10,
+    perks: ['Giảm 10% mọi đơn hàng', 'Tích 1 điểm cho mỗi 10.000đ thanh toán']
   }
 };
 
@@ -71,81 +68,40 @@ export default function MemberTier() {
   const [calcAmount, setCalcAmount] = useState('');
   const [calcPoints, setCalcPoints] = useState(0);
 
-  const handlePhoneSearch = (e) => {
+  // Chỉ tra cứu được tài khoản đang đăng nhập — tra hạng/điểm của người khác bằng số điện thoại
+  // sẽ làm lộ thông tin khách hàng. Số liệu lấy mới từ máy chủ.
+  const handlePhoneSearch = async (e) => {
     e.preventDefault();
     setSearchError('');
     setSearchResult(null);
 
     const cleanSearch = phoneSearch.trim();
-
     if (!cleanSearch) {
       setSearchError('Vui lòng nhập số điện thoại hoặc email cần tra cứu.');
       return;
     }
-
-    // 1. Check currently logged-in user
-    if (user && (user.phone === cleanSearch || user.email === cleanSearch)) {
-      setSearchResult({
-        name: user.fullname || user.name || 'Khách hàng',
-        phone: user.phone || '',
-        tier: user.tier || 'BRONZE',
-        loyaltyPoints: user.loyaltyPoints || 0
-      });
+    if (!user || user.role !== 'CUSTOMER') {
+      setSearchError('Vui lòng đăng nhập tài khoản khách hàng để xem hạng thành viên và điểm tích lũy của bạn.');
       return;
     }
-
-    // 2. Search erp_orders to see if they bought items using this phone number/email
-    {
-      const storedOrders = JSON.parse(localStorage.getItem('erp_orders') || '[]');
-      const cleanPhone = cleanSearch.replace(/[^0-9]/g, '');
-      const matchedOrders = storedOrders.filter(ord =>
-        ord.status !== 'CANCELLED' &&
-        ((ord.phone && ord.phone.replace(/[^0-9]/g, '') === cleanPhone) || ord.email === cleanSearch)
-      );
-
-      if (matchedOrders.length > 0) {
-        // Calculate points
-        let totalPoints = 0;
-        matchedOrders.forEach(ord => {
-          totalPoints += Math.floor(parseFloat(ord.totalAmount) / 10000);
-        });
-
-        // Determine tier
-        let calculatedTier = 'BRONZE';
-        if (totalPoints >= 30000) calculatedTier = 'DIAMOND';
-        else if (totalPoints >= 15000) calculatedTier = 'PLATINUM';
-        else if (totalPoints >= 5000) calculatedTier = 'GOLD';
-        else if (totalPoints >= 1000) calculatedTier = 'SILVER';
-
-        const customerNameFromOrder = matchedOrders[0].customerName || 'Khách hàng';
-
-        setSearchResult({
-          name: customerNameFromOrder,
-          phone: cleanSearch,
-          tier: calculatedTier,
-          loyaltyPoints: totalPoints
-        });
-      } else {
-        // 4. Create a deterministic mock result for presentation if not found in orders
-        if (/^[0-9]{10}$/.test(cleanSearch)) {
-          const fakePoints = 50 + (parseInt(cleanSearch.slice(-4)) % 18000);
-          let fakeTier = 'BRONZE';
-          if (fakePoints >= 30000) fakeTier = 'DIAMOND';
-          else if (fakePoints >= 15000) fakeTier = 'PLATINUM';
-          else if (fakePoints >= 5000) fakeTier = 'GOLD';
-          else if (fakePoints >= 1000) fakeTier = 'SILVER';
-
-          setSearchResult({
-            name: 'Khách hàng ẩn danh',
-            phone: cleanSearch,
-            tier: fakeTier,
-            loyaltyPoints: fakePoints
-          });
-        } else {
-          setSearchError('Không tìm thấy thông tin thành viên khớp với thông tin nhập.');
-        }
-      }
+    const digits = (v) => String(v || '').replace(/[^0-9]/g, '');
+    const isMine = (user.email && user.email.toLowerCase() === cleanSearch.toLowerCase()) ||
+      (user.phone && digits(user.phone) === digits(cleanSearch));
+    if (!isMine) {
+      setSearchError('Vì bảo mật thông tin, bạn chỉ tra cứu được số điện thoại/email của tài khoản đang đăng nhập.');
+      return;
     }
+    let me = user;
+    try {
+      const res = await api.get('/auth/me');
+      me = res?.user || res?.data || user;
+    } catch (_) { /* dùng dữ liệu phiên hiện tại */ }
+    setSearchResult({
+      name: me.fullname || me.name || 'Khách hàng',
+      phone: me.phone || cleanSearch,
+      tier: (me.tier || 'BRONZE').toUpperCase(),
+      loyaltyPoints: me.loyaltyPoints || 0
+    });
   };
 
   const handleCalcChange = (val) => {
@@ -207,7 +163,7 @@ export default function MemberTier() {
             Đặc Quyền Hạng <span className="gradient-text">Thành Viên</span>
           </h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: '1rem', maxWidth: '600px', margin: '0 auto' }}>
-            Mua sắm tích lũy điểm thăng hạng nhận ngàn ưu đãi chiết khấu trực tiếp và dịch vụ hỗ trợ VIP độc quyền.
+            Mua sắm tích lũy điểm để thăng hạng — hạng càng cao, mức giảm giá trừ trực tiếp vào mỗi đơn hàng càng lớn.
           </p>
         </div>
 
@@ -304,7 +260,7 @@ export default function MemberTier() {
                   </>
                 ) : (
                   <div style={{ fontSize: '0.875rem', color: 'var(--accent)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <ShieldCheck size={18} /> Bạn đã đạt hạng thăng tối đa (Kim Cương)! Xin cảm ơn sự ủng hộ nhiệt tình của bạn.
+                    <ShieldCheck size={18} /> Bạn đã đạt hạng cao nhất (Bạch Kim)! Xin cảm ơn sự ủng hộ nhiệt tình của bạn.
                   </div>
                 )}
               </div>
@@ -371,7 +327,7 @@ export default function MemberTier() {
                 <Search size={18} style={{ color: 'var(--primary)' }} /> Tra Cứu Nhanh Thành Viên
               </h3>
               <p style={{ color: 'var(--text-muted)', fontSize: '0.8125rem', marginBottom: '1.5rem', lineHeight: 1.5 }}>
-                Nhập số điện thoại hoặc địa chỉ email để kiểm tra nhanh điểm tích lũy và thứ hạng mà không cần đăng nhập.
+                Đăng nhập rồi nhập số điện thoại hoặc email của tài khoản để xem điểm tích lũy và thứ hạng hiện tại.
               </p>
 
               <form onSubmit={handlePhoneSearch} style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
@@ -424,13 +380,13 @@ export default function MemberTier() {
                     <span style={{
                       fontSize: '0.75rem',
                       fontWeight: 700,
-                      color: TIER_CONFIGS[searchResult.tier.toUpperCase()]?.color || '#fff',
-                      background: TIER_CONFIGS[searchResult.tier.toUpperCase()]?.bgColor || 'rgba(255,255,255,0.05)',
+                      color: TIER_CONFIGS[searchResult.tier]?.color || '#fff',
+                      background: TIER_CONFIGS[searchResult.tier]?.bgColor || 'rgba(255,255,255,0.05)',
                       padding: '0.25rem 0.625rem',
                       borderRadius: 'var(--radius-sm)',
-                      border: `1px solid ${TIER_CONFIGS[searchResult.tier.toUpperCase()]?.color}22`
+                      border: `1px solid ${TIER_CONFIGS[searchResult.tier]?.color}22`
                     }}>
-                      {searchResult.tier.toUpperCase()}
+                      {TIER_CONFIGS[searchResult.tier]?.label || searchResult.tier}
                     </span>
                   </div>
                   <div style={{ height: '1px', backgroundColor: 'var(--border-glass)' }} />
@@ -440,7 +396,7 @@ export default function MemberTier() {
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8125rem' }}>
                     <span style={{ color: 'var(--text-secondary)' }}>Điểm tích lũy:</span>
-                    <span style={{ color: 'var(--success)', fontWeight: 700 }}>{formatNumber(searchResult.loyaltyPoints)}đ</span>
+                    <span style={{ color: 'var(--success)', fontWeight: 700 }}>{formatNumber(searchResult.loyaltyPoints)} điểm</span>
                   </div>
                 </div>
               ) : (
@@ -462,7 +418,7 @@ export default function MemberTier() {
               <Gift size={20} style={{ color: 'var(--warning)' }} /> Bảng Đặc Quyền Từng Hạng Thành Viên
             </h2>
             <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginTop: '0.25rem' }}>
-              Tích lũy càng nhiều điểm thăng hạng, bạn càng được hưởng mức chiết khấu tích lũy đơn hàng lớn và ưu tiên phục vụ.
+              Tích lũy càng nhiều điểm, hạng càng cao và mức giảm giá áp dụng trực tiếp cho mỗi đơn hàng càng lớn.
             </p>
           </div>
 
@@ -520,47 +476,31 @@ export default function MemberTier() {
                   <td><strong>Mốc điểm yêu cầu</strong></td>
                   {Object.entries(TIER_CONFIGS).map(([key, config]) => (
                     <td key={key} style={{ textAlign: 'center', fontWeight: 700, background: key === currentTierKey ? 'rgba(255,255,255,0.02)' : 'none' }}>
-                      {formatNumber(config.pointsRequired)}đ
+                      {formatNumber(config.pointsRequired)} điểm
                     </td>
                   ))}
                 </tr>
                 <tr>
-                  <td><strong>% Tích điểm đơn hàng</strong></td>
+                  <td><strong>Giảm giá mỗi đơn hàng</strong></td>
                   {Object.entries(TIER_CONFIGS).map(([key, config]) => (
                     <td key={key} style={{ textAlign: 'center', color: 'var(--success)', fontWeight: 700, background: key === currentTierKey ? 'rgba(255,255,255,0.02)' : 'none' }}>
-                      {key === 'BRONZE' ? '1%' : key === 'SILVER' ? '2%' : key === 'GOLD' ? '3%' : key === 'PLATINUM' ? '5%' : '7%'}
+                      {config.discount ? `${config.discount}%` : '-'}
+                    </td>
+                  ))}
+                </tr>
+                <tr>
+                  <td><strong>Tích điểm</strong></td>
+                  {Object.entries(TIER_CONFIGS).map(([key]) => (
+                    <td key={key} style={{ textAlign: 'center', fontSize: '0.8125rem', background: key === currentTierKey ? 'rgba(255,255,255,0.02)' : 'none' }}>
+                      10.000đ = 1 điểm
                     </td>
                   ))}
                 </tr>
                 <tr>
                   <td><strong>Phí vận chuyển</strong></td>
-                  {Object.entries(TIER_CONFIGS).map(([key, config]) => (
+                  {Object.entries(TIER_CONFIGS).map(([key]) => (
                     <td key={key} style={{ textAlign: 'center', fontSize: '0.8125rem', background: key === currentTierKey ? 'rgba(255,255,255,0.02)' : 'none' }}>
-                      {'Miễn phí toàn quốc'}
-                    </td>
-                  ))}
-                </tr>
-                <tr>
-                  <td><strong>Dịch vụ hỗ trợ & VIP</strong></td>
-                  {Object.entries(TIER_CONFIGS).map(([key, config]) => (
-                    <td key={key} style={{ textAlign: 'center', fontSize: '0.8125rem', background: key === currentTierKey ? 'rgba(255,255,255,0.02)' : 'none' }}>
-                      {key === 'BRONZE' ? 'Cơ bản' : key === 'SILVER' ? 'Cơ bản' : key === 'GOLD' ? 'Ưu tiên hỗ trợ' : key === 'PLATINUM' ? 'Đường dây nóng VIP 24/7' : 'Kỹ thuật viên hỗ trợ tại nhà'}
-                    </td>
-                  ))}
-                </tr>
-                <tr>
-                  <td><strong>Đặc quyền đặt trước</strong></td>
-                  {Object.entries(TIER_CONFIGS).map(([key, config]) => (
-                    <td key={key} style={{ textAlign: 'center', fontSize: '0.8125rem', background: key === currentTierKey ? 'rgba(255,255,255,0.02)' : 'none' }}>
-                      {key === 'PLATINUM' || key === 'DIAMOND' ? '✓ Đặt trước đồ HOT' : '-'}
-                    </td>
-                  ))}
-                </tr>
-                <tr>
-                  <td><strong>Dành cho Build PC</strong></td>
-                  {Object.entries(TIER_CONFIGS).map(([key, config]) => (
-                    <td key={key} style={{ textAlign: 'center', fontSize: '0.8125rem', background: key === currentTierKey ? 'rgba(255,255,255,0.02)' : 'none' }}>
-                      {key === 'GOLD' ? 'Giảm 10% phí dịch vụ' : key === 'PLATINUM' ? 'Giảm 20% phí dịch vụ' : key === 'DIAMOND' ? 'Miễn phí trọn đời' : '-'}
+                      Miễn phí toàn quốc
                     </td>
                   ))}
                 </tr>
@@ -605,29 +545,15 @@ export default function MemberTier() {
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem' }}>
                 <span style={{ color: 'var(--text-secondary)' }}>Điểm dự kiến nhận được:</span>
-                <strong style={{ color: 'var(--success)', fontSize: '1rem' }}>+{formatNumber(calcPoints)}đ</strong>
+                <strong style={{ color: 'var(--success)', fontSize: '1rem' }}>+{formatNumber(calcPoints)} điểm</strong>
               </div>
               <div style={{ height: '1px', backgroundColor: 'var(--border-glass)' }} />
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
-                <span>Đồng (1%):</span>
-                <span>+{formatNumber(calcPoints)}đ</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
-                <span>Bạc (2%):</span>
-                <span>+{formatNumber(calcPoints * 2)}đ</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
-                <span>Vàng (3%):</span>
-                <span>+{formatNumber(calcPoints * 3)}đ</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
-                <span>Bạch Kim (5%):</span>
-                <span>+{formatNumber(calcPoints * 5)}đ</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
-                <span>Kim Cương (7%):</span>
-                <span>+{formatNumber(calcPoints * 7)}đ</span>
-              </div>
+              {Object.entries(TIER_CONFIGS).map(([key, config]) => (
+                <div key={key} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
+                  <span>Giảm giá hạng {config.label.replace(/^Hạng /, '').replace(/ \(.*\)$/, '')} ({config.discount}%):</span>
+                  <span>-{formatNumber(Math.round((parseFloat(calcAmount) || 0) * config.discount / 100))}đ</span>
+                </div>
+              ))}
             </div>
           </div>
 
@@ -643,7 +569,7 @@ export default function MemberTier() {
                   1. Điểm tích lũy được tính như thế nào?
                 </h4>
                 <p style={{ color: 'var(--text-secondary)', fontSize: '0.8125rem', lineHeight: 1.5 }}>
-                  Điểm tích lũy được tính dựa trên giá trị thanh toán thực tế của hóa đơn. Cứ mỗi 10,000đ thanh toán, bạn sẽ nhận được 1 điểm cơ bản. Số điểm này được nhân thêm hệ số tương ứng với thứ hạng thành viên hiện tại của bạn tại thời điểm xuất hóa đơn.
+                  Điểm tích lũy được tính dựa trên giá trị thanh toán thực tế của hóa đơn. Cứ mỗi 10.000đ thanh toán, bạn nhận được 1 điểm, áp dụng như nhau cho mọi hạng. Điểm được cộng khi đơn hàng được xác nhận.
                 </p>
               </div>
 
@@ -652,7 +578,7 @@ export default function MemberTier() {
                   2. Điểm tích lũy dùng để làm gì?
                 </h4>
                 <p style={{ color: 'var(--text-secondary)', fontSize: '0.8125rem', lineHeight: 1.5 }}>
-                  Bạn có thể dùng điểm tích lũy để trừ tiền trực tiếp khi mua sắm đơn hàng tiếp theo tại cửa hàng hoặc thanh toán online. Tỷ lệ quy đổi là 1 điểm = 1đ giảm trừ hóa đơn.
+                  Điểm dùng để xét hạng thành viên. Đạt 1.000 điểm lên hạng Bạc (giảm 2%), 5.000 điểm lên Vàng (giảm 5%), 10.000 điểm lên Bạch Kim (giảm 10%). Mức giảm của hạng được trừ tự động vào mỗi đơn hàng.
                 </p>
               </div>
 
@@ -661,7 +587,7 @@ export default function MemberTier() {
                   3. Thứ hạng thành viên có bị giảm hạng không?
                 </h4>
                 <p style={{ color: 'var(--text-secondary)', fontSize: '0.8125rem', lineHeight: 1.5 }}>
-                  Có. Thứ hạng thành viên sẽ được xét lại định kỳ vào ngày 01/01 hàng năm dựa trên tổng số điểm tích lũy thực tế mà bạn mua sắm trong 12 tháng trước đó. Nếu không tích lũy đủ điểm tối thiểu của thứ hạng hiện tại, hệ thống sẽ tự động hạ hạng tương ứng.
+                  Có thể. Khi đơn hàng đã tích điểm bị hủy hoặc hoàn trả, số điểm của đơn đó bị trừ lại và hạng được tính lại theo tổng điểm còn lại.
                 </p>
               </div>
             </div>

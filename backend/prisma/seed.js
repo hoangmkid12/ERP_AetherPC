@@ -67,7 +67,7 @@ async function main() {
     // container before `npm start` ever ran, not just the product seeding.
     // Skip catalog/demo seeding instead of crash-looping the entire server;
     // load real data afterwards via restore-db.ps1 against the deployed DB.
-    console.warn('[Seed] scraper/data/products_clean.json not found — skipping catalog/demo seed. Restore a real backup (see restore-db.ps1) to populate this database.');
+    console.warn('[Seed] scraper/data/products_clean.json not found — skipping catalog/demo seed. Run `npm run db:prepare-seed` first (local), or restore a real backup (see restore-db.ps1) for a deployed DB.');
     return; // main()'s own .finally() below still disconnects the Prisma client
   }
 

@@ -382,41 +382,68 @@ export default function CustomerService() {
   const inProgressComplaints = complaintsInPeriod.filter(c => c.status === 'IN_PROGRESS').length;
   const openComplaints = complaintsInPeriod.filter(c => c.status === 'OPEN').length;
   const resolvedComplaints = complaintsInPeriod.filter(c => c.status === 'RESOLVED' || c.status === 'CLOSED').length;
-  const resolutionRate = totalComplaints > 0 ? Math.round((resolvedComplaints / totalComplaints) * 100) : 98;
+  const resolutionRate = totalComplaints > 0 ? Math.round((resolvedComplaints / totalComplaints) * 100) : null;
+
+  // Đánh giá sản phẩm thật của khách (bảng product_reviews) — nguồn cho KPI và tab "Khảo sát & CSAT"
+  const [feedback, setFeedback] = useState(null);
+  useEffect(() => {
+    let cancelled = false;
+    api.get('/complaints/feedback-summary')
+      .then(res => { if (!cancelled) setFeedback(res?.data || null); })
+      .catch(() => { if (!cancelled) setFeedback({ total: 0, average: null, distribution: {}, recent: [] }); });
+    return () => { cancelled = true; };
+  }, []);
+  const fbTotal = feedback?.total || 0;
+  const fbPct = (n) => fbTotal ? `${Math.round((n / fbTotal) * 1000) / 10}%` : '—';
+  const fbDist = feedback?.distribution || {};
+  const fbLow = (fbDist[1] || 0) + (fbDist[2] || 0) + (fbDist[3] || 0);
   const pendingRmaCount = returnRequestsInPeriod.filter(r => r.status === 'PENDING').length;
 
   const stats = [
     { label: 'Tổng Ticket Tiếp Nhận', value: `${totalComplaints} ticket`, change: 'Hỗ trợ khách hàng đa kênh', icon: <HeadphonesIcon size={20} />, color: '#2563eb', bg: '#eff6ff' },
     { label: 'Khiếu Nại Đang Xử Lý', value: `${inProgressComplaints + openComplaints} vụ việc`, change: `${openComplaints} ticket mới cần phản hồi`, icon: <Clock size={20} />, color: '#f59e0b', bg: '#fffbeb' },
-    { label: 'Tỷ Lệ Giải Quyết (SLA)', value: `${resolutionRate}%`, change: 'Mục tiêu chất lượng dịch vụ ≥ 95%', icon: <CheckCircle size={20} />, color: '#16a34a', bg: '#f0fdf4' },
+    { label: 'Tỷ Lệ Giải Quyết (SLA)', value: resolutionRate === null ? '—' : `${resolutionRate}%`, change: resolutionRate === null ? 'Chưa có ticket trong kỳ' : `${resolvedComplaints}/${totalComplaints} ticket đã giải quyết · mục tiêu ≥ 95%`, icon: <CheckCircle size={20} />, color: '#16a34a', bg: '#f0fdf4' },
     { label: 'Yêu Cầu Đổi Trả (RMA)', value: `${pendingRmaCount} yêu cầu`, change: 'Chờ CSKH thẩm định & duyệt thu hồi', icon: <RefreshCw size={20} />, color: '#8b5cf6', bg: '#f5f3ff' },
     { label: 'Phiên Chat Trực Tuyến', value: `${liveChatSessions.length} phiên`, change: 'Khách hàng đang online', icon: <MessageSquare size={20} />, color: '#0ea5e9', bg: '#f0f9ff' },
-    { label: 'Đánh Giá Dịch Vụ', value: '4.85 / 5.0', change: '96.4% đánh giá rất hài lòng', icon: <Star size={20} />, color: '#eab308', bg: '#fefce8' }
+    { label: 'Đánh Giá Sản Phẩm', value: feedback?.average ? `${feedback.average} / 5.0` : '—', change: fbTotal ? `${fbTotal} đánh giá · ${fbPct(fbDist[5] || 0)} 5 sao` : 'Chưa có đánh giá', icon: <Star size={20} />, color: '#eab308', bg: '#fefce8' }
   ];
 
-  // Chart 1: Complaint Categories Doughnut
+  // Chart 1: phân bố ticket theo mức độ ưu tiên (dữ liệu thật trong kỳ đang lọc)
+  const PRIORITY_LABELS = { URGENT: 'Khẩn cấp', HIGH: 'Cao', MEDIUM: 'Trung bình', LOW: 'Thấp' };
+  const priorityKeys = Object.keys(PRIORITY_LABELS);
   const categoryChartData = {
-    labels: ['Bảo hành / Lỗi phần cứng', 'Giao hàng trễ / Sai hẹn', 'Tư vấn cấu hình PC', 'Hóa đơn / Đổi trả', 'Khác'],
+    labels: priorityKeys.map(k => PRIORITY_LABELS[k]),
     datasets: [
       {
-        data: [42, 25, 18, 10, 5],
-        backgroundColor: ['#ef4444', '#f59e0b', '#3b82f6', '#8b5cf6', '#64748b']
+        data: priorityKeys.map(k => complaintsInPeriod.filter(c => (c.priority || 'MEDIUM') === k).length),
+        backgroundColor: ['#ef4444', '#f59e0b', '#3b82f6', '#64748b']
       }
     ]
   };
 
-  // Chart 2: Weekly Ticket Inflow Bar
+  // Chart 2: ticket tiếp nhận / đã giải quyết trong 7 ngày gần nhất (theo ngày tạo / ngày cập nhật)
+  const last7Days = Array.from({ length: 7 }, (_, idx) => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() - (6 - idx));
+    return d;
+  });
+  const sameDay = (value, day) => {
+    if (!value) return false;
+    const d = new Date(value);
+    return d.getFullYear() === day.getFullYear() && d.getMonth() === day.getMonth() && d.getDate() === day.getDate();
+  };
   const ticketVolumeData = {
-    labels: ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'CN'],
+    labels: last7Days.map(d => `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`),
     datasets: [
       {
         label: 'Ticket Tiếp Nhận',
-        data: [14, 19, 12, 22, 18, 25, 15],
+        data: last7Days.map(day => complaints.filter(c => sameDay(c.createdAt || c.date, day)).length),
         backgroundColor: '#2563eb'
       },
       {
         label: 'Đã Giải Quyết Xong',
-        data: [13, 18, 11, 20, 17, 24, 14],
+        data: last7Days.map(day => complaints.filter(c => ['RESOLVED', 'CLOSED'].includes(c.status) && sameDay(c.updatedAt, day)).length),
         backgroundColor: '#16a34a'
       }
     ]
@@ -539,7 +566,7 @@ export default function CustomerService() {
           <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.8fr', gap: '1.25rem', marginBottom: '1.25rem' }}>
             <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1.25rem', height: '320px', display: 'flex', flexDirection: 'column' }}>
               <h3 style={{ fontSize: '0.92rem', fontWeight: 800, color: '#0f172a', margin: '0 0 1rem 0' }}>
-                Phân Loại Nguyên Nhân Khiếu Nại
+                Phân Loại Ticket Theo Mức Ưu Tiên
               </h3>
               <div style={{ flex: 1, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <Doughnut
@@ -555,7 +582,7 @@ export default function CustomerService() {
 
             <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1.25rem', height: '320px', display: 'flex', flexDirection: 'column' }}>
               <h3 style={{ fontSize: '0.92rem', fontWeight: 800, color: '#0f172a', margin: '0 0 1rem 0' }}>
-                Lưu Lượng Tiếp Nhận & Giải Quyết Trong Tuần
+                Tiếp Nhận & Giải Quyết 7 Ngày Gần Nhất
               </h3>
               <div style={{ flex: 1, position: 'relative' }}>
                 <Bar
@@ -1397,7 +1424,7 @@ export default function CustomerService() {
             </h3>
 
             <div style={{ textAlign: 'center', padding: '1.5rem 0', backgroundColor: '#f8fafc', borderRadius: '8px', marginBottom: '1rem' }}>
-              <div style={{ fontSize: '2.5rem', fontWeight: 900, color: '#0f172a' }}>4.85 / 5.0</div>
+              <div style={{ fontSize: '2.5rem', fontWeight: 900, color: '#0f172a' }}>{feedback?.average ? `${feedback.average} / 5.0` : '—'}</div>
               <div style={{ display: 'flex', justifyContent: 'center', gap: '0.2rem', color: '#eab308', margin: '0.5rem 0' }}>
                 <Star fill="#eab308" size={20} />
                 <Star fill="#eab308" size={20} />
@@ -1405,21 +1432,21 @@ export default function CustomerService() {
                 <Star fill="#eab308" size={20} />
                 <Star fill="#eab308" size={20} />
               </div>
-              <span style={{ fontSize: '0.78rem', color: '#64748b' }}>Dựa trên 342 đánh giá sau khi hoàn tất đơn hàng</span>
+              <span style={{ fontSize: '0.78rem', color: '#64748b' }}>{fbTotal ? `Dựa trên ${fbTotal} đánh giá sản phẩm của khách hàng` : 'Chưa có đánh giá nào từ khách hàng'}</span>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', fontSize: '0.8rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span>5 Sao (Cực kỳ hài lòng):</span>
-                <strong style={{ color: '#16a34a' }}>88%</strong>
+                <strong style={{ color: '#16a34a' }}>{fbPct(fbDist[5] || 0)}</strong>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span>4 Sao (Hài lòng):</span>
-                <strong style={{ color: '#3b82f6' }}>8.4%</strong>
+                <strong style={{ color: '#3b82f6' }}>{fbPct(fbDist[4] || 0)}</strong>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span>1 - 3 Sao (Cần cải thiện):</span>
-                <strong style={{ color: '#ef4444' }}>3.6%</strong>
+                <strong style={{ color: '#ef4444' }}>{fbPct(fbLow)}</strong>
               </div>
             </div>
           </div>
@@ -1431,20 +1458,19 @@ export default function CustomerService() {
             </h3>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              {[
-                { name: 'Nguyễn Tiến Đạt', rating: 5, comment: 'Máy build rất đẹp, dây nguồn đi gọn gàng, nhân viên tư vấn nhiệt tình!', date: 'Hôm nay' },
-                { name: 'Vũ Thị Thanh', rating: 5, comment: 'Đổi trả bảo hành cực kỳ nhanh chóng, shipper đến tận nhà nhận lại hàng lỗi.', date: 'Hôm qua' },
-                { name: 'Hoàng Quốc Bảo', rating: 4, comment: 'PC chạy mát và mượt, chỉ là giao hàng chậm hơn 1 tiếng so với hẹn ban đầu.', date: '16/08/2026' }
-              ].map((fb, fbIdx) => (
+              {(feedback?.recent || []).length === 0 && (
+                <div style={{ fontSize: '0.8rem', color: '#94a3b8', textAlign: 'center', padding: '1.5rem 0' }}>Chưa có đánh giá nào.</div>
+              )}
+              {(feedback?.recent || []).map((fb, fbIdx) => (
                 <div key={fbIdx} style={{ padding: '0.75rem', borderRadius: '6px', border: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem' }}>
                     <strong style={{ fontSize: '0.82rem', color: '#0f172a' }}>{fb.name}</strong>
                     <div style={{ display: 'flex', color: '#eab308' }}>
-                      {[...Array(fb.rating)].map((_, i) => <Star key={i} fill="#eab308" size={12} />)}
+                      {[...Array(Math.max(0, Math.min(5, fb.rating)))].map((_, i) => <Star key={i} fill="#eab308" size={12} />)}
                     </div>
                   </div>
-                  <p style={{ fontSize: '0.78rem', color: '#475569', margin: '0 0 0.3rem 0' }}>"{fb.comment}"</p>
-                  <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{fb.date}</span>
+                  {fb.comment && <p style={{ fontSize: '0.78rem', color: '#475569', margin: '0 0 0.3rem 0' }}>"{fb.comment}"</p>}
+                  <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{fb.productName ? `${fb.productName} · ` : ''}{new Date(fb.createdAt).toLocaleDateString('vi-VN')}</span>
                 </div>
               ))}
             </div>

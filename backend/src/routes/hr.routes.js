@@ -11,6 +11,9 @@ const { getHrSettings, loadPayrollContext, computePayslip, describePayslip } = r
 
 const ah = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 const httpError = (status, message) => Object.assign(new Error(message), { statusCode: status });
+
+// Mọi :id ở module nhân sự là số nguyên — mã sai (vd "undefined") trả 400 thay vì lỗi truy vấn 500
+router.param('id', (req, res, next, id) => (/^\d+$/.test(id) ? next() : next(httpError(400, 'Mã bản ghi không hợp lệ.'))));
 const actorName = (req) => req.user?.name || req.user?.email || `NV #${req.user?.id}`;
 const isHrManager = (req) => HR_MANAGER_ROLES.includes(req.user?.role);
 
@@ -313,6 +316,7 @@ router.post('/leaves', authMiddleware(STAFF_ROLES), ah(async (req, res) => {
   if (isHrManager(req) && req.body.employeeId) employeeId = parseInt(req.body.employeeId);
   const { type, startDate, endDate, reason } = req.body;
   if (!type || !startDate || !endDate) throw httpError(400, 'Thiếu loại nghỉ, ngày bắt đầu hoặc ngày kết thúc.');
+  if (!P.LEAVE_TYPES.includes(type)) throw httpError(400, `Loại nghỉ không hợp lệ. Chọn một trong: ${P.LEAVE_TYPES.join(', ')}.`);
 
   const start = parseAnyDate(startDate);
   const end = parseAnyDate(endDate);

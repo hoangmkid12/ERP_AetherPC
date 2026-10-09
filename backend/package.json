@@ -14,7 +14,8 @@
     "db:backfill-cogs": "node prisma/backfill-cogs.js",
     "db:reconcile-stock": "node prisma/reconcile-stock.js",
     "queue:worker": "node src/services/orderWorker.js",
-    "queue:producer-demo": "node scripts/enqueue_demo.js"
+    "queue:producer-demo": "node scripts/enqueue_demo.js",
+    "db:prepare-seed": "node prisma/prepare-seed-data.js"
   },
   "dependencies": {
     "@google/genai": "^2.26.0",

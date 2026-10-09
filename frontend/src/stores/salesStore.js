@@ -325,6 +325,8 @@ export const useSalesStore = create((set, get) => ({
         shippingCity: inferredCity,
         shippingFee,
         couponDiscount: couponDiscountToSend,
+        // Đơn online: máy chủ chỉ dùng mã này để tự tính tiền giảm (bỏ qua couponDiscount)
+        ...(options.couponCode ? { couponCode: options.couponCode } : {}),
         memberDiscount: options.memberDiscount !== undefined ? Number(options.memberDiscount || 0) : undefined,
         totalAmount,
         notes: type === 'POS' ? 'Đơn bán lẻ tại quầy (POS)' : 'Đặt hàng online (Đồng bộ)',

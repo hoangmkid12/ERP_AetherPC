@@ -1,3 +1,4 @@
+const { signOrderLink } = require('../utils/signedLink');
 const nodemailer = require('nodemailer');
 const fs = require('fs');
 const path = require('path');
@@ -538,7 +539,7 @@ const sendOrderStatusUpdateEmail = async ({ toEmail, customerName, orderId, stat
   const hasProof = Boolean(rawProofPhoto);
 
   // Link ảnh minh chứng công khai HTTPS để Gmail / webmail load qua Google Image Proxy
-  const publicProofUrl = `${BRAND.siteUrl}/api/v1/orders/${encodeURIComponent(orderId)}/proof-photo`;
+  const publicProofUrl = `${BRAND.siteUrl}/api/v1/orders/${encodeURIComponent(orderId)}/proof-photo?sig=${signOrderLink(orderId)}`;
   // Nếu rawProofPhoto là URL ngoài (https://...) thì dùng trực tiếp, nếu là base64 thì dùng public endpoint
   const activeProofPhoto = (rawProofPhoto && /^https?:\/\//i.test(rawProofPhoto)) ? rawProofPhoto : publicProofUrl;
   const isBase64Proof = rawProofPhoto && rawProofPhoto.startsWith('data:');

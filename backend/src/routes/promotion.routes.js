@@ -2,13 +2,17 @@ const express = require('express');
 const router = express.Router();
 const { authMiddleware } = require('../middlewares/auth.middleware');
 const { checkOperationalPermission } = require('../middlewares/rbac.middleware');
-const { listPromotions, createPromotion, updatePromotion, deletePromotion } = require('../controllers/promotion.controller');
+const { listPromotions, listActivePromotions, checkPromotion, createPromotion, updatePromotion, deletePromotion } = require('../controllers/promotion.controller');
 
 const VIEW_ROLES = ['SALES', 'SALES_MANAGER', 'CEO', 'ADMIN'];
 const MANAGE_ROLES = ['SALES_MANAGER', 'CEO', 'ADMIN'];
 
 // @route   GET /api/v1/promotions
 // @desc    Danh sách khuyến mãi thật (nhân viên Sales đứng quầy dùng để áp mã)
+// Công khai: mã đang hiệu lực và kiểm tra mã cho giỏ hàng (không trả về thông tin nội bộ)
+router.get('/active', listActivePromotions);
+router.get('/check', checkPromotion);
+
 router.get('/', authMiddleware(VIEW_ROLES), listPromotions);
 
 // @route   POST /api/v1/promotions

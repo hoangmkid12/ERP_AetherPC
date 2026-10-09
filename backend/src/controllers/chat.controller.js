@@ -3,6 +3,7 @@ const path = require('path');
 const { NlpManager } = require('node-nlp');
 const prisma = require('../config/database');
 const { findBestKnowledgeMatch } = require('../utils/chatKnowledgeBase');
+const compact = (v) => String(v || '').toLowerCase().replace(/[\s\-_]+/g, '');
 
 const formatVnd = (val) => new Intl.NumberFormat('vi-VN').format(parseFloat(val) || 0) + '₫';
 
@@ -463,7 +464,8 @@ const handleChat = async (req, res, next) => {
                 if (pName.includes(`${kw.value}tb`) || pSpecs.includes(`${kw.value}tb`)) score += 25;
                 break;
               case 'model':
-                if (pName.includes(kw.value) || pSpecs.includes(kw.value)) score += 35;
+                // So khớp bỏ khoảng trắng/gạch nối: "rtx 4060" ↔ "RTX4060" ↔ "RTX-4060"
+                if (compact(pName).includes(compact(kw.value)) || compact(pSpecs).includes(compact(kw.value))) score += 35;
                 break;
             }
           }
@@ -481,21 +483,29 @@ const handleChat = async (req, res, next) => {
         });
 
         scored.sort((a, b) => (b._score !== a._score ? b._score - a._score : parseFloat(a.price) - parseFloat(b.price)));
-        matchedProducts = scored.slice(0, 4);
+        // Khách hỏi đích danh một mẫu (RTX 4060, i5-13400…) → chỉ trả các sản phẩm đúng mẫu đó; nếu cửa hàng
+        // không có thì nói rõ rồi mới gợi ý mẫu khác (trước đây hỏi 4060 có thể trả về 4070 mà không báo).
+        const modelKws = entities.specs.filter(kw => kw.type === 'model' && !/^ddr/i.test(kw.value));
+        const isExactModel = (p) => modelKws.every(kw => compact(p.name).includes(compact(kw.value)) || compact(JSON.stringify(p.specs || {})).includes(compact(kw.value)));
+        const exact = modelKws.length ? scored.filter(isExactModel) : scored;
+        const modelMissing = modelKws.length > 0 && exact.length === 0;
+        matchedProducts = (modelMissing ? scored : exact).slice(0, 4);
 
         let desc = '';
-        if (isCompareRequest) {
+        if (modelMissing) {
+          desc += `Hiện cửa hàng chưa có sẵn **${modelKws.map(kw => kw.raw.toUpperCase()).join(', ')}**. Bạn có thể tham khảo các mẫu gần nhất:\n\n`;
+        } else if (isCompareRequest) {
           desc += `Dạ, để so sánh bạn xem chi tiết ${matchedProducts.length} sản phẩm phù hợp nhất bên dưới nhé (giá, thương hiệu, thông số đầy đủ):\n\n`;
         } else if (entities.category) {
           desc += `Dạ, tôi tìm thấy **${dbProducts.length} mẫu ${entities.category.name}** phù hợp. `;
         } else {
           desc += `Dạ, tôi tìm thấy linh kiện phù hợp theo yêu cầu của bạn. `;
         }
-        if (!isCompareRequest && entities.budget > 0) {
+        if (!modelMissing && !isCompareRequest && entities.budget > 0) {
           const budgetStr = new Intl.NumberFormat('vi-VN').format(entities.budget) + '₫';
           desc += `ở tầm giá dưới **${budgetStr}** `;
         }
-        if (!isCompareRequest) desc += 'tại cửa hàng:\n\n';
+        if (!modelMissing && !isCompareRequest) desc += 'tại cửa hàng:\n\n';
 
         matchedProducts.forEach((p, index) => {
           const priceStr = new Intl.NumberFormat('vi-VN').format(parseFloat(p.price)) + '₫';

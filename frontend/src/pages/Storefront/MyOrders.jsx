@@ -1456,7 +1456,7 @@ export default function MyOrders() {
                             </div>
                             {Number(selectedOrder.discount || 0) > 0 && (
                               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                <span>Giảm giá / Voucher:</span>
+                                <span>Giảm giá (hạng thành viên + mã KM):</span>
                                 <span style={{ color: '#16a34a', fontWeight: 600 }}>-{formatPrice(selectedOrder.discount)}</span>
                               </div>
                             )}

@@ -9,7 +9,7 @@ import {
   AlertTriangle, XCircle, Layers, Database, Gamepad2, Zap, HardDrive, Box, Wind,
   Copy, Printer, MessageSquare, ChevronDown, ChevronUp, X, SlidersHorizontal
 } from 'lucide-react';
-import { HARDWARE_KNOWLEDGE_BASE, parseCustomerPrompt, runAIOptimizer } from '../../config/pcBuilderAIKnowledge';
+import { HARDWARE_KNOWLEDGE_BASE, parseCustomerPrompt, runAIOptimizer, hasIntegratedGraphics } from '../../config/pcBuilderAIKnowledge';
 
 const COMPONENT_SLOTS = [
   { id: 'CPU', label: 'Bộ xử lý (CPU)', icon: <Cpu size={18} /> },
@@ -287,6 +287,13 @@ export default function PCBuilder() {
       }
     }
 
+    if (CPU && MAINBOARD && (!getSocket(CPU) || !getSocket(MAINBOARD))) {
+      newWarnings.push({
+        level: 'warning',
+        text: 'Chưa xác định được Socket của CPU hoặc Bo mạch chủ từ thông tin sản phẩm — vui lòng kiểm tra lại với nhân viên tư vấn.'
+      });
+    }
+
     // 2. Mainboard & RAM DDR generation check
     if (MAINBOARD && RAM) {
       const mbRamType = getRamType(MAINBOARD);
@@ -368,6 +375,13 @@ export default function PCBuilder() {
   const removePart = (slotId) => {
     setSelectedParts(prev => ({ ...prev, [slotId]: null }));
   };
+
+  const SLOT_LABELS_VI = { CPU: 'CPU', MAINBOARD: 'Bo mạch chủ', RAM: 'RAM', VGA: 'Card đồ họa', PSU: 'Nguồn', STORAGE: 'Ổ cứng', CASE: 'Vỏ case', COOLER: 'Tản nhiệt' };
+  const selectedCount = Object.values(selectedParts).filter(Boolean).length;
+  // Card đồ họa không bắt buộc khi CPU có nhân đồ họa tích hợp (cấu hình văn phòng)
+  const missingSlots = Object.keys(SLOT_LABELS_VI)
+    .filter(slot => !selectedParts[slot] && !(slot === 'VGA' && selectedParts.CPU && hasIntegratedGraphics(selectedParts.CPU)))
+    .map(slot => SLOT_LABELS_VI[slot]);
 
   const calculateTotalPrice = () => {
     return Object.values(selectedParts).reduce((sum, item) => sum + (item ? (parseFloat(item.price) || 0) : 0), 0);
@@ -468,12 +482,39 @@ export default function PCBuilder() {
     notify('Đã thêm toàn bộ linh kiện của cấu hình vào giỏ hàng thành công!', 'success');
   };
 
+  // Chuẩn hóa danh sách cho thuật toán AI: CSDL thường thiếu specs nên suy socket / loại RAM /
+  // công suất từ tên sản phẩm (cùng các hàm dùng cho bảng cảnh báo tương thích), đánh dấu RAM laptop,
+  // loại khỏi mục Tản nhiệt các món không phải tản CPU (hub USB, quạt case, keo…) và bỏ qua sản phẩm
+  // giá thử nghiệm (< 50.000đ) để AI không gợi ý chúng.
+  const COOLER_NAME = /tản nhiệt|tan nhiet|\bAIO\b|heatsink/i;
+  const NOT_CPU_COOLER = /^(bộ\s*\d+\s*)?quạt|hub|usb|keo|thermal paste|led strip|dây|cáp|cable|laptop|đế tản/i;
+  const prepareProductsForAI = (list) => list
+    .filter(p => p.available !== false && (Number(p.price) || 0) >= 50000)
+    .filter(p => {
+      const cat = (p.category || '').toUpperCase();
+      if (cat === 'COOLER') return COOLER_NAME.test(p.name || '') && !NOT_CPU_COOLER.test(p.name || '');
+      if (cat === 'RAM') return getRamFormFactor(p) !== 'SODIMM';
+      return true;
+    })
+    .map(p => {
+      const cat = (p.category || '').toUpperCase();
+      const specs = { ...(p.specs || {}) };
+      if (cat === 'CPU' || cat === 'MAINBOARD') specs.socket = getSocket(p) || undefined;
+      if (cat === 'MAINBOARD' || cat === 'RAM') specs.ram_type = getRamType(p) || undefined;
+      if (cat === 'RAM') specs.form_factor = getRamFormFactor(p);
+      if (cat === 'PSU') specs.wattage = getPsuWattageHelper(p) || undefined;
+      // Cùng cách ước tính công suất với thẻ "Điện năng tiêu thụ" của trang
+      if (cat === 'CPU') specs.tdp = getCpuTdp(p);
+      if (cat === 'VGA') specs.tdp = getVgaTdp(p);
+      return { ...p, specs };
+    });
+
   // Dynamic AI PC Build selector based on client needs & Knowledge Base Engine
   const generateAIBuild = (usage, budgetLimit, brandPref, customPrompt = '') => {
     setIsAnalyzingAI(true);
     setTimeout(() => {
       try {
-        const activeProducts = products.length > 0 ? products : FALLBACK_PRODUCTS;
+        const activeProducts = prepareProductsForAI(products.length > 0 ? products : FALLBACK_PRODUCTS);
         const result = runAIOptimizer({
           promptText: customPrompt || customPromptText,
           budgetInput: budgetLimit || aiBudget,
@@ -487,6 +528,11 @@ export default function PCBuilder() {
         if (result && result.build) {
           setSelectedParts(result.build);
           setAiReport(result);
+          if (result.missing?.length) {
+            notify(`Chưa tìm được linh kiện tương thích cho: ${result.missing.join(', ')}.`, 'info');
+          } else if (!result.withinBudget) {
+            notify('Cấu hình gợi ý vượt ngân sách — kho không có lựa chọn tương thích rẻ hơn.', 'info');
+          }
         }
       } catch (err) {
         console.error('AI build error:', err);
@@ -988,9 +1034,16 @@ export default function PCBuilder() {
                 <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#166534', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                   <Sparkles size={18} color="#16a34a" /> Báo Cáo Phân Tích &amp; Tối Ưu Linh Kiện Từ AI AetherPC
                 </div>
-                <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#15803d', backgroundColor: '#dcfce7', padding: '0.25rem 0.65rem', borderRadius: '20px', border: '1px solid #86efac' }}>
-                  100% Tương Thích Linh Kiện
-                </div>
+{(() => {
+                  const hasError = warnings.some(w => w.level === 'error');
+                  const ok = !hasError && !(aiReport.missing || []).length;
+                  const text = hasError ? 'Có xung đột linh kiện' : (aiReport.missing || []).length ? 'Thiếu linh kiện tương thích' : aiReport.withinBudget === false ? 'Tương thích · vượt ngân sách' : 'Tương thích · trong ngân sách';
+                  return (
+                    <div style={{ fontSize: '0.75rem', fontWeight: 800, color: ok ? '#15803d' : '#b45309', backgroundColor: ok ? '#dcfce7' : '#fef3c7', padding: '0.25rem 0.65rem', borderRadius: '20px', border: ok ? '1px solid #86efac' : '1px solid #fcd34d' }}>
+                      {text}
+                    </div>
+                  );
+                })()}
               </div>
               <p style={{ fontSize: '0.83rem', color: '#166534', margin: '0 0 0.6rem 0', lineHeight: 1.6, whiteSpace: 'pre-line' }}>
                 {aiReport.aiExplanation}
@@ -1359,7 +1412,7 @@ export default function PCBuilder() {
               một thẻ duy nhất (trước đây là 2 thẻ tách rời, xếp chồng không cần thiết). */}
           <div className="card-glass" style={{ padding: '1.5rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', borderBottom: '1px solid var(--border-glass)', paddingBottom: '0.5rem' }}>
-              {warnings.length === 0 ? (
+              {warnings.length === 0 && selectedCount > 0 && missingSlots.length === 0 ? (
                 <ShieldCheck size={20} style={{ color: 'var(--success)' }} />
               ) : (
                 <ShieldAlert size={20} style={{ color: 'var(--warning)' }} />
@@ -1369,14 +1422,18 @@ export default function PCBuilder() {
 
             {warnings.length === 0 ? (
               <div style={{
-                color: 'var(--success)',
+                color: selectedCount > 0 && missingSlots.length === 0 ? 'var(--success)' : 'var(--text-secondary)',
                 fontSize: '0.875rem',
                 backgroundColor: 'rgba(16, 185, 129, 0.08)',
                 border: '1px solid rgba(16, 185, 129, 0.2)',
                 borderRadius: 'var(--radius-md)',
                 padding: '0.75rem 1rem'
               }}>
-                Tất cả linh kiện được chọn hiện tại hoàn toàn tương thích với nhau. Bạn có thể yên tâm đặt hàng.
+                {selectedCount === 0
+                  ? 'Chưa chọn linh kiện nào. Hãy chọn linh kiện hoặc dùng AI gợi ý cấu hình.'
+                  : missingSlots.length > 0
+                  ? `Chưa phát hiện xung đột giữa ${selectedCount} linh kiện đã chọn. Còn thiếu: ${missingSlots.join(', ')}.`
+                  : 'Không phát hiện xung đột Socket, chuẩn RAM, kích thước và công suất nguồn giữa các linh kiện đã chọn.'}
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
@@ -1448,19 +1505,19 @@ export default function PCBuilder() {
               <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed var(--border-glass)', paddingBottom: '0.375rem' }}>
                 <span style={{ color: 'var(--text-muted)' }}>Socket CPU:</span>
                 <span style={{ fontWeight: 700, color: selectedParts.CPU ? 'var(--text-primary)' : 'var(--text-muted)' }}>
-                  {selectedParts.CPU ? (getSocket(selectedParts.CPU) || 'Đang phân tích...') : 'Chưa chọn'}
+                  {selectedParts.CPU ? (getSocket(selectedParts.CPU) || 'Không xác định') : 'Chưa chọn'}
                 </span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed var(--border-glass)', paddingBottom: '0.375rem' }}>
                 <span style={{ color: 'var(--text-muted)' }}>Socket Bo mạch chủ:</span>
                 <span style={{ fontWeight: 700, color: selectedParts.MAINBOARD ? 'var(--text-primary)' : 'var(--text-muted)' }}>
-                  {selectedParts.MAINBOARD ? (getSocket(selectedParts.MAINBOARD) || 'Đang phân tích...') : 'Chưa chọn'}
+                  {selectedParts.MAINBOARD ? (getSocket(selectedParts.MAINBOARD) || 'Không xác định') : 'Chưa chọn'}
                 </span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed var(--border-glass)', paddingBottom: '0.375rem' }}>
                 <span style={{ color: 'var(--text-muted)' }}>RAM hỗ trợ (Mainboard):</span>
                 <span style={{ fontWeight: 700, color: selectedParts.MAINBOARD ? 'var(--text-primary)' : 'var(--text-muted)' }}>
-                  {selectedParts.MAINBOARD ? (getRamType(selectedParts.MAINBOARD) || 'Đang phân tích...') : 'Chưa chọn'}
+                  {selectedParts.MAINBOARD ? (getRamType(selectedParts.MAINBOARD) || 'Không xác định') : 'Chưa chọn'}
                 </span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed var(--border-glass)', paddingBottom: '0.375rem' }}>
@@ -1630,7 +1687,7 @@ export default function PCBuilder() {
               const { CPU, MAINBOARD, RAM } = selectedParts;
               let reasonText = null;
               if (activeSlot === 'MAINBOARD' && CPU) {
-                reasonText = `Đang đề xuất Bo mạch chủ Socket [${getSocket(CPU) || 'tương thích'}] trùng khớp 100% với CPU ${CPU.name}`;
+                reasonText = `Đang đề xuất Bo mạch chủ Socket [${getSocket(CPU) || 'tương thích'}] trùng khớp với CPU ${CPU.name}`;
               } else if (activeSlot === 'CPU' && MAINBOARD) {
                 reasonText = `Đang đề xuất CPU Socket [${getSocket(MAINBOARD) || 'tương thích'}] tương thích với Bo mạch chủ ${MAINBOARD.name}`;
               } else if (activeSlot === 'RAM' && MAINBOARD) {
@@ -1724,7 +1781,7 @@ export default function PCBuilder() {
                         style={{ cursor: 'pointer' }}
                       />
                       <label htmlFor="compat-filter" style={{ fontSize: '0.8rem', cursor: 'pointer', userSelect: 'none', fontWeight: 600, color: 'var(--primary)' }}>
-                        Chỉ hiện linh kiện tương thích 100%
+                        Chỉ hiện linh kiện tương thích
                       </label>
                     </div>
                   )}

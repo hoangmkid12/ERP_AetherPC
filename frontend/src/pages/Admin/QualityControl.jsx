@@ -494,32 +494,55 @@ export default function QualityControl() {
     { label: 'Nghiệm Thu Một Phần', value: `${partialQaPOs.length} lô hàng`, change: 'Nhận SP đạt & Trả SP lỗi', icon: <AlertTriangle size={20} />, color: '#ea580c', bg: '#fff7ed' },
     { label: 'Hoàn Trả NCC 100%', value: `${rejectedQaPOs.length} lô hàng`, change: 'Từ chối toàn bộ do lỗi nặng', icon: <XCircle size={20} />, color: '#ef4444', bg: '#fef2f2' },
     { label: 'Tỷ Lệ Đạt Chuẩn QA', value: passRate === null ? '—' : `${passRate}%`, change: 'Mục tiêu kiểm định >= 95%', icon: <Award size={20} />, color: '#2563eb', bg: '#eff6ff' },
-    { label: 'Đổi Trả Khách (RMA)', value: `${returnRequests.length || 3} yêu cầu`, change: 'Thẩm định lỗi phần cứng', icon: <ShieldAlert size={20} />, color: '#8b5cf6', bg: '#f5f3ff' }
+    { label: 'Đổi Trả Khách (RMA)', value: `${returnRequests.length} yêu cầu`, change: `${returnRequests.filter(r => r.status === 'DELIVERED_TO_WAREHOUSE').length} yêu cầu chờ thẩm định`, icon: <ShieldAlert size={20} />, color: '#8b5cf6', bg: '#f5f3ff' }
   ];
 
-  // Defect Distribution Chart Data
+  // Biểu đồ lấy từ dữ liệu thật: biên bản kiểm định lô nhập (receipts.qcInspections của PO trong kỳ)
+  // và kết luận thẩm định đổi trả (qcDefectType của yêu cầu RMA).
+  const poInspections = ordersInPeriod.flatMap(po => (po.receipts || []).flatMap(r => r.qcInspections || []));
+  const inboundDefective = poInspections.reduce((sum, q) => sum + (Number(q.defectiveQuantity) || 0), 0);
+  const rmaDefectCounts = returnRequests.reduce((acc, r) => {
+    const k = r.qcDefectType;
+    if (k && k !== 'NONE' && k !== 'NORMAL_RESTOCK') acc[k] = (acc[k] || 0) + 1;
+    return acc;
+  }, {});
+  const defectEntries = [
+    ...(inboundDefective > 0 ? [['Lỗi phát hiện khi nhập hàng NCC', inboundDefective]] : []),
+    ...Object.entries(rmaDefectCounts).map(([k, n]) => [`Đổi trả: ${(DEFECT_LABELS[k] || k).split(' (')[0]}`, n])
+  ];
   const defectChartData = {
-    labels: ['Móp Hộp / Rách Seal', 'Lỗi Nguồn / Mạch Điện', 'Thiếu Tem / Sai Serial', 'Sai Thông Số', 'Lỗi Khác'],
+    labels: defectEntries.length ? defectEntries.map(([label]) => label) : ['Chưa ghi nhận lỗi'],
     datasets: [
       {
-        data: [4, 2, 3, 1, 1],
-        backgroundColor: ['#f59e0b', '#ef4444', '#8b5cf6', '#3b82f6', '#64748b']
+        data: defectEntries.length ? defectEntries.map(([, n]) => n) : [1],
+        backgroundColor: defectEntries.length ? ['#f59e0b', '#ef4444', '#8b5cf6', '#3b82f6', '#64748b', '#0ea5e9', '#14b8a6', '#a855f7'] : ['#e2e8f0']
       }
     ]
   };
 
-  // Weekly Inspection Pass vs Fail Chart
+  // Số linh kiện đạt / lỗi theo 4 tuần gần nhất (theo ngày kiểm định)
+  const weekStarts = Array.from({ length: 4 }, (_, idx) => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() - 7 * (3 - idx) - 6);
+    return d;
+  });
+  const allInspections = orders.flatMap(po => (po.receipts || []).flatMap(r => r.qcInspections || []));
+  const inWeek = (q, start) => {
+    const t = new Date(q.inspectedAt).getTime();
+    return t >= start.getTime() && t < start.getTime() + 7 * 86400000;
+  };
   const weeklyChartData = {
-    labels: ['Tuần 1', 'Tuần 2', 'Tuần 3', 'Tuần 4 (Hiện tại)'],
+    labels: weekStarts.map((d, idx) => `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}${idx === 3 ? ' (tuần này)' : ''}`),
     datasets: [
       {
-        label: 'Sản Phẩm Đạt Chuẩn (Passed)',
-        data: [140, 185, 210, 195],
+        label: 'Sản Phẩm Đạt Chuẩn',
+        data: weekStarts.map(w => allInspections.filter(q => inWeek(q, w)).reduce((s2, q) => s2 + (Number(q.passedQuantity) || 0), 0)),
         backgroundColor: '#16a34a'
       },
       {
-        label: 'Sản Phẩm Lỗi (Defective)',
-        data: [4, 6, 3, 5],
+        label: 'Sản Phẩm Lỗi',
+        data: weekStarts.map(w => allInspections.filter(q => inWeek(q, w)).reduce((s2, q) => s2 + (Number(q.defectiveQuantity) || 0), 0)),
         backgroundColor: '#ef4444'
       }
     ]
@@ -1271,7 +1294,7 @@ export default function QualityControl() {
             {/* Weekly Pass Rate Chart */}
             <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1.25rem', height: '320px', display: 'flex', flexDirection: 'column' }}>
               <h3 style={{ fontSize: '0.92rem', fontWeight: 800, color: '#0f172a', margin: '0 0 1rem 0' }}>
-                Khối Lượng Linh Kiện Đạt Chuẩn vs Lỗi Theo Tuần
+                Linh Kiện Đạt Chuẩn vs Lỗi — 4 Tuần Gần Nhất
               </h3>
               <div style={{ flex: 1, position: 'relative' }}>
                 <Bar

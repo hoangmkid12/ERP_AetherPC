@@ -124,4 +124,40 @@ const deleteComplaint = async (req, res, next) => {
   }
 };
 
-module.exports = { getComplaints, createComplaint, updateComplaint, deleteComplaint };
+// GET /api/v1/complaints/feedback-summary — tổng hợp đánh giá sản phẩm thật của khách cho tab
+// "Khảo sát & CSAT" của CSKH (trước đây là số liệu dựng sẵn).
+const getFeedbackSummary = async (req, res, next) => {
+  try {
+    const [agg, groups, recent] = await Promise.all([
+      prisma.productReview.aggregate({ _avg: { rating: true }, _count: { _all: true } }),
+      prisma.productReview.groupBy({ by: ['rating'], _count: { _all: true } }),
+      prisma.productReview.findMany({
+        take: 8,
+        orderBy: { createdAt: 'desc' },
+        include: { customer: { select: { name: true } }, product: { select: { name: true } } }
+      })
+    ]);
+    const total = agg._count._all;
+    const countOf = (r) => groups.find(g => g.rating === r)?._count._all || 0;
+    res.json({
+      success: true,
+      data: {
+        total,
+        average: total ? Number(agg._avg.rating.toFixed(2)) : null,
+        distribution: { 5: countOf(5), 4: countOf(4), 3: countOf(3), 2: countOf(2), 1: countOf(1) },
+        recent: recent.map(r => ({
+          id: r.id,
+          name: r.customer?.name || 'Khách hàng',
+          productName: r.product?.name || '',
+          rating: r.rating,
+          comment: r.comment || '',
+          createdAt: r.createdAt
+        }))
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+module.exports = { getComplaints, createComplaint, updateComplaint, deleteComplaint, getFeedbackSummary };

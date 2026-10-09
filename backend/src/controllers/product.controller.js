@@ -30,6 +30,14 @@ const PRODUCT_CODE_TO_CATEGORY_SLUG = {
   MOUSE: 'mouse'
 };
 
+// Giá vốn bình quân là dữ liệu kinh doanh nội bộ — không trả về ở các API công khai của cửa hàng.
+const stripCost = (p) => {
+  if (!p || typeof p !== 'object') return p;
+  const { averageCost, ...rest } = p;
+  return rest;
+};
+const stripCostList = (list) => Array.isArray(list) ? list.map(stripCost) : list;
+
 const getProducts = async (req, res, next) => {
   try {
     const { category, brand, min_price, max_price, search } = req.query;
@@ -90,7 +98,7 @@ const getProducts = async (req, res, next) => {
 
     res.json({
       success: true,
-      data: products,
+      data: stripCostList(products),
       pagination: {
         total,
         page: pageNum || 1,
@@ -125,7 +133,7 @@ const getProductById = async (req, res, next) => {
 
     res.json({
       success: true,
-      data: product
+      data: stripCost(product)
     });
   } catch (err) {
     next(err);
@@ -185,7 +193,7 @@ const getBestSellers = async (req, res, next) => {
   try {
     const limit = parseInt(req.query.limit, 10) || 8;
     const data = await computeBestSellers(limit);
-    res.json({ success: true, data });
+    res.json({ success: true, data: stripCostList(data) });
   } catch (err) {
     next(err);
   }
@@ -201,7 +209,7 @@ const getPersonalizedRecommendations = async (req, res, next) => {
     const limit = parseInt(req.query.limit, 10) || 8;
 
     if (!req.user || req.user.role !== 'CUSTOMER') {
-      return res.json({ success: true, personalized: false, data: await computeBestSellers(limit) });
+      return res.json({ success: true, personalized: false, data: stripCostList(await computeBestSellers(limit)) });
     }
 
     const pastItems = await prisma.orderItem.findMany({
@@ -212,7 +220,7 @@ const getPersonalizedRecommendations = async (req, res, next) => {
     });
 
     if (pastItems.length === 0) {
-      return res.json({ success: true, personalized: false, data: await computeBestSellers(limit) });
+      return res.json({ success: true, personalized: false, data: stripCostList(await computeBestSellers(limit)) });
     }
 
     const purchasedIds = [...new Set(pastItems.map(i => i.productId))];
@@ -244,7 +252,7 @@ const getPersonalizedRecommendations = async (req, res, next) => {
     });
 
     if (candidates.length === 0) {
-      return res.json({ success: true, personalized: false, data: await computeBestSellers(limit, purchasedIds) });
+      return res.json({ success: true, personalized: false, data: stripCostList(await computeBestSellers(limit, purchasedIds)) });
     }
 
     const scored = candidates
@@ -255,7 +263,7 @@ const getPersonalizedRecommendations = async (req, res, next) => {
       .sort((a, b) => b._score - a._score)
       .slice(0, limit);
 
-    res.json({ success: true, personalized: true, data: scored });
+    res.json({ success: true, personalized: true, data: stripCostList(scored) });
   } catch (err) {
     next(err);
   }
@@ -336,7 +344,7 @@ const getAIRecommendations = async (req, res, next) => {
     res.json({
       success: true,
       algorithm: usedAlgorithms.join(' + ') || 'Content-Based Filtering',
-      data: combined
+      data: stripCostList(combined)
     });
   } catch (err) {
     next(err);

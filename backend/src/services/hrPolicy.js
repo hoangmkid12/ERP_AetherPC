@@ -51,6 +51,9 @@ const OT_RATE = { WEEKDAY: 1.5, REST_DAY: 2.0, HOLIDAY: 3.0 };
 const UNPAID_LEAVE_TYPES = ['Không Lương'];
 // Loại nghỉ trừ vào quỹ phép năm.
 const ANNUAL_LEAVE_TYPES = ['Phép Năm'];
+// Danh sách loại nghỉ hợp lệ duy nhất (khớp form ở EmployeePortal/Sidebar/HRManager). Loại khác bị từ chối —
+// trước đây gửi loại tự đặt (vd "ANNUAL") là vượt được quỹ phép mà vẫn được tính lương.
+const LEAVE_TYPES = ['Phép Năm', 'Nghỉ Ốm', 'Việc Riêng', 'Không Lương'];
 
 // ─── Thời gian theo giờ Việt Nam ───
 const vnParts = (d = new Date()) => {
@@ -185,7 +188,7 @@ const isValidDescriptor = (d) => Array.isArray(d) && d.length === 128 && d.every
 module.exports = {
   VN_TZ, BASE_SALARY_LEVEL, INSURANCE_CAP, EMPLOYEE_RATES, EMPLOYER_RATES, NO_INSURANCE_UNPAID_DAYS,
   familyDeduction, taxBrackets, overtimeFullyExempt, progressiveTax, MEAL_ALLOWANCE_TAX_FREE, OT_RATE,
-  UNPAID_LEAVE_TYPES, ANNUAL_LEAVE_TYPES,
+  UNPAID_LEAVE_TYPES, ANNUAL_LEAVE_TYPES, LEAVE_TYPES,
   vnToday, vnNowHHMM, toMinutes, isoDate, standardHoursPerDay, computeAttendanceMetrics,
   isScheduledWorkday, monthRange, eachDay, countLeaveWorkdays, annualLeaveEntitlement,
   euclideanDistance, isValidDescriptor

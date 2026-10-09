@@ -34,5 +34,6 @@ RUN npx prisma generate
 # Mở cổng port 5000 cho backend service
 EXPOSE 5000
 
-# Chạy lệnh cập nhật database schema, seed nếu trống, sau đó khởi chạy server ở chế độ ổn định
-CMD ["sh", "-c", "npx prisma db push --accept-data-loss && node prisma/seed-if-empty.js && node prisma/sync-supplier-accounts.js && node prisma/seed-rbac-if-empty.js && node prisma/rebalance-warehouse-locations.js && node prisma/rename-categories.js && node prisma/fix-payroll-settings.js && node prisma/upgrade-hr-module.js && node prisma/seed-sample-leaves.js && node prisma/seed-promotions-if-empty.js && node prisma/backfillDefaultSupplier.js && npm start"]
+# Đồng bộ schema (KHÔNG --accept-data-loss: thay đổi có thể mất dữ liệu sẽ dừng khởi động thay vì xóa cột),
+# seed nếu trống, sau đó khởi chạy server
+CMD ["sh", "-c", "npx prisma db push && node prisma/seed-if-empty.js && node prisma/sync-supplier-accounts.js && node prisma/seed-rbac-if-empty.js && node prisma/rebalance-warehouse-locations.js && node prisma/rename-categories.js && node prisma/fix-payroll-settings.js && node prisma/upgrade-hr-module.js && node prisma/seed-sample-leaves.js && node prisma/seed-promotions-if-empty.js && node prisma/backfillDefaultSupplier.js && npm start"]

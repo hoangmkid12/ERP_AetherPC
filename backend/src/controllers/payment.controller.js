@@ -9,8 +9,11 @@ const STAFF_ROLES = ['SALES', 'SALES_MANAGER', 'CSKH', 'ACCOUNTANT', 'CEO', 'ADM
 const fmt = (n) => `${Math.round(Number(n) || 0).toLocaleString('vi-VN')}đ`;
 
 // Lý do một khoản chuyển khoản phải hoàn lại cho khách
-function refundReasonOf(payment, order) {
+// paidAt: thời điểm đơn được thanh toán đủ (giao dịch SUCCESS) — khoản đến sau mốc này là chuyển thêm/trùng.
+function refundReasonOf(payment, order, paidAt = null) {
   if (String(payment.transactionId || '').endsWith('-DU')) return 'Chuyển dư so với giá trị đơn';
+  if (String(payment.transactionId || '').endsWith('-HUY')) return 'Đơn đã thanh toán nhưng bị hủy';
+  if (paidAt && new Date(payment.createdAt) > new Date(paidAt)) return 'Chuyển thêm sau khi đơn đã thanh toán';
   if (order?.status === 'CANCELLED') return 'Chuyển vào đơn đã hủy';
   if (Number(payment.amount) < Number(order?.totalAmount || 0)) return 'Chuyển thiếu số tiền đơn hàng';
   return 'Chuyển trùng, đơn đã được thanh toán';
@@ -38,6 +41,10 @@ const getSepayPayment = async (req, res, next) => {
       select: { amount: true, status: true, createdAt: true, transactionId: true },
       orderBy: { createdAt: 'asc' },
     });
+    const firstPaid = await prisma.orderPayment.findFirst({
+      where: { orderId: order.orderId, method: 'BANK_TRANSFER', status: 'SUCCESS' },
+      select: { createdAt: true }, orderBy: { createdAt: 'asc' },
+    });
     const total = Number(order.totalAmount);
     const base = {
       orderId: order.orderId,
@@ -49,7 +56,7 @@ const getSepayPayment = async (req, res, next) => {
       // Khoản đã chuyển nhưng không dùng để thanh toán đơn (thiếu / dư / trùng) — sẽ được hoàn lại
       refunds: refundRows.map(r => ({
         amount: Number(r.amount), status: r.status, at: r.createdAt,
-        reason: refundReasonOf(r, order),
+        reason: refundReasonOf(r, order, firstPaid?.createdAt),
       })),
     };
 
@@ -241,12 +248,19 @@ const listTransferRefunds = async (req, res, next) => {
       take: 200,
     });
     // Mã giao dịch ngân hàng gốc nằm trong mô tả bút toán thu tương ứng
-    const baseIdOf = (r) => r.transactionId.replace(/-DU$/, '');
+    const baseIdOf = (r) => r.transactionId.replace(/-(DU|HUY)$/, '');
     const ledger = await prisma.ledgerEntry.findMany({
       where: { referenceId: { in: [...new Set(rows.map(baseIdOf))] }, type: 'INCOME' },
       select: { referenceId: true, description: true, date: true },
     });
     const ledgerOf = Object.fromEntries(ledger.map(l => [l.referenceId, l]));
+    const paidRows = await prisma.orderPayment.findMany({
+      where: { orderId: { in: [...new Set(rows.map(r => r.orderId))] }, method: 'BANK_TRANSFER', status: 'SUCCESS' },
+      select: { orderId: true, createdAt: true },
+      orderBy: { createdAt: 'asc' },
+    });
+    const paidAtOf = {};
+    for (const p of paidRows) if (!paidAtOf[p.orderId]) paidAtOf[p.orderId] = p.createdAt;
     res.json({
       success: true,
       data: rows.map(r => {
@@ -256,7 +270,7 @@ const listTransferRefunds = async (req, res, next) => {
           orderId: r.orderId,
           amount: Number(r.amount),
           status: r.status,
-          reason: refundReasonOf(r, r.order),
+          reason: refundReasonOf(r, r.order, paidAtOf[r.orderId]),
           receivedAt: l?.date || r.createdAt,
           bankRef: (l?.description.match(/Mã GD ngân hàng ([^)\s]+)/) || [])[1] || null,
           refundedAt: r.status === 'REFUNDED' ? r.settledAt : null,
@@ -300,9 +314,13 @@ const completeTransferRefund = async (req, res, next) => {
         throw error;
       }
       const payment = await db.orderPayment.findUnique({ where: { id }, include: { order: true } });
-      const income = await db.ledgerEntry.findFirst({ where: { referenceId: payment.transactionId.replace(/-DU$/, ''), type: 'INCOME' } });
+      const income = await db.ledgerEntry.findFirst({ where: { referenceId: payment.transactionId.replace(/-(DU|HUY)$/, ''), type: 'INCOME' } });
       const amount = Number(payment.amount);
-      const reason = refundReasonOf(payment, payment.order);
+      const firstPaid = await db.orderPayment.findFirst({
+        where: { orderId: payment.orderId, method: 'BANK_TRANSFER', status: 'SUCCESS' },
+        select: { createdAt: true }, orderBy: { createdAt: 'asc' },
+      });
+      const reason = refundReasonOf(payment, payment.order, firstPaid?.createdAt);
       const detail = `(${reason}) · Mã GD hoàn ${refundRef}${note ? ` · ${note}` : ''}`;
 
       await db.ledgerEntry.create({

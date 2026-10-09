@@ -1,5 +1,6 @@
 const prisma = require('../config/database');
 const { logAudit } = require('../utils/auditLog');
+const { isUsable, discountOf } = require('../services/promotion');
 
 const serializePromotion = (p) => ({
   id: p.id,
@@ -100,4 +101,29 @@ const deletePromotion = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-module.exports = { listPromotions, createPromotion, updatePromotion, deletePromotion };
+// GET /api/v1/promotions/active — mã đang hiệu lực, hiển thị công khai ở trang Khuyến mãi và giỏ hàng
+const listActivePromotions = async (req, res, next) => {
+  try {
+    const promotions = await prisma.promotion.findMany({ where: { status: 'ACTIVE' }, orderBy: { minSpend: 'asc' } });
+    res.json({ success: true, data: promotions.filter(p => isUsable(p)).map(serializePromotion) });
+  } catch (err) { next(err); }
+};
+
+// GET /api/v1/promotions/check?code=&subtotal= — kiểm tra mã cho giỏ hàng. Chỉ để hiển thị trước;
+// khi tạo đơn, máy chủ tính lại tiền giảm từ mã (không nhận số tiền giảm do trình duyệt gửi).
+const checkPromotion = async (req, res, next) => {
+  try {
+    const code = String(req.query.code || '').trim().toUpperCase();
+    const subtotal = Number(req.query.subtotal) || 0;
+    const p = code ? await prisma.promotion.findUnique({ where: { code } }) : null;
+    if (!isUsable(p)) {
+      return res.status(404).json({ success: false, message: 'Mã giảm giá không chính xác hoặc đã hết hạn.' });
+    }
+    if (subtotal < Number(p.minSpend || 0)) {
+      return res.status(400).json({ success: false, message: `Mã ${p.code} chỉ áp dụng cho đơn từ ${Number(p.minSpend).toLocaleString('vi-VN')}đ.`, data: serializePromotion(p) });
+    }
+    res.json({ success: true, data: { ...serializePromotion(p), discountAmount: discountOf(p, subtotal) } });
+  } catch (err) { next(err); }
+};
+
+module.exports = { listPromotions, listActivePromotions, checkPromotion, createPromotion, updatePromotion, deletePromotion };

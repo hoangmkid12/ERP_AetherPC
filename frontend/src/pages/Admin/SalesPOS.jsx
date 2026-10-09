@@ -1630,7 +1630,7 @@ export default function SalesPOS() {
               <option value="BRONZE">Hạng Đồng</option>
               <option value="SILVER">Hạng Bạc</option>
               <option value="GOLD">Hạng Vàng</option>
-              <option value="PLATINUM">Hạng Kim Cương</option>
+              <option value="PLATINUM">Hạng Bạch Kim</option>
             </select>
             <select
               value={customerStatusFilter}
@@ -2591,7 +2591,7 @@ export default function SalesPOS() {
                     <option value="BRONZE">Hạng Đồng</option>
                     <option value="SILVER">Hạng Bạc</option>
                     <option value="GOLD">Hạng Vàng</option>
-                    <option value="PLATINUM">Hạng Kim Cương</option>
+                    <option value="PLATINUM">Hạng Bạch Kim</option>
                   </select>
                 </div>
               </div>
