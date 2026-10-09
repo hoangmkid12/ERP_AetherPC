@@ -267,15 +267,12 @@ digraph UseCaseAetherPC {
   // (như thử ban đầu) khiến dot không còn đủ ràng buộc hợp lệ và đẩy cả
   // a18 lẫn note_nhanvien lên tận đầu sơ đồ — lỗi đã gặp và sửa ở đây.
   a18 [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="2"><TR><TD><IMG SRC="actor_icon.png"/></TD></TR><TR><TD>Nhân Viên</TD></TR></TABLE>>];
-  // Nhân Viên Văn Phòng (role EMPLOYEE) — tài khoản nhân viên chung, chỉ dùng
-  // các chức năng tự phục vụ kế thừa từ «Nhân Viên», không có use case riêng.
-  a19 [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="2"><TR><TD><IMG SRC="actor_icon.png"/></TD></TR><TR><TD>Nhân Viên<BR/>Văn Phòng</TD></TR></TABLE>>];
-  { rank=same; a9; a10; a11; a12; a17; a13; a14; a15; a16; a18; a19; }
+  { rank=same; a9; a10; a11; a12; a17; a13; a14; a15; a16; a18; }
   // a17 (Hệ Thống Email) đặt cạnh Giao Hàng vì email trạng thái đơn
   // hàng gắn với bước xuất kho/giao hàng — không đi vòng xa. a18 đặt
   // CUỐI chuỗi (sau a16) vì nó chỉ liên quan use case ở cuối cột 4
   // (uc_xinnghi/uc_luongtoi đứng sau uc_tonkho, sát uc_grn).
-  a9 -> a10 -> a11 -> a12 -> a17 -> a13 -> a14 -> a15 -> a16 -> a18 -> a19 [style=invis];
+  a9 -> a10 -> a11 -> a12 -> a17 -> a13 -> a14 -> a15 -> a16 -> a18 [style=invis];
 
   // ============================================================
   // ASSOCIATION — Actor cột 1 ↔ Use case cột 2 (liền kề)
@@ -374,8 +371,6 @@ digraph UseCaseAetherPC {
   // Tương tự: Quản Lý Bán Hàng làm được mọi việc Nhân Viên Bán Hàng
   // làm (POS, xử lý đơn) cộng thêm quyền duyệt hủy đơn riêng.
   a5  -> a4 [arrowhead=empty, style=solid, constraint=false, weight=0];
-  // Nhân Viên Văn Phòng nằm ngay dưới «Nhân Viên» nên vẽ được mũi tên kế thừa tường minh.
-  a19 -> a18 [arrowhead=empty, style=solid, constraint=false, weight=0];
 
   // ---- KE THUA VE Nhan Vien (a18) ----
   // Da thu ve du 11 mui ten tam giac rong tu 11 vai tro noi bo ve a18
@@ -391,7 +386,7 @@ digraph UseCaseAetherPC {
   // ---- NOTE 1: giai thich quan he ke thua actor ----
   note_nhanvien [shape=note, style=filled, fillcolor="#fffde7", color="#999999",
     fontsize=9, fontname="Arial", margin=0.15,
-    label="KẾ THỪA ACTOR\l\lNhân Viên là actor cha của 12 vai trò nội bộ, nên vai trò\lnào cũng dùng được 5 chức năng chung ở trên.\lNhân Viên Văn Phòng chỉ dùng các chức năng chung này.\lQuản Lý Bán Hàng kế thừa Nhân Viên Bán Hàng.\lQuản Lý Kho kế thừa Nhân Viên Kho.\lKhách Hàng Thành Viên kế thừa Khách Vãng Lai.\l"];
+    label="KẾ THỪA ACTOR\l\lNhân Viên là actor cha của 12 vai trò nội bộ, nên vai trò\lnào cũng dùng được 5 chức năng chung ở trên.\lQuản Lý Bán Hàng kế thừa Nhân Viên Bán Hàng.\lQuản Lý Kho kế thừa Nhân Viên Kho.\lKhách Hàng Thành Viên kế thừa Khách Vãng Lai.\l"];
   a18 -> note_nhanvien [style=dashed, arrowhead=none, constraint=false, weight=0];
 
   // NOTE thứ 2 — giải thích trực quan NGAY TRÊN sơ đồ vì sao không có use

@@ -37,7 +37,7 @@ export const downloadCsv = (filename, header, rows) => {
 };
 
 export const ROLE_OPTIONS = [
-  ['EMPLOYEE', 'Nhân viên văn phòng (tài khoản chung)'],
+  ['EMPLOYEE', 'Nhân viên (tài khoản chung)'],
   ['SALES', 'Nhân viên bán hàng'], ['SALES_MANAGER', 'Quản lý bán hàng'],
   ['WAREHOUSE', 'Thủ kho'], ['WAREHOUSE_MANAGER', 'Quản lý kho'],
   ['PURCHASING', 'Nhân viên mua hàng'], ['QC', 'Kiểm định chất lượng'],

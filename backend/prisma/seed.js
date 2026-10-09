@@ -412,7 +412,7 @@ async function main() {
     { id: 20, code: 'delivery_kv2', name: 'Trần Minh Khoa (Shipper KV2)', email: 'delivery.kv2@kltn-erp.vn', dept: 'Delivery', role: 'DELIVERY', salary: 9000000, deliveryRegion: 'HCM_KV2' },
     { id: 21, code: 'delivery_kv3', name: 'Lê Hoàng Phúc (Shipper KV3)', email: 'delivery.kv3@kltn-erp.vn', dept: 'Delivery', role: 'DELIVERY', salary: 9000000, deliveryRegion: 'HCM_KV3' },
     { id: 22, code: 'delivery_kv4', name: 'Phạm Đức Thắng (Shipper KV4)', email: 'delivery.kv4@kltn-erp.vn', dept: 'Delivery', role: 'DELIVERY', salary: 9000000, deliveryRegion: 'HCM_KV4' },
-    // Tài khoản nhân viên chung (văn phòng) — chỉ có chức năng tự phục vụ: chấm công khuôn mặt,
+    // Tài khoản nhân viên chung — chỉ có chức năng tự phục vụ: chấm công khuôn mặt,
     // nghỉ phép, phiếu lương, hồ sơ cá nhân, tra cứu tài liệu nội bộ.
     { id: 23, code: GENERAL_EMPLOYEE.code, name: GENERAL_EMPLOYEE.name, email: GENERAL_EMPLOYEE.email, dept: GENERAL_EMPLOYEE.dept, role: GENERAL_EMPLOYEE.role, phone: GENERAL_EMPLOYEE.phone }
   ];

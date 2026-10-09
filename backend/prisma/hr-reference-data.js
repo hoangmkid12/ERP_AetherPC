@@ -22,7 +22,7 @@ const SALARY_GRID = {
   ASSEMBLY:          { baseSalary: 10000000, responsibilityAllowance: 0,       allowance: 930000,  jobTitle: 'Kỹ thuật viên lắp ráp' },
   CSKH:              { baseSalary: 9000000,  responsibilityAllowance: 0,       allowance: 1030000, jobTitle: 'Chuyên viên chăm sóc khách hàng' },
   DELIVERY:          { baseSalary: 7500000,  responsibilityAllowance: 0,       allowance: 1730000, jobTitle: 'Nhân viên giao hàng' },
-  EMPLOYEE:          { baseSalary: 8000000,  responsibilityAllowance: 0,       allowance: 930000,  jobTitle: 'Nhân viên hành chính - văn phòng' }
+  EMPLOYEE:          { baseSalary: 8000000,  responsibilityAllowance: 0,       allowance: 930000,  jobTitle: 'Nhân viên' }
 };
 
 // Tài khoản nhân viên chung: đăng nhập "nhanvien" / "123456".

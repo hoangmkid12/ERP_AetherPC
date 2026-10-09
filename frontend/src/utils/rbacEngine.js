@@ -29,9 +29,9 @@ export const ERP_ROLES = [
   { code: 'ACCOUNTANT', name: 'Kế Toán', color: '#14b8a6', desc: 'Kiểm soát dòng tiền thu chi, đối soát và quyết toán tài chính' },
   { code: 'CSKH', name: 'Chăm Sóc Khách Hàng', color: '#06b6d4', desc: 'Tiếp nhận hỗ trợ, tư vấn khách hàng và xử lý đổi trả' },
   { code: 'HR', name: 'Quản Trị Nhân Sự', color: '#ec4899', desc: 'Quản lý hồ sơ nhân viên, chấm công và chế độ đãi ngộ' },
-  // Tài khoản nhân viên chung (văn phòng/hành chính): không có phân hệ nghiệp vụ nào, chỉ dùng
+  // Tài khoản nhân viên chung: không có phân hệ nghiệp vụ nào, chỉ dùng
   // Cổng Nhân Viên tự phục vụ (/admin/me) vốn mở cho mọi nhân viên, không qua ma trận này.
-  { code: 'EMPLOYEE', name: 'Nhân Viên (Văn Phòng)', color: '#475569', desc: 'Tự chấm công khuôn mặt, xin nghỉ phép, xem phiếu lương và tài liệu nội bộ' }
+  { code: 'EMPLOYEE', name: 'Nhân Viên', color: '#475569', desc: 'Tự chấm công khuôn mặt, xin nghỉ phép, xem phiếu lương và tài liệu nội bộ' }
 ];
 
 // Tên tiếng Việt của một mã vai trò (UPPER_SNAKE) để HIỂN THỊ — mã trong JWT/CSDL giữ

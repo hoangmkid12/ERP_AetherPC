@@ -214,7 +214,7 @@ export default function Sidebar({ isOpen = false, onClose }) {
       case 'ACCOUNTANT': return 'Kế Toán Trưởng';
       case 'CSKH': return 'Chăm Sóc Khách Hàng';
       case 'DELIVERY': return 'Nhân Viên Giao Hàng';
-      case 'EMPLOYEE': return 'Nhân Viên Văn Phòng';
+      case 'EMPLOYEE': return 'Nhân Viên';
       default: return user?.username ? user.username.toUpperCase() : 'Tài Khoản ERP';
     }
   };
@@ -233,7 +233,7 @@ export default function Sidebar({ isOpen = false, onClose }) {
       case 'ACCOUNTANT': return 'Kế Toán Tài Chính';
       case 'CSKH': return 'Chăm Sóc Khách Hàng';
       case 'DELIVERY': return 'Nhân Viên Giao Hàng';
-      case 'EMPLOYEE': return 'Nhân Viên (Văn Phòng)';
+      case 'EMPLOYEE': return 'Nhân Viên';
       default: return user?.role || 'Nhân Sự';
     }
   };

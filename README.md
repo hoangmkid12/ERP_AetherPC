@@ -140,7 +140,7 @@ Hệ thống có 14 vai trò nội bộ, cùng hai nhóm người dùng bên ngo
 | 12 | `accounting` | Kế Toán Tài Chính | Sổ cái thu/chi (`INCOME`/`EXPENSE`), lập hóa đơn công nợ và thanh toán NCC, đối soát tiền thu hộ COD, hoàn tiền SePay, giải ngân lương. |
 | 13 | `cskh` | Chăm Sóc Khách Hàng | Quản lý Ticket bảo hành, Live Chat WebSocket thời gian thực, mẫu câu phản hồi nhanh, xóa phiên chat cũ. |
 | 14 | `delivery` | Nhân Viên Giao Hàng (5 tài khoản theo khu vực)| Xem đơn được Kho phân công ở tab "Chờ Nhận", tự bấm "Nhận Chuyến" để nhận và chuyển đơn sang "Đang Giao". Màn hình giao hàng gộp 1 trang duy nhất: bản đồ + lộ trình OSRM, phát GPS thời gian thực, chụp ảnh minh chứng (Base64) ngay trong màn hình, trượt xác nhận giao thành công hoặc báo lỗi nhanh (2 lý do phổ biến, hoặc mở đầy đủ 5 lý do). Xem chi tiết 5 tài khoản ở mục 12.1. |
-| 15 | `nhanvien` | Nhân Viên Văn Phòng | Chỉ dùng các chức năng tự phục vụ chung cho mọi nhân viên: chấm công khuôn mặt, xin nghỉ phép, xem phiếu lương cá nhân. |
+| 15 | `nhanvien` | Nhân Viên (tài khoản chung) | Chỉ dùng các chức năng tự phục vụ chung cho mọi nhân viên: chấm công khuôn mặt, xin nghỉ phép, xem phiếu lương cá nhân. |
 
 > `supplier` (dòng 8) là người dùng bên ngoài, không tính vào 14 vai trò nội bộ. Khách hàng đăng ký trực tiếp trên cửa hàng trực tuyến.
 
@@ -581,7 +581,7 @@ Hệ thống được deploy thật lên [Railway](https://railway.app) thay vì
 | 12 | `accounting` | Kế Toán Tài Chính | `accounting` | `123456` |
 | 13 | `cskh` | Chăm Sóc Khách Hàng | `cskh` | `123456` |
 | 14 | `delivery` | Nhân Viên Giao Hàng (liên tỉnh/toàn quốc) | `delivery` | `123456` |
-| 15 | `nhanvien` | Nhân Viên Văn Phòng | `nhanvien` | `123456` |
+| 15 | `nhanvien` | Nhân Viên (tài khoản chung) | `nhanvien` | `123456` |
 | 16 | `customer` | Khách Hàng | `customer` | `123456` |
 
 Vai trò `delivery` có **5 tài khoản** thật trong hệ thống (không chỉ 1 như các vai trò khác) vì mỗi shipper phụ trách riêng 1 khu vực địa lý — xem đầy đủ ở mục 12.1 ngay dưới đây.

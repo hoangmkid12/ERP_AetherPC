@@ -11,7 +11,7 @@ const normalizeQcRole = (role) => (QC_ROLES.includes(role) ? 'QC' : role);
 
 // Mọi tài khoản nhân viên nội bộ — dùng cho các chức năng tự phục vụ (chấm công,
 // nghỉ phép, phiếu lương, hồ sơ cá nhân). EMPLOYEE là tài khoản nhân viên chung
-// (văn phòng/hành chính) không thuộc phòng ban nghiệp vụ nào: chỉ có quyền tự phục vụ.
+// không thuộc phòng ban nghiệp vụ nào: chỉ có quyền tự phục vụ.
 const STAFF_ROLES = [
   'CEO', 'ADMIN', 'HR', 'SALES', 'SALES_MANAGER', 'WAREHOUSE', 'WAREHOUSE_MANAGER',
   'ASSEMBLY', 'ACCOUNTANT', 'PURCHASING', 'CSKH', 'DELIVERY', 'EMPLOYEE', ...QC_ROLES
