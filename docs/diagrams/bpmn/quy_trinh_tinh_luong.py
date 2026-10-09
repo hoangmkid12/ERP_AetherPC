@@ -1,5 +1,6 @@
-# Sinh sơ đồ BPMN "Quy trình Chấm Công & Tính Lương" (Hình 2.5 trong báo cáo).
-# Chạy: python quy_trinh_tinh_luong.py  → quy_trinh_tinh_luong.png / .svg cùng thư mục.
+# Sinh sơ đồ BPMN "Quy trình Chấm Công & Tính Lương" (Hình 3.4 trong báo cáo).
+# Chạy: python quy_trinh_tinh_luong.py  → quy_trinh_tinh_luong.png cùng thư mục.
+# Cổng rẽ nhánh là hình thoi trống, đồng bộ với Hình 3.1–3.3 và các sơ đồ chức năng.
 import os
 import matplotlib
 matplotlib.use('Agg')
@@ -39,8 +40,6 @@ def task(x, y, text, w=22, h=12):
 
 def gateway(x, y, label, r=4.5, label_pos='below'):
     ax.add_patch(Polygon([(x, y + r), (x + r, y), (x, y - r), (x - r, y)], closed=True, fc='white', ec=LINE, lw=1.3))
-    ax.plot([x - r * 0.45, x + r * 0.45], [y - r * 0.45, y + r * 0.45], color=LINE, lw=1.6)
-    ax.plot([x - r * 0.45, x + r * 0.45], [y + r * 0.45, y - r * 0.45], color=LINE, lw=1.6)
     dy = -(r + 2.2) if label_pos == 'below' else (r + 2.2)
     ax.text(x, y + dy, label, ha='center', va='center', fontsize=8.6, weight='bold')
 
@@ -116,5 +115,4 @@ flow([(216, NV), (222, NV)])
 
 out = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'quy_trinh_tinh_luong')
 fig.savefig(out + '.png', dpi=120, bbox_inches='tight', facecolor='white')
-fig.savefig(out + '.svg', bbox_inches='tight', facecolor='white')
 print('saved', out)

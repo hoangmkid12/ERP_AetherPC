@@ -43,12 +43,11 @@ services:
     restart: always
     ports:
       - "5000:5000"
-    # Tải biến môi trường từ tệp tin cục bộ .env để lấy GEMINI_API_KEY, v.v.
+    # DATABASE_URL, JWT_SECRET và các khóa bí mật khác lấy từ backend/.env
+    # (không commit tệp này; xem backend/.env.example)
     env_file:
       - ./backend/.env
-    # Kết nối trực tiếp tới PostgreSQL trên Railway
     environment:
-      - DATABASE_URL=postgresql://postgres:IvbTmfcNYDKhQzmByEELqONGmayojNiv@altaria.proxy.rlwy.net:48710/railway
       - REDIS_URL=redis://redis:6379
       - NODE_ENV=development
     volumes:
@@ -75,7 +74,6 @@ services:
     env_file:
       - ./backend/.env
     environment:
-      - DATABASE_URL=postgresql://postgres:IvbTmfcNYDKhQzmByEELqONGmayojNiv@altaria.proxy.rlwy.net:48710/railway
       - REDIS_URL=redis://redis:6379
       - NODE_ENV=development
     volumes:

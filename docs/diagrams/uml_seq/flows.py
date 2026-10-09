@@ -3,6 +3,7 @@
 và sơ đồ hoạt động (mục 3.5). Bám theo mã nguồn nhánh feat/thanh-toan-sepay.
 
 Chạy:  python flows.py   → ucNN_bpmn.png và ucNN_act.png cùng thư mục.
+BPMN dùng nhãn rút gọn (SHORT) và bố cục ghi đè (BPMN_LAYOUT); sơ đồ hoạt động giữ đặc tả gốc.
 Nút: (id, làn, bước, lệch, loại, chữ). Cạnh: (từ, tới, nhãn, tùy chọn).
 """
 import os
@@ -412,6 +413,122 @@ FLOWS['uc24'] = dict(title='Quản Trị Tài Khoản, Phân Quyền Và Nhật 
     ('s', 't1'), ('t1', 'g1'), ('g1', 't2', 'Phân quyền'), ('g1', 't3', 'Tài khoản'), ('g1', 't4', 'Nhật ký'),
     ('t2', 'g2'), ('t3', 't7', None, {'midstep': 3.6}), ('t4', 't8', None, {'midstep': 3.5}),
     ('g2', 't6', 'Có'), ('g2', 't5', 'Không'), ('t6', 'e'), ('t5', 'e'), ('t7', 'e'), ('t8', 'e')])
+
+
+# ---------------------------------------------------------------------------------------------
+# Nhãn rút gọn cho sơ đồ BPMN (mục 3.2) — Viết Hoa, ngắn gọn như 4 sơ đồ quy trình nghiệp vụ.
+# Sơ đồ hoạt động (mục 3.5) vẫn dùng câu mô tả đầy đủ ở trên. Cổng không khai báo ở đây sẽ được
+# tự Viết Hoa từ câu hỏi gốc.
+SHORT = {
+    'uc01': dict(t1='Chọn Đăng Ký', t2='Hiển Thị Form Đăng Ký', t3='Nhập Thông Tin Tài Khoản & Bấm Đăng Ký',
+                 t4='Kiểm Tra Trường Bắt Buộc & Định Dạng', t5='Kiểm Tra Trùng Email, Tên Đăng Nhập, SĐT',
+                 t6='Báo Lỗi Cụ Thể, Giữ Dữ Liệu Đã Nhập', t7='Tạo Tài Khoản Hạng Đồng & Phiên Đăng Nhập',
+                 t8='Gửi Email Chào Mừng, Về Trang Chủ'),
+    'uc02': dict(t1='Chọn Tự Cấu Hình Máy Tính', t2='Hiển Thị 8 Khe Linh Kiện', tA='Nhập Nhu Cầu Bằng Văn Bản',
+                 tB='Phân Tích Nhu Cầu, Tự Điền Linh Kiện', t3='Chọn / Điều Chỉnh Linh Kiện Từng Khe',
+                 t4='Kiểm Tra Tương Thích Linh Kiện', t5='Cảnh Báo, Không Chặn Thao Tác',
+                 t6='Cập Nhật Tổng Giá Cấu Hình', t7='Bấm Thêm Cấu Hình Vào Giỏ',
+                 t8='Thêm Gói Cấu Hình Vào Giỏ, Báo Thành Công', g0='Dùng Trợ Lý AI?'),
+    'uc03': dict(t1='Mở Giỏ Hàng, Chọn Đặt Hàng', t2='Hiển Thị Trang Thanh Toán & Địa Chỉ Mặc Định',
+                 t3='Bổ Sung Địa Chỉ Giao Hàng', t4='Nhập Mã Khuyến Mãi, Chọn Phương Thức & Xác Nhận',
+                 t5='Kiểm Tra Tồn Kho, Áp Giảm Giá Hạng & Mã KM', t6='Tạo Đơn "Chờ Thanh Toán"',
+                 t7='Tạo Đơn "Chờ Xác Nhận"', t8='Tạo Đơn "Chờ Nhập Hàng"', t9='Gửi Email Xác Nhận, Dọn Giỏ Hàng',
+                 t10='Dọn Giỏ, Mở Trang Thanh Toán VietQR'),
+    'uc04': dict(t1='Mở Trang Thanh Toán Của Đơn', t2='Sinh Mã VietQR Kèm Số Tiền & Nội Dung',
+                 t3='Quét Mã, Chuyển Khoản Qua Ngân Hàng', t4='Phát Hiện Tiền Vào, Gửi Thông Báo Giao Dịch',
+                 t5='Xác Thực Khóa, Tìm Mã Đơn Trong Nội Dung', t6='Bỏ Qua Giao Dịch, Ghi Cảnh Báo',
+                 t7='Ghi Đã Thanh Toán, Tự Duyệt Đơn, Ghi Sổ Thu', t8='Ghi Khoản "Chờ Hoàn Tiền", Ghi Sổ Thu',
+                 t9='Xem Kết Quả Thanh Toán'),
+    'uc05': dict(t1='Mở Màn Hình Chat Tư Vấn', t2='Xác Thực Phiên, Gửi Danh Sách Phiên Chat', t3='Chọn Một Phiên Chat',
+                 t4='Đánh Dấu Đã Đọc, Hiển Thị Lịch Sử', t5='Nhập Và Gửi Nội Dung Trả Lời',
+                 t6='Báo Lỗi Gửi Tin, Tự Kết Nối Lại', t7='Lưu Tin Nhắn Vào Phiên Chat', t8='Đẩy Tin Nhắn Tới Khách Hàng'),
+    'uc06': dict(t1='Mở Điểm Bán Hàng', t2='Hiển Thị Danh Mục Sản Phẩm & Giỏ Tại Quầy',
+                 t3='Quét Mã / Tìm Sản Phẩm, Nhập Số Lượng', t4='Cảnh Báo Hết Hàng, Không Thêm Vào Giỏ',
+                 t5='Thêm Vào Giỏ, Cập Nhật Tổng Tiền', t6='Nhập Khách, Chiết Khấu, Thanh Toán & Xác Nhận',
+                 t7='Từ Chối Tạo Đơn', t8='Tạo Đơn Đã Thanh Toán, Trừ Kho, Gán Serial', t9='In Phiếu Thu / Hóa Đơn'),
+    'uc07': dict(t1='Mở Danh Sách Đơn "Chờ Xác Nhận"', t2='Hiển Thị Đơn Theo Bộ Lọc',
+                 t3='Xem Chi Tiết, Bấm Xác Nhận Đơn', t4='Kiểm Tra Trạng Thái, Trừ Tồn Kho & Gán Serial',
+                 t5='Báo Không Đủ Tồn Kho, Giữ Nguyên Đơn', t6='Ghi Giá Vốn, Tích Điểm, Chuyển "Đã Xác Nhận"',
+                 t7='Lưu Lịch Sử Trạng Thái, Gửi Email'),
+    'uc08': dict(t1='Tạo Yêu Cầu Báo Giá (Sản Phẩm, Số Lượng, NCC)', t2='Báo Lỗi, Không Gửi',
+                 t3='Tạo Yêu Cầu Cho Từng NCC, Gửi Cổng NCC', t4='Phản Hồi Đơn Giá, Thời Gian Giao / Từ Chối',
+                 t5='Hiển Thị Bảng So Sánh Báo Giá', t6='Chọn Báo Giá Tốt Nhất', t7='Chốt Báo Giá, Hủy Báo Giá Còn Lại',
+                 t8='Lập Phiếu Mua Hàng Trình BGĐ', t9='Tạo Phiếu Mua Hàng "Chờ BGĐ Duyệt"'),
+    'uc09': dict(t1='Mở Mục Yêu Cầu Báo Giá', t2='Hiển Thị Yêu Cầu Chờ Phản Hồi', t3='Chọn Yêu Cầu, Xem Sản Phẩm & Số Lượng',
+                 t4='Nhập Đơn Giá, Thời Gian Giao & Gửi', t5='Chọn Từ Chối, Nhập Lý Do',
+                 t6='Lưu Đơn Giá, Chuyển "Đã Báo Giá"', t7='Chuyển "Đã Hủy" Kèm Lý Do'),
+    'uc10': dict(t1='Mở Trung Tâm Phê Duyệt – Đơn Mua Hàng', t2='Hiển Thị Phiếu Mua Hàng Chờ Duyệt',
+                 t3='Xem NCC, Đơn Giá, Báo Giá Gốc', t4='Nhập Lý Do Từ Chối', t5='Từ Chối Thao Tác',
+                 t6='Chuyển "Đơn Mua Hàng", Ghi Nhật Ký, Gửi NCC', t7='Chuyển Phiếu "Đã Hủy" Kèm Lý Do'),
+    'uc11': dict(t1='Mở Trung Tâm Phê Duyệt – Bảng Lương', t2='Hiển Thị Kỳ Lương Chờ Duyệt & Tổng Thực Lĩnh',
+                 t3='Xem Chi Tiết Bảng Lương', t5='Nhập Lý Do Trả Về', t4='Chuyển "Đã Duyệt – Chờ Giải Ngân"',
+                 t6='Chuyển "Bị Trả Về", Báo Lý Do Cho Nhân Sự'),
+    'uc12': dict(t1='Mở Đơn Mua Chờ Kiểm Định', t2='Hiển Thị Hàng Cần Kiểm Định',
+                 t3='Đối Chiếu Hàng Thực Nhận, Ghi Tỷ Lệ Lấy Mẫu', t5='Nhập Số Lượng Đạt / Không Đạt',
+                 t4='Chuyển "Đạt Kiểm Định"', t6='Chuyển "Đạt Một Phần", Lưu Tỷ Lệ Đạt',
+                 t7='Chuyển "Không Đạt", Hủy Phiếu Nhập', t8='Lưu Biên Bản, Báo Kho Nhập Kho'),
+    'uc13': dict(t1='Mở Yêu Cầu Đổi Trả Đã Về Kho', t2='Hiển Thị Yêu Cầu & Lý Do Khách Báo',
+                 t3='Kiểm Tra Tem, Ngoại Quan, Hoạt Động, Serial', t6='Ghi Lý Do Không Đạt',
+                 t4='Chuyển "Đạt Thẩm Định", Lưu Dạng Lỗi & Ảnh', t5='Báo Kho Nhập Kệ, Kế Toán Hoàn Tiền / Đổi Mới',
+                 t7='Chuyển "Từ Chối", Giao Trả Khách'),
+    'uc14': dict(t1='Mở Phiếu Nhập Kho Của Đơn Mua', t2='Hiển Thị Số Lượng Được Nhập Theo Kiểm Định',
+                 t3='Quét Serial, Bấm Duyệt Phiếu Nhập', t4='Từ Chối, Báo Serial Thiếu / Trùng',
+                 t5='Tạo Serial, Cộng Tồn Kho, Ghi Phiếu Nhập', t6='Tính Lại Giá Vốn, Đơn Mua "Đã Nhận Hàng"'),
+    'uc15': dict(t1='Mở Lệnh Giao Hàng', t2='Hiển Thị Đơn Sẵn Sàng Xuất Kho', t3='Chọn Đơn, Bấm Xác Nhận Xuất Kho',
+                 t4='Gợi Ý Nhân Viên Giao Hàng Theo Khu Vực', t5='Chọn Nhân Viên Giao Hàng, Xác Nhận',
+                 t6='Từ Chối Phân Công', t7='Gán Nhân Viên, Đưa Đơn Vào "Chờ Nhận"',
+                 t8='Gỡ Phân Công, Trả Đơn Về Danh Sách Chờ', t9='Bắt Đầu Giao Hàng', g1='Nhân Viên Hợp Lệ?'),
+    'uc16': dict(t1='Mở Lệnh Lắp Ráp', t2='Hiển Thị Linh Kiện & Checklist 4 Mục', t3='Lắp Phần Cứng, Nhập Serial Linh Kiện',
+                 t4='Kiểm Thử BIOS/POST, Cài HĐH, Chạy Tải, Niêm Phong', t5='Lưu Serial & Tiến Độ Kiểm Thử',
+                 t6='Bấm Nghiệm Thu', t7='Từ Chối, Báo Phần Còn Thiếu', t8='Lệnh "Hoàn Tất", Đơn "Sẵn Sàng Giao"',
+                 t9='Gửi Email Thông Báo Khách Hàng', g1='Đủ Kiểm Thử & Serial?'),
+    'uc17': dict(t1='Bấm Nhận Chuyến', t2='Chuyển "Đang Giao", Ghi Vị Trí', t3='Đến Địa Chỉ Giao Hàng',
+                 t8='Chụp Ảnh Xác Nhận, Thu Tiền / Nhập Mã GD', t4='Ghi Lý Do Vắng Mặt', t6='Chụp Ảnh Kiện Hàng',
+                 t9='Chuyển "Đã Giao", Ghi Khoản Thu Chờ Đối Soát', t5='Chuyển "Giao Không Thành Công"',
+                 t7='Chuyển "Đang Hoàn Về Kho", Hoàn Tồn Kho'),
+    'uc18': dict(t1='Chọn Đơn Mua Đã Nhập Kho', t2='Hiển Thị Số Lượng Đã Nghiệm Thu', t3='Chọn Lập Hóa Đơn Công Nợ',
+                 t4='Đối Chiếu 3 Chiều, Tạo Hóa Đơn Theo SL Đạt', t5='Ghi Nhận Một Đợt Thanh Toán',
+                 t6='Từ Chối, Yêu Cầu Nhập Lại', t7='Ghi Thanh Toán, Bút Toán Chi, Cập Nhật Công Nợ',
+                 t8='Hóa Đơn "Đã Thanh Toán", Đơn Mua "Hoàn Tất"'),
+    'uc19': dict(t1='Mở Đối Soát Tiền Thu Hộ', t2='Tổng Hợp Tiền Mặt Theo Nhân Viên Giao Hàng',
+                 t3='Chọn Nhân Viên, Kiểm Đếm Tiền Mặt', t4='Đối Chiếu Lại Với Nhân Viên Giao Hàng',
+                 t5='Bấm Xác Nhận Đã Thu', t6='Đánh Dấu Các Khoản Đã Đối Soát', t7='Ghi Bút Toán Thu Tiền Mặt & Nhật Ký'),
+    'uc20': dict(t1='Chọn Kỳ Lương, Bấm Tính Lương', t2='Từ Chối Tính Lại', t3='Phân Loại Ngày Công, Nghỉ Phép, Ngày Lễ',
+                 t4='Tính Công, Tăng Ca, Hoa Hồng, Bảo Hiểm, Thuế', t5='Lưu Phiếu "Nháp", Hiển Thị Tổng Quỹ Lương',
+                 t6='Rà Soát Từng Phiếu Lương', t7='Nhập Thưởng / Khấu Trừ Kèm Lý Do', t8='Tính Lại Thuế & Thực Lĩnh',
+                 t9='Bấm Trình Ban Giám Đốc Duyệt', t10='Chuyển Phiếu Sang "Chờ BGĐ Duyệt"',
+                 t11='Nhận Bảng Lương Chờ Duyệt'),
+    'uc21': dict(t1='Chọn Chấm Công Khuôn Mặt (Chưa Có Mẫu)', t2='Tải Mô Hình Nhận Diện, Mở Camera',
+                 t3='Thực Hiện Thử Thách Quay Đầu', t4='Nhắc Điều Chỉnh, Làm Lại', t5='Lấy 5 Mẫu, Tính Vector Trung Bình',
+                 t6='Từ Chối, Hướng Dẫn Liên Hệ Nhân Sự', t7='Lưu Vector & Ảnh Mẫu, Báo Thành Công'),
+    'uc22': dict(t1='Chọn Chấm Công Khuôn Mặt', t2='Hiển Thị Ca Hôm Nay, Mở Camera', t3='Thực Hiện Thử Thách Quay Đầu',
+                 t4='Xác Nhận Người Thật, Trích Vector, Gửi Máy Chủ', t5='Từ Chối, Ghi Nhật Ký Lần Thử',
+                 t6='Ghi Giờ Vào Ca, Tính Đi Muộn', t7='Ghi Giờ Ra Ca, Tính Giờ Làm & Tăng Ca', t8='Hiển Thị Kết Quả Chấm Công'),
+    'uc23': dict(t1='Mở Trang Đăng Nhập', t2='Hiển Thị Form Đăng Nhập', t3='Nhập Tài Khoản, Mật Khẩu & Bấm Đăng Nhập',
+                 t4='Gửi Yêu Cầu Đăng Nhập Nội Bộ & Khách Hàng', t5='So Khớp Mật Khẩu, Kiểm Tra Trạng Thái',
+                 t6='Báo Lỗi Đăng Nhập', t7='Tạo JWT, Đặt Cookie Phiên, Ghi Nhật Ký', t8='Chuyển Tới Trang Theo Vai Trò'),
+    'uc24': dict(t1='Mở Quản Trị Hệ Thống', t2='Bật / Tắt Quyền Trong Ma Trận, Lưu', t3='Khóa / Mở Khóa / Đặt Lại Mật Khẩu',
+                 t4='Lọc Nhật Ký Theo Người, Hành Động, Thời Gian', t6='Lưu, Áp Dụng Ngay, Ghi Nhật Ký', t5='Từ Chối Lưu',
+                 t7='Cập Nhật Trạng Thái Tài Khoản, Ghi Nhật Ký', t8='Hiển Thị Kết Quả Tra Cứu'),
+}
+for _k, _v in SHORT.items():
+    FLOWS[_k]['short'] = _v
+
+# Bố cục riêng cho BPMN (làn ngang) ở những luồng mà vị trí dùng chung với sơ đồ hoạt động
+# làm đường nối cắt nhau hoặc chạy sát ô. Nút: id → (bước, lệch); cạnh: (từ, tới) → tùy chọn.
+BPMN_LAYOUT = {
+    'uc04': dict(edges={('t8', 't9'): {'midstep': 8.25}, ('t7', 't9'): {'midstep': 8.25}}),
+    'uc10': dict(nodes={'t7': (5.8, -1), 'e': (6.8, 0)}),
+    'uc11': dict(nodes={'t4': (5.8, 0), 't6': (5.8, -1), 'e': (6.8, -0.5)},
+                 edges={('t5', 't6'): {'midstep': 5.3}}),
+    'uc13': dict(nodes={'t5': (6.2, 0), 't7': (6.2, -1), 'e': (7.2, -0.5)},
+                 edges={('t6', 't7'): {'midstep': 5.7}}),
+    'uc17': dict(nodes={'t9': (6.4, 0), 't5': (6.4, 1), 't7': (6.4, 2), 'e': (7.4, 1)},
+                 edges={('t8', 't9'): {'midstep': 5.75}, ('t4', 't5'): {'midstep': 5.55}, ('t6', 't7'): {'midstep': 5.35}}),
+    'uc24': dict(nodes={'g2': (4.1, 0), 't6': (5.1, 0), 't5': (5.1, 1), 't7': (5.1, 2), 't8': (5.1, 3), 'e': (6.1, 1.5)}),
+}
+for _k, _v in BPMN_LAYOUT.items():
+    FLOWS[_k]['bpmn'] = _v
 
 
 if __name__ == '__main__':
