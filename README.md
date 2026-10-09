@@ -187,7 +187,8 @@ sequenceDiagram
     actor Kế Toán
 
     Khách Hàng / POS->>Hệ Thống ERP: Đặt đơn linh kiện / máy bộ PC (POS / Storefront), chọn COD hoặc chuyển khoản
-    Hệ Thống ERP->>Hệ Thống ERP: Chuyển khoản: SePay báo tiền về qua webhook -> tự xác nhận đơn; COD: nhân viên xác nhận (quá 5 giờ thì tự duyệt)
+    Hệ Thống ERP->>Hệ Thống ERP: Chuyển khoản - SePay báo tiền về qua webhook, đơn tự xác nhận
+    Hệ Thống ERP->>Hệ Thống ERP: COD - nhân viên xác nhận (quá 5 giờ thì hệ thống tự duyệt)
     Hệ Thống ERP->>Kỹ Thuật Viên: Đơn có cấu hình PC -> sinh lệnh lắp ráp
     Kỹ Thuật Viên->>Hệ Thống ERP: Nhập Serial linh kiện, tích đủ 4 mục kiểm thử -> Nghiệm thu -> đơn READY_TO_SHIP
     Thủ Kho / Quản Lý Kho->>Hệ Thống ERP: Mở Modal Điều Phối Vận Chuyển -> Hệ thống tự nhận diện khu vực từ địa chỉ & gợi ý shipper nội bộ rảnh nhất
