@@ -1,0 +1,13 @@
+[SelfTrainedAI] Đang nạp trọng số mô hình đã huấn luyện từ model.nlp...
+✅ [SelfTrainedAI] Đã nạp thành công mô hình NLP tự huấn luyện cục bộ!
+==================================================
+  KLTN ERP Server is running on port 5000
+  Environment: development
+  Email Service: Gmail SMTP (<GMAIL_USER>) [⚠️ Lưu ý: Railway chặn cổng SMTP 465/587]
+  Database status check pending connection...
+==================================================
+==================================================
+[WebSocket] Chat server initialized on ws://localhost:5000/ws/cskh
+[WebSocket] Tracking server initialized on ws://localhost:5000/ws/tracking
+[WebSocket] Storage: PostgreSQL Database
+==================================================

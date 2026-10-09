@@ -1,0 +1,3 @@
+Environment variables loaded from .env
+Prisma schema loaded from prisma\schema.prisma
+✔ Generated Prisma Client (v6.19.3) to .\node_modules\@prisma\client in 333ms
