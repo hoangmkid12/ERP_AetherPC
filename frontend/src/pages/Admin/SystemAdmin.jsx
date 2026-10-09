@@ -1554,7 +1554,7 @@ export default function SystemAdmin() {
   // Trước đây hàm này chỉ xuất employees/orders/inventory/purchaseOrders đang
   // có trong state frontend — thiếu tuyệt đại đa số bảng thật (GRN, QC, trả
   // hàng, sổ cái, chấm công...). Giờ gọi thẳng pg_dump thật ở backend (GET
-  // /system/backup), cùng cơ chế với backup-db.ps1 ở gốc dự án.
+  // /system/backup), cùng cơ chế với scripts/db/backup-db.ps1.
   const handleBackupData = async () => {
     try {
       const res = await fetch('/api/v1/system/backup', { credentials: 'include' });

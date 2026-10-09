@@ -24,8 +24,8 @@ FONT_PATH = 'C:/Windows/Fonts/arial.ttf'
 FONT_BOLD = 'C:/Windows/Fonts/arialbd.ttf'
 FS = 25                  # cỡ chữ thông điệp
 LINE_H = 31
-MAX_LABEL_W = 330
-SELF_LABEL_W = 310        # nhãn dài hơn sẽ xuống dòng
+MAX_LABEL_W = 680        # như mẫu tham khảo: nhãn để một dòng, chỉ ngắt khi quá dài
+SELF_LABEL_W = 640        # nhãn dài hơn sẽ xuống dòng
 FILL = (126, 196, 230)
 INK = (30, 30, 30)
 GRAY = (110, 110, 110)
@@ -130,7 +130,7 @@ def render(parts, steps, out_path, title=None):
             y += 8
             layout.append(('fstart', s, y, depth))
             frame_stack.append(len(layout) - 1)
-            y += 46
+            y += 76          # thẻ khung + dòng điều kiện đặt bên dưới thẻ
         elif ev == 'frame_else':
             y += 4
             layout.append(('felse', s, y, depth))
@@ -187,7 +187,7 @@ def render(parts, steps, out_path, title=None):
             d.polygon([(x0, sy), (x0 + tag_w, sy), (x0 + tag_w, sy + 24), (x0 + tag_w - 10, sy + 34), (x0, sy + 34)],
                       fill='white', outline=INK)
             d.text((x0 + 8, sy + 3), tag, font=font_b, fill=INK)
-            guards.append((x0 + tag_w + 12, sy + 5, guard))
+            guards.append((x0 + 10, sy + 38, guard))   # điều kiện nằm dưới thẻ, như mẫu
         elif kind == 'felse':
             x0 = fx0 + depth * 10
             for xx in range(x0, fx1 - depth * 10, 18):

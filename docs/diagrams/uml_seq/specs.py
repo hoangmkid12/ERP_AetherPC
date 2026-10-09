@@ -78,27 +78,32 @@ D['uc02'] = ([(A, KV), (B, GD), (C, CT), (C, AI), (E, SP), (B, GH)], [
 ])
 
 # ============ 03. Đặt hàng (Khách hàng) ============
-KHG, GD, CT, SP, OD, EM = 'KHÁCH HÀNG', 'GD_THANHTOAN', 'CTRL_ORDER', 'ENTITY_PRODUCT', 'ENTITY_ORDER', 'HỆ THỐNG EMAIL'
-D['uc03'] = ([(A, KHG), (B, GD), (C, CT), (E, SP), (E, OD), (X, EM)], [
+KHG, GD, CT, SP, PR, OD, EM = 'KHÁCH HÀNG', 'GD_THANHTOAN', 'CTRL_ORDER', 'ENTITY_PRODUCT', 'ENTITY_PROMOTION', 'ENTITY_ORDER', 'HỆ THỐNG EMAIL'
+D['uc03'] = ([(A, KHG), (B, GD), (C, CT), (E, SP), (E, PR), (E, OD), (X, EM)], [
     m(KHG, GD, '1: Mở giỏ hàng, chọn "Đặt hàng"'),
     s(GD, '1.1: Hiển thị địa chỉ mặc định và phương thức thanh toán'),
-    m(KHG, GD, '2: Xác nhận địa chỉ, chọn COD hoặc chuyển khoản, bấm "Xác nhận đặt hàng"'),
-    m(GD, CT, '2.1: createOrder(dsSanPham, phuongThucTT, diaChi, ghiChu)'),
+    m(KHG, GD, '2: Xác nhận địa chỉ, nhập mã khuyến mãi (nếu có), chọn COD hoặc chuyển khoản, bấm "Xác nhận đặt hàng"'),
+    m(GD, CT, '2.1: createOrder(dsSanPham, phuongThucTT, diaChi, ghiChu, maKhuyenMai)'),
     loop('[MỖI SẢN PHẨM TRONG GIỎ]',
          m(CT, SP, '2.1.1: findUnique(productId)'),
          r(SP, CT, '2.1.2: return sanPham (giá, tồn kho)'),
          ),
-    s(CT, '2.1.3: Tính tạm tính, giảm giá hạng thành viên, mã khuyến mãi'),
+    s(CT, '2.1.3: Tính tạm tính, giảm giá hạng thành viên'),
+    opt('[CÓ MÃ KHUYẾN MÃI]',
+        m(CT, PR, '2.1.4: resolvePromotion(maKhuyenMai, tamTinh) — findUnique(code)'),
+        r(PR, CT, '2.1.5: return khuyenMai'),
+        s(CT, '2.1.6: Kiểm tra còn hiệu lực, đủ giá trị tối thiểu; máy chủ tự tính tiền giảm'),
+        ),
     alt(('[CHUYỂN KHOẢN]', [
-        m(CT, OD, '2.1.4: create(đơn, trạng thái = Chờ thanh toán)'),
+        m(CT, OD, '2.1.7: create(đơn, trạng thái = Chờ thanh toán)'),
     ]), ('[THIẾU TỒN KHO]', [
-        m(CT, OD, '2.1.5: create(đơn, trạng thái = Chờ nhập hàng)'),
+        m(CT, OD, '2.1.8: create(đơn, trạng thái = Chờ nhập hàng)'),
     ]), ('[COD, ĐỦ HÀNG]', [
-        m(CT, OD, '2.1.6: create(đơn, trạng thái = Chờ xác nhận)'),
+        m(CT, OD, '2.1.9: create(đơn, trạng thái = Chờ xác nhận)'),
     ])),
-    r(OD, CT, '2.1.7: return donHang'),
+    r(OD, CT, '2.1.10: return donHang'),
     opt('[KHÔNG PHẢI ĐƠN CHỜ THANH TOÁN]',
-        m(CT, EM, '2.1.8: sendOrderConfirmationEmail(donHang)'),
+        m(CT, EM, '2.1.11: sendOrderConfirmationEmail(donHang)'),
         ),
     r(CT, GD, '2.2: return maDon, trangThai'),
     s(GD, '2.3: Xóa sản phẩm đã đặt khỏi giỏ'),
@@ -222,19 +227,27 @@ D['uc07'] = ([(A, NV), (B, GD), (C, CT), (E, OD), (E, SP), (E, OH), (X, EM)], [
     s(GD, '2.1: Hiển thị sản phẩm, địa chỉ, thanh toán, lịch sử'),
     m(NV, GD, '3: Chọn "Xác nhận đơn"'),
     m(GD, CT, '3.1: updateOrderStatus(maDon, "Đã xác nhận")'),
-    loop('[MỖI DÒNG SẢN PHẨM]',
-         m(CT, SP, '3.1.1: updateMany(tồn kho ≥ số lượng, trừ tồn), gán Serial'),
-         r(SP, CT, '3.1.2: return soDongCapNhat'),
-         ),
-    alt(('[TỒN KHO KHÔNG ĐỦ]', [
-        r(CT, GD, '3.2: return loi("Tồn kho không đủ")'),
+    m(CT, OD, '3.1.1: findUnique(maDon)'),
+    r(OD, CT, '3.1.2: return donHang (trạng thái hiện tại)'),
+    s(CT, '3.1.3: orderTransitionError(donHang, "Đã xác nhận", vaiTro)'),
+    alt(('[CHUYỂN TRẠNG THÁI KHÔNG HỢP LỆ]', [
+        r(CT, GD, '3.2: return loi("Không thể chuyển đơn từ … sang …")'),
         s(GD, '3.3: Hiển thị lỗi, đơn giữ nguyên'),
-    ]), ('[THÀNH CÔNG]', [
-        m(CT, OD, '3.1.3: update(Đã xác nhận), ghi giá vốn'),
-        m(CT, OH, '3.1.4: create(lịch sử trạng thái)'),
-        m(CT, EM, '3.1.5: sendOrderStatusUpdateEmail(donHang)'),
-        r(CT, GD, '3.4: return donHang'),
-        s(GD, '3.5: Cập nhật trạng thái trên danh sách'),
+    ]), ('[HỢP LỆ]', [
+        loop('[MỖI DÒNG SẢN PHẨM]',
+             m(CT, SP, '3.1.4: updateMany(tồn kho ≥ số lượng, trừ tồn), gán Serial'),
+             r(SP, CT, '3.1.5: return soDongCapNhat'),
+             ),
+        alt(('[TỒN KHO KHÔNG ĐỦ]', [
+            r(CT, GD, '3.4: return loi("Tồn kho không đủ")'),
+            s(GD, '3.5: Hiển thị lỗi, đơn giữ nguyên'),
+        ]), ('[THÀNH CÔNG]', [
+            m(CT, OD, '3.1.6: update(Đã xác nhận), ghi giá vốn'),
+            m(CT, OH, '3.1.7: create(lịch sử trạng thái)'),
+            m(CT, EM, '3.1.8: sendOrderStatusUpdateEmail(donHang)'),
+            r(CT, GD, '3.6: return donHang'),
+            s(GD, '3.7: Cập nhật trạng thái trên danh sách'),
+        ])),
     ])),
 ])
 
@@ -497,11 +510,13 @@ SH, GD, WS, CT, PM, EM = 'NV GIAO HÀNG', 'GD_GIAOHANG', 'CTRL_WEBSOCKET', 'CTRL
 D['uc17'] = ([(A, SH), (B, GD), (C, WS), (C, CT), (E, OD), (E, PM), (X, EM)], [
     m(SH, GD, '1: Bấm "Nhận chuyến"'),
     m(GD, CT, '1.1: updateOrderStatus(maDon, "Đang giao")'),
-    m(CT, OD, '1.1.1: update(Đang giao, shippedAt)'),
+    s(CT, '1.1.1: orderTransitionError() — đơn phải được phân công cho chính shipper này'),
+    m(CT, OD, '1.1.2: update(Đang giao, shippedAt)'),
     r(CT, GD, '1.2: return donHang'),
     loop('[TRONG KHI ĐANG GIAO]',
          m(GD, WS, '2: SHIPPER_UPDATE_LOCATION(maDon, viDo, kinhDo)'),
-         s(WS, '2.1: updateDeliveryLocation() — lưu vị trí, đẩy cho khách theo dõi'),
+         s(WS, '2.1: canBroadcastLocation(maDon) — chỉ shipper được phân công'),
+         s(WS, '2.2: updateDeliveryLocation() — lưu vị trí, đẩy cho chủ đơn theo dõi'),
          ),
     m(SH, GD, '3: Chụp ảnh xác nhận, thu tiền, bấm "Giao hàng thành công"'),
     m(GD, CT, '3.1: updateOrderStatus(maDon, "Đã giao", proofPhoto, cashAmount, bankAmount, bankRefCode)'),

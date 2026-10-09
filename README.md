@@ -433,9 +433,22 @@ ERP_AetherPC/
 │   ├── .env.example          # Tệp cấu hình môi trường mẫu cho Frontend
 │   └── Dockerfile            # Cấu hình Docker build Frontend
 ├── osrm/                     # Hạ tầng tự host OSRM Routing Engine trên Railway (Dockerfile, script build dữ liệu bản đồ)
-├── docs/                     # Tài liệu Khóa luận Tốt nghiệp IUH (.docx) & Sơ đồ UML/BPMN
-├── scraper/                  # Python Scraper cào & làm sạch 1.580 linh kiện PC thực tế
-├── scripts/                  # Scripts hỗ trợ xuất báo cáo luận văn IUH
+├── ai_training/              # Bộ dữ liệu ý định & notebook huấn luyện PhoBERT (backend đọc dataset_intent.json)
+├── backups/                  # Bản sao lưu CSDL (kltn_erp_backup.dump, init.sql)
+├── deploy/                   # Cấu hình Nginx cho bản triển khai production
+├── docs/
+│   ├── bao_cao/              # Báo cáo KLTN (.docx, .pdf) và mẫu báo cáo của khoa
+│   ├── diagrams/             # Sơ đồ: bpmn, uml_seq (tuần tự/hoạt động sinh từ specs.py, flows.py), lop_domain,
+│   │                         #        usecase, sitemap, kientruc, cong_nghe — kèm script sinh sơ đồ
+│   ├── screenshots/          # Ảnh giao diện chương 5 và shoot.js (chụp tự động bằng Playwright)
+│   ├── danh_gia/             # Script & kết quả đánh giá hiệu năng, nhận diện khuôn mặt (chương 6)
+│   ├── nghiep_vu/            # Mô tả nghiệp vụ: khách hàng đặt hàng, quy trình xử lý đơn, đổi hàng / hoàn tiền
+│   ├── ky_thuat/             # Ghi chú kỹ thuật: chỉ mục CSDL, WebSocket, chuyển đổi store, lộ trình cải tiến
+│   └── scripts_baocao/       # Script sinh bản nháp báo cáo .docx ban đầu
+├── osrm/                     # Hạ tầng tự host OSRM Routing Engine trên Railway (Dockerfile, script build dữ liệu bản đồ)
+├── scraper/                  # Python Scraper cào & làm sạch 1.580 linh kiện PC thực tế (seed đọc scraper/data/)
+├── scripts/db/               # backup-db.ps1, restore-db.ps1 — sao lưu / khôi phục CSDL
+├── DEPLOYMENT.md             # Hướng dẫn triển khai production
 └── docker-compose.yml        # Cấu hình containerization trọn gói (Frontend, Backend, Postgres)
 ```
 
@@ -487,7 +500,7 @@ Hệ thống được deploy thật lên [Railway](https://railway.app) thay vì
 2. **Frontend**: deploy cùng repo, Root Directory trỏ `frontend/`, dùng `frontend/Dockerfile.production` — build Vite production rồi serve bằng Nginx (`nginx.production.conf`). Nginx tự proxy `location /api/` và `location /ws/` (WebSocket CSKH, có header `Upgrade`/`Connection`) về đúng backend qua biến `BACKEND_URL` (bắt buộc có `https://`), giữ mọi request cùng origin với trang — tránh vấn đề CORS/cookie cross-site.
 3. **Domain riêng**: trỏ domain gốc vào frontend, subdomain (`api.<domain>`) vào backend — cùng domain gốc để cookie đăng nhập (`SameSite=Strict`) vẫn hoạt động giữa 2 subdomain.
 4. **CI/CD**: mỗi lần `git push` lên `main`, GitHub Actions (`.github/workflows/ci.yml`) chạy build-check cả hai phía trong ~1 phút, song song đó Railway tự động build & deploy lại (push-to-deploy) — không cần thao tác thủ công.
-5. **Khôi phục dữ liệu thật vào Postgres Railway** (lần đầu, hoặc sau khi tạo mới database): dùng `backup-db.ps1`/`restore-db.ps1` — sửa `restore-db.ps1` trỏ tới connection string public (`DATABASE_PUBLIC_URL` hoặc TCP Proxy) của Railway thay vì container local.
+5. **Khôi phục dữ liệu thật vào Postgres Railway** (lần đầu, hoặc sau khi tạo mới database): dùng `scripts/db/backup-db.ps1`/`scripts/db/restore-db.ps1` — sửa `scripts/db/restore-db.ps1` trỏ tới connection string public (`DATABASE_PUBLIC_URL` hoặc TCP Proxy) của Railway thay vì container local.
 
 ---
 
