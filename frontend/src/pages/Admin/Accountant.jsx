@@ -99,12 +99,33 @@ export default function Accountant() {
     }
   };
 
+  // Chọn từng đơn để chốt một phần khi shipper nộp thiếu — { [shipperId]: [paymentId] }.
+  // Không chọn đơn nào = chốt toàn bộ khoản shipper đang giữ.
+  const [codSelected, setCodSelected] = useState({});
+  const toggleCodPayment = (shipperId, paymentId) => {
+    setCodSelected(prev => {
+      const current = prev[shipperId] || [];
+      const next = current.includes(paymentId) ? current.filter(id => id !== paymentId) : [...current, paymentId];
+      return { ...prev, [shipperId]: next };
+    });
+  };
+  const selectRemittedCod = (group) => {
+    setCodSelected(prev => ({ ...prev, [group.shipperId]: group.orders.filter(o => o.remittedAt).map(o => o.paymentId) }));
+  };
+
   const handleSettleCod = async (group) => {
-    if (!(await confirm(`Xác nhận đã thu hồi ${fmt(group.totalAmount)} tiền mặt COD từ shipper "${group.shipperName}" (${group.orders.length} đơn)?`))) return;
+    const selectedIds = codSelected[group.shipperId] || [];
+    const targets = selectedIds.length > 0 ? group.orders.filter(o => selectedIds.includes(o.paymentId)) : group.orders;
+    const amount = targets.reduce((sum, o) => sum + (Number(o.amount) || 0), 0);
+    if (!(await confirm(`Xác nhận đã thu hồi ${fmt(amount)} tiền mặt COD từ shipper "${group.shipperName}" (${targets.length}/${group.orders.length} đơn)?`))) return;
     setSettlingShipperId(group.shipperId);
     try {
-      const res = await api.post(`/ledger/cod-settlement/${group.shipperId}/settle`);
+      const res = await api.post(
+        `/ledger/cod-settlement/${group.shipperId}/settle`,
+        selectedIds.length > 0 ? { paymentIds: selectedIds } : {}
+      );
       notify(res.message || 'Đã đối soát COD thành công.', 'success');
+      setCodSelected(prev => ({ ...prev, [group.shipperId]: [] }));
       loadCodSettlement();
     } catch (err) {
       notify(err?.message || 'Không thể đối soát COD.', 'error');
@@ -1788,6 +1809,8 @@ export default function Accountant() {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                     {filteredPendingGroups.map(group => {
                       const isBusy = settlingShipperId === group.shipperId;
+                      const selectedIds = codSelected[group.shipperId] || [];
+                      const remittedCount = group.orders.filter(o => o.remittedAt).length;
                       return (
                         <div key={group.shipperId} style={{ border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.85rem 1rem', backgroundColor: '#fffbeb', borderBottom: '1px solid #fef3c7', flexWrap: 'wrap', gap: '0.75rem' }}>
@@ -1795,7 +1818,12 @@ export default function Accountant() {
                               <Truck size={18} style={{ color: '#d97706' }} />
                               <div>
                                 <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.92rem' }}>{group.shipperName}</div>
-                                <div style={{ fontSize: '0.79rem', color: '#b45309' }}>{group.orders.length} đơn COD tiền mặt chưa nộp</div>
+                                <div style={{ fontSize: '0.79rem', color: '#b45309' }}>{group.orders.length} đơn COD tiền mặt chưa đối soát</div>
+                                {remittedCount > 0 && (
+                                  <div style={{ fontSize: '0.79rem', color: '#2563eb', fontWeight: 700 }}>
+                                    Shipper đã khai báo nộp {fmt(group.remittedAmount)} ({remittedCount} đơn)
+                                  </div>
+                                )}
                               </div>
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
@@ -1803,29 +1831,48 @@ export default function Accountant() {
                                 <div style={{ fontSize: '0.77rem', color: '#92400e' }}>Tổng tiền mặt đang giữ</div>
                                 <div style={{ fontWeight: 900, color: '#b45309', fontSize: '1.1rem' }}>{fmt(group.totalAmount)}</div>
                               </div>
+                              {remittedCount > 0 && remittedCount < group.orders.length && (
+                                <button
+                                  type="button"
+                                  onClick={() => selectRemittedCod(group)}
+                                  style={{ backgroundColor: '#ffffff', color: '#2563eb', border: '1px solid #bfdbfe', borderRadius: '6px', padding: '0.5rem 0.75rem', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
+                                >
+                                  Chọn đơn đã khai báo
+                                </button>
+                              )}
                               <button
                                 disabled={isBusy}
                                 onClick={() => handleSettleCod(group)}
                                 style={{ backgroundColor: '#16a34a', color: '#ffffff', border: 'none', borderRadius: '6px', padding: '0.5rem 1rem', fontSize: '0.8rem', fontWeight: 800, cursor: isBusy ? 'default' : 'pointer', opacity: isBusy ? 0.6 : 1, whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
                               >
                                 <CheckCircle size={15} />
-                                {isBusy ? 'Đang xác nhận...' : 'Xác Nhận Đã Thu Tiền'}
+                                {isBusy ? 'Đang xác nhận...' : (selectedIds.length > 0 ? `Xác Nhận Đã Thu (${selectedIds.length} đơn)` : 'Xác Nhận Đã Thu Toàn Bộ')}
                               </button>
                             </div>
                           </div>
                           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
                             <thead>
                               <tr style={{ textAlign: 'left', color: '#64748b', fontSize: '0.77rem', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+                                <th style={{ padding: '0.5rem 0 0.5rem 1rem', width: '28px' }} title="Chọn đơn để chốt một phần"></th>
                                 <th style={{ padding: '0.5rem 1rem' }}>Mã Đơn</th>
                                 <th style={{ padding: '0.5rem 1rem' }}>Khách Hàng & SĐT</th>
                                 <th style={{ padding: '0.5rem 1rem' }}>Địa Chỉ Giao</th>
                                 <th style={{ padding: '0.5rem 1rem' }}>Ngày Giao</th>
+                                <th style={{ padding: '0.5rem 1rem' }}>Shipper Khai Báo</th>
                                 <th style={{ padding: '0.5rem 1rem', textAlign: 'right' }}>Số Tiền Thu</th>
                               </tr>
                             </thead>
                             <tbody>
                               {group.orders.map(o => (
-                                <tr key={o.paymentId} style={{ borderTop: '1px solid #f1f5f9' }}>
+                                <tr key={o.paymentId} style={{ borderTop: '1px solid #f1f5f9', backgroundColor: selectedIds.includes(o.paymentId) ? '#f0fdf4' : undefined }}>
+                                  <td style={{ padding: '0.55rem 0 0.55rem 1rem' }}>
+                                    <input
+                                      type="checkbox"
+                                      checked={selectedIds.includes(o.paymentId)}
+                                      onChange={() => toggleCodPayment(group.shipperId, o.paymentId)}
+                                      disabled={isBusy}
+                                    />
+                                  </td>
                                   <td style={{ padding: '0.55rem 1rem', fontWeight: 700, color: '#2563eb' }}>#{o.orderId}</td>
                                   <td style={{ padding: '0.55rem 1rem', color: '#0f172a' }}>
                                     <div>{o.customerName || 'Khách hàng'}</div>
@@ -1833,6 +1880,15 @@ export default function Accountant() {
                                   </td>
                                   <td style={{ padding: '0.55rem 1rem', color: '#64748b', fontSize: '0.8rem' }}>{o.shippingAddress}</td>
                                   <td style={{ padding: '0.55rem 1rem', color: '#64748b', fontSize: '0.8rem' }}>{o.deliveredAt ? new Date(o.deliveredAt).toLocaleDateString('vi-VN') : '-'}</td>
+                                  <td style={{ padding: '0.55rem 1rem', fontSize: '0.8rem' }}>
+                                    {o.remittedAt ? (
+                                      <span style={{ color: '#2563eb', fontWeight: 700 }} title={o.remitNote || ''}>
+                                        Đã nộp • {new Date(o.remittedAt).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })}
+                                      </span>
+                                    ) : (
+                                      <span style={{ color: '#94a3b8' }}>Chưa khai báo</span>
+                                    )}
+                                  </td>
                                   <td style={{ padding: '0.55rem 1rem', textAlign: 'right', fontWeight: 800, color: '#0f172a' }}>{fmt(o.amount)}</td>
                                 </tr>
                               ))}

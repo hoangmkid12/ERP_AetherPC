@@ -355,6 +355,10 @@ model OrderPayment {
   // per shipper for CASH-method rows on delivered orders.
   settledAt     DateTime? @map("settled_at") @db.Timestamptz()
   settledBy     String?   @map("settled_by") @db.VarChar(100)
+  // Shipper's own declaration that they handed this cash to Kế Toán. Only a
+  // claim — the row is still outstanding until Kế Toán sets settledAt.
+  remittedAt    DateTime? @map("remitted_at") @db.Timestamptz()
+  remitNote     String?   @map("remit_note") @db.VarChar(255)
 
   order         Order    @relation(fields: [orderId], references: [orderId], onDelete: Cascade)
 

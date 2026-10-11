@@ -182,10 +182,12 @@ const getCodSettlement = async (req, res, next) => {
           shipperName: shipper.fullName,
           shipperCode: shipper.employeeCode,
           totalAmount: 0,
+          remittedAmount: 0,
           orders: []
         };
       }
       byShipper[shipperId].totalAmount += Number(payment.amount);
+      if (payment.remittedAt) byShipper[shipperId].remittedAmount += Number(payment.amount);
       byShipper[shipperId].orders.push({
         paymentId: payment.id,
         orderId: payment.order.orderId,
@@ -193,7 +195,9 @@ const getCodSettlement = async (req, res, next) => {
         customerPhone: payment.order.customer?.phone,
         amount: Number(payment.amount),
         deliveredAt: payment.order.deliveredAt,
-        shippingAddress: payment.order.shippingAddress
+        shippingAddress: payment.order.shippingAddress,
+        remittedAt: payment.remittedAt,
+        remitNote: payment.remitNote
       });
     }
 
@@ -243,8 +247,10 @@ const getCodSettlement = async (req, res, next) => {
 };
 
 // POST /api/v1/ledger/cod-settlement/:shipperId/settle — Kế Toán xác nhận đã
-// thu hồi tiền mặt COD từ 1 shipper cụ thể, đóng toàn bộ khoản còn nợ của
-// shipper đó tại thời điểm này và ghi nhận bút toán thu tiền vào Sổ Cái.
+// thu hồi tiền mặt COD từ 1 shipper cụ thể. Body { paymentIds } (tuỳ chọn) để
+// chỉ chốt một phần khi shipper nộp thiếu; bỏ trống thì chốt toàn bộ khoản
+// còn nợ. Đánh dấu settledAt và ghi bút toán Sổ Cái trong cùng 1 transaction
+// để không xảy ra cảnh đã chốt COD mà Sổ Cái thiếu bút toán thu.
 const settleCodForShipper = async (req, res, next) => {
   try {
     const shipperId = parseInt(req.params.shipperId, 10);
@@ -252,60 +258,85 @@ const settleCodForShipper = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'Mã shipper không hợp lệ.' });
     }
 
-    const pendingPayments = await prisma.orderPayment.findMany({
-      where: {
-        method: 'CASH',
-        status: 'SUCCESS',
-        settledAt: null,
-        order: { assignedShipperId: shipperId }
-      },
-      include: {
-        order: {
-          select: {
-            orderId: true,
-            assignedShipper: { select: { fullName: true } }
-          }
-        }
+    let paymentIds = null;
+    if (req.body?.paymentIds !== undefined) {
+      paymentIds = Array.isArray(req.body.paymentIds) ? req.body.paymentIds.map(Number) : [];
+      if (paymentIds.length === 0 || paymentIds.some(id => !Number.isInteger(id))) {
+        return res.status(400).json({ success: false, message: 'Danh sách khoản COD cần đối soát không hợp lệ.' });
       }
-    });
-
-    if (pendingPayments.length === 0) {
-      return res.status(409).json({ success: false, message: 'Không có khoản COD nào đang chờ đối soát cho shipper này.' });
     }
 
-    const totalAmount = pendingPayments.reduce((sum, p) => sum + Number(p.amount), 0);
-    const shipperName = pendingPayments[0]?.order?.assignedShipper?.fullName || `Shipper #${shipperId}`;
     const settledBy = req.user?.fullname || req.user?.name || req.user?.email || req.user?.code || 'Kế toán';
     const now = new Date();
 
-    const paymentIds = pendingPayments.map(p => p.id);
-    await prisma.orderPayment.updateMany({
-      where: { id: { in: paymentIds } },
-      data: { settledAt: now, settledBy }
+    const result = await prisma.$transaction(async (tx) => {
+      const pendingPayments = await tx.orderPayment.findMany({
+        where: {
+          ...(paymentIds ? { id: { in: paymentIds } } : {}),
+          method: 'CASH',
+          status: 'SUCCESS',
+          settledAt: null,
+          order: { assignedShipperId: shipperId }
+        },
+        include: {
+          order: {
+            select: {
+              orderId: true,
+              assignedShipper: { select: { fullName: true } }
+            }
+          }
+        }
+      });
+
+      if (pendingPayments.length === 0) return null;
+      if (paymentIds && pendingPayments.length !== new Set(paymentIds).size) {
+        const error = new Error('Một số khoản COD đã chọn không còn chờ đối soát hoặc không thuộc shipper này. Vui lòng tải lại danh sách.');
+        error.statusCode = 409;
+        throw error;
+      }
+
+      const totalAmount = pendingPayments.reduce((sum, p) => sum + Number(p.amount), 0);
+      const shipperName = pendingPayments[0]?.order?.assignedShipper?.fullName || `Shipper #${shipperId}`;
+
+      // settledAt: null trong where chặn 2 kế toán cùng chốt 1 khoản
+      const updated = await tx.orderPayment.updateMany({
+        where: { id: { in: pendingPayments.map(p => p.id) }, settledAt: null },
+        data: { settledAt: now, settledBy }
+      });
+      if (updated.count !== pendingPayments.length) {
+        const error = new Error('Khoản COD vừa được người khác đối soát. Vui lòng tải lại danh sách.');
+        error.statusCode = 409;
+        throw error;
+      }
+
+      if (totalAmount > 0) {
+        await tx.ledgerEntry.create({
+          data: {
+            type: 'INCOME',
+            amount: totalAmount,
+            channel: 'CASH',
+            description: `Thu tiền mặt COD từ shipper ${shipperName} (${pendingPayments.length} đơn: ${pendingPayments.map(p => p.order.orderId).join(', ')})`,
+            referenceId: `COD-SETTLE-${shipperId}-${Date.now().toString().slice(-6)}`,
+            date: now
+          }
+        });
+      }
+
+      return { count: pendingPayments.length, totalAmount };
     });
 
-    // Tự động ghi bút toán thu tiền vào Sổ Cái Kế Toán (LedgerEntry)
-    if (totalAmount > 0) {
-      await prisma.ledgerEntry.create({
-        data: {
-          type: 'INCOME',
-          amount: totalAmount,
-          channel: 'CASH',
-          description: `Thu tiền mặt COD từ shipper ${shipperName} (${pendingPayments.length} đơn hàng)`,
-          referenceId: `COD-SETTLE-${shipperId}-${Date.now().toString().slice(-6)}`,
-          date: now
-        }
-      }).catch(e => console.warn('[LedgerEntry] Lỗi ghi nhận sổ cái COD:', e.message));
+    if (!result) {
+      return res.status(409).json({ success: false, message: 'Không có khoản COD nào đang chờ đối soát cho shipper này.' });
     }
 
-    logAudit({ req, action: 'SETTLE_COD', module: 'Kế Toán', targetId: shipperId, note: `${pendingPayments.length} đơn, ${totalAmount}đ` });
+    logAudit({ req, action: 'SETTLE_COD', module: 'Kế Toán', targetId: shipperId, note: `${result.count} đơn, ${result.totalAmount}đ` });
 
     res.json({
       success: true,
-      message: `Đã đối soát thành công ${pendingPayments.length} đơn COD (Tổng: ${totalAmount.toLocaleString('vi-VN')}đ).`,
+      message: `Đã đối soát thành công ${result.count} đơn COD (Tổng: ${result.totalAmount.toLocaleString('vi-VN')}đ).`,
       data: {
-        count: pendingPayments.length,
-        totalAmount,
+        count: result.count,
+        totalAmount: result.totalAmount,
         settledBy,
         settledAt: now
       }
@@ -315,4 +346,116 @@ const settleCodForShipper = async (req, res, next) => {
   }
 };
 
-module.exports = { getLedger, createLedgerEntry, updateLedgerEntry, deleteLedgerEntry, getCodSettlement, settleCodForShipper };
+// GET /api/v1/ledger/cod/my — Shipper xem tiền mặt COD mình đang giữ theo dữ
+// liệu thật (OrderPayment.settledAt), không ước tính từ danh sách đơn.
+const getMyCod = async (req, res, next) => {
+  try {
+    const shipperId = Number(req.user?.id);
+    if (!Number.isInteger(shipperId)) {
+      return res.status(403).json({ success: false, message: 'Không xác định được shipper.' });
+    }
+
+    const orderSelect = {
+      orderId: true,
+      deliveredAt: true,
+      shippingAddress: true,
+      customer: { select: { name: true } }
+    };
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+    const [unsettled, settled] = await Promise.all([
+      prisma.orderPayment.findMany({
+        where: { method: 'CASH', status: 'SUCCESS', settledAt: null, order: { assignedShipperId: shipperId } },
+        include: { order: { select: orderSelect } },
+        orderBy: { createdAt: 'asc' }
+      }),
+      prisma.orderPayment.findMany({
+        where: { method: 'CASH', status: 'SUCCESS', settledAt: { gte: thirtyDaysAgo }, order: { assignedShipperId: shipperId } },
+        include: { order: { select: orderSelect } },
+        orderBy: { settledAt: 'desc' },
+        take: 100
+      })
+    ]);
+
+    const toRow = p => ({
+      paymentId: p.id,
+      orderId: p.order?.orderId,
+      customerName: p.order?.customer?.name,
+      shippingAddress: p.order?.shippingAddress,
+      deliveredAt: p.order?.deliveredAt,
+      amount: Number(p.amount),
+      remittedAt: p.remittedAt,
+      remitNote: p.remitNote,
+      settledAt: p.settledAt,
+      settledBy: p.settledBy
+    });
+    const sum = rows => rows.reduce((s, p) => s + Number(p.amount), 0);
+
+    res.json({
+      success: true,
+      data: {
+        holdingAmount: sum(unsettled.filter(p => !p.remittedAt)),
+        remittedPendingAmount: sum(unsettled.filter(p => p.remittedAt)),
+        settledAmount30d: sum(settled),
+        pending: unsettled.map(toRow),
+        history: settled.map(toRow)
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// POST /api/v1/ledger/cod/my/remit — Shipper khai báo đã nộp tiền mặt cho Kế
+// Toán. Body { paymentIds?, note? }; bỏ trống paymentIds = khai báo toàn bộ
+// khoản đang giữ. Chỉ là khai báo — Kế Toán vẫn phải xác nhận (settle).
+const remitMyCod = async (req, res, next) => {
+  try {
+    const shipperId = Number(req.user?.id);
+    if (!Number.isInteger(shipperId)) {
+      return res.status(403).json({ success: false, message: 'Không xác định được shipper.' });
+    }
+
+    let paymentIds = null;
+    if (req.body?.paymentIds !== undefined) {
+      paymentIds = Array.isArray(req.body.paymentIds) ? req.body.paymentIds.map(Number) : [];
+      if (paymentIds.length === 0 || paymentIds.some(id => !Number.isInteger(id))) {
+        return res.status(400).json({ success: false, message: 'Danh sách khoản COD không hợp lệ.' });
+      }
+    }
+    const note = req.body?.note ? String(req.body.note).trim().slice(0, 255) : null;
+
+    const payments = await prisma.orderPayment.findMany({
+      where: {
+        ...(paymentIds ? { id: { in: paymentIds } } : {}),
+        method: 'CASH',
+        status: 'SUCCESS',
+        settledAt: null,
+        remittedAt: null,
+        order: { assignedShipperId: shipperId }
+      },
+      select: { id: true, amount: true }
+    });
+    if (payments.length === 0) {
+      return res.status(409).json({ success: false, message: 'Không có khoản COD nào đang giữ để khai báo nộp.' });
+    }
+
+    await prisma.orderPayment.updateMany({
+      where: { id: { in: payments.map(p => p.id) }, settledAt: null, remittedAt: null },
+      data: { remittedAt: new Date(), remitNote: note }
+    });
+
+    const totalAmount = payments.reduce((s, p) => s + Number(p.amount), 0);
+    logAudit({ req, action: 'REMIT_COD', module: 'Giao Hàng', targetId: shipperId, note: `${payments.length} đơn, ${totalAmount}đ` });
+
+    res.json({
+      success: true,
+      message: `Đã khai báo nộp ${totalAmount.toLocaleString('vi-VN')}đ (${payments.length} đơn). Chờ Kế toán xác nhận.`,
+      data: { count: payments.length, totalAmount }
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+module.exports = { getLedger, createLedgerEntry, updateLedgerEntry, deleteLedgerEntry, getCodSettlement, settleCodForShipper, getMyCod, remitMyCod };

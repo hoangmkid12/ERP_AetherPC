@@ -22,7 +22,8 @@ import {
   matchesDateFilter,
   getOrderDateTime,
   getDateFilterLabel,
-  getDeliveryIncidentStatus
+  getDeliveryIncidentStatus,
+  isCodOrder, getOrderCashAmount, isOrderCodSettled
 } from './deliveryHelpers';
 import { SignatureRow, SignatureCell, displaySigner, historySigner } from '../../../components/Signature/ESignature';
 
@@ -93,25 +94,15 @@ export default function OverviewTab({
     // Phân tích chi tiết tiền mặt COD: Đã thu, Đã nộp kế toán, Đang giữ
     const codOrders = periodOrders.filter(o => {
       if (o.status !== 'DELIVERED') return false;
-      return o.paymentMethod === 'COD' || o.actualPaymentMethod === 'COD' || o.actualPaymentMethod === 'CASH' || (!o.paymentMethod && !o.actualPaymentMethod);
+      return isCodOrder(o);
     });
 
-    const isOrderSettled = (o) => {
-      if (Array.isArray(o.payments) && o.payments.length > 0) {
-        const cashPayments = o.payments.filter(p => p.method === 'CASH');
-        if (cashPayments.length > 0) {
-          return cashPayments.every(p => p.settledAt !== null);
-        }
-      }
-      return Boolean(o.codSettled || o.settledAt);
-    };
+    const settledOrders = codOrders.filter(isOrderCodSettled);
+    const pendingOrders = codOrders.filter(o => !isOrderCodSettled(o));
 
-    const settledOrders = codOrders.filter(isOrderSettled);
-    const pendingOrders = codOrders.filter(o => !isOrderSettled(o));
-
-    const totalCollected = codOrders.reduce((sum, o) => sum + parseFloat(o.totalAmount || o.total || 0), 0);
-    const settledAmount = settledOrders.reduce((sum, o) => sum + parseFloat(o.totalAmount || o.total || 0), 0);
-    const pendingAmount = pendingOrders.reduce((sum, o) => sum + parseFloat(o.totalAmount || o.total || 0), 0);
+    const totalCollected = codOrders.reduce((sum, o) => sum + getOrderCashAmount(o), 0);
+    const settledAmount = settledOrders.reduce((sum, o) => sum + getOrderCashAmount(o), 0);
+    const pendingAmount = pendingOrders.reduce((sum, o) => sum + getOrderCashAmount(o), 0);
     const percentSettled = totalCollected > 0 ? Math.min(100, Math.round((settledAmount / totalCollected) * 100)) : 100;
 
     return [
@@ -135,25 +126,15 @@ export default function OverviewTab({
   const codAnalytics = useMemo(() => {
     const codOrders = periodOrders.filter(o => {
       if (o.status !== 'DELIVERED') return false;
-      return o.paymentMethod === 'COD' || o.actualPaymentMethod === 'COD' || o.actualPaymentMethod === 'CASH' || (!o.paymentMethod && !o.actualPaymentMethod);
+      return isCodOrder(o);
     });
 
-    const isOrderSettled = (o) => {
-      if (Array.isArray(o.payments) && o.payments.length > 0) {
-        const cashPayments = o.payments.filter(p => p.method === 'CASH');
-        if (cashPayments.length > 0) {
-          return cashPayments.every(p => p.settledAt !== null);
-        }
-      }
-      return Boolean(o.codSettled || o.settledAt);
-    };
+    const settledOrders = codOrders.filter(isOrderCodSettled);
+    const pendingOrders = codOrders.filter(o => !isOrderCodSettled(o));
 
-    const settledOrders = codOrders.filter(isOrderSettled);
-    const pendingOrders = codOrders.filter(o => !isOrderSettled(o));
-
-    const totalCollected = codOrders.reduce((sum, o) => sum + parseFloat(o.totalAmount || o.total || 0), 0);
-    const settledAmount = settledOrders.reduce((sum, o) => sum + parseFloat(o.totalAmount || o.total || 0), 0);
-    const pendingAmount = pendingOrders.reduce((sum, o) => sum + parseFloat(o.totalAmount || o.total || 0), 0);
+    const totalCollected = codOrders.reduce((sum, o) => sum + getOrderCashAmount(o), 0);
+    const settledAmount = settledOrders.reduce((sum, o) => sum + getOrderCashAmount(o), 0);
+    const pendingAmount = pendingOrders.reduce((sum, o) => sum + getOrderCashAmount(o), 0);
     const percentSettled = totalCollected > 0 ? Math.min(100, Math.round((settledAmount / totalCollected) * 100)) : 100;
 
     return {
@@ -205,7 +186,7 @@ export default function OverviewTab({
       periodOrders.forEach(o => {
         if (o.status === 'DELIVERED') {
           const dt = getOrderDateTime(o);
-          const amt = (o.paymentMethod === 'COD' || !o.paymentMethod) ? parseFloat(o.totalAmount || o.total || 0) / 1000000 : 0;
+          const amt = (isCodOrder(o) ? getOrderCashAmount(o) : 0) / 1000000;
           if (dt) {
             const h = dt.getHours();
             if (h >= 7 && h < 11) buckets[0] += amt;
@@ -225,7 +206,7 @@ export default function OverviewTab({
       periodOrders.forEach(o => {
         if (o.status === 'DELIVERED') {
           const dt = getOrderDateTime(o);
-          const amt = (o.paymentMethod === 'COD' || !o.paymentMethod) ? parseFloat(o.totalAmount || o.total || 0) / 1000000 : 0;
+          const amt = (isCodOrder(o) ? getOrderCashAmount(o) : 0) / 1000000;
           if (dt) {
             const dayNum = dt.getDate();
             if (dayNum <= 7) buckets[0] += amt;
@@ -243,7 +224,7 @@ export default function OverviewTab({
       periodOrders.forEach(o => {
         if (o.status === 'DELIVERED') {
           const dt = getOrderDateTime(o);
-          const amt = (o.paymentMethod === 'COD' || !o.paymentMethod) ? parseFloat(o.totalAmount || o.total || 0) / 1000000 : 0;
+          const amt = (isCodOrder(o) ? getOrderCashAmount(o) : 0) / 1000000;
           if (dt) {
             buckets[dt.getMonth()] += amt;
           }
@@ -257,7 +238,7 @@ export default function OverviewTab({
       periodOrders.forEach(o => {
         if (o.status === 'DELIVERED') {
           const dt = getOrderDateTime(o);
-          const amt = (o.paymentMethod === 'COD' || !o.paymentMethod) ? parseFloat(o.totalAmount || o.total || 0) / 1000000 : 0;
+          const amt = (isCodOrder(o) ? getOrderCashAmount(o) : 0) / 1000000;
           if (dt) {
             const day = dt.getDay();
             const idx = day === 0 ? 6 : day - 1;
@@ -605,14 +586,14 @@ export default function OverviewTab({
                     </thead>
                     <tbody>
                       {codAnalytics.codOrders.map((o, idx) => {
-                        const isSettled = Array.isArray(o.payments) && o.payments.some(p => p.method === 'CASH' && p.settledAt !== null);
+                        const isSettled = isOrderCodSettled(o);
                         return (
                           <tr key={idx} style={{ borderBottom: '1px solid #e2e8f0' }}>
                             <td style={{ padding: '0.45rem 0.6rem', fontWeight: 700, color: '#2563eb' }}>#{o.orderId || o.id}</td>
                             <td style={{ padding: '0.45rem 0.6rem', color: '#0f172a' }}>{o.customerName}</td>
                             <td style={{ padding: '0.45rem 0.6rem', color: '#64748b' }}>{o.shippingAddress}</td>
                             <td style={{ padding: '0.45rem 0.6rem', textAlign: 'right', fontWeight: 800, color: '#0f172a' }}>
-                              {fmt(parseFloat(o.totalAmount || o.total || 0))}
+                              {fmt(getOrderCashAmount(o))}
                             </td>
                             <td style={{ padding: '0.45rem 0.6rem', textAlign: 'center' }}>
                               {isSettled ? (

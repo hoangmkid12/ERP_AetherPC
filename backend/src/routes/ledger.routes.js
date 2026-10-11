@@ -1,9 +1,18 @@
 const express = require('express');
 const router = express.Router();
 const { authMiddleware } = require('../middlewares/auth.middleware');
-const { getLedger, createLedgerEntry, updateLedgerEntry, deleteLedgerEntry, getCodSettlement, settleCodForShipper } = require('../controllers/ledger.controller');
+const { getLedger, createLedgerEntry, updateLedgerEntry, deleteLedgerEntry, getCodSettlement, settleCodForShipper, getMyCod, remitMyCod } = require('../controllers/ledger.controller');
 
 const LEDGER_ROLES = ['ACCOUNTANT', 'CEO', 'ADMIN'];
+
+// Khai báo trước '/:id' để '/cod/...' không bị nuốt bởi route tham số.
+// @route   GET /api/v1/ledger/cod/my
+// @desc    Shipper xem tiền mặt COD mình đang giữ / đã khai báo nộp / đã được đối soát
+router.get('/cod/my', authMiddleware(['DELIVERY']), getMyCod);
+
+// @route   POST /api/v1/ledger/cod/my/remit
+// @desc    Shipper khai báo đã nộp tiền mặt COD cho Kế Toán (chờ Kế Toán xác nhận)
+router.post('/cod/my/remit', authMiddleware(['DELIVERY']), remitMyCod);
 
 // @route   GET /api/v1/ledger
 router.get('/', authMiddleware(LEDGER_ROLES), getLedger);

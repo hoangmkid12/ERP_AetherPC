@@ -536,6 +536,29 @@ export const getDateFilterLabel = (filterConfig) => {
 /**
  * Các trạng thái thể hiện đơn hàng đang trong hành trình giao thật sự của Shipper
  */
+// ── Tiền mặt COD của 1 đơn ─────────────────────────────────────────────
+// Đơn SPLIT (vừa tiền mặt vừa chuyển khoản) chỉ có phần tiền mặt là shipper
+// giữ — lấy theo OrderPayment CASH khi backend trả kèm payments, chỉ fallback
+// về totalAmount khi chưa có dữ liệu thanh toán.
+export const isCodOrder = (o) =>
+  o.paymentMethod === 'COD' || o.actualPaymentMethod === 'COD' || o.actualPaymentMethod === 'CASH' ||
+  o.actualPaymentMethod === 'SPLIT' || (!o.paymentMethod && !o.actualPaymentMethod);
+
+const getCashPayments = (o) => (Array.isArray(o.payments) ? o.payments.filter(p => p.method === 'CASH') : []);
+
+export const getOrderCashAmount = (o) => {
+  const cashPayments = getCashPayments(o);
+  if (cashPayments.length > 0) return cashPayments.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
+  if (Array.isArray(o.payments) && o.payments.length > 0) return 0; // đã thanh toán, không có tiền mặt
+  return parseFloat(o.totalAmount || o.total || 0);
+};
+
+export const isOrderCodSettled = (o) => {
+  const cashPayments = getCashPayments(o);
+  if (cashPayments.length > 0) return cashPayments.every(p => p.settledAt !== null);
+  return Boolean(o.codSettled || o.settledAt);
+};
+
 export const ACTIVE_DELIVERY_STATUSES = ['SHIPPED', 'OUT_FOR_DELIVERY', 'ASSIGNED', 'SHIPPING_FAILED', 'RETURNING_TO_WAREHOUSE'];
 
 /**
@@ -689,28 +712,17 @@ export const generateShipperNotifications = (
   // 5. Cảnh báo hạn mức tiền mặt COD đang giữ & đối soát nộp tiền
   const deliveredToday = orders.filter(o => {
     if (!o || o.status !== 'DELIVERED' || !isShipperMatched(o)) return false;
-    const isCod = o.paymentMethod === 'COD' || o.actualPaymentMethod === 'COD' || o.actualPaymentMethod === 'CASH' || (!o.paymentMethod && !o.actualPaymentMethod);
-    if (!isCod) return false;
+    if (!isCodOrder(o)) return false;
     const d = getOrderDateTime(o);
     return matchesDateFilter(d, { period: 'TODAY' });
   });
 
-  const isOrderSettled = (o) => {
-    if (Array.isArray(o.payments) && o.payments.length > 0) {
-      const cashPayments = o.payments.filter(p => p.method === 'CASH');
-      if (cashPayments.length > 0) {
-        return cashPayments.every(p => p.settledAt !== null);
-      }
-    }
-    return Boolean(o.codSettled || o.settledAt);
-  };
+  const settledToday = deliveredToday.filter(isOrderCodSettled);
+  const pendingToday = deliveredToday.filter(o => !isOrderCodSettled(o));
 
-  const settledToday = deliveredToday.filter(isOrderSettled);
-  const pendingToday = deliveredToday.filter(o => !isOrderSettled(o));
-
-  const totalCodToday = deliveredToday.reduce((sum, o) => sum + parseFloat(o.totalAmount || o.total || 0), 0);
-  const settledCodToday = settledToday.reduce((sum, o) => sum + parseFloat(o.totalAmount || o.total || 0), 0);
-  const pendingCodToday = pendingToday.reduce((sum, o) => sum + parseFloat(o.totalAmount || o.total || 0), 0);
+  const totalCodToday = deliveredToday.reduce((sum, o) => sum + getOrderCashAmount(o), 0);
+  const settledCodToday = settledToday.reduce((sum, o) => sum + getOrderCashAmount(o), 0);
+  const pendingCodToday = pendingToday.reduce((sum, o) => sum + getOrderCashAmount(o), 0);
 
   // 5a. Cảnh báo nếu tiền mặt COD đang giữ vượt ngưỡng an toàn
   if (pendingCodToday >= 3000000) {
