@@ -20,12 +20,12 @@ export function AuthTopBar() {
   );
 }
 
-export function PasswordInput({ id, value, onChange, placeholder, autoComplete = 'new-password', invalid }) {
+export function PasswordInput({ id, name, value, onChange, placeholder, autoComplete = 'new-password', invalid }) {
   const [show, setShow] = useState(false);
   return (
     <div className={`sf-input${invalid ? ' is-invalid' : ''}`}>
       <Key size={17} className="ic" />
-      <input id={id} type={show ? 'text' : 'password'} value={value} onChange={onChange} placeholder={placeholder}
+      <input id={id} name={name || id} type={show ? 'text' : 'password'} value={value} onChange={onChange} placeholder={placeholder}
         autoComplete={autoComplete} aria-invalid={invalid || undefined} />
       <button type="button" className="eye" onClick={() => setShow(s => !s)} aria-label={show ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}>
         {show ? <EyeOff size={17} /> : <Eye size={17} />}

@@ -5,11 +5,12 @@ import { notify } from '../context/NotificationContext';
 import { api } from '../services/api';
 import {
   LogIn, User as UserIcon, AlertTriangle, UserPlus, ArrowLeft, Mail, Phone,
-  PackageSearch, ShieldCheck, Award, Truck, Contact, CheckCircle2, Send, MailCheck, KeyRound
+  PackageSearch, ShieldCheck, Award, Truck, Contact, CheckCircle2, Send, MailCheck, KeyRound, Lock, Headphones
 } from 'lucide-react';
 import {
   AuthTopBar, PasswordInput, PasswordStrength, GoogleSignInButton, AuthDivider
 } from '../components/Auth/AuthParts';
+import { SHOP } from '../components/Storefront/catalog';
 
 // Quyền lợi mô tả đúng chức năng hệ thống đang có
 const PERKS = [
@@ -41,7 +42,16 @@ const writeRemembered = (identifier) => {
   } catch { /* trình duyệt chặn lưu trữ — bỏ qua */ }
 };
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+// Credential Management API (Chrome/Edge): báo trình duyệt lưu mật khẩu vào trình quản lý
+// mật khẩu của nó và lấy lại để tự điền. Đăng nhập kiểu SPA (fetch, không tải lại trang)
+// khiến Chrome thường không tự nhận ra để lưu, nên phải gọi chủ động.
+const canUseCredentials = () => typeof window !== 'undefined' && 'PasswordCredential' in window && !!navigator.credentials;
+const storeBrowserCredential = async (id, password, name) => {
+  if (!canUseCredentials()) return;
+  try { await navigator.credentials.store(new window.PasswordCredential({ id, password, name: name || id })); } catch { /* người dùng từ chối lưu */ }
+};
+
+const EMAIL_RE =/^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE_RE = /^0[35789]\d{8}$/;
 const USERNAME_RE = /^[a-z0-9_]{3,30}$/;
 const RESEND_SECONDS = 60;
@@ -59,7 +69,7 @@ function FieldError({ msg }) {
 export default function Login() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { login, loginWithGoogle, register } = useAuth();
+  const { user, loading: authLoading, login, loginWithGoogle, register } = useAuth();
 
   const initialMode = new URLSearchParams(location.search).get('mode');
   const [mode, setMode] = useState(['register', 'forgot'].includes(initialMode) ? initialMode : 'login');
@@ -82,6 +92,31 @@ export default function Login() {
   const [error, setError] = useState(null);
   const [info, setInfo] = useState(location.state?.notice || null);
   const [loading, setLoading] = useState(false);
+
+  // Đang còn phiên (đã "Ghi nhớ đăng nhập") thì không bắt đăng nhập lại.
+  const [redirected, setRedirected] = useState(false);
+  useEffect(() => {
+    if (!authLoading && user && !redirected) {
+      setRedirected(true);
+      navigate(EMPLOYEE_HOME[user.role] || '/', { replace: true });
+    }
+  }, [authLoading, user, redirected, navigate]);
+
+  // Đã ghi nhớ trên máy này → lấy tài khoản/mật khẩu đã lưu trong trình duyệt để điền sẵn.
+  // Chỉ điền, không tự bấm đăng nhập; 'optional' để Chrome hiện bảng chọn tài khoản nếu có nhiều.
+  useEffect(() => {
+    if (!readRemembered() || !canUseCredentials()) return undefined;
+    let active = true;
+    navigator.credentials.get({ password: true, mediation: 'optional' })
+      .then(cred => {
+        if (active && cred?.type === 'password' && cred.password) {
+          setUsername(cred.id);
+          setPassword(cred.password);
+        }
+      })
+      .catch(() => {});
+    return () => { active = false; };
+  }, []);
 
   useEffect(() => {
     if (cooldown <= 0) return undefined;
@@ -116,6 +151,8 @@ export default function Login() {
     try {
       const loggedUser = await login(username, password, { remember });
       writeRemembered(remember ? username.trim() : '');
+      if (remember) await storeBrowserCredential(username.trim(), password, loggedUser.name);
+      setRedirected(true);
       goHome(loggedUser);
     } catch (err) {
       setError(err.message || 'Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.');
@@ -225,6 +262,11 @@ export default function Login() {
                 </div>
               ))}
             </div>
+            <div className="sf-auth-side-foot">
+              <div className="line" />
+              <div className="row"><Lock size={15} /> Thông tin tài khoản được mã hóa và bảo mật tuyệt đối</div>
+              <div className="row"><Headphones size={15} /> Cần hỗ trợ? Gọi <b>{SHOP.hotline}</b></div>
+            </div>
           </aside>
 
           <div className="sf-auth-form">
@@ -247,7 +289,7 @@ export default function Login() {
             </>}
             {mode === 'register' && <>
               <h1>Tạo tài khoản</h1>
-              <p className="sub">Chỉ mất chưa đến một phút để trở thành thành viên AetherPC.</p>
+              <p className="sub">Đăng ký miễn phí, chỉ mất 1 phút.</p>
             </>}
             {isForgot && !sentTo && <>
               <span className="sf-auth-icon"><KeyRound size={26} /></span>
@@ -354,7 +396,7 @@ export default function Login() {
 
                 <label className="sf-check sf-check-terms">
                   <input type="checkbox" checked={agree} onChange={e => { setAgree(e.target.checked); setRegErrors(x => ({ ...x, agree: undefined })); }} />
-                  <span>Tôi đồng ý với <a href="/about" target="_blank" rel="noreferrer">Điều khoản sử dụng</a> và <a href="/about" target="_blank" rel="noreferrer">Chính sách bảo mật</a> của AetherPC.</span>
+                  <span>Tôi đồng ý với <a href="/about" target="_blank" rel="noreferrer">Điều khoản</a> &amp; <a href="/about" target="_blank" rel="noreferrer">Chính sách bảo mật</a></span>
                 </label>
                 <FieldError msg={regErrors.agree} />
 

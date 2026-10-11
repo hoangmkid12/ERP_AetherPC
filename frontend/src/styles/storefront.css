@@ -679,7 +679,7 @@
 .sf-auth-bar .back:hover { background: rgba(0, 0, 0, .28); }
 .sf-auth-wrap { flex: 1; display: flex; align-items: center; justify-content: center; padding: 32px 16px 40px; }
 .sf-auth-card { width: 100%; max-width: 980px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); background: #fff; border-radius: 16px; overflow: hidden; box-shadow: 0 20px 50px rgba(17, 24, 39, .12); }
-.sf-auth-side { position: relative; color: #1e293b; padding: 44px 38px; display: flex; flex-direction: column; justify-content: center; overflow: hidden;
+.sf-auth-side { position: relative; color: #1e293b; padding: 44px 38px; display: flex; flex-direction: column; justify-content: flex-start; overflow: hidden;
   background: #f8fafc; border-right: 1px solid #e2e8f0; }
 .sf-auth-side h2 { color: #0f172a; font-size: 25px; font-weight: 800; line-height: 1.35; letter-spacing: -.02em; margin: 14px 0 10px; }
 .sf-auth-side > p { color: #64748b; font-size: 15px; line-height: 1.6; margin: 0 0 28px; }
@@ -688,7 +688,7 @@
 .sf-auth-perk .ic { width: 42px; height: 42px; border-radius: 12px; background: #fff; color: var(--sf-primary); border: 1.5px solid #e2e8f0; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 2px 6px rgba(0,0,0,0.03); }
 .sf-auth-perk b { display: block; font-size: 15px; font-weight: 700; color: #1e293b; margin-bottom: 4px; }
 .sf-auth-perk span { font-size: 13.5px; color: #64748b; line-height: 1.55; }
-.sf-auth-form { padding: 44px 44px; display: flex; flex-direction: column; justify-content: center; }
+.sf-auth-form { padding: 44px 44px; display: flex; flex-direction: column; justify-content: flex-start; }
 .sf-auth-form h1 { font-size: 26px; font-weight: 800; letter-spacing: -.02em; margin: 0 0 6px; color: var(--sf-text); }
 .sf-auth-form .sub { font-size: 14.5px; color: var(--sf-muted); margin: 0 0 24px; }
 .sf-auth-tabs { display: grid; grid-template-columns: 1fr 1fr; border-bottom: 1px solid var(--sf-border); margin-bottom: 20px; }
@@ -708,7 +708,12 @@
 .sf-auth-switch button { border: none; background: none; color: var(--sf-primary); font-weight: 700; cursor: pointer; font-size: inherit; padding: 0; }
 
 /* ---------- Đăng nhập / Đăng ký / Quên & đặt lại mật khẩu ---------- */
-.sf-auth-card-single { grid-template-columns: minmax(0, 1fr); max-width: 480px; }
+.sf-auth-side-foot { margin-top: auto; padding-top: 28px; display: flex; flex-direction: column; gap: 10px; }
+.sf-auth-side-foot .row { display: flex; align-items: center; gap: 10px; font-size: 13px; color: #64748b; }
+.sf-auth-side-foot .row svg { color: #16a34a; flex-shrink: 0; }
+.sf-auth-side-foot .row b { color: #1e293b; }
+.sf-auth-side-foot .line { height: 1px; background: #e2e8f0; margin-bottom: 6px; }
+.sf-auth-card-single {grid-template-columns: minmax(0, 1fr); max-width: 480px; }
 .sf-auth-badge { font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: #dc2626; background: #fee2e2; padding: 3px 10px; border-radius: 6px; width: fit-content; }
 .sf-auth-form .sf-btn-solid { background: var(--sf-primary); color: #fff !important; border-color: var(--sf-primary); margin-top: 6px; }
 .sf-auth-form .sf-btn-solid:hover:not(:disabled) { background: var(--sf-primary-dark); border-color: var(--sf-primary-dark); color: #fff !important; box-shadow: 0 6px 18px rgba(215, 0, 24, .25); }
@@ -716,7 +721,8 @@
 .sf-auth-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: -2px 0 16px; }
 .sf-check { display: inline-flex; align-items: flex-start; gap: 8px; font-size: 13.5px; color: var(--sf-text-2); cursor: pointer; user-select: none; line-height: 1.45; }
 .sf-check input { width: 16px; height: 16px; margin: 1px 0 0; accent-color: var(--sf-primary); cursor: pointer; flex-shrink: 0; }
-.sf-check-terms { margin: 4px 0 8px; font-size: 13px; }
+.sf-check-terms { margin: 4px 0 8px; font-size: 13px; white-space: nowrap; }
+@media (max-width: 400px) { .sf-check-terms { white-space: normal; } }
 .sf-check-terms a { color: var(--sf-primary) !important; font-weight: 600; }
 .sf-check-terms a:hover { text-decoration: underline; }
 .sf-link { border: none; background: none; padding: 0; color: var(--sf-primary) !important; font-weight: 600; font-size: 13.5px; cursor: pointer; font-family: inherit; }

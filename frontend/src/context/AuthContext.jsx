@@ -186,6 +186,8 @@ export const AuthProvider = ({ children }) => {
     // Fire-and-forget: clear the HTTP-Only cookie server-side. The UI has
     // already logged the user out locally regardless of this call's outcome.
     api.post('/auth/logout').catch(() => {});
+    // Mật khẩu đã lưu trong trình duyệt vẫn giữ, nhưng không được dùng tự động khi chưa hỏi người dùng.
+    navigator.credentials?.preventSilentAccess?.().catch(() => {});
   };
 
   const value = {
