@@ -45,7 +45,8 @@ export const AuthProvider = ({ children }) => {
     return () => window.removeEventListener('auth-change', handleAuthChange);
   }, []);
 
-  const login = async (username, password) => {
+  // remember: true = phiên 30 ngày, false = hết khi đóng trình duyệt (xem issueSession ở backend)
+  const login = async (username, password, { remember } = {}) => {
     setLoading(true);
     try {
       const cleanUser = String(username || '').trim();
@@ -77,10 +78,14 @@ export const AuthProvider = ({ children }) => {
       const employeeAttempt = api.post('/auth/employee/login', {
         ...(cleanUser.includes('@') ? { email: cleanUser } : {}),
         username: cleanUser,
-        password
+        password,
+        ...(remember !== undefined ? { rememberMe: !!remember } : {})
       }).then(response => ({ kind: 'employee', response }));
 
-      const customerAttempt = api.post('/auth/login', { email: cleanUser, username: cleanUser, password })
+      const customerAttempt = api.post('/auth/login', {
+        email: cleanUser, username: cleanUser, password,
+        ...(remember !== undefined ? { rememberMe: !!remember } : {})
+      })
         .then(response => ({ kind: 'customer', response }));
 
       let kind, response;
@@ -96,6 +101,9 @@ export const AuthProvider = ({ children }) => {
         if (rateLimitErr) {
           throw new Error(rateLimitErr.message || 'Quá nhiều yêu cầu đăng nhập, vui lòng thử lại sau ít phút.');
         }
+        // Tài khoản khách tạo qua Google chưa có mật khẩu — giữ nguyên hướng dẫn của máy chủ.
+        const googleOnlyErr = errors.find(e => e?.message?.includes('đăng nhập bằng Google'));
+        if (googleOnlyErr) throw new Error(googleOnlyErr.message);
         throw new Error('Tài khoản hoặc mật khẩu không chính xác');
       }
 
@@ -135,6 +143,22 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const loginWithGoogle = async (credential, { remember } = {}) => {
+    setLoading(true);
+    try {
+      const response = await api.post('/auth/google', { credential, rememberMe: !!remember });
+      if (!response || !response.token || !response.user) {
+        throw new Error('Đăng nhập Google không thành công');
+      }
+      const userObj = { ...response.user, role: 'CUSTOMER', isNew: !!response.isNew };
+      setUser(userObj);
+      initializeAllStores(userObj).catch(() => {});
+      return userObj;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const updateUser = async (updatedFields) => {
     setLoading(true);
     try {
@@ -168,6 +192,7 @@ export const AuthProvider = ({ children }) => {
     user,
     loading,
     login,
+    loginWithGoogle,
     register,
     logout,
     updateUser,

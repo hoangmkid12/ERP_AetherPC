@@ -720,9 +720,64 @@ const sendWelcomeEmail = async ({ toEmail, customerName }) => {
   return emailData;
 };
 
+/**
+ * Gửi email xác nhận yêu cầu đặt lại mật khẩu, kèm nút dẫn tới trang đặt lại mật khẩu.
+ * Khác các mẫu khác: KHÔNG ghi HTML vào email_logs.json vì đường dẫn chứa token đổi mật khẩu
+ * và nhật ký này có endpoint đọc được — chỉ lưu bản đã che link.
+ */
+const sendPasswordResetEmail = async ({ toEmail, customerName, resetUrl, expiresMinutes = 30 }) => {
+  const safeUrl = escapeHtml(resetUrl);
+  const bodyHtml = `
+    <p style="font-size: 14px; color: #0f172a; margin: 0 0 4px 0; line-height: 1.5;">Xin chào <strong>${escapeHtml(customerName || 'Quý khách')}</strong>,</p>
+    <p style="font-size: 13.5px; color: #334155; line-height: 1.6; margin: 0 0 16px 0;">
+      Chúng tôi vừa nhận được yêu cầu đặt lại mật khẩu cho tài khoản <strong>${escapeHtml(toEmail)}</strong> tại <strong>Aether Computer</strong>.
+      Nhấn nút bên dưới để xác nhận và tạo mật khẩu mới.
+    </p>
+
+    <div style="text-align: center; margin: 24px 0;">
+      <a href="${safeUrl}" class="cta-btn" target="_blank" style="display: inline-block; background-color: #d70018; color: #ffffff; font-weight: 800; font-size: 14px; padding: 14px 32px; border-radius: 8px; text-decoration: none;">Xác Nhận Đổi Mật Khẩu</a>
+    </div>
+
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #fffbeb; border: 1px solid #fde68a; border-radius: 10px; margin-bottom: 16px;">
+      <tr><td style="padding: 12px 14px; font-size: 12.5px; color: #92400e; line-height: 1.6;">
+        ⏳ Liên kết có hiệu lực trong <strong>${expiresMinutes} phút</strong> và chỉ dùng được <strong>một lần</strong>.<br>
+        🔒 Nếu bạn không yêu cầu đổi mật khẩu, hãy bỏ qua email này — mật khẩu hiện tại vẫn giữ nguyên.
+      </td></tr>
+    </table>
+
+    <p style="font-size: 12px; color: #64748b; line-height: 1.6; margin: 0 0 18px 0; word-break: break-all;">
+      Nếu nút không hoạt động, sao chép đường dẫn sau vào trình duyệt:<br>
+      <a href="${safeUrl}" style="color: #2563eb;">${safeUrl}</a>
+    </p>
+  `;
+
+  const html = renderShell({
+    title: 'Đặt lại mật khẩu tài khoản AetherPC',
+    heading: 'XÁC NHẬN ĐẶT LẠI MẬT KHẨU',
+    subheading: `Yêu cầu lúc ${formatVietnamDateTime()}`,
+    bodyHtml
+  });
+
+  const subject = '[AetherPC] Xác nhận đặt lại mật khẩu tài khoản';
+  logEmail({
+    id: `MAIL-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`,
+    type: 'PASSWORD_RESET',
+    toEmail,
+    customerName: customerName || 'Khách hàng',
+    subject,
+    html: html.split(safeUrl).join('#token-da-an'),
+    sentAt: new Date().toISOString()
+  });
+
+  const result = await dispatchEmail({ toEmail, customerName, subject, html });
+  console.log(`[EmailService] ✅ Đã gửi email đặt lại mật khẩu tới ${toEmail} qua ${result.provider}`);
+  return result;
+};
+
 module.exports = {
   sendOrderConfirmationEmail,
   sendOrderStatusUpdateEmail,
   sendWelcomeEmail,
+  sendPasswordResetEmail,
   getEmailLogs
 };

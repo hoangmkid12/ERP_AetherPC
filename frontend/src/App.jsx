@@ -39,6 +39,7 @@ const MemberTier = lazy(() => import('./pages/Storefront/MemberTier'));
 const FlashSale = lazy(() => import('./pages/Storefront/FlashSale'));
 const Profile = lazy(() => import('./pages/Storefront/Profile'));
 const Login = lazy(() => import('./pages/Login'));
+const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 
 // Admin ERP Components
 const Dashboard = lazy(() => import('./pages/Admin/Dashboard'));
@@ -353,6 +354,7 @@ export default function App() {
 
                 {/* Standalone Login Route */}
                 <Route path="/login" element={<Login />} />
+                <Route path="/reset-password" element={<ResetPassword />} />
 
                 {/* Protected Admin ERP Layout Routes */}
                 <Route path="/admin" element={<AdminLayout />}>

@@ -1,5 +1,8 @@
 const express = require('express');
-const { loginCustomer, loginEmployee, registerCustomer, getMe, updateProfile, changePassword } = require('../controllers/auth.controller');
+const {
+  loginCustomer, loginEmployee, registerCustomer, getMe, updateProfile, changePassword,
+  forgotPassword, verifyResetToken, resetPassword, getGoogleConfig, loginWithGoogle
+} = require('../controllers/auth.controller');
 const { authMiddleware } = require('../middlewares/auth.middleware');
 
 // Takes the brute-force limiter as a param so it can be scoped to only the
@@ -21,6 +24,26 @@ module.exports = (authLimiter) => {
   // @route   POST /api/v1/auth/employee/login
   // @desc    Employee ERP login portal
   router.post('/employee/login', authLimiter, loginEmployee);
+
+  // @route   GET /api/v1/auth/google/config
+  // @desc    Google OAuth client ID for the frontend's Google Identity Services button
+  router.get('/google/config', getGoogleConfig);
+
+  // @route   POST /api/v1/auth/google
+  // @desc    Sign in / sign up a customer with a Google ID token
+  router.post('/google', authLimiter, loginWithGoogle);
+
+  // @route   POST /api/v1/auth/forgot-password
+  // @desc    Email a one-time password-reset link
+  router.post('/forgot-password', authLimiter, forgotPassword);
+
+  // @route   GET /api/v1/auth/reset-password/verify
+  // @desc    Check a reset token before showing the new-password form
+  router.get('/reset-password/verify', authLimiter, verifyResetToken);
+
+  // @route   POST /api/v1/auth/reset-password
+  // @desc    Set a new password using the emailed reset token
+  router.post('/reset-password', authLimiter, resetPassword);
 
   // @route   POST /api/v1/auth/logout
   // @desc    Logout and clear authentication cookie
