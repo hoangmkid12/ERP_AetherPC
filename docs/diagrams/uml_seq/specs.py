@@ -22,28 +22,48 @@ def loop(g, *st): return ('loop', g, list(st))
 D = {}
 
 # ============ 01. Đăng ký tài khoản (Khách vãng lai) ============
-KV, GD, CT, KH, EM = 'KHÁCH VÃNG LAI', 'GD_DANGKY', 'CTRL_AUTH', 'ENTITY_CUSTOMER', 'HỆ THỐNG EMAIL'
-D['uc01'] = ([(A, KV), (B, GD), (C, CT), (E, KH), (X, EM)], [
+KV, GD, CT, KH, GG, EM = 'KHÁCH VÃNG LAI', 'GD_DANGKY', 'CTRL_AUTH', 'ENTITY_CUSTOMER', 'GOOGLE IDENTITY', 'HỆ THỐNG EMAIL'
+D['uc01'] = ([(A, KV), (B, GD), (C, CT), (E, KH), (X, GG), (X, EM)], [
     m(KV, GD, '1: Chọn "Đăng ký"'),
-    s(GD, '1.1: hienThiFormDangKy()'),
-    m(KV, GD, '2: Nhập họ tên, email, tên đăng nhập, SĐT, mật khẩu và bấm "Đăng ký"'),
-    s(GD, '2.1: kiemTraTruongBatBuoc()'),
-    m(GD, CT, '2.2: registerCustomer(hoTen, email, username, sdt, matKhau, diaChi)'),
-    s(CT, '2.2.1: kiemTraDinhDangUsername()'),
-    m(CT, KH, '2.2.2: findFirst(email | username | sdt)'),
-    r(KH, CT, '2.2.3: return khachHangTrung'),
-    alt(('[ĐÃ ĐƯỢC SỬ DỤNG]', [
-        r(CT, GD, '2.2.4: return loi("… đã được sử dụng bởi tài khoản khác")'),
-        s(GD, '2.3: Hiển thị lỗi, giữ dữ liệu đã nhập'),
-    ]), ('[HỢP LỆ]', [
-        s(CT, '2.2.5: bcrypt.hash(matKhau)'),
-        m(CT, KH, '2.2.6: create(khachHang, hang = Đồng, diem = 0)'),
-        r(KH, CT, '2.2.7: return khachHangMoi'),
-        m(CT, EM, '2.2.8: sendWelcomeEmail(email, hoTen)'),
-        s(CT, '2.2.9: taoPhien(JWT, cookie authToken)'),
-        r(CT, GD, '2.2.10: return khachHangMoi'),
-        s(GD, '2.4: Chuyển về trang chủ (đã đăng nhập)'),
+    s(GD, '1.1: hienThiFormDangKy(), hiển thị nút "Đăng ký bằng Google"'),
+    alt(('[ĐĂNG KÝ BẰNG EMAIL]', [
+        m(KV, GD, '2: Nhập họ tên, tên đăng nhập, email, SĐT, mật khẩu, nhập lại mật khẩu, đồng ý điều khoản, bấm "Tạo tài khoản"'),
+        s(GD, '2.1: validateRegister(): trường bắt buộc, định dạng, mật khẩu khớp, điều khoản'),
+        m(GD, CT, '2.2: registerCustomer(hoTen, email, username, sdt, matKhau)'),
+        s(CT, '2.2.1: kiemTraDinhDangUsername()'),
+        m(CT, KH, '2.2.2: findFirst(email | username | sdt)'),
+        r(KH, CT, '2.2.3: return khachHangTrung'),
+        alt(('[ĐÃ ĐƯỢC SỬ DỤNG]', [
+            r(CT, GD, '2.2.4: return loi("… đã được sử dụng bởi tài khoản khác")'),
+            s(GD, '2.3: Hiển thị lỗi dưới ô nhập, giữ dữ liệu đã nhập'),
+        ]), ('[HỢP LỆ]', [
+            s(CT, '2.2.5: bcrypt.hash(matKhau)'),
+            m(CT, KH, '2.2.6: create(khachHang, hang = Đồng, diem = 0)'),
+            r(KH, CT, '2.2.7: return khachHangMoi'),
+        ])),
+    ]), ('[ĐĂNG KÝ BẰNG GOOGLE]', [
+        m(KV, GD, '3: Bấm "Đăng ký bằng Google", chọn tài khoản'),
+        m(GD, GG, '3.1: Yêu cầu mã xác thực (ID token)'),
+        r(GG, GD, '3.2: return credential'),
+        m(GD, CT, '3.3: loginWithGoogle(credential)'),
+        m(CT, GG, '3.3.1: tokeninfo(credential)'),
+        r(GG, CT, '3.3.2: return email, ten, aud, email_verified'),
+        s(CT, '3.3.3: Kiểm tra aud = GOOGLE_CLIENT_ID, email đã xác minh'),
+        m(CT, KH, '3.3.4: findFirst(email)'),
+        r(KH, CT, '3.3.5: return khachHang'),
+        opt('[CHƯA CÓ TÀI KHOẢN]',
+            m(CT, KH, '3.3.6: create(khachHang, matKhau = null, hang = Đồng)'),
+            r(KH, CT, '3.3.7: return khachHangMoi'),
+            ),
     ])),
+    opt('[ĐĂNG KÝ / ĐĂNG NHẬP THÀNH CÔNG]',
+        opt('[TÀI KHOẢN MỚI TẠO]',
+            m(CT, EM, '4: sendWelcomeEmail(email, hoTen)'),
+            ),
+        s(CT, '4.1: issueSession(JWT, cookie authToken)'),
+        r(CT, GD, '4.2: return khachHang'),
+        s(GD, '4.3: Chuyển về trang chủ (đã đăng nhập)'),
+        ),
 ])
 
 # ============ 02. Tự cấu hình máy tính (Khách vãng lai) ============
@@ -565,28 +585,39 @@ D['uc18'] = ([(A, KT), (B, GD), (C, CT), (E, PO), (E, VB), (E, VP), (E, LG)], [
 ])
 
 # ============ 19. Đối soát tiền thu hộ COD (Nhân viên kế toán) ============
-GD, CT, AU = 'GD_DOISOAT_COD', 'CTRL_LEDGER', 'ENTITY_AUDITLOG'
-D['uc19'] = ([(A, KT), (B, GD), (C, CT), (E, PM), (E, LG), (E, AU)], [
-    m(KT, GD, '1: Mở mục "Đối soát tiền thu hộ"'),
-    m(GD, CT, '1.1: getCodSettlement()'),
-    m(CT, PM, '1.1.1: findMany(CASH, chưa đối soát)'),
-    r(PM, CT, '1.1.2: return dsKhoanThu'),
-    s(CT, '1.1.3: Gom theo nhân viên giao hàng: số đơn, tổng tiền'),
-    r(CT, GD, '1.2: return dsTheoShipper'),
-    s(GD, '1.3: Hiển thị bảng tổng hợp'),
-    m(KT, GD, '2: Chọn shipper, kiểm đếm tiền mặt'),
-    s(GD, '2.1: Hiển thị chi tiết từng đơn'),
-    m(KT, GD, '3: Bấm "Xác nhận đã thu"'),
-    m(GD, CT, '3.1: settleCodForShipper(maShipper)'),
-    m(CT, PM, '3.1.1: updateMany(chưa đối soát → đã đối soát, nguoi, thoiDiem)'),
-    r(PM, CT, '3.1.2: return soKhoan'),
-    alt(('[SỐ KHOẢN = 0]', [
-        r(CT, GD, '3.2: return loi("Không có khoản COD nào đang chờ")'),
-    ]), ('[THÀNH CÔNG]', [
-        m(CT, LG, '3.1.3: create(INCOME, kênh CASH)'),
-        m(CT, AU, '3.1.4: logAudit("Đối soát COD")'),
-        r(CT, GD, '3.3: return soKhoan, tongTien'),
-        s(GD, '3.4: Báo "Đã đối soát thành công … đơn"'),
+SH, GS, GD, CT, AU = 'NV GIAO HÀNG', 'GD_LICHSU_GIAOHANG', 'GD_DOISOAT_COD', 'CTRL_LEDGER', 'ENTITY_AUDITLOG'
+D['uc19'] = ([(A, KT), (B, GD), (C, CT), (E, PM), (E, LG), (E, AU), (B, GS), (A, SH)], [
+    opt('[NV GIAO HÀNG KHAI BÁO NỘP TIỀN]',
+        m(SH, GS, '1: Bấm "Khai báo đã nộp tiền cho Kế toán"'),
+        m(GS, CT, '1.1: remitMyCod()'),
+        m(CT, PM, '1.1.1: updateMany(CASH, chưa đối soát, chưa khai báo → remittedAt)'),
+        m(CT, AU, '1.1.2: logAudit("REMIT_COD")'),
+        r(CT, GS, '1.2: return soKhoan, tongTien'),
+        s(GS, '1.3: Hiển thị "Đã khai báo nộp, chờ Kế toán xác nhận"'),
+        ),
+    m(KT, GD, '2: Mở mục "Đối soát tiền thu hộ"'),
+    m(GD, CT, '2.1: getCodSettlement()'),
+    m(CT, PM, '2.1.1: findMany(CASH, chưa đối soát)'),
+    r(PM, CT, '2.1.2: return dsKhoanThu (kèm remittedAt)'),
+    s(CT, '2.1.3: Gom theo nhân viên giao hàng: số đơn, tổng tiền, số tiền đã khai báo nộp'),
+    r(CT, GD, '2.2: return dsTheoShipper'),
+    s(GD, '2.3: Hiển thị bảng tổng hợp'),
+    m(KT, GD, '3: Kiểm đếm tiền mặt; nếu thiếu thì chọn các đơn đã nhận đủ'),
+    m(KT, GD, '4: Bấm "Xác nhận đã thu"'),
+    m(GD, CT, '4.1: settleCodForShipper(maShipper, dsKhoan?)'),
+    s(CT, '4.1.1: Bắt đầu giao dịch ($transaction)'),
+    m(CT, PM, '4.1.2: findMany(chưa đối soát, thuộc shipper, trong dsKhoan)'),
+    r(PM, CT, '4.1.3: return dsKhoanCho'),
+    alt(('[KHÔNG CÒN KHOẢN / DANH SÁCH LỆCH]', [
+        s(CT, '4.1.4: Hủy (rollback) giao dịch'),
+        r(CT, GD, '4.2: return loi("Vui lòng tải lại danh sách")'),
+    ]), ('[HỢP LỆ]', [
+        m(CT, PM, '4.1.5: updateMany(settledAt, settledBy)'),
+        m(CT, LG, '4.1.6: create(INCOME, kênh CASH, dsMaDon)'),
+        s(CT, '4.1.7: Xác nhận (commit) giao dịch'),
+        m(CT, AU, '4.1.8: logAudit("SETTLE_COD")'),
+        r(CT, GD, '4.3: return soKhoan, tongTien'),
+        s(GD, '4.4: Báo "Đã đối soát thành công … đơn"'),
     ])),
 ])
 
@@ -683,35 +714,67 @@ D['uc22'] = ([(A, NVI), (B, GD), (C, FA), (C, CT), (E, EP), (E, AT), (E, AU)], [
 ])
 
 # ============ 23. Đăng nhập (Người dùng) ============
-ND, GD, CT, EP, SU, KH, AU = 'NGƯỜI DÙNG', 'GD_DANGNHAP', 'CTRL_AUTH', 'ENTITY_EMPLOYEE', 'ENTITY_SUPPLIER', 'ENTITY_CUSTOMER', 'ENTITY_AUDITLOG'
-D['uc23'] = ([(A, ND), (B, GD), (C, CT), (E, EP), (E, SU), (E, KH), (E, AU)], [
+ND, GD, GR, CT, EP, SU, KH, AU, EM = ('NGƯỜI DÙNG', 'GD_DANGNHAP', 'GD_DATLAI_MATKHAU', 'CTRL_AUTH', 'ENTITY_EMPLOYEE',
+                                      'ENTITY_SUPPLIER', 'ENTITY_CUSTOMER', 'ENTITY_AUDITLOG', 'HỆ THỐNG EMAIL')
+D['uc23'] = ([(A, ND), (B, GD), (B, GR), (C, CT), (E, EP), (E, SU), (E, KH), (E, AU), (X, EM)], [
     m(ND, GD, '1: Mở trang "Đăng nhập"'),
-    s(GD, '1.1: hienThiFormDangNhap()'),
-    m(ND, GD, '2: Nhập tên đăng nhập hoặc email, mật khẩu, bấm "Đăng nhập"'),
-    s(GD, '2.1: Kiểm tra không bỏ trống'),
-    ('par', [('[TÀI KHOẢN NỘI BỘ]', [
-        m(GD, CT, '2.2: loginEmployee(username, password)'),
-        m(CT, EP, '2.2.1: findFirst(email | mã nhân viên)'),
-        r(EP, CT, '2.2.2: return nhanVien'),
-        opt('[KHÔNG PHẢI NHÂN VIÊN]',
-            m(CT, SU, '2.2.3: findFirst(email | mã NCC)'),
-            r(SU, CT, '2.2.4: return nhaCungCap'),
+    s(GD, '1.1: hienThiFormDangNhap(); đã ghi nhớ thì navigator.credentials.get() điền sẵn'),
+    alt(('[ĐĂNG NHẬP BẰNG MẬT KHẨU]', [
+        m(ND, GD, '2: Nhập tài khoản, mật khẩu, chọn "Ghi nhớ đăng nhập", bấm "Đăng nhập"'),
+        s(GD, '2.1: Kiểm tra không bỏ trống'),
+        ('par', [('[TÀI KHOẢN NỘI BỘ]', [
+            m(GD, CT, '2.2: loginEmployee(username, password, rememberMe)'),
+            m(CT, EP, '2.2.1: findFirst(email | mã nhân viên)'),
+            r(EP, CT, '2.2.2: return nhanVien'),
+            opt('[KHÔNG PHẢI NHÂN VIÊN]',
+                m(CT, SU, '2.2.3: findFirst(email | mã NCC)'),
+                r(SU, CT, '2.2.4: return nhaCungCap'),
+                ),
+            s(CT, '2.2.5: bcrypt.compare(), kiểm tra trạng thái'),
+            m(CT, AU, '2.2.6: logAudit("LOGIN", SUCCESS | FAILED)'),
+        ]), ('[TÀI KHOẢN KHÁCH HÀNG]', [
+            m(GD, CT, '2.3: loginCustomer(username, password, rememberMe)'),
+            m(CT, KH, '2.3.1: findFirst(email | tên đăng nhập)'),
+            r(KH, CT, '2.3.2: return khachHang'),
+            s(CT, '2.3.3: bcrypt.compare(), kiểm tra trạng thái'),
+        ])]),
+        alt(('[CẢ HAI ĐỀU THẤT BẠI]', [
+            r(CT, GD, '2.4: return loi'),
+            s(GD, '2.5: Báo lỗi đăng nhập hoặc quá số lần thử'),
+        ]), ('[CÓ MỘT YÊU CẦU THÀNH CÔNG]', [
+            s(CT, '2.6: issueSession(): ghi nhớ → JWT và cookie 30 ngày; không → cookie phiên'),
+            r(CT, GD, '2.7: return nguoiDung, vaiTro'),
+            opt('[GHI NHỚ ĐĂNG NHẬP]',
+                s(GD, '2.8: navigator.credentials.store(taiKhoan, matKhau)'),
+                ),
+            s(GD, '2.9: Chuyển tới trang theo vai trò'),
+        ])),
+    ]), ('[QUÊN MẬT KHẨU]', [
+        m(ND, GD, '3: Bấm "Quên mật khẩu?", nhập email, bấm "Gửi email xác nhận"'),
+        m(GD, CT, '3.1: forgotPassword(email)'),
+        m(CT, KH, '3.1.1: findAccountByEmail(email) — khách hàng, nhân viên, NCC'),
+        r(KH, CT, '3.1.2: return taiKhoan'),
+        opt('[TÀI KHOẢN TỒN TẠI VÀ ĐANG HOẠT ĐỘNG]',
+            s(CT, '3.1.3: jwt.sign(purpose, id, fp = băm(passwordHash), 30 phút)'),
+            m(CT, EM, '3.1.4: sendPasswordResetEmail(email, lienKet)'),
+            m(CT, AU, '3.1.5: logAudit("FORGOT_PASSWORD")'),
             ),
-        s(CT, '2.2.5: bcrypt.compare(), kiểm tra trạng thái'),
-        m(CT, AU, '2.2.6: logAudit("LOGIN", SUCCESS | FAILED)'),
-    ]), ('[TÀI KHOẢN KHÁCH HÀNG]', [
-        m(GD, CT, '2.3: loginCustomer(username, password)'),
-        m(CT, KH, '2.3.1: findFirst(email | tên đăng nhập)'),
-        r(KH, CT, '2.3.2: return khachHang'),
-        s(CT, '2.3.3: bcrypt.compare(), kiểm tra trạng thái'),
-    ])]),
-    alt(('[CẢ HAI ĐỀU THẤT BẠI]', [
-        r(CT, GD, '2.4: return loi'),
-        s(GD, '2.5: Báo lỗi đăng nhập hoặc quá số lần thử'),
-    ]), ('[CÓ MỘT YÊU CẦU THÀNH CÔNG]', [
-        s(CT, '2.6: jwt.sign(id, role) — nhân viên 1 ngày, khách 7 ngày; đặt cookie authToken'),
-        r(CT, GD, '2.7: return nguoiDung, vaiTro'),
-        s(GD, '2.8: Chuyển tới trang theo vai trò'),
+        r(CT, GD, '3.2: return thongBaoChung'),
+        s(GD, '3.3: Hiển thị "Kiểm tra hộp thư của bạn"'),
+        m(ND, GR, '4: Bấm "Xác Nhận Đổi Mật Khẩu" trong email'),
+        m(GR, CT, '4.1: verifyResetToken(token)'),
+        s(CT, '4.1.1: Kiểm tra chữ ký, hạn dùng và fp còn khớp'),
+        r(CT, GR, '4.2: return emailDaChe'),
+        m(ND, GR, '5: Nhập mật khẩu mới hai lần, bấm "Cập nhật mật khẩu"'),
+        m(GR, CT, '5.1: resetPassword(token, matKhauMoi)'),
+        alt(('[LIÊN KẾT HẾT HẠN / ĐÃ DÙNG]', [
+            r(CT, GR, '5.2: return loi("Liên kết không hợp lệ hoặc đã được sử dụng")'),
+        ]), ('[HỢP LỆ]', [
+            m(CT, KH, '5.1.1: update(passwordHash = bcrypt.hash(matKhauMoi)) trên bảng của tài khoản'),
+            m(CT, AU, '5.1.2: logAudit("RESET_PASSWORD")'),
+            r(CT, GR, '5.3: return thanhCong'),
+            s(GR, '5.4: Báo "Đổi mật khẩu thành công", chuyển về trang đăng nhập'),
+        ])),
     ])),
 ])
 

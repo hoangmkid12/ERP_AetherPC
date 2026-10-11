@@ -25,19 +25,24 @@ HI = {'side': 'hi'}
 # 01 ---------------------------------------------------------------- Đăng ký tài khoản
 FLOWS['uc01'] = dict(title='Đăng Ký Tài Khoản', lanes=['Khách Vãng Lai', HT], nodes=[
     S(), T('t1', 0, 1, 'Chọn "Đăng ký" trên trang đăng nhập'),
-    T('t2', 1, 2, 'Hiển thị form đăng ký'),
-    T('t3', 0, 3, 'Nhập họ tên, email, tên đăng nhập, SĐT, mật khẩu, bấm "Đăng ký"'),
-    T('t4', 1, 4, 'Kiểm tra trường bắt buộc, định dạng tên đăng nhập'),
-    G('g1', 1, 4.8, 'Hợp lệ?'),
-    T('t5', 1, 5.8, 'Kiểm tra trùng email, tên đăng nhập, SĐT'),
-    G('g2', 1, 6.6, 'Bị trùng?'),
-    T('t6', 1, 7.6, 'Báo lỗi cụ thể, giữ dữ liệu đã nhập', 1),
-    T('t7', 1, 7.6, 'Băm mật khẩu, tạo tài khoản hạng Đồng, tạo phiên đăng nhập'),
-    T('t8', 1, 8.6, 'Gửi email chào mừng, về trang chủ'),
-    E(1, 9.4)], edges=[
-    ('s', 't1'), ('t1', 't2'), ('t2', 't3'), ('t3', 't4'), ('t4', 'g1'),
+    T('t2', 1, 2, 'Hiển thị form đăng ký và nút "Đăng ký bằng Google"'),
+    G('g0', 0, 2.8, 'Cách đăng ký?'),
+    T('t3', 0, 3.8, 'Nhập họ tên, tên đăng nhập, email, SĐT, mật khẩu, nhập lại mật khẩu, đồng ý điều khoản'),
+    T('tg1', 0, 3.8, 'Chọn tài khoản Google', -1),
+    T('t4', 1, 4.8, 'Kiểm tra trường bắt buộc, định dạng, mật khẩu nhập lại và điều khoản'),
+    T('tg2', 1, 5.8, 'Xác minh mã Google, tìm tài khoản theo email, chưa có thì tạo mới', -1),
+    G('g1', 1, 5.6, 'Hợp lệ?'),
+    T('t5', 1, 6.6, 'Kiểm tra trùng email, tên đăng nhập, SĐT'),
+    G('g2', 1, 7.4, 'Bị trùng?'),
+    T('t6', 1, 8.4, 'Báo lỗi cụ thể, giữ dữ liệu đã nhập', 1),
+    T('t7', 1, 8.4, 'Băm mật khẩu, tạo tài khoản hạng Đồng'),
+    M('m1', 1, 9.2),
+    T('t8', 1, 10, 'Tạo phiên đăng nhập, gửi email chào mừng, về trang chủ'),
+    E(1, 10.8)], edges=[
+    ('s', 't1'), ('t1', 't2'), ('t2', 'g0'), ('g0', 't3', 'Email'), ('g0', 'tg1', 'Google'),
+    ('t3', 't4'), ('t4', 'g1'), ('tg1', 'tg2', None, {'midstep': 5.3}),
     ('g1', 't5', 'Có'), ('g1', 't6', 'Không'), ('t5', 'g2'), ('g2', 't6', 'Có'), ('g2', 't7', 'Không'),
-    ('t6', 't3', None, HI), ('t7', 't8'), ('t8', 'e')])
+    ('t6', 't3', None, HI), ('t7', 'm1'), ('tg2', 'm1'), ('m1', 't8'), ('t8', 'e')])
 
 # 02 ---------------------------------------------------------------- Tự cấu hình máy tính
 FLOWS['uc02'] = dict(title='Tự Cấu Hình Máy Tính', lanes=['Khách Vãng Lai', HT], nodes=[
@@ -318,18 +323,24 @@ FLOWS['uc18'] = dict(title='Thanh Toán Nhà Cung Cấp', lanes=['Nhân Viên K�
     ('g2', 't8', 'Không'), ('g2', 't5', 'Còn'), ('t8', 'e')])
 
 # 19 ---------------------------------------------------------------- Đối soát tiền thu hộ
-FLOWS['uc19'] = dict(title='Đối Soát Tiền Thu Hộ', lanes=['Nhân Viên Kế Toán', HT], nodes=[
-    S(), T('t1', 0, 1, 'Mở "Đối soát tiền thu hộ"'),
-    T('t2', 1, 2, 'Tổng hợp tiền mặt theo từng nhân viên giao hàng'),
-    T('t3', 0, 3, 'Chọn nhân viên giao hàng, kiểm đếm tiền mặt'),
-    G('g1', 0, 3.8, 'Số tiền khớp?'),
-    T('t4', 0, 4.8, 'Đối chiếu lại với nhân viên giao hàng', 1),
-    T('t5', 0, 4.8, 'Bấm "Xác nhận đã thu"'),
-    T('t6', 1, 5.8, 'Đánh dấu các khoản đã đối soát, ghi người và thời điểm'),
-    T('t7', 1, 6.8, 'Ghi bút toán thu tiền mặt, nhật ký, báo kết quả'),
-    E(1, 7.6)], edges=[
-    ('s', 't1'), ('t1', 't2'), ('t2', 't3'), ('t3', 'g1'), ('g1', 't5', 'Khớp'), ('g1', 't4', 'Không khớp'),
-    ('t4', 't3', None, HI), ('t5', 't6'), ('t6', 't7'), ('t7', 'e')])
+FLOWS['uc19'] = dict(title='Đối Soát Tiền Thu Hộ', lanes=['Nhân Viên Kế Toán', HT, 'Nhân Viên Giao Hàng'], nodes=[
+    S(2), T('ts1', 2, 1, 'Bấm "Khai báo đã nộp tiền cho Kế toán", bàn giao tiền mặt'),
+    T('ts2', 1, 2, 'Ghi thời điểm khai báo nộp cho các khoản đang giữ'),
+    T('t1', 0, 3, 'Mở "Đối soát tiền thu hộ"'),
+    T('t2', 1, 4, 'Tổng hợp tiền mặt theo nhân viên giao hàng, đánh dấu khoản đã khai báo nộp'),
+    T('t3', 0, 5, 'Kiểm đếm tiền mặt nhận bàn giao'),
+    G('g1', 0, 5.8, 'Đủ tiền?'),
+    T('t4', 0, 6.8, 'Chọn các đơn đã nhận đủ tiền', 1),
+    M('m1', 0, 7.6),
+    T('t5', 0, 8.4, 'Bấm "Xác nhận đã thu"'),
+    T('t6', 1, 9.4, 'Trong một giao dịch: đánh dấu đã đối soát, ghi bút toán thu tiền mặt'),
+    G('g2', 1, 10.2, 'Các khoản còn chờ?'),
+    T('t7', 1, 11.2, 'Hủy giao dịch, báo tải lại danh sách', 1),
+    T('t8', 1, 11.2, 'Ghi nhật ký, báo "Đã đối soát thành công … đơn"'),
+    E(1, 12)], edges=[
+    ('s', 'ts1'), ('ts1', 'ts2'), ('ts2', 't1'), ('t1', 't2'), ('t2', 't3'), ('t3', 'g1'),
+    ('g1', 'm1', 'Đủ'), ('g1', 't4', 'Thiếu'), ('t4', 'm1'), ('m1', 't5'), ('t5', 't6'), ('t6', 'g2'),
+    ('g2', 't8', 'Còn'), ('g2', 't7', 'Không'), ('t7', 't3', None, HI), ('t8', 'e')])
 
 # 20 ---------------------------------------------------------------- Tính lương và trình duyệt
 FLOWS['uc20'] = dict(title='Tính Lương Và Trình Duyệt Bảng Lương', lanes=['Nhân Viên Nhân Sự', HT, 'Ban Giám Đốc'], nodes=[
@@ -385,16 +396,23 @@ FLOWS['uc22'] = dict(title='Chấm Công Bằng Khuôn Mặt', lanes=['Nhân Vi�
 # 23 ---------------------------------------------------------------- Đăng nhập
 FLOWS['uc23'] = dict(title='Đăng Nhập', lanes=['Người Dùng', HT], nodes=[
     S(), T('t1', 0, 1, 'Mở trang "Đăng nhập"'),
-    T('t2', 1, 2, 'Hiển thị form đăng nhập'),
-    T('t3', 0, 3, 'Nhập tên đăng nhập hoặc email, mật khẩu, bấm "Đăng nhập"'),
-    T('t4', 1, 4, 'Gửi đồng thời yêu cầu đăng nhập nội bộ và khách hàng'),
-    T('t5', 1, 5, 'So khớp mật khẩu đã băm, kiểm tra trạng thái tài khoản'),
-    G('g1', 1, 5.8, 'Hợp lệ?'),
-    T('t6', 1, 6.8, 'Báo lỗi: sai thông tin, ngừng hoạt động hoặc thử quá nhiều lần', 1),
-    T('t7', 1, 6.8, 'Tạo JWT, đặt cookie phiên, ghi nhật ký'),
-    T('t8', 1, 7.8, 'Chuyển tới trang theo vai trò'),
-    E(1, 8.6)], edges=[
-    ('s', 't1'), ('t1', 't2'), ('t2', 't3'), ('t3', 't4'), ('t4', 't5'), ('t5', 'g1'),
+    T('t2', 1, 2, 'Hiển thị form, điền sẵn tài khoản đã ghi nhớ'),
+    G('g0', 0, 2.8, 'Người dùng chọn?'),
+    T('t3', 0, 3.8, 'Nhập tài khoản, mật khẩu, chọn "Ghi nhớ đăng nhập" (tùy chọn), bấm "Đăng nhập"'),
+    T('tf1', 0, 3.8, 'Bấm "Quên mật khẩu?", nhập email', -1),
+    T('t4', 1, 4.8, 'Gửi đồng thời yêu cầu đăng nhập nội bộ và khách hàng'),
+    T('tf2', 1, 5.8, 'Gửi email kèm liên kết đặt lại (30 phút, dùng một lần) nếu email đã đăng ký', -1),
+    T('t5', 1, 5.8, 'So khớp mật khẩu đã băm, kiểm tra trạng thái tài khoản'),
+    T('tf3', 0, 6.8, 'Bấm "Xác Nhận Đổi Mật Khẩu" trong email, nhập mật khẩu mới hai lần', -1),
+    G('g1', 1, 6.6, 'Hợp lệ?'),
+    T('tf4', 1, 7.8, 'Kiểm tra liên kết, cập nhật mật khẩu, ghi nhật ký', -1),
+    T('t6', 1, 7.6, 'Báo lỗi: sai thông tin, ngừng hoạt động hoặc thử quá nhiều lần', 1),
+    T('t7', 1, 7.6, 'Tạo JWT, đặt cookie (ghi nhớ: 30 ngày), ghi nhật ký'),
+    E(1, 8.8, -1, i='e2'),
+    T('t8', 1, 8.6, 'Chuyển tới trang theo vai trò'),
+    E(1, 9.4)], edges=[
+    ('s', 't1'), ('t1', 't2'), ('t2', 'g0'), ('g0', 't3', 'Đăng nhập'), ('g0', 'tf1', 'Quên mật khẩu'),
+    ('t3', 't4'), ('t4', 't5'), ('t5', 'g1'), ('tf1', 'tf2', None, {'midstep': 5.3}), ('tf2', 'tf3'), ('tf3', 'tf4'), ('tf4', 'e2'),
     ('g1', 't7', 'Có'), ('g1', 't6', 'Không'), ('t6', 't3', None, HI), ('t7', 't8'), ('t8', 'e')])
 
 # 24 ---------------------------------------------------------------- Quản trị tài khoản, phân quyền và nhật ký
@@ -420,10 +438,11 @@ FLOWS['uc24'] = dict(title='Quản Trị Tài Khoản, Phân Quyền Và Nhật 
 # Sơ đồ hoạt động (mục 3.5) vẫn dùng câu mô tả đầy đủ ở trên. Cổng không khai báo ở đây sẽ được
 # tự Viết Hoa từ câu hỏi gốc.
 SHORT = {
-    'uc01': dict(t1='Chọn Đăng Ký', t2='Hiển Thị Form Đăng Ký', t3='Nhập Thông Tin Tài Khoản & Bấm Đăng Ký',
-                 t4='Kiểm Tra Trường Bắt Buộc & Định Dạng', t5='Kiểm Tra Trùng Email, Tên Đăng Nhập, SĐT',
-                 t6='Báo Lỗi Cụ Thể, Giữ Dữ Liệu Đã Nhập', t7='Tạo Tài Khoản Hạng Đồng & Phiên Đăng Nhập',
-                 t8='Gửi Email Chào Mừng, Về Trang Chủ'),
+    'uc01': dict(t1='Chọn Đăng Ký', t2='Hiển Thị Form & Nút Google', t3='Nhập Thông Tin & Bấm Tạo Tài Khoản',
+                 tg1='Chọn Tài Khoản Google', tg2='Xác Minh Google, Tạo Tài Khoản Nếu Chưa Có',
+                 t4='Kiểm Tra Dữ Liệu Form', t5='Kiểm Tra Trùng Email, Tên Đăng Nhập, SĐT',
+                 t6='Báo Lỗi Cụ Thể, Giữ Dữ Liệu Đã Nhập', t7='Băm Mật Khẩu, Tạo Tài Khoản Hạng Đồng',
+                 t8='Tạo Phiên, Gửi Email Chào Mừng'),
     'uc02': dict(t1='Chọn Tự Cấu Hình Máy Tính', t2='Hiển Thị 8 Khe Linh Kiện', tA='Nhập Nhu Cầu Bằng Văn Bản',
                  tB='Phân Tích Nhu Cầu, Tự Điền Linh Kiện', t3='Chọn / Điều Chỉnh Linh Kiện Từng Khe',
                  t4='Kiểm Tra Tương Thích Linh Kiện', t5='Cảnh Báo, Không Chặn Thao Tác',
@@ -490,9 +509,10 @@ SHORT = {
                  t4='Đối Chiếu 3 Chiều, Tạo Hóa Đơn Theo SL Đạt', t5='Ghi Nhận Một Đợt Thanh Toán',
                  t6='Từ Chối, Yêu Cầu Nhập Lại', t7='Ghi Thanh Toán, Bút Toán Chi, Cập Nhật Công Nợ',
                  t8='Hóa Đơn "Đã Thanh Toán", Đơn Mua "Hoàn Tất"'),
-    'uc19': dict(t1='Mở Đối Soát Tiền Thu Hộ', t2='Tổng Hợp Tiền Mặt Theo Nhân Viên Giao Hàng',
-                 t3='Chọn Nhân Viên, Kiểm Đếm Tiền Mặt', t4='Đối Chiếu Lại Với Nhân Viên Giao Hàng',
-                 t5='Bấm Xác Nhận Đã Thu', t6='Đánh Dấu Các Khoản Đã Đối Soát', t7='Ghi Bút Toán Thu Tiền Mặt & Nhật Ký'),
+    'uc19': dict(ts1='Khai Báo Đã Nộp Tiền, Bàn Giao Tiền Mặt', ts2='Ghi Thời Điểm Khai Báo Nộp',
+                 t1='Mở Đối Soát Tiền Thu Hộ', t2='Tổng Hợp Tiền Mặt Theo Nhân Viên Giao Hàng',
+                 t3='Kiểm Đếm Tiền Mặt', t4='Chọn Các Đơn Đã Nhận Đủ Tiền', t5='Bấm Xác Nhận Đã Thu',
+                 t6='Đánh Dấu Đã Đối Soát & Ghi Bút Toán Thu', t7='Hủy Giao Dịch, Báo Tải Lại', t8='Ghi Nhật Ký, Báo Kết Quả'),
     'uc20': dict(t1='Chọn Kỳ Lương, Bấm Tính Lương', t2='Từ Chối Tính Lại', t3='Phân Loại Ngày Công, Nghỉ Phép, Ngày Lễ',
                  t4='Tính Công, Tăng Ca, Hoa Hồng, Bảo Hiểm, Thuế', t5='Lưu Phiếu "Nháp", Hiển Thị Tổng Quỹ Lương',
                  t6='Rà Soát Từng Phiếu Lương', t7='Nhập Thưởng / Khấu Trừ Kèm Lý Do', t8='Tính Lại Thuế & Thực Lĩnh',
@@ -504,9 +524,11 @@ SHORT = {
     'uc22': dict(t1='Chọn Chấm Công Khuôn Mặt', t2='Hiển Thị Ca Hôm Nay, Mở Camera', t3='Thực Hiện Thử Thách Quay Đầu',
                  t4='Xác Nhận Người Thật, Trích Vector, Gửi Máy Chủ', t5='Từ Chối, Ghi Nhật Ký Lần Thử',
                  t6='Ghi Giờ Vào Ca, Tính Đi Muộn', t7='Ghi Giờ Ra Ca, Tính Giờ Làm & Tăng Ca', t8='Hiển Thị Kết Quả Chấm Công'),
-    'uc23': dict(t1='Mở Trang Đăng Nhập', t2='Hiển Thị Form Đăng Nhập', t3='Nhập Tài Khoản, Mật Khẩu & Bấm Đăng Nhập',
+    'uc23': dict(t1='Mở Trang Đăng Nhập', t2='Hiển Thị Form, Điền Sẵn Tài Khoản Ghi Nhớ', t3='Nhập Tài Khoản, Mật Khẩu & Bấm Đăng Nhập',
+                 tf1='Bấm Quên Mật Khẩu, Nhập Email', tf2='Gửi Email Liên Kết Đặt Lại Mật Khẩu',
+                 tf3='Mở Liên Kết, Nhập Mật Khẩu Mới', tf4='Kiểm Tra Liên Kết, Cập Nhật Mật Khẩu',
                  t4='Gửi Yêu Cầu Đăng Nhập Nội Bộ & Khách Hàng', t5='So Khớp Mật Khẩu, Kiểm Tra Trạng Thái',
-                 t6='Báo Lỗi Đăng Nhập', t7='Tạo JWT, Đặt Cookie Phiên, Ghi Nhật Ký', t8='Chuyển Tới Trang Theo Vai Trò'),
+                 t6='Báo Lỗi Đăng Nhập', t7='Tạo JWT, Đặt Cookie, Ghi Nhật Ký', t8='Chuyển Tới Trang Theo Vai Trò'),
     'uc24': dict(t1='Mở Quản Trị Hệ Thống', t2='Bật / Tắt Quyền Trong Ma Trận, Lưu', t3='Khóa / Mở Khóa / Đặt Lại Mật Khẩu',
                  t4='Lọc Nhật Ký Theo Người, Hành Động, Thời Gian', t6='Lưu, Áp Dụng Ngay, Ghi Nhật Ký', t5='Từ Chối Lưu',
                  t7='Cập Nhật Trạng Thái Tài Khoản, Ghi Nhật Ký', t8='Hiển Thị Kết Quả Tra Cứu'),
