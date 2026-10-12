@@ -430,18 +430,18 @@ const renderFinancials = ({ subtotal, shippingFee, discount, totalAmount, vatAmo
   const rows = [];
   const subVal = Number(subtotal || 0);
   const shipVal = Number(shippingFee || 0);
-  // Thuế GTGT cộng thêm (đơn mới); đơn cũ vatAmount = 0 vì giá đã gồm VAT
-  const vatVal = Number(vatAmount || 0);
   let discVal = Number(discount || 0);
-  const totVal = Number(totalAmount || (subVal + shipVal - discVal + vatVal));
+  const totVal = Number(totalAmount || (subVal + shipVal - discVal));
+  // Giá đã gồm VAT 10%: chỉ hiển thị phần thuế nằm trong tổng, không cộng thêm
+  const vatVal = Number(vatAmount || 0) > 0 ? Number(vatAmount) : Math.round(totVal - totVal / 1.1);
 
   // Đảm bảo tính nhất quán toán học tuyệt đối:
   // Nếu subVal + shipVal == totVal, nghĩa là không có giảm giá checkout bổ sung
   // (tránh hiển thị dòng giảm giá niêm yết cũ gây hiểu lầm phép tính)
-  if (Math.abs((subVal + shipVal + vatVal) - totVal) < 100) {
+  if (Math.abs((subVal + shipVal) - totVal) < 100) {
     discVal = 0;
-  } else if (discVal > 0 && Math.abs((subVal + shipVal - discVal + vatVal) - totVal) > 100) {
-    discVal = Math.max(0, subVal + shipVal + vatVal - totVal);
+  } else if (discVal > 0 && Math.abs((subVal + shipVal - discVal) - totVal) > 100) {
+    discVal = Math.max(0, subVal + shipVal - totVal);
   }
 
   if (subtotal !== undefined && subtotal !== null) {
@@ -451,10 +451,10 @@ const renderFinancials = ({ subtotal, shippingFee, discount, totalAmount, vatAmo
   if (discVal > 0) {
     rows.push(`<tr><td style="color: #64748b; padding: 4px 0;">Giảm giá / Voucher:</td><td style="font-weight: 700; color: #16a34a; text-align: right;">-${money(discVal)}</td></tr>`);
   }
-  if (vatVal > 0) {
-    rows.push(`<tr><td style="color: #64748b; padding: 4px 0;">Thuế GTGT (10%):</td><td style="font-weight: 600; color: #334155; text-align: right;">${money(vatVal)}</td></tr>`);
-  }
   rows.push(`<tr style="border-top: 1px dashed #cbd5e1;"><td style="color: #0f172a; padding: 8px 0 0 0; font-weight: 800; font-size: 14px;">Tổng thanh toán:</td><td style="font-weight: 900; color: #0f172a; text-align: right; font-size: 16px; padding-top: 8px;">${money(totVal)}</td></tr>`);
+  if (vatVal > 0) {
+    rows.push(`<tr><td style="color: #94a3b8; padding: 2px 0; font-size: 12px;">(Đã bao gồm thuế GTGT 10%):</td><td style="color: #94a3b8; text-align: right; font-size: 12px;">${money(vatVal)}</td></tr>`);
+  }
 
   return `
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px 16px; margin-bottom: 20px;">

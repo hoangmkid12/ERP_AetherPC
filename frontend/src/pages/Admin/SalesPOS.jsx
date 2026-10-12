@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import { useInventoryStore, useSalesStore } from '../../stores';
 import { printDocument } from '../../utils/printDocument';
-import { vatOnTop } from '../../utils/vat';
+import { vatInGross } from '../../utils/vat';
 import { useAuth } from '../../context/AuthContext';
 import { usePermission } from '../../hooks/usePermission';
 import { useNotification, notify } from '../../context/NotificationContext';
@@ -465,16 +465,13 @@ export default function SalesPOS() {
     return posCart.reduce((sum, item) => sum + (item.unitPrice * item.quantity), 0);
   };
 
-  // Giá sản phẩm là giá CHƯA thuế — thuế GTGT 10% cộng thêm trên phần sau chiết khấu (như backend)
-  const calculateVat = () => {
-    const sub = calculateSubtotal();
-    return vatOnTop(Math.max(0, sub - (sub * posDiscountPercent) / 100));
-  };
+  // Giá niêm yết đã gồm VAT 10% — phần thuế nằm trong tổng, chỉ hiển thị (không cộng thêm)
+  const calculateVat = () => vatInGross(calculateTotal());
 
   const calculateTotal = () => {
     const sub = calculateSubtotal();
     const discountAmount = (sub * posDiscountPercent) / 100;
-    return Math.max(0, sub - discountAmount) + calculateVat();
+    return Math.max(0, sub - discountAmount);
   };
 
   // Checkout POS Order
@@ -1372,13 +1369,12 @@ export default function SalesPOS() {
                   <span>- {formatCurrency((calculateSubtotal() * posDiscountPercent) / 100)}</span>
                 </div>
               )}
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.25rem' }}>
-                <span>Thuế GTGT (VAT 10%):</span>
-                <span>{formatCurrency(calculateVat())}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1rem', fontWeight: 800, color: '#0f172a', margin: '0.5rem 0 1rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1rem', fontWeight: 800, color: '#0f172a', margin: '0.5rem 0 0.15rem' }}>
                 <span>Tổng Thanh Toán:</span>
                 <span style={{ color: '#16a34a' }}>{formatCurrency(calculateTotal())}</span>
+              </div>
+              <div style={{ textAlign: 'right', fontSize: '0.72rem', color: '#94a3b8', marginBottom: '1rem' }}>
+                (Đã bao gồm VAT 10%: {formatCurrency(calculateVat())})
               </div>
 
               <button
@@ -2502,13 +2498,13 @@ export default function SalesPOS() {
                   <span>- {formatCurrency(printedReceipt.discountAmount)}</span>
                 </div>
               )}
-              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b' }}>
-                <span>Thuế GTGT (VAT 10%):</span>
-                <span>{formatCurrency(printedReceipt.vatAmount || 0)}</span>
-              </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.05rem', fontWeight: 900, color: '#16a34a', borderTop: '1px dashed #e2e8f0', paddingTop: '0.5rem' }}>
                 <span>TỔNG CỘNG:</span>
                 <span>{formatCurrency(printedReceipt.total)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#94a3b8', fontSize: '0.75rem' }}>
+                <span>(Đã bao gồm VAT 10%)</span>
+                <span>{formatCurrency(printedReceipt.vatAmount || 0)}</span>
               </div>
             </div>
 

@@ -229,8 +229,8 @@ model Order {
   subtotal       Decimal             @db.Decimal(15, 2)
   discount       Decimal?            @default(0.00) @db.Decimal(15, 2)
   shippingFee    Decimal?            @default(0.00) @map("shipping_fee") @db.Decimal(15, 2)
-  // Thuế GTGT 10% cộng thêm trên (tiền hàng − chiết khấu + phí ship). Giá bán sản phẩm là giá CHƯA thuế.
-  // Đơn cũ (trước khi tách VAT) có vatAmount = 0: khi đó giá trong đơn đã gồm VAT.
+  // Phần thuế GTGT 10% NẰM TRONG totalAmount (giá niêm yết đã gồm thuế): totalAmount − totalAmount/1,1.
+  // Chỉ để ghi nhận cho hoá đơn / báo cáo thuế; đơn tạo trước khi có cột này mang giá trị 0.
   vatAmount      Decimal             @default(0.00) @map("vat_amount") @db.Decimal(15, 2)
   totalAmount    Decimal             @map("total_amount") @db.Decimal(15, 2)
   paymentMethod  String              @map("payment_method") @db.VarChar(30)

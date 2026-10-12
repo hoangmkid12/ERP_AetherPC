@@ -675,9 +675,9 @@ export default function Dashboard() {
   const outputVatVal = totalRevenueVal - netRevenueVal;
   const grossProfit = netRevenueVal - cogsAmount;
   const grossMarginPct = netRevenueVal > 0 ? (grossProfit / netRevenueVal) * 100 : 0;
-  // Giá trị tồn kho theo GIÁ VỐN (averageCost), không phải giá bán; mã chưa có giá vốn tạm tính theo giá bán (chưa VAT).
+  // Giá trị tồn kho theo GIÁ VỐN (averageCost), không phải giá bán; mã chưa có giá vốn tạm tính theo giá bán chưa VAT.
   const totalInventoryAsset = inventory.reduce((sum, item) => {
-    const cost = Number(item.averageCost) > 0 ? Number(item.averageCost) : Number(item.price || item.unitCost || 0);
+    const cost = Number(item.averageCost) > 0 ? Number(item.averageCost) : netOfVat(item.price || item.unitCost || 0);
     return sum + Number(item.stock || item.stockQuantity || 0) * cost;
   }, 0);
   // Bảng lương đang hiển thị để duyệt: các phiếu đang chờ CEO, nếu không có thì kỳ gần nhất.

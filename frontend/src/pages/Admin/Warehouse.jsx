@@ -5,7 +5,7 @@ import { useAuth } from '../../context/AuthContext';
 import { usePermission } from '../../hooks/usePermission';
 import { useAutoRefresh } from '../../hooks/useAutoRefresh';
 import { useNotification, notify, confirm } from '../../context/NotificationContext';
-import { grossMarginPct } from '../../utils/vat';
+import { grossMarginPct, grossProfitPerUnit } from '../../utils/vat';
 import { DELIVERY_REGIONS, detectDeliveryRegion } from '../../utils/deliveryRegions';
 import { QC_STATUS, STOCK_INTAKE_STATUS, getStatusInfo } from '../../utils/statusLabels';
 import { api } from '../../services/api';
@@ -7735,7 +7735,7 @@ export default function Warehouse() {
                   {infoRow('Nhà Cung Cấp', editingProd.supplier || 'Chưa rõ')}
                   {infoRow('Vị Trí Kệ', editingProd.location || 'Chưa xếp kệ')}
                   {infoRow('Thời Hạn Bảo Hành', editingProd.warranty || '36 tháng')}
-                  {infoRow('Giá Đã Giảm (giá bán, chưa VAT)', safeFormatPrice(editingProd.price))}
+                  {infoRow('Giá Đã Giảm (giá bán, gồm VAT)', safeFormatPrice(editingProd.price))}
                   {infoRow('Giá Chưa Khuyến Mãi', (
                     <span>
                       {editingProd.originalPrice && editingProd.originalPrice > editingProd.price ? (
@@ -7757,7 +7757,7 @@ export default function Warehouse() {
                   {editingProd.averageCost != null && infoRow('Biên Lợi Nhuận Gộp', (() => {
                     const margin = grossMarginPct(editingProd.price, editingProd.averageCost);
                     if (margin == null) return '—';
-                    const profitPerUnit = Math.round(Number(editingProd.price || 0) - Number(editingProd.averageCost || 0));
+                    const profitPerUnit = grossProfitPerUnit(editingProd.price, editingProd.averageCost);
                     return <span style={{ color: margin < 0 ? '#dc2626' : '#15803d' }}>{margin.toFixed(1)}% · {safeFormatPrice(profitPerUnit)}/sp</span>;
                   })())}
                   {infoRow('Ngưỡng An Toàn', `${threshNum} sản phẩm`)}
@@ -7880,7 +7880,7 @@ export default function Warehouse() {
                     </div>
                   </div>
 
-                  {/* 3 mức giá: giá vốn (cố định, chỉ đổi khi nhập kho) · giá chưa khuyến mãi · giá đã giảm. Giá bán là giá CHƯA VAT. */}
+                  {/* 3 mức giá: giá vốn (chưa VAT, cố định — chỉ đổi khi nhập kho) · giá chưa khuyến mãi · giá đã giảm (giá bán gồm VAT). */}
                   <div style={{ display: 'grid', gridTemplateColumns: editingProd.averageCost != null ? '1fr 1fr 1fr' : '1fr 1fr', gap: '0.85rem' }}>
                     {editingProd.averageCost != null && (
                       <div>
@@ -7916,10 +7916,10 @@ export default function Warehouse() {
                           </>
                         )}
                         <strong style={{ color: '#dc2626' }}>{safeFormatPrice(curr)}</strong>
-                        <span style={{ color: '#94a3b8', fontSize: '0.74rem' }}>(+ VAT 10% khi thanh toán)</span>
+                        <span style={{ color: '#94a3b8', fontSize: '0.74rem' }}>(đã gồm VAT 10%)</span>
                         {margin != null && (
                           <span style={{ marginLeft: 'auto', fontWeight: 700, color: margin < 0 ? '#dc2626' : margin < 5 ? '#d97706' : '#15803d' }}>
-                            {margin < 0 ? `Bán dưới giá vốn (${margin.toFixed(1)}%)` : `Lãi ${safeFormatPrice(curr - editingProd.averageCost)}/sp · biên ${margin.toFixed(1)}%`}
+                            {margin < 0 ? `Bán dưới giá vốn (${margin.toFixed(1)}%)` : `Lãi ${safeFormatPrice(grossProfitPerUnit(curr, editingProd.averageCost))}/sp · biên ${margin.toFixed(1)}%`}
                           </span>
                         )}
                       </div>

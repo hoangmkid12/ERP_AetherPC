@@ -1513,7 +1513,7 @@ export default function PCBuilder() {
               {formatPrice(calculateTotalPrice())}
             </div>
             <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '1.25rem' }}>
-              Chưa gồm VAT 10% · Đã gồm VAT: <strong>{formatPrice(Math.round(calculateTotalPrice() * 1.1))}</strong>
+              Giá đã bao gồm VAT 10%
             </div>
 
             <button

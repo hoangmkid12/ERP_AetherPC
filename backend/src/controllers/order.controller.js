@@ -8,7 +8,7 @@ const { bundlePercent, bundlePrice, groupOfSlug } = require('../services/bundleD
 const { resolvePromotion } = require('../services/promotion');
 
 const LOYALTY_VND_PER_POINT = 10000; // 10.000 VNĐ = 1 điểm
-const VAT_RATE = 0.1; // Thuế GTGT cộng thêm trên giá bán (giá sản phẩm là giá chưa thuế)
+const VAT_RATE = 0.1; // Thuế GTGT — giá niêm yết đã gồm thuế, chỉ tách ra để ghi nhận
 
 const tierForPoints = (points) => {
   if (points >= 10000) return 'PLATINUM';
@@ -209,9 +209,10 @@ const createOrder = async (req, res, next) => {
 
       // Phí vận chuyển: Miễn phí vận chuyển 100% toàn quốc cho toàn bộ đơn hàng
       const shippingFee = 0;
-      // Giá bán sản phẩm là giá CHƯA thuế — cộng thuế GTGT 10% trên phần tiền hàng sau chiết khấu.
-      const vatAmount = Math.round((discountedSubtotal + shippingFee) * VAT_RATE);
-      const totalAmount = discountedSubtotal + shippingFee + vatAmount;
+      // Giá niêm yết bán lẻ ĐÃ GỒM thuế GTGT 10% — khách trả đúng giá hiển thị. vatAmount chỉ ghi lại
+      // phần thuế nằm trong tổng tiền (phục vụ hoá đơn GTGT và báo cáo thuế), không cộng thêm.
+      const totalAmount = discountedSubtotal + shippingFee;
+      const vatAmount = totalAmount - Math.round(totalAmount / (1 + VAT_RATE));
 
       // Sinh mã đơn hàng dạng ORD-YYMMDD-XXXX
       const dateStr = new Date().toISOString().slice(2, 10).replace(/-/g, '');

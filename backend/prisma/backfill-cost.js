@@ -15,16 +15,18 @@
  * Chạy:  npm run db:backfill-cost                → chỉ xem trước (không ghi gì)
  *        npm run db:backfill-cost -- --apply     → ghi vào CSDL
  *        thêm --fix-outliers  → tính lại cả các mã có giá vốn bất thường (< 30% hoặc > 100% giá bán chưa VAT)
- *        thêm --reprice-legacy → các mã đang mang giá vốn ƯỚC TÍNH theo quy ước cũ (giá bán đã gồm VAT,
- *                               vốn = giá/1,1 × (1 − biên)) được tính lại theo quy ước mới: giá bán là giá
- *                               CHƯA VAT → vốn = giá × (1 − biên). Bút toán COGS của đơn cũ giữ nguyên.
+ *        thêm --fix-estimates → sửa các mã mang giá vốn ước tính SAI quy ước (vốn = giá × (1 − biên),
+ *                               tức coi giá bán là giá chưa VAT) về đúng: vốn = giá / 1,1 × (1 − biên).
+ *
+ * Quy ước: giá bán niêm yết ĐÃ GỒM VAT 10%; giá vốn là giá CHƯA VAT. Khi --apply, script cũng điền
+ * orders.vat_amount (phần thuế nằm trong tổng tiền) cho các đơn tạo trước khi có cột này.
  */
 require('dotenv').config();
 const prisma = require('../src/config/database');
 
 const APPLY = process.argv.includes('--apply');
 const FIX_OUTLIERS = process.argv.includes('--fix-outliers');
-const REPRICE_LEGACY = process.argv.includes('--reprice-legacy');
+const FIX_ESTIMATES = process.argv.includes('--fix-estimates');
 const VAT_RATE = 0.1;
 
 // Biên lợi nhuận gộp chuẩn (trên giá bán chưa VAT) theo ngành hàng linh kiện PC bán lẻ.
@@ -71,14 +73,15 @@ async function main() {
   const updates = [];
   let fromPo = 0, estimated = 0, keptValid = 0, outliers = 0;
   for (const p of products) {
-    // Giá bán sản phẩm là giá CHƯA VAT (xem frontend/src/utils/vat.js)
+    // Giá bán niêm yết đã gồm VAT → doanh thu thuần / giá so sánh với giá vốn = giá / 1,1
     const price = Number(p.price) || 0;
-    const net = price;
+    const net = price / (1 + VAT_RATE);
     const current = Number(p.averageCost) || 0;
     const isOutlier = current > 0 && net > 0 && (current < net * 0.3 || current > net);
     const margin = marginFor(p.category?.slug);
-    const isLegacyEstimate = current > 0 && current === round((price / (1 + VAT_RATE)) * (1 - margin));
-    if (current > 0 && !(FIX_OUTLIERS && isOutlier) && !(REPRICE_LEGACY && isLegacyEstimate)) {
+    // Ước tính sai quy ước (coi giá bán là giá chưa VAT) — sinh ra bởi lần chạy dở trước đó
+    const isWrongEstimate = current > 0 && current === round(price * (1 - margin)) && current !== round(net * (1 - margin));
+    if (current > 0 && !(FIX_OUTLIERS && isOutlier) && !(FIX_ESTIMATES && isWrongEstimate)) {
       keptValid++;
       if (isOutlier) outliers++;
       continue;
@@ -125,6 +128,12 @@ async function main() {
     console.log('\n(Chưa ghi gì. Chạy lại với --apply để áp dụng.)\n');
     return;
   }
+
+  // Ghi nhận phần thuế GTGT nằm trong tổng tiền cho các đơn cũ (giá đã gồm VAT)
+  const vatFilled = await prisma.$executeRawUnsafe(
+    'UPDATE orders SET vat_amount = total_amount - ROUND(total_amount / 1.1) WHERE vat_amount = 0 AND total_amount > 0'
+  );
+  console.log(`Điền thuế GTGT trong giá cho ${vatFilled} đơn cũ.`);
 
   const BATCH = 200;
   for (let i = 0; i < updates.length; i += BATCH) {

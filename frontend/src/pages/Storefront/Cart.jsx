@@ -17,7 +17,7 @@ import SearchableSelect from '../../components/Common/SearchableSelect';
 import { effectiveUnitPrice } from '../../components/Storefront/bundleRules';
 import SepayPayment from '../../components/Storefront/SepayPayment';
 import InvoiceModal from '../../components/Storefront/InvoiceModal';
-import { vatOnTop } from '../../utils/vat';
+import { vatInGross } from '../../utils/vat';
 
 const formatPrice = (price) => {
   return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price || 0);
@@ -336,11 +336,9 @@ export default function Cart() {
   }
 
   const memberDiscountAmount = Math.round(selectedCartTotal * memberDiscountPercent);
-  // Giá sản phẩm là giá CHƯA thuế: cộng thuế GTGT 10% trên phần sau chiết khấu (cùng công thức với
-  // backend createOrder — tổng tiền thật do máy chủ tính lại, không tin số từ trình duyệt).
-  const taxableTotal = Math.max(0, selectedCartTotal + shippingFee - couponDiscount - memberDiscountAmount);
-  const vatAmount = vatOnTop(taxableTotal);
-  const finalTotal = taxableTotal + vatAmount;
+  // Giá niêm yết đã gồm VAT 10% — khách trả đúng tổng này (máy chủ tính lại khi tạo đơn).
+  const finalTotal = Math.max(0, selectedCartTotal + shippingFee - couponDiscount - memberDiscountAmount);
+  const vatAmount = vatInGross(finalTotal); // phần thuế nằm trong tổng, chỉ để hiển thị
 
   const formatPrice = (price) => {
     if (price === null || price === undefined || isNaN(price)) return '0 đ';
@@ -1206,16 +1204,14 @@ export default function Cart() {
                       </div>
                     )}
 
-                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b' }}>
-                      <span>Thuế GTGT (VAT 10%):</span>
-                      <span style={{ fontWeight: 700, color: '#0f172a' }}>{formatPrice(vatAmount)}</span>
-                    </div>
-
                     <div style={{ borderTop: '1.5px dashed #cbd5e1', paddingTop: '0.5rem', marginTop: '0.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.95rem' }}>Tổng thanh toán:</span>
                       <strong style={{ fontSize: '1.35rem', fontWeight: 900, color: '#dc2626' }}>
                         {formatPrice(finalTotal)}
                       </strong>
+                    </div>
+                    <div style={{ textAlign: 'right', fontSize: '0.72rem', color: '#94a3b8' }}>
+                      (Giá đã bao gồm VAT 10%: {formatPrice(vatAmount)})
                     </div>
                   </div>
 

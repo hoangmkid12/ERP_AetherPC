@@ -1352,8 +1352,6 @@ export default function MyOrders() {
                                 shippingFee: Number(selectedOrder.shippingFee) || 0,
                                 discount: Number(selectedOrder.discount) || 0,
                                 vatAmount: Number(selectedOrder.vatAmount) || 0,
-                                // Đơn cũ trước khi tách VAT: giá trong đơn đã gồm thuế
-                                vatIncluded: !(Number(selectedOrder.vatAmount) > 0),
                                 total: Number(selectedOrder.totalAmount) || 0
                               })}
                               style={{ marginTop: '0.5rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem', padding: '0.35rem 0.75rem', borderRadius: '8px', border: '1px solid #bfdbfe', backgroundColor: '#eff6ff', color: '#2563eb', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer' }}
@@ -1493,16 +1491,12 @@ export default function MyOrders() {
                                 <span style={{ color: '#16a34a', fontWeight: 600 }}>-{formatPrice(selectedOrder.discount)}</span>
                               </div>
                             )}
-                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                              <span>Thuế GTGT (VAT 10%):</span>
-                              <span>{Number(selectedOrder.vatAmount) > 0 ? formatPrice(selectedOrder.vatAmount) : 'Đã gồm trong giá'}</span>
-                            </div>
                             <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #e2e8f0', paddingTop: '0.6rem', marginTop: '0.3rem' }}>
                               <strong style={{ color: '#0f172a' }}>Tổng cộng:</strong>
                               <strong style={{ color: '#ef4444', fontSize: '1.1rem' }}>{formatPrice(selectedOrder.totalAmount)}</strong>
                             </div>
                             <div style={{ marginTop: '0.25rem', fontSize: '0.75rem', color: '#64748b' }}>
-                              Thanh toán qua <strong>{selectedOrder.type === 'POS' ? 'Tiền mặt/Quẹt thẻ' : (selectedOrder.paymentMethod === 'BANK_TRANSFER' || selectedOrder.payment_method === 'BANK_TRANSFER' || selectedOrder.actualPaymentMethod === 'BANK_TRANSFER') ? 'Chuyển khoản VietQR' : 'Tiền mặt khi nhận hàng'}</strong>
+                              (Đã bao gồm VAT 10%: {formatPrice(Number(selectedOrder.vatAmount) > 0 ? Number(selectedOrder.vatAmount) : Math.round(Number(selectedOrder.totalAmount || 0) - Number(selectedOrder.totalAmount || 0) / 1.1))}) - Thanh toán qua <strong>{selectedOrder.type === 'POS' ? 'Tiền mặt/Quẹt thẻ' : (selectedOrder.paymentMethod === 'BANK_TRANSFER' || selectedOrder.payment_method === 'BANK_TRANSFER' || selectedOrder.actualPaymentMethod === 'BANK_TRANSFER') ? 'Chuyển khoản VietQR' : 'Tiền mặt khi nhận hàng'}</strong>
                             </div>
                           </div>
                         </div>
