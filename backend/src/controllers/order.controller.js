@@ -8,6 +8,7 @@ const { bundlePercent, bundlePrice, groupOfSlug } = require('../services/bundleD
 const { resolvePromotion } = require('../services/promotion');
 
 const LOYALTY_VND_PER_POINT = 10000; // 10.000 VNĐ = 1 điểm
+const VAT_RATE = 0.1; // Thuế GTGT cộng thêm trên giá bán (giá sản phẩm là giá chưa thuế)
 
 const tierForPoints = (points) => {
   if (points >= 10000) return 'PLATINUM';
@@ -208,7 +209,9 @@ const createOrder = async (req, res, next) => {
 
       // Phí vận chuyển: Miễn phí vận chuyển 100% toàn quốc cho toàn bộ đơn hàng
       const shippingFee = 0;
-      const totalAmount = discountedSubtotal;
+      // Giá bán sản phẩm là giá CHƯA thuế — cộng thuế GTGT 10% trên phần tiền hàng sau chiết khấu.
+      const vatAmount = Math.round((discountedSubtotal + shippingFee) * VAT_RATE);
+      const totalAmount = discountedSubtotal + shippingFee + vatAmount;
 
       // Sinh mã đơn hàng dạng ORD-YYMMDD-XXXX
       const dateStr = new Date().toISOString().slice(2, 10).replace(/-/g, '');
@@ -246,6 +249,7 @@ const createOrder = async (req, res, next) => {
           subtotal,
           discount: orderDiscount,
           shippingFee,
+          vatAmount,
           totalAmount,
           paymentMethod,
           paymentStatus: initialPaymentStatus,
@@ -359,6 +363,7 @@ const createOrder = async (req, res, next) => {
         subtotal: order.subtotal,
         discount: order.discount,
         shippingFee: order.shippingFee,
+        vatAmount: order.vatAmount,
         totalAmount: order.totalAmount,
         paymentMethod: order.paymentMethod,
         shippingAddress: order.shippingAddress
@@ -1369,6 +1374,7 @@ const updateOrderStatus = async (req, res, next) => {
         subtotal: updatedOrderFull.subtotal,
         discount: updatedOrderFull.discount,
         shippingFee: updatedOrderFull.shippingFee,
+        vatAmount: updatedOrderFull.vatAmount,
         totalAmount: updatedOrderFull.totalAmount,
         proofPhoto: req.body.proofPhoto || req.body.proofUrl || updatedOrderFull.proofPhoto || null,
         receiverNote: req.body.receiverNote || updatedOrderFull.receiverNote || null,

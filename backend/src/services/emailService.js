@@ -426,20 +426,22 @@ const renderItemsTable = (orderId, items) => {
 
 // Financial breakdown — ensures mathematical consistency between subtotal,
 // shipping fee, discount, and total amount.
-const renderFinancials = ({ subtotal, shippingFee, discount, totalAmount }) => {
+const renderFinancials = ({ subtotal, shippingFee, discount, totalAmount, vatAmount }) => {
   const rows = [];
   const subVal = Number(subtotal || 0);
   const shipVal = Number(shippingFee || 0);
+  // Thuế GTGT cộng thêm (đơn mới); đơn cũ vatAmount = 0 vì giá đã gồm VAT
+  const vatVal = Number(vatAmount || 0);
   let discVal = Number(discount || 0);
-  const totVal = Number(totalAmount || (subVal + shipVal - discVal));
+  const totVal = Number(totalAmount || (subVal + shipVal - discVal + vatVal));
 
   // Đảm bảo tính nhất quán toán học tuyệt đối:
   // Nếu subVal + shipVal == totVal, nghĩa là không có giảm giá checkout bổ sung
   // (tránh hiển thị dòng giảm giá niêm yết cũ gây hiểu lầm phép tính)
-  if (Math.abs((subVal + shipVal) - totVal) < 100) {
+  if (Math.abs((subVal + shipVal + vatVal) - totVal) < 100) {
     discVal = 0;
-  } else if (discVal > 0 && Math.abs((subVal + shipVal - discVal) - totVal) > 100) {
-    discVal = Math.max(0, subVal + shipVal - totVal);
+  } else if (discVal > 0 && Math.abs((subVal + shipVal - discVal + vatVal) - totVal) > 100) {
+    discVal = Math.max(0, subVal + shipVal + vatVal - totVal);
   }
 
   if (subtotal !== undefined && subtotal !== null) {
@@ -448,6 +450,9 @@ const renderFinancials = ({ subtotal, shippingFee, discount, totalAmount }) => {
   rows.push(`<tr><td style="color: #64748b; padding: 4px 0;">Phí vận chuyển:</td><td style="font-weight: 700; color: #16a34a; text-align: right;">Miễn phí (0 đ)</td></tr>`);
   if (discVal > 0) {
     rows.push(`<tr><td style="color: #64748b; padding: 4px 0;">Giảm giá / Voucher:</td><td style="font-weight: 700; color: #16a34a; text-align: right;">-${money(discVal)}</td></tr>`);
+  }
+  if (vatVal > 0) {
+    rows.push(`<tr><td style="color: #64748b; padding: 4px 0;">Thuế GTGT (10%):</td><td style="font-weight: 600; color: #334155; text-align: right;">${money(vatVal)}</td></tr>`);
   }
   rows.push(`<tr style="border-top: 1px dashed #cbd5e1;"><td style="color: #0f172a; padding: 8px 0 0 0; font-weight: 800; font-size: 14px;">Tổng thanh toán:</td><td style="font-weight: 900; color: #0f172a; text-align: right; font-size: 16px; padding-top: 8px;">${money(totVal)}</td></tr>`);
 
@@ -462,7 +467,7 @@ const renderFinancials = ({ subtotal, shippingFee, discount, totalAmount }) => {
 /**
  * Gửi email xác nhận đơn hàng khi khách hàng hoàn tất thanh toán/đặt hàng
  */
-const sendOrderConfirmationEmail = async ({ toEmail, customerName, orderId, items, subtotal, discount, totalAmount, paymentMethod, shippingAddress, shippingFee }) => {
+const sendOrderConfirmationEmail = async ({ toEmail, customerName, orderId, items, subtotal, discount, totalAmount, paymentMethod, shippingAddress, shippingFee, vatAmount }) => {
   const bodyHtml = `
     <p style="font-size: 14px; color: #0f172a; margin: 0 0 4px 0; line-height: 1.5;">Xin chào <strong>${escapeHtml(customerName || 'Quý khách hàng')}</strong>,</p>
     <p style="font-size: 13.5px; color: #334155; line-height: 1.6; margin: 0 0 18px 0;">
@@ -482,7 +487,7 @@ const sendOrderConfirmationEmail = async ({ toEmail, customerName, orderId, item
     </div>
 
     ${renderItemsTable(orderId, items)}
-    ${renderFinancials({ subtotal, shippingFee, discount, totalAmount })}
+    ${renderFinancials({ subtotal, shippingFee, discount, totalAmount, vatAmount })}
 
     <div style="text-align: center; margin: 22px 0 8px 0;">
       <a href="${BRAND.siteUrl}/my-orders" class="cta-btn" target="_blank" style="display: inline-block; background-color: #00D2FF; color: #0f172a; font-weight: 800; font-size: 13px; padding: 13px 28px; border-radius: 8px; text-decoration: none;">Tra Cứu Đơn Hàng Ngay →</a>
@@ -530,7 +535,7 @@ const sendOrderConfirmationEmail = async ({ toEmail, customerName, orderId, item
 /**
  * Gửi email thông báo cập nhật trạng thái đơn hàng (CONFIRMED, SHIPPED, DELIVERED, CANCELLED,...)
  */
-const sendOrderStatusUpdateEmail = async ({ toEmail, customerName, orderId, status, note, items, subtotal, discount, totalAmount, shippingFee, proofPhoto, proofUrl, receiverNote, deliveredTime }) => {
+const sendOrderStatusUpdateEmail = async ({ toEmail, customerName, orderId, status, note, items, subtotal, discount, totalAmount, shippingFee, vatAmount, proofPhoto, proofUrl, receiverNote, deliveredTime }) => {
   const statusVN = labelOf(STATUS_LABELS, status);
   const isDelivered = ['DELIVERED', 'COMPLETED'].includes(status);
   const isException = getStepIndex(status) === -1;
@@ -573,7 +578,7 @@ const sendOrderStatusUpdateEmail = async ({ toEmail, customerName, orderId, stat
 
     ${renderItemsTable(orderId, items)}
     ${proofSectionHtml}
-    ${renderFinancials({ subtotal, shippingFee, discount, totalAmount })}
+    ${renderFinancials({ subtotal, shippingFee, discount, totalAmount, vatAmount })}
 
     <div style="text-align: center; margin: 22px 0 8px 0;">
       <a href="${BRAND.siteUrl}/my-orders" class="cta-btn" target="_blank" style="display: inline-block; background-color: #00D2FF; color: #0f172a; font-weight: 800; font-size: 13px; padding: 13px 28px; border-radius: 8px; text-decoration: none;">Tra Cứu Vận Đơn →</a>

@@ -1509,8 +1509,11 @@ export default function PCBuilder() {
             <h3 style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.5rem' }}>
               Tổng kết cấu hình PC
             </h3>
-            <div style={{ fontSize: '2rem', fontWeight: 'bold', color: 'var(--success)', marginBottom: '1.25rem' }}>
+            <div style={{ fontSize: '2rem', fontWeight: 'bold', color: 'var(--success)' }}>
               {formatPrice(calculateTotalPrice())}
+            </div>
+            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '1.25rem' }}>
+              Chưa gồm VAT 10% · Đã gồm VAT: <strong>{formatPrice(Math.round(calculateTotalPrice() * 1.1))}</strong>
             </div>
 
             <button

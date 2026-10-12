@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import { useInventoryStore, useSalesStore } from '../../stores';
 import { printDocument } from '../../utils/printDocument';
+import { vatOnTop } from '../../utils/vat';
 import { useAuth } from '../../context/AuthContext';
 import { usePermission } from '../../hooks/usePermission';
 import { useNotification, notify } from '../../context/NotificationContext';
@@ -464,10 +465,16 @@ export default function SalesPOS() {
     return posCart.reduce((sum, item) => sum + (item.unitPrice * item.quantity), 0);
   };
 
+  // Giá sản phẩm là giá CHƯA thuế — thuế GTGT 10% cộng thêm trên phần sau chiết khấu (như backend)
+  const calculateVat = () => {
+    const sub = calculateSubtotal();
+    return vatOnTop(Math.max(0, sub - (sub * posDiscountPercent) / 100));
+  };
+
   const calculateTotal = () => {
     const sub = calculateSubtotal();
     const discountAmount = (sub * posDiscountPercent) / 100;
-    return Math.max(0, sub - discountAmount);
+    return Math.max(0, sub - discountAmount) + calculateVat();
   };
 
   // Checkout POS Order
@@ -478,7 +485,8 @@ export default function SalesPOS() {
     }
 
     const subTotal = calculateSubtotal();
-    const finalTotal = calculateTotal();
+    let finalTotal = calculateTotal();
+    let vatAmount = calculateVat();
 
     const itemsForERP = posCart.map(item => ({
       productId: String(item.product.productId || item.product.id),
@@ -509,6 +517,10 @@ export default function SalesPOS() {
           { discount: (subTotal * posDiscountPercent) / 100 }
         );
         if (resId) orderId = resId;
+        // Hoá đơn in theo đúng số tiền máy chủ đã tính (gồm VAT)
+        const saved = (useSalesStore.getState().orders || []).find(o => o.orderId === resId);
+        if (Number(saved?.totalAmount) > 0) finalTotal = Number(saved.totalAmount);
+        if (Number(saved?.vatAmount) > 0) vatAmount = Number(saved.vatAmount);
       } catch (err) {
         notify(err.message || 'Không thể tạo đơn bán lẻ — vui lòng thử lại.', 'error');
         return;
@@ -523,6 +535,7 @@ export default function SalesPOS() {
       subTotal,
       discountPercent: posDiscountPercent,
       discountAmount: (subTotal * posDiscountPercent) / 100,
+      vatAmount,
       total: finalTotal,
       paymentMethod: posPaymentMethod === 'CASH' ? 'Tiền mặt' : posPaymentMethod === 'BANK' ? 'Chuyển khoản QR' : 'Thẻ POS',
       cashier: user?.fullname || user?.username || 'Nhân viên bán hàng',
@@ -1359,6 +1372,10 @@ export default function SalesPOS() {
                   <span>- {formatCurrency((calculateSubtotal() * posDiscountPercent) / 100)}</span>
                 </div>
               )}
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: '#64748b', marginBottom: '0.25rem' }}>
+                <span>Thuế GTGT (VAT 10%):</span>
+                <span>{formatCurrency(calculateVat())}</span>
+              </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1rem', fontWeight: 800, color: '#0f172a', margin: '0.5rem 0 1rem' }}>
                 <span>Tổng Thanh Toán:</span>
                 <span style={{ color: '#16a34a' }}>{formatCurrency(calculateTotal())}</span>
@@ -2485,6 +2502,10 @@ export default function SalesPOS() {
                   <span>- {formatCurrency(printedReceipt.discountAmount)}</span>
                 </div>
               )}
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b' }}>
+                <span>Thuế GTGT (VAT 10%):</span>
+                <span>{formatCurrency(printedReceipt.vatAmount || 0)}</span>
+              </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.05rem', fontWeight: 900, color: '#16a34a', borderTop: '1px dashed #e2e8f0', paddingTop: '0.5rem' }}>
                 <span>TỔNG CỘNG:</span>
                 <span>{formatCurrency(printedReceipt.total)}</span>

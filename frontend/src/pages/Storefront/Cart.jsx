@@ -17,6 +17,7 @@ import SearchableSelect from '../../components/Common/SearchableSelect';
 import { effectiveUnitPrice } from '../../components/Storefront/bundleRules';
 import SepayPayment from '../../components/Storefront/SepayPayment';
 import InvoiceModal from '../../components/Storefront/InvoiceModal';
+import { vatOnTop } from '../../utils/vat';
 
 const formatPrice = (price) => {
   return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price || 0);
@@ -335,7 +336,11 @@ export default function Cart() {
   }
 
   const memberDiscountAmount = Math.round(selectedCartTotal * memberDiscountPercent);
-  const finalTotal = Math.max(0, selectedCartTotal + shippingFee - couponDiscount - memberDiscountAmount);
+  // Giá sản phẩm là giá CHƯA thuế: cộng thuế GTGT 10% trên phần sau chiết khấu (cùng công thức với
+  // backend createOrder — tổng tiền thật do máy chủ tính lại, không tin số từ trình duyệt).
+  const taxableTotal = Math.max(0, selectedCartTotal + shippingFee - couponDiscount - memberDiscountAmount);
+  const vatAmount = vatOnTop(taxableTotal);
+  const finalTotal = taxableTotal + vatAmount;
 
   const formatPrice = (price) => {
     if (price === null || price === undefined || isNaN(price)) return '0 đ';
@@ -430,19 +435,25 @@ export default function Cart() {
         }
       );
 
+      // Số tiền thật do máy chủ tính (gồm VAT) — dùng cho QR chuyển khoản & hoá đơn; dự phòng số tạm tính
+      const savedOrder = (useSalesStore.getState().orders || []).find(o => o.orderId === orderId);
+      const serverTotal = Number(savedOrder?.totalAmount);
+      const serverVat = Number(savedOrder?.vatAmount);
+
       const invoiceData = {
         customerName,
         phone,
         address: fullAddress,
         paymentMethod,
         orderId,
-        totalAmount: finalTotal,
+        totalAmount: Number.isFinite(serverTotal) && serverTotal > 0 ? serverTotal : finalTotal,
         date: new Date().toLocaleDateString('vi-VN'),
         createdAt: new Date().toISOString(),
         email: targetEmail,
         items: itemsForERP.map(it => ({ name: it.name, category: it.category, quantity: it.quantity, price: it.price })),
         shippingFee,
-        discount: (couponDiscount || 0) + (memberDiscountAmount || 0)
+        discount: (couponDiscount || 0) + (memberDiscountAmount || 0),
+        vatAmount: Number.isFinite(serverVat) && serverVat > 0 ? serverVat : vatAmount
       };
 
       removeSelectedFromCart(selectedCartItems.map(getItemKey));
@@ -575,6 +586,7 @@ export default function Cart() {
             items: invoice.items,
             shippingFee: invoice.shippingFee,
             discount: invoice.discount,
+            vatAmount: invoice.vatAmount,
             total: invoice.totalAmount
           }}
         />
@@ -1193,6 +1205,11 @@ export default function Cart() {
                         <span>-{formatPrice(memberDiscountAmount)}</span>
                       </div>
                     )}
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b' }}>
+                      <span>Thuế GTGT (VAT 10%):</span>
+                      <span style={{ fontWeight: 700, color: '#0f172a' }}>{formatPrice(vatAmount)}</span>
+                    </div>
 
                     <div style={{ borderTop: '1.5px dashed #cbd5e1', paddingTop: '0.5rem', marginTop: '0.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.95rem' }}>Tổng thanh toán:</span>

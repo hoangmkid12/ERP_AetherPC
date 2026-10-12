@@ -211,6 +211,7 @@ export default function ProductDetail() {
               {off > 0 && <span className="sf-discount" style={{ fontSize: 13, lineHeight: '22px' }}>-{off}%</span>}
             </div>
             {saving > 0 && <div className="sf-pd-save">Tiết kiệm {fmtVnd(saving)} so với giá niêm yết</div>}
+            <div style={{ marginTop: 4, fontSize: 12.5, color: '#64748b' }}>Giá chưa gồm VAT 10% — thuế được cộng khi thanh toán ({fmtVnd(Math.round(Number(product.price || 0) * 1.1))} đã gồm VAT)</div>
             <div style={{ marginTop: 8, fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}>
               {inStock
                 ? <span className="sf-stock-ok"><PackageCheck size={15} /> Còn hàng ({product.stockQuantity} sản phẩm tại kho)</span>

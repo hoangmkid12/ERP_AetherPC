@@ -2,13 +2,13 @@ import React, { useMemo, useRef } from 'react';
 import { Printer, X, FileText } from 'lucide-react';
 import { printDocument } from '../../utils/printDocument';
 import { SHOP } from './catalog';
-import { netOfVat } from '../../utils/vat';
+import { vatOnTop } from '../../utils/vat';
 
 // Hoá đơn GTGT hiển thị cho khách, trình bày theo bản thể hiện hoá đơn điện tử:
 // - stamped = true (mặc định): đơn đã đặt thành công — có mộc đỏ + thông tin ký số của công ty.
 // - stamped = false: xem trước khi build PC — giữ nguyên hoá đơn, chỉ để trống vị trí đóng dấu.
-// Giá niêm yết trên hệ thống đã gồm VAT 10% (xem utils/vat.js); hoá đơn trình bày theo đúng mẫu GTGT:
-// đơn giá & thành tiền chưa thuế → cộng tiền thuế → tổng thanh toán = đúng số tiền khách trả.
+// Giá sản phẩm là giá chưa thuế (xem utils/vat.js); hoá đơn theo mẫu GTGT: đơn giá & thành tiền =
+// giá sản phẩm → cộng tiền thuế GTGT 10% → tổng thanh toán = đúng số tiền khách trả.
 
 const DIGITS = ['không', 'một', 'hai', 'ba', 'bốn', 'năm', 'sáu', 'bảy', 'tám', 'chín'];
 const GROUP_UNITS = ['', 'nghìn', 'triệu', 'tỷ', 'nghìn tỷ', 'triệu tỷ'];
@@ -108,7 +108,7 @@ const Field = ({ name, value }) => (
  *   stamped?: boolean, orderId?: string, date?: string|Date, customerName?: string, phone?: string,
  *   email?: string, address?: string, paymentMethod?: string,
  *   items: { name: string, unit?: string, quantity?: number, price: number }[],
- *   shippingFee?: number, discount?: number, total?: number, note?: string
+ *   shippingFee?: number, discount?: number, vatAmount?: number, vatIncluded?: boolean, total?: number, note?: string
  * } }} props
  */
 export default function InvoiceModal({ open, onClose, invoice }) {
@@ -119,23 +119,21 @@ export default function InvoiceModal({ open, onClose, invoice }) {
 
   const stamped = invoice.stamped !== false;
   const items = (invoice.items || []).filter(Boolean);
-  // Hoá đơn GTGT ghi đơn giá & thành tiền CHƯA thuế, rồi cộng thuế GTGT ở dòng riêng. Giá niêm yết
-  // (giá khách trả) đã gồm VAT nên đơn giá chưa thuế = giá niêm yết / 1,1; tiền thuế lấy phần chênh
-  // để "Tổng tiền thanh toán" luôn khớp đúng số tiền khách trả, không lệch do làm tròn.
+  // Giá sản phẩm là giá CHƯA thuế: đơn giá & thành tiền ghi đúng giá sản phẩm, thuế GTGT 10% cộng
+  // thêm ở dòng riêng (utils/vat.js). Đơn cũ trước khi tách VAT (vatIncluded) — giá trong đơn đã gồm
+  // thuế nên chỉ ghi chú "đã bao gồm", không tách/trừ gì để tổng khớp đúng số tiền khách đã trả.
+  const vatIncluded = Boolean(invoice.vatIncluded);
   const lines = items.map(it => {
     const qty = Number(it.quantity) || 1;
-    const gross = (Number(it.price) || 0) * qty;
-    return { ...it, qty, unitNet: netOfVat(it.price), amountNet: netOfVat(gross), gross };
+    const unitPrice = Number(it.price) || 0;
+    return { ...it, qty, unitPrice, amount: unitPrice * qty };
   });
-  const subtotalGross = lines.reduce((s, l) => s + l.gross, 0);
-  const goodsNet = lines.reduce((s, l) => s + l.amountNet, 0);
+  const goods = lines.reduce((s, l) => s + l.amount, 0);
   const shippingFee = Number(invoice.shippingFee) || 0;
   const discount = Number(invoice.discount) || 0;
-  const shippingNet = netOfVat(shippingFee);
-  const discountNet = netOfVat(discount);
-  const total = invoice.total != null ? Number(invoice.total) : Math.max(0, subtotalGross + shippingFee - discount);
-  const taxableNet = Math.max(0, goodsNet + shippingNet - discountNet);
-  const vat = Math.round(total) - taxableNet;
+  const taxable = Math.max(0, goods + shippingFee - discount);
+  const vat = vatIncluded ? 0 : (invoice.vatAmount != null && Number(invoice.vatAmount) > 0 ? Math.round(Number(invoice.vatAmount)) : vatOnTop(taxable));
+  const total = invoice.total != null && Number(invoice.total) > 0 ? Math.round(Number(invoice.total)) : taxable + vat;
   const dateObj = invoice.date ? new Date(invoice.date) : new Date();
   const date = Number.isNaN(dateObj.getTime()) ? new Date() : dateObj;
   const dd = String(date.getDate()).padStart(2, '0');
@@ -224,8 +222,8 @@ export default function InvoiceModal({ open, onClose, invoice }) {
                     <td style={td}>{l.name}</td>
                     <td style={{ ...td, textAlign: 'center' }}>{l.unit || 'Cái'}</td>
                     <td style={{ ...td, textAlign: 'center' }}>{l.qty}</td>
-                    <td style={num}>{fmt(l.unitNet)}</td>
-                    <td style={num}>{fmt(l.amountNet)}</td>
+                    <td style={num}>{fmt(l.unitPrice)}</td>
+                    <td style={num}>{fmt(l.amount)}</td>
                   </tr>
                 ))}
                 {lines.length === 0 && (
@@ -233,18 +231,18 @@ export default function InvoiceModal({ open, onClose, invoice }) {
                 )}
                 <tr>
                   <td colSpan={5} style={{ ...td, textAlign: 'right' }}>Cộng tiền hàng:</td>
-                  <td style={num}>{fmt(goodsNet)}</td>
+                  <td style={num}>{fmt(goods)}</td>
                 </tr>
                 {shippingFee > 0 && (
-                  <tr><td colSpan={5} style={{ ...td, textAlign: 'right' }}>Phí vận chuyển:</td><td style={num}>{fmt(shippingNet)}</td></tr>
+                  <tr><td colSpan={5} style={{ ...td, textAlign: 'right' }}>Phí vận chuyển:</td><td style={num}>{fmt(shippingFee)}</td></tr>
                 )}
                 {discount > 0 && (
-                  <tr><td colSpan={5} style={{ ...td, textAlign: 'right' }}>Chiết khấu thương mại:</td><td style={num}>-{fmt(discountNet)}</td></tr>
+                  <tr><td colSpan={5} style={{ ...td, textAlign: 'right' }}>Chiết khấu thương mại:</td><td style={num}>-{fmt(discount)}</td></tr>
                 )}
                 <tr>
                   <td colSpan={3} style={td}>Thuế suất GTGT: <strong>10%</strong></td>
                   <td colSpan={2} style={{ ...td, textAlign: 'right' }}>Tiền thuế GTGT:</td>
-                  <td style={num}>{fmt(vat)}</td>
+                  <td style={num}>{vatIncluded ? 'Đã gồm trong giá' : fmt(vat)}</td>
                 </tr>
                 <tr>
                   <td colSpan={5} style={{ ...td, textAlign: 'right', fontWeight: 700, fontSize: '14.5px' }}>Tổng tiền thanh toán:</td>

@@ -169,6 +169,7 @@ const updateAssemblyJob = async (req, res, next) => {
           subtotal: readyOrder.subtotal,
           discount: readyOrder.discount,
           shippingFee: readyOrder.shippingFee,
+          vatAmount: readyOrder.vatAmount,
           totalAmount: readyOrder.totalAmount
         }).catch(err => console.warn('[Email] Lỗi gửi email sẵn sàng giao hàng:', err.message));
       }

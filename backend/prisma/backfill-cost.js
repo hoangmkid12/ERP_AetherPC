@@ -15,12 +15,16 @@
  * Chạy:  npm run db:backfill-cost                → chỉ xem trước (không ghi gì)
  *        npm run db:backfill-cost -- --apply     → ghi vào CSDL
  *        thêm --fix-outliers  → tính lại cả các mã có giá vốn bất thường (< 30% hoặc > 100% giá bán chưa VAT)
+ *        thêm --reprice-legacy → các mã đang mang giá vốn ƯỚC TÍNH theo quy ước cũ (giá bán đã gồm VAT,
+ *                               vốn = giá/1,1 × (1 − biên)) được tính lại theo quy ước mới: giá bán là giá
+ *                               CHƯA VAT → vốn = giá × (1 − biên). Bút toán COGS của đơn cũ giữ nguyên.
  */
 require('dotenv').config();
 const prisma = require('../src/config/database');
 
 const APPLY = process.argv.includes('--apply');
 const FIX_OUTLIERS = process.argv.includes('--fix-outliers');
+const REPRICE_LEGACY = process.argv.includes('--reprice-legacy');
 const VAT_RATE = 0.1;
 
 // Biên lợi nhuận gộp chuẩn (trên giá bán chưa VAT) theo ngành hàng linh kiện PC bán lẻ.
@@ -67,11 +71,14 @@ async function main() {
   const updates = [];
   let fromPo = 0, estimated = 0, keptValid = 0, outliers = 0;
   for (const p of products) {
+    // Giá bán sản phẩm là giá CHƯA VAT (xem frontend/src/utils/vat.js)
     const price = Number(p.price) || 0;
-    const net = price / (1 + VAT_RATE);
+    const net = price;
     const current = Number(p.averageCost) || 0;
     const isOutlier = current > 0 && net > 0 && (current < net * 0.3 || current > net);
-    if (current > 0 && !(FIX_OUTLIERS && isOutlier)) {
+    const margin = marginFor(p.category?.slug);
+    const isLegacyEstimate = current > 0 && current === round((price / (1 + VAT_RATE)) * (1 - margin));
+    if (current > 0 && !(FIX_OUTLIERS && isOutlier) && !(REPRICE_LEGACY && isLegacyEstimate)) {
       keptValid++;
       if (isOutlier) outliers++;
       continue;
@@ -81,7 +88,7 @@ async function main() {
     const poAvg = po ? po.total / po.qty : 0;
     let cost; let source;
     if (poAvg >= net * 0.3 && poAvg <= net) { cost = Math.round(poAvg); source = 'PO'; fromPo++; }
-    else { cost = round(net * (1 - marginFor(p.category?.slug))); source = 'ước tính'; estimated++; }
+    else { cost = round(net * (1 - margin)); source = 'ước tính'; estimated++; }
     updates.push({ productId: p.productId, name: p.name, price, old: current, cost, source });
   }
 

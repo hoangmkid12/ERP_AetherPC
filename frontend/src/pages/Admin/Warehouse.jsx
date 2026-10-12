@@ -3375,8 +3375,6 @@ export default function Warehouse() {
     setEditingProd({
       ...p,
       originalPrice: p.originalPrice !== undefined ? p.originalPrice : (p.price || 0),
-      // Giá cũ dùng để gạch ngang: giá niêm yết gốc, hoặc giá bán hiện tại nếu chưa có giá niêm yết cao hơn
-      listPrice: Math.max(Number(p.originalPrice) || 0, Number(p.price) || 0),
       brand: p.brand || '',
       warranty: p.warranty || '36 tháng',
       specs: (typeof p.specs === 'object' && p.specs !== null) ? p.specs : {},
@@ -3985,8 +3983,8 @@ export default function Warehouse() {
 
     const targetId = editingProd.id;
     const priceVal = editingProd.price !== undefined ? (parseFloat(editingProd.price) || 0) : 0;
-    // Giá cũ (gạch ngang) không sửa tay: giữ giá niêm yết gốc; nếu tăng giá bán vượt giá cũ thì giá cũ = giá mới (không còn giảm giá)
-    const origVal = Math.max(Number(editingProd.listPrice ?? editingProd.originalPrice) || 0, priceVal);
+    // Giá chưa khuyến mãi không được thấp hơn giá đã giảm (nếu nhập thấp hơn thì coi như không khuyến mãi)
+    const origVal = Math.max(Number(editingProd.originalPrice) || 0, priceVal);
 
     const fieldsToUpdate = {
       name: editingProd.name,
@@ -7043,6 +7041,9 @@ export default function Warehouse() {
                           )}
                         </td>
                         <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 700, color: '#16a34a', whiteSpace: 'nowrap' }}>
+                          {Number(p.originalPrice) > Number(p.price) && (
+                            <div style={{ fontSize: '0.72rem', fontWeight: 600, color: '#94a3b8', textDecoration: 'line-through' }}>{safeFormatPrice(p.originalPrice)}</div>
+                          )}
                           {safeFormatPrice(p.price)}
                           {p.averageCost != null && (() => {
                             const margin = grossMarginPct(p.price, p.averageCost);
@@ -7734,8 +7735,8 @@ export default function Warehouse() {
                   {infoRow('Nhà Cung Cấp', editingProd.supplier || 'Chưa rõ')}
                   {infoRow('Vị Trí Kệ', editingProd.location || 'Chưa xếp kệ')}
                   {infoRow('Thời Hạn Bảo Hành', editingProd.warranty || '36 tháng')}
-                  {infoRow('Đơn Giá Bán Khuyến Mãi', safeFormatPrice(editingProd.price))}
-                  {infoRow('Giá Gốc Niêm Yết', (
+                  {infoRow('Giá Đã Giảm (giá bán, chưa VAT)', safeFormatPrice(editingProd.price))}
+                  {infoRow('Giá Chưa Khuyến Mãi', (
                     <span>
                       {editingProd.originalPrice && editingProd.originalPrice > editingProd.price ? (
                         <>
@@ -7747,7 +7748,7 @@ export default function Warehouse() {
                       ) : safeFormatPrice(editingProd.originalPrice || editingProd.price)}
                     </span>
                   ))}
-                  {editingProd.averageCost != null && infoRow('Giá Vốn Bình Quân (chưa VAT)', (
+                  {editingProd.averageCost != null && infoRow('Giá Vốn (cố định)', (
                     <span>
                       {editingProd.averageCost > 0 ? safeFormatPrice(editingProd.averageCost) : <span style={{ color: '#d97706' }}>Chưa có</span>}
                       <span style={{ display: 'block', fontSize: '0.72rem', fontWeight: 500, color: '#94a3b8', marginTop: '0.15rem' }}>Cố định · tự cập nhật khi nhập kho</span>
@@ -7756,7 +7757,7 @@ export default function Warehouse() {
                   {editingProd.averageCost != null && infoRow('Biên Lợi Nhuận Gộp', (() => {
                     const margin = grossMarginPct(editingProd.price, editingProd.averageCost);
                     if (margin == null) return '—';
-                    const profitPerUnit = Math.round(Number(editingProd.price || 0) / 1.1 - Number(editingProd.averageCost || 0));
+                    const profitPerUnit = Math.round(Number(editingProd.price || 0) - Number(editingProd.averageCost || 0));
                     return <span style={{ color: margin < 0 ? '#dc2626' : '#15803d' }}>{margin.toFixed(1)}% · {safeFormatPrice(profitPerUnit)}/sp</span>;
                   })())}
                   {infoRow('Ngưỡng An Toàn', `${threshNum} sản phẩm`)}
@@ -7879,34 +7880,30 @@ export default function Warehouse() {
                     </div>
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  {/* 3 mức giá: giá vốn (cố định, chỉ đổi khi nhập kho) · giá chưa khuyến mãi · giá đã giảm. Giá bán là giá CHƯA VAT. */}
+                  <div style={{ display: 'grid', gridTemplateColumns: editingProd.averageCost != null ? '1fr 1fr 1fr' : '1fr 1fr', gap: '0.85rem' }}>
+                    {editingProd.averageCost != null && (
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.35rem' }}>Giá Vốn</label>
+                        <div title="Giá vốn bình quân gia quyền (chưa VAT) — chỉ thay đổi khi nhập kho, không sửa tay" style={{ padding: '0.6rem 0.85rem', fontSize: '0.85rem', fontWeight: 700, color: '#475569', border: '1px dashed #cbd5e1', borderRadius: '6px', backgroundColor: '#f1f5f9', display: 'flex', justifyContent: 'space-between', gap: '0.4rem' }}>
+                          <span>{editingProd.averageCost > 0 ? safeFormatPrice(editingProd.averageCost) : 'Chưa có'}</span>
+                          <span style={{ fontSize: '0.7rem', fontWeight: 600, color: '#94a3b8' }}>🔒 Cố định</span>
+                        </div>
+                      </div>
+                    )}
                     <div>
-                      {editingProd.averageCost != null ? (
-                        <>
-                          <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.35rem' }}>Giá Vốn Bình Quân (chưa VAT)</label>
-                          <div title="Giá vốn bình quân gia quyền — chỉ thay đổi khi nhập kho (GRN), không sửa tay" style={{ padding: '0.6rem 0.85rem', fontSize: '0.85rem', fontWeight: 700, color: '#475569', border: '1px dashed #cbd5e1', borderRadius: '6px', backgroundColor: '#f8fafc', display: 'flex', justifyContent: 'space-between', gap: '0.5rem' }}>
-                            <span>{editingProd.averageCost > 0 ? safeFormatPrice(editingProd.averageCost) : 'Chưa có'}</span>
-                            <span style={{ fontSize: '0.72rem', fontWeight: 600, color: '#94a3b8' }}>Cố định</span>
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.35rem' }}>Giá Cũ (VNĐ)</label>
-                          <div style={{ padding: '0.6rem 0.85rem', fontSize: '0.85rem', fontWeight: 700, color: '#94a3b8', border: '1px dashed #cbd5e1', borderRadius: '6px', backgroundColor: '#f8fafc', textDecoration: 'line-through' }}>
-                            {safeFormatPrice(editingProd.listPrice ?? editingProd.originalPrice ?? editingProd.price)}
-                          </div>
-                        </>
-                      )}
+                      <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.35rem' }}>Giá Chưa Khuyến Mãi</label>
+                      <input type="number" min="0" value={editingProd.originalPrice !== undefined ? editingProd.originalPrice : (editingProd.price || 0)} onChange={(e) => setEditingProd({ ...editingProd, originalPrice: parseFloat(e.target.value) || 0 })} style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.85rem', fontWeight: 600, color: '#64748b', border: '1px solid #cbd5e1', borderRadius: '6px', backgroundColor: '#ffffff', boxSizing: 'border-box' }} />
                     </div>
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.35rem' }}>Giá Bán (VNĐ, đã gồm VAT)</label>
+                      <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.35rem' }}>Giá Đã Giảm (giá bán)</label>
                       <input type="number" min="0" value={editingProd.price !== undefined ? editingProd.price : 0} onChange={(e) => setEditingProd({ ...editingProd, price: parseFloat(e.target.value) || 0 })} style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.85rem', fontWeight: 700, color: '#16a34a', border: '1px solid #cbd5e1', borderRadius: '6px', backgroundColor: '#ffffff', boxSizing: 'border-box' }} />
                     </div>
                   </div>
 
-                  {/* Xem trước giá khách thấy: giá cũ gạch ngang + % giảm; biên lợi nhuận tại giá mới (người được xem giá vốn) */}
+                  {/* Xem trước giá khách thấy: giá chưa KM gạch ngang + % khuyến mãi; biên lợi nhuận tại giá bán (người được xem giá vốn) */}
                   {(() => {
-                    const orig = Number(editingProd.listPrice ?? editingProd.originalPrice ?? 0) || 0;
+                    const orig = Number(editingProd.originalPrice) || 0;
                     const curr = parseFloat(editingProd.price) || 0;
                     const margin = editingProd.averageCost > 0 ? grossMarginPct(curr, editingProd.averageCost) : null;
                     return (
@@ -7919,9 +7916,10 @@ export default function Warehouse() {
                           </>
                         )}
                         <strong style={{ color: '#dc2626' }}>{safeFormatPrice(curr)}</strong>
+                        <span style={{ color: '#94a3b8', fontSize: '0.74rem' }}>(+ VAT 10% khi thanh toán)</span>
                         {margin != null && (
                           <span style={{ marginLeft: 'auto', fontWeight: 700, color: margin < 0 ? '#dc2626' : margin < 5 ? '#d97706' : '#15803d' }}>
-                            {margin < 0 ? `Bán dưới giá vốn (${margin.toFixed(1)}%)` : `Biên lợi nhuận ${margin.toFixed(1)}%`}
+                            {margin < 0 ? `Bán dưới giá vốn (${margin.toFixed(1)}%)` : `Lãi ${safeFormatPrice(curr - editingProd.averageCost)}/sp · biên ${margin.toFixed(1)}%`}
                           </span>
                         )}
                       </div>
