@@ -4,10 +4,11 @@ import { useCart } from '../../context/CartContext';
 import { notify } from '../../context/NotificationContext';
 import { api } from '../../services/api';
 import { printDocument } from '../../utils/printDocument';
+import InvoiceModal from '../../components/Storefront/InvoiceModal';
 import {
   Cpu, Trash2, ShieldCheck, ShieldAlert, ShoppingCart, HelpCircle, Sparkles,
   AlertTriangle, XCircle, Layers, Database, Gamepad2, Zap, HardDrive, Box, Wind,
-  Copy, Printer, MessageSquare, ChevronDown, ChevronUp, X, SlidersHorizontal
+  Copy, Printer, MessageSquare, ChevronDown, ChevronUp, X, SlidersHorizontal, FileText
 } from 'lucide-react';
 import { HARDWARE_KNOWLEDGE_BASE, parseCustomerPrompt, runAIOptimizer, hasIntegratedGraphics } from '../../config/pcBuilderAIKnowledge';
 
@@ -211,6 +212,7 @@ export default function PCBuilder() {
   const [showGuide, setShowGuide] = useState(false);
   const [activeStepTab, setActiveStepTab] = useState(0);
   const [showAdvancedAI, setShowAdvancedAI] = useState(false);
+  const [showSampleInvoice, setShowSampleInvoice] = useState(false);
   const { addToCart } = useCart();
 
   useEffect(() => {
@@ -1578,10 +1580,31 @@ export default function PCBuilder() {
               <ShoppingCart size={20} />
               Thêm Toàn Bộ Vào Giỏ Hàng
             </button>
+
+            <button
+              onClick={() => setShowSampleInvoice(true)}
+              className="btn btn-secondary"
+              style={{ width: '100%', marginTop: '0.5rem', padding: '0.6rem', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
+              disabled={Object.values(selectedParts).every(item => !item)}
+            >
+              <FileText size={15} /> Xem hoá đơn mẫu
+            </button>
           </div>
         </div>
       </div>
       </div> {/* Close pc-builder-screen-layout */}
+
+      <InvoiceModal
+        open={showSampleInvoice}
+        onClose={() => setShowSampleInvoice(false)}
+        invoice={{
+          sample: true,
+          items: COMPONENT_SLOTS
+            .filter(slot => selectedParts[slot.id])
+            .map(slot => ({ name: selectedParts[slot.id].name, category: slot.label, quantity: 1, price: parseFloat(selectedParts[slot.id].price) || 0 })),
+          note: 'Cấu hình PC tự build trên AetherPC (Build PC).'
+        }}
+      />
 
       {/* PRINT-ONLY TEMPLATE */}
       <div className="print-only-layout aetherpc-print-only">

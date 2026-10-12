@@ -72,4 +72,8 @@ export const SHOP = {
   hotlineSales: '0912.888.999',
   email: 'support@aetherpc.vn',
   address: '123 Nguyễn Văn Linh, Q.7, TP.HCM',
+  // Thông tin pháp nhân in trên hoá đơn / con dấu (dữ liệu demo của đồ án)
+  legalName: 'CÔNG TY TNHH AETHERPC',
+  taxCode: '0318686899',
+  sealCity: 'TP. HỒ CHÍ MINH',
 };

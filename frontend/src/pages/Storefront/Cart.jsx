@@ -7,7 +7,7 @@ import {
   ShoppingCart, ShoppingBag, Trash2, ArrowLeft, CreditCard, Sparkles, 
   MapPin, User, Phone, Lock, LogIn, UserPlus, CheckCircle, 
   ShieldCheck, Truck, RotateCcw, AlertCircle, QrCode, Banknote, Mail,
-  ChevronDown, Search, X
+  ChevronDown, Search, X, FileText
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../../services/api';
@@ -16,6 +16,7 @@ import { VIETNAM_PROVINCES, removeAccents, buildStandardAddress, cleanProvinceNa
 import SearchableSelect from '../../components/Common/SearchableSelect';
 import { effectiveUnitPrice } from '../../components/Storefront/bundleRules';
 import SepayPayment from '../../components/Storefront/SepayPayment';
+import InvoiceModal from '../../components/Storefront/InvoiceModal';
 
 const formatPrice = (price) => {
   return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price || 0);
@@ -147,6 +148,7 @@ export default function Cart() {
 
   // Invoice / Success state
   const [invoice, setInvoice] = useState(null);
+  const [showInvoiceDoc, setShowInvoiceDoc] = useState(false);
   // Modal QR cho chuyển khoản SePay
   const [qrModalOrder, setQrModalOrder] = useState(null);
 
@@ -436,7 +438,11 @@ export default function Cart() {
         orderId,
         totalAmount: finalTotal,
         date: new Date().toLocaleDateString('vi-VN'),
-        email: targetEmail
+        createdAt: new Date().toISOString(),
+        email: targetEmail,
+        items: itemsForERP.map(it => ({ name: it.name, category: it.category, quantity: it.quantity, price: it.price })),
+        shippingFee,
+        discount: (couponDiscount || 0) + (memberDiscountAmount || 0)
       };
 
       removeSelectedFromCart(selectedCartItems.map(getItemKey));
@@ -542,7 +548,10 @@ export default function Cart() {
             </div>
           )}
 
-          <div style={{ display: 'flex', gap: '1rem', marginTop: '2rem', justifyContent: 'center' }}>
+          <div style={{ display: 'flex', gap: '1rem', marginTop: '2rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+            <button type="button" onClick={() => setShowInvoiceDoc(true)} style={{ padding: '0.75rem 1.5rem', borderRadius: '12px', fontWeight: 700, backgroundColor: '#2563eb', color: '#ffffff', border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.45rem', fontSize: '1rem' }}>
+              <FileText size={18} /> Xem Hoá Đơn
+            </button>
             <Link to="/" style={{ padding: '0.75rem 2rem', borderRadius: '12px', fontWeight: 700, backgroundColor: '#fff1f2', color: '#d70018', border: '1.5px solid #fecdd3', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
               Tiếp Tục Mua Sắm
             </Link>
@@ -551,6 +560,24 @@ export default function Cart() {
             </Link>
           </div>
         </div>
+        <InvoiceModal
+          open={showInvoiceDoc}
+          onClose={() => setShowInvoiceDoc(false)}
+          invoice={{
+            orderId: invoice.orderId,
+            date: invoice.createdAt,
+            customerName: invoice.customerName,
+            phone: invoice.phone,
+            email: invoice.email,
+            address: invoice.address,
+            paymentMethod: invoice.paymentMethod,
+            paid: isPaidOnline,
+            items: invoice.items,
+            shippingFee: invoice.shippingFee,
+            discount: invoice.discount,
+            total: invoice.totalAmount
+          }}
+        />
       </div>
     );
   }

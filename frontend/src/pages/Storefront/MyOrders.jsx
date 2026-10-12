@@ -3,7 +3,7 @@ import { useSalesStore, useUtilityStore, useInventoryStore } from '../../stores'
 import { useAuth } from '../../context/AuthContext';
 import { useNotification, notify, confirm } from '../../context/NotificationContext';
 import { COMPLAINT_STATUS, getStatusInfo, getStatusLabel, formatRmaCode } from '../../utils/statusLabels';
-import { Search, Package, Clock, ShieldCheck, CheckCircle2, ChevronRight, ChevronDown, ChevronUp, HelpCircle, RefreshCw, X, AlertCircle, Sparkles, Eye, Upload, CheckCircle, MapPin, Camera } from 'lucide-react';
+import { Search, Package, Clock, ShieldCheck, CheckCircle2, ChevronRight, ChevronDown, ChevronUp, HelpCircle, RefreshCw, X, AlertCircle, Sparkles, Eye, Upload, CheckCircle, MapPin, Camera, FileText } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { api } from '../../services/api';
 import { REGION_COORDS, detectDeliveryRegion, getAddressCoordinates } from '../../utils/deliveryRegions';
@@ -11,6 +11,7 @@ import ReturnRequestModal from '../../components/ReturnRequestModal';
 import DeliveryMap from '../../components/DeliveryMap';
 import SepayPayment from '../../components/Storefront/SepayPayment';
 import { PLACEHOLDER_IMG } from '../../components/Storefront/catalog';
+import InvoiceModal from '../../components/Storefront/InvoiceModal';
 
 export default function MyOrders() {
   const orders = useSalesStore(state => state.orders) || [];
@@ -28,6 +29,7 @@ export default function MyOrders() {
   const assemblyJobs = useUtilityStore(state => state.assemblyJobs) || [];
   const products = useInventoryStore(state => state.products) || [];
   const getProducts = useInventoryStore(state => state.getProducts);
+  const [invoiceOrder, setInvoiceOrder] = useState(null);
   const { user } = useAuth() || {};
   const { addNotification } = useNotification() || {};
   const [phoneQuery, setPhoneQuery] = useState('');
@@ -1327,6 +1329,34 @@ export default function MyOrders() {
                             <span style={{ fontSize: '0.7rem', color: '#7c3aed', fontWeight: 600, display: 'block' }}>
                               (Bù trừ bảo hành 100%)
                             </span>
+                          )}
+                          {/* Hoá đơn có mộc đỏ chỉ xuất cho đơn đã đặt thành công (không áp dụng đơn huỷ / chưa chuyển khoản) */}
+                          {!['CANCELLED', 'WAITING_PAYMENT', 'REFUNDED'].includes(selectedOrder.status) && (
+                            <button
+                              type="button"
+                              onClick={() => setInvoiceOrder({
+                                orderId: selectedOrder.orderId,
+                                date: selectedOrder.createdAt || selectedOrder.date,
+                                customerName: selectedOrder.customerName,
+                                phone: selectedOrder.phone,
+                                email: selectedOrder.email || selectedOrder.customerEmail,
+                                address: selectedOrder.shippingAddress || 'Nhận tại cửa hàng (POS)',
+                                paymentMethod: selectedOrder.type === 'POS' ? 'CASH' : (selectedOrder.paymentMethod || selectedOrder.payment_method || selectedOrder.actualPaymentMethod),
+                                paid: selectedOrder.paymentStatus === 'PAID' || ['DELIVERED', 'COMPLETED'].includes(selectedOrder.status) || selectedOrder.type === 'POS',
+                                items: orderItems.map(it => ({
+                                  name: it.name || it.product?.name,
+                                  category: it.category || it.product?.category?.name,
+                                  quantity: it.quantity || 1,
+                                  price: Number(it.price) || 0
+                                })),
+                                shippingFee: Number(selectedOrder.shippingFee) || 0,
+                                discount: Number(selectedOrder.discount) || 0,
+                                total: Number(selectedOrder.totalAmount) || 0
+                              })}
+                              style={{ marginTop: '0.5rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem', padding: '0.35rem 0.75rem', borderRadius: '8px', border: '1px solid #bfdbfe', backgroundColor: '#eff6ff', color: '#2563eb', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer' }}
+                            >
+                              <FileText size={14} /> Xem hoá đơn
+                            </button>
                           )}
                         </div>
                       </div>
@@ -3281,6 +3311,7 @@ export default function MyOrders() {
           </div>
         </div>
       )}
+      <InvoiceModal open={!!invoiceOrder} onClose={() => setInvoiceOrder(null)} invoice={invoiceOrder} />
     </div>
   );
 }
