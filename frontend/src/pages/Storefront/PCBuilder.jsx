@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useCart } from '../../context/CartContext';
+import { useAuth } from '../../context/AuthContext';
 import { notify } from '../../context/NotificationContext';
 import { api } from '../../services/api';
 import { printDocument } from '../../utils/printDocument';
@@ -214,6 +215,7 @@ export default function PCBuilder() {
   const [showAdvancedAI, setShowAdvancedAI] = useState(false);
   const [showSampleInvoice, setShowSampleInvoice] = useState(false);
   const { addToCart } = useCart();
+  const { user } = useAuth() || {};
 
   useEffect(() => {
     const fetchProducts = async () => {
@@ -1587,7 +1589,7 @@ export default function PCBuilder() {
               style={{ width: '100%', marginTop: '0.5rem', padding: '0.6rem', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
               disabled={Object.values(selectedParts).every(item => !item)}
             >
-              <FileText size={15} /> Xem hoá đơn mẫu
+              <FileText size={15} /> Xem hoá đơn
             </button>
           </div>
         </div>
@@ -1598,11 +1600,14 @@ export default function PCBuilder() {
         open={showSampleInvoice}
         onClose={() => setShowSampleInvoice(false)}
         invoice={{
-          sample: true,
+          stamped: false,
+          customerName: user?.fullname || user?.fullName || user?.name || '',
+          phone: user?.phone || '',
+          email: user?.email || '',
+          address: user?.address || '',
           items: COMPONENT_SLOTS
             .filter(slot => selectedParts[slot.id])
-            .map(slot => ({ name: selectedParts[slot.id].name, category: slot.label, quantity: 1, price: parseFloat(selectedParts[slot.id].price) || 0 })),
-          note: 'Cấu hình PC tự build trên AetherPC (Build PC).'
+            .map(slot => ({ name: selectedParts[slot.id].name, quantity: 1, price: parseFloat(selectedParts[slot.id].price) || 0 }))
         }}
       />
 
