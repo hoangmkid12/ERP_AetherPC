@@ -217,7 +217,7 @@ export default function InvoiceModal({ open, onClose, invoice }) {
                   <tr><td colSpan={5} style={{ ...td, textAlign: 'right' }}>Phí vận chuyển:</td><td style={num}>{fmt(shippingFee)}</td></tr>
                 )}
                 {discount > 0 && (
-                  <tr><td colSpan={5} style={{ ...td, textAlign: 'right' }}>Chiết khấu thương mại:</td><td style={num}>-{fmt(discount)}</td></tr>
+                  <tr><td colSpan={5} style={{ ...td, textAlign: 'right' }}>Khuyến mãi:</td><td style={num}>-{fmt(discount)}</td></tr>
                 )}
                 <tr>
                   <td colSpan={5} style={{ ...td, textAlign: 'right', fontWeight: 700, fontSize: '14.5px' }}>Tổng tiền thanh toán:</td>
@@ -249,11 +249,7 @@ export default function InvoiceModal({ open, onClose, invoice }) {
               <div style={{ height: '150px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 {stamped && <CompanySeal size={138} />}
               </div>
-              {stamped && (
-                <div style={{ display: 'inline-block', border: '1px solid #16a34a', color: '#15803d', padding: '4px 10px', fontSize: '12px', lineHeight: 1.5, textAlign: 'left' }}>
-                  Ký bởi: <strong>{SHOP.legalName}</strong><br />Ký ngày: {dd}/{mm}/{date.getFullYear()}
-                </div>
-              )}
+              <div style={{ fontWeight: 700, fontSize: '14px' }}>{SHOP.legalName}</div>
             </div>
           </div>
 
