@@ -1,4 +1,5 @@
 const prisma = require('../config/database');
+const { GEMINI_MODEL } = require('../services/ai/geminiConfig');
 const { getToolsForRole } = require('../services/ai/tools.definition');
 const { executeToolCall, identifySemanticTopic } = require('../services/ai/tools.executor');
 const { classifyIntentLocal } = require('../services/ai/localNlp.service');
@@ -177,7 +178,7 @@ const classifyIntent = async (promptText, userRole) => {
 
   try {
     const aiResult = await aiClient.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: GEMINI_MODEL,
       contents: [{
         role: 'user',
         parts: [{
@@ -337,6 +338,7 @@ const chatWithAi = async (req, res, next) => {
   let toolCallsExecuted = [];
   let finalAiResponse = '';
   let citations = [];
+  let uncertainFallback = ''; // lời "chưa chắc + gợi ý" của tầng offline, dùng nếu các tầng sau không trả lời
 
   try {
     // ========================================================================
@@ -353,7 +355,18 @@ const chatWithAi = async (req, res, next) => {
     // Các trạng thái là CÂU TRẢ LỜI CUỐI: dừng tại đây. Đặc biệt FORBIDDEN (vai trò
     // không có quyền với kỹ năng này) trước đây KHÔNG nằm trong danh sách nên câu
     // hỏi rơi tiếp xuống tầng Gemini sinh SQL — vượt quyền đúng cái vừa bị chặn.
-    const TERMINAL_ACTOR_STATUSES = ['SUCCESS', 'CLARIFICATION_REQUIRED', 'ACCESS_DENIED', 'FORBIDDEN', 'UNCERTAIN'];
+    //
+    // UNCERTAIN (tầng offline chưa chắc) chỉ là điểm dừng khi KHÔNG có Gemini. Khi
+    // có Gemini, câu hỏi đi tiếp xuống các tầng sau (vẫn qua kiểm quyền + bộ thực
+    // thi SQL an toàn) — trước đây mọi câu "chưa chắc" đều dừng ở đây nên câu hỏi
+    // kiến thức chung / diễn đạt lạ không bao giờ tới được Gemini. Lời "chưa chắc +
+    // gợi ý" được giữ lại làm câu trả lời dự phòng nếu các tầng sau cũng không trả lời.
+    const geminiAvailable = Boolean(process.env.GEMINI_API_KEY && aiClient);
+    const TERMINAL_ACTOR_STATUSES = ['SUCCESS', 'CLARIFICATION_REQUIRED', 'ACCESS_DENIED', 'FORBIDDEN',
+      ...(geminiAvailable ? [] : ['UNCERTAIN'])];
+    if (actorResult && actorResult.status === 'UNCERTAIN' && geminiAvailable) {
+      uncertainFallback = actorResult.text || actorResult.message || '';
+    }
     if (actorResult && TERMINAL_ACTOR_STATUSES.includes(actorResult.status)) {
       finalAiResponse = actorResult.text || actorResult.message;
       offlineMetadata = {
@@ -494,7 +507,7 @@ Câu hỏi gốc của nhân viên: "${promptText}"
 Hãy trả lời trực tiếp, thân thiện, rõ ràng và chuẩn xác dựa trên dữ liệu trên. Định dạng Markdown đẹp.`;
 
               const aiGen = await aiClient.models.generateContent({
-                model: 'gemini-2.5-flash',
+                model: GEMINI_MODEL,
                 contents: [{ role: 'user', parts: [{ text: profileContext }] }],
                 config: { systemInstruction: SYSTEM_INSTRUCTION, temperature: 0.3 }
               });
@@ -616,7 +629,7 @@ Hãy phân tích câu hỏi trên và đưa ra phản hồi lịch sự, thân t
 Định dạng Markdown đẹp, gãy gọn, tinh tế.`;
 
                 const aiGen = await aiClient.models.generateContent({
-                  model: 'gemini-2.5-flash',
+                  model: GEMINI_MODEL,
                   contents: [{ role: 'user', parts: [{ text: clarifyPrompt }] }],
                   config: { systemInstruction: SYSTEM_INSTRUCTION, temperature: 0.3 }
                 });
@@ -758,7 +771,7 @@ Vai trò người hỏi: ${user.role}
 Hãy trả lời chính xác dựa trên dữ liệu trên. Dùng Markdown đẹp, chuyên nghiệp.`;
 
               const aiGen = await aiClient.models.generateContent({
-                model: 'gemini-2.5-flash',
+                model: GEMINI_MODEL,
                 contents: [{ role: 'user', parts: [{ text: contextPrompt }] }],
                 config: { systemInstruction: SYSTEM_INSTRUCTION, temperature: 0.3 }
               });
@@ -801,7 +814,7 @@ Hãy trả lời chính xác dựa trên dữ liệu trên. Dùng Markdown đẹ
           if (process.env.GEMINI_API_KEY && aiClient) {
             try {
               const aiGen = await aiClient.models.generateContent({
-                model: 'gemini-2.5-flash',
+                model: GEMINI_MODEL,
                 contents: [{
                   role: 'user',
                   parts: [{
@@ -827,7 +840,7 @@ Hãy trả lời chính xác dựa trên dữ liệu trên. Dùng Markdown đẹ
           if (process.env.GEMINI_API_KEY && aiClient) {
             try {
               const aiGen = await aiClient.models.generateContent({
-                model: 'gemini-2.5-flash',
+                model: GEMINI_MODEL,
                 contents: [{
                   role: 'user',
                   parts: [{
@@ -855,8 +868,11 @@ Hãy trả lời chính xác dựa trên dữ liệu trên. Dùng Markdown đẹ
       default: {
         const isGreeting = /^(chào|xin chào|hi|hello|hey|bạn là ai|alo|cảm ơn|thank)/i.test(promptText);
 
-        // Chỉ chạy qua Universal SQL khi câu hỏi thực sự hỏi về dữ liệu hoặc thống kê ERP
-        if (!isGreeting) {
+        // Chỉ chạy qua Universal SQL khi câu hỏi thực sự hỏi về dữ liệu hoặc thống kê ERP.
+        // Bỏ qua khi bộ phân loại đã chắc chắn đây là trò chuyện / kiến thức chung — tránh
+        // tốn thêm 1 lượt Gemini (và ~5–10 giây) để sinh SQL cho câu như "ray tracing là gì".
+        const isConfidentChat = intent === 'GENERAL_CHAT' && (classified?.confidence || 0) >= 0.85;
+        if (!isGreeting && !isConfidentChat) {
           try {
             const universalResult = await executeUniversalDataQuery(promptText, user);
             if (universalResult && universalResult.success && universalResult.finalResponse) {
@@ -876,7 +892,7 @@ Hãy trả lời chính xác dựa trên dữ liệu trên. Dùng Markdown đẹ
         if (process.env.GEMINI_API_KEY && aiClient) {
           try {
             const aiGen = await aiClient.models.generateContent({
-              model: 'gemini-2.5-flash',
+              model: GEMINI_MODEL,
               contents: [
                 ...conversationHistory.slice(-8).map(h => ({
                   role: (h.sender === 'USER' || h.role === 'user') ? 'user' : 'model',
@@ -901,6 +917,9 @@ Hãy trả lời chính xác dựa trên dữ liệu trên. Dùng Markdown đẹ
     // ========================================================================
     // BƯỚC 3: FALLBACK CUỐI CÙNG - Menu trợ lý điều hướng ERP
     // ========================================================================
+    if (!finalAiResponse && uncertainFallback) {
+      finalAiResponse = uncertainFallback;
+    }
     if (!finalAiResponse) {
       finalAiResponse = `Xin chào **${user.name || 'bạn'}**! Tôi là **AetherCopilot** - Trợ lý Doanh nghiệp AetherPC ERP.\n\nTôi có thể hỗ trợ bạn trực tiếp các tác vụ:\n- 🔍 **Tra cứu tồn kho & Giá:** *"Kiểm tra tồn kho card RTX 4070"*, *"Giá CPU i5 13400"*\n- 📦 **Kiểm tra tiến độ đơn hàng:** *"Tra cứu đơn hàng DH-1002"*, *"Đơn hàng theo SĐT 0912345678"*\n- ⚙️ **Thẩm định tương thích PC:** *"i5 13400 + RTX 4060 cần nguồn bao nhiêu Watt?"*\n- 📖 **Tra cứu quy trình & chính sách:** *"Chính sách bảo hành 1 đổi 1"*, *"Quy chuẩn đóng gói thùng xốp"*\n${['CEO', 'ADMIN', 'ACCOUNTANT'].includes(user.role) ? '- 💰 **Báo cáo tài chính:** *"Báo cáo doanh thu hôm nay và tài khoản VietQR"*\n' : ''}\nBạn cần tôi hỗ trợ việc gì ngay bây giờ?`;
     }

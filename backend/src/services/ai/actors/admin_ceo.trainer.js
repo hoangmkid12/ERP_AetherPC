@@ -172,8 +172,8 @@ adminCeoTrainer.addSkill({
       where: {
         order: { status: { in: ['DELIVERED', 'COMPLETED'] } }
       },
-      _sum: { quantity: true, total: true },
-      orderBy: { _sum: { total: 'desc' } },
+      _sum: { quantity: true, totalPrice: true },
+      orderBy: { _sum: { totalPrice: 'desc' } },
       take: 5
     });
 
@@ -187,7 +187,7 @@ adminCeoTrainer.addSkill({
     return topItems.map(i => ({
       name: productMap[i.productId] || `SP #${i.productId}`,
       quantity: i._sum.quantity || 0,
-      revenue: Number(i._sum.total || 0)
+      revenue: Number(i._sum.totalPrice || 0)
     }));
   },
   template: (items) => {
@@ -199,7 +199,7 @@ adminCeoTrainer.addSkill({
     });
     return res.trim();
   },
-  sql: () => `SELECT p.name AS ten_san_pham, SUM(oi.quantity) AS so_luong_ban, SUM(oi.total) AS tong_doanh_thu FROM order_items oi JOIN products p ON p.product_id = oi.product_id JOIN orders o ON o.order_id = oi.order_id WHERE o.status IN ('DELIVERED', 'COMPLETED') GROUP BY p.name ORDER BY tong_doanh_thu DESC LIMIT 5;`
+  sql: () => `SELECT p.name AS ten_san_pham, SUM(oi.quantity) AS so_luong_ban, SUM(oi.total_price) AS tong_doanh_thu FROM order_items oi JOIN products p ON p.product_id = oi.product_id JOIN orders o ON o.order_id = oi.order_id WHERE o.status IN ('DELIVERED', 'COMPLETED') GROUP BY p.name ORDER BY tong_doanh_thu DESC LIMIT 5;`
 });
 
 // Kỹ năng 5: Tỷ lệ đơn hàng giao thành công so với đơn bị hủy hoặc hoàn hàng

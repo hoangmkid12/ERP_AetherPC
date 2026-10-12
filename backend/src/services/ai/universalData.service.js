@@ -1,5 +1,7 @@
 const prisma = require('../../config/database');
-const { executeSafeAiSql, accessGroupOf, ACCESS_GROUPS } = require('./safeSqlExecutor');
+const { GEMINI_MODEL } = require('./geminiConfig');
+const { executeSafeAiSql, accessGroupOf } = require('./safeSqlExecutor');
+const { describeSchemaForRole } = require('./schemaIntrospector');
 
 // Khởi tạo Gemini client linh hoạt (Dynamic Lazy Initialization)
 let GoogleGenAI = null;
@@ -29,7 +31,8 @@ PHẦN 0. NGUYÊN TẮC BẢO MẬT & BẤT BIẾN
 2. Chỉ dùng bảng và cột có thật trong PHẦN 1. Không tự bịa tên cột. Nếu dữ liệu không tồn tại trong schema, trả status "UNSUPPORTED".
 3. Luôn có LIMIT. Mặc định LIMIT 20. Nếu câu hỏi yêu cầu "top N" thì LIMIT N (tối đa 100). Với câu lệnh tổng hợp (COUNT, SUM, AVG) chỉ ra 1 dòng thì không cần LIMIT.
 4. CẤM SELECT *. Chỉ chọn đúng các cột cần thiết cho câu trả lời.
-5. Tìm kiếm chuỗi/văn bản luôn dùng ILIKE '%...%'. Giá trị trạng thái/enum luôn so sánh bằng với key chuẩn IN HOA.
+5. Cột trạng thái/loại (status, type, method, role...) CHỈ được so sánh với các giá trị liệt kê trong {...} ở PHẦN 1 — không tự đặt giá trị khác.
+5b. Tìm kiếm chuỗi/văn bản luôn dùng ILIKE '%...%'. Giá trị trạng thái/enum luôn so sánh bằng với key chuẩn IN HOA.
 6. TUYỆT ĐỐI KHÔNG xuất mật khẩu (password_hash), token, khóa bảo mật. Nếu câu hỏi chạm vào thông tin này, trả status "FORBIDDEN".
 7. Tiền tệ là VND (numeric), không chia thập phân khi SUM/AVG trừ phi tính tỷ lệ %.
 8. Định dạng đầu ra DUY NHẤT LÀ JSON theo PHẦN 6. Không thêm bất kỳ lời dẫn nào ngoài JSON.
@@ -37,66 +40,10 @@ PHẦN 0. NGUYÊN TẮC BẢO MẬT & BẤT BIẾN
 ==================================================
 PHẦN 1. SCHEMA CHI TIẾT ĐẦY ĐỦ CỦA AETHERPC ERP
 ==================================================
-1. customers(customer_id, name, phone, email, loyalty_points, tier, city, status, created_at)
-   - tier: 'BRONZE' | 'SILVER' | 'GOLD' | 'DIAMOND' | 'REGULAR'
-   - status: 'ACTIVE' | 'INACTIVE'
+{{SCHEMA}}
 
-2. customer_addresses(id, customer_id, recipient_name, recipient_phone, address_line, ward, district, city, is_default)
-
-3. products(product_id, sku, name, brand_id, category_id, price, average_cost, stock_quantity, warranty_months, status, available)
-   - status: 'ACTIVE' | 'INACTIVE' | 'DISCONTINUED'
-   - available: true/false
-
-4. categories(id, name, slug)
-   - Danh mục: CPU, VGA, Mainboard, RAM, Ổ cứng / SSD, Nguồn / PSU, Case, Tản nhiệt, Màn hình, Bàn phím, Chuột...
-
-5. brands(id, name)
-   - Thương hiệu: ASUS, MSI, GIGABYTE, INTEL, AMD, NVIDIA, CORSAIR, KINGSTON, SAMSUNG, VIEWSONIC, LOGITECH...
-
-6. orders(order_id, customer_id, status, payment_method, payment_status, total_amount, subtotal, discount, shipping_fee, shipping_address, shipping_city, channel, assigned_shipper_id, sold_by_id, created_at, delivered_at)
-   - status: 'PENDING' | 'CONFIRMED' | 'PROCESSING' | 'AWAITING_STOCK' | 'READY_TO_SHIP' | 'SHIPPED' | 'DELIVERED' | 'COMPLETED' | 'CANCELLED' | 'FAILED_DELIVERY' | 'RETURNING_TO_WAREHOUSE'
-   - payment_method: 'COD' | 'VIETQR' | 'BANK_TRANSFER' | 'MOMO' | 'CASH'
-   - payment_status: 'PENDING' | 'PAID' | 'REFUNDED' | 'PARTIAL'
-   - channel: 'ONLINE' | 'POS'
-
-7. order_items(id, order_id, product_id, quantity, price, total)
-
-8. purchase_orders(id, po_number, supplier_code, status, total_amount, created_at, expected_date)
-   - status: 'RFQ' | 'QUOTED' | 'APPROVED' | 'ORDERED' | 'PARTIALLY_RECEIVED' | 'DELIVERED' | 'CANCELLED'
-
-9. purchase_order_items(id, po_id, product_id, quantity, unit_cost, total_cost)
-
-10. suppliers(code, name, phone, email, address, status)
-
-11. return_requests(id, rma_code, order_id, customer_id, type, reason, status, refund_amount, created_at)
-    - type: 'EXCHANGE' | 'REFUND' | 'WARRANTY'
-    - status: 'PENDING' | 'RETURN_APPROVED' | 'DELIVERED_TO_WAREHOUSE' | 'QC_PASSED' | 'COMPLETED' | 'REJECTED'
-
-12. complaints(id, ticket_code, customer_id, order_id, subject, description, priority, status, created_at)
-    - priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT'
-    - status: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED'
-
-13. promotions(id, code, title, discount_type, discount_value, min_spend, status, expires_at)
-    - discount_type: 'PERCENT' | 'FIXED'
-    - status: 'ACTIVE' | 'INACTIVE'
-
-14. product_reviews(id, product_id, customer_id, rating, comment, created_at)
-    - rating: từ 1 đến 5 sao
-
-15. employees(id, employee_code, full_name, role, department, phone, email, status, created_at)
-    - role: 'CEO' | 'ADMIN' | 'SALES' | 'SALES_MANAGER' | 'WAREHOUSE' | 'WAREHOUSE_MANAGER' | 'DELIVERY' | 'ACCOUNTANT' | 'HR'
-
-16. company_bank_accounts(id, bank_code, bank_name, account_number, account_holder, current_balance, is_default_qr, status)
-
-Quan hệ chính:
-orders.customer_id = customers.customer_id
-order_items.order_id = orders.order_id
-order_items.product_id = products.product_id
-products.brand_id = brands.id
-products.category_id = categories.id
-purchase_orders.supplier_code = suppliers.code
-orders.assigned_shipper_id = employees.id
-return_requests.order_id = orders.order_id
+Ký hiệu: PK = khoá chính; → bảng.cột = khoá ngoại (dùng để JOIN); {A|B|...} = các giá trị CÓ THẬT trong dữ liệu.
+(Mô tả này được sinh tự động từ cơ sở dữ liệu thật — chỉ gồm bảng/cột vai trò của người hỏi được phép đọc.)
 
 ==================================================
 PHẦN 2. BỘ TỪ ĐIỂN ÁNH XẠ TIẾNG VIỆT SIÊU ĐỘ PHỦ
@@ -114,10 +61,8 @@ PHẦN 2. BỘ TỪ ĐIỂN ÁNH XẠ TIẾNG VIỆT SIÊU ĐỘ PHỦ
 - Hủy/đã hủy: 'CANCELLED'
 
 2.2 Thanh toán & Phương thức:
-- Tiền mặt: 'CASH'
-- COD / trả khi nhận: 'COD'
-- Chuyển khoản / quét qr / vietqr / tài khoản ngân hàng: ('VIETQR', 'BANK_TRANSFER')
-- Ví điện tử: 'MOMO'
+- Phương thức của ĐƠN HÀNG (orders.payment_method): COD = trả khi nhận hàng; chuyển khoản / quét QR / VietQR = 'BANK_TRANSFER'
+- Từng GIAO DỊCH thanh toán (tiền mặt, chuyển khoản, số tiền thực thu) nằm ở bảng order_payments (cột method, amount, status) — câu hỏi về 'giao dịch', 'tiền mặt thu được' dùng bảng này
 - Đã trả/đã thanh toán/thu xong: payment_status = 'PAID'
 - Chưa trả/nợ tiền/chưa thanh toán: payment_status = 'PENDING'
 
@@ -182,10 +127,10 @@ SQL: SELECT bank_name, account_number, account_holder, current_balance FROM comp
 
 --- NHÓM 6: DOANH THU & LỢI NHUẬN NÂNG CAO ---
 User: "Doanh thu theo từng danh mục tháng này"
-SQL: SELECT c.name AS danh_muc, SUM(oi.total) AS doanh_thu FROM order_items oi JOIN orders o ON o.order_id = oi.order_id JOIN products p ON p.product_id = oi.product_id JOIN categories c ON c.id = p.category_id WHERE o.status IN ('DELIVERED', 'COMPLETED') AND o.created_at >= date_trunc('month', now() AT TIME ZONE 'Asia/Ho_Chi_Minh') GROUP BY c.name ORDER BY doanh_thu DESC LIMIT 20;
+SQL: SELECT c.name AS danh_muc, SUM(oi.total_price) AS doanh_thu FROM order_items oi JOIN orders o ON o.order_id = oi.order_id JOIN products p ON p.product_id = oi.product_id JOIN categories c ON c.id = p.category_id WHERE o.status IN ('DELIVERED', 'COMPLETED') AND o.created_at >= date_trunc('month', now() AT TIME ZONE 'Asia/Ho_Chi_Minh') GROUP BY c.name ORDER BY doanh_thu DESC LIMIT 20;
 
 User: "Sản phẩm nào mang lại nhiều lợi nhuận nhất năm nay"
-SQL: SELECT p.product_id, p.name, SUM(oi.total - oi.quantity * p.average_cost) AS tong_loi_nhuan FROM order_items oi JOIN orders o ON o.order_id = oi.order_id JOIN products p ON p.product_id = oi.product_id WHERE o.status IN ('DELIVERED', 'COMPLETED') AND o.created_at >= date_trunc('year', now() AT TIME ZONE 'Asia/Ho_Chi_Minh') GROUP BY p.product_id, p.name ORDER BY tong_loi_nhuan DESC LIMIT 10;
+SQL: SELECT p.product_id, p.name, SUM(oi.total_price - oi.quantity * p.average_cost) AS tong_loi_nhuan FROM order_items oi JOIN orders o ON o.order_id = oi.order_id JOIN products p ON p.product_id = oi.product_id WHERE o.status IN ('DELIVERED', 'COMPLETED') AND o.created_at >= date_trunc('year', now() AT TIME ZONE 'Asia/Ho_Chi_Minh') GROUP BY p.product_id, p.name ORDER BY tong_loi_nhuan DESC LIMIT 10;
 
 --- NHÓM 7: BẢO HÀNH & ĐỔI TRẢ (RMA) ---
 User: "Các yêu cầu bảo hành đang chờ duyệt"
@@ -206,7 +151,7 @@ PHẦN 4. XỬ LÝ CÂU HỎI MƠ HỒ HOẶC VIẾT TẮT
 ==================================================
 1. Người dùng chỉ gõ tên linh kiện/mã (VD: "i5 13400", "rtx 4070") -> Tự động tìm trong bảng products theo tên hoặc sku còn hàng và ACTIVE.
 2. Thiếu thời gian ("doanh thu") -> Mặc định tháng hiện tại, ghi chú vào "assumption".
-3. Câu hỏi so sánh hai kênh ("online vs quầy") -> GROUP BY o.channel.
+3. Câu hỏi so sánh kênh bán (online / tại quầy): hệ thống không lưu cột kênh bán riêng — trả status "UNSUPPORTED" thay vì tự đặt tên cột.
 
 ==================================================
 PHẦN 5. QUY TẮC TỪ CHỐI
@@ -261,11 +206,12 @@ const sanitizeAndHealSql = (sql) => {
   if (!sql || typeof sql !== 'string') return sql;
   let healed = sql.trim();
 
-  // 1. Tự động sửa tên trường sai phổ biến trong PostgreSQL
+  // 1. Sửa vài tên cột "đoán sai" phổ biến. CHỈ gồm những tên KHÔNG tồn tại trong DB —
+  //    trước đây còn đổi total_price → total_amount, phá cột thật order_items.total_price.
+  //    Lỗi tên cột khác do vòng tự sửa (repairSqlWithGemini) xử lý dựa trên lỗi thật của DB.
   healed = healed
     .replace(/\border_date\b/gi, 'created_at')
     .replace(/\border_status\b/gi, 'status')
-    .replace(/\btotal_price\b/gi, 'total_amount')
     .replace(/\bproduct_price\b/gi, 'price')
     .replace(/\bquantity_in_stock\b/gi, 'stock_quantity');
 
@@ -408,7 +354,15 @@ const generateSqlBySemanticPattern = (userPrompt, userRole, userId) => {
 const generateSqlFromQuestion = async (userPrompt, userRole, userId) => {
   // 0. Bước 0: Ưu tiên bộ quy tắc chuyên biệt được huấn luyện cho từng Actor (Nhanh & Chuẩn xác 100%)
   const actorMatchSql = evaluateActorSemanticRules(userPrompt, userRole, userId);
-  if (actorMatchSql && isSafeSqlQuery(actorMatchSql)) {
+  // SQL soạn sẵn khớp theo từ khoá chủ đề nên có thể trả lời SAI DẠNG câu hỏi: VD "tổng số
+  // dư các tài khoản" khớp mẫu "liệt kê tài khoản" → trả danh sách thay vì cộng tổng. Câu
+  // hỏi đòi tính toán (tổng / đếm / trung bình) mà SQL soạn sẵn không có hàm tính tương ứng
+  // thì bỏ qua để Gemini viết SQL đúng.
+  const asksAggregate = /(tổng|tong |đếm|dem so|trung bình|trung binh|cộng lại)/i.test(userPrompt);
+  const sqlAggregates = /\b(sum|count|avg)\s*\(/i.test(actorMatchSql || '');
+  if (actorMatchSql && asksAggregate && !sqlAggregates) {
+    console.log(`[UniversalData] Bỏ qua SQL soạn sẵn (câu hỏi cần tính tổng/đếm nhưng mẫu không có): "${actorMatchSql}"`);
+  } else if (actorMatchSql && isSafeSqlQuery(actorMatchSql)) {
     console.log(`[UniversalData] Khớp mẫu Actor-Specific Semantic Rule (${userRole}) → "${actorMatchSql}"`);
     return actorMatchSql;
   }
@@ -451,18 +405,15 @@ const generateSqlFromQuestion = async (userPrompt, userRole, userId) => {
           actorFewShotsList.map(s => `User: "${s.question}"\nSQL: ${s.sql}`).join('\n\n');
       }
 
-      const group = accessGroupOf(userRole);
-      const allowedTablesText = group && ACCESS_GROUPS[group]
-        ? ACCESS_GROUPS[group].join(', ')
-        : 'mọi bảng nghiệp vụ (trừ cấu hình hệ thống)';
+      const schemaPrompt = await getSchemaPromptForRole(userRole);
 
-      const prompt = `${ERP_DATABASE_SCHEMA_PROMPT}${adminTrainedFewShots}${actorFewShotsPrompt}
+      const prompt = `${schemaPrompt}${adminTrainedFewShots}${actorFewShotsPrompt}
 
 NGUYÊN TẮC BẮT BUỘC:
 1. Bạn CHỈ ĐƯỢC sinh ra ĐÚNG 1 câu lệnh SQL "SELECT" duy nhất, thuần túy, KHÔNG markdown (không \`\`\`sql), KHÔNG giải thích.
 2. Tuyệt đối không dùng INSERT, UPDATE, DELETE, DROP, ALTER.
 3. Luôn dùng LIMIT tối đa 20 dòng trừ khi câu hỏi yêu cầu đếm (COUNT) hoặc tổng hợp (SUM, AVG).
-4. Phân quyền: người hỏi CHỈ được đọc các bảng sau: ${allowedTablesText}. Nếu câu hỏi cần bảng khác, trả về JSON {"status": "FORBIDDEN"}. (Hệ thống kiểm tra lại quyền bằng code, SQL vượt quyền sẽ bị chặn.)
+4. Phân quyền: PHẦN 1 chỉ liệt kê các bảng/cột người hỏi được phép đọc. Nếu câu hỏi cần bảng/cột không có trong PHẦN 1, trả về JSON {"status": "FORBIDDEN"}. (Hệ thống kiểm tra lại quyền bằng code, SQL vượt quyền sẽ bị chặn.)
 5. Khi so sánh chuỗi tiếng Việt hoặc tên, hãy dùng ILIKE '%...%' để tìm kiếm linh hoạt không phân biệt hoa thường.
 6. KHÔNG dùng SELECT * và không lấy cả dòng (row_to_json, bảng.*) — luôn liệt kê rõ từng cột cần thiết. Không bao giờ chọn cột mật khẩu, khuôn mặt, tài khoản ngân hàng, mã số thuế.
 7. Không dùng comment SQL, không dùng dấu chấm phẩy giữa câu, không gọi hàm hệ thống (pg_*, current_setting...).
@@ -472,7 +423,7 @@ Vai trò người hỏi: ${userRole}
 SQL Query:`;
 
       const result = await aiClient.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: GEMINI_MODEL,
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
         config: { temperature: 0.05, maxOutputTokens: 500 }
       });
@@ -518,6 +469,98 @@ SQL Query:`;
 };
 
 /**
+ * Prompt mô tả DB cho Gemini theo vai trò: phần quy tắc/từ điển/mẫu viết tay + PHẦN 1
+ * (bảng, cột, khoá, giá trị trạng thái) SINH TỰ ĐỘNG từ DB thật, chỉ gồm những gì vai trò
+ * được đọc. Nếu tạm thời không đọc được DB thì vẫn trả phần viết tay để không chặn luồng.
+ */
+const getSchemaPromptForRole = async (role) => {
+  let schema = '';
+  try {
+    schema = await describeSchemaForRole(role);
+  } catch (err) {
+    console.warn('[UniversalData] Không đọc được cấu trúc DB, dùng prompt không có PHẦN 1:', err.message);
+  }
+  return ERP_DATABASE_SCHEMA_PROMPT.replace('{{SCHEMA}}', schema || '(Tạm thời không đọc được danh sách bảng — chỉ dùng các bảng xuất hiện trong PHẦN 3.)');
+};
+
+/** Lấy câu SQL từ phản hồi của Gemini (JSON theo PHẦN 6 hoặc SQL thô / bọc markdown). */
+const extractSqlFromLlm = (rawResponse) => {
+  const raw = String(rawResponse || '').trim();
+  const jsonMatch = raw.match(/\{[\s\S]*\}/);
+  if (jsonMatch) {
+    try {
+      const parsed = JSON.parse(jsonMatch[0]);
+      if (parsed.status && parsed.status !== 'OK') return { refused: parsed.status };
+      if (parsed.sql) return { sql: String(parsed.sql).trim() };
+    } catch (e) { /* không phải JSON hợp lệ → thử SQL thô */ }
+  }
+  const sql = raw.replace(/```sql/gi, '').replace(/```/g, '').trim();
+  return /^(select|with)\b/i.test(sql) ? { sql } : {};
+};
+
+/**
+ * Sửa một câu SQL bị lỗi khi chạy: gửi cho Gemini câu hỏi gốc + SQL + THÔNG BÁO LỖI THẬT
+ * của PostgreSQL + mô tả DB đúng của vai trò. Trả về SQL mới hoặc null.
+ */
+const repairSqlWithGemini = async ({ question, sql, error, role }) => {
+  const aiClient = getAiClient();
+  if (!aiClient) return null;
+  const schemaPrompt = await getSchemaPromptForRole(role);
+  const prompt = `${schemaPrompt}
+
+CÂU SQL DƯỚI ĐÂY ĐÃ CHẠY LỖI TRÊN POSTGRESQL. Hãy sửa để chạy đúng và trả lời đúng câu hỏi.
+- Chỉ dùng bảng, cột và giá trị trạng thái có trong PHẦN 1. Đọc kỹ thông báo lỗi để biết cột/bảng nào sai.
+- Trả về đúng định dạng JSON của PHẦN 6.
+
+Câu hỏi của người dùng: "${question || ''}"
+SQL bị lỗi: ${sql}
+Thông báo lỗi từ PostgreSQL: ${String(error || '').split('\n').pop().slice(0, 500)}`;
+  try {
+    const result = await aiClient.models.generateContent({
+      model: GEMINI_MODEL,
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      config: { temperature: 0.05, maxOutputTokens: 600 }
+    });
+    const { sql: fixed } = extractSqlFromLlm(result.text);
+    return fixed && isSafeSqlQuery(fixed) ? fixed : null;
+  } catch (err) {
+    console.warn('[UniversalData] Lỗi khi nhờ Gemini sửa SQL:', err.message);
+    return null;
+  }
+};
+
+/**
+ * Sinh SQL cho câu hỏi rồi CHẠY THỬ qua bộ thực thi an toàn; nếu lỗi SQL (sai cột, sai cú
+ * pháp...) thì tự gửi lỗi thật cho Gemini sửa, tối đa maxRepairs lần.
+ * @returns {Promise<{ sql, rows?, tables?, attempts, error?, denied? }>}
+ */
+const generateValidatedSql = async (question, user, { maxRepairs = 2 } = {}) => {
+  const role = user?.role || null;
+  let sql = await generateSqlFromQuestion(question, role, user?.id || 0);
+  if (!sql) return { sql: null, attempts: 1, error: 'Không sinh được câu SQL cho câu hỏi này.' };
+
+  let attempts = 0;
+  let lastError = null;
+  while (attempts <= maxRepairs) {
+    attempts++;
+    const runnable = sanitizeAndHealSql(sql);
+    try {
+      const result = await executeSafeAiSql(runnable, user);
+      return { sql: runnable, rows: result.rows, tables: result.tables, attempts };
+    } catch (err) {
+      if (err.isDenied) return { sql: runnable, attempts, denied: true, error: err.message };
+      lastError = err.message;
+      if (attempts > maxRepairs) break;
+      const fixed = await repairSqlWithGemini({ question, sql: runnable, error: err.message, role });
+      if (!fixed || fixed.trim() === runnable.trim()) break;
+      console.log(`[UniversalData] Tự sửa SQL lần ${attempts}: "${fixed}"`);
+      sql = fixed;
+    }
+  }
+  return { sql: sanitizeAndHealSql(sql), attempts, error: lastError };
+};
+
+/**
  * Hàm điều phối thực thi câu hỏi dữ liệu toàn năng (Universal Live Data Query)
  * @param {string} promptText - Câu hỏi người dùng
  * @param {Object} user - Người dùng đang đăng nhập
@@ -539,35 +582,31 @@ const executeUniversalDataQuery = async (promptText, user) => {
     };
   }
 
-  // 1. Sinh câu lệnh SQL tối ưu từ câu hỏi tự nhiên
-  const generatedSql = await generateSqlFromQuestion(promptText, userRole, userId);
+  // 1–3. Sinh SQL → chạy thử qua bộ thực thi an toàn (READ ONLY, timeout, đối chiếu
+  // bảng/cột thật bằng EXPLAIN theo quyền vai trò) → nếu lỗi SQL thì tự sửa theo lỗi thật.
+  const outcome = await generateValidatedSql(promptText, user);
+  const generatedSql = outcome.sql;
   if (!generatedSql) {
     return null;
   }
-
-  // 2 & 3. Kiểm duyệt + thực thi qua bộ thực thi an toàn: giao dịch READ ONLY,
-  // timeout, đối chiếu bảng/cột thật (EXPLAIN) với quyền của vai trò.
-  let cleanData = [];
-  try {
-    const result = await executeSafeAiSql(generatedSql, user);
-    cleanData = result.rows;
-    console.log(`[UniversalData] Đã chạy SQL (${userRole}, bảng: ${result.tables.join(', ')}): "${generatedSql}"`);
-  } catch (err) {
-    if (err.isDenied) {
-      console.warn(`[UniversalData] Chặn SQL của ${userRole}: ${err.message} | SQL: ${generatedSql}`);
-      // Trả lời từ chối rõ ràng — không rơi tiếp xuống Gemini trò chuyện tự do
-      // (có thể bịa ra số liệu thay cho dữ liệu bị chặn).
-      return {
-        success: true,
-        denied: true,
-        finalResponse: `🔒 ${err.message}`,
-        sqlUsed: generatedSql,
-        rowCount: 0
-      };
-    }
-    console.warn('[UniversalData] Lỗi thực thi SQL trên database:', err.message);
+  if (outcome.denied) {
+    console.warn(`[UniversalData] Chặn SQL của ${userRole}: ${outcome.error} | SQL: ${generatedSql}`);
+    // Trả lời từ chối rõ ràng — không rơi tiếp xuống Gemini trò chuyện tự do
+    // (có thể bịa ra số liệu thay cho dữ liệu bị chặn).
+    return {
+      success: true,
+      denied: true,
+      finalResponse: `🔒 ${outcome.error}`,
+      sqlUsed: generatedSql,
+      rowCount: 0
+    };
+  }
+  if (outcome.error) {
+    console.warn(`[UniversalData] SQL vẫn lỗi sau ${outcome.attempts} lần thử:`, outcome.error);
     return null;
   }
+  const cleanData = outcome.rows;
+  console.log(`[UniversalData] Đã chạy SQL (${userRole}, bảng: ${outcome.tables.join(', ')}, ${outcome.attempts} lần thử): "${generatedSql}"`);
 
   const rowCount = cleanData.length;
 
@@ -601,7 +640,7 @@ Nhiệm vụ:
 - Định dạng Markdown đẹp mắt, chuyên nghiệp.`;
 
       const aiGen = await aiClientSummary.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: GEMINI_MODEL,
         contents: [{ role: 'user', parts: [{ text: summaryPrompt }] }],
         config: { temperature: 0.2, maxOutputTokens: 1500 }
       });
@@ -651,5 +690,12 @@ module.exports = {
   executeUniversalDataQuery,
   isSafeSqlQuery,
   sanitizeAndHealSql,
-  generateSqlFromQuestion
+  generateSqlFromQuestion,
+  // Dùng bởi màn hình huấn luyện SQL (aiFeedback.controller) — trước đây KHÔNG được export
+  // nên màn hình đó nhận undefined: gợi ý SQL lỗi 500, nút "Sửa SQL" gửi "undefined" thay cho mô tả DB
+  generateSqlBySemanticPattern,
+  ERP_DATABASE_SCHEMA_PROMPT,
+  getSchemaPromptForRole,
+  repairSqlWithGemini,
+  generateValidatedSql
 };

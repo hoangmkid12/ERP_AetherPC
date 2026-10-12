@@ -1,4 +1,5 @@
 const prisma = require('../config/database');
+const { GEMINI_MODEL } = require('../services/ai/geminiConfig');
 
 const KNOWLEDGE_CATEGORIES = [
   'WARRANTY_RMA',
@@ -395,35 +396,36 @@ const generateSuggestedSql = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'Thiếu câu hỏi cần gợi ý SQL.' });
     }
 
-    const { generateSqlFromQuestion, generateSqlBySemanticPattern } = require('../services/ai/universalData.service');
-    let sql = await generateSqlFromQuestion(question.trim(), req.user?.role || 'ADMIN');
-    if (!sql) {
-      sql = generateSqlBySemanticPattern(question.trim(), req.user?.role || 'ADMIN');
+    // Sinh SQL (Gemini + mô tả DB tự sinh từ DB thật) → chạy thử → nếu lỗi thì tự sửa theo
+    // lỗi thật của PostgreSQL (tối đa 2 lần). Trước đây khi không sinh được SQL, màn hình
+    // này trả một câu SQL "dự phòng" chung chung (VD: hễ có chữ "doanh thu" là trả doanh
+    // thu cả năm) — trông như chạy được nhưng SAI câu hỏi.
+    const { generateValidatedSql } = require('../services/ai/universalData.service');
+    const outcome = await generateValidatedSql(question.trim(), req.user);
+    if (!outcome.sql) {
+      return res.json({
+        success: false,
+        message: 'Chưa sinh được SQL cho câu hỏi này. Hãy diễn đạt rõ hơn (nêu rõ đối tượng, điều kiện, khoảng thời gian) hoặc tự viết SQL rồi bấm "Chạy thử".'
+      });
     }
 
-    // Fallback thông minh theo chủ đề câu hỏi thay vì hardcode generic query
-    if (!sql) {
-      const lower = question.toLowerCase();
-      if (/(doanh thu|doanh số|tiền thu|thu được)/.test(lower)) {
-        sql = `SELECT SUM(total_amount) AS doanh_thu_nam_nay FROM orders WHERE status IN ('DELIVERED', 'COMPLETED') AND created_at >= date_trunc('year', now() AT TIME ZONE 'Asia/Ho_Chi_Minh');`;
-      } else if (/(tồn kho|hết hàng|sản phẩm)/.test(lower)) {
-        sql = `SELECT product_id, name, sku, stock_quantity, price FROM products WHERE stock_quantity > 0 ORDER BY stock_quantity DESC LIMIT 15;`;
-      } else {
-        sql = `SELECT order_id, total_amount, status, created_at FROM orders ORDER BY created_at DESC LIMIT 10;`;
-      }
-    }
-
-    // Thẩm định bằng RLVR Evaluator Sandbox
+    // Thẩm định bằng RLVR Evaluator (chạy trong giao dịch chỉ-đọc)
     const { evaluateSqlReward } = require('../services/ai/rlvrEvaluator.service');
-    const evaluation = await evaluateSqlReward(sql, question, req.user);
+    const evaluation = await evaluateSqlReward(outcome.sql, question, req.user);
 
     res.json({
       success: true,
-      sql: evaluation.healedSql || sql,
+      sql: evaluation.healedSql || outcome.sql,
+      attempts: outcome.attempts,
+      autoRepaired: outcome.attempts > 1 && !outcome.error,
       rewardScore: evaluation.rewardScore,
       grade: evaluation.grade,
       isDeployable: evaluation.isDeployable,
-      feedback: evaluation.feedback
+      feedback: [
+        ...(outcome.attempts > 1 && !outcome.error ? [`🔧 Đã tự sửa SQL ${outcome.attempts - 1} lần dựa trên lỗi thật của cơ sở dữ liệu.`] : []),
+        ...(outcome.error && !outcome.denied ? [`⚠️ SQL vẫn lỗi sau ${outcome.attempts} lần thử: ${String(outcome.error).split('\n').pop()}`] : []),
+        ...(evaluation.feedback || [])
+      ]
     });
   } catch (err) {
     next(err);
@@ -453,60 +455,33 @@ const autoFixSql = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'Thiếu câu SQL cần sửa.' });
     }
 
-    let fixedSql = sql.trim();
+    // Sửa SQL dựa trên LỖI THẬT của PostgreSQL + mô tả DB tự sinh (đúng với DB thật).
+    // Trước đây bước này còn đổi tên cột "mù" (amount → total_amount, quantity →
+    // stock_quantity...) — phá cả những câu đúng dùng cột có thật như
+    // order_payments.amount, order_items.quantity — và gửi cho Gemini chữ "undefined" thay
+    // cho mô tả DB (biến không được export).
+    const { repairSqlWithGemini } = require('../services/ai/universalData.service');
+    const fixedSql = await repairSqlWithGemini({
+      question,
+      sql: sql.trim(),
+      error: error || 'Câu SQL chạy lỗi (không có thông báo lỗi cụ thể).',
+      role: req.user?.role
+    });
 
-    // 1. Khắc phục các lỗi cột thông dụng (Common schema column fixes)
-    fixedSql = fixedSql.replace(/\bretail_price\b/gi, 'price');
-    fixedSql = fixedSql.replace(/\bproduct_name\b/gi, 'name');
-    fixedSql = fixedSql.replace(/\bcustomer_name\b/gi, 'name');
-    fixedSql = fixedSql.replace(/\bamount\b/gi, 'total_amount');
-    fixedSql = fixedSql.replace(/\border_date\b/gi, 'created_at');
-    fixedSql = fixedSql.replace(/\bquantity\b/gi, 'stock_quantity');
-    fixedSql = fixedSql.replace(/\bstock\b/gi, 'stock_quantity');
-
-    // 2. Nếu có Gemini AI, kết hợp sửa lỗi thông minh theo Error Message
-    let GoogleGenAI = null;
-    try {
-      GoogleGenAI = require('@google/genai').GoogleGenAI;
-    } catch (e) { }
-
-    if (GoogleGenAI && process.env.GEMINI_API_KEY) {
-      try {
-        const aiClient = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-        const { ERP_DATABASE_SCHEMA_PROMPT } = require('../services/ai/universalData.service');
-        const prompt = `${ERP_DATABASE_SCHEMA_PROMPT}
-
-CÂU LỆNH SQL ĐANG BỊ LỖI KHI CHẠY TRÊN POSTGRESQL:
-"${sql}"
-
-THÔNG BÁO LỖI TỪ DATABASE:
-"${error || 'Lỗi không xác định'}"
-
-CÂU HỎI GỐC CỦA NGƯỜI DÙNG:
-"${question || ''}"
-
-YÊU CẦU:
-Hãy sửa lại câu lệnh SQL trên để chạy thành công 100% trên PostgreSQL AetherPC.
-CHỈ TRẢ VỀ ĐÚNG 1 CÂU LỆNH SQL DUY NHẤT (không markdown, không giải thích).`;
-
-        const aiGen = await aiClient.models.generateContent({
-          model: 'gemini-2.5-flash',
-          contents: [{ role: 'user', parts: [{ text: prompt }] }],
-          config: { temperature: 0.05, maxOutputTokens: 300 }
-        });
-        const aiClean = aiGen.text?.replace(/```sql/gi, '').replace(/```/g, '').trim();
-        if (aiClean && aiClean.toUpperCase().startsWith('SELECT')) {
-          fixedSql = aiClean;
-        }
-      } catch (aiErr) {
-        console.warn('[AutoFixSql] Gemini error, using rule-based fix:', aiErr.message);
-      }
+    if (!fixedSql) {
+      return res.json({
+        success: false,
+        fixedSql: sql.trim(),
+        message: process.env.GEMINI_API_KEY
+          ? 'Chưa tự sửa được câu SQL này. Hãy xem thông báo lỗi và chỉnh tay tên bảng/cột.'
+          : 'Chưa cấu hình Gemini nên không thể tự sửa SQL.'
+      });
     }
 
     res.json({
       success: true,
       fixedSql,
-      message: 'Đã tự động sửa câu lệnh SQL phù hợp với cấu trúc dữ liệu.'
+      message: 'Đã sửa câu SQL dựa trên lỗi thật của cơ sở dữ liệu. Hãy bấm "Chạy thử" để kiểm tra lại.'
     });
   } catch (err) {
     next(err);
@@ -582,7 +557,7 @@ Câu lệnh SQL: "${cleanSql}"
 Không dùng thuật ngữ lập trình khó hiểu. Trả về văn bản thuần túy.`;
 
         const aiGen = await aiClient.models.generateContent({
-          model: 'gemini-2.5-flash',
+          model: GEMINI_MODEL,
           contents: [{ role: 'user', parts: [{ text: prompt }] }],
           config: { temperature: 0.1, maxOutputTokens: 200 }
         });

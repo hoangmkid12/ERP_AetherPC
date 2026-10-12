@@ -744,6 +744,12 @@ export default function SystemAdmin() {
         setTrainingForm(prev => ({ ...prev, sql: suggestRes.sql }));
         handleExplainSql(suggestRes.sql, questionText);
         handleFetchSmartTemplate(suggestRes.sql, questionText, detectedRole);
+        if (suggestRes.autoRepaired) {
+          notify(`AI đã tự sửa SQL ${suggestRes.attempts - 1} lần dựa trên lỗi thật của cơ sở dữ liệu.`, 'info');
+        }
+      } else if (suggestRes?.success === false && suggestRes.message) {
+        // Không có SQL đã kiểm chứng: báo rõ để Admin không lưu nhầm câu SQL đoán sẵn
+        notify(suggestRes.message, 'warning');
       }
     } catch (e) {
       // Đã có initialSql thông minh, giữ nguyên không bị gián đoạn
@@ -1134,6 +1140,8 @@ export default function SystemAdmin() {
             setTestingSql(false);
           }
         }, 300);
+      } else if (res?.message) {
+        notify(res.message, 'warning');
       }
     } catch (err) {
       notify('Không thể tự động sửa SQL: ' + (err?.message || 'Lỗi không xác định'), 'error');

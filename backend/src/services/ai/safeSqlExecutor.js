@@ -270,8 +270,27 @@ const executeSafeAiSql = async (sql, user) => {
   }, { maxWait: 5000, timeout: STATEMENT_TIMEOUT_MS * 2 + 2000 });
 };
 
+/**
+ * Vai trò (nhóm quyền) có được đọc bảng / cột này không — dùng để mô tả DB cho AI chỉ
+ * liệt kê đúng những gì vai trò được đọc (khớp với các lớp chặn ở trên).
+ */
+const isTableReadable = (table, group) => {
+  if (!group || NEVER_TABLES.has(table)) return false;
+  const allowed = ACCESS_GROUPS[group];
+  return allowed === null || allowed.includes(table);
+};
+const isColumnReadable = (table, col, group) => {
+  if (!isTableReadable(table, group)) return false;
+  if (NEVER_COLUMN_PATTERN.test(col)) return false;
+  if ((SALARY_COLUMNS[table] || []).includes(col) && !SALARY_GROUPS.has(group)) return false;
+  if ((CUSTOMER_PII_COLUMNS[table] || []).includes(col) && !CUSTOMER_PII_GROUPS.has(group)) return false;
+  return true;
+};
+
 module.exports = {
   executeSafeAiSql,
+  isTableReadable,
+  isColumnReadable,
   accessGroupOf,
   assertLexicallySafe,
   checkPlan,

@@ -103,6 +103,36 @@ PhoBERT chính xác hơn rõ rệt và nhất quán ở cả 5 fold. Hệ thốn
 hành (mô hình ~540 MB so với ~0,5 MB, thêm ~300–500 MB RAM, cần tách từ bằng Python); tích hợp PhoBERT
 là hướng phát triển tiếp theo.
 
+## 1d. Sinh SQL từ câu hỏi (Gemini + mô tả DB)
+
+`sql_generation_eval.js`: 17 câu hỏi (CEO / Kế toán / Kho), mỗi câu có SQL đáp án viết tay; tính
+ĐÚNG khi SQL hệ thống sinh ra chạy được và cho cùng kết quả với đáp án. Model `gemini-3.5-flash-lite`.
+
+| | Trước | Sau |
+|---|---|---|
+| Đúng | 10/17 (59%) | **15/17** lần chạy đầu → **17/17** sau 2 chỉnh sửa* |
+| Chạy được (không lỗi SQL) | 12/17 | **17/17** |
+| Vòng tự sửa: sửa đúng SQL lỗi cố ý | — | **3/3** |
+
+\* 2 chỉnh sửa sau khi xem kết quả: (1) đáp án câu "5 PO giao sớm nhất" thêm cột `po_number`
+(hệ thống trả đúng 5 PO, đúng thứ tự, nhưng theo `po_number` thay vì `id`); (2) bỏ qua SQL soạn
+sẵn khi câu hỏi đòi tính tổng/đếm mà mẫu không có hàm tính. Vì chỉnh sau khi xem kết quả và bộ
+câu hỏi nhỏ, **con số khách quan để báo cáo là 10/17 → 15/17**.
+
+Nguyên nhân lỗi trước khi sửa và cách sửa:
+- Mô tả DB viết tay lệch với DB thật (cột không tồn tại `orders.channel`,
+  `purchase_orders.expected_date`, `products.warranty_months`, `order_items.total`; giá trị trạng
+  thái sai như `payment_method = 'VIETQR'/'MOMO'`; chỉ 16/55 bảng) → **mô tả tự sinh từ DB thật**
+  (`schemaIntrospector.js`): bảng, cột, khoá chính/ngoại và giá trị trạng thái thật, chỉ gồm những
+  gì vai trò được đọc.
+- Hàm và mô tả DB không được export → màn hình huấn luyện nhận `undefined` (gợi ý SQL lỗi 500,
+  nút "Sửa SQL" gửi `undefined` cho Gemini) → export đúng.
+- Bước "chữa tên cột" phá cột thật (`total_price` → `total_amount`; nút "Sửa SQL" đổi mọi
+  `amount`/`quantity`) → bỏ, thay bằng **vòng tự sửa**: gửi lỗi thật của PostgreSQL cho Gemini
+  sửa, tối đa 2 lần (`generateValidatedSql`, `repairSqlWithGemini`).
+- Màn hình huấn luyện trả SQL "dự phòng" chung chung khi không sinh được (sai câu hỏi) → báo rõ
+  "chưa sinh được SQL".
+
 ## 2. Bảo mật
 
 | Bộ kiểm thử | Nội dung | Kết quả |
