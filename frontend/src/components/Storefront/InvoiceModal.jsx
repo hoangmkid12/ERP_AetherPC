@@ -158,18 +158,7 @@ export default function InvoiceModal({ open, onClose, invoice }) {
         </div>
 
         <div ref={docRef} className="aetherpc-print-flush" style={{ backgroundColor: '#ffffff', color: INK, borderRadius: '6px', padding: '2.25rem 2.5rem', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.35)', fontFamily: FONT }}>
-          {/* Đầu hoá đơn: logo + ký hiệu, số */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap' }}>
-            <div style={{ fontFamily: '"Be Vietnam Pro", Arial, sans-serif', fontSize: '26px', fontWeight: 800, color: '#d70018', letterSpacing: '-0.5px', lineHeight: 1 }}>
-              Aether<span style={{ color: INK }}>PC</span>
-            </div>
-            <div style={{ fontSize: '14px', lineHeight: 1.7, textAlign: 'right' }}>
-              <div>Ký hiệu: <strong>1C26TAE</strong></div>
-              <div>Số: <strong style={{ color: '#b91c1c', fontSize: '15px' }}>{invoiceNo}</strong></div>
-            </div>
-          </div>
-
-          <div style={{ textAlign: 'center', margin: '0.5rem 0 1.25rem' }}>
+          <div style={{ textAlign: 'center', margin: '0 0 1.25rem' }}>
             <div style={{ fontSize: '22px', fontWeight: 700, letterSpacing: '0.5px' }}>HOÁ ĐƠN BÁN HÀNG</div>
             <div style={{ fontSize: '13.5px', fontStyle: 'italic', marginTop: '2px' }}>(Bản thể hiện của hoá đơn điện tử)</div>
             <div style={{ fontSize: '14px', fontStyle: 'italic', marginTop: '4px' }}>Ngày {dd} tháng {mm} năm {date.getFullYear()}</div>
@@ -224,10 +213,6 @@ export default function InvoiceModal({ open, onClose, invoice }) {
                 {lines.length === 0 && (
                   <tr><td colSpan={6} style={{ ...td, textAlign: 'center', fontStyle: 'italic' }}>Chưa có hàng hoá</td></tr>
                 )}
-                <tr>
-                  <td colSpan={5} style={{ ...td, textAlign: 'right' }}>Cộng tiền hàng:</td>
-                  <td style={num}>{fmt(goods)}</td>
-                </tr>
                 {shippingFee > 0 && (
                   <tr><td colSpan={5} style={{ ...td, textAlign: 'right' }}>Phí vận chuyển:</td><td style={num}>{fmt(shippingFee)}</td></tr>
                 )}
