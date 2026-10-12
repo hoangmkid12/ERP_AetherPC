@@ -160,7 +160,6 @@ export default function InvoiceModal({ open, onClose, invoice }) {
         <div ref={docRef} className="aetherpc-print-flush" style={{ backgroundColor: '#ffffff', color: INK, borderRadius: '6px', padding: '2.25rem 2.5rem', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.35)', fontFamily: FONT }}>
           <div style={{ textAlign: 'center', margin: '0 0 1.25rem' }}>
             <div style={{ fontSize: '22px', fontWeight: 700, letterSpacing: '0.5px' }}>HOÁ ĐƠN BÁN HÀNG</div>
-            <div style={{ fontSize: '13.5px', fontStyle: 'italic', marginTop: '2px' }}>(Bản thể hiện của hoá đơn điện tử)</div>
             <div style={{ fontSize: '14px', fontStyle: 'italic', marginTop: '4px' }}>Ngày {dd} tháng {mm} năm {date.getFullYear()}</div>
           </div>
 
