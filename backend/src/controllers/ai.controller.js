@@ -1,50 +1,23 @@
 const prisma = require('../config/database');
-const { GEMINI_MODEL } = require('../services/ai/geminiConfig');
 const { getToolsForRole } = require('../services/ai/tools.definition');
 const { executeToolCall, identifySemanticTopic } = require('../services/ai/tools.executor');
 const { classifyIntentLocal } = require('../services/ai/localNlp.service');
 const { executeUniversalDataQuery } = require('../services/ai/universalData.service');
 
-// Khởi tạo Gemini client nếu có GEMINI_API_KEY
-let GoogleGenAI = null;
-try {
-  const genaiPkg = require('@google/genai');
-  GoogleGenAI = genaiPkg.GoogleGenAI;
-} catch (e) {
-  // @google/genai optional fallback
-}
-
-const getAiClient = () => {
-  if (process.env.GEMINI_API_KEY && GoogleGenAI) {
-    return new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-  }
-  return null;
-};
-
-// Prompt hệ thống thông minh, thân thiện, linh hoạt như các trợ lý AI hàng đầu hiện nay
-const SYSTEM_INSTRUCTION = `Bạn là AetherCopilot - Trợ lý AI Thông Minh và Đồng Nghiệp Số của hệ thống AetherPC ERP.
-
-PHONG CÁCH VÀ TÍNH CÁCH TRÒ CHUYỆN:
-1. TỰ NHIÊN & THÂN THIỆN: Trò chuyện gần gũi, ấm áp, nhạy bén và thông minh như một đồng nghiệp xuất sắc (tương tự ChatGPT/Claude). Biết chào hỏi, cảm ơn, hỏi thăm và thấu hiểu tâm trạng của người dùng.
-2. ĐA NĂNG & HIỂU BIẾT RỘNG:
-   - Khi người dùng hỏi chuyện xã giao, công nghệ, cuộc sống, lập trình, viết lách, học tập, hay tâm sự: Hãy trò chuyện cởi mở, sinh động, truyền cảm hứng và cuốn hút.
-   - Khi người dùng hỏi về ERP, công việc, linh kiện máy tính, đơn hàng, chính sách, tài chính: Hãy chuyển sang phong thái chuyên nghiệp, cung cấp số liệu chính xác và phân tích chuyên sâu.
-3. NGỮ CẢNH & TRÍ NHỚ HỘI THOẠI: Luôn theo sát dòng suy nghĩ và các câu hỏi trước đó trong cuộc hội thoại để phản hồi liền mạch, không hỏi lại những gì người dùng đã nói.
-4. NGUYÊN TẮC BẢO MẬT & TRUNG THỰC: 
-   - Với dữ liệu nội bộ ERP (đơn hàng, tiền nong, tồn kho): Luôn dựa trên dữ liệu thực tế từ hệ thống, không tự bịa đặt số liệu.
-   - Tuyệt đối không cung cấp mật khẩu cá nhân của nhân viên khác.
-5. ĐỊNH DẠNG: Trình bày Markdown tinh tế, gãy gọn, có ngắt đoạn rõ ràng, dùng bullet point và icon hợp lý để tạo cảm giác dễ đọc.`;
+// Gemini dùng chung 1 client (thử lại khi quá tải, model dự phòng, system prompt theo phiên)
+// — xem services/ai/geminiClient.js
+const gemini = require('../services/ai/geminiClient');
+const getAiClient = () => gemini.getClient();
 
 const { getActorSystemPrompt, evaluateActorSemanticRules, executeActorIntent } = require('../services/ai/actors');
 const { queryCache } = require('../services/ai/cache');
 
 /**
- * Kết hợp System Instruction chung với Persona chuyên biệt của từng Actor
+ * System prompt cho 1 lượt chat: persona chung + ngữ cảnh phiên (giờ hiện tại, tên, vai trò)
+ * + persona chuyên biệt của từng Actor.
  */
-const getEffectiveSystemInstruction = (role) => {
-  const actorPrompt = getActorSystemPrompt(role);
-  return `${SYSTEM_INSTRUCTION}\n\n==================================================\nHƯỚNG DẪN CHUYÊN BIỆT THEO VAI TRÒ NGƯỜI DÙNG (${role}):\n==================================================\n${actorPrompt}`;
-};
+const getEffectiveSystemInstruction = (user) =>
+  gemini.buildSystemInstruction(user, `HƯỚNG DẪN CHUYÊN BIỆT THEO VAI TRÒ (${user?.role}):\n${getActorSystemPrompt(user?.role)}`);
 
 // Danh sách câu hỏi gợi ý nhanh theo vai trò (Prompt Chips)
 const ROLE_PROMPT_CHIPS = {
@@ -177,18 +150,16 @@ const classifyIntent = async (promptText, userRole) => {
   if (!aiClient || !process.env.GEMINI_API_KEY) return null;
 
   try {
-    const aiResult = await aiClient.models.generateContent({
-      model: GEMINI_MODEL,
+    const text = await gemini.generate({
       contents: [{
         role: 'user',
         parts: [{
           text: `${INTENT_CLASSIFIER_PROMPT}\n\n---\nCâu hỏi cần phân loại: "${promptText}"\nVai trò người hỏi: ${userRole}`
         }]
       }],
-      config: { temperature: 0.05, maxOutputTokens: 450 }
+      temperature: 0.05,
+      maxOutputTokens: 450
     });
-
-    const text = aiResult.text?.trim();
     if (!text) return null;
 
     // Trích xuất JSON từ phản hồi (hỗ trợ cả raw JSON và markdown-wrapped)
@@ -335,10 +306,22 @@ const chatWithAi = async (req, res, next) => {
 
   const promptText = message.trim();
   const aiClient = getAiClient();
+  // Hỏi Gemini kèm lịch sử hội thoại + system prompt theo người dùng. Trước đây các bước tổng hợp
+  // không gửi lịch sử nên câu hỏi nối tiếp ("còn tháng trước thì sao?") bị trả lời lạc đề.
+  const askGemini = (text, { temperature = 0.5, maxOutputTokens } = {}) => gemini.generate({
+    contents: [...gemini.historyToContents(conversationHistory), { role: 'user', parts: [{ text }] }],
+    system: getEffectiveSystemInstruction(user),
+    temperature,
+    maxOutputTokens
+  });
+  // Viết lại câu trả lời dạng khuôn mẫu cho tự nhiên, đa dạng; tự kiểm tra số liệu, lệch thì giữ bản gốc.
+  const polish = (draft) => gemini.polishGroundedAnswer({ draft, question: promptText, user, history: conversationHistory });
   let toolCallsExecuted = [];
   let finalAiResponse = '';
   let citations = [];
   let uncertainFallback = ''; // lời "chưa chắc + gợi ý" của tầng offline, dùng nếu các tầng sau không trả lời
+  // Câu trả lời dữ liệu dạng khuôn mẫu cố định → cho Gemini viết lại tự nhiên trước khi trả về
+  let polishable = false;
 
   try {
     // ========================================================================
@@ -347,6 +330,22 @@ const chatWithAi = async (req, res, next) => {
     // ========================================================================
     const sessionId = scopedSessionId(user, req.body.sessionId);
     let offlineMetadata = null;
+
+    // Chào hỏi ngắn khi KHÔNG có Gemini: tầng offline vốn trả "chưa chắc chắn (16%)" cho câu
+    // "xin chào" — trả lời chào tự nhiên, xoay vòng nhiều mẫu để không lặp một câu.
+    if (!gemini.isAvailable() && promptText.length <= 40 && /^(xin chào|chào|hi|hello|hey|alo|good (morning|afternoon))\b/i.test(promptText)) {
+      const firstName = String(user.name || '').trim().split(/\s+/).pop() || 'bạn';
+      const greetings = [
+        `Chào ${firstName} 👋 Hôm nay mình giúp gì được cho bạn — tra tồn kho, xem đơn hàng hay tìm quy trình nội bộ?`,
+        `Hi ${firstName}! Mình là AetherCopilot. Bạn cứ hỏi thẳng, ví dụ *"RTX 4060 còn mấy cái?"* hoặc *"quy trình đối soát COD"*.`,
+        `Xin chào ${firstName} 😊 Mình sẵn sàng rồi. Cần số liệu, tra đơn hay tư vấn cấu hình PC thì cứ nhắn nhé.`
+      ];
+      const reply = greetings[Math.floor(Math.random() * greetings.length)];
+      return res.json({
+        success: true,
+        data: { reply, response: reply, citations: [], toolCalls: [], latencyMs: Date.now() - startTime, followUps: [] }
+      });
+    }
     const actorResult = await executeActorIntent(promptText, user.role, prisma, user, {
       sessionId,
       conversationHistory
@@ -369,6 +368,7 @@ const chatWithAi = async (req, res, next) => {
     }
     if (actorResult && TERMINAL_ACTOR_STATUSES.includes(actorResult.status)) {
       finalAiResponse = actorResult.text || actorResult.message;
+      polishable = actorResult.status === 'SUCCESS';
       offlineMetadata = {
         isCached: Boolean(actorResult.fromCache),
         matchSource: actorResult.matchSource,
@@ -506,13 +506,9 @@ Câu hỏi gốc của nhân viên: "${promptText}"
 
 Hãy trả lời trực tiếp, thân thiện, rõ ràng và chuẩn xác dựa trên dữ liệu trên. Định dạng Markdown đẹp.`;
 
-              const aiGen = await aiClient.models.generateContent({
-                model: GEMINI_MODEL,
-                contents: [{ role: 'user', parts: [{ text: profileContext }] }],
-                config: { systemInstruction: SYSTEM_INSTRUCTION, temperature: 0.3 }
-              });
-              if (aiGen.text) {
-                finalAiResponse = aiGen.text;
+              const aiText = await askGemini(profileContext, { temperature: 0.55 });
+              if (aiText) {
+                finalAiResponse = aiText;
                 synthesized = true;
               }
             } catch (e) {
@@ -576,6 +572,7 @@ Hãy trả lời trực tiếp, thân thiện, rõ ràng và chuẩn xác dựa 
             `- **Phân bổ theo vai trò chức năng:**\n` +
             rolesGroup.map(r => `  • **${r.role}:** ${r._count.id} nhân sự`).join('\n') +
             `\n\n*Ghi chú: Bạn có thể xem và quản lý chi tiết danh sách tại menu **Quản Trị Hệ Thống > Tài Khoản & Người Dùng**.*`;
+          polishable = true;
         }
         break;
       }
@@ -598,6 +595,7 @@ Hãy trả lời trực tiếp, thân thiện, rõ ràng và chuẩn xác dựa 
             `- **Thanh toán:** ${o.paymentSummary}\n` +
             `- **Shipper phụ trách:** ${o.shipper}\n` +
             `- **Linh kiện trong đơn:** ${o.itemNames || 'Chi tiết đơn lẻ'}`;
+          polishable = true;
         } else if (orderResult.success === false) {
           // Vai trò không được tra đơn / đơn ngoài phạm vi: trả lời từ chối, không
           // vòng sang tầng SQL tự do để tra lại đúng thứ vừa bị chặn.
@@ -628,13 +626,9 @@ Hãy phân tích câu hỏi trên và đưa ra phản hồi lịch sự, thân t
 4. Hướng dẫn người dùng cung cấp thông tin chuẩn để hệ thống hỗ trợ tốt nhất.
 Định dạng Markdown đẹp, gãy gọn, tinh tế.`;
 
-                const aiGen = await aiClient.models.generateContent({
-                  model: GEMINI_MODEL,
-                  contents: [{ role: 'user', parts: [{ text: clarifyPrompt }] }],
-                  config: { systemInstruction: SYSTEM_INSTRUCTION, temperature: 0.3 }
-                });
-                if (aiGen.text) {
-                  finalAiResponse = aiGen.text;
+                const aiText = await askGemini(clarifyPrompt, { temperature: 0.55 });
+                if (aiText) {
+                  finalAiResponse = aiText;
                   clarificationGiven = true;
                 }
               } catch (e) {
@@ -661,6 +655,7 @@ Hãy phân tích câu hỏi trên và đưa ra phản hồi lịch sự, thân t
         } else if (result.success) {
           const orderLines = result.orders.map(order => `- **${order.orderId}** (${order.status})`).join('\n');
           finalAiResponse = `Hôm nay bạn đang được phân công **${result.count} đơn chưa hoàn tất**${result.count ? `:\n\n${orderLines}` : '.'}\n\n*${result.note}*`;
+          polishable = true;
         }
         break;
       }
@@ -679,6 +674,7 @@ Hãy phân tích câu hỏi trên và đưa ra phản hồi lịch sự, thân t
             productResult.products.map(p =>
               `- **${p.name}**\n  • Giá bán lẻ: **${p.retailPriceFormatted}**\n  • Tồn kho khả dụng: **${p.availableStock} sản phẩm** (${p.stockLocations || 'Kho chính'})\n  • Mã SKU: \`${p.sku || 'N/A'}\``
             ).join('\n\n');
+          polishable = true;
         } else {
           finalAiResponse = `Hiện tại kho của AetherPC không tìm thấy linh kiện nào có tên "${keyword}". Bạn có thể kiểm tra danh mục trên trang Kho hoặc tạo Phiếu yêu cầu nhập hàng (PR).`;
         }
@@ -690,9 +686,18 @@ Hãy phân tích câu hỏi trên và đưa ra phản hồi lịch sự, thân t
       // -----------------------------------------------------------------------
       case 'PC_COMPATIBILITY': {
         // Ưu tiên entity từ AI classifier, fallback sang regex extraction
-        let cpuMatch = entities.cpuName || promptText.match(/i[3579]-?\d{4,5}[A-Z]?|ryzen\s?[3579]\s?\d{4}[A-Z]?/i)?.[0] || 'Intel Core i5-13400F';
-        let mbMatch = entities.mainboardName || promptText.match(/[hbz]\d{3}[A-Z]?|a620|b650|x670/i)?.[0] || 'B760M';
-        let gpuMatch = entities.gpuName || promptText.match(/rtx\s?\d{4}[A-Z\s]*|gtx\s?\d{4}|rx\s?\d{4}[A-Z]*/i)?.[0] || 'RTX 4060';
+        const cpuFound = entities.cpuName || promptText.match(/i[3579]-?\d{4,5}[A-Z]?|ryzen\s?[3579]\s?\d{4}[A-Z]?/i)?.[0];
+        const mbFound = entities.mainboardName || promptText.match(/[hbz]\d{3}[A-Z]?|a620|b650|x670/i)?.[0];
+        const gpuFound = entities.gpuName || promptText.match(/rtx\s?\d{4}[A-Z\s]*|gtx\s?\d{4}|rx\s?\d{4}[A-Z]*/i)?.[0];
+        // Câu hỏi tương thích chung chung (không nêu linh kiện cụ thể nào): trước đây bị gán cứng
+        // cấu hình mặc định i5-13400F + B760M + RTX 4060 nên trả lời lạc đề — để Gemini tư vấn.
+        if (!cpuFound && !mbFound && !gpuFound && aiClient) {
+          const aiText = await askGemini(promptText, { temperature: 0.6 });
+          if (aiText) { finalAiResponse = aiText; break; }
+        }
+        let cpuMatch = cpuFound || 'Intel Core i5-13400F';
+        let mbMatch = mbFound || 'B760M';
+        let gpuMatch = gpuFound || 'RTX 4060';
         let psuMatch = entities.psuWattage || parseInt(promptText.match(/(\d{3})\s?w/i)?.[1] || '0', 10);
 
         const compResult = executeToolCall('check_pc_compatibility', {
@@ -705,6 +710,7 @@ Hãy phân tích câu hỏi trên và đưa ra phản hồi lịch sự, thân t
           `- **Đánh giá:** **${compResult.summary}**\n\n` +
           (compResult.issues.length > 0 ? `⚠️ **Vấn đề cảnh báo:**\n${compResult.issues.map(i => `- ${i}`).join('\n')}\n\n` : '') +
           compResult.notes.map(n => `✅ ${n}`).join('\n');
+        polishable = true;
         break;
       }
 
@@ -770,12 +776,8 @@ Vai trò người hỏi: ${user.role}
 
 Hãy trả lời chính xác dựa trên dữ liệu trên. Dùng Markdown đẹp, chuyên nghiệp.`;
 
-              const aiGen = await aiClient.models.generateContent({
-                model: GEMINI_MODEL,
-                contents: [{ role: 'user', parts: [{ text: contextPrompt }] }],
-                config: { systemInstruction: SYSTEM_INSTRUCTION, temperature: 0.3 }
-              });
-              if (aiGen.text) finalAiResponse = aiGen.text;
+              const aiText = await askGemini(contextPrompt, { temperature: 0.55 });
+              if (aiText) finalAiResponse = aiText;
             } catch (e) {
               console.warn('[AetherCopilot] Contextualized finance response error:', e.message);
             }
@@ -813,18 +815,9 @@ Hãy trả lời chính xác dựa trên dữ liệu trên. Dùng Markdown đẹ
           let synthesized = false;
           if (process.env.GEMINI_API_KEY && aiClient) {
             try {
-              const aiGen = await aiClient.models.generateContent({
-                model: GEMINI_MODEL,
-                contents: [{
-                  role: 'user',
-                  parts: [{
-                    text: `Bạn là trợ lý ERP AetherPC. Dựa trên trích đoạn tài liệu quy chế sau đây:\n"""\n${excerpt}\n"""\nHãy trả lời trực tiếp, rõ ràng, thực tế và gãy gọn cho câu hỏi của nhân viên: "${promptText}".\n${subIntent ? `Ý định cụ thể: ${subIntent}` : ''}\n${entities.sopTopic ? `Chủ đề SOP: ${entities.sopTopic}` : ''}\nNêu rõ phương án xử lý theo quy định, không sao chép thừa thãi.`
-                  }]
-                }],
-                config: { systemInstruction: SYSTEM_INSTRUCTION, temperature: 0.2 }
-              });
-              if (aiGen.text) {
-                finalAiResponse = `${aiGen.text}\n\n📄 *Căn cứ văn bản: [${doc.title}](/admin/system?tab=knowledge&doc=${doc.slug})*`;
+              const aiText = await askGemini(`Bạn là trợ lý ERP AetherPC. Dựa trên trích đoạn tài liệu quy chế sau đây:\n"""\n${excerpt}\n"""\nHãy trả lời trực tiếp, rõ ràng, thực tế và gãy gọn cho câu hỏi của nhân viên: "${promptText}".\n${subIntent ? `Ý định cụ thể: ${subIntent}` : ''}\n${entities.sopTopic ? `Chủ đề SOP: ${entities.sopTopic}` : ''}\nNêu rõ phương án xử lý theo quy định, không sao chép thừa thãi. Chỉ dựa vào trích đoạn: điều gì văn bản không đề cập thì nói rõ là văn bản chưa quy định và gợi ý nên hỏi bộ phận nào.`, { temperature: 0.45 });
+              if (aiText) {
+                finalAiResponse = `${aiText}\n\n📄 *Căn cứ văn bản: [${doc.title}](/admin/system?tab=knowledge&doc=${doc.slug})*`;
                 synthesized = true;
               }
             } catch (e) {
@@ -839,18 +832,9 @@ Hãy trả lời chính xác dựa trên dữ liệu trên. Dùng Markdown đẹ
           // Khi tài liệu không có sẵn trong Knowledge Base, nhờ Gemini giải thích theo nghiệp vụ ERP chung
           if (process.env.GEMINI_API_KEY && aiClient) {
             try {
-              const aiGen = await aiClient.models.generateContent({
-                model: GEMINI_MODEL,
-                contents: [{
-                  role: 'user',
-                  parts: [{
-                    text: `Nhân viên AetherPC hỏi: "${promptText}".\nHệ thống Knowledge Base nội bộ hiện chưa có văn bản quy chế ban hành riêng cho chủ đề này. Hãy giải thích ngắn gọn, chuẩn mực, khách quan theo thực tiễn linh kiện máy tính / ERP và khuyên nhân viên tham khảo ý kiến Trưởng bộ phận nếu cần phê duyệt đặc biệt.`
-                  }]
-                }],
-                config: { systemInstruction: SYSTEM_INSTRUCTION, temperature: 0.3 }
-              });
-              if (aiGen.text) {
-                finalAiResponse = aiGen.text;
+              const aiText = await askGemini(`Nhân viên AetherPC hỏi: "${promptText}".\nHệ thống Knowledge Base nội bộ hiện chưa có văn bản quy chế ban hành riêng cho chủ đề này. Hãy giải thích ngắn gọn, chuẩn mực, khách quan theo thực tiễn linh kiện máy tính / ERP và khuyên nhân viên tham khảo ý kiến Trưởng bộ phận nếu cần phê duyệt đặc biệt.`, { temperature: 0.55 });
+              if (aiText) {
+                finalAiResponse = aiText;
               }
             } catch (e) {
               console.warn('[AetherCopilot] Gemini SOP fallback answer error:', e.message);
@@ -891,19 +875,9 @@ Hãy trả lời chính xác dựa trên dữ liệu trên. Dùng Markdown đẹ
 
         if (process.env.GEMINI_API_KEY && aiClient) {
           try {
-            const aiGen = await aiClient.models.generateContent({
-              model: GEMINI_MODEL,
-              contents: [
-                ...conversationHistory.slice(-8).map(h => ({
-                  role: (h.sender === 'USER' || h.role === 'user') ? 'user' : 'model',
-                  parts: [{ text: h.content || h.text || '' }]
-                })),
-                { role: 'user', parts: [{ text: promptText }] }
-              ],
-              config: { systemInstruction: getEffectiveSystemInstruction(user.role), temperature: 0.7 }
-            });
-            if (aiGen.text) {
-              finalAiResponse = aiGen.text;
+            const aiText = await askGemini(promptText, { temperature: 0.85, maxOutputTokens: 2048 });
+            if (aiText) {
+              finalAiResponse = aiText;
             }
           } catch (e) {
             console.warn('[AetherCopilot] Gemini general response error:', e.message);
@@ -917,6 +891,9 @@ Hãy trả lời chính xác dựa trên dữ liệu trên. Dùng Markdown đẹ
     // ========================================================================
     // BƯỚC 3: FALLBACK CUỐI CÙNG - Menu trợ lý điều hướng ERP
     // ========================================================================
+    if (polishable && finalAiResponse) {
+      finalAiResponse = await polish(finalAiResponse);
+    }
     if (!finalAiResponse && uncertainFallback) {
       finalAiResponse = uncertainFallback;
     }

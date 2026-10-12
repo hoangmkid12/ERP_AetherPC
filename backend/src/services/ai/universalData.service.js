@@ -3,19 +3,9 @@ const { GEMINI_MODEL } = require('./geminiConfig');
 const { executeSafeAiSql, accessGroupOf } = require('./safeSqlExecutor');
 const { describeSchemaForRole } = require('./schemaIntrospector');
 
-// Khởi tạo Gemini client linh hoạt (Dynamic Lazy Initialization)
-let GoogleGenAI = null;
-try {
-  const genaiPkg = require('@google/genai');
-  GoogleGenAI = genaiPkg.GoogleGenAI;
-} catch (e) {}
-
-const getAiClient = () => {
-  if (process.env.GEMINI_API_KEY && GoogleGenAI) {
-    return new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-  }
-  return null;
-};
+// Dùng chung client Gemini (khởi tạo 1 lần) — xem geminiClient.js
+const gemini = require('./geminiClient');
+const getAiClient = () => gemini.getClient();
 
 /**
  * Tóm tắt Schema Cơ Sở Dữ Liệu PostgreSQL & Bộ Quy Tắc Few-Shots Siêu Độ Phủ của AetherPC ERP
@@ -621,36 +611,29 @@ const executeUniversalDataQuery = async (promptText, user) => {
 
   // 5. Cho Gemini đọc kết quả thô từ Database và trình bày dạng bảng / tóm tắt chuyên nghiệp
   let finalAiResponse = '';
-  const aiClientSummary = getAiClient();
-  if (aiClientSummary) {
-    try {
-      const summaryPrompt = `Bạn là trợ lý AetherCopilot của hệ thống AetherPC ERP.
-Dữ liệu thực tế trích xuất trực tiếp từ Cơ sở dữ liệu PostgreSQL (${rowCount} bản ghi):
+  if (gemini.isAvailable()) {
+    const shown = cleanData.slice(0, 25);
+    const summaryPrompt = `Dữ liệu thực tế vừa truy vấn từ cơ sở dữ liệu ERP (${rowCount} bản ghi${rowCount > shown.length ? `, dưới đây là ${shown.length} bản ghi đầu` : ''}):
 \`\`\`json
-${JSON.stringify(cleanData.slice(0, 15), null, 2)}
+${JSON.stringify(shown, null, 2)}
 \`\`\`
 
 Câu hỏi của người dùng: "${promptText}"
-Vai trò người hỏi: ${userRole}
 
-Nhiệm vụ:
-- Trả lời trực tiếp, tự nhiên và chuẩn xác vào câu hỏi.
-- Nếu là câu hỏi tổng hợp doanh thu/số lượng: Nêu rõ con số cụ thể kèm định dạng tiền tệ VND (ví dụ: "Tổng doanh thu năm nay của AetherPC là **10.718.796.960 VNĐ**...").
-- Nếu là danh sách đơn/sản phẩm: Liệt kê rõ ràng dạng Markdown (gạch đầu dòng hoặc bảng).
-- Định dạng Markdown đẹp mắt, chuyên nghiệp.`;
+Hãy trả lời như một chuyên viên phân tích:
+1. Câu đầu tiên trả lời thẳng câu hỏi bằng con số/kết luận chính (tiền tệ định dạng kiểu **12.345.000 ₫**).
+2. Danh sách nhiều dòng thì trình bày bảng Markdown hoặc gạch đầu dòng gọn; chỉ giữ các cột có ý nghĩa với người hỏi, đổi tên cột sang tiếng Việt dễ hiểu, ngày giờ theo định dạng Việt Nam.
+3. Thêm 1–2 nhận xét đáng chú ý rút ra TRỰC TIẾP từ dữ liệu (cao nhất/thấp nhất, tỉ trọng, bất thường, việc cần xử lý) — chỉ khi dữ liệu cho thấy rõ.
+4. Kết bằng 1 gợi ý câu hỏi/bước tiếp theo hữu ích.
+Chỉ dùng số liệu có trong dữ liệu trên — không suy đoán thêm số liệu khác.${rowCount > shown.length ? ' Nói rõ đang hiển thị một phần kết quả.' : ''}`;
 
-      const aiGen = await aiClientSummary.models.generateContent({
-        model: GEMINI_MODEL,
-        contents: [{ role: 'user', parts: [{ text: summaryPrompt }] }],
-        config: { temperature: 0.2, maxOutputTokens: 1500 }
-      });
-
-      if (aiGen.text && aiGen.text.length > 50) {
-        finalAiResponse = aiGen.text;
-      }
-    } catch (e) {
-      console.warn('[UniversalData] Lỗi tổng hợp phản hồi từ Gemini:', e.message);
-    }
+    const text = await gemini.generate({
+      contents: [{ role: 'user', parts: [{ text: summaryPrompt }] }],
+      system: gemini.buildSystemInstruction(user),
+      temperature: 0.35,
+      maxOutputTokens: 1800
+    });
+    if (text && text.length > 50) finalAiResponse = text;
   }
 
   // Fallback định dạng danh sách thẻ nếu Gemini tạm thời offline
