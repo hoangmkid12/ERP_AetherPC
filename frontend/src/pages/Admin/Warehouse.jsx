@@ -4,7 +4,7 @@ import { useInventoryStore, useSalesStore, useFinanceStore, useUtilityStore } fr
 import { useAuth } from '../../context/AuthContext';
 import { usePermission } from '../../hooks/usePermission';
 import { useAutoRefresh } from '../../hooks/useAutoRefresh';
-import { useNotification, notify, confirm, promptText } from '../../context/NotificationContext';
+import { useNotification, notify, confirm } from '../../context/NotificationContext';
 import { grossMarginPct } from '../../utils/vat';
 import { DELIVERY_REGIONS, detectDeliveryRegion } from '../../utils/deliveryRegions';
 import { QC_STATUS, STOCK_INTAKE_STATUS, getStatusInfo } from '../../utils/statusLabels';
@@ -2980,22 +2980,6 @@ export default function Warehouse() {
   const [warehousePeriod, setWarehousePeriod] = useState('ALL');
 
   const { user, isCEO, isWarehouseManager, isWarehouse, isAdmin } = useAuth();
-  // Khai báo giá vốn đầu kỳ (hàng tồn chưa có phiếu nhập) — nghiệp vụ kế toán (khớp COST_EDIT_ROLES ở backend)
-  const canEditCost = ['CEO', 'ADMIN', 'ACCOUNTANT'].includes(user?.role);
-  const editProductCost = async (prod) => {
-    const input = await promptText(`Giá vốn bình quân (chưa VAT) cho "${prod.name}" — giá bán hiện tại ${Number(prod.price || 0).toLocaleString('vi-VN')}đ (đã gồm VAT):`, String(Math.round(prod.averageCost || 0)));
-    if (input == null || input === false) return;
-    const value = Number(String(input).replace(/[^\d]/g, ''));
-    if (!Number.isFinite(value) || value <= 0) { notify('Giá vốn không hợp lệ.', 'error'); return; }
-    try {
-      const res = await api.patch(`/products/admin/${prod.id}/cost`, { averageCost: value });
-      useInventoryStore.setState(state => ({ inventory: state.inventory.map(i => i.id === prod.id ? { ...i, averageCost: value } : i) }));
-      setEditingProd(prev => (prev && prev.id === prod.id ? { ...prev, averageCost: value } : prev));
-      notify(res?.message || 'Đã cập nhật giá vốn.', 'success');
-    } catch (err) {
-      notify(err.message || 'Không cập nhật được giá vốn.', 'error');
-    }
-  };
   // Khớp phân quyền đọc ở backend (warehouse.routes.js, purchase.routes.js): vai trò chỉ được xem tồn kho
   // (vd. Quản lý bán hàng) không gọi các API bị từ chối, tránh 403 làm hỏng cả lượt tải dữ liệu.
   const canReadReceipts = ['WAREHOUSE', 'WAREHOUSE_MANAGER', 'QC', 'QA', 'QUALITY_CONTROL', 'PURCHASING', 'ACCOUNTANT', 'CEO', 'ADMIN'].includes(user?.role);
@@ -3391,6 +3375,8 @@ export default function Warehouse() {
     setEditingProd({
       ...p,
       originalPrice: p.originalPrice !== undefined ? p.originalPrice : (p.price || 0),
+      // Giá cũ dùng để gạch ngang: giá niêm yết gốc, hoặc giá bán hiện tại nếu chưa có giá niêm yết cao hơn
+      listPrice: Math.max(Number(p.originalPrice) || 0, Number(p.price) || 0),
       brand: p.brand || '',
       warranty: p.warranty || '36 tháng',
       specs: (typeof p.specs === 'object' && p.specs !== null) ? p.specs : {},
@@ -3999,7 +3985,8 @@ export default function Warehouse() {
 
     const targetId = editingProd.id;
     const priceVal = editingProd.price !== undefined ? (parseFloat(editingProd.price) || 0) : 0;
-    const origVal = editingProd.originalPrice !== undefined ? (parseFloat(editingProd.originalPrice) || 0) : priceVal;
+    // Giá cũ (gạch ngang) không sửa tay: giữ giá niêm yết gốc; nếu tăng giá bán vượt giá cũ thì giá cũ = giá mới (không còn giảm giá)
+    const origVal = Math.max(Number(editingProd.listPrice ?? editingProd.originalPrice) || 0, priceVal);
 
     const fieldsToUpdate = {
       name: editingProd.name,
@@ -7761,11 +7748,9 @@ export default function Warehouse() {
                     </span>
                   ))}
                   {editingProd.averageCost != null && infoRow('Giá Vốn Bình Quân (chưa VAT)', (
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    <span>
                       {editingProd.averageCost > 0 ? safeFormatPrice(editingProd.averageCost) : <span style={{ color: '#d97706' }}>Chưa có</span>}
-                      {canEditCost && (
-                        <button type="button" onClick={() => editProductCost(editingProd)} style={{ fontSize: '0.75rem', fontWeight: 700, color: '#2563eb', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '4px', padding: '0.1rem 0.45rem', cursor: 'pointer' }}>Khai báo</button>
-                      )}
+                      <span style={{ display: 'block', fontSize: '0.72rem', fontWeight: 500, color: '#94a3b8', marginTop: '0.15rem' }}>Cố định · tự cập nhật khi nhập kho</span>
                     </span>
                   ))}
                   {editingProd.averageCost != null && infoRow('Biên Lợi Nhuận Gộp', (() => {
@@ -7896,29 +7881,51 @@ export default function Warehouse() {
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.35rem' }}>Giá Gốc Niêm Yết (VNĐ)</label>
-                      <input type="number" min="0" value={editingProd.originalPrice !== undefined ? editingProd.originalPrice : (editingProd.price || 0)} onChange={(e) => setEditingProd({ ...editingProd, originalPrice: parseFloat(e.target.value) || 0 })} placeholder="Giá gạch ngang" style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.85rem', border: '1px solid #cbd5e1', borderRadius: '6px', backgroundColor: '#ffffff', boxSizing: 'border-box' }} />
+                      {editingProd.averageCost != null ? (
+                        <>
+                          <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.35rem' }}>Giá Vốn Bình Quân (chưa VAT)</label>
+                          <div title="Giá vốn bình quân gia quyền — chỉ thay đổi khi nhập kho (GRN), không sửa tay" style={{ padding: '0.6rem 0.85rem', fontSize: '0.85rem', fontWeight: 700, color: '#475569', border: '1px dashed #cbd5e1', borderRadius: '6px', backgroundColor: '#f8fafc', display: 'flex', justifyContent: 'space-between', gap: '0.5rem' }}>
+                            <span>{editingProd.averageCost > 0 ? safeFormatPrice(editingProd.averageCost) : 'Chưa có'}</span>
+                            <span style={{ fontSize: '0.72rem', fontWeight: 600, color: '#94a3b8' }}>Cố định</span>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.35rem' }}>Giá Cũ (VNĐ)</label>
+                          <div style={{ padding: '0.6rem 0.85rem', fontSize: '0.85rem', fontWeight: 700, color: '#94a3b8', border: '1px dashed #cbd5e1', borderRadius: '6px', backgroundColor: '#f8fafc', textDecoration: 'line-through' }}>
+                            {safeFormatPrice(editingProd.listPrice ?? editingProd.originalPrice ?? editingProd.price)}
+                          </div>
+                        </>
+                      )}
                     </div>
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.35rem' }}>Đơn Giá Bán Khuyến Mãi (VNĐ)</label>
+                      <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b', marginBottom: '0.35rem' }}>Giá Bán (VNĐ, đã gồm VAT)</label>
                       <input type="number" min="0" value={editingProd.price !== undefined ? editingProd.price : 0} onChange={(e) => setEditingProd({ ...editingProd, price: parseFloat(e.target.value) || 0 })} style={{ width: '100%', padding: '0.6rem 0.85rem', fontSize: '0.85rem', fontWeight: 700, color: '#16a34a', border: '1px solid #cbd5e1', borderRadius: '6px', backgroundColor: '#ffffff', boxSizing: 'border-box' }} />
                     </div>
                   </div>
 
-                  {/* Live Discount Calculator Preview */}
+                  {/* Xem trước giá khách thấy: giá cũ gạch ngang + % giảm; biên lợi nhuận tại giá mới (người được xem giá vốn) */}
                   {(() => {
-                    const orig = parseFloat(editingProd.originalPrice) || 0;
+                    const orig = Number(editingProd.listPrice ?? editingProd.originalPrice ?? 0) || 0;
                     const curr = parseFloat(editingProd.price) || 0;
-                    if (orig > curr && curr > 0) {
-                      const pct = Math.round((1 - curr / orig) * 100);
-                      return (
-                        <div style={{ backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '6px', padding: '0.45rem 0.75rem', fontSize: '0.78rem', color: '#15803d', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <span style={{ fontWeight: 800, backgroundColor: '#dcfce7', padding: '0.1rem 0.45rem', borderRadius: '4px' }}>-{pct}%</span>
-                          <span>Khách hàng sẽ thấy giá gốc <strong>{safeFormatPrice(orig)}</strong> gạch ngang và giảm còn <strong>{safeFormatPrice(curr)}</strong> (tiết kiệm {safeFormatPrice(orig - curr)})</span>
-                        </div>
-                      );
-                    }
-                    return null;
+                    const margin = editingProd.averageCost > 0 ? grossMarginPct(curr, editingProd.averageCost) : null;
+                    return (
+                      <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '0.55rem 0.75rem', fontSize: '0.8rem', color: '#334155', display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+                        <span style={{ color: '#64748b' }}>Khách hàng thấy:</span>
+                        {orig > curr && curr > 0 && (
+                          <>
+                            <span style={{ textDecoration: 'line-through', color: '#94a3b8' }}>{safeFormatPrice(orig)}</span>
+                            <span style={{ fontWeight: 800, color: '#15803d', backgroundColor: '#dcfce7', padding: '0.1rem 0.45rem', borderRadius: '4px' }}>-{Math.round((1 - curr / orig) * 100)}%</span>
+                          </>
+                        )}
+                        <strong style={{ color: '#dc2626' }}>{safeFormatPrice(curr)}</strong>
+                        {margin != null && (
+                          <span style={{ marginLeft: 'auto', fontWeight: 700, color: margin < 0 ? '#dc2626' : margin < 5 ? '#d97706' : '#15803d' }}>
+                            {margin < 0 ? `Bán dưới giá vốn (${margin.toFixed(1)}%)` : `Biên lợi nhuận ${margin.toFixed(1)}%`}
+                          </span>
+                        )}
+                      </div>
+                    );
                   })()}
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>

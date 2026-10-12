@@ -918,34 +918,4 @@ const getProductImageBlob = async (req, res) => {
   }
 };
 
-/**
- * PATCH /api/v1/products/admin/:id/cost — khai báo / điều chỉnh giá vốn bình quân (giá vốn đầu kỳ).
- * Dùng cho hàng tồn chưa có phiếu nhập kho (tồn đầu kỳ, dữ liệu seed); các lần nhập kho sau đó
- * vẫn tự bình quân gia quyền như thường. Chỉ ảnh hưởng giá vốn của các lần xuất kho SAU khi sửa.
- */
-const updateProductCost = async (req, res, next) => {
-  try {
-    const cost = Number(req.body?.averageCost);
-    if (!Number.isFinite(cost) || cost < 0) {
-      return res.status(400).json({ success: false, message: 'Giá vốn phải là số không âm.' });
-    }
-    const product = await prisma.product.findUnique({
-      where: { productId: String(req.params.id) },
-      select: { productId: true, name: true, price: true, averageCost: true }
-    });
-    if (!product) return res.status(404).json({ success: false, message: 'Không tìm thấy sản phẩm.' });
-    const price = Number(product.price) || 0;
-    if (price > 0 && cost > price * 2) {
-      return res.status(400).json({ success: false, message: 'Giá vốn lớn hơn gấp đôi giá bán — vui lòng kiểm tra lại số liệu.' });
-    }
-    const updated = await prisma.product.update({
-      where: { productId: product.productId },
-      data: { averageCost: Math.round(cost * 100) / 100 },
-      select: { productId: true, name: true, price: true, averageCost: true }
-    });
-    console.log(`[Giá vốn] ${req.user?.role}#${req.user?.id} chỉnh giá vốn ${product.productId} (${product.name}): ${product.averageCost} → ${updated.averageCost}`);
-    res.json({ success: true, message: 'Đã cập nhật giá vốn.', data: updated });
-  } catch (err) { next(err); }
-};
-
-Object.assign(module.exports, { createProduct, updateProduct, updateProductVisibility, deleteProductImage, deleteProduct, getProductImageBlob, updateProductCost });
+Object.assign(module.exports, { createProduct, updateProduct, updateProductVisibility, deleteProductImage, deleteProduct, getProductImageBlob });

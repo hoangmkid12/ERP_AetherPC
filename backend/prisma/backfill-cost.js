@@ -8,8 +8,7 @@
  * Cách làm (theo thứ tự ưu tiên, không đụng sản phẩm đã có giá vốn hợp lệ):
  *   1. Có phiếu mua hàng (PO) với đơn giá nhập hợp lý → bình quân gia quyền các lần mua đó.
  *   2. Không có → ƯỚC TÍNH giá vốn đầu kỳ = giá bán chưa VAT × (1 − biên lợi nhuận gộp chuẩn
- *      của ngành hàng). Đây là số ước tính, kế toán có thể chỉnh từng mã ở màn hình Kho
- *      (PATCH /products/admin/:id/cost).
+ *      của ngành hàng). Đây là số ước tính; các lần nhập kho sau sẽ tự bình quân với giá nhập thật.
  *   3. Đơn đã xuất kho (đã qua CONFIRMED, chưa huỷ) mà chưa có bút toán COGS → ghi bù bút toán
  *      COGS-<mã đơn> (ngày = ngày tạo đơn) và chụp giá vốn vào order_items.unit_cost.
  *
