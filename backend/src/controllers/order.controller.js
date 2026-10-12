@@ -905,10 +905,17 @@ const updateOrderStatus = async (req, res, next) => {
     // không hề đổi, chỉ là nội bộ đổi người giao).
     let skipCustomerEmail = false;
 
+    // true khi request chỉ là gửi lặp "Đã giao" cho đơn đã giao — trả về đơn
+    // hiện tại, không ghi thêm lịch sử/thanh toán, không gửi lại email.
+    let isDuplicateDelivered = false;
+
     const order = await prisma.$transaction(async (tx) => {
-      if (status === 'CANCELLED') {
-        await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${'sepay:' + id}))::text`;
-      }
+      // Khoá theo từng đơn cho MỌI lần đổi trạng thái (cùng khoá với webhook
+      // SePay): trước đây chỉ khoá khi huỷ đơn, nên shipper trượt xác nhận bắn
+      // nhiều request cùng lúc thì các transaction đều đọc thấy đơn chưa giao
+      // và cùng ghi — 1 đơn có hàng chục dòng lịch sử "Đã giao" và nhiều dòng
+      // OrderPayment CASH (tiền COD bị nhân lên khi đối soát).
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${'sepay:' + id}))::text`;
       const existingOrder = await tx.order.findUnique({
         where: { orderId: id },
         include: { items: true, customer: true }
@@ -916,6 +923,18 @@ const updateOrderStatus = async (req, res, next) => {
 
       if (!existingOrder) {
         throw new Error('Không tìm thấy đơn hàng trong hệ thống');
+      }
+
+      if (status === 'DELIVERED' && existingOrder.status === 'DELIVERED') {
+        isDuplicateDelivered = true;
+        skipCustomerEmail = true;
+        return existingOrder;
+      }
+
+      // Giữ nguyên trạng thái, chỉ đổi shipper phụ trách (Kho gán lại đơn tồn)
+      // — với khách không có gì thay đổi, không gửi lại email trạng thái.
+      if (status === existingOrder.status && req.body.assignedShipperId !== undefined) {
+        skipCustomerEmail = true;
       }
 
       const transitionError = orderTransitionError(existingOrder, status, req.user, req.body.unassignShipper === true);
@@ -1351,7 +1370,10 @@ const updateOrderStatus = async (req, res, next) => {
 
     res.json({
       success: true,
-      message: `Cập nhật trạng thái đơn hàng thành "${labelOf(ORDER_STATUS_VI, status)}" thành công`,
+      message: isDuplicateDelivered
+        ? 'Đơn hàng đã được xác nhận giao thành công trước đó.'
+        : `Cập nhật trạng thái đơn hàng thành "${labelOf(ORDER_STATUS_VI, status)}" thành công`,
+      duplicate: isDuplicateDelivered || undefined,
       data: order
     });
   } catch (err) {
@@ -2481,6 +2503,169 @@ const getDeliveryLocationHistory = async (req, res, next) => {
   }
 };
 
+// ============================================================================
+// ĐƠN GIAO HÀNG TỒN QUA NGÀY
+// ============================================================================
+
+// Trạng thái còn nằm "ngoài đường" (shipper đang giữ hàng hoặc đơn chưa chốt
+// xong) — đơn ở các trạng thái này mà bắt đầu từ trước hôm nay là đơn tồn.
+const IN_TRANSIT_STATUSES = ['SHIPPED', 'SHIPPING_FAILED', 'FAILED_DELIVERY', 'RETURNING_TO_WAREHOUSE'];
+
+// Hạn tự hoàn kho cho đơn giao thất bại (mục "Chờ gọi lại 24h" trước đây chỉ
+// là lời hứa trên giao diện — không job nào thực hiện, đơn treo mãi).
+const AWAITING_CALLBACK_LIMIT_MS = 24 * 60 * 60 * 1000;
+const FAILED_DELIVERY_LIMIT_MS = 3 * 24 * 60 * 60 * 1000;
+
+// Cùng bộ từ khoá với getDeliveryIncidentStatus (frontend deliveryHelpers.js)
+const isAwaitingCallbackFail = (order) => {
+  const s = `${order.failReason || ''} ${order.failNote || ''}`.toLowerCase();
+  return s.includes('không liên lạc') || s.includes('không nghe máy') || s.includes('thuê bao') || s.includes('gọi lại');
+};
+
+// 0h hôm nay theo giờ Việt Nam (server có thể chạy UTC)
+const startOfTodayVN = () => {
+  const vn = new Date(Date.now() + 7 * 60 * 60 * 1000);
+  return new Date(Date.UTC(vn.getUTCFullYear(), vn.getUTCMonth(), vn.getUTCDate()) - 7 * 60 * 60 * 1000);
+};
+
+// Thời điểm đơn bước vào trạng thái hiện tại: dòng lịch sử mới nhất cùng trạng
+// thái, nếu không có thì ngày xuất kho / ngày tạo đơn.
+const getStatusSinceMap = async (client, orders) => {
+  const ids = orders.map(o => o.orderId);
+  if (ids.length === 0) return new Map();
+  const rows = await client.orderStatusHistory.groupBy({
+    by: ['orderId', 'status'],
+    where: { orderId: { in: ids } },
+    _max: { timestamp: true }
+  });
+  const latest = new Map(rows.map(r => [`${r.orderId}|${r.status}`, r._max.timestamp]));
+  return new Map(orders.map(o => [
+    o.orderId,
+    latest.get(`${o.orderId}|${o.status}`) || o.shippedAt || o.createdAt
+  ]));
+};
+
+// Job định kỳ: đơn SHIPPING_FAILED quá hạn → tự chuyển RETURNING_TO_WAREHOUSE
+// để shipper mang hàng về kho thay vì giữ vô thời hạn.
+const autoReturnOverdueFailedDeliveries = async () => {
+  const failed = await prisma.order.findMany({
+    where: { status: 'SHIPPING_FAILED' },
+    select: { orderId: true, status: true, failReason: true, failNote: true, shippedAt: true, createdAt: true }
+  });
+  if (failed.length === 0) return [];
+
+  const sinceMap = await getStatusSinceMap(prisma, failed);
+  const now = Date.now();
+  const returned = [];
+
+  for (const ord of failed) {
+    const awaiting = isAwaitingCallbackFail(ord);
+    const limit = awaiting ? AWAITING_CALLBACK_LIMIT_MS : FAILED_DELIVERY_LIMIT_MS;
+    const since = new Date(sinceMap.get(ord.orderId)).getTime();
+    if (!(now - since > limit)) continue;
+
+    const reason = awaiting
+      ? 'Quá 24h khách không gọi lại'
+      : 'Quá 3 ngày giao thất bại / hẹn lại chưa giao được';
+    try {
+      const done = await prisma.$transaction(async (tx) => {
+        await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${'sepay:' + ord.orderId}))::text`;
+        const current = await tx.order.findUnique({ where: { orderId: ord.orderId }, select: { status: true } });
+        if (current?.status !== 'SHIPPING_FAILED') return false; // shipper vừa tự xử lý
+        await tx.order.update({
+          where: { orderId: ord.orderId },
+          data: {
+            status: 'RETURNING_TO_WAREHOUSE',
+            returnNote: `Hệ thống tự chuyển hoàn kho: ${reason}.`
+          }
+        });
+        await tx.orderStatusHistory.create({
+          data: {
+            orderId: ord.orderId,
+            status: 'RETURNING_TO_WAREHOUSE',
+            note: `Tự động chuyển hoàn kho — ${reason}. Shipper mang hàng về kho.`,
+            changedBy: 'Hệ Thống Tự Động'
+          }
+        });
+        return true;
+      });
+      if (done) returned.push({ orderId: ord.orderId, reason });
+    } catch (err) {
+      console.warn(`[AutoReturn] Không thể tự hoàn kho đơn ${ord.orderId}:`, err.message);
+    }
+  }
+  return returned;
+};
+
+// GET /api/v1/orders/stale-deliveries — đơn còn ngoài đường từ trước hôm nay
+// và đơn đang giao mà không có shipper (không ai thấy để xử lý), nhóm theo
+// shipper kèm tiền mặt COD shipper đó đang giữ chưa đối soát.
+const getStaleDeliveries = async (req, res, next) => {
+  try {
+    const todayStart = startOfTodayVN();
+    const candidates = await prisma.order.findMany({
+      where: { status: { in: IN_TRANSIT_STATUSES } },
+      select: {
+        orderId: true, status: true, totalAmount: true, shippingAddress: true,
+        failReason: true, failNote: true, shippedAt: true, createdAt: true,
+        assignedShipperId: true,
+        assignedShipper: { select: { id: true, fullName: true, employeeCode: true, phone: true } },
+        customer: { select: { name: true, phone: true } }
+      }
+    });
+
+    const sinceMap = await getStatusSinceMap(prisma, candidates);
+    const stale = candidates
+      .map(o => ({ ...o, since: sinceMap.get(o.orderId) }))
+      .filter(o => !o.assignedShipperId || new Date(o.since) < todayStart);
+
+    const shipperIds = [...new Set(stale.map(o => o.assignedShipperId).filter(Boolean))];
+    const codRows = shipperIds.length === 0 ? [] : await prisma.orderPayment.findMany({
+      where: { method: 'CASH', status: 'SUCCESS', settledAt: null, order: { assignedShipperId: { in: shipperIds } } },
+      select: { amount: true, order: { select: { assignedShipperId: true } } }
+    });
+    const codByShipper = {};
+    for (const p of codRows) {
+      const sid = p.order.assignedShipperId;
+      codByShipper[sid] = (codByShipper[sid] || 0) + Number(p.amount);
+    }
+
+    const groups = {};
+    for (const o of stale) {
+      const key = o.assignedShipperId || 'UNASSIGNED';
+      if (!groups[key]) {
+        groups[key] = {
+          shipperId: o.assignedShipperId || null,
+          shipperName: o.assignedShipper?.fullName || null,
+          shipperCode: o.assignedShipper?.employeeCode || null,
+          shipperPhone: o.assignedShipper?.phone || null,
+          codHolding: o.assignedShipperId ? (codByShipper[o.assignedShipperId] || 0) : 0,
+          orders: []
+        };
+      }
+      groups[key].orders.push({
+        orderId: o.orderId,
+        status: o.status,
+        totalAmount: Number(o.totalAmount),
+        customerName: o.customer?.name,
+        customerPhone: o.customer?.phone,
+        shippingAddress: o.shippingAddress,
+        failReason: o.failReason,
+        since: o.since,
+        daysStale: Math.max(0, Math.floor((todayStart - new Date(o.since)) / 86400000) + 1)
+      });
+    }
+
+    const data = Object.values(groups)
+      .map(g => ({ ...g, orders: g.orders.sort((a, b) => new Date(a.since) - new Date(b.since)) }))
+      .sort((a, b) => (a.shipperId === null) - (b.shipperId === null) || b.orders.length - a.orders.length);
+
+    res.json({ success: true, data, total: stale.length });
+  } catch (err) {
+    next(err);
+  }
+};
+
 module.exports = {
   createOrder,
   createPosOrder,
@@ -2506,5 +2691,9 @@ module.exports = {
   confirmReceivedOrder,
   customerCancelOrder,
   cancelSingleOrderInternal,
-  autoCancelUnpaidOrders
+  autoCancelUnpaidOrders,
+  autoReturnOverdueFailedDeliveries,
+  getStaleDeliveries,
+  IN_TRANSIT_STATUSES,
+  startOfTodayVN
 };

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Truck, Filter, RefreshCw, Calendar } from 'lucide-react';
+import { Truck, Filter, RefreshCw, Calendar, AlertTriangle } from 'lucide-react';
 import OrderCard from './components/OrderCard';
 import FilterSheet from './components/FilterSheet';
 import DateFilterControl from './components/DateFilterControl';
@@ -108,6 +108,37 @@ export default function ActiveTab({
           )}
         </button>
       </div>
+
+      {/* Cảnh báo đơn tồn qua đêm — shipper đang giữ hàng (và có thể cả tiền
+          COD) từ hôm trước, cần chốt: giao, hẹn lại hoặc hoàn kho. */}
+      {backlogCount > 0 && (
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.6rem',
+          padding: '0.65rem 0.8rem', marginBottom: '0.75rem', borderRadius: 'var(--radius-md)',
+          backgroundColor: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.35)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
+            <AlertTriangle size={18} style={{ color: 'var(--danger)', flexShrink: 0, marginTop: '1px' }} />
+            <div>
+              <div style={{ fontSize: '0.84rem', fontWeight: 800, color: 'var(--danger)' }}>
+                {backlogCount} đơn tồn từ hôm trước — cần xử lý ngay
+              </div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.15rem' }}>
+                Giao trong hôm nay, báo hẹn lại hoặc hoàn kho. Đơn giao thất bại quá hạn (chờ gọi lại &gt; 24h, hẹn lại &gt; 3 ngày) sẽ được hệ thống tự chuyển hoàn kho.
+              </div>
+            </div>
+          </div>
+          {incidentFilter !== 'BACKLOG' && (
+            <button
+              type="button"
+              onClick={() => setIncidentFilter('BACKLOG')}
+              style={{ flexShrink: 0, padding: '0.45rem 0.7rem', fontSize: '0.77rem', fontWeight: 800, color: '#fff', backgroundColor: 'var(--danger)', border: 'none', borderRadius: 'var(--radius-md)', cursor: 'pointer' }}
+            >
+              Xem đơn tồn
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Interactive Quick Time Filter Bar */}
       <div style={{

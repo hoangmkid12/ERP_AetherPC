@@ -28,7 +28,8 @@ const {
   getDeliveryTracking,
   getDeliveryLocationHistory,
   confirmReceivedOrder,
-  customerCancelOrder
+  customerCancelOrder,
+  getStaleDeliveries
 } = require('../controllers/order.controller');
 const { authMiddleware, optionalAuthMiddleware } = require('../middlewares/auth.middleware');
 const { getEmailLogs } = require('../services/emailService');
@@ -42,6 +43,10 @@ router.post('/pos', authMiddleware(['SALES', 'SALES_MANAGER', 'CEO', 'ADMIN']), 
 // @route   GET /api/v1/orders
 // @desc    Lấy danh sách đơn hàng (Khách hàng xem đơn của mình, Nhân viên/Shipper xem danh sách phân công)
 router.get('/', authMiddleware(['CUSTOMER', 'DELIVERY', 'SALES', 'SALES_MANAGER', 'WAREHOUSE', 'WAREHOUSE_MANAGER', 'CEO', 'ADMIN', 'CSKH', 'ACCOUNTANT']), getCustomerOrders);
+
+// @route   GET /api/v1/orders/stale-deliveries
+// @desc    Đơn giao hàng tồn từ hôm trước / đang giao mà không có shipper (Kho, Quản lý)
+router.get('/stale-deliveries', authMiddleware(['WAREHOUSE', 'WAREHOUSE_MANAGER', 'SALES_MANAGER', 'CEO', 'ADMIN']), getStaleDeliveries);
 
 // @route   POST & PATCH /api/v1/orders/:id/cancel
 // @desc    Khách hàng / Nhân viên hủy đơn hàng (PENDING, WAITING_PAYMENT, AWAITING_STOCK)

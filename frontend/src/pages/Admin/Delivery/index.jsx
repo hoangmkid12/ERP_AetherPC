@@ -434,6 +434,12 @@ export default function Delivery() {
     });
 
     return list.sort((a, b) => {
+      // Tab Đang Giao: đơn tồn từ hôm trước luôn ghim lên đầu, phải xử lý trước
+      if (activeTab === 'active') {
+        const backlogA = getOrderTimeClassification(a).isBacklog ? 1 : 0;
+        const backlogB = getOrderTimeClassification(b).isBacklog ? 1 : 0;
+        if (backlogA !== backlogB) return backlogB - backlogA;
+      }
       const timeA = new Date(a.deliveredAt || a.updatedAt || a.createdAt || a.packedAt || 0).getTime();
       const timeB = new Date(b.deliveredAt || b.updatedAt || b.createdAt || b.packedAt || 0).getTime();
       const codA = parseFloat(a.totalAmount || a.total || 0);
@@ -471,9 +477,15 @@ export default function Delivery() {
     }
   };
 
+  // Đơn đang gửi xác nhận "Đã giao" — chặn gửi lặp (bấm/trượt nhiều lần,
+  // mở lại modal khi request trước chưa xong).
+  const deliveringIdsRef = useRef(new Set());
+
   const handleConfirmDelivered = async (ord, payload) => {
     if (!ord) return;
     const ordId = ord.orderId || ord.id;
+    if (deliveringIdsRef.current.has(String(ordId))) return;
+    deliveringIdsRef.current.add(String(ordId));
     const payLabel = payload.actualPaymentMethod === 'BANK_TRANSFER' ? `Chuyển khoản VietQR (${payload.bankRefCode})` : (payload.actualPaymentMethod === 'CASH' ? 'Tiền mặt' : 'Đã thanh toán trước');
 
     // Optimistically update apiOrders state for instant UI responsiveness
@@ -498,6 +510,7 @@ export default function Delivery() {
     } catch (err) {
       addNotification(`Lỗi cập nhật trạng thái đơn #${ordId}: ${err.message}`, 'error');
     } finally {
+      deliveringIdsRef.current.delete(String(ordId));
       fetchApiData(true);
     }
   };

@@ -615,6 +615,28 @@ export const generateShipperNotifications = (
     o && o.status === 'READY_TO_SHIP' && isShipperMatched(o)
   );
 
+  // 0. Đơn tồn từ hôm trước — shipper còn giữ hàng qua đêm
+  const startOfTodayLocal = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const backlogOrders = assignedActiveOrders.filter(o => {
+    const d = getOrderDateTime(o);
+    return d && d < startOfTodayLocal;
+  });
+  if (backlogOrders.length > 0) {
+    const id = `notif-backlog-${backlogOrders.length}-${now.toDateString()}`;
+    notifs.push({
+      id,
+      type: 'BACKLOG_WARNING',
+      category: 'urgent',
+      title: `🚨 ${backlogOrders.length} Đơn Tồn Từ Hôm Trước`,
+      message: `Bạn còn giữ ${backlogOrders.length} đơn chưa chốt từ ngày trước (${backlogOrders.slice(0, 3).map(o => '#' + (o.orderId || o.id)).join(', ')}${backlogOrders.length > 3 ? '…' : ''}). Hãy giao trong hôm nay, báo hẹn lại hoặc hoàn kho.`,
+      targetTab: 'active',
+      actionText: 'Xử lý đơn tồn',
+      timeLabel: 'Hôm nay',
+      isRead: readNotificationIds.has(id),
+      createdAt: now
+    });
+  }
+
   // 1. Cảnh báo trễ hẹn (Late Warnings)
   assignedActiveOrders.forEach(ord => {
     if (ord.status === 'SHIPPED') {

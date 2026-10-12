@@ -12,6 +12,7 @@ import { Package, CheckCircle, CheckCircle2, X, AlertCircle, Truck, RotateCcw, S
 import ActorNotificationBar from '../../components/ActorNotificationBar';
 import PackAndScanModal from '../../components/PackAndScanModal';
 import OrderDetailModal from '../../components/OrderDetailModal';
+import StaleDeliveriesPanel from '../../components/Warehouse/StaleDeliveriesPanel';
 import { printDocument } from '../../utils/printDocument';
 import { numberToVietnameseWords } from '../../utils/numberToWords';
 import PeriodFilterBar, { isDateInPeriod } from '../../components/Common/PeriodFilterBar';
@@ -5301,6 +5302,8 @@ export default function Warehouse() {
               Kiểm tra đóng gói, quét mã sản phẩm và phân công nhân viên Shipper giao hàng
             </p>
           </div>
+
+          <StaleDeliveriesPanel />
 
           {/* Filter bar */}
           <div style={{ backgroundColor: '#ffffff', padding: '1rem', borderRadius: '8px', border: '1px solid #e3e8ef', marginBottom: '1.25rem', display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>

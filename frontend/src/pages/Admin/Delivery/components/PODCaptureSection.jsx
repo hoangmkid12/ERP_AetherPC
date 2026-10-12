@@ -11,6 +11,13 @@ function SwipeConfirmButton({ onConfirm, disabled, label = "Trượt để hoàn
   const [isCompleted, setIsCompleted] = useState(false);
   const startXRef = useRef(0);
   const maxSlideRef = useRef(0);
+  // Cờ đồng bộ bằng ref: touchmove/mousemove bắn liên tục nhiều lần trước khi
+  // React kịp render lại, nên kiểm tra theo state (isDragging/isCompleted)
+  // vẫn còn giá trị cũ — mỗi sự kiện vượt ngưỡng lại gọi onConfirm thêm 1
+  // lần (1 đơn bị xác nhận "Đã giao" hàng chục lần). Listener mousemove gắn ở
+  // window cũng giữ closure cũ, nên phải đọc qua ref.
+  const draggingRef = useRef(false);
+  const completedRef = useRef(false);
 
   const getMaxSlide = () => {
     if (!containerRef.current) return 200;
@@ -18,19 +25,22 @@ function SwipeConfirmButton({ onConfirm, disabled, label = "Trượt để hoàn
   };
 
   const handleStart = (clientX) => {
-    if (disabled || isCompleted) return;
+    if (disabled || completedRef.current) return;
+    draggingRef.current = true;
     setIsDragging(true);
     startXRef.current = clientX - sliderPos;
     maxSlideRef.current = getMaxSlide();
   };
 
   const handleMove = (clientX) => {
-    if (!isDragging || disabled || isCompleted) return;
+    if (!draggingRef.current || disabled || completedRef.current) return;
     const max = maxSlideRef.current || getMaxSlide();
     const currentPos = Math.max(0, Math.min(clientX - startXRef.current, max));
     setSliderPos(currentPos);
 
     if (currentPos >= max * 0.85) {
+      draggingRef.current = false;
+      completedRef.current = true;
       setIsDragging(false);
       setIsCompleted(true);
       setSliderPos(max);
@@ -42,7 +52,8 @@ function SwipeConfirmButton({ onConfirm, disabled, label = "Trượt để hoàn
   };
 
   const handleEnd = () => {
-    if (!isDragging || isCompleted) return;
+    if (!draggingRef.current || completedRef.current) return;
+    draggingRef.current = false;
     setIsDragging(false);
     setSliderPos(0);
   };
