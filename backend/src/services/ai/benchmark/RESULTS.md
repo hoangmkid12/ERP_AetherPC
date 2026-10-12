@@ -84,6 +84,25 @@ dữ liệu, bước phân loại cục bộ bị bỏ qua hoàn toàn. Nay data
 Huấn luyện lại: `cd backend && npm run ai:train` (đánh giá + lưu mô hình), `npm run ai:eval`
 (chỉ đánh giá), thêm `--cv-errors` để xem lỗi CV theo cặp ý định.
 
+## 1c. So sánh với PhoBERT (thử nghiệm, chưa tích hợp)
+
+Fine-tune `vinai/phobert-base-v2` trên Google Colab (GPU T4) với **cùng 466 câu, cùng 5 fold**
+(`../data/cv_folds.json`) và **cùng bộ TEST khoá** — notebook `ai_training/Train_PhoBERT_KLTN.ipynb`,
+chi tiết & kết quả gốc trong `ai_training/PHOBERT.md` và `ai_training/results/`.
+
+| Chỉ số | node-nlp | PhoBERT |
+|---|---|---|
+| CV Accuracy | 90,3% | **97,0%** (5 fold: 95,7–97,9%, độ lệch chuẩn 0,8%) |
+| CV Macro-F1 | 91,1% | **97,0%** |
+| CV Precision @0,70 | 94,9% | **98,0%** |
+| CV định tuyến nhầm @0,70 | 22 | **9** |
+| TEST Accuracy | 89,3% | **96,4%** |
+| TEST Precision @0,70 | 92,2% | **98,1%** |
+
+PhoBERT chính xác hơn rõ rệt và nhất quán ở cả 5 fold. Hệ thống vẫn dùng node-nlp vì chi phí vận
+hành (mô hình ~540 MB so với ~0,5 MB, thêm ~300–500 MB RAM, cần tách từ bằng Python); tích hợp PhoBERT
+là hướng phát triển tiếp theo.
+
 ## 2. Bảo mật
 
 | Bộ kiểm thử | Nội dung | Kết quả |

@@ -69,18 +69,34 @@ Hai mô hình được đánh giá trên **cùng** dữ liệu và **cùng** cá
 - **Chỉ số**: Accuracy, Macro-F1, và tại ngưỡng 0,70: Coverage (tỷ lệ câu đủ tự tin để dùng) và
   Precision (trong số đó, tỷ lệ đúng — sai ở đây nghĩa là định tuyến nhầm).
 
-Kết quả node-nlp (đã có, xem `backend/src/services/ai/benchmark/RESULTS.md`):
+## 5b. Kết quả (chạy 2026-10-12, Google Colab, GPU T4)
 
-| Chỉ số | node-nlp CV | PhoBERT CV | node-nlp TEST | PhoBERT TEST |
+File gốc: `results/phobert_results.json`, biểu đồ `results/phobert_confusion_matrix.png`,
+`results/phobert_training_loss.png`. Số liệu node-nlp: `backend/src/services/ai/benchmark/RESULTS.md`.
+
+| Chỉ số | node-nlp CV | **PhoBERT CV** | node-nlp TEST | **PhoBERT TEST** |
 |---|---|---|---|---|
-| Accuracy | 90,3% | *(điền sau khi chạy)* | 89,3% | *(điền)* |
-| Macro-F1 | 91,1% | | 89,9% | |
-| Coverage @0,70 | 92,7% | | 91,1% | |
-| Precision @0,70 | 94,9% | | 92,2% | |
+| Accuracy | 90,3% | **97,0%** | 89,3% | **96,4%** |
+| Macro-F1 | 91,1% | **97,0%** | 89,9% | **96,4%** |
+| Coverage @0,70 | 92,7% | **97,2%** | 91,1% | **96,4%** |
+| Precision @0,70 | 94,9% | **98,0%** | 92,2% | **98,1%** |
+| Số câu định tuyến nhầm @0,70 | 22 | **9** | 4 | **1** |
 
-Lưu ý khi đọc kết quả: bộ TEST chỉ 56 câu — mỗi câu ≈ 1,8 điểm phần trăm, nên chênh lệch 1–2 câu
-giữa hai mô hình chưa đủ để kết luận mô hình nào tốt hơn. Kết quả CV (466 dự đoán) đáng tin hơn;
-notebook in thêm độ lệch chuẩn accuracy giữa 5 fold.
+- **Accuracy từng fold (PhoBERT):** 96,9% · 97,9% · 95,7% · 96,7% · 97,8% — trung bình 97,0%,
+  độ lệch chuẩn 0,8%. Fold kém nhất của PhoBERT (95,7%) vẫn cao hơn trung bình node-nlp (90,3%).
+- **Số câu sai trên CV:** ~14/466 (PhoBERT) so với ~45/466 (node-nlp) — ít lỗi hơn khoảng 3 lần.
+- **Bộ TEST:** 6/8 ý định đúng tuyệt đối; 2 câu sai rơi vào đúng cặp node-nlp cũng hay nhầm nhất:
+  "kpi cá nhân tháng này đạt bao nhiêu rồi" → FINANCE_REPORT (0,57 — dưới ngưỡng, không bị dùng) và
+  "công ty mình có tổng cộng bao nhiêu nhân viên" → MY_PROFILE_TASKS (0,85).
+- **Đường loss:** giảm đều 2,02 → 0,09 qua 10 epoch, phẳng dần từ epoch 7 — hội tụ ổn định. (Đây là
+  loss trên dữ liệu train; khả năng tổng quát hoá được đánh giá bằng CV và bộ TEST ở trên.)
+
+Đọc kết quả: bộ TEST chỉ 56 câu (mỗi câu ≈ 1,8 điểm %), nên **kết luận dựa trên CV** (466 dự đoán, cùng
+fold cho cả hai mô hình). Trên CV, PhoBERT hơn node-nlp ~6,7 điểm accuracy và nhất quán ở cả 5 fold.
+
+**Kết luận:** mô hình ngôn ngữ pre-train cho tiếng Việt (PhoBERT) phân loại ý định chính xác hơn rõ rệt
+so với mạng nơ-ron nhỏ huấn luyện từ đầu (node-nlp) trên cùng 466 câu — đúng như kỳ vọng của transfer
+learning: PhoBERT đã "hiểu" tiếng Việt từ trước nên tổng quát hoá tốt hơn với câu diễn đạt lạ, không dấu.
 
 ## 6. Vì sao không tích hợp PhoBERT vào hệ thống đang chạy
 
@@ -92,14 +108,22 @@ notebook in thêm độ lệch chuẩn accuracy giữa 5 fold.
 | Tách từ | Không cần | Cần (pyvi/VnCoreNLP là thư viện Python/Java — backend là Node.js) |
 | Huấn luyện lại | Vài giây, ngay trên máy | Cần GPU (Colab) |
 
-Với 8 ý định và câu hỏi ngắn, mô hình nhỏ đã đạt ~90%; PhoBERT tốn tài nguyên hơn hàng trăm lần.
-Tích hợp chỉ đáng làm khi PhoBERT cho kết quả **vượt rõ rệt** trên CV — hoặc khi bài toán mở rộng
-(phân loại thẳng vào ~95 kỹ năng thay vì 8 ý định, dữ liệu vài nghìn câu). Hướng tích hợp khi cần:
-xuất ONNX (cell cuối notebook) → chạy bằng `onnxruntime-node`; tách từ bằng một dịch vụ Python nhỏ,
-hoặc fine-tune lại không tách từ để bỏ phụ thuộc pyvi.
+Kết quả mục 5b cho thấy PhoBERT **vượt rõ rệt** (97,0% so với 90,3% trên CV), nên về độ chính xác thì
+tích hợp là xứng đáng. Hệ thống hiện chưa tích hợp vì chi phí vận hành: mô hình nặng hơn ~1.000 lần,
+cần thêm ~300–500 MB RAM trên server và bước tách từ bằng Python trong khi backend là Node.js. Ngoài ra,
+mô hình phân loại chỉ là một tầng trong pipeline (trước nó còn tầng quy tắc + vector theo kỹ năng), nên
+mức cải thiện trên toàn hệ thống sẽ nhỏ hơn mức chênh 6,7 điểm của riêng bộ phân loại.
+
+**Hướng phát triển tiếp theo:** xuất ONNX (cell cuối notebook, nén int8 còn ~135 MB) → chạy bằng
+`onnxruntime-node`; tách từ bằng một dịch vụ Python nhỏ, hoặc fine-tune lại không tách từ để bỏ phụ
+thuộc pyvi; giữ node-nlp làm phương án dự phòng khi PhoBERT chưa sẵn sàng.
 
 ## 7. Câu hỏi hội đồng có thể hỏi
 
+- **PhoBERT tốt hơn vậy sao hệ thống không dùng?** Đánh đổi giữa độ chính xác và chi phí vận hành:
+  PhoBERT hơn ~6,7 điểm nhưng nặng hơn ~1.000 lần, cần thêm RAM server và một dịch vụ Python để tách từ.
+  Bộ phân loại chỉ là một tầng trong pipeline nên lợi ích trên toàn hệ thống nhỏ hơn. Thử nghiệm này
+  cung cấp số liệu để quyết định tích hợp ở giai đoạn sau, khi quy mô người dùng tăng.
 - **Vì sao không train PhoBERT từ đầu?** Pre-train cần hàng chục GB văn bản và nhiều GPU trong nhiều
   ngày; fine-tune tận dụng kiến thức đã học, chỉ cần vài trăm câu và vài phút GPU.
 - **466 câu có đủ không?** Cho 8 ý định (~40–80 câu/ý định) là đủ để fine-tune; đánh giá bằng

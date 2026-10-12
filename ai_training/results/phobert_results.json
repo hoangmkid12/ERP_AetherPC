@@ -1,0 +1,77 @@
+{
+  "model": "vinai/phobert-base-v2",
+  "device": "cuda",
+  "hyperparams": {
+    "max_len": 64,
+    "batch_size": 16,
+    "epochs": 10,
+    "lr": 3e-05,
+    "weight_decay": 0.01,
+    "warmup_ratio": 0.1,
+    "seed": 42,
+    "segmenter": "pyvi"
+  },
+  "data": {
+    "train": 466,
+    "test_locked": 56,
+    "intents": [
+      "FINANCE_REPORT",
+      "GENERAL_CHAT",
+      "HR_STAFF_COUNT",
+      "KNOWLEDGE_SOP",
+      "MY_PROFILE_TASKS",
+      "ORDER_LOOKUP",
+      "PC_COMPATIBILITY",
+      "PRODUCT_LOOKUP"
+    ]
+  },
+  "cv_5fold": {
+    "n": 466,
+    "accuracy": 0.9699570815450643,
+    "macro_f1": 0.970217127648414,
+    "coverage_at_threshold": 0.9721030042918455,
+    "precision_at_threshold": 0.9801324503311258,
+    "misrouted_at_threshold": 9,
+    "fold_accuracies": [
+      0.96875,
+      0.9787234042553191,
+      0.9574468085106383,
+      0.967391304347826,
+      0.9777777777777777
+    ]
+  },
+  "test_locked": {
+    "n": 56,
+    "accuracy": 0.9642857142857143,
+    "macro_f1": 0.9641941391941392,
+    "coverage_at_threshold": 0.9642857142857143,
+    "precision_at_threshold": 0.9814814814814815,
+    "misrouted_at_threshold": 1
+  },
+  "test_errors": [
+    {
+      "text": "kpi cá nhân tháng này đạt bao nhiêu rồi",
+      "actual": "MY_PROFILE_TASKS",
+      "predicted": "FINANCE_REPORT",
+      "confidence": 0.568
+    },
+    {
+      "text": "công ty mình có tổng cộng bao nhiêu nhân viên",
+      "actual": "HR_STAFF_COUNT",
+      "predicted": "MY_PROFILE_TASKS",
+      "confidence": 0.852
+    }
+  ],
+  "training_loss_per_epoch": [
+    2.0199491580327353,
+    1.5762227416038512,
+    0.9852663218975067,
+    0.5467010806004207,
+    0.30786414444446564,
+    0.19018002450466157,
+    0.1333401175836722,
+    0.11067291001478831,
+    0.09854038779934247,
+    0.09162012413144112
+  ]
+}
