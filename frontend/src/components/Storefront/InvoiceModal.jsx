@@ -85,12 +85,11 @@ export function CompanySeal({ size = 150 }) {
   );
 }
 
-const FONT = '"Times New Roman", Times, serif';
+const FONT = '"Be Vietnam Pro", "Segoe UI", Arial, sans-serif';
 const INK = '#111827';
 const LINE = '#4b5563';
 const td = { border: `1px solid ${LINE}`, padding: '6px 8px', fontSize: '13.5px', verticalAlign: 'top', color: INK };
 const th = { ...td, fontWeight: 700, textAlign: 'center', verticalAlign: 'middle', backgroundColor: '#f3f4f6' };
-const idx = { ...td, textAlign: 'center', fontStyle: 'italic', fontSize: '12px', padding: '2px 8px', color: '#4b5563' };
 const num = { ...td, textAlign: 'right', whiteSpace: 'nowrap' };
 const row = { display: 'flex', gap: '0.35rem', fontSize: '14px', lineHeight: 1.75, color: INK };
 
@@ -205,9 +204,6 @@ export default function InvoiceModal({ open, onClose, invoice }) {
                   <th style={{ ...th, width: '64px' }}>Số lượng</th>
                   <th style={{ ...th, width: '118px' }}>Đơn giá</th>
                   <th style={{ ...th, width: '130px' }}>Thành tiền</th>
-                </tr>
-                <tr>
-                  <td style={idx}>1</td><td style={idx}>2</td><td style={idx}>3</td><td style={idx}>4</td><td style={idx}>5</td><td style={idx}>6 = 4 x 5</td>
                 </tr>
               </thead>
               <tbody>
