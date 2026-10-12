@@ -1,0 +1,75 @@
+# Đánh giá AetherCopilot — kết quả & cách chạy lại
+
+Ngày đánh giá: 2026-10-12. Mọi bộ kiểm thử nằm trong thư mục này và chạy lại được.
+
+## 1. Độ chính xác hiểu câu hỏi (held-out)
+
+`heldout_cases.js` gồm 2 bộ câu hỏi **diễn đạt khác với dữ liệu huấn luyện**:
+
+- **DEV** (26 câu): dùng để phân tích lỗi và tinh chỉnh ngưỡng / quy tắc.
+- **TEST** (40 câu): viết và **khoá trước khi tinh chỉnh**, không dùng để chỉnh — chỉ báo cáo.
+
+Chỉ số: *Đúng* (chọn đúng kỹ năng / từ chối đúng câu vượt quyền hoặc ngoài phạm vi),
+*Sai tự tin* (trả lời SUCCESS nhưng sai kỹ năng, hoặc trả lời câu lẽ ra phải từ chối —
+loại lỗi nguy hiểm nhất), *Từ chối thừa* (câu trả lời được nhưng hệ thống báo chưa chắc).
+
+| Bộ   | Thời điểm        | Đúng          | Sai tự tin   | Từ chối thừa | Chặn quyền sai |
+|------|------------------|---------------|--------------|--------------|----------------|
+| DEV  | Trước cải tiến   | 19/26 (73,1%) | 6/26 (23,1%) | 1/26 (3,8%)  | 0              |
+| DEV  | Sau cải tiến*    | 26/26 (100%)  | 0            | 0            | 0              |
+| TEST | Trước cải tiến   | 32/40 (80,0%) | 6/40 (15,0%) | 2/40 (5,0%)  | 0              |
+| TEST | **Sau cải tiến** | **34/40 (85,0%)** | **2/40 (5,0%)** | 4/40 (10,0%) | 0          |
+
+\* Kết quả DEV sau cải tiến lạc quan vì đã tinh chỉnh trên chính bộ này — **số liệu nên báo
+cáo là của bộ TEST**.
+
+Cải tiến chính: tỷ lệ *sai tự tin* trên TEST giảm từ 15% xuống 5%, đổi lại tỷ lệ "chưa
+chắc chắn, mời diễn đạt lại" tăng 5 điểm — với hệ thống ERP, hỏi lại an toàn hơn hiện
+một con số sai.
+
+Các câu TEST còn sai (để phát triển tiếp, không chỉnh theo):
+- "giá con i7 14700k bên mình bán nhiêu" → nhầm sang tư vấn tương thích
+- "đang có chương trình giảm giá gì không" → nhầm sang tra giá sản phẩm
+- 4 câu báo "chưa chắc chắn" dù trả lời được (chính sách đổi trả, tỷ lệ phương thức
+  thanh toán, số người mỗi phòng ban, cách đóng thùng máy)
+
+Thay đổi đã áp dụng:
+- Ngưỡng cosine 0,38 → 0,42 và yêu cầu khoảng cách tới ý định thứ 2 ≥ 0,05
+  (`matcher/vectorMatcher.js`); ngưỡng đồng thuận vector+NLP 0,20 → 0,5.
+- Quy tắc định tuyến theo tín hiệu rõ ràng (`actors/intentGuards.js`): mã đơn → tra đơn;
+  hỏi tương thích / công suất nguồn; chiết khấu VIP; câu hỏi quy trình → SOP; kỳ thời
+  gian phải khớp kỹ năng doanh thu (nhận cả không dấu / gõ thiếu 1 ký tự).
+- Thêm kỹ năng `YESTERDAY_REVENUE`.
+
+Lưu ý phương pháp: đây là đánh giá **khâu chọn kỹ năng** của tầng offline với DB giả —
+không đo chất lượng câu trả lời do Gemini sinh ra.
+
+## 2. Bảo mật
+
+| Bộ kiểm thử | Nội dung | Kết quả |
+|---|---|---|
+| `security_sql_test.js` — lớp ứng dụng | SQL do AI sinh: vượt quyền bảng theo vai trò, cột bí mật, lấy cả dòng, CTE/subquery giấu bảng, ghi dữ liệu, hàm hệ thống, nhiều câu lệnh, comment... | 51/51 |
+| `security_sql_test.js` — lớp DB | User `aether_ai_readonly`: không ghi, không đọc cột bí mật / bảng cấu hình / hàm hệ thống | 9/9 |
+| `chat_rbac_test.js` | Toàn bộ luồng chat: shipper / sales / kho / HR hỏi dữ liệu vượt quyền, prompt injection, tra đơn của người khác | 12/12 |
+| `cache_isolation_test.js` | Cache không trả câu trả lời của người này cho người khác | Đạt |
+
+## 3. Các bộ kiểm thử có sẵn (đã sửa để kiểm tra đúng nội dung)
+
+| Bộ | Kết quả | Ghi chú |
+|---|---|---|
+| `benchmark_stage5.js` | 14/14 | Trước đây "100 câu đồng thời" báo 76–88/100 — nguyên nhân là DB giả thiếu `order.findFirst`, không phải lỗi đồng thời. Câu gõ sai "doang thu thag nay" trước đây "đạt" dù trả doanh thu CẢ NĂM — nay kiểm tra đúng kỳ THÁNG. Test vô hiệu hoá cache trước đây luôn đạt (tra khoá không tồn tại) — nay kiểm tra thật. |
+| `../context/test_stage4_multiturn.js` | 23/23 | "thế còn hôm qua?" trước đây "đạt" nhưng trả doanh thu HÔM NAY — nay kiểm tra nội dung là doanh thu hôm qua. |
+| `../actors/test_actor_trainers.js` | 15/15 | |
+
+## Cách chạy lại
+
+```bash
+cd backend
+node src/services/ai/benchmark/heldout_eval.js            # DEV + TEST (offline)
+node src/services/ai/benchmark/heldout_eval.js TEST -v    # in từng câu
+node src/services/ai/benchmark/benchmark_stage5.js        # offline
+node src/services/ai/benchmark/cache_isolation_test.js    # offline
+node src/services/ai/context/test_stage4_multiturn.js     # offline
+node -r dotenv/config src/services/ai/benchmark/security_sql_test.js   # cần DB, chỉ đọc
+node -r dotenv/config src/services/ai/benchmark/chat_rbac_test.js      # cần DB, chỉ đọc
+```

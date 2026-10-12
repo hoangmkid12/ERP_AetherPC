@@ -301,13 +301,35 @@ const classifyIntentByRegex = (promptText) => {
 // POST /api/v1/ai/chat - Hàm xử lý chat chính
 // Flow: AI Intent Classification → Route to Handler → Synthesize Response
 // ============================================================================
+// Phiên hội thoại luôn gắn với người dùng đang đăng nhập. sessionId do client gửi
+// chỉ dùng để phân biệt nhiều cửa sổ chat của CÙNG người đó — trước đây dùng thẳng
+// giá trị client gửi (frontend gửi "session_<id>", đoán được), nên một người có
+// thể đọc ké ngữ cảnh hội thoại (mã đơn, sản phẩm vừa hỏi...) của người khác.
+const scopedSessionId = (user, clientSessionId) => {
+  const suffix = String(clientSessionId || 'default').replace(/[^\w-]/g, '').slice(0, 64) || 'default';
+  return `${user?.role || 'ANON'}:${user?.id ?? 'anon'}:${suffix}`;
+};
+
 const chatWithAi = async (req, res, next) => {
   const startTime = Date.now();
-  const { message, conversationHistory = [] } = req.body;
-  const user = req.user || { role: 'SALES', name: 'Nhân viên' };
+  const { message } = req.body;
+  // Lịch sử hội thoại do client gửi lên được đưa thẳng vào prompt Gemini — giới
+  // hạn số lượt và độ dài để không bị nhồi prompt quá lớn.
+  const conversationHistory = (Array.isArray(req.body.conversationHistory) ? req.body.conversationHistory : [])
+    .slice(-8)
+    .map(h => ({ ...h, content: String(h?.content || h?.text || '').slice(0, 2000), text: undefined }));
+  // Không còn mặc định coi người gọi là SALES khi thiếu thông tin đăng nhập —
+  // route đã bắt buộc tài khoản nhân viên, đây là chốt chặn phòng hờ.
+  const user = req.user;
+  if (!user || !user.role) {
+    return res.status(401).json({ success: false, message: 'Vui lòng đăng nhập tài khoản nhân viên để dùng trợ lý AI.' });
+  }
 
-  if (!message || !message.trim()) {
+  if (!message || typeof message !== 'string' || !message.trim()) {
     return res.status(400).json({ success: false, message: 'Nội dung câu hỏi không được để trống.' });
+  }
+  if (message.length > 1000) {
+    return res.status(400).json({ success: false, message: 'Câu hỏi quá dài (tối đa 1000 ký tự).' });
   }
 
   const promptText = message.trim();
@@ -321,14 +343,18 @@ const chatWithAi = async (req, res, next) => {
     // BƯỚC 0: KIẾN TRÚC OFFLINE DETERMINISTIC PIPELINE (GIAI ĐOẠN 1, 2, 3 & 4)
     // Pipeline: Vector/Hybrid Matcher -> Entity Extraction -> Context/Anaphora Resolution -> RBAC Prisma Handler
     // ========================================================================
-    const sessionId = req.body.sessionId || (user.id ? String(user.id) : 'session_default');
+    const sessionId = scopedSessionId(user, req.body.sessionId);
     let offlineMetadata = null;
     const actorResult = await executeActorIntent(promptText, user.role, prisma, user, {
       sessionId,
       conversationHistory
     });
 
-    if (actorResult && (actorResult.status === 'SUCCESS' || actorResult.status === 'CLARIFICATION_REQUIRED' || actorResult.status === 'ACCESS_DENIED' || actorResult.status === 'UNCERTAIN')) {
+    // Các trạng thái là CÂU TRẢ LỜI CUỐI: dừng tại đây. Đặc biệt FORBIDDEN (vai trò
+    // không có quyền với kỹ năng này) trước đây KHÔNG nằm trong danh sách nên câu
+    // hỏi rơi tiếp xuống tầng Gemini sinh SQL — vượt quyền đúng cái vừa bị chặn.
+    const TERMINAL_ACTOR_STATUSES = ['SUCCESS', 'CLARIFICATION_REQUIRED', 'ACCESS_DENIED', 'FORBIDDEN', 'UNCERTAIN'];
+    if (actorResult && TERMINAL_ACTOR_STATUSES.includes(actorResult.status)) {
       finalAiResponse = actorResult.text || actorResult.message;
       offlineMetadata = {
         isCached: Boolean(actorResult.fromCache),
@@ -559,10 +585,16 @@ Hãy trả lời trực tiếp, thân thiện, rõ ràng và chuẩn xác dựa 
             `- **Thanh toán:** ${o.paymentSummary}\n` +
             `- **Shipper phụ trách:** ${o.shipper}\n` +
             `- **Linh kiện trong đơn:** ${o.itemNames || 'Chi tiết đơn lẻ'}`;
+        } else if (orderResult.success === false) {
+          // Vai trò không được tra đơn / đơn ngoài phạm vi: trả lời từ chối, không
+          // vòng sang tầng SQL tự do để tra lại đúng thứ vừa bị chặn.
+          finalAiResponse = `🔒 ${orderResult.message}`;
         } else {
           // Thử tra cứu qua Universal ERP Live Data Engine (cho các câu hỏi tổng hợp: thống kê trạng thái, top đơn, v.v.)
           const universalResult = await executeUniversalDataQuery(promptText, user).catch(() => null);
-          if (universalResult && universalResult.success && universalResult.rowCount > 0) {
+          if (universalResult && universalResult.denied) {
+            finalAiResponse = universalResult.finalResponse;
+          } else if (universalResult && universalResult.success && universalResult.rowCount > 0) {
             finalAiResponse = universalResult.finalResponse;
             toolCallsExecuted.push({
               tool: 'universal_live_data_query',
@@ -668,6 +700,12 @@ Hãy phân tích câu hỏi trên và đưa ra phản hồi lịch sự, thân t
       // Hỗ trợ ngữ cảnh: targetRole, timePeriod, subIntent
       // -----------------------------------------------------------------------
       case 'FINANCE_REPORT': {
+        // Báo cáo tài chính doanh nghiệp chỉ dành cho Ban giám đốc / Kế toán — kiểm
+        // tra TRƯỚC khi chạy tầng SQL (trước đây SQL chạy trước, kiểm quyền sau).
+        if (!['CEO', 'ADMIN', 'ACCOUNTANT'].includes(user.role)) {
+          finalAiResponse = `⚠️ **Từ chối truy cập:** Vai trò của bạn (**${user.role}**) không có thẩm quyền tra cứu dữ liệu tài chính của doanh nghiệp. Vui lòng liên hệ Ban Giám Đốc (CEO) hoặc Kế Toán Trưởng.`;
+          break;
+        }
         // Nếu người dùng hỏi doanh thu cụ thể theo thời gian (năm nay, tháng này, quý này, từng tháng, top sản phẩm, kênh online...)
         // hãy ưu tiên Universal Live Data Engine để query đúng 100% số liệu thực từ database
         const isTimePeriodRevenue = /(năm nay|tháng này|tháng trước|hôm qua|tuần này|từng tháng|chi tiết|bao nhiêu|kênh|danh mục|quý)/i.test(promptText);
@@ -983,13 +1021,13 @@ const getAiStats = async (req, res, next) => {
  */
 const clearAiSession = async (req, res, next) => {
   try {
-    const { sessionId } = req.body;
-    const sid = sessionId || `session_${req.user?.id || 'anon'}`;
+    const sid = scopedSessionId(req.user, req.body?.sessionId);
     const { conversationContext } = require('../services/ai/context');
     const { queryCache } = require('../services/ai/cache');
 
     conversationContext.clearSession(sid);
-    queryCache.clear(); // Xóa sạch cache để đảm bảo không bị dính câu trả lời cũ
+    // Chỉ xoá cache của chính người dùng này (trước đây xoá sạch cache của mọi người)
+    queryCache.invalidateByUser(req.user?.role, req.user?.id);
 
     res.json({
       success: true,

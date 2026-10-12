@@ -40,7 +40,12 @@ class QueryCacheService {
    */
   generateKey(prompt, role, userId = null, isPersonal = false) {
     const cleanPrompt = (prompt || '').toLowerCase().trim().replace(/\s+/g, ' ');
-    const userScope = isPersonal && userId ? `:u_${userId}` : '';
+    // LUÔN tách cache theo người dùng. Trước đây chỉ tách khi câu hỏi có cụm "của
+    // tôi"... nên câu như "hôm nay tôi phải giao mấy đơn" dùng chung khoá cho mọi
+    // shipper → shipper B nhận nguyên danh sách đơn (kèm địa chỉ khách) của shipper A
+    // trong 30s. Cache được tra TRƯỚC khi biết kỹ năng nên không thể chỉ tách cho
+    // câu hỏi "cá nhân" một cách an toàn. (isPersonal giữ lại để tương thích.)
+    const userScope = `:u_${userId != null && userId !== '' ? userId : 'anon'}`;
     return `${role || 'GLOBAL'}${userScope}::${cleanPrompt}`;
   }
 
@@ -134,7 +139,21 @@ class QueryCacheService {
    * Xóa cache theo vai trò cụ thể
    */
   invalidateByRole(role) {
-    const prefix = `${role}::`;
+    // Khoá có dạng `${role}:u_${userId}::${prompt}` (xem generateKey)
+    const prefix = `${role}:`;
+    for (const key of this.cache.keys()) {
+      if (key.startsWith(prefix)) {
+        this.cache.delete(key);
+      }
+    }
+  }
+
+  /**
+   * Xoá cache của đúng 1 người dùng (dùng khi người đó bấm "làm mới hội thoại") —
+   * không xoá cache của người khác.
+   */
+  invalidateByUser(role, userId) {
+    const prefix = `${role || 'GLOBAL'}:u_${userId != null && userId !== '' ? userId : 'anon'}::`;
     for (const key of this.cache.keys()) {
       if (key.startsWith(prefix)) {
         this.cache.delete(key);

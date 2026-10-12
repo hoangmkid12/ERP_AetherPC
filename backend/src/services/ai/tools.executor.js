@@ -19,7 +19,7 @@ const executeToolCall = async (toolName, params, user) => {
       return executeCheckPcCompatibility(params);
 
     case 'lookup_order_status':
-      return await executeLookupOrderStatus(params, userRole);
+      return await executeLookupOrderStatus(params, user);
 
     case 'get_my_delivery_tasks':
       return await executeGetMyDeliveryTasks(user, userRole);
@@ -476,10 +476,27 @@ const executeCheckPcCompatibility = (params) => {
 };
 
 // 4. Tra cứu đơn hàng & giao vận
-const executeLookupOrderStatus = async (params) => {
+// Vai trò nội bộ được tra cứu đơn của mọi khách (đã che SĐT khách trong kết quả)
+const ORDER_LOOKUP_ALL_ROLES = ['CEO', 'ADMIN', 'SALES', 'SALES_MANAGER', 'CSKH', 'ACCOUNTANT', 'WAREHOUSE', 'WAREHOUSE_MANAGER', 'ASSEMBLY'];
+
+const executeLookupOrderStatus = async (params, user) => {
   const { orderIdOrPhone } = params || {};
   if (!orderIdOrPhone) {
     return { success: false, message: 'Vui lòng cung cấp Mã đơn hàng hoặc Số điện thoại.' };
+  }
+
+  // Phạm vi đơn được phép tra theo vai trò. Trước đây không kiểm tra gì: ai đăng
+  // nhập cũng tra được đơn (tên, sản phẩm, shipper) của khách khác bằng SĐT.
+  const role = user?.role;
+  let scope;
+  if (ORDER_LOOKUP_ALL_ROLES.includes(role)) {
+    scope = {};
+  } else if (role === 'DELIVERY' && user?.id != null) {
+    scope = { assignedShipperId: Number(user.id) };
+  } else if (role === 'CUSTOMER' && user?.id != null) {
+    scope = { customerId: String(user.id) };
+  } else {
+    return { success: false, message: 'Vai trò của bạn không được tra cứu đơn hàng qua trợ lý AI.' };
   }
 
   const queryClean = String(orderIdOrPhone).trim();
@@ -488,6 +505,7 @@ const executeLookupOrderStatus = async (params) => {
 
   const order = await prisma.order.findFirst({
     where: {
+      ...scope,
       OR: [
         { orderId: { equals: searchTerm, mode: 'insensitive' } },
         { customer: { phone: searchTerm } }

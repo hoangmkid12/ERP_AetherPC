@@ -165,8 +165,14 @@ class BaseActorTrainer {
     }
 
     // 1. Kiểm tra quyền hạn (RBAC)
+    // So khớp vai trò thật + các vai trò tương đương khai báo rõ ràng (trước đây so
+    // đúng tên nên Trưởng phòng Kinh doanh / Quản lý kho bị từ chối kỹ năng của
+    // chính phòng mình). Không dùng normalizeActorRole vì hàm đó mặc định mọi vai
+    // trò lạ (HR, CSKH...) thành SALES — sẽ cấp nhầm quyền.
     const userRole = (user.role || '').toUpperCase();
-    const isAllowed = skill.allowedRoles.some(r => r.toUpperCase() === userRole || userRole === 'ADMIN' || userRole === 'CEO');
+    const effectiveRoles = [userRole, ...(BaseActorTrainer.ROLE_EQUIVALENTS[userRole] || [])];
+    const isAllowed = userRole === 'ADMIN' || userRole === 'CEO' ||
+      skill.allowedRoles.some(r => effectiveRoles.includes(r.toUpperCase()));
     if (!isAllowed) {
       return {
         status: 'FORBIDDEN',
@@ -305,5 +311,18 @@ class BaseActorTrainer {
     return dataset;
   }
 }
+
+// Vai trò tương đương khi xét quyền kỹ năng: vai trò quản lý/kỹ thuật của một phòng
+// ban được dùng kỹ năng của phòng đó. Khai báo tường minh — vai trò không có trong
+// bảng chỉ được dùng kỹ năng ghi đúng tên vai trò của mình.
+BaseActorTrainer.ROLE_EQUIVALENTS = {
+  SALES_MANAGER: ['SALES'],
+  WAREHOUSE_MANAGER: ['WAREHOUSE'],
+  ASSEMBLY: ['WAREHOUSE'],
+  PURCHASING: ['WAREHOUSE'],
+  QC: ['QC_TECH'],
+  QA: ['QC', 'QC_TECH'],
+  QUALITY_CONTROL: ['QC', 'QC_TECH']
+};
 
 module.exports = BaseActorTrainer;

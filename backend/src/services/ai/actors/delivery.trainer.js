@@ -610,17 +610,23 @@ deliveryTrainer.addSkill({
     /(tiến độ đơn hàng|kiểm tra đơn|giao tới đâu|ai đang.*giao|khách.*trả tiền|trạng thái đơn hàng)/i
   ],
   allowedRoles: ['DELIVERY', 'SALES', 'WAREHOUSE', 'ACCOUNTANT', 'ADMIN_CEO', 'ADMIN'],
-  handler: async (prisma, params) => {
+  handler: async (prisma, params, user = {}) => {
     let rawId = params?.orderId ? String(params.orderId).trim() : '';
     if (!rawId) return null;
 
-    return await prisma.order.findFirst({
-      where: {
-        OR: [
-          { orderId: rawId },
-          { orderId: { contains: rawId, mode: 'insensitive' } }
-        ]
-      },
+    // Shipper chỉ được tra đơn ĐƯỢC GIAO CHO MÌNH (trước đây tra được mọi đơn kèm
+    // SĐT + địa chỉ khách). Các vai trò khác trong allowedRoles tra mọi đơn.
+    const role = String(user.role || '').toUpperCase();
+    const scope = role === 'DELIVERY' ? { assignedShipperId: Number(user.id) || -1 } : {};
+
+    // Khớp đúng mã trước; chỉ tìm "chứa" khi chuỗi đủ dài (>= 4 ký tự) — trước đây
+    // gõ "1" cũng khớp bừa một đơn bất kỳ có chữ số 1.
+    const idFilter = rawId.length >= 4
+      ? { OR: [{ orderId: { equals: rawId, mode: 'insensitive' } }, { orderId: { contains: rawId, mode: 'insensitive' } }] }
+      : { orderId: { equals: rawId, mode: 'insensitive' } };
+
+    const order = await prisma.order.findFirst({
+      where: { ...scope, ...idFilter },
       select: {
         orderId: true,
         status: true,
@@ -634,6 +640,16 @@ deliveryTrainer.addSkill({
         assignedShipper: { select: { fullName: true, phone: true } }
       }
     });
+
+    // SĐT khách: Sales/CSKH/Kế toán/Ban giám đốc và shipper phụ trách đơn (cần gọi
+    // khách) xem đầy đủ; vai trò khác (VD Kho) chỉ thấy bản che — cùng chính sách
+    // với tầng SQL (safeSqlExecutor).
+    const FULL_PHONE_ROLES = ['SALES', 'SALES_MANAGER', 'CSKH', 'ACCOUNTANT', 'ADMIN', 'CEO', 'ADMIN_CEO', 'DELIVERY'];
+    if (order?.customer?.phone && !FULL_PHONE_ROLES.includes(role)) {
+      const p = order.customer.phone;
+      order.customer.phone = `${p.slice(0, 3)}****${p.slice(-3)}`;
+    }
+    return order;
   },
   template: (order) => {
     if (!order) {

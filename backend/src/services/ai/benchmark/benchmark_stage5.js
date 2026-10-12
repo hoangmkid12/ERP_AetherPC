@@ -38,6 +38,19 @@ const createBenchmarkPrisma = () => {
         totalAmount: 25000000,
         shippingAddress: 'Quận 1, TP.HCM'
       }),
+      // Kỹ năng tra đơn (DELIVERY_TRACK_ORDER) dùng findFirst — thiếu hàm này nên
+      // trước đây 1/8 câu hỏi luôn lỗi và bị hiểu nhầm là "lỗi xử lý đồng thời".
+      findFirst: async () => ({
+        orderId: 'DH-1002',
+        status: 'SHIPPED',
+        totalAmount: 25000000,
+        shippingAddress: 'Quận 1, TP.HCM',
+        createdAt: new Date(),
+        customer: { name: 'Khách Test', phone: '0900000000' },
+        assignedShipper: { fullName: 'Shipper Test', phone: '0911111111' },
+        items: [],
+        payments: []
+      }),
       findMany: async () => [],
       count: async () => 10,
       aggregate: async () => ({
@@ -123,19 +136,31 @@ async function runStage5Benchmark() {
     { prompt: 'sản phẩm khuyến mãi giảm giá', role: 'SALES' }
   ];
 
+  // Kịch bản thực tế: 10 nhân viên, mỗi người hỏi lặp lại các câu của mình.
+  // Cache được tách theo từng người dùng (không dùng chung kết quả giữa người này
+  // với người khác — trước đây dùng chung khiến shipper này thấy đơn của shipper
+  // kia), nên bước làm ấm cũng làm theo đúng từng (người dùng, câu hỏi).
+  const USERS = 10;
+  const totalConcurrent = 100;
+  const pairOf = (i) => ({ item: concurrentPrompts[i % concurrentPrompts.length], userId: (i % USERS) + 1 });
+
   // Làm ấm Cache (Warm-up phase)
-  for (const item of concurrentPrompts) {
-    await executeActorIntent(item.prompt, item.role, prisma, { id: 99, role: item.role }, { sessionId: 'warmup' });
+  const warmed = new Set();
+  for (let i = 0; i < totalConcurrent; i++) {
+    const { item, userId } = pairOf(i);
+    const key = `${userId}|${item.prompt}`;
+    if (warmed.has(key)) continue;
+    warmed.add(key);
+    await executeActorIntent(item.prompt, item.role, prisma, { id: userId, role: item.role }, { sessionId: `warmup_${userId}` });
   }
 
-  const totalConcurrent = 100;
   const tasks = [];
   const startStress = Date.now();
 
   for (let i = 0; i < totalConcurrent; i++) {
-    const item = concurrentPrompts[i % concurrentPrompts.length];
+    const { item, userId } = pairOf(i);
     tasks.push(
-      executeActorIntent(item.prompt, item.role, prisma, { id: i + 1, role: item.role }, { sessionId: `stress_${i}` })
+      executeActorIntent(item.prompt, item.role, prisma, { id: userId, role: item.role }, { sessionId: `stress_${i}` })
     );
   }
 
@@ -143,6 +168,15 @@ async function runStage5Benchmark() {
   const totalStressTimeMs = Date.now() - startStress;
   const successfulQueries = results.filter(r => r && (r.status === 'SUCCESS' || r.status === 'CLARIFICATION_REQUIRED')).length;
   const qps = Math.round((totalConcurrent / (totalStressTimeMs / 1000)));
+
+  // In rõ câu nào không thành công và vì sao (trước đây chỉ in tổng số)
+  const failedByPrompt = {};
+  results.forEach((r, i) => {
+    if (r && (r.status === 'SUCCESS' || r.status === 'CLARIFICATION_REQUIRED')) return;
+    const key = `${concurrentPrompts[i % concurrentPrompts.length].prompt} → ${r?.status || 'null'}: ${String(r?.message || '').slice(0, 90)}`;
+    failedByPrompt[key] = (failedByPrompt[key] || 0) + 1;
+  });
+  Object.entries(failedByPrompt).forEach(([k, n]) => console.log(`    ⚠️ ${n}x ${k}`));
 
   assert(successfulQueries === totalConcurrent, `Hoàn thành 100% câu hỏi đồng thời (${successfulQueries}/${totalConcurrent})`);
   assert(totalStressTimeMs < 1000, `Tổng thời gian xử lý 100 câu hỏi < 1000ms (Thực tế: ${totalStressTimeMs}ms)`);
@@ -180,6 +214,11 @@ async function runStage5Benchmark() {
     typoResult && typoResult.status === 'SUCCESS',
     'Từ khóa gõ sai dấu ("doang thu thag nay") -> Vẫn nhận diện chính xác doanh thu nhờ Subword Vector'
   );
+  // Trước đây chỉ kiểm tra SUCCESS — câu này từng được trả bằng doanh thu CẢ NĂM.
+  assert(
+    typoResult && (typoResult.skillId === 'MONTHLY_REVENUE' || typoResult.intent === 'MONTHLY_REVENUE'),
+    'Từ khóa gõ sai dấu ("doang thu thag nay") -> Đúng kỳ: doanh thu THÁNG (không phải cả năm)'
+  );
 
   // --------------------------------------------------------------------------
   // PHẦN 4: ĐÁNH GIÁ HIỆU SUẤT CACHE (HIT RATE & INVALIDATION)
@@ -190,10 +229,14 @@ async function runStage5Benchmark() {
   assert(stats.hits > 0, `Ghi nhận lượt trúng cache (Hits: ${stats.hits})`);
   assert(stats.hitRate >= 50.0, `Tỷ lệ trúng cache đạt yêu cầu (Hit Rate: ${stats.hitRate}%)`);
 
-  // Thử nghiệm vô hiệu hóa cache theo vai trò
+  // Thử nghiệm vô hiệu hóa cache theo vai trò. Trước đây test tra một khoá không
+  // bao giờ tồn tại (thiếu userId) nên luôn "đạt" — giờ kiểm tra khoá thật của
+  // người dùng có tồn tại TRƯỚC khi xoá và biến mất SAU khi xoá.
+  await executeActorIntent(testPrompt, 'SALES', prisma, salesUser, { sessionId: 'invalidate_check' });
+  const realKey = queryCache.generateKey(testPrompt, 'SALES', salesUser.id);
+  assert(queryCache.get(realKey) !== null, 'Khoá cache thật của người dùng SALES tồn tại trước khi vô hiệu hoá');
   queryCache.invalidateByRole('SALES');
-  const checkInvalidated = queryCache.get(queryCache.generateKey(testPrompt, 'SALES'));
-  assert(checkInvalidated === null, 'Vô hiệu hóa cache vai trò SALES thành công');
+  assert(queryCache.get(realKey) === null, 'Vô hiệu hóa cache vai trò SALES thành công');
 
   // --------------------------------------------------------------------------
   // TỔNG KẾT

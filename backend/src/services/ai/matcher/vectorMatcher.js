@@ -2,9 +2,15 @@
  * VECTOR MATCHER - GIAI ĐOẠN 3: SO KHỚP Ý ĐỊNH BẰNG VECTOR & COSINE SIMILARITY
  * - Lập chỉ mục Vector Embedding toàn bộ 79+ kỹ năng và 401+ câu hỏi mẫu
  * - Tìm kiếm ý định có độ tương đồng Cosine cao nhất
- * - Hỗ trợ Ngưỡng tin cậy (Confidence Threshold = 0.65):
- *   + Nếu score >= 0.65: Khớp ý định thành công
- *   + Nếu score < 0.65: Báo 'UNCERTAIN' kèm Top 3 gợi ý gần nhất
+ * - Chỉ coi là KHỚP khi đồng thời:
+ *   + điểm cosine >= confidenceThreshold (mặc định 0.42), và
+ *   + bỏ xa ý định đứng thứ 2 ít nhất minMargin (mặc định 0.05).
+ *   Ngược lại báo 'UNCERTAIN' kèm Top 3 gợi ý.
+ *   (Trước đây ngưỡng thực tế là 0.38 dù tài liệu ghi 0.65, không xét khoảng cách,
+ *   nên câu ngoài phạm vi kiểu "hôm nay ăn gì" vẫn bị khớp với điểm ~0.40.
+ *   Hai ngưỡng mới được chọn trên bộ DEV trong benchmark/heldout_cases.js: các
+ *   câu khớp sai có điểm 0.39–0.40 hoặc khoảng cách 0.03–0.04; câu khớp đúng có
+ *   điểm >= 0.44 và khoảng cách >= 0.067.)
  */
 
 const VectorEngine = require('./vectorEngine');
@@ -26,7 +32,8 @@ const TRAINERS = {
 class VectorMatcher {
   constructor(options = {}) {
     this.engine = new VectorEngine();
-    this.confidenceThreshold = options.confidenceThreshold || 0.38;
+    this.confidenceThreshold = options.confidenceThreshold || 0.42;
+    this.minMargin = options.minMargin ?? 0.05;
     this.isIndexed = false;
     this.skillLookup = new Map(); // key: `${role}_${intentId}` -> skill object
   }
@@ -255,7 +262,9 @@ class VectorMatcher {
     }
 
     // Kiểm tra với ngưỡng tin cậy
-    const isConfident = bestIntent.score >= this.confidenceThreshold;
+    const secondScore = sortedIntents[1] ? sortedIntents[1].score : 0;
+    const margin = bestIntent.score - secondScore;
+    const isConfident = bestIntent.score >= this.confidenceThreshold && margin >= this.minMargin;
 
     if (isConfident) {
       return {

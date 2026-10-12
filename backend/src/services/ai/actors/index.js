@@ -99,6 +99,26 @@ const matchActorSkill = (userPrompt, role, userId) => {
 
 const { extractParameters } = require('../extractors');
 const { matchHybridIntent } = require('../matcher');
+const { vectorMatcher } = require('../matcher/vectorMatcher');
+const { preRoute, postAdjust, resolveAmbiguousRevenue } = require('./intentGuards');
+
+/** Tìm kỹ năng theo id trên mọi Actor (kèm Trainer sở hữu để thực thi). */
+const findSkillOwner = (skillId) => {
+  for (const t of Object.values(TRAINERS)) {
+    const skill = t.getSkill(skillId);
+    if (skill) return { trainer: t, skill };
+  }
+  return null;
+};
+
+/** Tài liệu quy trình (KNOWLEDGE_SOP) gần nhất với câu hỏi, trong phạm vi vai trò. */
+const searchNearestSop = (query, role) => {
+  if (!vectorMatcher.isIndexed) vectorMatcher.buildIndex();
+  const results = vectorMatcher.engine.search(query, 5, (doc) =>
+    doc.metadata.type === 'KNOWLEDGE_SOP' && (!role || doc.metadata.role === role || doc.metadata.role === 'ALL'));
+  if (!results.length) return null;
+  return { skillId: results[0].metadata.intentId, score: results[0].score };
+};
 const { conversationContext } = require('../context');
 const { queryCache } = require('../cache');
 
@@ -251,9 +271,20 @@ const executeActorIntent = async (userPrompt, role, prisma, user = {}, params = 
   const sessionId = params.sessionId || user.id || 'default_session';
   const isAdminCeo = trainer.role === 'ADMIN_CEO' || user.role === 'ADMIN' || user.role === 'CEO';
 
-  // 1. Tầng 1: So khớp bằng Regex Patterns nhanh
-  let matchResult = trainer.match(userPrompt, user.id);
+  // 0. Định tuyến theo tín hiệu rõ ràng (mã đơn, hỏi tương thích, hỏi nguồn W,
+  //    hỏi chiết khấu VIP) — xem intentGuards.js. Kỹ năng được chọn vẫn qua kiểm
+  //    tra quyền allowedRoles như bình thường.
+  let matchResult = null;
   let executingTrainer = trainer;
+  const guardedId = preRoute(userPrompt, user.role || role);
+  const guarded = guardedId ? findSkillOwner(guardedId) : null;
+  if (guarded) {
+    matchResult = { skill: guarded.skill, score: 1, source: 'INTENT_GUARD' };
+    executingTrainer = guarded.trainer;
+  }
+
+  // 1. Tầng 1: So khớp bằng Regex Patterns nhanh
+  if (!matchResult) matchResult = trainer.match(userPrompt, user.id);
 
   // Nếu là ADMIN / CEO và chưa khớp kịch bản của ADMIN, thử khớp với các Actor nghiệp vụ khác
   if (!matchResult && isAdminCeo) {
@@ -270,7 +301,7 @@ const executeActorIntent = async (userPrompt, role, prisma, user = {}, params = 
 
   let matchedSkill = matchResult ? matchResult.skill : null;
   let matchScore = matchResult ? matchResult.score : 0;
-  let matchSource = 'PATTERN_RULE';
+  let matchSource = matchResult?.source || 'PATTERN_RULE';
 
   // 1.1 Kiểm tra xem có phải câu hỏi tiếp nối theo thời gian (Follow-up Date Query) không
   if (!matchedSkill) {
@@ -292,7 +323,17 @@ const executeActorIntent = async (userPrompt, role, prisma, user = {}, params = 
   if (!matchedSkill) {
     const searchRole = isAdminCeo ? null : trainer.role;
     const hybridMatch = await matchHybridIntent(userPrompt, searchRole, trainer);
-    if (hybridMatch && hybridMatch.skill) {
+    // Chưa chắc chắn giữa các kỹ năng doanh thu khác kỳ → dùng kỳ trong câu hỏi
+    const revenueByPeriod = hybridMatch && hybridMatch.status === 'UNCERTAIN'
+      ? resolveAmbiguousRevenue(userPrompt, [hybridMatch.intent, ...(hybridMatch.suggestions || []).map(s => s.intent)])
+      : null;
+    const revenueOwner = revenueByPeriod ? findSkillOwner(revenueByPeriod) : null;
+    if (revenueOwner) {
+      matchedSkill = revenueOwner.skill;
+      executingTrainer = revenueOwner.trainer;
+      matchScore = hybridMatch.score;
+      matchSource = 'GUARD_PERIOD_DISAMBIGUATION';
+    } else if (hybridMatch && hybridMatch.skill) {
       if (hybridMatch.status === 'UNCERTAIN') {
         const suggestionText = hybridMatch.suggestions && hybridMatch.suggestions.length > 0
           ? '\n\n💡 **GỢI Ý CÁC CHỦ ĐỀ LIÊN QUAN:**\n' +
@@ -351,6 +392,25 @@ const executeActorIntent = async (userPrompt, role, prisma, user = {}, params = 
     return null; // Không nhận diện được ý định nào phù hợp
   }
 
+  // 2.2 Hiệu chỉnh sau khi chọn: câu hỏi quy trình → SOP; kỳ thời gian phải khớp
+  //     kỳ của kỹ năng doanh thu (xem intentGuards.js)
+  if (matchSource !== 'INTENT_GUARD') {
+    const adjust = postAdjust(userPrompt, matchedSkill, (q) => searchNearestSop(q, isAdminCeo ? null : trainer.role));
+    if (adjust?.abstain) {
+      return null; // Không có kỹ năng offline đúng kỳ → để tầng sau (SQL có kiểm quyền) xử lý
+    }
+    if (adjust?.skillId) {
+      const owner = findSkillOwner(adjust.skillId);
+      if (owner) {
+        matchedSkill = owner.skill;
+        executingTrainer = owner.trainer;
+        // Câu nối tiếp ngữ cảnh ("thế còn hôm qua?") vẫn là CONTEXT_FOLLOW_UP — chỉ
+        // đổi sang kỹ năng đúng kỳ.
+        if (matchSource !== 'CONTEXT_FOLLOW_UP') matchSource = `GUARD_${adjust.reason}`;
+      }
+    }
+  }
+
   // GIAI ĐOẠN 2: Tự động bóc tách thực thể, ngày tháng, mã phiếu, ngân sách từ câu hỏi
   const initialParams = await extractParameters(userPrompt, prisma, user, params);
 
@@ -381,20 +441,25 @@ const executeActorIntent = async (userPrompt, role, prisma, user = {}, params = 
   // Xử lý kịch bản SQL do Quản trị viên huấn luyện trực tiếp (Active Learning & User Feedback Loop)
   if (matchedSkill.type === 'DYNAMIC_SQL' && matchedSkill.sql) {
     try {
-      const { isSafeSqlQuery, sanitizeAndHealSql } = require('../universalData.service');
+      const { sanitizeAndHealSql } = require('../universalData.service');
+      const { executeSafeAiSql } = require('../safeSqlExecutor');
       const sqlToRun = sanitizeAndHealSql(matchedSkill.sql.trim());
-      if (!isSafeSqlQuery(sqlToRun)) {
+      // Kịch bản do Admin huấn luyện vẫn chạy với quyền của NGƯỜI ĐANG HỎI (không
+      // phải quyền Admin) — chặn trường hợp kịch bản đọc bảng mà vai trò này không
+      // được xem.
+      let safeResult = null;
+      try {
+        safeResult = await executeSafeAiSql(sqlToRun, { ...user, role: user.role || role });
+      } catch (safeErr) {
+        if (!safeErr.isDenied) throw safeErr;
         execResult = {
-          status: 'ERROR',
-          message: 'Câu lệnh SQL huấn luyện vi phạm quy chuẩn an toàn (chỉ cho phép truy vấn SELECT đọc dữ liệu).'
+          status: 'FORBIDDEN',
+          intent: matchedSkill.id,
+          message: `🔒 ${safeErr.message}`
         };
-      } else {
-        const currentUserId = Number(user.id) || 0;
-        const finalSql = sqlToRun.replace(/:userId/g, currentUserId.toString());
-        const rawData = await prisma.$queryRawUnsafe(finalSql);
-        const cleanData = JSON.parse(JSON.stringify(rawData, (key, value) =>
-          typeof value === 'bigint' ? value.toString() : value
-        ));
+      }
+      if (safeResult) {
+        const cleanData = safeResult.rows;
 
         let formattedText = '';
 

@@ -14,6 +14,7 @@
 
 const prisma = require('../../config/database');
 const { isSafeSqlQuery, sanitizeAndHealSql } = require('./universalData.service');
+const { executeSafeAiSql } = require('./safeSqlExecutor');
 
 // Các bảng hợp lệ đã được xác minh trong hệ thống AetherPC ERP
 const KNOWN_TABLES = [
@@ -106,23 +107,26 @@ const evaluateSqlReward = async (rawSql, question = '', user = {}) => {
   }
   breakdown.schema = schemaScore;
 
-  // BƯỚC 3: THỰC THI KIỂM CHỨNG TRONG MÔI TRƯỜNG SANDBOX POSTGRESQL (30 ĐIỂM)
+  // BƯỚC 3: THỰC THI KIỂM CHỨNG (30 ĐIỂM)
+  // Chạy qua bộ thực thi an toàn: giao dịch READ ONLY + timeout + kiểm tra bảng/cột
+  // theo quyền của người đang kiểm thử. (Trước đây gọi là "sandbox" nhưng thực ra
+  // chạy thẳng trên DB thật bằng user superuser.)
   let executionSuccess = false;
   let rawData = [];
-  const currentUserId = Number(user.id) || 1;
-  const executableSql = healedSql.replace(/:userId/g, currentUserId.toString());
 
   try {
     const execStart = Date.now();
-    // Thực thi trực tiếp trên PostgreSQL Client
-    rawData = await prisma.$queryRawUnsafe(executableSql);
+    const safeResult = await executeSafeAiSql(healedSql, user);
+    rawData = safeResult.rows;
     const execLatency = Date.now() - execStart;
 
     executionSuccess = true;
     breakdown.execution = 30;
-    feedback.push(`✅ Thực thi Sandbox: Thành công 100% không phát sinh lỗi SQL (Độ trễ: ${execLatency}ms).`);
+    feedback.push(`✅ Thực thi kiểm chứng (giao dịch chỉ-đọc): thành công, không phát sinh lỗi SQL (Độ trễ: ${execLatency}ms).`);
   } catch (dbErr) {
-    feedback.push(`❌ Lỗi thực thi Sandbox: ${dbErr.message}`);
+    feedback.push(dbErr.isDenied
+      ? `❌ Bị chặn bởi kiểm soát an toàn: ${dbErr.message}`
+      : `❌ Lỗi thực thi SQL: ${dbErr.message}`);
     breakdown.execution = 0;
   }
 

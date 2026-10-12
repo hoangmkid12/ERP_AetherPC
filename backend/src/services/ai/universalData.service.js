@@ -1,4 +1,5 @@
 const prisma = require('../../config/database');
+const { executeSafeAiSql, accessGroupOf, ACCESS_GROUPS } = require('./safeSqlExecutor');
 
 // Khởi tạo Gemini client linh hoạt (Dynamic Lazy Initialization)
 let GoogleGenAI = null;
@@ -450,14 +451,21 @@ const generateSqlFromQuestion = async (userPrompt, userRole, userId) => {
           actorFewShotsList.map(s => `User: "${s.question}"\nSQL: ${s.sql}`).join('\n\n');
       }
 
+      const group = accessGroupOf(userRole);
+      const allowedTablesText = group && ACCESS_GROUPS[group]
+        ? ACCESS_GROUPS[group].join(', ')
+        : 'mọi bảng nghiệp vụ (trừ cấu hình hệ thống)';
+
       const prompt = `${ERP_DATABASE_SCHEMA_PROMPT}${adminTrainedFewShots}${actorFewShotsPrompt}
 
 NGUYÊN TẮC BẮT BUỘC:
 1. Bạn CHỈ ĐƯỢC sinh ra ĐÚNG 1 câu lệnh SQL "SELECT" duy nhất, thuần túy, KHÔNG markdown (không \`\`\`sql), KHÔNG giải thích.
 2. Tuyệt đối không dùng INSERT, UPDATE, DELETE, DROP, ALTER.
 3. Luôn dùng LIMIT tối đa 20 dòng trừ khi câu hỏi yêu cầu đếm (COUNT) hoặc tổng hợp (SUM, AVG).
-4. Phân quyền RBAC: Nếu người hỏi là vai trò thông thường (SALES, WAREHOUSE, DELIVERY), KHÔNG truy vấn bảng ledger_entries hay lương thưởng của người khác.
+4. Phân quyền: người hỏi CHỈ được đọc các bảng sau: ${allowedTablesText}. Nếu câu hỏi cần bảng khác, trả về JSON {"status": "FORBIDDEN"}. (Hệ thống kiểm tra lại quyền bằng code, SQL vượt quyền sẽ bị chặn.)
 5. Khi so sánh chuỗi tiếng Việt hoặc tên, hãy dùng ILIKE '%...%' để tìm kiếm linh hoạt không phân biệt hoa thường.
+6. KHÔNG dùng SELECT * và không lấy cả dòng (row_to_json, bảng.*) — luôn liệt kê rõ từng cột cần thiết. Không bao giờ chọn cột mật khẩu, khuôn mặt, tài khoản ngân hàng, mã số thuế.
+7. Không dùng comment SQL, không dùng dấu chấm phẩy giữa câu, không gọi hàm hệ thống (pg_*, current_setting...).
 
 Câu hỏi của người dùng: "${userPrompt}"${slotHints}
 Vai trò người hỏi: ${userRole}
@@ -516,8 +524,20 @@ SQL Query:`;
  * @returns {Promise<{success: boolean, finalResponse: string, sqlUsed: string, rowCount: number}|null>}
  */
 const executeUniversalDataQuery = async (promptText, user) => {
-  const userRole = user?.role || 'SALES';
+  const userRole = user?.role || null;
   const userId = user?.id || 0;
+
+  // Vai trò không được truy vấn dữ liệu (khách hàng, nhà cung cấp...) — dừng
+  // trước khi gọi Gemini sinh SQL.
+  if (!accessGroupOf(userRole)) {
+    return {
+      success: true,
+      denied: true,
+      finalResponse: '🔒 Tài khoản của bạn không được dùng chức năng tra cứu dữ liệu nội bộ của trợ lý AI.',
+      sqlUsed: null,
+      rowCount: 0
+    };
+  }
 
   // 1. Sinh câu lệnh SQL tối ưu từ câu hỏi tự nhiên
   const generatedSql = await generateSqlFromQuestion(promptText, userRole, userId);
@@ -525,37 +545,29 @@ const executeUniversalDataQuery = async (promptText, user) => {
     return null;
   }
 
-  // 2. Kiểm duyệt an toàn (Security Guardrail)
-  if (!isSafeSqlQuery(generatedSql)) {
-    console.warn('[UniversalData] Cảnh báo an ninh: Câu SQL bị chặn do không an toàn:', generatedSql);
-    return {
-      success: false,
-      finalResponse: '⚠️ Yêu cầu dữ liệu này bị từ chối do vi phạm quy tắc an toàn bảo mật cơ sở dữ liệu (Chỉ hỗ trợ truy vấn đọc dữ liệu hợp lệ).',
-      sqlUsed: null,
-      rowCount: 0
-    };
-  }
-
-  // Thay thế :userId nếu có (lọc theo người dùng hiện tại)
-  const currentUserId = Number(user?.id) || 0;
-  const finalExecutableSql = generatedSql.replace(/:userId/g, currentUserId.toString());
-
-  console.log(`[UniversalData] Thực thi SQL an toàn: "${finalExecutableSql}"`);
-
-  // 3. Thực thi truy vấn đọc dữ liệu trên PostgreSQL
-  let rawData = [];
+  // 2 & 3. Kiểm duyệt + thực thi qua bộ thực thi an toàn: giao dịch READ ONLY,
+  // timeout, đối chiếu bảng/cột thật (EXPLAIN) với quyền của vai trò.
+  let cleanData = [];
   try {
-    rawData = await prisma.$queryRawUnsafe(finalExecutableSql);
-  } catch (dbErr) {
-    console.warn('[UniversalData] Lỗi thực thi SQL trên database:', dbErr.message);
+    const result = await executeSafeAiSql(generatedSql, user);
+    cleanData = result.rows;
+    console.log(`[UniversalData] Đã chạy SQL (${userRole}, bảng: ${result.tables.join(', ')}): "${generatedSql}"`);
+  } catch (err) {
+    if (err.isDenied) {
+      console.warn(`[UniversalData] Chặn SQL của ${userRole}: ${err.message} | SQL: ${generatedSql}`);
+      // Trả lời từ chối rõ ràng — không rơi tiếp xuống Gemini trò chuyện tự do
+      // (có thể bịa ra số liệu thay cho dữ liệu bị chặn).
+      return {
+        success: true,
+        denied: true,
+        finalResponse: `🔒 ${err.message}`,
+        sqlUsed: generatedSql,
+        rowCount: 0
+      };
+    }
+    console.warn('[UniversalData] Lỗi thực thi SQL trên database:', err.message);
     return null;
   }
-
-  // 4. Định dạng dữ liệu an toàn & tổng hợp câu trả lời tự nhiên
-  // Format lại các kiểu dữ liệu BigInt / Decimal / Date sang dạng JSON serialize được
-  const cleanData = JSON.parse(JSON.stringify(rawData, (key, value) =>
-    typeof value === 'bigint' ? value.toString() : value
-  ));
 
   const rowCount = cleanData.length;
 

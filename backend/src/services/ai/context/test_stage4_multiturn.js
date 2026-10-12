@@ -211,6 +211,10 @@ async function runStage4Tests() {
 
   assert(dateTurn2 && dateTurn2.status === 'SUCCESS', 'Lượt 2: Nhận diện câu hỏi nối tiếp "thế còn hôm qua?"');
   assert(dateTurn2.matchSource === 'CONTEXT_FOLLOW_UP', 'Lượt 2: Nguồn khớp là CONTEXT_FOLLOW_UP');
+  // Trước đây lượt này "đạt" nhưng trả về doanh thu HÔM NAY cho câu hỏi về hôm qua
+  // (handler TODAY_REVENUE bỏ qua tham số ngày) — kiểm tra cả nội dung trả lời.
+  assert(dateTurn2.skillId === 'YESTERDAY_REVENUE' || dateTurn2.intent === 'YESTERDAY_REVENUE', 'Lượt 2: Trả lời bằng doanh thu HÔM QUA (không phải hôm nay)');
+  assert(/hôm qua/i.test(dateTurn2.text || ''), 'Lượt 2: Nội dung trả lời nói về ngày hôm qua');
 
   // --------------------------------------------------------------------------
   // TEST CASE 4: Prompt làm rõ khi thiếu tham số bắt buộc (Clarification Prompting)

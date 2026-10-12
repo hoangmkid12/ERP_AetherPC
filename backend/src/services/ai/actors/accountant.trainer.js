@@ -106,6 +106,47 @@ accountantTrainer.addSkill({
   sql: () => `SELECT COALESCE(SUM(total_amount), 0) AS doanh_thu_hom_nay, COUNT(order_id) AS so_don_hom_nay FROM orders WHERE status IN ('DELIVERED', 'COMPLETED') AND created_at >= date_trunc('day', now() AT TIME ZONE 'Asia/Ho_Chi_Minh');`
 });
 
+// Kỹ năng 2b: Doanh thu hôm qua — trước đây câu nối tiếp "thế còn hôm qua?" được
+// trả bằng kỹ năng doanh thu HÔM NAY (handler bỏ qua tham số ngày) → sai số liệu.
+accountantTrainer.addSkill({
+  id: 'YESTERDAY_REVENUE',
+  title: 'Báo cáo doanh thu thực tế hôm qua',
+  description: 'Tính tổng doanh thu bán hàng thực thu trong ngày hôm qua',
+  type: 'PRISMA_QUERY',
+  examples: [
+    'doanh thu hôm qua',
+    'hôm qua thu được bao nhiêu tiền',
+    'báo cáo doanh thu ngày hôm qua',
+    'hôm qua bán được bao nhiêu'
+  ],
+  patterns: [
+    /(doanh thu|thực thu|tiền thu|bán được).*(hôm qua)/i
+  ],
+  allowedRoles: ['ACCOUNTANT', 'ADMIN_CEO', 'ADMIN'],
+  handler: async (prisma) => {
+    const startToday = getStartOfDay();
+    const startYesterday = new Date(startToday.getTime() - 24 * 60 * 60 * 1000);
+    const res = await prisma.order.aggregate({
+      where: {
+        status: { in: ['DELIVERED', 'COMPLETED'] },
+        createdAt: { gte: startYesterday, lt: startToday }
+      },
+      _sum: { totalAmount: true },
+      _count: { orderId: true }
+    });
+    return {
+      revenueYesterday: Number(res._sum.totalAmount || 0),
+      orderCountYesterday: res._count.orderId || 0
+    };
+  },
+  template: (data) => {
+    return `💵 **DOANH THU THỰC TẾ NGÀY HÔM QUA:**\n\n` +
+           `- Doanh thu ghi nhận: **${formatVND(data.revenueYesterday)}**\n` +
+           `- Số đơn hoàn tất: **${data.orderCountYesterday} đơn**`;
+  },
+  sql: () => `SELECT COALESCE(SUM(total_amount), 0) AS doanh_thu_hom_qua, COUNT(order_id) AS so_don_hom_qua FROM orders WHERE status IN ('DELIVERED', 'COMPLETED') AND created_at >= date_trunc('day', now() AT TIME ZONE 'Asia/Ho_Chi_Minh') - INTERVAL '1 day' AND created_at < date_trunc('day', now() AT TIME ZONE 'Asia/Ho_Chi_Minh');`
+});
+
 // Kỹ năng 3: Doanh thu tháng này
 accountantTrainer.addSkill({
   id: 'MONTHLY_REVENUE',

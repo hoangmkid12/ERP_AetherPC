@@ -49,7 +49,10 @@ const matchHybridIntent = async (query, role = null, trainer = null) => {
       role: vectorRes.role,
       score: combinedScore,
       skill: vectorRes.skill,
-      status: combinedScore >= 0.20 ? 'MATCHED' : 'UNCERTAIN',
+      // Hai mô hình đồng thuận là bằng chứng cộng thêm, nhưng không được hạ chuẩn
+      // xuống quá thấp (trước đây 0.20 — gần như mọi câu đều "khớp"): khớp khi
+      // vector tự đã đủ tin cậy, hoặc điểm kết hợp >= 0.5.
+      status: (vectorRes.status === 'MATCHED' || combinedScore >= 0.5) ? 'MATCHED' : 'UNCERTAIN',
       suggestions: vectorRes.suggestions || []
     };
   }

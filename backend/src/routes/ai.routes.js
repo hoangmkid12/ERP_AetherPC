@@ -1,6 +1,24 @@
 const express = require('express');
 const router = express.Router();
+const { rateLimit } = require('express-rate-limit');
 const { authMiddleware } = require('../middlewares/auth.middleware');
+const { STAFF_ROLES } = require('../constants/roles');
+
+// AetherCopilot là trợ lý NỘI BỘ: chỉ tài khoản nhân viên được dùng. Trước đây
+// các route này dùng authMiddleware() không giới hạn vai trò, nên tài khoản
+// khách hàng / nhà cung cấp cũng gọi được và hỏi ra dữ liệu nội bộ.
+const AI_STAFF = authMiddleware(STAFF_ROLES);
+
+// Mỗi câu hỏi có thể gọi Gemini nhiều lần + chạy SQL — giới hạn theo người dùng
+// để tránh lạm dụng chi phí / tải DB.
+const chatLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 20,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  keyGenerator: (req) => `ai-chat:${req.user?.role || 'anon'}:${req.user?.id || 'anon'}`,
+  message: { success: false, message: 'Bạn hỏi trợ lý AI quá nhanh, vui lòng thử lại sau ít phút.' }
+});
 const {
   chatWithAi,
   getPromptChips,
@@ -20,15 +38,15 @@ const {
 
 // @route   GET /api/v1/ai/prompt-chips
 // Lấy danh sách câu hỏi gợi ý nhanh theo vai trò của người dùng
-router.get('/prompt-chips', authMiddleware(), getPromptChips);
+router.get('/prompt-chips', AI_STAFF, getPromptChips);
 
 // @route   POST /api/v1/ai/chat
 // Hội thoại với AetherCopilot (Hỗ trợ Tool Calling, đối chiếu Knowledge Base)
-router.post('/chat', authMiddleware(), chatWithAi);
+router.post('/chat', AI_STAFF, chatLimiter, chatWithAi);
 
 // @route   POST /api/v1/ai/feedback
 // Lưu đánh giá của người dùng; phản hồi cần cải thiện sẽ chờ Admin/CEO duyệt
-router.post('/feedback', authMiddleware(), submitAiFeedback);
+router.post('/feedback', AI_STAFF, submitAiFeedback);
 
 // @route   GET /api/v1/ai/feedback/pending
 // Danh sách phản hồi đang chờ duyệt (Chỉ Admin / CEO)
@@ -90,6 +108,6 @@ router.get('/stats', authMiddleware(['ADMIN', 'CEO']), getAiStats);
 // @route   POST /api/v1/ai/session/clear
 // Làm mới phiên hội thoại và bộ nhớ đệm AI
 const { clearAiSession } = require('../controllers/ai.controller');
-router.post('/session/clear', authMiddleware(), clearAiSession);
+router.post('/session/clear', AI_STAFF, clearAiSession);
 
 module.exports = router;
