@@ -118,6 +118,21 @@ mức cải thiện trên toàn hệ thống sẽ nhỏ hơn mức chênh 6,7 đ
 `onnxruntime-node`; tách từ bằng một dịch vụ Python nhỏ, hoặc fine-tune lại không tách từ để bỏ phụ
 thuộc pyvi; giữ node-nlp làm phương án dự phòng khi PhoBERT chưa sẵn sàng.
 
+## 6b. Demo khi trình bày
+
+Bộ câu `backend/src/services/ai/benchmark/demo_cases.json` (18 câu, **không có trong dữ liệu train**):
+câu thường, không dấu, văn nói/viết tắt, gõ sai chính tả, các cặp dễ nhầm, trò chuyện.
+
+- **node-nlp (mô hình đang chạy thật):** `cd backend && npm run ai:demo` — hoặc thử 1 câu:
+  `npm run ai:demo -- "câu hỏi bất kỳ"`. Kết quả hiện tại: đúng 17/18.
+- **PhoBERT:** ô **DEMO 1** trong notebook chạy cùng bộ câu; ô **DEMO 2** có hàm `thu('...')` để gõ câu
+  bất kỳ. Lưu mô hình vào Google Drive một lần (ô "Lưu mô hình"), hôm trình bày chỉ cần chạy ô 1–4
+  rồi ô "Nạp mô hình" — không phải train lại.
+
+Câu node-nlp sai — *"đh DH-5521 ship tới đâu r"* → MY_PROFILE_TASKS với độ tin cậy 1,00 — là ví dụ tốt
+để giải thích kiến trúc nhiều tầng: trong hệ thống thật, quy tắc `intentGuards` nhận ra mã đơn `DH-…`
+và đưa thẳng vào tra cứu đơn **trước** khi tới bộ phân loại, nên câu này vẫn được trả lời đúng.
+
 ## 7. Câu hỏi hội đồng có thể hỏi
 
 - **PhoBERT tốt hơn vậy sao hệ thống không dùng?** Đánh đổi giữa độ chính xác và chi phí vận hành:

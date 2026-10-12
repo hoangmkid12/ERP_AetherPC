@@ -1,0 +1,25 @@
+[
+  {"group": "1. Câu thường", "text": "kiểm tra giúp tôi đơn hàng ORD-260915-0042", "intent": "ORDER_LOOKUP"},
+  {"group": "1. Câu thường", "text": "card màn hình rtx 5070 còn hàng không", "intent": "PRODUCT_LOOKUP"},
+  {"group": "1. Câu thường", "text": "quy trình đổi trả linh kiện bị lỗi như thế nào", "intent": "KNOWLEDGE_SOP"},
+  {"group": "1. Câu thường", "text": "doanh thu toàn công ty tuần vừa rồi", "intent": "FINANCE_REPORT"},
+
+  {"group": "2. Không dấu", "text": "toi muon xem thong tin ca nhan", "intent": "MY_PROFILE_TASKS"},
+  {"group": "2. Không dấu", "text": "cpu ryzen 7 9700x lap main b650 duoc khong", "intent": "PC_COMPATIBILITY"},
+  {"group": "2. Không dấu", "text": "cong ty co bao nhieu ke toan", "intent": "HR_STAFF_COUNT"},
+
+  {"group": "3. Văn nói / viết tắt", "text": "ê shop ơi con 4060ti 16g giá sao", "intent": "PRODUCT_LOOKUP"},
+  {"group": "3. Văn nói / viết tắt", "text": "nv kho bên mình đang có mấy ng", "intent": "HR_STAFF_COUNT"},
+  {"group": "3. Văn nói / viết tắt", "text": "đh DH-5521 ship tới đâu r", "intent": "ORDER_LOOKUP"},
+
+  {"group": "4. Gõ sai chính tả", "text": "chinh sach bao hahn card do hoa", "intent": "KNOWLEDGE_SOP"},
+  {"group": "4. Gõ sai chính tả", "text": "doanh thu thnag nay cua cong ty", "intent": "FINANCE_REPORT"},
+
+  {"group": "5. Cặp dễ nhầm", "text": "doanh số cá nhân của tôi tuần này", "intent": "MY_PROFILE_TASKS"},
+  {"group": "5. Cặp dễ nhầm", "text": "doanh thu của cả công ty tuần này", "intent": "FINANCE_REPORT"},
+  {"group": "5. Cặp dễ nhầm", "text": "shop còn nguồn 750w không", "intent": "PRODUCT_LOOKUP"},
+  {"group": "5. Cặp dễ nhầm", "text": "card 4070 dùng nguồn 750w có đủ không", "intent": "PC_COMPATIBILITY"},
+
+  {"group": "6. Trò chuyện / kiến thức chung", "text": "chào buổi chiều nhé", "intent": "GENERAL_CHAT"},
+  {"group": "6. Trò chuyện / kiến thức chung", "text": "dlss với fsr khác nhau thế nào", "intent": "GENERAL_CHAT"}
+]

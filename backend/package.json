@@ -17,7 +17,8 @@
     "queue:producer-demo": "node scripts/enqueue_demo.js",
     "db:prepare-seed": "node prisma/prepare-seed-data.js",
     "ai:train": "node src/services/ai/benchmark/nlp_intent_eval.js --save",
-    "ai:eval": "node src/services/ai/benchmark/nlp_intent_eval.js"
+    "ai:eval": "node src/services/ai/benchmark/nlp_intent_eval.js",
+    "ai:demo": "node src/services/ai/benchmark/demo_nlp.js"
   },
   "dependencies": {
     "@google/genai": "^2.26.0",
