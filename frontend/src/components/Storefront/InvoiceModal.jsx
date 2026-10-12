@@ -253,7 +253,6 @@ export default function InvoiceModal({ open, onClose, invoice }) {
           </div>
 
           <div style={{ marginTop: '1.5rem', paddingTop: '0.6rem', borderTop: `1px solid ${LINE}`, fontSize: '12.5px', textAlign: 'center', lineHeight: 1.6 }}>
-            <em>(Cần kiểm tra, đối chiếu khi lập, giao, nhận hoá đơn)</em><br />
             Tra cứu hoá đơn, bảo hành tại website AetherPC hoặc hotline {SHOP.hotline}
           </div>
         </div>
