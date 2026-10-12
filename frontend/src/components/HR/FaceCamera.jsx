@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Camera, RefreshCw, CheckCircle2, AlertTriangle, Loader2, ScanFace, ArrowLeft, ArrowRight, UserCheck } from 'lucide-react';
-import { loadFaceModels, detectFace, createFaceTracker, createHeadTurnChallenge, snapshot, averageDescriptors } from '../../utils/faceRecognition';
+import { loadFaceDetector, loadFaceRecognizer, detectFace, createFaceTracker, createHeadTurnChallenge, snapshot, averageDescriptors } from '../../utils/faceRecognition';
 
 const REGISTER_SAMPLES = 5;
 const FAST_INTERVAL = 15;      // ms nghỉ giữa hai lần quét trong lúc làm thử thách quay đầu
@@ -32,18 +32,22 @@ export default function FaceCamera({ mode = 'verify', onCapture, submitLabel, co
   const streamRef = useRef(null);
   const timerRef = useRef(null);
   const stateRef = useRef(null);
+  const runRef = useRef(0);       // tăng mỗi lần tắt/mở lại camera để huỷ các lần mở camera đã lỗi thời
   const [phase, setPhase] = useState('loading'); // loading | scanning | submitting | done | error
   const [step, setStep] = useState('calibrating');
   const [hint, setHint] = useState('Đang tải mô hình nhận diện khuôn mặt...');
   const [tone, setTone] = useState('info');      // info | warn | ok | error
   const [result, setResult] = useState(null);
+  const [cameraOn, setCameraOn] = useState(false);
 
   const freshState = () => ({ challenge: createHeadTurnChallenge(), tracker: createFaceTracker(), samples: [], busy: false, lostSince: null });
 
   const stopCamera = useCallback(() => {
+    runRef.current += 1;
     clearTimeout(timerRef.current);
     streamRef.current?.getTracks().forEach(t => t.stop());
     streamRef.current = null;
+    setCameraOn(false);
   }, []);
 
   const say = (t, h) => { setTone(t); setHint(h); };
@@ -102,6 +106,12 @@ export default function FaceCamera({ mode = 'verify', onCapture, submitLabel, co
       setStep('verify');
       delay = 120;
       if (!st.challenge.isFacingFront(face.yaw)) { say('info', HINTS.front); return; }
+      // Mô hình trích đặc trưng được tải nền trong lúc làm thử thách; thường đã xong ở bước này.
+      if (!st.recognizerReady) {
+        say('info', 'Đang hoàn tất tải mô hình nhận diện, giữ yên và nhìn thẳng...');
+        await loadFaceRecognizer();
+        st.recognizerReady = true;
+      }
       const full = await detectFace(video);
       if (!full || full.multiple) { say('warn', 'Giữ khuôn mặt trong khung hình...'); return; }
       if (mode === 'register') {
@@ -133,21 +143,35 @@ export default function FaceCamera({ mode = 'verify', onCapture, submitLabel, co
       say('error', 'Trình duyệt không cho phép dùng camera. Camera chỉ hoạt động trên HTTPS hoặc localhost.');
       return;
     }
+    const runId = runRef.current;
     try {
-      say('info', 'Đang tải mô hình nhận diện khuôn mặt...');
-      await loadFaceModels();
+      // Mở camera và tải mô hình phát hiện mặt SONG SONG (trước đây tải xong toàn bộ ~7MB mô hình mới
+      // mở camera). Mô hình trích đặc trưng nặng nhất chỉ cần ở bước cuối nên tải nền.
       say('info', 'Đang mở camera...');
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }, audio: false });
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play().catch(() => {});
-      }
+      const recognizer = loadFaceRecognizer();
+      recognizer.catch(() => {}); // lỗi (nếu có) sẽ được báo lại khi thật sự cần dùng
+      const cameraPromise = navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }, audio: false })
+        .then(async stream => {
+          // Đã đóng khung camera (hoặc lỗi tải mô hình) trước khi người dùng cấp quyền: tắt luôn camera.
+          if (runRef.current !== runId) { stream.getTracks().forEach(t => t.stop()); return stream; }
+          streamRef.current = stream;
+          if (videoRef.current) {
+            videoRef.current.srcObject = stream;
+            await videoRef.current.play().catch(() => {});
+          }
+          setCameraOn(true);
+          return stream;
+        });
+      let detectorReady = false;
+      cameraPromise.then(() => { if (!detectorReady) say('info', 'Camera đã sẵn sàng — đang tải mô hình nhận diện...'); }).catch(() => {});
+      await Promise.all([cameraPromise, loadFaceDetector().then(() => { detectorReady = true; })]);
+      if (runRef.current !== runId) return;
       stateRef.current = freshState();
       setPhase('scanning');
       say('info', HINTS.calibrating);
-      timerRef.current = setTimeout(tick, 300);
+      timerRef.current = setTimeout(tick, 60);
     } catch (err) {
+      if (runRef.current !== runId) return; // lỗi của lần mở camera cũ, đã có lần mới thay thế
       stopCamera();
       setPhase('error');
       const CAMERA_ERRORS = {
@@ -170,7 +194,7 @@ export default function FaceCamera({ mode = 'verify', onCapture, submitLabel, co
   const toneColor = { info: '#2563eb', warn: '#d97706', ok: '#16a34a', error: '#dc2626' }[tone];
   const size = compact ? 260 : 320;
   const stepIndex = phase === 'done' ? STEPS.length : STEP_INDEX[step] ?? 0;
-  const showVideo = phase === 'scanning' || phase === 'submitting';
+  const showVideo = phase === 'scanning' || phase === 'submitting' || (phase === 'loading' && cameraOn);
   // Video hiển thị lật gương nên "bên trái của người dùng" nằm ở bên trái màn hình.
   const arrow = phase === 'scanning' && (step === 'left' ? 'left' : step === 'right' ? 'right' : null);
 
@@ -208,6 +232,11 @@ export default function FaceCamera({ mode = 'verify', onCapture, submitLabel, co
                 ? <img src={result.image || result.data.faceImage} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 : phase === 'done' ? <CheckCircle2 size={64} color="#4ade80" /> : null}
               {phase === 'error' && <AlertTriangle size={56} color="#f87171" />}
+            </div>
+          )}
+          {phase === 'loading' && cameraOn && (
+            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(15,23,42,0.25)' }}>
+              <Loader2 size={40} color="#ffffff" style={{ animation: 'face-spin 1s linear infinite' }} />
             </div>
           )}
           {phase === 'submitting' && (

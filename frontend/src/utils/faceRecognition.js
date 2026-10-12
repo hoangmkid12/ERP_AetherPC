@@ -2,14 +2,13 @@
 // Trình duyệt chỉ trích xuất vector đặc trưng 128 chiều; việc SO KHỚP với khuôn mặt đã đăng ký
 // do backend thực hiện (hr.routes.js) nên client không thể tự khẳng định "đã khớp".
 //
-// Thư viện và model (~7MB) được tải từ CDN ở lần dùng đầu tiên rồi được trình duyệt cache lại.
+// Thư viện và model (~7MB) được tải từ CDN ở lần dùng đầu tiên rồi được trình duyệt cache lại. Tải theo
+// 2 giai đoạn: phần nhẹ (phát hiện mặt + điểm mốc) để mở camera ngay, phần nặng (trích đặc trưng) tải nền.
 // Có thể trỏ sang bản tự host bằng biến môi trường VITE_FACE_API_URL / VITE_FACE_MODEL_URL.
 
 const FACE_API_VERSION = '1.7.15';
 const LIB_URL = import.meta.env.VITE_FACE_API_URL || `https://cdn.jsdelivr.net/npm/@vladmandic/face-api@${FACE_API_VERSION}/dist/face-api.js`;
 const MODEL_URL = import.meta.env.VITE_FACE_MODEL_URL || `https://cdn.jsdelivr.net/npm/@vladmandic/face-api@${FACE_API_VERSION}/model/`;
-
-let loadingPromise = null;
 
 // Cấu hình phát hiện mặt: thử inputSize nhỏ trước (nhanh, bắt tốt mặt ở gần webcam) rồi tới lớn hơn.
 const DETECT_SIZES = [160, 224, 320];
@@ -25,33 +24,69 @@ const loadScript = (src) => new Promise((resolve, reject) => {
   document.head.appendChild(el);
 });
 
-/** Tải thư viện + 3 model cần thiết (phát hiện mặt, 68 điểm mốc, trích đặc trưng). Gọi nhiều lần vẫn chỉ tải 1 lần. */
-export const loadFaceModels = () => {
-  if (!loadingPromise) {
-    loadingPromise = (async () => {
-      const faceapi = await loadScript(LIB_URL);
-      await Promise.all([
-        faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
-        faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
-        faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
-      ]);
-      // Chạy thử mỗi mạng một lần trên ảnh trống: trình duyệt biên dịch shader WebGL ngay lúc này,
-      // tránh để khung hình đầu tiên khi người dùng đã nhìn vào camera bị chậm 1–2 giây.
-      try {
-        const blank = document.createElement('canvas');
-        blank.width = 160;
-        blank.height = 160;
-        for (const inputSize of DETECT_SIZES) await faceapi.detectAllFaces(blank, new faceapi.TinyFaceDetectorOptions({ inputSize }));
-        await faceapi.detectFaceLandmarks(blank);
-        await faceapi.computeFaceDescriptor(blank);
-      } catch { /* chỉ là bước làm nóng, lỗi ở đây không ảnh hưởng */ }
-      return faceapi;
-    })().catch(err => {
-      loadingPromise = null; // cho phép thử lại
-      throw err;
-    });
-  }
-  return loadingPromise;
+// Cho phép tải lại khi lần trước lỗi (mất mạng...), còn thành công thì chỉ tải đúng 1 lần.
+const once = (fn) => {
+  let p = null;
+  return () => {
+    if (!p) p = fn().catch(err => { p = null; throw err; });
+    return p;
+  };
+};
+
+const blankCanvas = () => {
+  const c = document.createElement('canvas');
+  c.width = 160;
+  c.height = 160;
+  return c;
+};
+
+/**
+ * Giai đoạn 1 — đủ để mở camera và làm thử thách quay đầu: thư viện + mô hình phát hiện mặt (~190KB)
+ * + 68 điểm mốc (~350KB). Chỉ làm nóng shader cho inputSize nhỏ nhất ngay; các cỡ lớn hơn làm nóng
+ * ở nền để không bắt người dùng chờ.
+ */
+export const loadFaceDetector = once(async () => {
+  const faceapi = await loadScript(LIB_URL);
+  await Promise.all([
+    faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+    faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL)
+  ]);
+  try {
+    const blank = blankCanvas();
+    await faceapi.detectAllFaces(blank, new faceapi.TinyFaceDetectorOptions({ inputSize: DETECT_SIZES[0] }));
+    await faceapi.detectFaceLandmarks(blank);
+  } catch { /* chỉ là bước làm nóng */ }
+  (async () => {
+    try {
+      const blank = blankCanvas();
+      for (const inputSize of DETECT_SIZES.slice(1)) await faceapi.detectAllFaces(blank, new faceapi.TinyFaceDetectorOptions({ inputSize }));
+    } catch { /* bỏ qua */ }
+  })();
+  return faceapi;
+});
+
+/**
+ * Giai đoạn 2 — mô hình trích vector đặc trưng (~6MB, nặng nhất). Chỉ cần ở bước cuối (sau khi
+ * quay đầu xong) nên được tải song song trong lúc người dùng đang làm thử thách.
+ */
+export const loadFaceRecognizer = once(async () => {
+  const faceapi = await loadFaceDetector();
+  await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
+  try { await faceapi.computeFaceDescriptor(blankCanvas()); } catch { /* làm nóng */ }
+  return faceapi;
+});
+
+/** Tải đủ cả 3 mô hình. Gọi nhiều lần vẫn chỉ tải 1 lần. */
+export const loadFaceModels = () => loadFaceRecognizer();
+
+/**
+ * Tải trước mô hình khi trình duyệt rảnh (gọi khi vào trang có chấm công) để lúc bấm mở camera
+ * gần như không phải chờ. Lỗi được bỏ qua — lúc mở camera sẽ tải lại và báo lỗi rõ ràng.
+ */
+export const prefetchFaceModels = () => {
+  const run = () => loadFaceModels().catch(() => {});
+  if (typeof window.requestIdleCallback === 'function') window.requestIdleCallback(run, { timeout: 2000 });
+  else setTimeout(run, 300);
 };
 
 /**

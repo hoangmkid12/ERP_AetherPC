@@ -10,6 +10,7 @@ import { notify } from '../../context/NotificationContext';
 import { getRoleName } from '../../utils/rbacEngine';
 import { LEAVE_STATUS, ATTENDANCE_STATUS, getStatusInfo, getStatusLabel } from '../../utils/statusLabels';
 import FaceCamera from '../../components/HR/FaceCamera';
+import { prefetchFaceModels } from '../../utils/faceRecognition';
 import PayslipView, { fmtVnd, periodLabel } from '../../components/HR/PayslipView';
 import TimesheetPanel from './hr/TimesheetPanel';
 
@@ -65,6 +66,8 @@ export default function EmployeePortal() {
   const [payslips, setPayslips] = useState([]);
   const [selectedSlip, setSelectedSlip] = useState(null);
   const [holidays, setHolidays] = useState([]);
+  // Tải sẵn mô hình nhận diện khi trình duyệt rảnh để bấm chấm công là mở camera ngay.
+  useEffect(() => { prefetchFaceModels(); }, []);
 
   const loadProfile = useCallback(() => api.get('/hr/me/profile').then(r => setProfile(r.data)).catch(err => notify(err.message, 'error')), []);
   const loadToday = useCallback(() => api.get('/hr/me/attendance/today').then(r => setToday(r.data)).catch(() => {}), []);

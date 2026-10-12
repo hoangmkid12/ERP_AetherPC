@@ -11,6 +11,7 @@ import { notify } from '../../../context/NotificationContext';
 import { getRoleName } from '../../../utils/rbacEngine';
 import { DEPARTMENTS, downloadCsv } from './hrUi';
 import FaceCamera from '../../../components/HR/FaceCamera';
+import { prefetchFaceModels } from '../../../utils/faceRecognition';
 
 // Helper: Lấy 2 chữ cái viết tắt đại diện cho tên nhân viên
 // Vd: "Nguyễn Hà Quang Đức" -> "QĐ", "Đỗ Văn Sơn" -> "VS", "Nguyễn Viết Dũng" -> "VD"
@@ -124,6 +125,8 @@ export default function TimesheetPanel({ defaultView }) {
   // Modals
   const [showLegend, setShowLegend] = useState(false);
   const [showCameraModal, setShowCameraModal] = useState(false);
+  // Tải sẵn mô hình nhận diện khi trình duyệt rảnh để bấm chấm công là mở camera ngay.
+  useEffect(() => { prefetchFaceModels(); }, []);
 
   // 5. Fetch API dữ liệu
   const fetchData = useCallback(async () => {
