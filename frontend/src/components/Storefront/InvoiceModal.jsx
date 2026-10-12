@@ -2,14 +2,12 @@ import React, { useMemo, useRef } from 'react';
 import { Printer, X, FileText } from 'lucide-react';
 import { printDocument } from '../../utils/printDocument';
 import { SHOP } from './catalog';
-import { netOfVat } from '../../utils/vat';
 
 // Hoá đơn GTGT hiển thị cho khách, trình bày theo bản thể hiện hoá đơn điện tử:
 // - stamped = true (mặc định): đơn đã đặt thành công — có mộc đỏ + thông tin ký số của công ty.
 // - stamped = false: xem trước khi build PC — giữ nguyên hoá đơn, chỉ để trống vị trí đóng dấu.
-// Giá niêm yết bán lẻ ĐÃ GỒM VAT 10% (xem utils/vat.js) — khách trả đúng giá hiển thị. Hoá đơn GTGT theo
-// mẫu chuẩn: đơn giá & thành tiền ghi giá CHƯA thuế (= giá niêm yết / 1,1) → dòng thuế GTGT → tổng
-// thanh toán = đúng số tiền khách trả; kèm dòng ghi chú để khách hiểu không bị trừ tiền.
+// Giá niêm yết bán lẻ ĐÃ GỒM VAT 10% (xem utils/vat.js): hoá đơn ghi đúng giá sản phẩm, không tách
+// dòng thuế; tổng thanh toán = số tiền khách trả, kèm ghi chú "đã bao gồm thuế VAT".
 
 const DIGITS = ['không', 'một', 'hai', 'ba', 'bốn', 'năm', 'sáu', 'bảy', 'tám', 'chín'];
 const GROUP_UNITS = ['', 'nghìn', 'triệu', 'tỷ', 'nghìn tỷ', 'triệu tỷ'];
@@ -120,23 +118,17 @@ export default function InvoiceModal({ open, onClose, invoice }) {
 
   const stamped = invoice.stamped !== false;
   const items = (invoice.items || []).filter(Boolean);
-  // Tách giá chưa thuế từng dòng; tiền thuế lấy phần chênh để tổng luôn khớp đúng số khách trả.
   const lines = items.map(it => {
     const qty = Number(it.quantity) || 1;
-    const gross = (Number(it.price) || 0) * qty;
-    return { ...it, qty, gross, unitNet: netOfVat(it.price), amountNet: netOfVat(gross) };
+    const unitPrice = Number(it.price) || 0;
+    return { ...it, qty, unitPrice, amount: unitPrice * qty };
   });
-  const goodsGross = lines.reduce((s, l) => s + l.gross, 0);
-  const goodsNet = lines.reduce((s, l) => s + l.amountNet, 0);
+  const goods = lines.reduce((s, l) => s + l.amount, 0);
   const shippingFee = Number(invoice.shippingFee) || 0;
   const discount = Number(invoice.discount) || 0;
-  const shippingNet = netOfVat(shippingFee);
-  const discountNet = netOfVat(discount);
   const total = invoice.total != null && Number(invoice.total) > 0
     ? Math.round(Number(invoice.total))
-    : Math.max(0, goodsGross + shippingFee - discount);
-  const taxableNet = Math.max(0, goodsNet + shippingNet - discountNet);
-  const vat = total - taxableNet;
+    : Math.max(0, goods + shippingFee - discount);
   const dateObj = invoice.date ? new Date(invoice.date) : new Date();
   const date = Number.isNaN(dateObj.getTime()) ? new Date() : dateObj;
   const dd = String(date.getDate()).padStart(2, '0');
@@ -178,7 +170,7 @@ export default function InvoiceModal({ open, onClose, invoice }) {
           </div>
 
           <div style={{ textAlign: 'center', margin: '0.5rem 0 1.25rem' }}>
-            <div style={{ fontSize: '22px', fontWeight: 700, letterSpacing: '0.5px' }}>HOÁ ĐƠN GIÁ TRỊ GIA TĂNG</div>
+            <div style={{ fontSize: '22px', fontWeight: 700, letterSpacing: '0.5px' }}>HOÁ ĐƠN BÁN HÀNG</div>
             <div style={{ fontSize: '13.5px', fontStyle: 'italic', marginTop: '2px' }}>(Bản thể hiện của hoá đơn điện tử)</div>
             <div style={{ fontSize: '14px', fontStyle: 'italic', marginTop: '4px' }}>Ngày {dd} tháng {mm} năm {date.getFullYear()}</div>
           </div>
@@ -225,28 +217,23 @@ export default function InvoiceModal({ open, onClose, invoice }) {
                     <td style={td}>{l.name}</td>
                     <td style={{ ...td, textAlign: 'center' }}>{l.unit || 'Cái'}</td>
                     <td style={{ ...td, textAlign: 'center' }}>{l.qty}</td>
-                    <td style={num}>{fmt(l.unitNet)}</td>
-                    <td style={num}>{fmt(l.amountNet)}</td>
+                    <td style={num}>{fmt(l.unitPrice)}</td>
+                    <td style={num}>{fmt(l.amount)}</td>
                   </tr>
                 ))}
                 {lines.length === 0 && (
                   <tr><td colSpan={6} style={{ ...td, textAlign: 'center', fontStyle: 'italic' }}>Chưa có hàng hoá</td></tr>
                 )}
                 <tr>
-                  <td colSpan={5} style={{ ...td, textAlign: 'right' }}>Cộng tiền hàng (chưa thuế):</td>
-                  <td style={num}>{fmt(goodsNet)}</td>
+                  <td colSpan={5} style={{ ...td, textAlign: 'right' }}>Cộng tiền hàng:</td>
+                  <td style={num}>{fmt(goods)}</td>
                 </tr>
                 {shippingFee > 0 && (
-                  <tr><td colSpan={5} style={{ ...td, textAlign: 'right' }}>Phí vận chuyển:</td><td style={num}>{fmt(shippingNet)}</td></tr>
+                  <tr><td colSpan={5} style={{ ...td, textAlign: 'right' }}>Phí vận chuyển:</td><td style={num}>{fmt(shippingFee)}</td></tr>
                 )}
                 {discount > 0 && (
-                  <tr><td colSpan={5} style={{ ...td, textAlign: 'right' }}>Chiết khấu thương mại:</td><td style={num}>-{fmt(discountNet)}</td></tr>
+                  <tr><td colSpan={5} style={{ ...td, textAlign: 'right' }}>Chiết khấu thương mại:</td><td style={num}>-{fmt(discount)}</td></tr>
                 )}
-                <tr>
-                  <td colSpan={3} style={td}>Thuế suất GTGT: <strong>10%</strong></td>
-                  <td colSpan={2} style={{ ...td, textAlign: 'right' }}>Tiền thuế GTGT:</td>
-                  <td style={num}>{fmt(vat)}</td>
-                </tr>
                 <tr>
                   <td colSpan={5} style={{ ...td, textAlign: 'right', fontWeight: 700, fontSize: '14.5px' }}>Tổng tiền thanh toán:</td>
                   <td style={{ ...num, fontWeight: 700, fontSize: '14.5px', color: '#b91c1c' }}>{fmt(total)}</td>
@@ -255,8 +242,8 @@ export default function InvoiceModal({ open, onClose, invoice }) {
                   <td colSpan={6} style={td}>Số tiền viết bằng chữ: <strong style={{ fontStyle: 'italic', fontWeight: 600 }}>{moneyToWords(total)}.</strong></td>
                 </tr>
                 <tr>
-                  <td colSpan={6} style={{ ...td, fontSize: '12.5px', fontStyle: 'italic', color: '#475569' }}>
-                    Giá bán niêm yết đã bao gồm thuế GTGT 10%. Đơn giá trên hoá đơn là giá chưa thuế (= giá niêm yết ÷ 1,1); tổng tiền thanh toán đúng bằng giá niêm yết.
+                  <td colSpan={6} style={{ ...td, fontSize: '13px', fontStyle: 'italic', color: '#475569', textAlign: 'center' }}>
+                    (Giá trên đã bao gồm thuế VAT 10%)
                   </td>
                 </tr>
               </tbody>
