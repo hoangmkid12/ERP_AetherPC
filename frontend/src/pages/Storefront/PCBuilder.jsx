@@ -4,12 +4,11 @@ import { useCart } from '../../context/CartContext';
 import { useAuth } from '../../context/AuthContext';
 import { notify } from '../../context/NotificationContext';
 import { api } from '../../services/api';
-import { printDocument } from '../../utils/printDocument';
 import InvoiceModal from '../../components/Storefront/InvoiceModal';
 import {
   Cpu, Trash2, ShieldCheck, ShieldAlert, ShoppingCart, HelpCircle, Sparkles,
   AlertTriangle, XCircle, Layers, Database, Gamepad2, Zap, HardDrive, Box, Wind,
-  Copy, Printer, MessageSquare, ChevronDown, ChevronUp, X, SlidersHorizontal, FileText
+  MessageSquare, ChevronDown, ChevronUp, X, SlidersHorizontal, FileText
 } from 'lucide-react';
 import { HARDWARE_KNOWLEDGE_BASE, parseCustomerPrompt, runAIOptimizer, hasIntegratedGraphics } from '../../config/pcBuilderAIKnowledge';
 
@@ -456,27 +455,6 @@ export default function PCBuilder() {
     return getPsuWattageHelper(PSU);
   };
 
-  const handleCopyBuild = () => {
-    const list = Object.entries(selectedParts)
-      .filter(([_, item]) => item !== null)
-      .map(([slotId, item]) => `- ${COMPONENT_SLOTS.find(s => s.id === slotId)?.label}: ${item.name} (${formatPrice(item.price)})`)
-      .join('\n');
-    
-    if (!list) {
-      notify('Vui lòng chọn ít nhất một linh kiện trước khi sao chép!', 'error');
-      return;
-    }
-
-    const text = `CẤU HÌNH PC - AETHERPC\n---------------------\n${list}\n---------------------\nTỔNG CỘNG: ${formatPrice(calculateTotalPrice())}\nLink build: ${window.location.href}`;
-    navigator.clipboard.writeText(text)
-      .then(() => notify('Đã sao chép cấu hình máy tính vào clipboard thành công!', 'success'))
-      .catch(() => notify('Không thể sao chép vào clipboard — trình duyệt đã chặn quyền truy cập.', 'error'));
-  };
-
-  const handlePrintBuild = () => {
-    printDocument('.print-only-layout', { title: 'Cấu hình PC - AetherPC' });
-  };
-
   const addWholeBuildToCart = () => {
     Object.values(selectedParts).forEach(item => {
       if (item) {
@@ -651,25 +629,6 @@ export default function PCBuilder() {
           }
           .pcb-sidebar {
             position: static !important;
-          }
-        }
-        .print-only-layout {
-          display: none;
-        }
-        @media print {
-          header, footer, .chat-bot, #chat-bot, [class*="Header"], [class*="Footer"], [class*="Chatbot"] {
-            display: none !important;
-          }
-          .pc-builder-screen-layout {
-            display: none !important;
-          }
-          .print-only-layout {
-            display: block !important;
-            background: #fff !important;
-            color: #000 !important;
-            width: 100% !important;
-            margin: 0 !important;
-            padding: 0 !important;
           }
         }
       `}</style>
@@ -1554,24 +1513,14 @@ export default function PCBuilder() {
               {formatPrice(calculateTotalPrice())}
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '0.5rem', marginBottom: '0.75rem' }}>
-              <button
-                onClick={handleCopyBuild}
-                className="btn btn-secondary"
-                style={{ fontSize: '0.8rem', padding: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}
-                disabled={Object.values(selectedParts).every(item => !item)}
-              >
-                <Copy size={13} /> Sao chép văn bản
-              </button>
-              <button
-                onClick={handlePrintBuild}
-                className="btn btn-secondary"
-                style={{ fontSize: '0.8rem', padding: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}
-                disabled={Object.values(selectedParts).every(item => !item)}
-              >
-                <Printer size={13} /> Tải / In
-              </button>
-            </div>
+            <button
+              onClick={() => setShowSampleInvoice(true)}
+              className="btn btn-secondary"
+              style={{ width: '100%', marginBottom: '0.6rem', padding: '0.65rem', fontSize: '0.9rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
+              disabled={Object.values(selectedParts).every(item => !item)}
+            >
+              <FileText size={16} /> Xem hoá đơn
+            </button>
 
             <button
               onClick={addWholeBuildToCart}
@@ -1581,15 +1530,6 @@ export default function PCBuilder() {
             >
               <ShoppingCart size={20} />
               Thêm Toàn Bộ Vào Giỏ Hàng
-            </button>
-
-            <button
-              onClick={() => setShowSampleInvoice(true)}
-              className="btn btn-secondary"
-              style={{ width: '100%', marginTop: '0.5rem', padding: '0.6rem', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
-              disabled={Object.values(selectedParts).every(item => !item)}
-            >
-              <FileText size={15} /> Xem hoá đơn
             </button>
           </div>
         </div>
@@ -1610,60 +1550,6 @@ export default function PCBuilder() {
             .map(slot => ({ name: selectedParts[slot.id].name, quantity: 1, price: parseFloat(selectedParts[slot.id].price) || 0 }))
         }}
       />
-
-      {/* PRINT-ONLY TEMPLATE */}
-      <div className="print-only-layout aetherpc-print-only">
-        <div style={{ padding: '2rem', fontFamily: 'Arial, sans-serif', color: '#000', backgroundColor: '#fff' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #000', paddingBottom: '1rem', marginBottom: '2rem' }}>
-            <div>
-              <h1 style={{ fontSize: '24px', margin: 0, fontWeight: 'bold', color: '#000' }}>AetherPC</h1>
-              <p style={{ fontSize: '12px', margin: '4px 0 0 0', color: '#555' }}>Hệ thống Quản lý Bán linh kiện máy tính tích hợp AI</p>
-            </div>
-            <div style={{ textAlign: 'right' }}>
-              <h2 style={{ fontSize: '16px', margin: 0, fontWeight: 'bold', textTransform: 'uppercase', color: '#000' }}>BẢNG BÁO GIÁ CẤU HÌNH PC</h2>
-              <p style={{ fontSize: '12px', margin: '4px 0 0 0', color: '#555' }}>Ngày tạo: {new Date().toLocaleDateString('vi-VN')}</p>
-            </div>
-          </div>
-
-          <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '2rem' }}>
-            <thead>
-              <tr style={{ borderBottom: '2px solid #000', textAlign: 'left' }}>
-                <th style={{ padding: '8px', fontSize: '14px', fontWeight: 'bold', color: '#000', width: '20%' }}>Linh kiện</th>
-                <th style={{ padding: '8px', fontSize: '14px', fontWeight: 'bold', color: '#000', width: '50%' }}>Tên sản phẩm</th>
-                <th style={{ padding: '8px', fontSize: '14px', fontWeight: 'bold', color: '#000', width: '15%' }}>Hãng</th>
-                <th style={{ padding: '8px', fontSize: '14px', fontWeight: 'bold', color: '#000', width: '15%', textAlign: 'right' }}>Đơn giá</th>
-              </tr>
-            </thead>
-            <tbody>
-              {COMPONENT_SLOTS.map(slot => {
-                const item = selectedParts[slot.id];
-                return (
-                  <tr key={slot.id} style={{ borderBottom: '1px solid #ddd' }}>
-                    <td style={{ padding: '10px 8px', fontSize: '13px', fontWeight: 'bold', color: '#000' }}>{slot.label}</td>
-                    <td style={{ padding: '10px 8px', fontSize: '13px', color: '#333' }}>{item ? item.name : 'Chưa chọn'}</td>
-                    <td style={{ padding: '10px 8px', fontSize: '13px', color: '#333' }}>{item ? item.brand : '-'}</td>
-                    <td style={{ padding: '10px 8px', fontSize: '13px', color: '#000', textAlign: 'right', fontWeight: item ? 'bold' : 'normal' }}>
-                      {item ? formatPrice(item.price) : '-'}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-
-          <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '2px solid #000', paddingTop: '1rem' }}>
-            <div style={{ textAlign: 'right' }}>
-              <span style={{ fontSize: '16px', fontWeight: 'bold', marginRight: '1rem', color: '#000' }}>TỔNG CỘNG THANH TOÁN:</span>
-              <strong style={{ fontSize: '22px', color: '#10b981' }}>{formatPrice(calculateTotalPrice())}</strong>
-            </div>
-          </div>
-
-          <div style={{ marginTop: '4rem', textAlign: 'center', fontSize: '11px', color: '#777', borderTop: '1px dashed #ccc', paddingTop: '1rem' }}>
-            <p>Mọi thắc mắc vui lòng liên hệ hotline: 1900 xxxx hoặc truy cập website: http://localhost:3000</p>
-            <p>Cảm ơn quý khách đã tin tưởng và mua sắm tại AetherPC!</p>
-          </div>
-        </div>
-      </div>
 
       {activeSlot && (
         <div style={{

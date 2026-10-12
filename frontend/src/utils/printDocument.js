@@ -42,7 +42,8 @@ const PRINT_CSS = `
   }
   /* Bỏ padding thừa của wrapper chứng từ khi in vì body iframe đã có lề */
   .aetherpc-print-root #aetherpc-supplier-confirm-document,
-  .aetherpc-print-root [id*="-document"] {
+  .aetherpc-print-root [id*="-document"],
+  .aetherpc-print-root > .aetherpc-print-flush {
     padding: 0 !important;
   }
   /* Bảo vệ grid/flex/table bên trong: không override width con cháu, chỉ reset wrapper ngoài cùng */
@@ -110,7 +111,14 @@ export function printDocument(target, { title = 'AetherPC', fitOnePage = true } 
   clone.removeAttribute('id');
   doc.querySelector('.aetherpc-print-root').appendChild(doc.importNode(clone, true));
 
+  // Đo chiều cao sau khi web font (Be Vietnam Pro...) đã tải xong — đo bằng font dự phòng rồi
+  // mới đổi font thì phiếu cao hơn mức đã tính và tràn sang trang 2.
   const runPrint = () => {
+    const fontsReady = doc.fonts?.ready || Promise.resolve();
+    Promise.race([fontsReady, new Promise(r => setTimeout(r, 1500))]).then(printNow, printNow);
+  };
+
+  const printNow = () => {
     const root = doc.querySelector('.aetherpc-print-root');
     if (fitOnePage && root) {
       const height = root.scrollHeight;

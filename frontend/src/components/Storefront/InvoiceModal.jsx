@@ -153,7 +153,7 @@ export default function InvoiceModal({ open, onClose, invoice }) {
           </div>
         </div>
 
-        <div ref={docRef} style={{ backgroundColor: '#ffffff', color: INK, borderRadius: '6px', padding: '2.25rem 2.5rem', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.35)', fontFamily: FONT }}>
+        <div ref={docRef} className="aetherpc-print-flush" style={{ backgroundColor: '#ffffff', color: INK, borderRadius: '6px', padding: '2.25rem 2.5rem', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.35)', fontFamily: FONT }}>
           {/* Đầu hoá đơn: logo + ký hiệu, số */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap' }}>
             <div style={{ fontFamily: '"Be Vietnam Pro", Arial, sans-serif', fontSize: '26px', fontWeight: 800, color: '#d70018', letterSpacing: '-0.5px', lineHeight: 1 }}>
@@ -201,7 +201,7 @@ export default function InvoiceModal({ open, onClose, invoice }) {
                   <th style={{ ...th, width: '44px' }}>STT</th>
                   <th style={th}>Tên hàng hoá, dịch vụ</th>
                   <th style={{ ...th, width: '60px' }}>Đơn vị tính</th>
-                  <th style={{ ...th, width: '64px' }}>Số lượng</th>
+                  <th style={{ ...th, width: '76px' }}>Số lượng</th>
                   <th style={{ ...th, width: '118px' }}>Đơn giá</th>
                   <th style={{ ...th, width: '130px' }}>Thành tiền</th>
                 </tr>
