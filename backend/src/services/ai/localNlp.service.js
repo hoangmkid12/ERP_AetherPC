@@ -6,7 +6,9 @@ let manager = null;
 let isModelReady = false;
 
 const MODEL_PATH = path.join(__dirname, 'model.nlp');
-const DATASET_PATH = path.join(__dirname, '../../../../ai_training/dataset_intent.json');
+// Dataset nằm trong backend/ để Docker (build context ./backend) đóng gói được —
+// trước đây ở ai_training/ ngoài backend nên trên server không có dataset lẫn model.
+const DATASET_PATH = path.join(__dirname, 'data', 'dataset_intent.json');
 
 /**
  * Đăng ký các thực thể đặc trưng ERP vào bộ nhận diện thực thể (NER - Named Entity Recognition)

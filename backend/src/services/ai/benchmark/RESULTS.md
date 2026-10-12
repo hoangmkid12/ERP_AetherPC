@@ -44,6 +44,46 @@ Thay đổi đã áp dụng:
 Lưu ý phương pháp: đây là đánh giá **khâu chọn kỹ năng** của tầng offline với DB giả —
 không đo chất lượng câu trả lời do Gemini sinh ra.
 
+## 1b. Mô hình phân loại ý định tự huấn luyện (node-nlp, chạy cục bộ)
+
+Mô hình mạng nơ-ron nhỏ của thư viện `node-nlp`, huấn luyện cục bộ (không gọi API ngoài)
+trên `../data/dataset_intent.json`, phân loại câu hỏi vào 8 ý định để định tuyến trong
+`ai.controller.js` (chỉ dùng kết quả khi độ tin cậy ≥ 0,70).
+
+Phương pháp (`nlp_intent_eval.js`):
+- **K-fold phân tầng 5 phần**, xáo trộn bằng seed cố định (chạy lại ra cùng kết quả).
+- **Bộ TEST khoá** `intent_test_locked.json`: 56 câu (7 câu/ý định), viết TRƯỚC khi mở rộng
+  dữ liệu, có câu không dấu / văn nói / viết tắt. Script dừng nếu câu TEST lọt vào dữ liệu
+  train; khi mở rộng dữ liệu, mọi câu giống câu TEST (trigram Jaccard ≥ 0,5, không phân biệt
+  dấu) bị loại tự động (34 câu bị loại).
+- Dữ liệu bổ sung đợt 2 dựa trên lỗi của cross-validation, **không** dựa trên lỗi bộ TEST.
+
+| Chỉ số | 170 câu (ban đầu) | 466 câu (mở rộng) |
+|---|---|---|
+| CV Accuracy | 82,9% | **90,3%** |
+| CV Macro-F1 | 83,5% | **91,1%** |
+| CV Precision @0,70 (đúng trong số câu mô hình đủ tự tin) | 87,9% | **94,9%** |
+| TEST Accuracy | 85,7% | **89,3%** |
+| TEST Macro-F1 | 86,3% | **89,9%** |
+| TEST Coverage @0,70 (tỷ lệ câu đủ tự tin để dùng) | 83,9% | **91,1%** |
+| TEST Precision @0,70 | 95,7% (2 nhầm) | 92,2% (4 nhầm) |
+
+Lưu ý khi báo cáo: Precision @0,70 trên TEST giảm nhẹ, nhưng TEST chỉ 56 câu nên chênh
+2 câu nằm trong dao động; trên CV (466 dự đoán) chỉ số này tăng 87,9% → 94,9%. Giữ ngưỡng
+0,70 vì đường cong trên CV khá phẳng (0,85 chỉ giảm 22 → 13 câu nhầm nhưng mất ~7% độ phủ —
+các câu đó sẽ rơi xuống tầng Gemini, tốn lượt gọi API).
+
+Lỗi còn lại trên TEST tập trung ở MY_PROFILE_TASKS ↔ HR_STAFF_COUNT (câu có "nhân viên",
+"cá nhân") và PRODUCT_LOOKUP ↔ PC_COMPATIBILITY (câu hỏi tồn kho dạng "có ... không").
+
+Sửa lỗi triển khai: trước đây `model.nlp` bị `.gitignore` bỏ qua và dataset nằm ở
+`ai_training/` ngoài build context Docker (`./backend`) → trên server không có mô hình lẫn
+dữ liệu, bước phân loại cục bộ bị bỏ qua hoàn toàn. Nay dataset nằm trong backend và
+`model.nlp` (đúng bản đã đánh giá) được đưa vào git.
+
+Huấn luyện lại: `cd backend && npm run ai:train` (đánh giá + lưu mô hình), `npm run ai:eval`
+(chỉ đánh giá), thêm `--cv-errors` để xem lỗi CV theo cặp ý định.
+
 ## 2. Bảo mật
 
 | Bộ kiểm thử | Nội dung | Kết quả |
@@ -66,6 +106,7 @@ không đo chất lượng câu trả lời do Gemini sinh ra.
 ```bash
 cd backend
 node src/services/ai/benchmark/heldout_eval.js            # DEV + TEST (offline)
+npm run ai:eval                                           # mô hình node-nlp: k-fold + TEST khoá (offline)
 node src/services/ai/benchmark/heldout_eval.js TEST -v    # in từng câu
 node src/services/ai/benchmark/benchmark_stage5.js        # offline
 node src/services/ai/benchmark/cache_isolation_test.js    # offline

@@ -57,6 +57,10 @@ temp_*.txt
 
 # NLP.js generated models
 *.nlp
+# Ngoại lệ: mô hình phân loại ý định CHẠY THẬT trên server — đúng bản đã được đánh giá
+# (benchmark/nlp_intent_eval.js --save). Trước đây file này bị bỏ qua nên server không
+# có mô hình. Train lại: cd backend && npm run ai:train
+!backend/src/services/ai/model.nlp
 
 # Local logs & scratch
 scratch/

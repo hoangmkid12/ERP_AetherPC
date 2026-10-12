@@ -54,7 +54,8 @@ class ERPIntentDataset(Dataset):
         }
 
 def load_data():
-    dataset_path = os.path.join(os.path.dirname(__file__), 'dataset_intent.json')
+    # Dataset dùng chung với mô hình node-nlp của backend
+    dataset_path = os.path.join(os.path.dirname(__file__), '..', 'backend', 'src', 'services', 'ai', 'data', 'dataset_intent.json')
     with open(dataset_path, 'r', encoding='utf-8') as f:
         data = json.load(f)
 

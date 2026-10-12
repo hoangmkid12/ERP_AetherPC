@@ -15,7 +15,9 @@
     "db:reconcile-stock": "node prisma/reconcile-stock.js",
     "queue:worker": "node src/services/orderWorker.js",
     "queue:producer-demo": "node scripts/enqueue_demo.js",
-    "db:prepare-seed": "node prisma/prepare-seed-data.js"
+    "db:prepare-seed": "node prisma/prepare-seed-data.js",
+    "ai:train": "node src/services/ai/benchmark/nlp_intent_eval.js --save",
+    "ai:eval": "node src/services/ai/benchmark/nlp_intent_eval.js"
   },
   "dependencies": {
     "@google/genai": "^2.26.0",
