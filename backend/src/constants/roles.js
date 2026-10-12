@@ -20,4 +20,10 @@ const STAFF_ROLES = [
 // Người được xem/sửa dữ liệu nhân sự của người khác.
 const HR_MANAGER_ROLES = ['HR', 'CEO', 'ADMIN'];
 
-module.exports = { QC_ROLES, normalizeQcRole, STAFF_ROLES, HR_MANAGER_ROLES };
+// Giá vốn (averageCost) & biên lợi nhuận là dữ liệu kinh doanh nhạy cảm: chỉ cấp quản lý, kế toán,
+// mua hàng được xem; khách hàng và nhân viên bán hàng/kho thường chỉ thấy giá bán.
+const COST_VIEW_ROLES = ['CEO', 'ADMIN', 'ACCOUNTANT', 'WAREHOUSE_MANAGER', 'PURCHASING', 'SALES_MANAGER'];
+// Khai báo/điều chỉnh giá vốn đầu kỳ thủ công (hàng tồn chưa có phiếu nhập) — nghiệp vụ của kế toán.
+const COST_EDIT_ROLES = ['CEO', 'ADMIN', 'ACCOUNTANT'];
+
+module.exports = { QC_ROLES, normalizeQcRole, STAFF_ROLES, HR_MANAGER_ROLES, COST_VIEW_ROLES, COST_EDIT_ROLES };

@@ -4,7 +4,8 @@ import { useInventoryStore, useSalesStore, useFinanceStore, useUtilityStore } fr
 import { useAuth } from '../../context/AuthContext';
 import { usePermission } from '../../hooks/usePermission';
 import { useAutoRefresh } from '../../hooks/useAutoRefresh';
-import { useNotification, notify, confirm } from '../../context/NotificationContext';
+import { useNotification, notify, confirm, promptText } from '../../context/NotificationContext';
+import { grossMarginPct } from '../../utils/vat';
 import { DELIVERY_REGIONS, detectDeliveryRegion } from '../../utils/deliveryRegions';
 import { QC_STATUS, STOCK_INTAKE_STATUS, getStatusInfo } from '../../utils/statusLabels';
 import { api } from '../../services/api';
@@ -2979,6 +2980,22 @@ export default function Warehouse() {
   const [warehousePeriod, setWarehousePeriod] = useState('ALL');
 
   const { user, isCEO, isWarehouseManager, isWarehouse, isAdmin } = useAuth();
+  // Khai báo giá vốn đầu kỳ (hàng tồn chưa có phiếu nhập) — nghiệp vụ kế toán (khớp COST_EDIT_ROLES ở backend)
+  const canEditCost = ['CEO', 'ADMIN', 'ACCOUNTANT'].includes(user?.role);
+  const editProductCost = async (prod) => {
+    const input = await promptText(`Giá vốn bình quân (chưa VAT) cho "${prod.name}" — giá bán hiện tại ${Number(prod.price || 0).toLocaleString('vi-VN')}đ (đã gồm VAT):`, String(Math.round(prod.averageCost || 0)));
+    if (input == null || input === false) return;
+    const value = Number(String(input).replace(/[^\d]/g, ''));
+    if (!Number.isFinite(value) || value <= 0) { notify('Giá vốn không hợp lệ.', 'error'); return; }
+    try {
+      const res = await api.patch(`/products/admin/${prod.id}/cost`, { averageCost: value });
+      useInventoryStore.setState(state => ({ inventory: state.inventory.map(i => i.id === prod.id ? { ...i, averageCost: value } : i) }));
+      setEditingProd(prev => (prev && prev.id === prod.id ? { ...prev, averageCost: value } : prev));
+      notify(res?.message || 'Đã cập nhật giá vốn.', 'success');
+    } catch (err) {
+      notify(err.message || 'Không cập nhật được giá vốn.', 'error');
+    }
+  };
   // Khớp phân quyền đọc ở backend (warehouse.routes.js, purchase.routes.js): vai trò chỉ được xem tồn kho
   // (vd. Quản lý bán hàng) không gọi các API bị từ chối, tránh 403 làm hỏng cả lượt tải dữ liệu.
   const canReadReceipts = ['WAREHOUSE', 'WAREHOUSE_MANAGER', 'QC', 'QA', 'QUALITY_CONTROL', 'PURCHASING', 'ACCOUNTANT', 'CEO', 'ADMIN'].includes(user?.role);
@@ -7040,6 +7057,14 @@ export default function Warehouse() {
                         </td>
                         <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 700, color: '#16a34a', whiteSpace: 'nowrap' }}>
                           {safeFormatPrice(p.price)}
+                          {p.averageCost != null && (() => {
+                            const margin = grossMarginPct(p.price, p.averageCost);
+                            return (
+                              <div title="Giá vốn bình quân (chưa VAT) · biên lợi nhuận gộp trên giá bán chưa VAT" style={{ fontSize: '0.72rem', fontWeight: 600, color: '#64748b', marginTop: '0.15rem' }}>
+                                {p.averageCost > 0 ? <>Vốn {safeFormatPrice(p.averageCost)} · <span style={{ color: margin == null ? '#64748b' : margin < 0 ? '#dc2626' : margin < 5 ? '#d97706' : '#15803d' }}>LN {margin == null ? '—' : `${margin.toFixed(1)}%`}</span></> : <span style={{ color: '#d97706' }}>Chưa có giá vốn</span>}
+                              </div>
+                            );
+                          })()}
                         </td>
                         <td style={{ padding: '0.75rem 0.5rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
                           <button
@@ -7735,6 +7760,20 @@ export default function Warehouse() {
                       ) : safeFormatPrice(editingProd.originalPrice || editingProd.price)}
                     </span>
                   ))}
+                  {editingProd.averageCost != null && infoRow('Giá Vốn Bình Quân (chưa VAT)', (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                      {editingProd.averageCost > 0 ? safeFormatPrice(editingProd.averageCost) : <span style={{ color: '#d97706' }}>Chưa có</span>}
+                      {canEditCost && (
+                        <button type="button" onClick={() => editProductCost(editingProd)} style={{ fontSize: '0.75rem', fontWeight: 700, color: '#2563eb', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '4px', padding: '0.1rem 0.45rem', cursor: 'pointer' }}>Khai báo</button>
+                      )}
+                    </span>
+                  ))}
+                  {editingProd.averageCost != null && infoRow('Biên Lợi Nhuận Gộp', (() => {
+                    const margin = grossMarginPct(editingProd.price, editingProd.averageCost);
+                    if (margin == null) return '—';
+                    const profitPerUnit = Math.round(Number(editingProd.price || 0) / 1.1 - Number(editingProd.averageCost || 0));
+                    return <span style={{ color: margin < 0 ? '#dc2626' : '#15803d' }}>{margin.toFixed(1)}% · {safeFormatPrice(profitPerUnit)}/sp</span>;
+                  })())}
                   {infoRow('Ngưỡng An Toàn', `${threshNum} sản phẩm`)}
                   {infoRow('Trên Trang Bán Hàng', editingProd.available !== false
                     ? <span style={{ color: '#15803d' }}>Đang hiển thị</span>

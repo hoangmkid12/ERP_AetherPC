@@ -116,11 +116,12 @@ User: "Tài khoản công ty hiện có bao nhiêu tiền"
 SQL: SELECT bank_name, account_number, account_holder, current_balance FROM company_bank_accounts WHERE status = 'ACTIVE' ORDER BY current_balance DESC;
 
 --- NHÓM 6: DOANH THU & LỢI NHUẬN NÂNG CAO ---
+-- Quy ước: total_price / total_amount ĐÃ GỒM VAT 10%; giá vốn (order_items.unit_cost = giá vốn lúc xuất kho, products.average_cost = giá vốn hiện tại) CHƯA VAT. Lợi nhuận = total_price / 1.1 − quantity × giá vốn.
 User: "Doanh thu theo từng danh mục tháng này"
 SQL: SELECT c.name AS danh_muc, SUM(oi.total_price) AS doanh_thu FROM order_items oi JOIN orders o ON o.order_id = oi.order_id JOIN products p ON p.product_id = oi.product_id JOIN categories c ON c.id = p.category_id WHERE o.status IN ('DELIVERED', 'COMPLETED') AND o.created_at >= date_trunc('month', now() AT TIME ZONE 'Asia/Ho_Chi_Minh') GROUP BY c.name ORDER BY doanh_thu DESC LIMIT 20;
 
 User: "Sản phẩm nào mang lại nhiều lợi nhuận nhất năm nay"
-SQL: SELECT p.product_id, p.name, SUM(oi.total_price - oi.quantity * p.average_cost) AS tong_loi_nhuan FROM order_items oi JOIN orders o ON o.order_id = oi.order_id JOIN products p ON p.product_id = oi.product_id WHERE o.status IN ('DELIVERED', 'COMPLETED') AND o.created_at >= date_trunc('year', now() AT TIME ZONE 'Asia/Ho_Chi_Minh') GROUP BY p.product_id, p.name ORDER BY tong_loi_nhuan DESC LIMIT 10;
+SQL: SELECT p.product_id, p.name, ROUND(SUM(oi.total_price / 1.1 - oi.quantity * COALESCE(oi.unit_cost, p.average_cost))) AS tong_loi_nhuan FROM order_items oi JOIN orders o ON o.order_id = oi.order_id JOIN products p ON p.product_id = oi.product_id WHERE o.status IN ('DELIVERED', 'COMPLETED') AND o.created_at >= date_trunc('year', now() AT TIME ZONE 'Asia/Ho_Chi_Minh') GROUP BY p.product_id, p.name ORDER BY tong_loi_nhuan DESC LIMIT 10;
 
 --- NHÓM 7: BẢO HÀNH & ĐỔI TRẢ (RMA) ---
 User: "Các yêu cầu bảo hành đang chờ duyệt"

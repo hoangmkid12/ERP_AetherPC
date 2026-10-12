@@ -291,7 +291,10 @@ const createOrder = async (req, res, next) => {
           // 1b. Bắt buộc gán Serial Number cho từng đơn vị xuất kho.
           await claimAvailableSerials(tx, itemProdId, qty, ordCode);
 
-          totalCogs += Number(productBeforeUpdate?.averageCost || 0) * qty;
+          const unitCost = Number(productBeforeUpdate?.averageCost || 0);
+          totalCogs += unitCost * qty;
+          // Chụp giá vốn lúc xuất kho vào chi tiết đơn (báo cáo lợi nhuận theo sản phẩm/đơn)
+          await tx.orderItem.updateMany({ where: { orderId: ordCode, productId: itemProdId }, data: { unitCost } });
 
           // 2. Trừ tồn kho vật lý (ưu tiên Kho 1, thiếu thì lấy tiếp ở kho khác) + nhật ký OUT
           await deductInventory(tx, itemProdId, qty, { referenceId: ordCode, note: `Xuất kho tự động cho Đơn Hàng ${ordCode}` });
@@ -519,6 +522,7 @@ const cancelSingleOrderInternal = async (orderId, reason = 'Khách hàng yêu c�
       });
 
       await tx.ledgerEntry.deleteMany({ where: { referenceId: `COGS-${orderId}` } });
+      await tx.orderItem.updateMany({ where: { orderId: orderId }, data: { unitCost: null } });
     }
 
     const updated = await tx.order.update({
@@ -997,7 +1001,10 @@ const updateOrderStatus = async (req, res, next) => {
             // Bắt buộc gán Serial Number cho từng đơn vị xuất kho.
             await claimAvailableSerials(tx, item.productId, item.quantity, id);
 
-            totalCogs += Number(productBeforeUpdate?.averageCost || 0) * item.quantity;
+            const unitCost = Number(productBeforeUpdate?.averageCost || 0);
+            totalCogs += unitCost * item.quantity;
+            // Chụp giá vốn lúc xuất kho vào chi tiết đơn (báo cáo lợi nhuận theo sản phẩm/đơn)
+            await tx.orderItem.update({ where: { orderItemId: item.orderItemId }, data: { unitCost } });
 
             // Trừ tồn kho vật lý đúng bằng số đã trừ ở Product.stockQuantity (có thể lấy từ nhiều kho)
             await deductInventory(tx, item.productId, item.quantity, { referenceId: id, note: `Xuất kho khi duyệt Đơn Hàng ${id}` });
@@ -1074,6 +1081,7 @@ const updateOrderStatus = async (req, res, next) => {
           // Order.status), nên giá vốn tương ứng cũng phải bị loại theo để
           // không còn khoản chi mồ côi không có doanh thu đối ứng.
           await tx.ledgerEntry.deleteMany({ where: { referenceId: `COGS-${id}` } });
+          await tx.orderItem.updateMany({ where: { orderId: id }, data: { unitCost: null } });
         }
       }
 

@@ -1,12 +1,14 @@
 const express = require('express');
 const router = express.Router();
-const { getProducts, getProductById, getAIRecommendations, getBestSellers, getPersonalizedRecommendations, getProductReviews, addProductReview, createProduct, updateProduct, updateProductVisibility, deleteProductImage, deleteProduct, getProductImageBlob } = require('../controllers/product.controller');
+const { getProducts, getProductById, getAIRecommendations, getBestSellers, getPersonalizedRecommendations, getProductReviews, addProductReview, createProduct, updateProduct, updateProductVisibility, deleteProductImage, deleteProduct, getProductImageBlob, updateProductCost } = require('../controllers/product.controller');
+const { COST_EDIT_ROLES } = require('../constants/roles');
 const { authMiddleware, optionalAuthMiddleware } = require('../middlewares/auth.middleware');
 const { uploadProductImage } = require('../middlewares/upload.middleware');
 
 // @route   GET /api/v1/products
 // @desc    Query products list with pagination & filters
-router.get('/', getProducts);
+// optionalAuth: tài khoản quản lý đăng nhập thì nhận kèm giá vốn (xem stripCost trong controller)
+router.get('/', optionalAuthMiddleware, getProducts);
 
 // Các route path cố định (best-sellers, personalized, blobs) PHẢI khai báo TRƯỚC
 // route động '/:id' bên dưới — Express khớp theo thứ tự đăng ký, nếu để sau
@@ -28,7 +30,7 @@ router.get('/personalized', optionalAuthMiddleware, getPersonalizedRecommendatio
 
 // @route   GET /api/v1/products/:id
 // @desc    Get detailed product by ID
-router.get('/:id', getProductById);
+router.get('/:id', optionalAuthMiddleware, getProductById);
 
 // @route   GET /api/v1/products/:id/recommendations
 // @desc    Get AI recommendations based on similarity of specs
@@ -53,6 +55,10 @@ router.post('/admin', authMiddleware(['WAREHOUSE_MANAGER', 'CEO', 'ADMIN']), upl
 // @route   PUT /api/v1/products/admin/:id
 // @desc    Update a product (Admin / Warehouse Manager only)
 router.put('/admin/:id', authMiddleware(['WAREHOUSE_MANAGER', 'CEO', 'ADMIN']), uploadProductImage, updateProduct);
+
+// @route   PATCH /api/v1/products/admin/:id/cost
+// @desc    Khai báo / điều chỉnh giá vốn đầu kỳ (Kế toán / CEO / Admin)
+router.patch('/admin/:id/cost', authMiddleware(COST_EDIT_ROLES), updateProductCost);
 
 // @route   PATCH /api/v1/products/admin/:id/visibility
 // @desc    Toggle whether a product shows on the storefront — narrower than the full

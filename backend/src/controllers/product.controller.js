@@ -31,12 +31,16 @@ const PRODUCT_CODE_TO_CATEGORY_SLUG = {
 };
 
 // Giá vốn bình quân là dữ liệu kinh doanh nội bộ — không trả về ở các API công khai của cửa hàng.
-const stripCost = (p) => {
-  if (!p || typeof p !== 'object') return p;
+// Riêng danh sách / chi tiết sản phẩm: tài khoản quản lý (COST_VIEW_ROLES) đăng nhập thì được nhận
+// kèm averageCost để màn hình Kho/Kế toán hiển thị giá vốn & biên lợi nhuận.
+const { COST_VIEW_ROLES } = require('../constants/roles');
+const canViewCost = (req) => COST_VIEW_ROLES.includes(req?.user?.role);
+const stripCost = (p, req) => {
+  if (!p || typeof p !== 'object' || canViewCost(req)) return p;
   const { averageCost, ...rest } = p;
   return rest;
 };
-const stripCostList = (list) => Array.isArray(list) ? list.map(stripCost) : list;
+const stripCostList = (list, req) => Array.isArray(list) ? list.map(p => stripCost(p, req)) : list;
 
 const getProducts = async (req, res, next) => {
   try {
@@ -98,7 +102,7 @@ const getProducts = async (req, res, next) => {
 
     res.json({
       success: true,
-      data: stripCostList(products),
+      data: stripCostList(products, req),
       pagination: {
         total,
         page: pageNum || 1,
@@ -133,7 +137,7 @@ const getProductById = async (req, res, next) => {
 
     res.json({
       success: true,
-      data: stripCost(product)
+      data: stripCost(product, req)
     });
   } catch (err) {
     next(err);
@@ -914,4 +918,34 @@ const getProductImageBlob = async (req, res) => {
   }
 };
 
-Object.assign(module.exports, { createProduct, updateProduct, updateProductVisibility, deleteProductImage, deleteProduct, getProductImageBlob });
+/**
+ * PATCH /api/v1/products/admin/:id/cost — khai báo / điều chỉnh giá vốn bình quân (giá vốn đầu kỳ).
+ * Dùng cho hàng tồn chưa có phiếu nhập kho (tồn đầu kỳ, dữ liệu seed); các lần nhập kho sau đó
+ * vẫn tự bình quân gia quyền như thường. Chỉ ảnh hưởng giá vốn của các lần xuất kho SAU khi sửa.
+ */
+const updateProductCost = async (req, res, next) => {
+  try {
+    const cost = Number(req.body?.averageCost);
+    if (!Number.isFinite(cost) || cost < 0) {
+      return res.status(400).json({ success: false, message: 'Giá vốn phải là số không âm.' });
+    }
+    const product = await prisma.product.findUnique({
+      where: { productId: String(req.params.id) },
+      select: { productId: true, name: true, price: true, averageCost: true }
+    });
+    if (!product) return res.status(404).json({ success: false, message: 'Không tìm thấy sản phẩm.' });
+    const price = Number(product.price) || 0;
+    if (price > 0 && cost > price * 2) {
+      return res.status(400).json({ success: false, message: 'Giá vốn lớn hơn gấp đôi giá bán — vui lòng kiểm tra lại số liệu.' });
+    }
+    const updated = await prisma.product.update({
+      where: { productId: product.productId },
+      data: { averageCost: Math.round(cost * 100) / 100 },
+      select: { productId: true, name: true, price: true, averageCost: true }
+    });
+    console.log(`[Giá vốn] ${req.user?.role}#${req.user?.id} chỉnh giá vốn ${product.productId} (${product.name}): ${product.averageCost} → ${updated.averageCost}`);
+    res.json({ success: true, message: 'Đã cập nhật giá vốn.', data: updated });
+  } catch (err) { next(err); }
+};
+
+Object.assign(module.exports, { createProduct, updateProduct, updateProductVisibility, deleteProductImage, deleteProduct, getProductImageBlob, updateProductCost });

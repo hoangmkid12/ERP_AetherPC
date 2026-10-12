@@ -289,7 +289,7 @@ adminCeoTrainer.addSkill({
 adminCeoTrainer.addSkill({
   id: 'ESTIMATED_GROSS_PROFIT',
   title: 'Ước tính lợi nhuận gộp toàn công ty (Gross Profit & Margin)',
-  description: 'Tổng hợp doanh thu thuần trừ đi giá vốn mua hàng nhà cung cấp (COGS)',
+  description: 'Doanh thu thuần (chưa VAT) trừ giá vốn hàng bán thực tế (bút toán COGS bình quân gia quyền)',
   type: 'PRISMA_QUERY',
   examples: [
     'ước tính lợi nhuận gộp toàn công ty năm nay',
@@ -303,42 +303,47 @@ adminCeoTrainer.addSkill({
   ],
   allowedRoles: ['ADMIN_CEO', 'ADMIN'],
   handler: async (prisma) => {
-    // 1. Doanh thu đơn DELIVERED / COMPLETED năm nay
+    const start = getStartOfYear();
+    // 1. Doanh thu các đơn đã xuất kho trong năm (khách trả, đã gồm VAT 10%) → doanh thu thuần chưa VAT
     const revRes = await prisma.order.aggregate({
       where: {
-        status: { in: ['DELIVERED', 'COMPLETED'] },
-        createdAt: { gte: getStartOfYear() }
+        status: { in: ['CONFIRMED', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'COMPLETED', 'RETURNING_TO_WAREHOUSE', 'EXCHANGED', 'REFUNDED'] },
+        createdAt: { gte: start }
       },
       _sum: { totalAmount: true }
     });
-    const totalRev = Number(revRes._sum.totalAmount || 0);
+    const grossRevenue = Number(revRes._sum.totalAmount || 0);
+    const netRevenue = Math.round(grossRevenue / 1.1);
 
-    // 2. Chi phí mua hàng từ NCC (Vendor Bills)
-    const costRes = await prisma.vendorBill.aggregate({
-      where: {
-        status: { not: 'CANCELLED' }
-      },
-      _sum: { amountTotal: true }
+    // 2. Giá vốn hàng ĐÃ BÁN = các bút toán COGS ghi lúc xuất kho (giá bình quân gia quyền).
+    //    Trước đây lấy tổng hoá đơn NCC — đó là tiền MUA hàng (cả hàng còn tồn), không phải giá vốn.
+    const cogsRes = await prisma.ledgerEntry.aggregate({
+      where: { type: 'EXPENSE', referenceId: { startsWith: 'COGS-' }, date: { gte: start } },
+      _sum: { amount: true }
     });
-    const totalCost = Number(costRes._sum.amountTotal || 0);
+    const cogs = Number(cogsRes._sum.amount || 0);
 
-    const grossProfit = totalRev - totalCost;
-    const grossMargin = totalRev > 0 ? Number(((grossProfit / totalRev) * 100).toFixed(1)) : 0;
+    const grossProfit = netRevenue - cogs;
+    const grossMargin = netRevenue > 0 ? Number(((grossProfit / netRevenue) * 100).toFixed(1)) : 0;
 
-    return {
-      revenue: totalRev,
-      cogs: totalCost,
-      grossProfit,
-      grossMargin
-    };
+    return { grossRevenue, revenue: netRevenue, cogs, grossProfit, grossMargin, year: new Date().getFullYear() };
   },
   template: (data) => {
-    return `💎 **BÁO CÁO LỢI NHUẬN GỘP KINH DOANH LŨY KẾ (YTD 2026):**\n\n` +
-           `- 📈 Tổng doanh thu bán hàng: **${formatVND(data.revenue)}**\n` +
-           `- 📦 Tổng giá vốn mua hàng (COGS): **${formatVND(data.cogs)}**\n` +
-           `- 💰 **Lợi nhuận gộp (Gross Profit): ${formatVND(data.grossProfit)}**\n` +
-           `- 📊 Biên lợi nhuận gộp (Gross Margin): **${data.grossMargin}%**\n\n` +
-           `Chỉ số biên lợi nhuận trên 15% là mức an toàn cao đối với mô hình bán lẻ linh kiện PC.`;
+    return `💎 **BÁO CÁO LỢI NHUẬN GỘP LŨY KẾ NĂM ${data.year}:**
+
+` +
+           `- 🧾 Doanh thu bán hàng (gồm VAT): **${formatVND(data.grossRevenue)}**
+` +
+           `- 📈 Doanh thu thuần (chưa VAT): **${formatVND(data.revenue)}**
+` +
+           `- 📦 Giá vốn hàng bán (COGS): **${formatVND(data.cogs)}**
+` +
+           `- 💰 **Lợi nhuận gộp: ${formatVND(data.grossProfit)}**
+` +
+           `- 📊 Biên lợi nhuận gộp: **${data.grossMargin}%**
+
+` +
+           `*Lợi nhuận gộp = doanh thu thuần − giá vốn bình quân gia quyền của hàng đã xuất bán.*`;
   }
 });
 

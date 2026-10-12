@@ -210,6 +210,8 @@ export const useInventoryStore = create((set, get) => ({
           ? row.locations.map(l => `${l.zone}-${l.shelf}-${l.bin}`).join(', ')
           : 'Chưa xếp kệ',
         price: row.product?.price ?? row.price ?? 0,
+        // Giá vốn bình quân (chưa VAT) — backend chỉ trả cho vai trò quản lý/kế toán; null = không được xem
+        averageCost: row.product?.averageCost != null ? Number(row.product.averageCost) : null,
         originalPrice: row.product?.originalPrice ?? row.product?.price ?? row.price ?? 0,
         discountPercent: row.product?.discountPercent ?? 0,
         brand: row.product?.brand?.name || (typeof row.product?.brand === 'string' ? row.product.brand : 'Khác'),

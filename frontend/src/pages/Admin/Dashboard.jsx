@@ -33,6 +33,7 @@ import { getRoleName } from '../../utils/rbacEngine';
 import { SignatureRow, SignatureCell, displaySigner, historySigner } from '../../components/Signature/ESignature';
 import { formatCompactVnd } from '../../utils/formatCompact';
 import PeriodFilterBar from '../../components/Common/PeriodFilterBar';
+import { netOfVat } from '../../utils/vat';
 
 // Register ChartJS modules
 ChartJS.register(
@@ -669,9 +670,16 @@ export default function Dashboard() {
     .filter(tx => tx && tx.type === 'EXPENSE' && typeof tx.referenceId === 'string' && tx.referenceId.startsWith('COGS-'))
     .filter(tx => isDateInFilter(tx.date || tx.createdAt, dateFilterPeriod, customStartDate, customEndDate))
     .reduce((sum, tx) => sum + (Number(tx.amount || 0) || 0), 0);
-  const grossProfit = totalRevenueVal - cogsAmount;
-  const grossMarginPct = totalRevenueVal > 0 ? (grossProfit / totalRevenueVal) * 100 : 0;
-  const totalInventoryAsset = inventory.reduce((sum, item) => sum + (Number(item.stock || item.stockQuantity || 0) * Number(item.price || item.unitCost || 0)), 0);
+  // Doanh thu đơn hàng đã gồm VAT 10%; giá vốn là số chưa VAT → lợi nhuận tính trên doanh thu thuần.
+  const netRevenueVal = netOfVat(totalRevenueVal);
+  const outputVatVal = totalRevenueVal - netRevenueVal;
+  const grossProfit = netRevenueVal - cogsAmount;
+  const grossMarginPct = netRevenueVal > 0 ? (grossProfit / netRevenueVal) * 100 : 0;
+  // Giá trị tồn kho theo GIÁ VỐN (averageCost), không phải giá bán; mã chưa có giá vốn tạm tính theo giá bán chưa VAT.
+  const totalInventoryAsset = inventory.reduce((sum, item) => {
+    const cost = Number(item.averageCost) > 0 ? Number(item.averageCost) : netOfVat(item.price || item.unitCost || 0);
+    return sum + Number(item.stock || item.stockQuantity || 0) * cost;
+  }, 0);
   // Bảng lương đang hiển thị để duyệt: các phiếu đang chờ CEO, nếu không có thì kỳ gần nhất.
   const awaitingCeoPayrolls = (payrolls || []).filter(p => p && ['SUBMITTED_TO_ACCOUNTING', 'SUBMITTED_TO_CEO'].includes(p.status));
   const latestPayrollPeriod = (payrolls || []).map(p => p.period).sort().pop();
@@ -682,7 +690,7 @@ export default function Dashboard() {
   const refundAmount = (generalLedger || []).filter(tx => tx && tx.type === 'REFUND').reduce((sum, tx) => sum + (Number(tx.amount || 0) || 0), 0);
   // Chi phí lương trong P&L = lương đã thực chi (phiếu PAID), cùng cách tính với trang Kế toán.
   const payrollExpensePaid = (payrolls || []).filter(p => p && p.status === 'PAID').reduce((sum, p) => sum + (Number(p.netSalary || 0) || 0), 0);
-  const netIncome = totalRevenueVal - cogsAmount - payrollExpensePaid - operatingExpense - refundAmount;
+  const netIncome = netRevenueVal - cogsAmount - payrollExpensePaid - operatingExpense - refundAmount;
 
   const lowStockCount = inventory.filter(item => Number(item.stock || item.stockQuantity || 0) <= Number(item.threshold || 5)).length;
   const readyToShipCount = filteredOrders.filter(o => o.status === 'READY_TO_SHIP').length;
@@ -732,9 +740,9 @@ export default function Dashboard() {
 
   // 6 Balanced Executive KPI Cards
   const stats = [
-    { label: 'Tổng Doanh Thu', value: formatCompactVnd(totalRevenueVal), full: formatPrice(totalRevenueVal), change: 'Cả trực tuyến & tại quầy', icon: <DollarSign size={20} />, color: '#16a34a', bg: '#f0fdf4' },
+    { label: 'Tổng Doanh Thu', value: formatCompactVnd(totalRevenueVal), full: formatPrice(totalRevenueVal), change: `Gồm VAT · thuần ${formatCompactVnd(netRevenueVal)}`, icon: <DollarSign size={20} />, color: '#16a34a', bg: '#f0fdf4' },
     { label: 'Lợi Nhuận Gộp', value: formatCompactVnd(grossProfit), full: formatPrice(grossProfit), change: `Tỷ suất lợi nhuận ${grossMarginPct.toFixed(1)}%`, icon: <TrendingUp size={20} />, color: '#2563eb', bg: '#eff6ff' },
-    { label: 'Giá Trị Tồn Kho', value: formatCompactVnd(totalInventoryAsset), full: formatPrice(totalInventoryAsset), change: `${inventory.length} mã linh kiện lưu kho`, icon: <Package size={20} />, color: '#8b5cf6', bg: '#f5f3ff' },
+    { label: 'Giá Trị Tồn Kho', value: formatCompactVnd(totalInventoryAsset), full: formatPrice(totalInventoryAsset), change: `Theo giá vốn · ${inventory.length} mã linh kiện`, icon: <Package size={20} />, color: '#8b5cf6', bg: '#f5f3ff' },
     { label: 'Quỹ Lương Nhân Sự', value: formatCompactVnd(totalPayrollCost), full: formatPrice(totalPayrollCost), change: `${employees.length} nhân sự toàn công ty`, icon: <Users size={20} />, color: '#0ea5e9', bg: '#f0f9ff' },
     { label: 'Cảnh Báo Tồn Kho Thấp', value: `${lowStockCount} linh kiện`, change: 'Cần duyệt thêm RFQ/PO', icon: <AlertTriangle size={20} />, color: '#d97706', bg: '#fffbeb' },
     { label: 'Chờ CEO Phê Duyệt', value: `${totalPendingCeoApprovals} nhiệm vụ`, change: 'PO, Bảng lương, Nghỉ phép', icon: <Bell size={20} />, color: '#ef4444', bg: '#fef2f2' }
@@ -801,7 +809,7 @@ export default function Dashboard() {
       unit,
       labels: keys.map(k => map[k].label),
       revenue: keys.map(k => Number((map[k].revenue / 1e6).toFixed(1))),
-      profit: keys.map(k => Number(((map[k].revenue - map[k].cogs) / 1e6).toFixed(1))),
+      profit: keys.map(k => Number(((netOfVat(map[k].revenue) - map[k].cogs) / 1e6).toFixed(1))),
     };
   }, [revenueOrders, generalLedger, dateFilterPeriod, customStartDate, customEndDate]);
 
@@ -1531,8 +1539,18 @@ export default function Dashboard() {
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', fontSize: '0.82rem' }}>
               <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'baseline', gap: '0.4rem', paddingBottom: '0.4rem', borderBottom: '1px solid #f1f5f9' }}>
-                <span style={{ fontWeight: 700, color: '#0f172a', flex: '1 1 220px', minWidth: 0 }}>(+) Tổng Doanh Thu Bán Hàng:</span>
+                <span style={{ fontWeight: 700, color: '#0f172a', flex: '1 1 220px', minWidth: 0 }}>(+) Tổng Doanh Thu Bán Hàng (gồm VAT):</span>
                 <strong style={{ color: '#16a34a', whiteSpace: 'nowrap' }}>{formatPrice(totalRevenueVal)}</strong>
+              </div>
+
+              <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'baseline', gap: '0.4rem', paddingBottom: '0.4rem', borderBottom: '1px solid #f1f5f9' }}>
+                <span style={{ color: '#64748b', flex: '1 1 220px', minWidth: 0 }}>(-) Thuế GTGT Đầu Ra (10%):</span>
+                <strong style={{ color: '#64748b', whiteSpace: 'nowrap' }}>{formatPrice(outputVatVal)}</strong>
+              </div>
+
+              <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'baseline', gap: '0.4rem', paddingBottom: '0.4rem', borderBottom: '1px solid #f1f5f9' }}>
+                <span style={{ fontWeight: 700, color: '#0f172a', flex: '1 1 220px', minWidth: 0 }}>(=) Doanh Thu Thuần:</span>
+                <strong style={{ color: '#16a34a', whiteSpace: 'nowrap' }}>{formatPrice(netRevenueVal)}</strong>
               </div>
 
               <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'baseline', gap: '0.4rem', paddingBottom: '0.4rem', borderBottom: '1px solid #f1f5f9' }}>

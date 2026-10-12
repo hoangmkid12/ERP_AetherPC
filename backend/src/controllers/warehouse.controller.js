@@ -317,6 +317,9 @@ const getStockMovements = async (req, res, next) => {
 // GET /api/v1/warehouse/inventory
 const getInventory = async (req, res, next) => {
   try {
+    // Giá vốn chỉ trả cho vai trò quản lý / kế toán / mua hàng (COST_VIEW_ROLES); nhân viên kho,
+    // bán hàng, QC vẫn dùng chung API này nhưng không thấy giá vốn.
+    const showCost = require('../constants/roles').COST_VIEW_ROLES.includes(req.user?.role);
     const [inventoryData, supplierLinks] = await Promise.all([
       prisma.inventory.findMany({
         include: {
@@ -326,6 +329,7 @@ const getInventory = async (req, res, next) => {
               name: true,
               sku: true,
               price: true,
+              averageCost: showCost,
               stockQuantity: true,
               primaryImage: true,
               descriptionText: true,

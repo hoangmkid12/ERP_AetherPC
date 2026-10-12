@@ -31,6 +31,7 @@ import DateRangeFilter, { isDateInRange } from '../../components/Common/DateRang
 import PeriodFilterBar, { isDateInPeriod } from '../../components/Common/PeriodFilterBar';
 import TransferRefunds from '../../components/Accounting/TransferRefunds';
 import { formatCompactVnd } from '../../utils/formatCompact';
+import { netOfVat, vatInGross } from '../../utils/vat';
 
 ChartJS.register(
   CategoryScale, 
@@ -329,7 +330,10 @@ export default function Accountant() {
   // Tổng chi phí = đúng bằng tổng 4 dòng chi trong P&L bên dưới
   const totalExpense = cogsAmount + payrollExpensePaid + operatingExpense + refundAmount;
 
-  const netProfit = totalRevenue - totalExpense;
+  // Doanh thu từ đơn hàng là số tiền khách trả (đã gồm VAT 10%) — lợi nhuận phải tính trên doanh thu
+  // thuần chưa VAT vì giá vốn & chi phí là số chưa thuế (xem utils/vat.js).
+  const netRevenue = netOfVat(totalRevenue);
+  const netProfit = netRevenue - totalExpense;
 
   // Tính toán P&L theo bộ lọc thời gian riêng cho Báo Cáo
   const pnlRevenue = useMemo(() => {
@@ -367,14 +371,21 @@ export default function Accountant() {
       .reduce((sum, tx) => sum + (Number(tx.amount || 0) || 0), 0);
   }, [ledger, reportStartDate, reportEndDate]);
 
+  const pnlOutputVat = vatInGross(pnlRevenue);
+  const pnlNetRevenue = pnlRevenue - pnlOutputVat;
+  const pnlGrossProfit = pnlNetRevenue - pnlCogs;
+  const pnlGrossMargin = pnlNetRevenue > 0 ? (pnlGrossProfit / pnlNetRevenue) * 100 : 0;
+  // VAT đầu vào được khấu trừ: phần thuế 10% trên giá vốn hàng đã bán (hàng mua từ NCC). Lương và
+  // hoàn tiền không có hoá đơn GTGT đầu vào nên không được khấu trừ.
+  const pnlInputVat = Math.round(pnlCogs * 0.1);
   const pnlTotalExpense = pnlCogs + pnlPayroll + pnlOperating + pnlRefund;
-  const pnlNetProfit = pnlRevenue - pnlTotalExpense;
+  const pnlNetProfit = pnlNetRevenue - pnlTotalExpense;
   // Không có module vốn chủ sở hữu/số dư đầu kỳ thật trong hệ thống — không bịa
   // "vốn góp ban đầu". Số dư lũy kế chỉ phản ánh đúng lợi nhuận ròng tích lũy.
   const cashBalance = netProfit;
 
   const stats = [
-    { label: 'Tổng Doanh Thu Bán Hàng', value: formatCompactVnd(totalRevenue), full: fmt(totalRevenue), change: 'Bao gồm POS & Website Online', icon: <ArrowUpRight size={20} />, color: '#16a34a', bg: '#f0fdf4' },
+    { label: 'Tổng Doanh Thu Bán Hàng', value: formatCompactVnd(totalRevenue), full: fmt(totalRevenue), change: `Gồm VAT · Doanh thu thuần ${formatCompactVnd(netRevenue)}`, icon: <ArrowUpRight size={20} />, color: '#16a34a', bg: '#f0fdf4' },
     { label: 'Tổng Chi Phí Hoạt Động', value: formatCompactVnd(totalExpense), full: fmt(totalExpense), change: 'Giá vốn, lương & mua linh kiện', icon: <ArrowDownLeft size={20} />, color: '#ef4444', bg: '#fef2f2' },
     { label: 'Lợi Nhuận Ròng', value: formatCompactVnd(netProfit), full: fmt(netProfit), change: netProfit >= 0 ? 'Tỷ suất lợi nhuận dương' : 'Cần tối ưu chi phí', icon: <DollarSign size={20} />, color: netProfit >= 0 ? '#16a34a' : '#ef4444', bg: netProfit >= 0 ? '#f0fdf4' : '#fef2f2' },
     { label: 'Lợi Nhuận Ròng Lũy Kế', value: formatCompactVnd(cashBalance), full: fmt(cashBalance), change: 'Chưa gồm vốn góp ban đầu', icon: <CreditCard size={20} />, color: '#2563eb', bg: '#eff6ff' },
@@ -2071,33 +2082,43 @@ export default function Accountant() {
             </p>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', fontSize: '0.85rem' }}>
-              <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'baseline', gap: '0.5rem', padding: '0.75rem', backgroundColor: '#f0fdf4', borderRadius: '6px', border: '1px solid #bbf7d0' }}>
-                <strong style={{ color: '#16a34a', flex: '1 1 260px', minWidth: 0 }}>1. DOANH THU THUẦN TỪ BÁN HÀNG & DỊCH VỤ:</strong>
-                <strong style={{ color: '#16a34a', fontSize: '1rem', whiteSpace: 'nowrap' }}>{fmt(pnlRevenue)}</strong>
+              <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'baseline', gap: '0.5rem', padding: '0.75rem', backgroundColor: '#f8fafc', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+                <strong style={{ color: '#334155', flex: '1 1 260px', minWidth: 0 }}>1. DOANH THU BÁN HÀNG (khách thanh toán, đã gồm VAT):</strong>
+                <strong style={{ color: '#334155', fontSize: '1rem', whiteSpace: 'nowrap' }}>{fmt(pnlRevenue)}</strong>
               </div>
-
+              <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'baseline', gap: '0.5rem', padding: '0.75rem', backgroundColor: '#f8fafc', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+                <strong style={{ color: '#64748b', flex: '1 1 260px', minWidth: 0 }}>2. CÁC KHOẢN GIẢM TRỪ — Thuế GTGT đầu ra (10%):</strong>
+                <strong style={{ color: '#64748b', fontSize: '1rem', whiteSpace: 'nowrap' }}>- {fmt(pnlOutputVat)}</strong>
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'baseline', gap: '0.5rem', padding: '0.75rem', backgroundColor: '#f0fdf4', borderRadius: '6px', border: '1px solid #bbf7d0' }}>
+                <strong style={{ color: '#16a34a', flex: '1 1 260px', minWidth: 0 }}>3. DOANH THU THUẦN (1 − 2):</strong>
+                <strong style={{ color: '#16a34a', fontSize: '1rem', whiteSpace: 'nowrap' }}>{fmt(pnlNetRevenue)}</strong>
+              </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'baseline', gap: '0.5rem', padding: '0.75rem', backgroundColor: '#fef2f2', borderRadius: '6px', border: '1px solid #fecaca' }}>
-                <strong style={{ color: '#dc2626', flex: '1 1 260px', minWidth: 0 }}>2. GIÁ VỐN HÀNG BÁN:</strong>
+                <strong style={{ color: '#dc2626', flex: '1 1 260px', minWidth: 0 }}>4. GIÁ VỐN HÀNG BÁN (bình quân gia quyền):</strong>
                 <strong style={{ color: '#dc2626', fontSize: '1rem', whiteSpace: 'nowrap' }}>- {fmt(pnlCogs)}</strong>
               </div>
-
+              <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'baseline', gap: '0.5rem', padding: '0.75rem', backgroundColor: '#ecfdf5', borderRadius: '6px', border: '1px solid #6ee7b7' }}>
+                <strong style={{ color: '#047857', flex: '1 1 260px', minWidth: 0 }}>5. LỢI NHUẬN GỘP (3 − 4):</strong>
+                <strong style={{ color: '#047857', fontSize: '1rem', whiteSpace: 'nowrap' }}>{fmt(pnlGrossProfit)} · biên {pnlGrossMargin.toFixed(1)}%</strong>
+              </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'baseline', gap: '0.5rem', padding: '0.75rem', backgroundColor: '#fef2f2', borderRadius: '6px', border: '1px solid #fecaca' }}>
-                <strong style={{ color: '#dc2626', flex: '1 1 260px', minWidth: 0 }}>3. CHI PHÍ LƯƠNG NHÂN VIÊN & HOA HỒNG:</strong>
+                <strong style={{ color: '#dc2626', flex: '1 1 260px', minWidth: 0 }}>6. CHI PHÍ LƯƠNG NHÂN VIÊN & HOA HỒNG:</strong>
                 <strong style={{ color: '#dc2626', fontSize: '1rem', whiteSpace: 'nowrap' }}>- {fmt(pnlPayroll)}</strong>
               </div>
 
               <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'baseline', gap: '0.5rem', padding: '0.75rem', backgroundColor: '#fef2f2', borderRadius: '6px', border: '1px solid #fecaca' }}>
-                <strong style={{ color: '#dc2626', flex: '1 1 260px', minWidth: 0 }}>4. CHI PHÍ VẬN HÀNH (Phiếu Chi Thủ Công):</strong>
+                <strong style={{ color: '#dc2626', flex: '1 1 260px', minWidth: 0 }}>7. CHI PHÍ VẬN HÀNH (Phiếu Chi Thủ Công):</strong>
                 <strong style={{ color: '#dc2626', fontSize: '1rem', whiteSpace: 'nowrap' }}>- {fmt(pnlOperating)}</strong>
               </div>
 
               <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'baseline', gap: '0.5rem', padding: '0.75rem', backgroundColor: '#fef2f2', borderRadius: '6px', border: '1px solid #fecaca' }}>
-                <strong style={{ color: '#dc2626', flex: '1 1 260px', minWidth: 0 }}>5. CHI HOÀN TIỀN KHÁCH HÀNG:</strong>
+                <strong style={{ color: '#dc2626', flex: '1 1 260px', minWidth: 0 }}>8. CHI HOÀN TIỀN KHÁCH HÀNG:</strong>
                 <strong style={{ color: '#dc2626', fontSize: '1rem', whiteSpace: 'nowrap' }}>- {fmt(pnlRefund)}</strong>
               </div>
 
               <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'baseline', gap: '0.5rem', padding: '1rem', backgroundColor: '#eff6ff', borderRadius: '8px', border: '2px solid #3b82f6', marginTop: '0.5rem' }}>
-                <strong style={{ color: '#1d4ed8', fontSize: '1.05rem', flex: '1 1 260px', minWidth: 0 }}>6. LỢI NHUẬN RÒNG TRƯỚC THUẾ:</strong>
+                <strong style={{ color: '#1d4ed8', fontSize: '1.05rem', flex: '1 1 260px', minWidth: 0 }}>9. LỢI NHUẬN RÒNG TRƯỚC THUẾ (5 − 6 − 7 − 8):</strong>
                 <strong style={{ color: '#1d4ed8', fontSize: '1.15rem', whiteSpace: 'nowrap' }}>{fmt(pnlNetProfit)}</strong>
               </div>
             </div>
@@ -2112,15 +2133,20 @@ export default function Accountant() {
               <div style={{ padding: '0.85rem', backgroundColor: '#f8fafc', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
                 <strong style={{ fontSize: '0.85rem', color: '#0f172a' }}>Thuế VAT Đầu Ra (Bán Hàng 10%):</strong>
                 <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#16a34a', marginTop: '0.35rem' }}>
-                  {fmt(Math.round(pnlRevenue * 0.1))}
+                  {fmt(pnlOutputVat)}
                 </div>
               </div>
               <div style={{ padding: '0.85rem', backgroundColor: '#f8fafc', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
                 <strong style={{ fontSize: '0.85rem', color: '#0f172a' }}>Thuế VAT Đầu Vào Được Khấu Trừ:</strong>
                 <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#dc2626', marginTop: '0.35rem' }}>
-                  {fmt(Math.round(pnlTotalExpense * 0.1))}
+                  {fmt(pnlInputVat)}
                 </div>
+                <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '0.2rem' }}>10% trên giá vốn hàng đã bán (lương không có VAT đầu vào)</div>
               </div>
+            </div>
+            <div style={{ marginTop: '0.75rem', padding: '0.75rem 0.85rem', backgroundColor: '#fffbeb', borderRadius: '6px', border: '1px solid #fde68a', display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
+              <strong style={{ fontSize: '0.85rem', color: '#92400e' }}>Thuế GTGT phải nộp (đầu ra − đầu vào):</strong>
+              <strong style={{ fontSize: '1.05rem', color: '#b45309' }}>{fmt(Math.max(0, pnlOutputVat - pnlInputVat))}</strong>
             </div>
           </div>
 

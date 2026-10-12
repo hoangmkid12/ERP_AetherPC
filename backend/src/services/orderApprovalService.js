@@ -70,7 +70,10 @@ const approveOrderIfReady = async (tx, orderId, { noteSuffix = '' } = {}) => {
     // dụng nghĩa là tồn kho thật không đủ, dù Product.stockQuantity nói khác.
     await claimAvailableSerials(tx, item.productId, item.quantity, freshOrder.orderId);
 
-    totalCogs += Number(productBeforeUpdate?.averageCost || 0) * item.quantity;
+    const unitCost = Number(productBeforeUpdate?.averageCost || 0);
+    totalCogs += unitCost * item.quantity;
+    // Chụp giá vốn lúc xuất kho vào chi tiết đơn (báo cáo lợi nhuận theo sản phẩm/đơn)
+    await tx.orderItem.update({ where: { orderItemId: item.orderItemId }, data: { unitCost } });
 
     const inventory = await tx.inventory.findFirst({
       where: { productId: item.productId, warehouseId: 1 }
