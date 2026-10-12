@@ -118,6 +118,16 @@ const pct = (x) => `${(x * 100).toFixed(1)}%`;
   for (const it of intents) {
     shuffle(data.filter(d => d.intent === it), rand).forEach((s, i) => folds[i % K].push(s));
   }
+  // Xuất cách chia fold để mô hình khác (PhoBERT trên Colab) dùng ĐÚNG cùng các fold —
+  // so sánh công bằng giữa hai mô hình.
+  if (args.includes('--export-folds')) {
+    const out = path.join(__dirname, '..', 'data', 'cv_folds.json');
+    const rows = folds.flatMap((f, k) => f.map(s => ({ text: s.text, intent: s.intent, fold: k })));
+    fs.writeFileSync(out, '[\n' + rows.map(r => '  ' + JSON.stringify(r)).join(',\n') + '\n]\n');
+    origLog(`💾 Đã xuất ${rows.length} dòng (${K} fold) → ${path.relative(process.cwd(), out)}`);
+    process.exit(0);
+  }
+
   const allPreds = [];
   for (let k = 0; k < K; k++) {
     const trainData = folds.filter((_, i) => i !== k).flat();
