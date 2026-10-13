@@ -167,62 +167,77 @@ export default function QualityControl() {
   // Selected Log for Details Modal
   const [viewingLog, setViewingLog] = useState(null);
 
-  // Inspection Logs (Stored in localStorage for mock persistence)
-  const [qaLogs, setQaLogs] = useState(() => {
-    try {
-      const raw = localStorage.getItem('erp_qa_inspection_logs');
-      return raw ? JSON.parse(raw) : [
-        {
-          id: 'QA-2026-001',
-          type: 'INBOUND_PO',
-          poNumber: 'PO-2026-0005',
-          supplierName: 'ASUS Vietnam',
-          inspector: 'Nguyễn Văn QC',
-          date: '15/06/2026',
-          totalQty: 50,
-          passedQty: 50,
-          failedQty: 0,
-          decision: 'ACCEPT_ALL',
-          defectCategory: 'NONE',
-          notes: 'Lô hàng VGA ASUS RTX 4070 nguyên tem niêm phong, kiểm tra 100% đạt chuẩn.',
-          status: 'QA_PASSED'
-        },
-        {
-          id: 'QA-2026-002',
-          type: 'INBOUND_PO',
-          poNumber: 'PO-2026-0006',
-          supplierName: 'GIGABYTE Technology',
-          inspector: 'Trần Văn QA',
-          date: '16/06/2026',
-          totalQty: 30,
-          passedQty: 28,
-          failedQty: 2,
-          decision: 'ACCEPT_PARTIAL',
-          defectCategory: 'PACKAGE_DAMAGED',
-          notes: 'Phát hiện 2 bo mạch chủ bị móp góc hộp khi vận chuyển, đã lập biên bản hoàn trả NCC.',
-          status: 'QA_PARTIAL'
-        },
-        {
-          id: 'RMA-QA-101',
-          type: 'CUSTOMER_RMA',
-          rmaId: 'RET-001',
-          orderId: 'ORD-101',
-          customerName: 'Lê Hoàng Hùng',
-          productName: 'Intel Core i5-13400F',
-          serialNumber: 'SN-CPU-13400F-8821',
-          inspector: 'Nguyễn Văn QC',
-          date: '17/06/2026',
-          decision: 'EXCHANGE_NEW',
-          defectCategory: 'DOA_FACTORY_DEFECT',
-          notes: 'Xác nhận CPU bị lỗi không POST BIOS trên test bench chuẩn. Đủ điều kiện đổi mới 1-1.',
-          status: 'QC_PASSED'
-        }
-      ];
-    } catch (e) {
-      return [];
-    }
-  });
-
+  // Nhật ký & biên bản QC dựng từ dữ liệu THẬT trên máy chủ — mọi máy/vai trò thấy cùng một
+  // nhật ký. Trước đây nhật ký chỉ nằm trong localStorage của từng trình duyệt và hiện sẵn
+  // 3 biên bản mẫu bịa (QA-2026-001 tham chiếu PO-2026-0005 không tồn tại).
+  //  - Kiểm định hàng nhập: QcInspection gắn phiếu nhận hàng của từng PO.
+  //  - Thẩm định đổi trả khách: ReturnRequest đã có qcInspectedAt.
+  //  - Thẩm định kiện giao thất bại hoàn kho: đơn QC đã đóng (ghi chú "QC xác nhận...").
+  // sessionLogs chỉ giữ biên bản vừa lập trong phiên để hiện ngay, trước khi dữ liệu tải lại.
+  const [sessionLogs, setSessionLogs] = useState([]);
+  const serverQaLogs = useMemo(() => {
+    const viDate = (d) => (d ? new Date(d).toLocaleDateString('vi-VN') : '');
+    const inbound = (orders || []).flatMap(po => (po.receipts || []).flatMap(r => (r.qcInspections || []).map(insp => {
+      const passed = Number(insp.passedQuantity) || 0;
+      const failed = Number(insp.defectiveQuantity) || 0;
+      const status = insp.status === 'FAILED' ? 'QA_REJECTED' : insp.status === 'CONDITIONAL' ? 'QA_PARTIAL' : 'QA_PASSED';
+      return {
+        id: `QC-${insp.id}`,
+        type: 'INBOUND_PO',
+        poNumber: po.poNumber,
+        supplierName: po.supplier?.name || po.supplierCode,
+        inspector: insp.inspector?.fullName || 'Chuyên viên QA/QC',
+        date: viDate(insp.inspectedAt),
+        ts: new Date(insp.inspectedAt || 0).getTime(),
+        totalQty: passed + failed,
+        passedQty: passed,
+        failedQty: failed,
+        decision: status === 'QA_REJECTED' ? 'REJECT_ALL' : status === 'QA_PARTIAL' ? 'ACCEPT_PARTIAL' : 'ACCEPT_ALL',
+        defectCategory: failed > 0 ? 'PACKAGE_DAMAGED' : 'NONE',
+        notes: insp.notes || '',
+        status
+      };
+    })));
+    const rma = (returnRequests || []).filter(r => r && r.qcInspectedAt).map(r => ({
+      id: `RMA-QA-${r.rmaCode || r.id}`,
+      type: 'CUSTOMER_RMA',
+      rmaId: r.rmaCode || r.id,
+      orderId: r.orderId,
+      customerName: r.customerName,
+      productName: r.productName || r.order?.items?.map(i => i.name).join(', ') || '',
+      serialNumber: (String(r.qcNotes || '').match(/Mã Serial đối soát: ([^\]]+)\]/) || [])[1] || '',
+      inspector: 'Chuyên viên QA/QC',
+      date: viDate(r.qcInspectedAt),
+      ts: new Date(r.qcInspectedAt).getTime(),
+      decision: r.qcDecision || (r.type === 'EXCHANGE' ? 'EXCHANGE_NEW' : 'RESTOCK_WAREHOUSE'),
+      defectCategory: r.qcDefectType || 'DOA_FACTORY_DEFECT',
+      notes: r.qcNotes || '',
+      status: ['REJECTED', 'QC_REJECTED', 'RETURNING_TO_CUSTOMER', 'RETURNED_TO_CUSTOMER'].includes(r.status) ? 'QA_REJECTED' : 'QC_PASSED'
+    }));
+    const restock = (erpOrders || []).filter(o => o?.status === 'CANCELLED' && /^QC xác nhận/.test(o.statusHistory?.[0]?.note || '')).map(o => {
+      const h = o.statusHistory[0];
+      const damaged = /Hư hỏng/i.test(h.note);
+      return {
+        id: `QA-RET-${o.orderId}`,
+        type: 'FAILED_DELIVERY_RESTOCK',
+        orderId: o.orderId,
+        customerName: o.customerName || o.customer?.name,
+        inspector: h.changedBy || 'Chuyên viên QA/QC',
+        date: viDate(h.timestamp),
+        ts: new Date(h.timestamp || 0).getTime(),
+        decision: damaged ? 'CARRIER_DAMAGE_DISPUTE' : /Móp/i.test(h.note) ? 'RESTOCK_OUTLET' : 'RESTOCK_NEW',
+        defectCategory: damaged ? 'USER_PHYSICAL_DAMAGE' : 'NORMAL_RESTOCK',
+        notes: h.note,
+        status: damaged ? 'QA_REJECTED' : 'QC_PASSED'
+      };
+    });
+    return [...inbound, ...rma, ...restock].sort((a, b) => (b.ts || 0) - (a.ts || 0));
+  }, [orders, returnRequests, erpOrders]);
+  const qaLogs = useMemo(() => {
+    const keyOf = (l) => l.poNumber || l.rmaId || l.orderId || l.id;
+    const seen = new Set(serverQaLogs.map(keyOf));
+    return [...sessionLogs.filter(l => !seen.has(keyOf(l))), ...serverQaLogs];
+  }, [serverQaLogs, sessionLogs]);
   // Standard enterprise PO/RFQ code formatter
   const formatPurchaseReference = (po) => {
     if (!po) return '';
@@ -284,8 +299,8 @@ export default function QualityControl() {
     let localOrders = [];
     try { localOrders = JSON.parse(localStorage.getItem('erp_pos') || '[]'); } catch (_) { localOrders = purchaseOrders; }
 
-    let storedQaLogs = [];
-    try { storedQaLogs = JSON.parse(localStorage.getItem('erp_qa_inspection_logs') || '[]'); } catch (_) { storedQaLogs = qaLogs; }
+    // Kết quả nghiệm thu lấy từ QcInspection thật (receipts[].qcInspections) — không còn cache cục bộ
+    const storedQaLogs = [];
 
     // Only let cache/context entries introduce a BRAND NEW row when the real API
     // genuinely returned nothing — once it has data, it's authoritative on which
@@ -389,8 +404,7 @@ export default function QualityControl() {
     const deduped = newLogs.filter((log, index, all) =>
       index === all.findIndex(item => (item.poNumber && item.poNumber === log.poNumber) || (item.id && item.id === log.id))
     );
-    setQaLogs(deduped);
-    localStorage.setItem('erp_qa_inspection_logs', JSON.stringify(deduped));
+    setSessionLogs(deduped);
   };
 
   const formatPrice = (price) => {

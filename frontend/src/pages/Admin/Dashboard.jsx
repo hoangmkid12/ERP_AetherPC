@@ -703,11 +703,36 @@ export default function Dashboard() {
   // Hiệu suất kỹ thuật viên lấy từ lệnh lắp ráp thật đã nghiệm thu trong kỳ (người nghiệm thu = completedBy);
   // thưởng = số lệnh × đơn giá thưởng lắp ráp trong cấu hình nhân sự (cùng công thức với bảng lương).
   const [assemblyBonusRate, setAssemblyBonusRate] = useState(null);
+  const [salesCommissionPct, setSalesCommissionPct] = useState(null);
   useEffect(() => {
     api.get('/hr/settings')
-      .then(res => { const v = Number(res?.data?.assemblyBonus); if (Number.isFinite(v)) setAssemblyBonusRate(v); })
+      .then(res => {
+        const v = Number(res?.data?.assemblyBonus); if (Number.isFinite(v)) setAssemblyBonusRate(v);
+        const c = Number(res?.data?.salesCommissionFlat); if (Number.isFinite(c)) setSalesCommissionPct(c > 100 ? 1 : c);
+      })
       .catch(() => {});
   }, []);
+  // Bảng xếp hạng doanh số THẬT trong kỳ: đơn bán tại quầy theo nhân viên đứng quầy (soldById —
+  // căn cứ tính hoa hồng trong bảng lương), đơn khách tự đặt online gom một dòng riêng.
+  // Trước đây bảng này là 3 dòng số liệu dựng sẵn (VD "Lê Hoàng Hùng 45.200.000đ").
+  const salesLeaderboard = useMemo(() => {
+    const map = new Map();
+    revenueOrders.forEach(o => {
+      const key = o.soldById ? String(o.soldById) : 'ONLINE';
+      const emp = o.soldById ? employees.find(e => String(e.id) === String(o.soldById)) : null;
+      const cur = map.get(key) || {
+        name: o.soldById ? (emp?.fullName || emp?.name || `NV #${o.soldById}`) : 'Kênh online (khách tự đặt)',
+        role: o.soldById ? (emp?.role || 'SALES') : 'ONLINE',
+        revenue: 0, orders: 0, isOnline: !o.soldById
+      };
+      cur.revenue += Number(o.totalAmount) || 0;
+      cur.orders += 1;
+      map.set(key, cur);
+    });
+    return [...map.values()]
+      .map(r => ({ ...r, commission: !r.isOnline && r.role === 'SALES' && salesCommissionPct !== null ? Math.round(r.revenue * salesCommissionPct / 100) : null }))
+      .sort((a, b) => b.revenue - a.revenue);
+  }, [revenueOrders, employees, salesCommissionPct]);
   const technicianStats = useMemo(() => {
     const map = new Map();
     filteredAssemblyJobs.filter(j => j.status === 'COMPLETED').forEach(j => {
@@ -1630,11 +1655,10 @@ export default function Dashboard() {
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              {[
-                { name: 'Trần Thị B', role: 'Sales Online', revenue: totalRevenueVal, orders: filteredOrders.length, commission: totalRevenueVal * 0.01 },
-                { name: 'Lê Hoàng Hùng', role: 'Sales POS Showroom', revenue: 45200000, orders: 12, commission: 452000 },
-                { name: 'Nguyễn Thị Hoa', role: 'Sales Tư Vấn', revenue: 32100000, orders: 8, commission: 321000 }
-              ].map((s, idx) => (
+              {salesLeaderboard.length === 0 && (
+                <div style={{ fontSize: '0.8rem', color: '#64748b', padding: '0.75rem 0' }}>Chưa có doanh số được ghi nhận trong kỳ đã chọn.</div>
+              )}
+              {salesLeaderboard.map((s, idx) => (
                 <div key={idx} style={{ padding: '0.85rem', borderRadius: '6px', border: '1px solid #e2e8f0', backgroundColor: idx === 0 ? '#eff6ff' : '#ffffff' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
@@ -1642,16 +1666,18 @@ export default function Dashboard() {
                         {idx + 1}
                       </span>
                       <strong style={{ fontSize: '0.85rem', color: '#0f172a' }}>{s.name}</strong>
-                      <span style={{ fontSize: '0.77rem', color: '#64748b' }}>({getRoleName(s.role)})</span>
+                      <span style={{ fontSize: '0.77rem', color: '#64748b' }}>({s.isOnline ? 'Không tính hoa hồng' : getRoleName(s.role)})</span>
                     </div>
-                    <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#16a34a' }}>
-                      Hoa hồng: {formatPrice(s.commission)}
-                    </span>
+                    {s.commission !== null && (
+                      <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#16a34a' }}>
+                        Hoa hồng: {formatPrice(s.commission)}
+                      </span>
+                    )}
                   </div>
 
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: '#475569' }}>
                     <span>Doanh số chốt: <strong>{formatPrice(s.revenue)}</strong></span>
-                    <span>Đơn hoàn tất: <strong>{s.orders} đơn</strong></span>
+                    <span>Số đơn: <strong>{s.orders} đơn</strong></span>
                   </div>
                 </div>
               ))}
