@@ -86,6 +86,21 @@ Chuỗi trạng thái phiếu: `PENDING → RETURN_APPROVED → RETURNING_TO_WAR
 - Nhật ký & biên bản QC dựng từ dữ liệu thật trên máy chủ (QcInspection, phiếu đổi trả đã thẩm định, đơn QC đóng),
   bỏ localStorage và các biên bản/phiếu RMA mẫu bịa.
 
+## 2.7 Kiểm thử giao diện (Chrome, 13/10/2026 tối)
+
+Chạy frontend + backend ở localhost (nối cùng DB production; không nhập mật khẩu lên trang production) bằng tài khoản CEO.
+Đạt: Kế toán (KQKD mới: DT 19,75 tỷ, hàng trả lại 6,16tr, giá vốn 15,65 tỷ, biên gộp 12,8%, chi phí nhân sự 1,878 tỷ,
+LN trước thuế 418,6tr), Lắp ráp (serial thật của đơn), Quản lý đơn (bộ lọc + nút phân bổ), Dashboard KPI (bảng xếp
+hạng thật), QC (nhật ký thật; thẩm định kiện hoàn ORD-311404 qua giao diện → đơn đóng, OUT 1 / IN 1), Mua hàng (nhãn
+"Đã nhập kho"), Kho (hàng chờ giao). Lỗi tìm thấy & đã sửa (commit phần 3):
+- Ngày đặt hàng hiển thị sai (22/10 thay vì 13/10): chuỗi "HH:mm DD/MM/YYYY" bị tách theo "/" → lấy giờ làm ngày;
+  bộ lọc kỳ (`PeriodFilterBar`) còn loại đơn trong ngày khỏi mọi thống kê. Sửa parser ở Bán hàng/Mua hàng/Kho và 2 bộ lọc.
+- Đơn POS hiện kênh "Online Web" (nhận diện theo tiền tố mã POS- cũ) → nhận diện theo `soldById`.
+- Dashboard: kỹ thuật viên hiện email → hiện họ tên.
+- Nhật ký QC: mã quyết định cũ (APPROVE_REFUND…) hiện nhầm "TỪ CHỐI"; mã biên bản lặp "RMA-QA-RMA-".
+Ghi nhận thêm (chưa sửa): khi mạng chậm, Báo cáo KQKD hiện "0đ" doanh thu trong lúc đang tải danh sách đơn (nên có
+trạng thái đang tải); lệnh lắp ráp đã giao vẫn mang nhãn "Đã Hoàn Tất - Chờ Xuất Kho".
+
 ## 3. Việc CÒN LẠI cho phiên sau
 
 1. **Chạy script đối chiếu dữ liệu** (bị chặn quyền ghi trực tiếp DB trong phiên này):

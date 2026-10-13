@@ -17,12 +17,10 @@ export function isDateInRange(dateValue, startDate, endDate) {
   } else if (typeof dateValue === 'string') {
     const trimmed = dateValue.trim();
     // Khớp định dạng DD/MM/YYYY hoặc DD-MM-YYYY (vd: 15/06/2026)
-    if (/^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{4}/.test(trimmed)) {
-      const parts = trimmed.split(/[\/\-]/);
-      const day = parseInt(parts[0], 10);
-      const month = parseInt(parts[1], 10) - 1;
-      const year = parseInt(parts[2].slice(0, 4), 10);
-      d = new Date(year, month, day);
+    const vn = trimmed.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+    if (vn) {
+      // Cả dạng "HH:mm DD/MM/YYYY" của đơn hàng: lấy đúng phần ngày, không lấy nhầm giờ
+      d = new Date(Number(vn[3]), Number(vn[2]) - 1, Number(vn[1]));
     } else {
       d = new Date(trimmed);
     }

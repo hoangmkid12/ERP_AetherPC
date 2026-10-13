@@ -736,7 +736,10 @@ export default function Dashboard() {
   const technicianStats = useMemo(() => {
     const map = new Map();
     filteredAssemblyJobs.filter(j => j.status === 'COMPLETED').forEach(j => {
-      const name = (j.completedBy || '').trim() || 'Chưa ghi nhận người nghiệm thu';
+      // completedBy lưu email/mã NV của người nghiệm thu — hiển thị họ tên nhân viên tương ứng
+      const by = (j.completedBy || '').trim();
+      const emp = by ? employees.find(e => [e.email, e.employeeCode, e.username].some(v => v && String(v).toLowerCase() === by.toLowerCase())) : null;
+      const name = emp?.fullName || emp?.name || by || 'Chưa ghi nhận người nghiệm thu';
       const cur = map.get(name) || { name, completed: 0, minutes: [] };
       cur.completed += 1;
       if (j.completedAt && j.createdAt) {
@@ -746,7 +749,7 @@ export default function Dashboard() {
       map.set(name, cur);
     });
     return [...map.values()].sort((x, y) => y.completed - x.completed);
-  }, [filteredAssemblyJobs]);
+  }, [filteredAssemblyJobs, employees]);
   const fmtDuration = (mins) => {
     if (!mins.length) return '—';
     const m = mins.reduce((a, b) => a + b, 0) / mins.length;

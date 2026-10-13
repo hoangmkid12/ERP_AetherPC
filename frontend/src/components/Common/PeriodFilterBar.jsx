@@ -14,8 +14,9 @@ export const parsePeriodDate = (val) => {
   }
   if (typeof val === 'string') {
     const trimmed = val.trim();
-    // Khớp DD/MM/YYYY hoặc DD/MM/YYYY HH:mm
-    const vn = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    // Khớp DD/MM/YYYY ở bất kỳ vị trí nào — đơn hàng lưu "HH:mm DD/MM/YYYY"; neo ^ trước đây làm
+    // đơn tạo trong ngày không khớp và bị loại khỏi mọi thống kê theo kỳ.
+    const vn = trimmed.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
     if (vn) {
       const d = new Date(Number(vn[3]), Number(vn[2]) - 1, Number(vn[1]));
       if (!isNaN(d.getTime())) return d;

@@ -60,6 +60,13 @@ const parseDateVal = (val) => {
   if (!val) return null;
   if (val instanceof Date) return val;
   if (typeof val === 'string') {
+    // Ngày dạng DD/MM/YYYY ở bất kỳ vị trí nào — đơn hàng lưu "HH:mm DD/MM/YYYY" (VD "22:23 13/10/2026");
+    // trước đây tách theo "/" nên lấy nhầm giờ (22) làm ngày → hiển thị 22/10/2026.
+    const vn = val.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    if (vn) {
+      const tm = val.match(/(\d{1,2}):(\d{2})/);
+      return new Date(Number(vn[3]), Number(vn[2]) - 1, Number(vn[1]), tm ? Number(tm[1]) : 0, tm ? Number(tm[2]) : 0);
+    }
     if (val.includes('/')) {
       const parts = val.split('/');
       if (parts.length === 3) {
@@ -1524,7 +1531,8 @@ export default function SalesPOS() {
                 ) : (
                   filteredOrdersList.map(o => {
                     const badge = getStatusBadge(o.status);
-                    const isPosOrder = (o.orderId || o.id || '').toString().startsWith('POS');
+                    // Đơn bán tại quầy: có nhân viên đứng quầy (soldById) — mã đơn POS luôn do máy chủ sinh dạng ORD-..., không còn tiền tố POS-
+                    const isPosOrder = !!o.soldById || o.type === 'POS' || (o.orderId || o.id || '').toString().startsWith('POS');
 
                     return (
                       <tr key={o.orderId || o.id} style={{ borderBottom: '1px solid #f1f5f9' }}>

@@ -199,7 +199,7 @@ export default function QualityControl() {
       };
     })));
     const rma = (returnRequests || []).filter(r => r && r.qcInspectedAt).map(r => ({
-      id: `RMA-QA-${r.rmaCode || r.id}`,
+      id: `QC-${String(r.rmaCode || r.id)}`,
       type: 'CUSTOMER_RMA',
       rmaId: r.rmaCode || r.id,
       orderId: r.orderId,
@@ -209,7 +209,11 @@ export default function QualityControl() {
       inspector: 'Chuyên viên QA/QC',
       date: viDate(r.qcInspectedAt),
       ts: new Date(r.qcInspectedAt).getTime(),
-      decision: r.qcDecision || (r.type === 'EXCHANGE' ? 'EXCHANGE_NEW' : 'RESTOCK_WAREHOUSE'),
+      // Máy chủ nhận cả mã quyết định cũ (APPROVE_REFUND, APPROVE_EXCHANGE, PASSED) — quy về bộ mã của màn QC
+      decision: ['REJECTED', 'QC_REJECTED', 'RETURNING_TO_CUSTOMER', 'RETURNED_TO_CUSTOMER'].includes(r.status)
+        ? 'REJECT_RMA'
+        : ({ APPROVE_REFUND: 'RESTOCK_WAREHOUSE', PASSED: 'RESTOCK_WAREHOUSE', APPROVE_EXCHANGE: 'EXCHANGE_NEW' }[r.qcDecision]
+          || r.qcDecision || (r.type === 'EXCHANGE' ? 'EXCHANGE_NEW' : 'RESTOCK_WAREHOUSE')),
       defectCategory: r.qcDefectType || 'DOA_FACTORY_DEFECT',
       notes: r.qcNotes || '',
       status: ['REJECTED', 'QC_REJECTED', 'RETURNING_TO_CUSTOMER', 'RETURNED_TO_CUSTOMER'].includes(r.status) ? 'QA_REJECTED' : 'QC_PASSED'
