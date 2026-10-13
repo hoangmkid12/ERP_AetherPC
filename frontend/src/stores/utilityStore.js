@@ -119,7 +119,7 @@ export const useUtilityStore = create((set, get) => ({
     if (!savedJob) throw new Error(res?.message || 'Không thể lưu lệnh lắp ráp.');
 
     set(state => {
-      const assemblyJobs = state.assemblyJobs.map(job => (job.id === jobId ? savedJob : job));
+      const assemblyJobs = state.assemblyJobs.map(job => (job.id === jobId ? { ...job, ...savedJob } : job));
       try {
         localStorage.setItem(STORAGE_KEYS.assemblyJobs, JSON.stringify(assemblyJobs));
       } catch (e) {}
@@ -128,7 +128,7 @@ export const useUtilityStore = create((set, get) => ({
 
     // The backend already advanced the real Order when it completed the job —
     // refresh the sales store's cache from the server instead of guessing.
-    if (savedJob.status === 'COMPLETED' && savedJob.orderId) {
+    if (['COMPLETED', 'ASSEMBLING'].includes(savedJob.status) && savedJob.orderId) {
       try {
         const salesState = useSalesStore.getState();
         if (typeof salesState.fetchOrders === 'function') await salesState.fetchOrders();

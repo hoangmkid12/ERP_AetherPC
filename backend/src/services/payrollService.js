@@ -54,13 +54,14 @@ const loadPayrollContext = async (period, employees) => {
   for (const l of leaves) (leavesByEmp[l.employeeId] ||= []).push(l);
   const holidaySet = new Set(holidays.map(h => P.isoDate(h.date)));
 
-  // Hoa hồng: doanh số đơn bán tại quầy (soldById) của Nhân Viên Bán Hàng, trừ đơn hủy/giao thất bại.
+  // Hoa hồng: doanh số đơn bán tại quầy (soldById) của Nhân Viên Bán Hàng — chỉ đơn đã ghi nhận doanh
+  // thu (đã xuất kho), không tính đơn hủy hay đơn khách trả hàng hoàn tiền.
   const salesIds = employees.filter(e => e.role === 'SALES').map(e => e.id);
   const revenueByEmp = {};
   if (salesIds.length) {
     const groups = await prisma.order.groupBy({
       by: ['soldById'],
-      where: { soldById: { in: salesIds }, createdAt: { gte: start, lt: end }, status: { notIn: ['CANCELLED', 'FAILED_DELIVERY'] } },
+      where: { soldById: { in: salesIds }, createdAt: { gte: start, lt: end }, status: { notIn: ['CANCELLED', 'REFUNDED', 'PENDING', 'WAITING_PAYMENT', 'AWAITING_STOCK'] } },
       _sum: { totalAmount: true }
     });
     for (const g of groups) revenueByEmp[g.soldById] = num(g._sum.totalAmount);

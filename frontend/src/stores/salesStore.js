@@ -319,8 +319,16 @@ export const useSalesStore = create((set, get) => ({
         customerName,
         phone,
         email: userEmail,
-        items: items.map(it => ({ productId: it.productId || it.id, quantity: it.quantity || 1, ...(it.bundleWith ? { bundleWith: it.bundleWith } : {}) })),
+        items: items.map(it => ({
+          productId: it.productId || it.id,
+          quantity: it.quantity || 1,
+          ...(it.bundleWith ? { bundleWith: it.bundleWith } : {}),
+          // Linh kiện chọn từ công cụ Build PC → máy chủ tự tạo lệnh lắp ráp cho đơn
+          ...(it.selectedSpec?.pc_build_bundle ? { pcBuild: true } : {})
+        })),
         paymentMethod: paymentMethod === 'BANK_TRANSFER' ? 'BANK_TRANSFER' : 'COD',
+        // POS: phương thức thật tại quầy (CASH / BANK / CARD) — máy chủ ghi đúng phiếu thu
+        ...(type === 'POS' ? { posPaymentMethod: paymentMethod || 'CASH' } : {}),
         shippingAddress: shippingAddress || (type === 'POS' ? 'Bán tại cửa hàng (POS)' : 'Hồ Chí Minh'),
         shippingCity: inferredCity,
         shippingFee,
@@ -525,7 +533,10 @@ export const useSalesStore = create((set, get) => ({
     try {
       await api.post(`/orders/${orderId}/confirm-received`, { note });
     } catch (err) {
-      console.warn('[SalesStore] confirmReceivedOrder API warning:', err.message);
+      // Không tự đánh dấu "Hoàn tất" ở máy khách khi máy chủ từ chối (VD đơn COD shipper
+      // chưa xác nhận giao/thu tiền) — trước đây lỗi bị nuốt, khách thấy đơn đã hoàn tất ảo.
+      console.warn('[SalesStore] confirmReceivedOrder API error:', err.message);
+      throw err;
     }
 
     set(state => {

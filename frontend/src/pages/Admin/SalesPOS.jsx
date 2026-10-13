@@ -18,6 +18,7 @@ import {
   CreditCard, ShieldCheck, CheckCircle2, ArrowRight, RefreshCw, AlertCircle, Lock, Clock
 } from 'lucide-react';
 import { formatCompactVnd } from '../../utils/formatCompact';
+import { isRevenueOrder } from '../../utils/revenue';
 
 const CATEGORY_MAP_VI = {
   CPU: 'Bộ Vi Xử Lý (CPU)',
@@ -151,6 +152,20 @@ export default function SalesPOS() {
   // Orders Management State
   const [orderSearch, setOrderSearch] = useState('');
   const [orderStatusFilter, setOrderStatusFilter] = useState('ALL');
+  const [allocatingStock, setAllocatingStock] = useState(false);
+  // Rà lại các đơn "Chờ hàng": đơn nào nay đã đủ tồn thì máy chủ duyệt & xuất kho ngay (đơn cũ nhất trước)
+  const handleAllocateAwaitingStock = async () => {
+    setAllocatingStock(true);
+    try {
+      const res = await api.post('/orders/awaiting-stock/allocate', {});
+      notify(res?.message || 'Đã rà soát đơn chờ hàng.', 'success');
+      await useSalesStore.getState().getOrders?.();
+    } catch (err) {
+      notify(err.message || 'Không thể phân bổ hàng cho đơn chờ hàng.', 'error');
+    } finally {
+      setAllocatingStock(false);
+    }
+  };
   const [orderStartDate, setOrderStartDate] = useState('');
   const [orderEndDate, setOrderEndDate] = useState('');
   const [salesReportStartDate, setSalesReportStartDate] = useState('');
@@ -500,7 +515,7 @@ export default function SalesPOS() {
       try {
         const resId = await processCheckout(
           posCustomerName || 'Khách Mua Tại Quầy',
-          posCustomerPhone || '0901234567',
+          posCustomerPhone || '',
           itemsForERP,
           'POS',
           finalTotal,
@@ -527,7 +542,7 @@ export default function SalesPOS() {
     const receiptData = {
       orderId,
       customerName: posCustomerName || 'Khách Mua Tại Quầy',
-      customerPhone: posCustomerPhone || '0901234567',
+      customerPhone: posCustomerPhone || '',
       items: [...posCart],
       subTotal,
       discountPercent: posDiscountPercent,
@@ -615,7 +630,7 @@ export default function SalesPOS() {
     return orders.filter(o => isDateInPeriod(o.date || o.createdAt, overviewPeriod));
   }, [orders, overviewPeriod]);
 
-  const activeOrdersInPeriod = ordersInPeriod.filter(o => !['CANCELLED', 'FAILED_DELIVERY'].includes(o.status));
+  const activeOrdersInPeriod = ordersInPeriod.filter(isRevenueOrder);
   const totalRevenue = activeOrdersInPeriod.reduce((sum, o) => sum + (parseFloat(o.totalAmount || o.total) || 0), 0);
   const pendingConfirmationCount = ordersInPeriod.filter(o => ['PENDING', 'WAITING_PAYMENT'].includes(o.status)).length;
   const pendingDeliveryCount = ordersInPeriod.filter(o => ['CONFIRMED', 'PROCESSING', 'READY_TO_SHIP', 'SHIPPED'].includes(o.status)).length;
@@ -1445,14 +1460,33 @@ export default function SalesPOS() {
                 <option value="NEED_ACTION">Cần xử lý ({pendingConfirmationCount})</option>
                 <option value="PENDING">Chờ xác nhận</option>
                 <option value="WAITING_PAYMENT">Chờ thanh toán</option>
+                <option value="AWAITING_STOCK">Chờ hàng về ({orders.filter(o => o.status === 'AWAITING_STOCK').length})</option>
                 <option value="PROCESSING">Đang chuẩn bị hàng</option>
                 <option value="CONFIRMED">Đã xác nhận (Chờ xuất kho)</option>
                 <option value="READY_TO_SHIP">Đã đóng gói (Chờ giao)</option>
                 <option value="SHIPPED">Đang vận chuyển</option>
-                <option value="DELIVERED">Đã giao hoàn tất</option>
+                <option value="DELIVERED">Đã giao (chờ khách xác nhận)</option>
+                <option value="COMPLETED">Hoàn tất</option>
+                <option value="RETURNING_TO_WAREHOUSE">Đang hoàn về kho</option>
+                <option value="REFUNDED">Đã hoàn tiền</option>
                 <option value="CANCELLED">Đã hủy</option>
               </select>
             </div>
+            {(isSalesManager || isCEO || isAdmin) && orders.some(o => o.status === 'AWAITING_STOCK') && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', padding: '0.6rem 0.75rem', backgroundColor: '#fffbeb', border: '1px solid #fde68a', borderRadius: '6px', fontSize: '0.8rem', color: '#92400e' }}>
+                <span>
+                  <strong>{orders.filter(o => o.status === 'AWAITING_STOCK').length} đơn đang chờ hàng.</strong> Hệ thống tự phân bổ khi Kho nhập hàng; có thể rà lại ngay sau kiểm kê/điều chỉnh tồn.
+                </span>
+                <button
+                  type="button"
+                  onClick={handleAllocateAwaitingStock}
+                  disabled={allocatingStock}
+                  style={{ height: '32px', padding: '0 0.85rem', fontSize: '0.78rem', fontWeight: 700, color: '#ffffff', backgroundColor: allocatingStock ? '#d97706aa' : '#d97706', border: 'none', borderRadius: '6px', cursor: allocatingStock ? 'wait' : 'pointer', whiteSpace: 'nowrap' }}
+                >
+                  {allocatingStock ? 'Đang phân bổ...' : 'Phân bổ hàng cho đơn chờ hàng'}
+                </button>
+              </div>
+            )}
 
             <DateRangeFilter
               startDate={orderStartDate}
@@ -2469,7 +2503,7 @@ export default function SalesPOS() {
 
             <div style={{ fontSize: '0.78rem', color: '#475569', display: 'flex', flexDirection: 'column', gap: '0.25rem', marginBottom: '1rem' }}>
               <div>Khách hàng: <strong>{printedReceipt.customerName}</strong></div>
-              <div>Số điện thoại: <strong>{printedReceipt.customerPhone}</strong></div>
+              {printedReceipt.customerPhone && <div>Số điện thoại: <strong>{printedReceipt.customerPhone}</strong></div>}
               <div>Thời gian: <strong>{printedReceipt.time}</strong></div>
               <div>Thu ngân: <strong>{printedReceipt.cashier}</strong></div>
               <div>Phương thức: <strong>{printedReceipt.paymentMethod}</strong></div>

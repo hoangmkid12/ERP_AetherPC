@@ -1028,7 +1028,7 @@ export default function QualityControl() {
   };
 
   // Submit Kết Quả Thẩm Định Tem & Cập Nhật Tồn Kho
-  const handleSubmitRestockInspection = (e) => {
+  const handleSubmitRestockInspection = async (e) => {
     e.preventDefault();
     if (!selectedRestockOrder) return;
 
@@ -1037,21 +1037,26 @@ export default function QualityControl() {
     const isOutletRestock = restockCondition === 'DENTED_BOX_OUTLET';
     const isDamaged = restockCondition === 'DAMAGED_CARRIER';
 
-    const targetStatus = isDamaged ? 'RETURN_DAMAGED' : 'CANCELLED';
-    const resolutionNote = isFullRestock 
+    // Đóng đơn kiện hoàn (CANCELLED). Máy chủ đọc restockCondition: hàng hư hỏng do vận
+    // chuyển thì KHÔNG nhập tồn bán (ghi nhận tổn thất), còn lại hoàn tồn kho bán.
+    const resolutionNote = isFullRestock
       ? 'QC xác nhận: Tem seal nguyên vẹn 100% -> Đã nhập lại Tồn Kho Bán Mới'
       : isOutletRestock
-      ? 'QC xác nhận: Móp vỏ hộp nhẹ -> Đã nhập vào Kho Thanh Lý / Open-Box'
-      : 'QC xác nhận: Hư hỏng vỡ seal do vận chuyển -> Đã chuyển vào Kho Chờ Xử Lý Bồi Thường';
+      ? 'QC xác nhận: Móp vỏ hộp nhẹ -> Nhập lại tồn kho (kệ Open-Box)'
+      : 'QC xác nhận: Hư hỏng vỡ seal do vận chuyển -> Không nhập tồn bán, chuyển chờ xử lý bồi thường';
 
-    if (typeof updateOrderStatus === 'function') {
-      updateOrderStatus(orderId, targetStatus, resolutionNote, {
-        restockedAt: new Date().toISOString(),
-        restockedBy: user?.fullname || 'Chuyên viên QA/QC',
+    setSubmitting(true);
+    try {
+      await updateOrderStatus(orderId, 'CANCELLED', `${resolutionNote}. Ghi chú QC: ${restockNotes}`, {
         restockCondition,
         restockChecklist
       });
+    } catch (err) {
+      setSubmitting(false);
+      showToast('Không thể cập nhật kiện hoàn', err.message || 'Lỗi kết nối máy chủ', 'error');
+      return;
     }
+    setSubmitting(false);
 
     const newLog = {
       id: `QA-RET-${Date.now().toString().slice(-4)}`,
@@ -1686,22 +1691,14 @@ export default function QualityControl() {
       {/* TAB 3: RETURNS (THẨM ĐỊNH HÀNG ĐỔI TRẢ KHÁCH & HÀNG GIAO HOÀN VỀ KHO) */}
       {/* ========================================================================= */}
       {activeTab === 'returns' && (() => {
-        // 1. Danh sách hàng giao thất bại / khách hủy chuyển hoàn về kho
-        const failedDeliveries = erpOrders.filter(o => o.status === 'RETURNING_TO_WAREHOUSE');
+        // 2. Yêu cầu đổi trả RMA thật từ máy chủ (không trộn localStorage, không dữ liệu mẫu)
+        const allReturns = returnRequests || [];
+        const activeRmaOrderIds = new Set(allReturns
+          .filter(r => !['REJECTED', 'QC_REJECTED', 'RETURNED_TO_CUSTOMER'].includes(r?.status))
+          .map(r => String(r.orderId)));
 
-        // 2. Danh sách yêu cầu đổi trả RMA từ khách hàng (kết hợp store & localStorage)
-        let localReturns = [];
-        try { localReturns = JSON.parse(localStorage.getItem('erp_return_requests') || '[]'); } catch (_) {}
-        const retMap = new Map();
-        (returnRequests || []).forEach(r => { const k = String(r.id || r.orderId || ''); if (k) retMap.set(k, r); });
-        localReturns.forEach(r => { const k = String(r.id || r.orderId || ''); if (k) retMap.set(k, { ...retMap.get(k), ...r }); });
-        const mergedReturns = Array.from(retMap.values());
-
-        const allReturns = mergedReturns.length > 0 ? mergedReturns : [
-          { id: 'RET-001', orderId: 'ORD-101', customerName: 'Lê Hoàng Hùng', phone: '0901234567', product: 'Intel Core i5-13400F', serial: 'SN-CPU-13400F-8821', reason: 'Cắm nguồn không lên hình, test bo mạch khác vẫn không POST', status: 'PENDING' },
-          { id: 'RET-002', orderId: 'ORD-102', customerName: 'Nguyễn Thị Hoa', phone: '0987654321', product: 'MSI GeForce RTX 4060 Ventus 2X 8GB OC', serial: 'SN-VGA-4060-9901', reason: 'Quạt quay kêu rè rè và nhiệt độ lên 85 độ C khi chơi game', status: 'PENDING' },
-          { id: 'RET-003', orderId: 'ORD-103', customerName: 'Trần Minh Nam', phone: '0912345678', product: 'ASUS ROG Strix RTX 4070 Super 12GB OC', serial: 'SN-VGA-4070S-3312', reason: 'Khách muốn đổi sang bản RTX 4080 Super (hàng nguyên seal)', status: 'PENDING' }
-        ];
+        // 1. Hàng giao thất bại chuyển hoàn về kho — loại các đơn đang đổi trả theo RMA (đi luồng riêng)
+        const failedDeliveries = erpOrders.filter(o => o.status === 'RETURNING_TO_WAREHOUSE' && !activeRmaOrderIds.has(String(o.orderId || o.id)));
 
         // Helper functions kiểm tra trạng thái RMA chuẩn xác tuyệt đối
         const isRmaPending = (rma) => !rma?.status || ['PENDING', 'NEW', 'PROCESSING', 'WAITING', 'DELIVERED_TO_WAREHOUSE', 'RETURN_REQUESTED', 'RETURN_APPROVED', 'RETURNING_TO_WAREHOUSE'].includes(rma.status);

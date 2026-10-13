@@ -23,7 +23,7 @@ const checkAndApprovePendingOrders = async () => {
 
     for (const order of pendingOrders) {
       try {
-        const result = await prisma.$transaction((tx) => approveOrderIfReady(tx, order.orderId, { noteSuffix: ' (sau 5h chờ)' }));
+        const result = await prisma.$transaction((tx) => approveOrderIfReady(tx, order.orderId, { noteSuffix: ' (sau 5h chờ)' }), { timeout: 20000 });
         if (result) {
           console.log(`[OrderScheduler] Auto-processed order ${order.orderId} to status ${result.status}`);
         }

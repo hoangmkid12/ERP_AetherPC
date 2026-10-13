@@ -34,6 +34,7 @@ import { SignatureRow, SignatureCell, displaySigner, historySigner } from '../..
 import { formatCompactVnd } from '../../utils/formatCompact';
 import PeriodFilterBar from '../../components/Common/PeriodFilterBar';
 import { netOfVat } from '../../utils/vat';
+import { isRevenueOrder, payrollCostOf } from '../../utils/revenue';
 
 // Register ChartJS modules
 ChartJS.register(
@@ -661,7 +662,7 @@ export default function Dashboard() {
 
   // Key Calculations — derived entirely from real data (Order/PurchaseOrder-VendorBill/Payroll/Ledger),
   // no invented multipliers or hardcoded fallbacks. CANCELLED/FAILED_DELIVERY orders never count as revenue.
-  const revenueOrders = filteredOrders.filter(o => !['CANCELLED', 'FAILED_DELIVERY'].includes(o.status));
+  const revenueOrders = filteredOrders.filter(isRevenueOrder);
   const totalRevenueVal = revenueOrders.reduce((sum, item) => sum + (Number(item.totalAmount) || 0), 0);
   // Giá vốn hàng bán = các bút toán COGS do backend ghi khi đơn thực sự xuất kho (giá bình quân gia quyền),
   // cùng cách tính với trang Kế toán. Không dùng tổng hóa đơn NCC — đó là tiền MUA hàng trong kỳ, không phải
@@ -671,8 +672,11 @@ export default function Dashboard() {
     .filter(tx => isDateInFilter(tx.date || tx.createdAt, dateFilterPeriod, customStartDate, customEndDate))
     .reduce((sum, tx) => sum + (Number(tx.amount || 0) || 0), 0);
   // Doanh thu đơn hàng đã gồm VAT 10%; giá vốn là số chưa VAT → lợi nhuận tính trên doanh thu thuần.
-  const netRevenueVal = netOfVat(totalRevenueVal);
-  const outputVatVal = totalRevenueVal - netRevenueVal;
+  // Hoàn tiền khách = hàng bán bị trả lại → giảm trừ doanh thu (cùng cách tính với trang Kế toán)
+  const inPeriod = (raw) => isDateInFilter(raw, dateFilterPeriod, customStartDate, customEndDate);
+  const refundAmount = (generalLedger || []).filter(tx => tx && tx.type === 'REFUND' && inPeriod(tx.date || tx.createdAt)).reduce((sum, tx) => sum + (Number(tx.amount || 0) || 0), 0);
+  const netRevenueVal = netOfVat(totalRevenueVal - refundAmount);
+  const outputVatVal = totalRevenueVal - refundAmount - netRevenueVal;
   const grossProfit = netRevenueVal - cogsAmount;
   const grossMarginPct = netRevenueVal > 0 ? (grossProfit / netRevenueVal) * 100 : 0;
   // Giá trị tồn kho theo GIÁ VỐN (averageCost), không phải giá bán; mã chưa có giá vốn tạm tính theo giá bán chưa VAT.
@@ -686,11 +690,10 @@ export default function Dashboard() {
   const shownPayrolls = awaitingCeoPayrolls.length ? awaitingCeoPayrolls : (payrolls || []).filter(p => p.period === latestPayrollPeriod);
   const shownPayrollPeriod = shownPayrolls[0]?.period || '';
   const totalPayrollCost = shownPayrolls.reduce((sum, p) => sum + (Number(p.netSalary || p.netAmount || 0) || 0), 0);
-  const operatingExpense = (generalLedger || []).filter(tx => tx && tx.type === 'EXPENSE' && !tx.referenceId).reduce((sum, tx) => sum + (Number(tx.amount || 0) || 0), 0);
-  const refundAmount = (generalLedger || []).filter(tx => tx && tx.type === 'REFUND').reduce((sum, tx) => sum + (Number(tx.amount || 0) || 0), 0);
+  const operatingExpense = (generalLedger || []).filter(tx => tx && tx.type === 'EXPENSE' && !tx.referenceId && inPeriod(tx.date || tx.createdAt)).reduce((sum, tx) => sum + (Number(tx.amount || 0) || 0), 0);
   // Chi phí lương trong P&L = lương đã thực chi (phiếu PAID), cùng cách tính với trang Kế toán.
-  const payrollExpensePaid = (payrolls || []).filter(p => p && p.status === 'PAID').reduce((sum, p) => sum + (Number(p.netSalary || 0) || 0), 0);
-  const netIncome = netRevenueVal - cogsAmount - payrollExpensePaid - operatingExpense - refundAmount;
+  const payrollExpensePaid = (payrolls || []).filter(p => p && p.status === 'PAID' && inPeriod(p.paidAt || p.disbursedAt || p.createdAt)).reduce((sum, p) => sum + payrollCostOf(p), 0);
+  const netIncome = netRevenueVal - cogsAmount - payrollExpensePaid - operatingExpense;
 
   const lowStockCount = inventory.filter(item => Number(item.stock || item.stockQuantity || 0) <= Number(item.threshold || 5)).length;
   const readyToShipCount = filteredOrders.filter(o => o.status === 'READY_TO_SHIP').length;
@@ -909,7 +912,7 @@ export default function Dashboard() {
     buckets.forEach((b, idx) => { bucketIndex[b.key] = idx; });
 
     orders.forEach(o => {
-      if (!o || ['CANCELLED', 'FAILED_DELIVERY'].includes(o.status)) return;
+      if (!isRevenueOrder(o)) return;
       const raw = o.date || o.createdAt;
       const d = raw ? new Date(raw) : null;
       if (!d || isNaN(d.getTime())) return;
@@ -1544,6 +1547,10 @@ export default function Dashboard() {
               </div>
 
               <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'baseline', gap: '0.4rem', paddingBottom: '0.4rem', borderBottom: '1px solid #f1f5f9' }}>
+                <span style={{ color: '#64748b', flex: '1 1 220px', minWidth: 0 }}>(-) Hàng Bán Bị Trả Lại (hoàn tiền khách):</span>
+                <strong style={{ color: '#64748b', whiteSpace: 'nowrap' }}>{formatPrice(refundAmount)}</strong>
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'baseline', gap: '0.4rem', paddingBottom: '0.4rem', borderBottom: '1px solid #f1f5f9' }}>
                 <span style={{ color: '#64748b', flex: '1 1 220px', minWidth: 0 }}>(-) Thuế GTGT Đầu Ra (10%):</span>
                 <strong style={{ color: '#64748b', whiteSpace: 'nowrap' }}>{formatPrice(outputVatVal)}</strong>
               </div>
@@ -1573,10 +1580,6 @@ export default function Dashboard() {
                 <span style={{ color: '#64748b', whiteSpace: 'nowrap' }}>{formatPrice(operatingExpense)}</span>
               </div>
 
-              <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'baseline', gap: '0.4rem', paddingBottom: '0.4rem', borderBottom: '1px solid #f1f5f9' }}>
-                <span style={{ color: '#64748b', flex: '1 1 220px', minWidth: 0 }}>(-) Chi Hoàn Tiền Khách Hàng (Refund):</span>
-                <span style={{ color: '#64748b', whiteSpace: 'nowrap' }}>{formatPrice(refundAmount)}</span>
-              </div>
 
               <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'baseline', gap: '0.4rem', padding: '0.6rem', backgroundColor: netIncome >= 0 ? '#eff6ff' : '#fef2f2', borderRadius: '6px', border: `1px solid ${netIncome >= 0 ? '#bfdbfe' : '#fecaca'}`, marginTop: '0.5rem' }}>
                 <span style={{ fontWeight: 800, color: netIncome >= 0 ? '#1d4ed8' : '#dc2626', flex: '1 1 220px', minWidth: 0 }}>(=) Lợi Nhuận Thuần Trước Thuế (Net Income):</span>

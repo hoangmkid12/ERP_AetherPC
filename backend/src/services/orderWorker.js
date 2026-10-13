@@ -57,7 +57,7 @@ async function handlePayload(payload) {
     // blindly marked the order CONFIRMED (and paymentStatus PAID) with no stock
     // check at all, so a real order with insufficient stock would have been
     // wrongly confirmed and oversold instead of falling back to AWAITING_STOCK.
-    const result = await prisma.$transaction((tx) => approveOrderIfReady(tx, orderId, { noteSuffix: ' (hàng đợi Redis)' }));
+    const result = await prisma.$transaction((tx) => approveOrderIfReady(tx, orderId, { noteSuffix: ' (hàng đợi Redis)' }), { timeout: 20000 });
     console.log(result ? `Order ${orderId} processed to status ${result.status}` : `Order ${orderId} no longer PENDING, skipped`);
   } finally {
     await releaseLock(lockKey, token).catch(() => {});

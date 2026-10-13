@@ -7,6 +7,7 @@ const router = express.Router();
 const CANCEL_ROLES = ['CUSTOMER', 'SALES', 'SALES_MANAGER', 'CSKH', 'CEO', 'ADMIN'];
 const RECEIVE_ROLES = ['CUSTOMER', 'CSKH', 'SALES_MANAGER', 'CEO', 'ADMIN'];
 const {
+  allocateAwaitingStock,
   createOrder,
   createPosOrder,
   getCustomerOrders,
@@ -42,10 +43,12 @@ router.post('/pos', authMiddleware(['SALES', 'SALES_MANAGER', 'CEO', 'ADMIN']), 
 
 // @route   GET /api/v1/orders
 // @desc    Lấy danh sách đơn hàng (Khách hàng xem đơn của mình, Nhân viên/Shipper xem danh sách phân công)
-router.get('/', authMiddleware(['CUSTOMER', 'DELIVERY', 'SALES', 'SALES_MANAGER', 'WAREHOUSE', 'WAREHOUSE_MANAGER', 'CEO', 'ADMIN', 'CSKH', 'ACCOUNTANT']), getCustomerOrders);
+router.get('/', authMiddleware(['CUSTOMER', 'DELIVERY', 'SALES', 'SALES_MANAGER', 'WAREHOUSE', 'WAREHOUSE_MANAGER', 'CEO', 'ADMIN', 'CSKH', 'ACCOUNTANT', ...QC_ROLES]), getCustomerOrders);
 
 // @route   GET /api/v1/orders/stale-deliveries
 // @desc    Đơn giao hàng tồn từ hôm trước / đang giao mà không có shipper (Kho, Quản lý)
+// Rà lại & phân bổ hàng cho các đơn đang Chờ hàng
+router.post('/awaiting-stock/allocate', authMiddleware(['SALES_MANAGER', 'WAREHOUSE_MANAGER', 'CEO', 'ADMIN']), allocateAwaitingStock);
 router.get('/stale-deliveries', authMiddleware(['WAREHOUSE', 'WAREHOUSE_MANAGER', 'SALES_MANAGER', 'CEO', 'ADMIN']), getStaleDeliveries);
 
 // @route   POST & PATCH /api/v1/orders/:id/cancel
@@ -55,7 +58,7 @@ router.patch('/:id/cancel', authMiddleware(CANCEL_ROLES), customerCancelOrder);
 
 // @route   PATCH /api/v1/orders/:id/status
 // @desc    Cập nhật trạng thái đơn hàng (Nhân viên Sale / Kho / Delivery / Admin)
-router.patch('/:id/status', authMiddleware(['SALES', 'SALES_MANAGER', 'WAREHOUSE', 'WAREHOUSE_MANAGER', 'CEO', 'ADMIN', 'CSKH', 'DELIVERY']), updateOrderStatus);
+router.patch('/:id/status', authMiddleware(['SALES', 'SALES_MANAGER', 'WAREHOUSE', 'WAREHOUSE_MANAGER', 'CEO', 'ADMIN', 'CSKH', 'DELIVERY', ...QC_ROLES]), updateOrderStatus);
 
 // @route   POST & PATCH /api/v1/orders/:id/confirm-received
 // @desc    Khách hàng xác nhận đã nhận được hàng -> chuyển sang COMPLETED

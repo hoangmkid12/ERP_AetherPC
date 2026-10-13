@@ -2,6 +2,7 @@ const prisma = require('../config/database');
 const { normalizeQcRole } = require('../constants/roles');
 const { computeBlendedAverageCost } = require('../utils/inventoryCosting');
 const { logAudit } = require('../utils/auditLog');
+const { afterReceiptValidated } = require('../services/receiptFollowUp');
 const { hasOperationalPermission } = require('../middlewares/rbac.middleware');
 const { PO_STATUS_VI, labelOf } = require('../constants/statusLabels');
 
@@ -346,6 +347,7 @@ const createPurchaseOrder = async (req, res, next) => {
       // 1c. RFQ lập từ một Phiếu Yêu Cầu Mua Hàng của kho: đề xuất phải đã được
       // Quản Lý Kho ký duyệt. Cho phép cả RFQ_CREATED vì một đợt so sánh gửi RFQ
       // tới nhiều nhà cung cấp cùng lúc (mỗi NCC một request) từ cùng một đề xuất.
+      let prTag = null;
       if (purchaseRequestId !== undefined && purchaseRequestId !== null) {
         const prId = parseInt(purchaseRequestId, 10);
         const claimed = Number.isInteger(prId)
@@ -359,6 +361,9 @@ const createPurchaseOrder = async (req, res, next) => {
           error.statusCode = 409;
           throw error;
         }
+        const pr = await tx.purchaseRequest.findUnique({ where: { id: prId }, select: { prCode: true } });
+        // Thẻ [PR:...] đi theo RFQ → PO chính thức để khi Kho nhập hàng xong thì đóng đề xuất.
+        prTag = pr ? `[PR:${pr.prCode}]` : null;
       }
 
       // 2. Generate poNumber (PO-YYYYMMDD-XXXX)
@@ -428,6 +433,7 @@ const createPurchaseOrder = async (req, res, next) => {
           supplierCode,
           status: 'RFQ',
           totalAmount,
+          notes: prTag,
           expectedDeliveryDate: expectedDeliveryDate ? new Date(expectedDeliveryDate) : null,
           createdBy,
           isBlanket: !!isBlanket,
@@ -539,7 +545,7 @@ const issuePurchaseOrder = async (req, res, next) => {
           status: 'QUOTED_PENDING_CEO',
           totalAmount: rfq.totalAmount,
           expectedDeliveryDate: expectedDeliveryDate ? new Date(expectedDeliveryDate) : rfq.expectedDeliveryDate,
-          notes: notes || null,
+          notes: [String(rfq.notes || '').match(/\[PR:[^\]]+\]/)?.[0], notes].filter(Boolean).join(' ') || null,
           createdBy: actorName,
           sourceRfqId: rfq.id,
           items: {
@@ -746,7 +752,8 @@ const updatePurchaseOrderStatus = async (req, res, next) => {
       if (expectedDeliveryDate) {
         updateData.expectedDeliveryDate = new Date(expectedDeliveryDate);
       }
-      if (reason || supplierNote || status === 'CANCELLED') {
+      // Ghi chú báo giá của NCC đã nằm trong lịch sử duyệt — cancelReason chỉ dành cho đơn huỷ.
+      if (status === 'CANCELLED' || status === 'QA_REJECTED') {
         updateData.cancelReason = reason || supplierNote || null;
       }
 
@@ -1241,7 +1248,8 @@ const validateReceipt = async (req, res, next) => {
       return tx.goodsReceipt.findUnique({ where: { id: receipt.id } });
     }, { timeout: 20000 });
 
-    res.json({ success: true, message: 'Đã xác nhận nhập kho.', data: updatedReceipt });
+    const followUp = await afterReceiptValidated(prisma, updatedReceipt.poId);
+    res.json({ success: true, message: 'Đã xác nhận nhập kho.', data: updatedReceipt, allocatedOrders: followUp.allocatedOrders });
   } catch (err) {
     next(err);
   }

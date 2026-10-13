@@ -1,6 +1,7 @@
 const prisma = require('../config/database');
 const { computeBlendedAverageCost } = require('../utils/inventoryCosting');
 const { logAudit } = require('../utils/auditLog');
+const { afterReceiptValidated } = require('../services/receiptFollowUp');
 
 // GET /api/v1/warehouse/receipts
 // Lấy danh sách phiếu nhận hàng (GoodsReceipt) kèm thông tin PO, items, product
@@ -272,10 +273,12 @@ const validateReceipt = async (req, res, next) => {
       });
     }, { timeout: 20000 });
 
+    const followUp = await afterReceiptValidated(prisma, updatedReceipt.poId);
     res.json({
       success: true,
-      message: 'Xác nhận nhập kho thành công!',
-      data: updatedReceipt
+      message: 'Xác nhận nhập kho thành công!' + (followUp.allocatedOrders.length ? ` Đã tự phân bổ hàng cho ${followUp.allocatedOrders.length} đơn đang chờ hàng (${followUp.allocatedOrders.join(', ')}).` : ''),
+      data: updatedReceipt,
+      allocatedOrders: followUp.allocatedOrders
     });
   } catch (err) {
     next(err);

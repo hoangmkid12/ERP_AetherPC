@@ -23,77 +23,18 @@ const CATEGORY_MAP_VI = {
   COOLER: 'Tản Nhiệt (Cooler)'
 };
 
-// Available Serial Numbers pool generator for each component category
-const getAvailableSerialsForCategory = (cat) => {
-  const c = String(cat || '').toUpperCase();
-  const year = new Date().getFullYear();
-  if (c.includes('CPU')) {
-    return [
-      `SN-CPU-${year}-0811`,
-      `SN-CPU-${year}-0812`,
-      `SN-CPU-${year}-0813`,
-      `SN-CPU-${year}-0814`
-    ];
-  }
-  if (c.includes('MAIN') || c.includes('BOARD') || c.includes('MB')) {
-    return [
-      `SN-MB-${year}-4412`,
-      `SN-MB-${year}-4413`,
-      `SN-MB-${year}-4414`,
-      `SN-MB-${year}-4415`
-    ];
-  }
-  if (c.includes('RAM')) {
-    return [
-      `SN-RAM-${year}-9021`,
-      `SN-RAM-${year}-9022`,
-      `SN-RAM-${year}-9023`,
-      `SN-RAM-${year}-9024`
-    ];
-  }
-  if (c.includes('VGA') || c.includes('CARD') || c.includes('GPU')) {
-    return [
-      `SN-VGA-${year}-1102`,
-      `SN-VGA-${year}-1103`,
-      `SN-VGA-${year}-1104`,
-      `SN-VGA-${year}-1105`
-    ];
-  }
-  if (c.includes('PSU') || c.includes('NGUỒN')) {
-    return [
-      `SN-PSU-${year}-7712`,
-      `SN-PSU-${year}-7713`,
-      `SN-PSU-${year}-7714`,
-      `SN-PSU-${year}-7715`
-    ];
-  }
-  if (c.includes('STORAGE') || c.includes('SSD') || c.includes('HDD')) {
-    return [
-      `SN-SSD-${year}-5519`,
-      `SN-SSD-${year}-5520`,
-      `SN-SSD-${year}-5521`,
-      `SN-SSD-${year}-5522`
-    ];
-  }
-  if (c.includes('CASE') || c.includes('THÙNG')) {
-    return [
-      `SN-CASE-${year}-3318`,
-      `SN-CASE-${year}-3319`,
-      `SN-CASE-${year}-3320`
-    ];
-  }
-  if (c.includes('COOLER') || c.includes('QUẠT') || c.includes('TẢN')) {
-    return [
-      `SN-FAN-${year}-6612`,
-      `SN-FAN-${year}-6613`,
-      `SN-FAN-${year}-6614`
-    ];
-  }
-  return [
-    `SN-${c}-${year}-101`,
-    `SN-${c}-${year}-102`,
-    `SN-${c}-${year}-103`
-  ];
+// Serial thật để gán cho từng linh kiện: lệnh gắn đơn hàng dùng đúng serial đã xuất kho cho
+// đơn (máy chủ trả kèm job.orderSerials theo productId). Trước đây danh sách này là serial
+// dựng sẵn "SN-CPU-2026-0811" không hề tồn tại trong kho.
+const getSerialOptionsForComponent = (job, comp) => {
+  const pool = (job?.orderSerials || {})[comp?.productId] || [];
+  const qty = Math.max(1, parseInt(comp?.quantity, 10) || 1);
+  if (pool.length === 0) return [];
+  if (qty === 1) return pool;
+  // Nhiều đơn vị cùng sản phẩm (VD 2 thanh RAM): gán trọn bộ serial của các đơn vị đó
+  const groups = [];
+  for (let i = 0; i + qty <= pool.length; i += qty) groups.push(pool.slice(i, i + qty).join(', '));
+  return groups;
 };
 
 const formatCurrency = (amount) => {
@@ -114,7 +55,6 @@ export default function Assembly() {
   const updateAssemblyJob = useUtilityStore(state => state.updateAssemblyJob);
   const createAssemblyJob = useUtilityStore(state => state.createAssemblyJob);
   const inventory = useInventoryStore(state => state.inventory) || [];
-  const serialNumbers = [];
   const orders = useSalesStore(state => state.orders) || [];
   const { user, isCEO, isAdmin } = useAuth();
   const jobs = assemblyJobs || [];
@@ -242,12 +182,17 @@ export default function Assembly() {
   const handleAutoAssignAllSerials = (job) => {
     if (!job) return;
     const autoSerials = {};
+    const missing = [];
     (job.components || []).forEach(comp => {
-      const available = getAvailableSerialsForCategory(comp.category);
-      autoSerials[comp.category] = available[0] || `SN-${comp.category}-2026-001`;
+      const available = getSerialOptionsForComponent(job, comp);
+      if (available[0]) autoSerials[comp.category] = available[0];
+      else if (!job.componentSerials?.[comp.category]) missing.push(comp.category);
     });
-    updateAssemblyJob(job.id, job.status, job.checklist, autoSerials)
-      .then(() => notify('Đã tự động gán mã Serial Number (S/N) tạm cho tất cả linh kiện — có thể sửa lại thủ công.', 'success'))
+    if (missing.length) {
+      notify(`Không tìm thấy serial xuất kho cho: ${missing.join(', ')} — nhập tay serial in trên linh kiện.`, 'error');
+    }
+    updateAssemblyJob(job.id, job.status, job.checklist, { ...(job.componentSerials || {}), ...autoSerials })
+      .then(() => notify('Đã gán Serial Number thật (đã xuất kho cho đơn) cho các linh kiện.', 'success'))
       .catch(err => notify(err.message || 'Không thể gán Serial Number.', 'error'));
   };
 
@@ -295,12 +240,13 @@ export default function Assembly() {
   const [creatingJob, setCreatingJob] = useState(false);
   const handleCreateJob = async (e) => {
     e.preventDefault();
-    if (!newJobCustomer.trim()) {
+    if (!newJobCustomer.trim() && !newJobOrderId.trim()) {
       notify('Vui lòng nhập tên khách hàng hoặc mục đích lệnh lắp ráp.', 'error');
       return;
     }
     const validComponents = newJobComponents.filter(c => c.name && c.name.trim());
-    if (validComponents.length === 0) {
+    // Lệnh gắn mã đơn: để trống linh kiện thì máy chủ lấy đúng linh kiện của đơn hàng
+    if (validComponents.length === 0 && !newJobOrderId.trim()) {
       notify('Vui lòng điền ít nhất 1 linh kiện cần lắp ráp.', 'error');
       return;
     }
@@ -309,7 +255,7 @@ export default function Assembly() {
     setCreatingJob(true);
     try {
       const newJob = await createAssemblyJob({
-        orderId: newJobOrderId || null,
+        orderId: newJobOrderId.trim() || null,
         customerName: newJobCustomer,
         components: validComponents
       });
@@ -800,7 +746,12 @@ export default function Assembly() {
                     <tbody>
                       {(activeJob.components || []).map((comp, idx) => {
                         const assignedSN = activeJob.componentSerials?.[comp.category] || '';
-                        const availableSerials = getAvailableSerialsForCategory(comp.category);
+                        const availableSerials = getSerialOptionsForComponent(activeJob, comp);
+                        const saveSerial = (value) => {
+                          const nextSerials = { ...(activeJob.componentSerials || {}), [comp.category]: value };
+                          updateAssemblyJob(activeJob.id, activeJob.status, activeJob.checklist, nextSerials)
+                            .catch(err => notify(err.message || 'Không thể lưu Serial Number.', 'error'));
+                        };
 
                         return (
                           <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
@@ -811,13 +762,18 @@ export default function Assembly() {
                               {comp.name || 'Chưa chỉ định'}
                             </td>
                             <td style={{ padding: '0.6rem 0.85rem', verticalAlign: 'top' }}>
+                              {availableSerials.length === 0 ? (
+                                <input
+                                  type="text"
+                                  defaultValue={assignedSN}
+                                  placeholder="Nhập / quét S/N trên linh kiện"
+                                  onBlur={(e) => { const v = e.target.value.trim(); if (v !== assignedSN) saveSerial(v); }}
+                                  style={{ width: '100%', height: '32px', padding: '0 0.5rem', fontSize: '0.78rem', border: '1px solid #cbd5e1', borderRadius: '4px', boxSizing: 'border-box' }}
+                                />
+                              ) : (
                               <select
                                 value={assignedSN}
-                                onChange={(e) => {
-                                  const nextSerials = { ...(activeJob.componentSerials || {}), [comp.category]: e.target.value };
-                                  updateAssemblyJob(activeJob.id, activeJob.status, activeJob.checklist, nextSerials)
-                                    .catch(err => notify(err.message || 'Không thể lưu Serial Number.', 'error'));
-                                }}
+                                onChange={(e) => saveSerial(e.target.value)}
                                 style={{
                                   width: '100%',
                                   height: '32px',
@@ -835,10 +791,11 @@ export default function Assembly() {
                                 <option value="">-- Chọn mã Serial S/N --</option>
                                 {availableSerials.map((snVal, sIdx) => (
                                   <option key={sIdx} value={snVal}>
-                                    {snVal} (Kho sẵn sàng)
+                                    {snVal} (đã xuất kho cho đơn)
                                   </option>
                                 ))}
                               </select>
+                              )}
                             </td>
                           </tr>
                         );
@@ -1109,7 +1066,7 @@ export default function Assembly() {
                   </label>
                   <input
                     type="text"
-                    placeholder="ORD-xxxxxx (hoặc để trống)..."
+                    placeholder="ORD-xxxxxx — để trống linh kiện bên dưới sẽ tự lấy theo đơn"
                     value={newJobOrderId}
                     onChange={(e) => setNewJobOrderId(e.target.value)}
                     style={{ width: '100%', height: '36px', padding: '0 0.75rem', fontSize: '0.82rem', border: '1px solid #e3e8ef', borderRadius: '6px', boxSizing: 'border-box' }}
@@ -1122,7 +1079,7 @@ export default function Assembly() {
                   </label>
                   <input
                     type="text"
-                    required
+                    required={!newJobOrderId.trim()}
                     placeholder="Tên khách hàng / PC Trưng bày..."
                     value={newJobCustomer}
                     onChange={(e) => setNewJobCustomer(e.target.value)}

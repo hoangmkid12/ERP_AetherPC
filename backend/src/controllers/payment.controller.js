@@ -191,7 +191,7 @@ const sepayWebhook = async (req, res, next) => {
         `Đã thanh toán ${fmt(total)} qua SePay${ref}${amount > total ? ` (khách chuyển dư ${fmt(amount - total)}, cần hoàn lại)` : ''}.`);
       const approved = wasWaiting ? await approveOrderIfReady(db, orderId, { noteSuffix: ' (đã thanh toán chuyển khoản)' }) : null;
       return { orderId, outcome, status: approved?.status || (wasWaiting ? 'PENDING' : order.status) };
-    });
+    }, { maxWait: 10000, timeout: 30000 });
 
     console.log(`[SePay] Giao dịch ${sepayId}: ${fmt(amount)} → đơn ${result.orderId} (${result.outcome})`);
 

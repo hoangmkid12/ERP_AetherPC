@@ -3,6 +3,16 @@ const { logAudit } = require('../utils/auditLog');
 
 const VALID_TYPES = ['INCOME', 'EXPENSE', 'EXPENSE_PROJECTED', 'SHIPPING', 'REFUND'];
 
+// Bút toán do nghiệp vụ tự sinh (giá vốn khi xuất kho, thu tiền POS/SePay/COD, chi trả NCC,
+// chi lương, hoàn tiền khách). Đây là chứng từ gắn với giao dịch thật — sửa/xoá tay làm Sổ
+// Cái lệch với đơn hàng/hoá đơn/bảng lương. Sai sót xử lý bằng bút toán điều chỉnh.
+const SYSTEM_REF = /^(COGS|VENDORBILL|COD-SETTLE|SEPAY|POS|PAYROLL|RF)-/;
+const isSystemEntry = (entry) => !!entry?.referenceId && (SYSTEM_REF.test(entry.referenceId) || entry.type === 'REFUND');
+const systemEntryError = () => Object.assign(
+  new Error('Bút toán do hệ thống tự ghi nhận từ nghiệp vụ (đơn hàng, hoá đơn NCC, bảng lương...) — không được sửa/xoá. Hãy lập bút toán điều chỉnh nếu cần.'),
+  { statusCode: 409 }
+);
+
 // GET /api/v1/ledger
 const getLedger = async (req, res, next) => {
   try {
@@ -34,6 +44,11 @@ const createLedgerEntry = async (req, res, next) => {
     const parsedAmount = parseFloat(amount);
     if (!(parsedAmount > 0)) {
       const error = new Error('Số tiền bút toán phải lớn hơn 0.');
+      error.statusCode = 400;
+      throw error;
+    }
+    if (referenceId && SYSTEM_REF.test(String(referenceId))) {
+      const error = new Error('Mã tham chiếu này dành cho bút toán hệ thống tự sinh — vui lòng dùng mã khác.');
       error.statusCode = 400;
       throw error;
     }
@@ -98,6 +113,7 @@ const updateLedgerEntry = async (req, res, next) => {
       error.statusCode = 404;
       throw error;
     }
+    if (isSystemEntry(existing)) throw systemEntryError();
 
     if (type && !VALID_TYPES.includes(String(type).toUpperCase())) {
       const error = new Error(`Loại bút toán không hợp lệ: ${type}.`);
@@ -136,7 +152,9 @@ const deleteLedgerEntry = async (req, res, next) => {
       error.statusCode = 404;
       throw error;
     }
+    if (isSystemEntry(existing)) throw systemEntryError();
     await prisma.ledgerEntry.delete({ where: { id } });
+    logAudit({ req, action: 'DELETE_LEDGER_ENTRY', module: 'Kế Toán', targetId: id, note: `${existing.type} ${existing.amount}đ — ${existing.description}` });
     res.json({ success: true, message: 'Đã xóa bút toán.' });
   } catch (err) {
     next(err);

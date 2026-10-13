@@ -1,51 +1,22 @@
 const prisma = require('../config/database');
 const { sendOrderConfirmationEmail, sendOrderStatusUpdateEmail } = require('../services/emailService');
-const { claimAvailableSerials } = require('../utils/serialAllocation');
-const { deductInventory, restockInventory } = require('../services/stockSync');
 const { hasOperationalPermission } = require('../middlewares/rbac.middleware');
 const { ORDER_STATUS_VI, labelOf } = require('../constants/statusLabels');
 const { bundlePercent, bundlePrice, groupOfSlug } = require('../services/bundleDeals');
 const { resolvePromotion } = require('../services/promotion');
+const {
+  LOYALTY_VND_PER_POINT,
+  adjustLoyaltyForOrder,
+  isStockOut,
+  deductOrderStock,
+  returnOrderStock
+} = require('../services/orderFulfillment');
 
-const LOYALTY_VND_PER_POINT = 10000; // 10.000 VNĐ = 1 điểm
 const VAT_RATE = 0.1; // Thuế GTGT — giá niêm yết đã gồm thuế, chỉ tách ra để ghi nhận
 
-const tierForPoints = (points) => {
-  if (points >= 10000) return 'PLATINUM';
-  if (points >= 5000) return 'GOLD';
-  if (points >= 1000) return 'SILVER';
-  return 'BRONZE';
-};
+// Nhóm linh kiện trên phiếu lắp ráp (CPU/MAINBOARD/RAM/VGA/...) — cùng bảng nhóm với ưu đãi mua kèm
+const assemblyCategoryOf = (slug) => groupOfSlug(slug) || 'OTHER';
 
-/**
- * Cộng ('add') hoặc trừ ('subtract') điểm thành viên tương ứng với giá trị
- * đơn hàng, và tự động điều chỉnh hạng thành viên theo tổng điểm mới. Dùng
- * chung cho mọi nơi đơn hàng thực sự được xác nhận (CONFIRMED) hoặc bị huỷ
- * sau khi đã xác nhận, để điểm/tier luôn khớp với trạng thái đơn hàng thật.
- */
-const adjustLoyaltyForOrder = async (tx, customerId, totalAmount, direction) => {
-  if (!customerId || customerId === 'WALK-IN') return;
-  const points = Math.floor(parseFloat(totalAmount || 0) / LOYALTY_VND_PER_POINT);
-  if (points === 0) return;
-  const delta = direction === 'add' ? points : -points;
-
-  let updatedCustomer = await tx.customer.update({
-    where: { customerId },
-    data: { loyaltyPoints: { increment: delta } }
-  });
-
-  if (updatedCustomer.loyaltyPoints < 0) {
-    updatedCustomer = await tx.customer.update({
-      where: { customerId },
-      data: { loyaltyPoints: 0 }
-    });
-  }
-
-  const nextTier = tierForPoints(updatedCustomer.loyaltyPoints);
-  if (nextTier !== updatedCustomer.tier) {
-    await tx.customer.update({ where: { customerId }, data: { tier: nextTier } });
-  }
-};
 
 /**
  * 1. KHÁCH HÀNG TẠO ĐƠN HÀNG MỚI (Storefront Checkout - M_KHDH)
@@ -72,18 +43,43 @@ const createOrder = async (req, res, next) => {
     // đặt ở storefront.
     const soldById = Number.isInteger(req.posEmployeeId) ? req.posEmployeeId : null;
     const posEmployeeRole = req.posEmployeeRole || null;
-    const { items, paymentMethod, shippingAddress, shippingCity, notes } = req.body;
+    const { items, shippingAddress, shippingCity, notes } = req.body;
+    const isPos = !!posEmployeeRole;
+    // Bán tại quầy: khách nhận hàng và trả tiền ngay tại cửa hàng (tiền mặt / chuyển khoản
+    // QR nhân viên đã thấy tiền về / quẹt thẻ) — đơn hoàn tất ngay, không qua kho xuất &
+    // giao hàng. Trước đây frontend gửi mọi phương thức POS lên là "COD", đơn nằm ở
+    // CONFIRMED và hiện nhầm trong hàng chờ xuất kho/giao hàng như một đơn online.
+    const POS_METHODS = { CASH: 'CASH', COD: 'CASH', BANK: 'BANK_TRANSFER', BANK_TRANSFER: 'BANK_TRANSFER', CARD: 'CARD' };
+    const paymentMethod = isPos
+      ? (POS_METHODS[String(req.body.posPaymentMethod || req.body.paymentMethod || 'CASH').toUpperCase()] || 'CASH')
+      : (['COD', 'BANK_TRANSFER'].includes(req.body.paymentMethod) ? req.body.paymentMethod : 'COD');
     // Khách tự đặt ở storefront không được tự khai "đã chuyển khoản" — đơn chuyển khoản chỉ được
     // xác nhận thanh toán khi webhook SePay báo tiền đã vào tài khoản (payment.controller.js).
-    // Cờ isPaid chỉ có hiệu lực với đơn POS, nơi nhân viên đã thu tiền tại quầy.
-    const isPaidAtCounter = !!posEmployeeRole && req.body.isPaid === true;
+    const isPaidAtCounter = isPos;
 
     if (!items || items.length === 0) {
       return res.status(400).json({ success: false, message: 'Giỏ hàng không được để trống' });
     }
 
+    // POS: gắn đơn vào hồ sơ khách theo số điện thoại (tạo mới nếu chưa có) để có lịch sử
+    // mua, tích điểm và tra cứu bảo hành — trước đây tên/SĐT nhập ở quầy bị bỏ, mọi đơn
+    // POS dồn vào khách chung "WALK-IN".
+    let effectiveCustomerId = customerId;
+    if (isPos) {
+      const phone = String(req.body.phone || '').replace(/\D/g, '');
+      if (/^0\d{9,10}$/.test(phone)) {
+        const name = String(req.body.customerName || '').trim() || 'Khách mua tại quầy';
+        const found = await prisma.customer.findUnique({ where: { phone } })
+          || await prisma.customer.create({
+            data: { customerId: `CUS-POS-${phone}`, email: `pos-${phone}@aetherpc.local`, name, phone, customerType: 'B2C', tier: 'BRONZE' }
+          }).catch(() => prisma.customer.findUnique({ where: { phone } }));
+        if (found?.customerId) effectiveCustomerId = found.customerId;
+      }
+    }
+
     // Thực hiện giao dịch cơ sở dữ liệu (Database Transaction)
     const order = await withOrderIdRetry(() => prisma.$transaction(async (tx) => {
+      const customerId = effectiveCustomerId;
       let subtotal = 0;
       let discount = 0;
       const orderItemsData = [];
@@ -155,7 +151,7 @@ const createOrder = async (req, res, next) => {
         const randSuffix = Math.floor(Math.random() * 1000);
         if (bundleNote) bundleNotes.push(`${prod.name}: ${bundleNote}`);
         orderItemsData.push({
-          orderItemId: `ORI-${Date.now()}-${randSuffix}`,
+          orderItemId: `ORI-${Date.now()}-${orderItemsData.length}-${randSuffix}`,
           productId: prod.productId,
           sku: prod.sku,
           name: prod.name,
@@ -214,35 +210,43 @@ const createOrder = async (req, res, next) => {
       const totalAmount = discountedSubtotal + shippingFee;
       const vatAmount = totalAmount - Math.round(totalAmount / (1 + VAT_RATE));
 
-      // Sinh mã đơn hàng dạng ORD-YYMMDD-XXXX
+      // Mã đơn luôn do máy chủ sinh — không nhận mã từ trình duyệt (khách có thể tự đặt
+      // mã trùng/giả mạo dạng ORD-EXC-..., và POS từng gửi mã tạm POS-xxxxxx).
       const dateStr = new Date().toISOString().slice(2, 10).replace(/-/g, '');
       const randCode = Math.floor(1000 + Math.random() * 9000);
-      const ordCode = req.body.orderId || `ORD-${dateStr}-${randCode}`;
+      const ordCode = `ORD-${dateStr}-${randCode}`;
 
-      // Xác định trạng thái ban đầu dựa vào phương thức thanh toán & tồn kho
-      let initialStatus = 'PENDING';
-      if (['BANK_TRANSFER', 'ONLINE_GATEWAY'].includes(paymentMethod) && !isPaidAtCounter) {
+      // Xác định trạng thái ban đầu dựa vào kênh bán, phương thức thanh toán & tồn kho
+      let initialStatus;
+      if (isPos) {
+        // Không giao được hàng không có trên kệ — POS phải đủ tồn ngay lúc bán.
+        if (hasShortage) {
+          const error = new Error(`Không đủ tồn kho để bán tại quầy: ${shortageItems.join(', ')}.`);
+          error.statusCode = 409;
+          throw error;
+        }
+        initialStatus = 'COMPLETED';
+      } else if (paymentMethod === 'BANK_TRANSFER') {
         initialStatus = 'WAITING_PAYMENT';
       } else if (hasShortage) {
         initialStatus = 'AWAITING_STOCK';
-      } else if (req.body.type === 'POS' || customerId === 'WALK-IN') {
-        initialStatus = 'CONFIRMED';
       } else {
         initialStatus = 'PENDING';
       }
 
-      // Trạng thái thanh toán ban đầu: KHÔNG được suy ra từ initialStatus.
-      // COD (paymentMethod = CASH) đặt qua storefront chỉ thực sự được thanh
-      // toán khi Shipper giao hàng thành công (xem updateOrderStatus, đơn
-      // DELIVERED mới set PAID) — nếu set PAID ngay lúc tạo đơn thì màn hình
-      // "Đang Giao" của Shipper sẽ hiển thị nhầm COD thành "Đã trả online".
-      // Bán tại quầy (POS, khách WALK-IN) thì tiền đã thu ngay nên coi là PAID.
-      const initialPaymentStatus = customerId === 'WALK-IN'
-        || (['BANK_TRANSFER', 'ONLINE_GATEWAY'].includes(paymentMethod) && isPaidAtCounter)
-        ? 'PAID'
-        : 'PENDING';
+      // COD đặt online chỉ thực sự được thanh toán khi Shipper giao thành công
+      // (updateOrderStatus → DELIVERED); chuyển khoản online chờ webhook SePay.
+      // Bán tại quầy thì tiền đã thu ngay.
+      const initialPaymentStatus = isPaidAtCounter ? 'PAID' : 'PENDING';
 
-      // Tạo đơn hàng trên DB
+      // Đơn Build PC (giỏ hàng gắn cờ pc_build_bundle từ công cụ Build PC) cần Kỹ thuật lắp
+      // ráp & test trước khi giao — ghi nhận ngay vào ghi chú đơn để mọi bộ phận đều thấy.
+      const buildItems = isPos ? [] : orderItemsData.filter((oi, idx) => {
+        const src = items[idx] || {};
+        return src.selectedSpec?.pc_build_bundle || src.pcBuild === true || src.assemble === true;
+      });
+      const needsAssembly = buildItems.length >= 2;
+
       const newOrder = await tx.order.create({
         data: {
           orderId: ordCode,
@@ -254,108 +258,89 @@ const createOrder = async (req, res, next) => {
           totalAmount,
           paymentMethod,
           paymentStatus: initialPaymentStatus,
-          shippingAddress: shippingAddress || 'Chưa cung cấp',
+          shippingAddress: isPos ? 'Nhận tại cửa hàng (POS)' : (shippingAddress || 'Chưa cung cấp'),
           shippingCity: shippingCity || 'TP. Hồ Chí Minh',
-          notes: [notes, bundleNotes.length ? `Ưu đãi mua kèm: ${bundleNotes.join('; ')}` : null, promoNote].filter(Boolean).join(' | ') || null,
+          notes: [
+            needsAssembly ? '[LẮP RÁP PC] Đơn Build PC — kỹ thuật lắp ráp & test trước khi giao' : null,
+            notes,
+            bundleNotes.length ? `Ưu đãi mua kèm: ${bundleNotes.join('; ')}` : null,
+            promoNote
+          ].filter(Boolean).join(' | ') || null,
           status: initialStatus,
           soldById,
-          items: {
-            create: orderItemsData
-          }
+          ...(initialStatus === 'COMPLETED' ? { confirmedAt: new Date(), deliveredAt: new Date(), actualPaymentMethod: paymentMethod, receivedByType: 'DIRECT_CUSTOMER' } : {}),
+          items: { create: orderItemsData }
         },
-        include: {
-          items: { include: { product: true } }
-        }
+        include: { items: { include: { product: true } } }
       });
 
-      // Nếu đơn đủ hàng & được tự động duyệt CONFIRMED -> Trừ tồn kho & ghi log xuất kho
-      if (initialStatus === 'CONFIRMED') {
-        let totalCogs = 0;
-        for (const cartItem of items) {
-          const itemProdId = String(cartItem.productId);
-          const qty = parseInt(cartItem.quantity);
-
-          const productBeforeUpdate = await tx.product.findUnique({
-            where: { productId: itemProdId },
-            select: { averageCost: true }
-          });
-
-          // 1. Trừ số lượng sản phẩm (Product stockQuantity)
-          // Atomic conditional decrement prevents two concurrent checkouts
-          // from selling the same stock.
-          const productUpdate = await tx.product.updateMany({
-            where: { productId: itemProdId, available: true, stockQuantity: { gte: qty } },
-            data: { stockQuantity: { decrement: qty } }
-          });
-          if (productUpdate.count !== 1) {
-            const error = new Error(`Tồn kho vừa thay đổi cho sản phẩm ${itemProdId}`);
-            error.statusCode = 409;
-            throw error;
-          }
-
-          // 1b. Bắt buộc gán Serial Number cho từng đơn vị xuất kho.
-          await claimAvailableSerials(tx, itemProdId, qty, ordCode);
-
-          const unitCost = Number(productBeforeUpdate?.averageCost || 0);
-          totalCogs += unitCost * qty;
-          // Chụp giá vốn lúc xuất kho vào chi tiết đơn (báo cáo lợi nhuận theo sản phẩm/đơn)
-          await tx.orderItem.updateMany({ where: { orderId: ordCode, productId: itemProdId }, data: { unitCost } });
-
-          // 2. Trừ tồn kho vật lý (ưu tiên Kho 1, thiếu thì lấy tiếp ở kho khác) + nhật ký OUT
-          await deductInventory(tx, itemProdId, qty, { referenceId: ordCode, note: `Xuất kho tự động cho Đơn Hàng ${ordCode}` });
-        }
-
-        // Giá vốn hàng bán (COGS) thực tế theo giá bình quân gia quyền — ghi Sổ
-        // Cái để P&L đối chiếu đúng doanh thu với giá vốn thật của đơn này.
-        if (totalCogs > 0) {
+      // Bán tại quầy: xuất kho ngay + ghi nhận phiếu thu (OrderPayment đã đối soát và bút
+      // toán thu tiền trên Sổ Cái) — trước đây đơn POS PAID nhưng không có bất kỳ chứng từ
+      // thu tiền nào, tiền mặt trong két không hề lên sổ.
+      if (initialStatus === 'COMPLETED') {
+        await deductOrderStock(tx, newOrder, { note: `Xuất kho bán tại quầy — Đơn ${ordCode}` });
+        const cashier = req.posEmployeeName || 'Thu ngân';
+        const payRef = `POS-${ordCode}`;
+        await tx.orderPayment.create({
+          data: { orderId: ordCode, method: paymentMethod, amount: totalAmount, transactionId: req.body.bankRefCode || payRef, status: 'SUCCESS', settledAt: new Date(), settledBy: cashier }
+        });
+        if (totalAmount > 0) {
           await tx.ledgerEntry.create({
             data: {
-              type: 'EXPENSE',
-              amount: totalCogs,
-              description: `Giá vốn hàng bán (COGS) — Đơn Hàng ${ordCode}`,
-              referenceId: `COGS-${ordCode}`
+              type: 'INCOME',
+              amount: totalAmount,
+              channel: paymentMethod === 'CASH' ? 'CASH' : 'BANK',
+              description: `Thu tiền bán lẻ tại quầy — Đơn ${ordCode} (${paymentMethod === 'CASH' ? 'Tiền mặt' : paymentMethod === 'CARD' ? 'Thẻ' : 'Chuyển khoản'}, thu ngân ${cashier})`,
+              referenceId: payRef
             }
           });
         }
-      }
-
-      // Tích lũy điểm thành viên (10.000 VNĐ = 1 điểm) — chỉ khi đơn được
-      // xác nhận ngay lúc tạo; đơn PENDING/AWAITING_STOCK sẽ được cộng điểm
-      // sau, khi thực sự chuyển sang CONFIRMED (xem updateOrderStatus).
-      const pointsEarned = initialStatus === 'CONFIRMED'
-        ? Math.floor(parseFloat(totalAmount) / LOYALTY_VND_PER_POINT)
-        : 0;
-      if (initialStatus === 'CONFIRMED') {
         await adjustLoyaltyForOrder(tx, customerId, totalAmount, 'add');
       }
 
-      // Ghi nhật ký lịch sử trạng thái đơn hàng (OrderStatusHistory) bằng Tiếng Việt
-      let historyNote = '';
-      if (initialStatus === 'WAITING_PAYMENT') {
-        historyNote = 'Đơn hàng vừa được khởi tạo, đang chờ khách hàng hoàn tất thanh toán chuyển khoản/online.';
-      } else if (initialStatus === 'AWAITING_STOCK') {
-        historyNote = `Hệ thống tạm giữ đơn hàng (Chờ nhập hàng: Thiếu tồn kho cho sản phẩm: ${shortageItems.join(', ')}).`;
-      } else if (initialStatus === 'CONFIRMED') {
-        historyNote = `Tự động duyệt thành công (Đủ tồn kho). Trừ kho tự động & tích lũy +${pointsEarned} điểm thành viên.`;
-      } else {
-        historyNote = `Đơn hàng khởi tạo thành công ở trạng thái PENDING. Tích lũy +${pointsEarned} điểm thành viên.`;
+      if (needsAssembly) {
+        await tx.assemblyJob.create({
+          data: {
+            jobCode: `ASM-${dateStr}-${Math.floor(1000 + Math.random() * 9000)}`,
+            orderId: ordCode,
+            customerName: req.body.customerName || 'Khách hàng',
+            components: (() => {
+              const seen = {};
+              return buildItems.map(oi => {
+                const base = assemblyCategoryOf(productCache.get(String(oi.productId))?.category?.slug);
+                seen[base] = (seen[base] || 0) + 1;
+                return { productId: oi.productId, category: seen[base] > 1 ? `${base} #${seen[base]}` : base, name: oi.name, quantity: oi.quantity };
+              });
+            })(),
+            status: 'PENDING',
+            createdBy: 'Hệ thống (đơn Build PC)'
+          }
+        });
       }
 
+      const pointsEarned = initialStatus === 'COMPLETED' ? Math.floor(parseFloat(totalAmount) / LOYALTY_VND_PER_POINT) : 0;
+      let historyNote;
+      if (initialStatus === 'COMPLETED') {
+        historyNote = `Bán tại quầy: đã thu ${Number(totalAmount).toLocaleString('vi-VN')}đ, xuất kho & giao hàng tận tay khách. Tích lũy +${pointsEarned} điểm thành viên.`;
+      } else if (initialStatus === 'WAITING_PAYMENT') {
+        historyNote = 'Đơn hàng vừa được khởi tạo, đang chờ khách hàng hoàn tất thanh toán chuyển khoản.';
+      } else if (initialStatus === 'AWAITING_STOCK') {
+        historyNote = `Hệ thống tạm giữ đơn hàng (Chờ nhập hàng: Thiếu tồn kho cho sản phẩm: ${shortageItems.join(', ')}).`;
+      } else {
+        historyNote = 'Đơn hàng khởi tạo thành công, chờ bộ phận bán hàng xác nhận.';
+      }
+      if (needsAssembly) historyNote += ' Đã tạo lệnh lắp ráp PC cho đơn.';
+
       await tx.orderStatusHistory.create({
-        data: {
-          orderId: ordCode,
-          status: initialStatus,
-          note: historyNote,
-          changedBy: 'Hệ thống'
-        }
+        data: { orderId: ordCode, status: initialStatus, note: historyNote, changedBy: isPos ? (req.posEmployeeName || 'Thu ngân') : 'Hệ thống' }
       });
 
       return newOrder;
-    }), req.body.orderId);
+    }, { maxWait: 10000, timeout: 30000 }));
 
     // Gửi email xác nhận đơn hàng cho khách hàng (đơn thanh toán online chỉ gửi khi thanh toán thành công)
-    const customer = await prisma.customer.findUnique({ where: { customerId: req.user.id } });
-    if (customer?.email && order.status !== 'WAITING_PAYMENT') {
+    const customer = await prisma.customer.findUnique({ where: { customerId: order.customerId } });
+    if (customer?.email && !customer.email.endsWith('@aetherpc.local') && order.status !== 'WAITING_PAYMENT') {
       sendOrderConfirmationEmail({
         toEmail: customer.email,
         customerName: customer.name,
@@ -403,6 +388,7 @@ const createPosOrder = async (req, res, next) => {
     // — dùng để kiểm tra quyền sales_approve_discount ở createOrder bên dưới
     // (không thể dùng req.user.role sau dòng kế tiếp vì lúc đó đã là CUSTOMER).
     req.posEmployeeRole = req.user?.role || null;
+    req.posEmployeeName = req.user?.name || req.user?.fullname || req.user?.email || null;
     req.user = { ...req.user, id: 'WALK-IN', role: 'CUSTOMER' };
     return createOrder(req, res, next);
   } catch (err) {
@@ -485,56 +471,20 @@ const cancelSingleOrderInternal = async (orderId, reason = 'Khách hàng yêu c�
       return existingOrder;
     }
 
-    // Xử lý hoàn kho nếu đơn này trước đó đã từng trừ kho
-    const existingOutMovement = await tx.stockMovement.findFirst({
-      where: {
-        referenceId: orderId,
-        type: 'OUT'
-      }
-    });
-
-    const existingInMovement = await tx.stockMovement.findFirst({
-      where: {
-        referenceId: orderId,
-        type: 'IN',
-        note: {
-          contains: 'Hoàn kho'
-        }
-      }
-    });
-
-    if (existingOutMovement && !existingInMovement) {
+    // Hoàn kho nếu đơn đã từng xuất kho (idempotent — xem services/orderFulfillment.js)
+    if (await returnOrderStock(tx, existingOrder, { note: `Hoàn kho tự động cho Đơn Hàng ${orderId} (Đã Hủy)` })) {
       await adjustLoyaltyForOrder(tx, existingOrder.customerId, existingOrder.totalAmount, 'subtract');
-
-      for (const item of existingOrder.items) {
-        await tx.product.update({
-          where: { productId: item.productId },
-          data: {
-            stockQuantity: {
-              increment: item.quantity
-            }
-          }
-        });
-
-        await restockInventory(tx, item.productId, item.quantity, {
-          referenceId: orderId,
-          note: `Hoàn kho tự động cho Đơn Hàng ${orderId} (Đã Hủy)`
-        });
-      }
-
-      await tx.serialNumber.updateMany({
-        where: { orderId, status: 'USED' },
-        data: { status: 'AVAILABLE', orderId: null }
-      });
-
-      await tx.ledgerEntry.deleteMany({ where: { referenceId: `COGS-${orderId}` } });
-      await tx.orderItem.updateMany({ where: { orderId: orderId }, data: { unitCost: null } });
     }
+    await tx.assemblyJob.updateMany({
+      where: { orderId, status: { in: ['PENDING', 'ASSEMBLING'] } },
+      data: { status: 'CANCELLED' }
+    });
 
     const updated = await tx.order.update({
       where: { orderId },
       data: {
         status: 'CANCELLED',
+        cancelledAt: new Date(),
         notes: existingOrder.notes ? `${existingOrder.notes} | Lý do hủy: ${reason}` : `Lý do hủy: ${reason}`
       }
     });
@@ -550,7 +500,7 @@ const cancelSingleOrderInternal = async (orderId, reason = 'Khách hàng yêu c�
     });
 
     return updated;
-  });
+  }, { maxWait: 10000, timeout: 30000 });
 };
 
 const autoCancelUnpaidOrders = async () => {
@@ -671,12 +621,20 @@ const confirmReceivedOrder = async (req, res, next) => {
         message: 'Chỉ có thể xác nhận đã nhận hàng khi đơn đang giao hoặc đã giao.'
       });
     }
+    // Đơn COD còn đang giao: tiền chưa được shipper thu/ghi nhận (OrderPayment tạo ở bước
+    // shipper xác nhận "Đã giao"). Nếu cho khách tự đóng đơn ở đây thì đơn thành PAID mà
+    // không có khoản thu nào → tiền COD không bao giờ được đối soát với shipper.
+    if (order.status === 'SHIPPED' && order.paymentStatus !== 'PAID') {
+      return res.status(409).json({
+        success: false,
+        message: 'Đơn thanh toán khi nhận hàng — vui lòng chờ nhân viên giao hàng xác nhận đã giao và thu tiền.'
+      });
+    }
 
     const updated = await prisma.order.update({
       where: { orderId: id },
       data: {
         status: 'COMPLETED',
-        paymentStatus: 'PAID',
         deliveredAt: order.deliveredAt || new Date()
       }
     });
@@ -846,12 +804,18 @@ const ORDER_TRANSITIONS = {
   PROCESSING: ['CONFIRMED', 'PACKED', 'READY_TO_SHIP', 'CANCELLED'],
   PACKED: ['PROCESSING', 'READY_TO_SHIP', 'CANCELLED'],
   READY_TO_SHIP: ['PACKED', 'SHIPPED', 'CANCELLED'],
+  // Giao thất bại: kiện hàng vẫn đang ở chỗ shipper — chỉ được giao lại hoặc chuyển hoàn
+  // về kho; đơn chỉ được đóng (CANCELLED, hoàn tồn) khi QC/Kho đã nhận lại kiện hàng.
   SHIPPED: ['DELIVERED', 'SHIPPING_FAILED', 'FAILED_DELIVERY', 'RETURNING_TO_WAREHOUSE'],
-  SHIPPING_FAILED: ['SHIPPED', 'FAILED_DELIVERY', 'RETURNING_TO_WAREHOUSE', 'CANCELLED'],
-  FAILED_DELIVERY: ['SHIPPED', 'RETURNING_TO_WAREHOUSE', 'CANCELLED'],
-  RETURNING_TO_WAREHOUSE: ['RETURNED', 'CANCELLED'],
-  DELIVERED: ['COMPLETED', 'RETURNING_TO_WAREHOUSE'],
+  SHIPPING_FAILED: ['SHIPPED', 'FAILED_DELIVERY', 'RETURNING_TO_WAREHOUSE'],
+  FAILED_DELIVERY: ['SHIPPED', 'RETURNING_TO_WAREHOUSE'],
+  RETURNING_TO_WAREHOUSE: ['CANCELLED'],
+  // Khách trả hàng sau khi đã nhận đi qua luồng đổi trả (POST /orders/:id/return), không
+  // đổi thẳng trạng thái ở đây.
+  DELIVERED: ['COMPLETED'],
 };
+// Đóng đơn kiện hoàn về kho là quyết định của QC/Kho (đã kiểm kiện), không phải "huỷ đơn" bán hàng
+const RETURN_RECEIVER_ROLES = ['QC', 'QA', 'QUALITY_CONTROL', 'WAREHOUSE', 'WAREHOUSE_MANAGER', 'CEO', 'ADMIN'];
 const SHIPPER_TARGETS = ['SHIPPED', 'DELIVERED', 'SHIPPING_FAILED', 'FAILED_DELIVERY', 'RETURNING_TO_WAREHOUSE', 'READY_TO_SHIP'];
 
 // Trả về thông báo lỗi nếu vai trò không được chuyển đơn sang trạng thái đích, ngược lại null.
@@ -863,9 +827,13 @@ function orderTransitionError(order, target, user, isUnassign) {
     if (!order.assignedShipperId) return 'Đơn chưa được phân công cho nhân viên giao hàng.';
     if (!SHIPPER_TARGETS.includes(target)) return 'Nhân viên giao hàng không được đặt trạng thái này.';
   }
+  if (['QC', 'QA', 'QUALITY_CONTROL'].includes(role) && !(from === 'RETURNING_TO_WAREHOUSE' && target === 'CANCELLED')) {
+    return 'QC chỉ được xác nhận kiện hàng hoàn về kho.';
+  }
   if (target === from) return null; // gửi lại cùng trạng thái (phân công lại, cập nhật ảnh…)
   if (isUnassign) return null;
   if (['DELIVERED'].includes(target) && !['DELIVERY', 'CEO', 'ADMIN'].includes(role)) return 'Chỉ nhân viên giao hàng xác nhận được "Đã giao".';
+  if (target === 'CANCELLED' && from === 'RETURNING_TO_WAREHOUSE' && !RETURN_RECEIVER_ROLES.includes(role)) return 'Chỉ QC/Kho xác nhận kiện hoàn về kho mới được đóng đơn.';
   if (target === 'COMPLETED' && !['CSKH', 'SALES_MANAGER', 'CEO', 'ADMIN'].includes(role)) return 'Vai trò của bạn không được đóng đơn "Hoàn tất".';
   const allowed = ORDER_TRANSITIONS[from] || [];
   if (!allowed.includes(target)) {
@@ -959,7 +927,7 @@ const updateOrderStatus = async (req, res, next) => {
       // router level — only the actual cancel action is gated by the
       // admin-configurable RBAC matrix. Skip on a no-op resubmit of an
       // already-cancelled order (frontend double-submit race).
-      if (status === 'CANCELLED' && existingOrder.status !== 'CANCELLED') {
+      if (status === 'CANCELLED' && existingOrder.status !== 'CANCELLED' && existingOrder.status !== 'RETURNING_TO_WAREHOUSE') {
         const allowed = await hasOperationalPermission(req.user?.role, 'sales_cancel_order');
         if (!allowed) {
           const error = new Error('Tài khoản của bạn không có quyền hủy đơn hàng (đã bị quản trị viên tắt trong Ma Trận Phân Quyền).');
@@ -968,127 +936,65 @@ const updateOrderStatus = async (req, res, next) => {
         }
       }
 
-      // Xử lý trừ kho khi chuyển sang trạng thái đã duyệt (CONFIRMED / PACKED / PROCESSING / READY_TO_SHIP)
-      const isApprovedStatus = ['CONFIRMED', 'PACKED', 'PROCESSING', 'READY_TO_SHIP'].includes(status);
-      const isPriorPending = ['PENDING', 'AWAITING_STOCK', 'WAITING_PAYMENT'].includes(existingOrder.status);
-
-      if (isApprovedStatus && isPriorPending) {
-        const existingMovement = await tx.stockMovement.findFirst({
-          where: {
-            referenceId: id,
-            type: 'OUT'
-          }
+      // Đơn đang có yêu cầu đổi trả của khách (RMA) đi theo luồng đổi trả riêng (QC thẩm
+      // định → Kho nhập kệ → Kế toán hoàn tiền). Màn QC "hàng hoàn kho" từng liệt kê chung
+      // mọi đơn RETURNING_TO_WAREHOUSE nên có thể huỷ nhầm đơn RMA → hoàn kho + hoàn tiền
+      // lần hai khi Kho nhập kệ theo RMA.
+      if (status === 'CANCELLED' && existingOrder.status === 'RETURNING_TO_WAREHOUSE') {
+        const activeRma = await tx.returnRequest.findFirst({
+          where: { orderId: id, status: { notIn: ['REJECTED', 'QC_REJECTED', 'RETURNED_TO_CUSTOMER'] } },
+          select: { rmaCode: true }
         });
-
-        if (!existingMovement) {
-          // Đơn chuyển từ trạng thái chờ sang đã duyệt lần đầu tiên — đây là
-          // lúc đơn thực sự được "xác nhận", nên tích điểm thành viên ở đây
-          // (đơn tạo sẵn ở CONFIRMED đã được tích lúc tạo, xem createOrder).
-          await adjustLoyaltyForOrder(tx, existingOrder.customerId, existingOrder.totalAmount, 'add');
-
-          let totalCogs = 0;
-          for (const item of existingOrder.items) {
-            const productBeforeUpdate = await tx.product.findUnique({
-              where: { productId: item.productId },
-              select: { averageCost: true }
-            });
-
-            // Trừ số lượng tồn sản phẩm
-            const productUpdate = await tx.product.updateMany({
-              where: { productId: item.productId, available: true, stockQuantity: { gte: item.quantity } },
-              data: { stockQuantity: { decrement: item.quantity } }
-            });
-            if (productUpdate.count !== 1) {
-              const error = new Error(`Tồn kho không đủ cho sản phẩm ${item.productId}`);
-              error.statusCode = 409;
-              throw error;
-            }
-
-            // Bắt buộc gán Serial Number cho từng đơn vị xuất kho.
-            await claimAvailableSerials(tx, item.productId, item.quantity, id);
-
-            const unitCost = Number(productBeforeUpdate?.averageCost || 0);
-            totalCogs += unitCost * item.quantity;
-            // Chụp giá vốn lúc xuất kho vào chi tiết đơn (báo cáo lợi nhuận theo sản phẩm/đơn)
-            await tx.orderItem.update({ where: { orderItemId: item.orderItemId }, data: { unitCost } });
-
-            // Trừ tồn kho vật lý đúng bằng số đã trừ ở Product.stockQuantity (có thể lấy từ nhiều kho)
-            await deductInventory(tx, item.productId, item.quantity, { referenceId: id, note: `Xuất kho khi duyệt Đơn Hàng ${id}` });
-          }
-
-          if (totalCogs > 0) {
-            await tx.ledgerEntry.create({
-              data: {
-                type: 'EXPENSE',
-                amount: totalCogs,
-                description: `Giá vốn hàng bán (COGS) — Đơn Hàng ${id}`,
-                referenceId: `COGS-${id}`
-              }
-            });
-          }
+        if (activeRma) {
+          const error = new Error(`Đơn đang xử lý theo phiếu đổi trả ${activeRma.rmaCode || ''} — hãy thẩm định & nhập kho theo luồng Đổi Trả, không huỷ đơn.`.replace('  ', ' '));
+          error.statusCode = 409;
+          throw error;
         }
       }
 
-      // Xử lý hoàn kho khi đơn bị HỦY (CANCELLED) hoặc GIAO THẤT BẠI (FAILED_DELIVERY)
-      if (['CANCELLED', 'FAILED_DELIVERY'].includes(status)) {
-        const existingOutMovement = await tx.stockMovement.findFirst({
-          where: {
-            referenceId: id,
-            type: 'OUT'
-          }
+      // Đơn Build PC còn lệnh lắp ráp chưa nghiệm thu thì Kho chưa được đóng gói/xuất giao
+      if (['READY_TO_SHIP', 'SHIPPED'].includes(status) && status !== existingOrder.status) {
+        const openJob = await tx.assemblyJob.findFirst({
+          where: { orderId: id, status: { in: ['PENDING', 'ASSEMBLING'] } },
+          select: { jobCode: true }
         });
-
-        const existingInMovement = await tx.stockMovement.findFirst({
-          where: {
-            referenceId: id,
-            type: 'IN',
-            note: {
-              contains: 'Hoàn kho'
-            }
-          }
-        });
-
-        if (existingOutMovement && !existingInMovement) {
-          // Đơn từng được duyệt (đã trừ kho -> đã tích điểm) và giờ bị huỷ
-          // hẳn -> trừ lại điểm đã tích. Giao thất bại (FAILED_DELIVERY)
-          // không phải huỷ đơn (có thể giao lại), nên không trừ điểm ở đây.
-          if (status === 'CANCELLED') {
-            await adjustLoyaltyForOrder(tx, existingOrder.customerId, existingOrder.totalAmount, 'subtract');
-          }
-
-          for (const item of existingOrder.items) {
-            // Cộng trả số lượng tồn sản phẩm
-            await tx.product.update({
-              where: { productId: item.productId },
-              data: {
-                stockQuantity: {
-                  increment: item.quantity
-                }
-              }
-            });
-
-            // Cộng trả tồn kho vật lý tại Kho 1 (tạo dòng tồn nếu chưa có) + nhật ký IN
-            await restockInventory(tx, item.productId, item.quantity, {
-              referenceId: id,
-              note: `Hoàn kho tự động cho Đơn Hàng ${id} (${status === 'CANCELLED' ? 'Đã Hủy' : 'Giao Thất Bại'})`
-            });
-          }
-
-          // Trả lại các Serial Number đã gán cho đơn này về trạng thái khả dụng —
-          // nếu không, serial sẽ mắc kẹt ở USED mãi mãi dù hàng đã quay lại kho,
-          // khiến số serial khả dụng lệch dần so với Product.stockQuantity thật.
-          await tx.serialNumber.updateMany({
-            where: { orderId: id, status: 'USED' },
-            data: { status: 'AVAILABLE', orderId: null }
-          });
-
-          // Xóa bút toán COGS gắn với đơn này — doanh thu của đơn CANCELLED/
-          // FAILED_DELIVERY đã bị loại khỏi P&L (Accountant.jsx lọc theo
-          // Order.status), nên giá vốn tương ứng cũng phải bị loại theo để
-          // không còn khoản chi mồ côi không có doanh thu đối ứng.
-          await tx.ledgerEntry.deleteMany({ where: { referenceId: `COGS-${id}` } });
-          await tx.orderItem.updateMany({ where: { orderId: id }, data: { unitCost: null } });
+        if (openJob) {
+          const error = new Error(`Đơn đang chờ lắp ráp (lệnh ${openJob.jobCode}) — chỉ xuất kho sau khi kỹ thuật nghiệm thu.`);
+          error.statusCode = 409;
+          throw error;
         }
+      }
+
+      // Duyệt đơn lần đầu (từ trạng thái chờ sang đã duyệt): trừ tồn kho, gán serial,
+      // chụp giá vốn, ghi COGS và tích điểm thành viên.
+      const isApprovedStatus = ['CONFIRMED', 'PACKED', 'PROCESSING', 'READY_TO_SHIP'].includes(status);
+      const isPriorPending = ['PENDING', 'AWAITING_STOCK', 'WAITING_PAYMENT'].includes(existingOrder.status);
+      if (isApprovedStatus && isPriorPending && !(await isStockOut(tx, id))) {
+        await adjustLoyaltyForOrder(tx, existingOrder.customerId, existingOrder.totalAmount, 'add');
+        await deductOrderStock(tx, existingOrder, { note: `Xuất kho khi duyệt Đơn Hàng ${id}` });
+      }
+
+      // Hoàn kho CHỈ khi đơn bị huỷ — lúc đó hàng đã thật sự về kho (huỷ trước khi giao,
+      // hoặc QC/Kho xác nhận kiện hoàn về). Trước đây "Giao thất bại" (FAILED_DELIVERY)
+      // cũng hoàn kho ngay dù kiện hàng vẫn đang trên xe shipper, và khi giao lại
+      // (FAILED_DELIVERY → SHIPPED) không trừ kho lần nữa → tồn kho bị cộng khống.
+      if (status === 'CANCELLED') {
+        // QC phân loại kiện hoàn về: hư hỏng do vận chuyển thì không nhập tồn bán, serial
+        // chuyển DEFECTIVE, giá vốn giữ lại như một khoản tổn thất chờ bồi thường.
+        const damaged = req.body.restockCondition === 'DAMAGED_CARRIER';
+        const restocked = await returnOrderStock(tx, existingOrder, {
+          sellable: !damaged,
+          note: damaged
+            ? `Kiện hoàn của Đơn ${id} hư hỏng do vận chuyển — chuyển kho chờ xử lý bồi thường`
+            : `Hoàn kho cho Đơn Hàng ${id} (Đã Hủy)`
+        });
+        if (restocked) {
+          await adjustLoyaltyForOrder(tx, existingOrder.customerId, existingOrder.totalAmount, 'subtract');
+        }
+        await tx.assemblyJob.updateMany({
+          where: { orderId: id, status: { in: ['PENDING', 'ASSEMBLING'] } },
+          data: { status: 'CANCELLED' }
+        });
       }
 
       // Cập nhật trạng thái đơn hàng & thông tin POD giao vận
@@ -1436,7 +1342,7 @@ const createReturnRequest = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Không tìm thấy đơn hàng' });
     }
 
-    if (!['DELIVERED', 'COMPLETED', 'SHIPPED'].includes(order.status)) {
+    if (!['DELIVERED', 'COMPLETED'].includes(order.status)) {
       return res.status(400).json({ success: false, message: 'Chỉ được tạo yêu cầu đổi trả cho đơn hàng đã nhận/giao thành công' });
     }
 
@@ -1701,11 +1607,16 @@ const shipperPickupReturn = async (req, res, next) => {
 
     const returnReq = await prisma.returnRequest.findFirst({
       where: { OR: [{ id: id }, { orderId: id }] },
+      orderBy: { createdAt: 'desc' },
       include: { order: true }
     });
 
     if (!returnReq) {
       return res.status(404).json({ success: false, message: 'Không tìm thấy yêu cầu đổi trả' });
+    }
+
+    if (returnReq.status !== 'RETURN_APPROVED') {
+      return res.status(409).json({ success: false, message: 'Chỉ thu hồi được kiện hàng của yêu cầu đổi trả đã được CSKH duyệt.' });
     }
 
     // Kiểm tra quyền: Nếu là Shipper (DELIVERY), chỉ nhân viên đã trực tiếp giao đơn này mới có quyền thu hồi
@@ -1761,9 +1672,13 @@ const shipperDeliverWarehouseReturn = async (req, res, next) => {
     const shipperName = req.user?.fullname || req.user?.name || req.user?.username || 'Shipper';
 
     const returnReq = await prisma.returnRequest.findFirst({
-      where: { OR: [{ id: id }, { orderId: id }] }
+      where: { OR: [{ id: id }, { orderId: id }] },
+      orderBy: { createdAt: 'desc' }
     });
 
+    if (returnReq && returnReq.status !== 'RETURNING_TO_WAREHOUSE') {
+      return res.status(409).json({ success: false, message: 'Kiện hàng đổi trả này chưa được shipper thu hồi hoặc đã bàn giao kho trước đó.' });
+    }
     if (returnReq) {
       await prisma.returnRequest.update({
         where: { id: returnReq.id },
@@ -1807,11 +1722,16 @@ const qcInspectReturn = async (req, res, next) => {
     const inspectorName = req.user?.fullname || req.user?.name || req.body.qcInspector || 'Kỹ thuật viên QC';
 
     const returnReq = await prisma.returnRequest.findFirst({
-      where: { OR: [{ id: id }, { orderId: id }] }
+      where: { OR: [{ id: id }, { orderId: id }] },
+      orderBy: { createdAt: 'desc' }
     });
 
     if (!returnReq) {
       return res.status(404).json({ success: false, message: 'Không tìm thấy yêu cầu đổi trả' });
+    }
+
+    if (returnReq.status !== 'DELIVERED_TO_WAREHOUSE') {
+      return res.status(409).json({ success: false, message: 'Chỉ thẩm định được kiện hàng đổi trả đã được bàn giao về kho.' });
     }
 
     const isApproved = ['APPROVE_REFUND', 'APPROVE_EXCHANGE', 'EXCHANGE_NEW', 'RESTOCK_WAREHOUSE', 'PASSED'].includes(qcDecision);
@@ -1870,6 +1790,7 @@ const shipperRedeliverReturn = async (req, res, next) => {
 
     const returnReq = await prisma.returnRequest.findFirst({
       where: { OR: [{ id: id }, { orderId: id }] },
+      orderBy: { createdAt: 'desc' },
       include: { order: true }
     });
 
@@ -1923,74 +1844,78 @@ const shipperRedeliverReturn = async (req, res, next) => {
 const confirmReturnWarehouse = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { shelfLocation, shelfNote, note, type } = req.body;
+    const { shelfLocation, shelfNote, note } = req.body;
     const changedBy = req.user?.fullname || req.user?.name || 'Thủ kho';
+    const SHELVES = ['SHELF_A1_RESTOCK', 'SHELF_B3_OUTLET', 'SHELF_C2_VENDOR', 'SHELF_D_SCRAP'];
+    const shelf = SHELVES.includes(shelfLocation) ? shelfLocation : 'SHELF_A1_RESTOCK';
 
     const order = await prisma.$transaction(async (tx) => {
-      const existingOrder = await tx.order.findFirst({
-        where: { orderId: id },
+      const returnReq = await tx.returnRequest.findFirst({
+        where: { OR: [{ id }, { orderId: id }, { rmaCode: id }] },
+        orderBy: { createdAt: 'desc' }
+      });
+      if (!returnReq) {
+        const error = new Error('Không tìm thấy phiếu đổi trả của đơn hàng này.');
+        error.statusCode = 404;
+        throw error;
+      }
+      // Chỉ nhập kho kiện hàng đã được QC thẩm định đạt — claim có điều kiện để 2 lần bấm
+      // (hoặc 2 thủ kho) không cộng tồn 2 lần. Trước đây hàm này không kiểm tra trạng thái
+      // nào, gọi lại là cộng tồn thêm một lần.
+      const claim = await tx.returnRequest.updateMany({
+        where: { id: returnReq.id, status: 'QC_PASSED' },
+        data: { status: 'RESTOCKING' }
+      });
+      if (claim.count !== 1) {
+        const error = new Error(`Phiếu đổi trả ${returnReq.rmaCode || returnReq.id} chưa đạt thẩm định QC hoặc đã được nhập kho trước đó.`);
+        error.statusCode = 409;
+        throw error;
+      }
+
+      const existingOrder = await tx.order.findUnique({
+        where: { orderId: returnReq.orderId },
         include: { items: true, customer: true }
       });
+      const isExchange = returnReq.type === 'EXCHANGE';
+      const isSellableShelf = ['SHELF_A1_RESTOCK', 'SHELF_B3_OUTLET'].includes(shelf);
 
-      if (!existingOrder) {
-        throw new Error('Không tìm thấy đơn hàng');
-      }
-
-      const returnReq = await tx.returnRequest.findFirst({
-        where: { orderId: existingOrder.orderId }
+      // Hàng trả về kệ bán: cộng tồn, serial về AVAILABLE, đảo giá vốn của đơn gốc (hàng
+      // chưa bị tiêu thụ). Kệ gửi hãng/phế phẩm: không cộng tồn bán, serial đánh dấu,
+      // giá vốn giữ lại như tổn thất.
+      await returnOrderStock(tx, existingOrder, {
+        sellable: isSellableShelf,
+        lostSerialStatus: shelf === 'SHELF_C2_VENDOR' ? 'WARRANTY' : 'DEFECTIVE',
+        note: isSellableShelf
+          ? `Nhập lại kho từ Đơn Hoàn Trả #${existingOrder.orderId} vào ${shelf}`
+          : `Kiện hoàn trả #${existingOrder.orderId} xếp ${shelf} — không nhập tồn bán`
       });
 
-      const effectiveType = type || returnReq?.type || 'REFUND';
-      const isExchange = effectiveType === 'EXCHANGE';
-
-      // 1. Chỉ tăng tồn kho khi hàng thật sự vào kệ bán được (Kệ A1/B3) —
-      // trước đây `isSellable` mặc định `true` nên hàng gửi hãng bảo hành
-      // (SHELF_C2_VENDOR) hoặc phế phẩm (SHELF_D_SCRAP) vẫn vô tình được
-      // cộng vào tồn kho bán, dù chưa hề rời khỏi kho về mặt vật lý để bán.
-      const isSellableShelf = ['SHELF_A1_RESTOCK', 'SHELF_B3_OUTLET'].includes(shelfLocation);
-      if (isSellableShelf) {
-        for (const item of existingOrder.items) {
-          await tx.product.update({
-            where: { productId: item.productId },
-            data: { stockQuantity: { increment: item.quantity } }
-          });
-
-          await restockInventory(tx, item.productId, item.quantity, {
-            referenceId: existingOrder.orderId,
-            note: `Nhập lại kho từ Đơn Hoàn Trả #${existingOrder.orderId} vào ${shelfLocation || 'Kệ kho'}`
-          });
-        }
-      }
-
+      // Đổi mới 1-1: tạo đơn thay thế 0đ và XUẤT KHO THẬT sản phẩm mới (trước đây đơn đổi
+      // mới tạo thẳng ở CONFIRMED nên hàng rời kho mà không hề trừ tồn/serial).
       let replacementOrderId = null;
-
-      // 2. Nếu là EXCHANGE (Đổi mới 1-1): Tự động tạo Đơn Đổi Mới ORD-EXC-...
       if (isExchange) {
         replacementOrderId = `ORD-EXC-${existingOrder.orderId.replace('ORD-', '')}`;
-        
-        // Kiểm tra xem đơn đổi mới đã tồn tại chưa
-        const existingExcOrder = await tx.order.findUnique({
-          where: { orderId: replacementOrderId }
-        });
-
+        const existingExcOrder = await tx.order.findUnique({ where: { orderId: replacementOrderId } });
         if (!existingExcOrder) {
-          await tx.order.create({
+          const replacement = await tx.order.create({
             data: {
               orderId: replacementOrderId,
               customerId: existingOrder.customerId,
               subtotal: 0,
               discount: 0,
               shippingFee: 0,
+              vatAmount: 0,
               totalAmount: 0,
-              paymentMethod: existingOrder.paymentMethod || 'EXCHANGE_1TO1',
+              paymentMethod: existingOrder.paymentMethod || 'COD',
               paymentStatus: 'PAID',
-              status: 'CONFIRMED', // Sẵn sàng để Kho đóng gói & bàn giao Shipper
+              status: 'CONFIRMED',
+              confirmedAt: new Date(),
               shippingAddress: existingOrder.shippingAddress,
               shippingCity: existingOrder.shippingCity || 'Hồ Chí Minh',
               notes: `[ĐỔI MỚI 1-1] Xuất kho sản phẩm mới thay thế cho đơn lỗi #${existingOrder.orderId}`,
               items: {
-                create: existingOrder.items.map(it => ({
-                  orderItemId: `EXC-ITM-${Date.now()}-${Math.floor(Math.random()*1000)}`,
+                create: existingOrder.items.map((it, idx) => ({
+                  orderItemId: `EXC-ITM-${Date.now()}-${idx}-${Math.floor(Math.random() * 1000)}`,
                   productId: it.productId,
                   sku: it.sku,
                   name: it.name,
@@ -2003,43 +1928,35 @@ const confirmReturnWarehouse = async (req, res, next) => {
               statusHistory: {
                 create: {
                   status: 'CONFIRMED',
-                  note: `Tự động tạo đơn đổi mới 1-1 (0đ) từ yêu cầu RMA #${returnReq?.id || existingOrder.orderId}. Chờ kho đóng gói.`,
+                  note: `Tự động tạo đơn đổi mới 1-1 (0đ) từ phiếu ${returnReq.rmaCode || returnReq.id}. Đã xuất kho sản phẩm thay thế, chờ kho bàn giao vận chuyển.`,
                   changedBy
                 }
               }
-            }
+            },
+            include: { items: true }
           });
+          await deductOrderStock(tx, replacement, { note: `Xuất kho sản phẩm đổi mới 1-1 cho đơn #${existingOrder.orderId}` });
         }
       }
 
-      // Trước đây hàm này chỉ tính được 2 kết quả (EXCHANGED/RESTOCKED) dù
-      // Kho thực tế có 4 lựa chọn kệ (bán mới, outlet, gửi hãng, phế phẩm) —
-      // 2 lựa chọn còn lại rơi vào 'RESTOCKED' sai nghĩa dù hàng không hề
-      // được nhập lại kho bán.
-      const targetStatus = shelfLocation === 'SHELF_D_SCRAP'
+      const targetStatus = shelf === 'SHELF_D_SCRAP'
         ? 'INSPECTED_SCRAP'
-        : shelfLocation === 'SHELF_C2_VENDOR'
+        : shelf === 'SHELF_C2_VENDOR'
           ? 'VENDOR_WARRANTY'
-          : isExchange
-            ? 'EXCHANGED'
-            : 'RESTOCKED';
+          : isExchange ? 'EXCHANGED' : 'RESTOCKED';
 
-      // 3. Cập nhật ReturnRequest
-      if (returnReq) {
-        await tx.returnRequest.update({
-          where: { id: returnReq.id },
-          data: {
-            status: targetStatus,
-            shelfLocation: shelfLocation || 'SHELF_A1_RESTOCK',
-            shelfNote: shelfNote || note || 'Đã phân luồng vị trí kệ kho',
-            replacementOrderId: replacementOrderId || undefined,
-            restockedAt: new Date(),
-            restockedById: req.user?.id && !isNaN(Number(req.user.id)) ? Number(req.user.id) : null
-          }
-        });
-      }
+      await tx.returnRequest.update({
+        where: { id: returnReq.id },
+        data: {
+          status: targetStatus,
+          shelfLocation: shelf,
+          shelfNote: shelfNote || note || 'Đã phân luồng vị trí kệ kho',
+          replacementOrderId: replacementOrderId || undefined,
+          restockedAt: new Date(),
+          restockedById: req.user?.id && !isNaN(Number(req.user.id)) ? Number(req.user.id) : null
+        }
+      });
 
-      // 4. Cập nhật Order gốc
       const updatedOrder = await tx.order.update({
         where: { orderId: existingOrder.orderId },
         data: { status: targetStatus }
@@ -2047,25 +1964,19 @@ const confirmReturnWarehouse = async (req, res, next) => {
 
       const historyNote = note || (
         targetStatus === 'INSPECTED_SCRAP'
-          ? `Kho đã xếp kiện hàng vào khu phế phẩm (${shelfLocation}). Không nhập lại tồn kho bán.`
+          ? `Kho đã xếp kiện hàng vào khu phế phẩm (${shelf}). Không nhập lại tồn kho bán.`
           : targetStatus === 'VENDOR_WARRANTY'
-            ? `Kho đã xếp kiện hàng vào khu chờ gửi hãng bảo hành (${shelfLocation}). Không nhập lại tồn kho bán.`
+            ? `Kho đã xếp kiện hàng vào khu chờ gửi hãng bảo hành (${shelf}). Không nhập lại tồn kho bán.`
             : isExchange
-              ? `Kho đã nhập kiện hàng cũ vào ${shelfLocation || 'kệ kho'}. Đã tự động tạo Đơn Đổi Mới #${replacementOrderId} chuyển Kho xuất hàng cho khách.`
-              : `Kho đã nhập kiện hàng vào ${shelfLocation || 'kệ kho'}. Đã lập Phiếu đề nghị chuyển Kế toán giải ngân hoàn tiền Napas247.`
+              ? `Kho đã nhận kiện hàng cũ (${shelf}). Đã tạo Đơn Đổi Mới #${replacementOrderId} và xuất kho sản phẩm thay thế.`
+              : `Kho đã nhập kiện hàng vào ${shelf}. Chuyển Kế toán giải ngân hoàn tiền.`
       );
-
       await tx.orderStatusHistory.create({
-        data: {
-          orderId: existingOrder.orderId,
-          status: targetStatus,
-          note: historyNote,
-          changedBy
-        }
+        data: { orderId: existingOrder.orderId, status: targetStatus, note: historyNote, changedBy }
       });
 
       return { ...updatedOrder, replacementOrderId };
-    });
+    }, { timeout: 20000 });
 
     const resultMessage = order.replacementOrderId
       ? `Đã nhập kho kiện hàng cũ và tự động khởi tạo Đơn Đổi Mới #${order.replacementOrderId}.`
@@ -2156,7 +2067,8 @@ const processRefund = async (req, res, next) => {
 
     // Chỉ hoàn tiền khi đơn có yêu cầu trả hàng hoàn tiền đã ĐẠT thẩm định, và không vượt
     // số tiền khách yêu cầu / giá trị đơn. Trước đây kế toán hoàn được số tiền bất kỳ cho mọi đơn.
-    const REFUNDABLE = ['QC_PASSED', 'RESTOCKED', 'VENDOR_WARRANTY', 'INSPECTED_SCRAP'];
+    // Hoàn tiền sau khi Kho đã nhận & phân luồng kiện hàng (nếu hoàn trước, Kho không còn nhập được kiện vào kệ).
+    const REFUNDABLE = ['RESTOCKED', 'VENDOR_WARRANTY', 'INSPECTED_SCRAP'];
     const eligible = await prisma.returnRequest.findFirst({
       where: { orderId: order.orderId, status: { in: REFUNDABLE }, type: { not: 'EXCHANGE' } },
       orderBy: { createdAt: 'desc' }
@@ -2170,41 +2082,42 @@ const processRefund = async (req, res, next) => {
       return res.status(400).json({ success: false, message: `Số tiền hoàn không hợp lệ: tối đa ${maxAmount.toLocaleString('vi-VN')}đ cho đơn #${order.orderId}.` });
     }
 
-    // 1. Cập nhật Order sang REFUNDED
-    const updatedOrder = await prisma.order.update({
-      where: { orderId: order.orderId },
-      data: {
-        status: 'REFUNDED',
-        paymentStatus: 'REFUNDED'
+    // Cập nhật đơn + phiếu đổi trả + ghi Sổ Cái trong cùng một giao dịch, có claim theo
+    // paymentStatus để 2 lần bấm không ghi 2 khoản chi.
+    const updatedOrder = await prisma.$transaction(async (tx) => {
+      const claim = await tx.order.updateMany({
+        where: { orderId: order.orderId, paymentStatus: { not: 'REFUNDED' } },
+        data: { status: 'REFUNDED', paymentStatus: 'REFUNDED' }
+      });
+      if (claim.count !== 1) {
+        const error = new Error(`Đơn #${order.orderId} vừa được hoàn tiền ở nơi khác.`);
+        error.statusCode = 409;
+        throw error;
       }
-    });
-
-    // 2. Cập nhật ReturnRequest sang REFUNDED
-    await prisma.returnRequest.updateMany({
-      where: { orderId: order.orderId },
-      data: {
-        status: 'REFUNDED',
-        refundTxnCode: refundTxnCode || '',
-        refundProofPhoto: refundProofPhoto || '',
-        refundedAt: new Date(),
-        refundedById: req.user?.id ? Number(req.user.id) : null
-      }
-    });
-
-    // 3. Ghi Sổ cái kế toán (LedgerEntry: REFUND)
-    try {
-      await prisma.ledgerEntry.create({
+      await tx.returnRequest.updateMany({
+        where: { id: eligible.id },
+        data: {
+          status: 'REFUNDED',
+          refundTxnCode: refundTxnCode || '',
+          refundProofPhoto: refundProofPhoto || '',
+          refundedAt: new Date(),
+          refundedById: req.user?.id && !isNaN(Number(req.user.id)) ? Number(req.user.id) : null
+        }
+      });
+      await tx.ledgerEntry.create({
         data: {
           type: 'REFUND',
           amount: finalAmount,
+          channel: refundMethod === 'CASH' ? 'CASH' : 'BANK',
           description: `Chi hoàn tiền đơn hàng #${order.orderId} - Khách: ${order.customer?.name || 'Khách hàng'} (${refundTxnCode ? `Mã GD: ${refundTxnCode}` : 'Chuyển khoản'})`,
           referenceId: order.orderId,
           date: new Date()
         }
       });
-    } catch (lErr) {
-      console.warn('Ghi log sổ cái thất bại (không chặn luồng):', lErr);
-    }
+      // Đơn bị trả hàng hoàn tiền: thu hồi điểm thành viên đã tích từ đơn này
+      await adjustLoyaltyForOrder(tx, order.customerId, order.totalAmount, 'subtract');
+      return tx.order.findUnique({ where: { orderId: order.orderId } });
+    });
 
     const amountFormatted = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(finalAmount);
 
@@ -2681,7 +2594,28 @@ const getStaleDeliveries = async (req, res, next) => {
   }
 };
 
+// POST /api/v1/orders/awaiting-stock/allocate — Quản lý rà lại toàn bộ đơn "Chờ hàng" (đơn cũ
+// nhất trước): đơn nào nay đã đủ tồn thì duyệt & xuất kho ngay. Dùng sau kiểm kê/điều chỉnh tồn
+// hoặc khi đơn bị kẹt ở Chờ hàng dù kho đã có hàng.
+const allocateAwaitingStock = async (req, res, next) => {
+  try {
+    const { allocateAwaitingOrders } = require('../services/orderApprovalService');
+    const before = await prisma.order.count({ where: { status: 'AWAITING_STOCK' } });
+    const approved = await allocateAwaitingOrders(prisma, null, { limit: 50 });
+    res.json({
+      success: true,
+      message: approved.length
+        ? `Đã phân bổ hàng & duyệt ${approved.length}/${before} đơn chờ hàng.`
+        : `Chưa đơn nào trong ${before} đơn chờ hàng đủ tồn kho để phân bổ.`,
+      data: { approved, remaining: before - approved.length }
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 module.exports = {
+  allocateAwaitingStock,
   createOrder,
   createPosOrder,
   getCustomerOrders,

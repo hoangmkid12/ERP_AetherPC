@@ -1723,6 +1723,8 @@ export default function Purchasing() {
         // RFQ_CREATED = đã lập RFQ). PENDING/REJECTED chỉ hiện với CEO/ADMIN (backend lọc).
         const toRfqCount = purchaseRequests.filter(r => r.status === 'APPROVED').length;
         const rfqCreatedCount = purchaseRequests.filter(r => r.status === 'RFQ_CREATED').length;
+        // COMPLETED = hàng của đề xuất đã nhập kho xong (backend tự đóng khi Kho xác nhận GRN)
+        const completedPrCount = purchaseRequests.filter(r => r.status === 'COMPLETED').length;
         const awaitingManagerCount = purchaseRequests.filter(r => r.status === 'PENDING').length;
         const rejectedCount = purchaseRequests.filter(r => r.status === 'REJECTED').length;
 
@@ -1865,6 +1867,7 @@ export default function Purchasing() {
                   { key: 'ALL', label: `Tất cả (${purchaseRequests.length})` },
                   { key: 'APPROVED', label: `Chờ lập RFQ (${toRfqCount})` },
                   { key: 'RFQ_CREATED', label: `Đã lập RFQ (${rfqCreatedCount})` },
+                  ...(completedPrCount > 0 ? [{ key: 'COMPLETED', label: `Đã nhập kho (${completedPrCount})` }] : []),
                   ...(awaitingManagerCount > 0 ? [{ key: 'PENDING', label: `Chờ QL Kho duyệt (${awaitingManagerCount})` }] : []),
                   ...(rejectedCount > 0 ? [{ key: 'REJECTED', label: `Từ chối (${rejectedCount})` }] : [])
                 ].map(f => (
@@ -1937,11 +1940,12 @@ export default function Purchasing() {
                         const isApproved = pr.status === 'APPROVED';
                         const isRfqCreated = pr.status === 'RFQ_CREATED';
                         const isRejected = pr.status === 'REJECTED';
+                        const isPrDone = pr.status === 'COMPLETED';
 
-                        const badgeBg = isRfqCreated ? '#eff6ff' : isApproved ? '#f0fdf4' : isRejected ? '#fef2f2' : '#fffbeb';
-                        const badgeColor = isRfqCreated ? '#1d4ed8' : isApproved ? '#15803d' : isRejected ? '#dc2626' : '#b45309';
-                        const badgeBorder = isRfqCreated ? '#bfdbfe' : isApproved ? '#bbf7d0' : isRejected ? '#fecaca' : '#fde68a';
-                        const badgeText = isRfqCreated ? 'Đã Lập RFQ' : isApproved ? 'QL Kho Đã Duyệt' : isRejected ? 'Từ Chối' : 'Chờ QL Kho Duyệt';
+                        const badgeBg = isPrDone ? '#f0fdfa' : isRfqCreated ? '#eff6ff' : isApproved ? '#f0fdf4' : isRejected ? '#fef2f2' : '#fffbeb';
+                        const badgeColor = isPrDone ? '#0f766e' : isRfqCreated ? '#1d4ed8' : isApproved ? '#15803d' : isRejected ? '#dc2626' : '#b45309';
+                        const badgeBorder = isPrDone ? '#99f6e4' : isRfqCreated ? '#bfdbfe' : isApproved ? '#bbf7d0' : isRejected ? '#fecaca' : '#fde68a';
+                        const badgeText = isPrDone ? 'Đã Nhập Kho' : isRfqCreated ? 'Đã Lập RFQ' : isApproved ? 'QL Kho Đã Duyệt' : isRejected ? 'Từ Chối' : 'Chờ QL Kho Duyệt';
 
                         return (
                           <tr key={pr.id || pr.prCode} style={{ borderBottom: '1px solid #f1f5f9' }}>
@@ -3380,8 +3384,8 @@ export default function Purchasing() {
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.5rem', fontSize: '0.85rem' }}>
                 <span style={{ color: '#64748b' }}>Trạng thái:</span>
                 {(() => {
-                  const statusLabel = selectedViewPR.status === 'RFQ_CREATED' ? 'Đã Lập RFQ' : selectedViewPR.status === 'APPROVED' ? 'QL Kho Đã Duyệt' : selectedViewPR.status === 'REJECTED' ? 'Từ Chối' : 'Chờ QL Kho Duyệt';
-                  const statusColor = selectedViewPR.status === 'RFQ_CREATED' ? '#1d4ed8' : selectedViewPR.status === 'APPROVED' ? '#15803d' : selectedViewPR.status === 'REJECTED' ? '#dc2626' : '#b45309';
+                  const statusLabel = selectedViewPR.status === 'COMPLETED' ? 'Đã Nhập Kho' : selectedViewPR.status === 'RFQ_CREATED' ? 'Đã Lập RFQ' : selectedViewPR.status === 'APPROVED' ? 'QL Kho Đã Duyệt' : selectedViewPR.status === 'REJECTED' ? 'Từ Chối' : 'Chờ QL Kho Duyệt';
+                  const statusColor = selectedViewPR.status === 'COMPLETED' ? '#0f766e' : selectedViewPR.status === 'RFQ_CREATED' ? '#1d4ed8' : selectedViewPR.status === 'APPROVED' ? '#15803d' : selectedViewPR.status === 'REJECTED' ? '#dc2626' : '#b45309';
                   return <strong style={{ color: statusColor }}>{statusLabel}</strong>;
                 })()}
                 {selectedViewPR.approvedBy && (
