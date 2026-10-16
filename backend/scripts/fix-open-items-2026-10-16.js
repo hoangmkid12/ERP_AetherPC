@@ -39,7 +39,7 @@ const APPLY = process.argv.includes('--apply');
   //   - ORD-576569 đã hoàn về kệ bán A1 (IN 1) nhưng serial SN-1047243498-00001 vẫn USED.
   const PID = '1047243498';
   const outs = await p.stockMovement.findMany({ where: { productId: PID, referenceId: 'ORD-834751', type: 'OUT' } });
-  const fixIn = await p.stockMovement.count({ where: { productId: PID, referenceId: 'ORD-834751', type: 'IN' } });
+  const fixIn = (await p.stockMovement.aggregate({ where: { productId: PID, referenceId: 'ORD-834751', type: 'IN' }, _sum: { quantity: true } }))._sum.quantity || 0;
   const o834 = await p.order.findUnique({ where: { orderId: 'ORD-834751' }, include: { items: true } });
   const qty834 = o834.items.filter(i => i.productId === PID).reduce((s, i) => s + i.quantity, 0);
   const extra = outs.reduce((s, m) => s + m.quantity, 0) - qty834 - fixIn;
