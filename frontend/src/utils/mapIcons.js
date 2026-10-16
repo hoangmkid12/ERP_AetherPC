@@ -4,7 +4,7 @@ import goongjs from '@goongmaps/goong-js';
 // (DeliveryMap.jsx — quan sát của khách/admin, và DeliveryNavigationModal.jsx
 // — điều hướng của chính Shipper) để 2 nơi luôn nhìn giống nhau.
 
-const GOONG_MAPTILES_KEY = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_GOONG_MAPTILES_KEY) || '';
+const GOONG_MAPTILES_KEY = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_GOONG_MAPTILES_KEY) || 'qteWdj9oo6cq07oHwt1OmVuivWHRxsKIRlaBRUE5';
 
 // goong-js tự đính kèm access token vào MỌI request tài nguyên nó gọi (tile,
 // sprite, glyph...) khi accessToken được set trước khi tạo Map — không cần
