@@ -155,7 +155,12 @@ Cả `AetherPC_KLTN.docx` (349 trang) và `_demo` (260 trang) đã sửa theo m�
   bước 4–6 hoàn tất bằng `scripts/reconcile-2026-10-13-resume.js` (người dùng tự chạy): đủ 77.340 serial OB-, 0 sản phẩm thiếu
   serial; bổ sung khoản thu COD cho ORD-551729, ORD-603601, ORD-413208, ORD-599756 (chờ Kế toán đối soát); chuẩn hoá 7/11 đơn.
   KHÔNG chạy lại script gốc với --apply (bước 2 sẽ trừ điểm lần hai).
-- Còn cần người quyết định: 4 đơn ORD-143082, ORD-278680, ORD-576569, ORD-205210 có tổng tiền = tạm tính + 30.000đ ship,
+- Phương án cho 2 việc còn mở (script `backend/scripts/fix-open-items-2026-10-16.js`, chạy thử rồi `--apply`, chạy lặp an toàn):
+  (A) 4 đơn: khách trả và được hoàn đúng tổng tiền = tạm tính + 30.000đ ship → giảm giá chưa từng được áp, ghi lại giảm giá 0đ,
+  giữ nguyên số tiền; (B1) serial SN-1050103254-00001 gắn cho ORD-413208 (đơn cũ xuất 1 chiếc khi chưa bắt buộc serial);
+  (B2) ORD-834751 bị ghi xuất kho lặp 3 lần cho 1 chiếc → hoàn 2 vào tồn + kho 1, serial SN-1047243498-00001 của ORD-576569
+  (đã nhập lại kệ A1) về "Sẵn có". Sau khi chạy: Logitech 40/40/40, HDD Seagate 18/18/18 (tồn/tồn kho/serial).
+- Chi tiết trước khi có phương án: 4 đơn ORD-143082, ORD-278680, ORD-576569, ORD-205210 có tổng tiền = tạm tính + 30.000đ ship,
   tức giảm giá (500–700 nghìn) được ghi nhưng không trừ vào số tiền khách trả — phải xác định khách đã trả bao nhiêu rồi mới
   sửa tay; 2 sản phẩm có serial khả dụng nhiều hơn tồn 1 chiếc (Logitech G Pro X TKL 1050103254: 41/40, HDD Seagate
   Barracuda 2TB 1047243498: 17/16) — Kho kiểm kê.
