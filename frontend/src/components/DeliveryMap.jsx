@@ -5,6 +5,7 @@ import { getAddressCoordinates } from '../utils/deliveryRegions';
 import {
   goongjs,
   GOONG_STYLE_URL,
+  CARTO_VOYAGER_STYLE,
   createWarehouseElement,
   createOriginHubElement,
   createGpsOriginElement,
@@ -152,26 +153,44 @@ export default function DeliveryMap({
     // Nguồn/lớp vẽ tuyến đường chỉ tạo được sau khi style load xong — tạo 1
     // lần rồi từ nay chỉ setData() lên nguồn có sẵn (không remove/add lại
     // layer mỗi lần cập nhật), tránh nháy bản đồ.
-    map.on('load', () => {
+    const initLayers = () => {
       if (!mapRef.current) return;
-      map.addSource('main-route', { type: 'geojson', data: EMPTY_LINE });
-      map.addLayer({
-        id: 'main-route-line',
-        type: 'line',
-        source: 'main-route',
-        layout: { 'line-cap': 'round', 'line-join': 'round' },
-        paint: { 'line-color': '#9aa0a6', 'line-width': 4, 'line-opacity': 0.85 }
-      });
-      map.addSource('remaining-route', { type: 'geojson', data: EMPTY_LINE });
-      map.addLayer({
-        id: 'remaining-route-line',
-        type: 'line',
-        source: 'remaining-route',
-        layout: { 'line-cap': 'round', 'line-join': 'round' },
-        paint: { 'line-color': '#1a73e8', 'line-width': 5, 'line-opacity': 0.95 }
-      });
+      if (!map.getSource('main-route')) {
+        map.addSource('main-route', { type: 'geojson', data: EMPTY_LINE });
+        map.addLayer({
+          id: 'main-route-line',
+          type: 'line',
+          source: 'main-route',
+          layout: { 'line-cap': 'round', 'line-join': 'round' },
+          paint: { 'line-color': '#9aa0a6', 'line-width': 4, 'line-opacity': 0.85 }
+        });
+      }
+      if (!map.getSource('remaining-route')) {
+        map.addSource('remaining-route', { type: 'geojson', data: EMPTY_LINE });
+        map.addLayer({
+          id: 'remaining-route-line',
+          type: 'line',
+          source: 'remaining-route',
+          layout: { 'line-cap': 'round', 'line-join': 'round' },
+          paint: { 'line-color': '#1a73e8', 'line-width': 5, 'line-opacity': 0.95 }
+        });
+      }
       styleReadyRef.current = true;
       setStyleReadyTick((t) => t + 1);
+    };
+
+    map.on('load', initLayers);
+
+    map.on('error', (e) => {
+      if (!styleReadyRef.current) {
+        console.warn('Lỗi tải bản đồ Goong, chuyển sang bản đồ dự phòng CARTO:', e);
+        try {
+          map.setStyle(CARTO_VOYAGER_STYLE);
+          map.once('styledata', () => {
+            initLayers();
+          });
+        } catch (_) {}
+      }
     });
 
     mapRef.current = map;
@@ -185,6 +204,8 @@ export default function DeliveryMap({
 
     return () => {
       window.removeEventListener('resize', handleResize);
+      Object.values(markersRef.current).forEach(m => m?.remove?.());
+      markersRef.current = {};
       map.remove();
       mapRef.current = null;
       styleReadyRef.current = false;

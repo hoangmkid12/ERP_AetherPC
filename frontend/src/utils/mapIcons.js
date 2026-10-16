@@ -6,35 +6,33 @@ import goongjs from '@goongmaps/goong-js';
 
 const GOONG_MAPTILES_KEY = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_GOONG_MAPTILES_KEY) || 'qteWdj9oo6cq07oHwt1OmVuivWHRxsKIRlaBRUE5';
 
-// goong-js tự đính kèm access token vào MỌI request tài nguyên nó gọi (tile,
-// sprite, glyph...) khi accessToken được set trước khi tạo Map — không cần
-// nhét "?api_key=" thủ công vào từng URL.
 if (GOONG_MAPTILES_KEY) {
   goongjs.accessToken = GOONG_MAPTILES_KEY;
 }
 
-// Bản đồ nền: dùng style thật của Goong (địa danh/tên đường tiếng Việt chính
-// xác, đã cập nhật theo sáp nhập hành chính) khi có Maptiles Key. Chưa cấu
-// hình key thì tự lùi về tile raster OpenStreetMap thường (không cần key) qua
-// 1 style JSON tối giản, để app vẫn chạy được cho người chưa có key Goong.
+// Bản đồ dự phòng (CartoDB Voyager): chạy mượt, CDN châu Á cực nhanh, không bao giờ bị chặn hay lỗi trắng màn hình
+export const CARTO_VOYAGER_STYLE = {
+  version: 8,
+  sources: {
+    carto: {
+      type: 'raster',
+      tiles: [
+        'https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png',
+        'https://b.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png',
+        'https://c.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png',
+        'https://d.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png'
+      ],
+      tileSize: 256,
+      attribution: '© OpenStreetMap contributors, © CARTO'
+    }
+  },
+  layers: [{ id: 'carto', type: 'raster', source: 'carto' }]
+};
+
+// Bản đồ nền: ưu tiên style vector của Goong Maps (có sẵn api_key) để hiển thị tên đường và địa danh VN chuẩn xác.
 export const GOONG_STYLE_URL = GOONG_MAPTILES_KEY
-  ? 'https://tiles.goong.io/assets/goong_map_web.json'
-  : {
-      version: 8,
-      sources: {
-        osm: {
-          type: 'raster',
-          tiles: [
-            'https://a.tile.openstreetmap.org/{z}/{x}/{y}.png',
-            'https://b.tile.openstreetmap.org/{z}/{x}/{y}.png',
-            'https://c.tile.openstreetmap.org/{z}/{x}/{y}.png'
-          ],
-          tileSize: 256,
-          attribution: '© OpenStreetMap contributors'
-        }
-      },
-      layers: [{ id: 'osm', type: 'raster', source: 'osm' }]
-    };
+  ? `https://tiles.goong.io/assets/goong_map_web.json?api_key=${GOONG_MAPTILES_KEY}`
+  : CARTO_VOYAGER_STYLE;
 
 // Pin kiểu Google Maps (giọt nước, chấm trắng giữa)
 const pinSvg = (color) => `<svg width="26" height="36" viewBox="0 0 26 36" xmlns="http://www.w3.org/2000/svg" style="display:block;filter:drop-shadow(0 2px 3px rgba(0,0,0,0.3));">

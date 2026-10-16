@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { X, Navigation, Phone, MapPin, Compass, AlertCircle, Gauge, ExternalLink, Pause, Locate } from 'lucide-react';
 import '@goongmaps/goong-js/dist/goong-js.css';
 import { fetchRoadRoute, forwardGeocode } from '../../../../utils/routingService';
-import { goongjs, GOONG_STYLE_URL, createWarehouseElement, createDestinationElement, createShipperElement, updateShipperElementHeading } from '../../../../utils/mapIcons';
+import { goongjs, GOONG_STYLE_URL, CARTO_VOYAGER_STYLE, createWarehouseElement, createDestinationElement, createShipperElement, updateShipperElementHeading } from '../../../../utils/mapIcons';
 import { getAddressCoordinates } from '../../../../utils/deliveryRegions';
 import { isOrderPrepaid } from '../../../../utils/statusLabels';
 import PODCaptureSection from './PODCaptureSection';
@@ -169,26 +169,45 @@ export default function DeliveryNavigationModal({
 
     // Nguồn/lớp vẽ tuyến đường chỉ tạo được sau khi style load xong — tạo 1
     // lần rồi từ nay chỉ setData() lên nguồn có sẵn, tránh nháy bản đồ.
-    map.on('load', () => {
+    const initLayers = () => {
       if (!mapRef.current) return;
-      map.addSource('main-route', { type: 'geojson', data: EMPTY_LINE });
-      map.addLayer({
-        id: 'main-route-line',
-        type: 'line',
-        source: 'main-route',
-        layout: { 'line-cap': 'round', 'line-join': 'round' },
-        paint: { 'line-color': '#9aa0a6', 'line-width': 4, 'line-opacity': 0.85 }
-      });
-      map.addSource('remaining-route', { type: 'geojson', data: EMPTY_LINE });
-      map.addLayer({
-        id: 'remaining-route-line',
-        type: 'line',
-        source: 'remaining-route',
-        layout: { 'line-cap': 'round', 'line-join': 'round' },
-        paint: { 'line-color': '#1a73e8', 'line-width': 5, 'line-opacity': 0.95 }
-      });
+      if (!map.getSource('main-route')) {
+        map.addSource('main-route', { type: 'geojson', data: EMPTY_LINE });
+        map.addLayer({
+          id: 'main-route-line',
+          type: 'line',
+          source: 'main-route',
+          layout: { 'line-cap': 'round', 'line-join': 'round' },
+          paint: { 'line-color': '#9aa0a6', 'line-width': 4, 'line-opacity': 0.85 }
+        });
+      }
+      if (!map.getSource('remaining-route')) {
+        map.addSource('remaining-route', { type: 'geojson', data: EMPTY_LINE });
+        map.addLayer({
+          id: 'remaining-route-line',
+          type: 'line',
+          source: 'remaining-route',
+          layout: { 'line-cap': 'round', 'line-join': 'round' },
+          paint: { 'line-color': '#1a73e8', 'line-width': 5, 'line-opacity': 0.95 }
+        });
+      }
       styleReadyRef.current = true;
       setStyleReadyTick((t) => t + 1);
+    };
+
+    map.on('load', initLayers);
+
+    map.on('error', (e) => {
+      // Khi Goong Maps gặp sự cố (403, 401, CORS hoặc mạng chập chờn), tự động fallback sang Carto Voyager
+      if (!styleReadyRef.current) {
+        console.warn('Lỗi tải bản đồ Goong, chuyển sang bản đồ dự phòng CARTO:', e);
+        try {
+          map.setStyle(CARTO_VOYAGER_STYLE);
+          map.once('styledata', () => {
+            initLayers();
+          });
+        } catch (_) {}
+      }
     });
 
     mapRef.current = map;
@@ -197,6 +216,8 @@ export default function DeliveryNavigationModal({
     }, 200);
 
     return () => {
+      Object.values(markersRef.current).forEach(m => m?.remove?.());
+      markersRef.current = {};
       map.remove();
       mapRef.current = null;
       styleReadyRef.current = false;
@@ -339,12 +360,11 @@ export default function DeliveryNavigationModal({
 
     // Marker Kho chỉ vẽ nếu có toạ độ Kho và Kho cách xa Shipper
     if (warehouse?.lat && warehouse?.lng) {
-      if (!markersRef.current.warehouse) {
-        markersRef.current.warehouse = new goongjs.Marker({ element: createWarehouseElement(), anchor: 'bottom' })
-          .setLngLat([warehouse.lng, warehouse.lat])
-          .setPopup(new goongjs.Popup({ offset: 28 }).setHTML(`<strong>🏬 Kho Xuất Phát:</strong><br/>${warehouse.name || 'Kho AetherPC'}`))
-          .addTo(map);
-      }
+      if (markersRef.current.warehouse) markersRef.current.warehouse.remove();
+      markersRef.current.warehouse = new goongjs.Marker({ element: createWarehouseElement(), anchor: 'bottom' })
+        .setLngLat([warehouse.lng, warehouse.lat])
+        .setPopup(new goongjs.Popup({ offset: 28 }).setHTML(`<strong>🏬 Kho Xuất Phát:</strong><br/>${warehouse.name || 'Kho AetherPC'}`))
+        .addTo(map);
     }
 
     markersRef.current.destination = new goongjs.Marker({ element: createDestinationElement(), anchor: 'bottom' })
@@ -368,7 +388,7 @@ export default function DeliveryNavigationModal({
         const coords = feature.geometry.coordinates;
         const bounds = coords.reduce((b, c) => b.extend(c), new goongjs.LngLatBounds(coords[0], coords[0]));
         if (shipperLoc) bounds.extend([shipperLoc.lng, shipperLoc.lat]);
-        mapRef.current.fitBounds(bounds, { padding: 45 });
+        mapRef.current.fitBounds(bounds, { padding: { top: 60, bottom: 50, left: 50, right: 70 } });
       }
     });
 
@@ -400,14 +420,17 @@ export default function DeliveryNavigationModal({
     const pos = [shipperLoc.lng, shipperLoc.lat];
     const initialHeading = compassHeadingRef.current || (typeof shipperLoc.heading === 'number' && !isNaN(shipperLoc.heading) ? shipperLoc.heading : 0);
 
-    if (markersRef.current.shipper) {
-      markersRef.current.shipper.setLngLat(pos);
-      updateShipperElementHeading(markersRef.current.shipper.getElement(), initialHeading);
-    } else {
+    if (!markersRef.current.shipper) {
       markersRef.current.shipper = new goongjs.Marker({ element: createShipperElement({ heading: initialHeading }) })
         .setLngLat(pos)
         .setPopup(new goongjs.Popup({ offset: 18 }).setHTML(`<strong>Vị Trí Của Bạn (Shipper)</strong><br/><span style="color:#16a34a;">● Đang phát tín hiệu GPS trực tiếp</span>`))
         .addTo(map);
+    } else {
+      markersRef.current.shipper.setLngLat(pos);
+      if (!markersRef.current.shipper._map) {
+        markersRef.current.shipper.addTo(map);
+      }
+      updateShipperElementHeading(markersRef.current.shipper.getElement(), initialHeading);
     }
 
     const bounds = map.getBounds();
@@ -453,7 +476,7 @@ export default function DeliveryNavigationModal({
     if (routeCoordsRef.current.length > 0) {
       const coords = routeCoordsRef.current.map(([lat, lng]) => [lng, lat]);
       const bounds = coords.reduce((b, c) => b.extend(c), new goongjs.LngLatBounds(coords[0], coords[0]));
-      map.fitBounds(bounds, { padding: 45, animate: true });
+      map.fitBounds(bounds, { padding: { top: 60, bottom: 50, left: 50, right: 70 }, animate: true });
     }
   }, []);
 
