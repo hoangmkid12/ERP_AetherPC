@@ -136,3 +136,18 @@ Ghi nhận thêm — đã sửa ở commit phần 4 (16/10/2026):
   xuất kho trước khi nghiệm thu, serial lạ, huỷ đơn khi kiện còn trên xe, Sales đóng kiện hoàn, khách tự xác nhận COD,
   QC thẩm định trước khi kiện về, hoàn tiền trước khi Kho phân luồng, nhập kệ 2 lần, chiết khấu POS >10%,
   sửa/xoá bút toán hệ thống). Script kiểm thử đã dùng: o2c / flows2 / exchange / p2p / payroll (cùng mẫu với mục 1).
+
+## 5. Đã cập nhật báo cáo (16/10/2026)
+
+Cả `AetherPC_KLTN.docx` (349 trang) và `_demo` (260 trang) đã sửa theo mục 2 + 4, PDF xuất lại:
+- Sơ đồ BPMN, hoạt động, tuần tự của 7 UC: Bán tại quầy, Xử lý đơn, Thẩm định hoàn trả, Nhập kho, Xuất kho
+  (thêm cổng "Lắp ráp đã nghiệm thu?"), Lắp ráp (cổng "Đơn đã xuất kho?", Serial của đơn), Giao hàng (thất bại
+  không hoàn kho). Nguồn `docs/diagrams/uml_seq/flows.py` + `specs.py`.
+- Lời văn 3.2 + bảng đặc tả 3.5 của các UC trên; Bảng 3.1/3.3; Bảng 3.21 thêm QT16–QT19.
+- Chương 4: Bảng 4.3 (chuyển trạng thái đơn bán), mục mới 4.3.6 + Bảng 4.4 (đổi trả, ghi nhận doanh thu, khoá bút toán),
+  chi phí lương 2 bút toán, dịch vụ xuất/hoàn kho dùng chung.
+- Chương 5: lời văn POS/đơn hàng/QC/lắp ráp/xuất kho; chụp lại Hình 5.28 (thẩm định đổi trả) và 5.30 (lắp ráp).
+- Chương 6: +20 test case lấy từ lần chạy 13/10 (tổng 138/138), Bảng 6.21 thêm 10 lỗi, đoạn mô tả đợt chạy thật.
+- CHƯA làm: 4 sơ đồ BPMN nghiệp vụ Hình 3.1–3.4 (.drawio, máy không có draw.io) — bảng bước 3.1/3.3 đã sửa chữ
+  nhưng hình vẫn là bản cũ; script đối chiếu `--apply` vẫn chưa chạy (bản xem trước 16/10 khớp mục 3.1).
+
