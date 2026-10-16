@@ -78,7 +78,7 @@ task(156, HR, 'Điều Chỉnh Thưởng /\nKhấu Trừ & Trình\nBan Giám Đ�
 task(156, BGD, 'Xem Xét Bảng Lương\n(Tổng Quỹ Lương)', w=24)
 gateway(182, BGD, 'Duyệt?', label_pos='below')
 # ── Kế Toán ──
-task(182, KT, 'Giải Ngân Lương &\nGhi Sổ Cái (Chi Phí)', w=24)
+task(182, KT, 'Giải Ngân Lương & Ghi\n2 Bút Toán (Thực Lĩnh;\nBH + Thuế TNCN)', w=24)
 # ── Nhân Viên ──
 task(206, NV, 'Xem Phiếu Lương\nCá Nhân', w=20)
 event(225, NV, 'Hoàn Tất\nKỳ Lương', end=True)

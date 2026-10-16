@@ -148,6 +148,7 @@ Cả `AetherPC_KLTN.docx` (349 trang) và `_demo` (260 trang) đã sửa theo m�
   chi phí lương 2 bút toán, dịch vụ xuất/hoàn kho dùng chung.
 - Chương 5: lời văn POS/đơn hàng/QC/lắp ráp/xuất kho; chụp lại Hình 5.28 (thẩm định đổi trả) và 5.30 (lắp ráp).
 - Chương 6: +20 test case lấy từ lần chạy 13/10 (tổng 138/138), Bảng 6.21 thêm 10 lỗi, đoạn mô tả đợt chạy thật.
-- CHƯA làm: 4 sơ đồ BPMN nghiệp vụ Hình 3.1–3.4 (.drawio, máy không có draw.io) — bảng bước 3.1/3.3 đã sửa chữ
-  nhưng hình vẫn là bản cũ; script đối chiếu `--apply` vẫn chưa chạy (bản xem trước 16/10 khớp mục 3.1).
+- Hình 3.1–3.4 đã sửa nhãn (draw.io bản Store: `C:/Program Files/WindowsApps/draw.io.draw.ioDiagrams_*/app/draw.io.exe
+  -x -f png -s 2 -o out.png in.drawio`; Hình 3.4 sinh bằng `quy_trinh_tinh_luong.py`), Bảng 3.2/3.4 sửa dòng tương ứng.
+- CHƯA làm: script đối chiếu `--apply` (bản xem trước 16/10 khớp mục 3.1).
 

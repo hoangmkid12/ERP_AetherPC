@@ -107,7 +107,7 @@
         <mxCell id="end_qc_lbl" value="Kết Thúc&lt;br/&gt;(Trả Hàng)" style="text;html=1;align=center;verticalAlign=top;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=10;fontColor=#222222;" vertex="1" parent="1">
           <mxGeometry x="1457" y="595.5" width="70" height="30" as="geometry" />
         </mxCell>
-        <mxCell id="k3" value="Nhập Kho Số Lượng&lt;br/&gt;Đạt &amp;amp; Quét Serial" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;strokeWidth=1.3;fontSize=10.5;fontColor=#1C2833;" vertex="1" parent="1">
+        <mxCell id="k3" value="Nhập Kho SL Đạt, Quét&lt;br/&gt;Serial; Đóng Đề Xuất,&lt;br/&gt;Phân Bổ Đơn Chờ Hàng" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;strokeWidth=1.3;fontSize=10.5;fontColor=#1C2833;" vertex="1" parent="1">
           <mxGeometry x="1215" y="397" width="150" height="60" as="geometry" />
         </mxCell>
         <mxCell id="a1" value="Lập Hoá Đơn NCC &amp;amp;&lt;br/&gt;Ghi Công Nợ Phải Trả&lt;br/&gt;(Theo Tỷ Lệ Đạt QC)" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;strokeWidth=1.3;fontSize=10.5;fontColor=#1C2833;" vertex="1" parent="1">
