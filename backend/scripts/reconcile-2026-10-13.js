@@ -1,3 +1,5 @@
+// ĐÃ CHẠY --apply ngày 16/10/2026 (bước 1–3 xong, bước 4 dừng giữa chừng) — KHÔNG chạy lại file này với --apply
+// (bước 2 trừ điểm không chặn chạy lặp). Phần còn lại: scripts/reconcile-2026-10-13-resume.js.
 // Đối chiếu & chuẩn hoá dữ liệu production ngày 13/10/2026. Mặc định chạy thử; thêm --apply để ghi.
 // Chạy: cd backend && node scripts/reconcile-2026-10-13.js [--apply]
 const { PrismaClient } = require('@prisma/client');

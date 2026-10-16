@@ -150,5 +150,8 @@ Cả `AetherPC_KLTN.docx` (349 trang) và `_demo` (260 trang) đã sửa theo m�
 - Chương 6: +20 test case lấy từ lần chạy 13/10 (tổng 138/138), Bảng 6.21 thêm 10 lỗi, đoạn mô tả đợt chạy thật.
 - Hình 3.1–3.4 đã sửa nhãn (draw.io bản Store: `C:/Program Files/WindowsApps/draw.io.draw.ioDiagrams_*/app/draw.io.exe
   -x -f png -s 2 -o out.png in.drawio`; Hình 3.4 sinh bằng `quy_trinh_tinh_luong.py`), Bảng 3.2/3.4 sửa dòng tương ứng.
-- CHƯA làm: script đối chiếu `--apply` (bản xem trước 16/10 khớp mục 3.1).
+- Script đối chiếu `--apply` chạy 16/10/2026 (sao lưu trước: `backups/before_reconcile_2026-10-16.json`, chỉ trên máy):
+  bước 1 đóng PR-03468130, bước 2 trừ 106 điểm customer_demo (3041 → 2935), bước 3 xoá bút toán mồ côi 47,5tr — XONG;
+  bước 4 dừng giữa chừng (đã tạo 45.084/77.340 serial OB-, còn 508 sản phẩm thiếu 32.256 serial); bước 5–6 CHƯA chạy.
+  Chạy tiếp: `cd backend && node scripts/reconcile-2026-10-13-resume.js` (KHÔNG chạy lại script gốc).
 
