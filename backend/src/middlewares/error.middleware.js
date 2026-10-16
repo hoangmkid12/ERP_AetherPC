@@ -22,6 +22,9 @@ const errorMiddleware = (err, req, res, next) => {
     if (err.code === 'P2025') {
       statusCode = 404;
       message = 'Không tìm thấy bản ghi cần thao tác (có thể đã bị xoá hoặc thay đổi).';
+    } else if (err.code === 'P2000') {
+      statusCode = 400;
+      message = 'Dữ liệu nhập vào quá dài so với giới hạn cho phép.';
     } else {
       statusCode = err.statusCode || 500;
       message = 'Lỗi truy vấn dữ liệu, vui lòng thử lại sau.';

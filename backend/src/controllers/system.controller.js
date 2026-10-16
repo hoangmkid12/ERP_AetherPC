@@ -382,9 +382,9 @@ const createBankAccount = async (req, res, next) => {
         accountNumber: cleanAccNo,
         accountHolder: cleanHolder,
         branch: branch ? String(branch).trim() : null,
-        purpose: purpose || 'GENERAL',
+        purpose: purpose ? String(purpose).trim() : 'GENERAL',
         isDefaultQr: shouldBeDefault,
-        status: 'ACTIVE'
+        status: req.body.status || 'ACTIVE'
       }
     });
 

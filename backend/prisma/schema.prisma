@@ -1132,7 +1132,7 @@ model CompanyBankAccount {
   accountNumber   String        @unique @map("account_number") @db.VarChar(50)
   accountHolder   String        @map("account_holder") @db.VarChar(150) // CTY TNHH AETHERPC ERP
   branch          String?       @db.VarChar(150)                       // Chi nhánh
-  purpose         String        @default("GENERAL") @db.VarChar(30)    // COLLECTION (Chuyên thu), DISBURSEMENT (Chuyên chi), GENERAL (Dùng chung)
+  purpose         String        @default("GENERAL") @db.VarChar(150)   // Mục đích sử dụng / ghi chú tài khoản
   currentBalance  Decimal       @default(0.00) @map("current_balance") @db.Decimal(15, 2)
   isDefaultQr     Boolean       @default(false) @map("is_default_qr") // Tài khoản nhận VietQR mặc định
   status          String        @default("ACTIVE") @db.VarChar(20)     // ACTIVE, INACTIVE
