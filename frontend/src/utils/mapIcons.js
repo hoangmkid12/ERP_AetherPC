@@ -76,7 +76,6 @@ export function createShipperElement({ heading = 0 } = {}) {
   el.className = 'shipper-puck-wrapper';
   el.style.width = '64px';
   el.style.height = '64px';
-  el.style.position = 'relative';
   el.style.cursor = 'pointer';
   el.style.userSelect = 'none';
 

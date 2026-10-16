@@ -421,7 +421,10 @@ export default function DeliveryNavigationModal({
     const initialHeading = compassHeadingRef.current || (typeof shipperLoc.heading === 'number' && !isNaN(shipperLoc.heading) ? shipperLoc.heading : 0);
 
     if (!markersRef.current.shipper) {
-      markersRef.current.shipper = new goongjs.Marker({ element: createShipperElement({ heading: initialHeading }) })
+      markersRef.current.shipper = new goongjs.Marker({
+        element: createShipperElement({ heading: initialHeading }),
+        anchor: 'center'
+      })
         .setLngLat(pos)
         .setPopup(new goongjs.Popup({ offset: 18 }).setHTML(`<strong>Vị Trí Của Bạn (Shipper)</strong><br/><span style="color:#16a34a;">● Đang phát tín hiệu GPS trực tiếp</span>`))
         .addTo(map);

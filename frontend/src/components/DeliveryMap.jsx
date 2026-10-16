@@ -316,7 +316,10 @@ export default function DeliveryMap({
       : null;
 
     if (!markersRef.current.shipper) {
-      markersRef.current.shipper = new goongjs.Marker({ element: createShipperElement({ heading: targetHeading || 0 }) })
+      markersRef.current.shipper = new goongjs.Marker({
+        element: createShipperElement({ heading: targetHeading || 0 }),
+        anchor: 'center'
+      })
         .setLngLat(newLngLat)
         .setPopup(new goongjs.Popup({ offset: 18 }).setHTML(`<div style="font-size:0.82rem;"><strong>${shipperName || 'Shipper AetherPC'}</strong>${shipperPhone ? `<br/>${shipperPhone}` : ''}<br/><span style="font-size:0.74rem;color:#1a73e8;">Đang di chuyển giao hàng</span></div>`))
         .addTo(map);
