@@ -406,7 +406,7 @@ export default function DeliveryNavigationModal({
     } else {
       markersRef.current.shipper = new goongjs.Marker({ element: createShipperElement({ heading: initialHeading }) })
         .setLngLat(pos)
-        .setPopup(new goongjs.Popup({ offset: 18 }).setHTML(`<strong>🛵 Vị Trí Của Bạn (Shipper)</strong><br/><span style="color:#16a34a;">● Đang phát tín hiệu GPS trực tiếp</span>`))
+        .setPopup(new goongjs.Popup({ offset: 18 }).setHTML(`<strong>Vị Trí Của Bạn (Shipper)</strong><br/><span style="color:#16a34a;">● Đang phát tín hiệu GPS trực tiếp</span>`))
         .addTo(map);
     }
 
@@ -715,11 +715,10 @@ export default function DeliveryNavigationModal({
               fontWeight: 700,
               display: 'flex',
               alignItems: 'center',
-              gap: '0.4rem',
+              gap: '0.45rem',
               boxShadow: '0 2px 8px rgba(0,0,0,0.25)'
             }}
           >
-            {isEffectiveGpsActive ? <Pause size={12} /> : <Navigation size={12} />}
             <span style={{
               width: '8px', height: '8px', borderRadius: '50%',
               backgroundColor: isEffectiveGpsActive ? '#4ade80' : '#f59e0b',
@@ -742,7 +741,7 @@ export default function DeliveryNavigationModal({
             gap: '0.45rem',
             boxShadow: '0 2px 8px rgba(0,0,0,0.25)'
           }}>
-            <span style={{ color: '#60a5fa' }}>🧭 {compassHeading}°</span>
+            <span style={{ color: '#60a5fa' }}>{compassHeading}°</span>
             <span>•</span>
             <span style={{ color: speedKmh > 0 ? '#4ade80' : '#94a3b8' }}>
               {speedKmh > 0 ? `${speedKmh} km/h` : 'Đang dừng'}
@@ -808,7 +807,7 @@ export default function DeliveryNavigationModal({
             <Navigation size={15} color="#1a73e8" style={{ transform: 'rotate(45deg)' }} />
           </div>
           <span style={{ flex: 1, textAlign: 'center' }}>
-            🧭 Mở Google Maps Dẫn Đường Giọng Nói
+            Mở Google Maps Dẫn Đường Giọng Nói
           </span>
           <ExternalLink size={15} style={{ opacity: 0.85 }} />
         </a>

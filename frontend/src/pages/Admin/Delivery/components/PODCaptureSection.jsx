@@ -536,7 +536,7 @@ export default function PODCaptureSection({ order, user, fmt, onConfirm, onRejec
                 fontWeight: 750, fontSize: '0.77rem', cursor: 'pointer', textAlign: 'center'
               }}
             >
-              💵 Tiền Mặt
+              Tiền Mặt
             </button>
             <button
               type="button"
@@ -550,7 +550,7 @@ export default function PODCaptureSection({ order, user, fmt, onConfirm, onRejec
                 fontWeight: 750, fontSize: '0.77rem', cursor: 'pointer', textAlign: 'center'
               }}
             >
-              📱 Quét QR/CK
+              Quét QR/CK
             </button>
             <button
               type="button"
@@ -564,14 +564,14 @@ export default function PODCaptureSection({ order, user, fmt, onConfirm, onRejec
                 fontWeight: 750, fontSize: '0.77rem', cursor: 'pointer', textAlign: 'center'
               }}
             >
-              🔀 Kết Hợp
+              Kết Hợp
             </button>
           </div>
 
           {/* CASH: xác nhận đơn giản */}
           {actualPaymentMethod === 'CASH' && (
             <div style={{ fontSize: '0.79rem', color: 'var(--success)', fontWeight: 600, padding: '0.4rem 0.6rem', backgroundColor: 'rgba(22,163,74,0.06)', borderRadius: '6px' }}>
-              ✅ Xác nhận thu đủ <strong>{fmt(codAmount)}</strong> tiền mặt từ khách.
+              Xác nhận thu đủ <strong>{fmt(codAmount)}</strong> tiền mặt từ khách.
               <br /><span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>Kế toán sẽ đối soát số tiền này với bạn sau khi giao.</span>
             </div>
           )}
@@ -580,11 +580,11 @@ export default function PODCaptureSection({ order, user, fmt, onConfirm, onRejec
           {actualPaymentMethod === 'SPLIT' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               <div style={{ fontSize: '0.77rem', color: '#b45309', fontWeight: 700 }}>
-                🔀 Thanh toán kết hợp — nhập số tiền từng hình thức:
+                Thanh toán kết hợp — nhập số tiền từng hình thức:
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: 'var(--success)', marginBottom: '0.15rem' }}>💵 Tiền mặt (đ)</label>
+                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: 'var(--success)', marginBottom: '0.15rem' }}>Tiền mặt (đ)</label>
                   <input
                     type="number"
                     inputMode="numeric"
@@ -595,7 +595,7 @@ export default function PODCaptureSection({ order, user, fmt, onConfirm, onRejec
                   />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: 'var(--primary)', marginBottom: '0.15rem' }}>📱 Chuyển khoản (đ)</label>
+                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: 'var(--primary)', marginBottom: '0.15rem' }}>Chuyển khoản (đ)</label>
                   <input
                     type="number"
                     inputMode="numeric"
@@ -614,12 +614,12 @@ export default function PODCaptureSection({ order, user, fmt, onConfirm, onRejec
               }}>
                 {cashAmt + bankAmt > 0 ? (
                   splitOk
-                    ? `✅ Tổng: ${fmt(cashAmt + bankAmt)} — Khớp đủ ${fmt(codAmount)}`
-                    : `⚠️ Tổng: ${fmt(cashAmt + bankAmt)} — Cần đủ ${fmt(codAmount)} (thiếu/dư ${fmt(Math.abs(cashAmt + bankAmt - codAmount))})`
+                    ? `Tổng: ${fmt(cashAmt + bankAmt)} — Khớp đủ ${fmt(codAmount)}`
+                    : `Tổng: ${fmt(cashAmt + bankAmt)} — Cần đủ ${fmt(codAmount)} (thiếu/dư ${fmt(Math.abs(cashAmt + bankAmt - codAmount))})`
                 ) : `Nhập số tiền mặt + chuyển khoản để tổng = ${fmt(codAmount)}`}
               </div>
               <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
-                💡 Tiền mặt: Kế Toán sẽ đối soát với bạn sau giao. Chuyển khoản: ghi nhận ngay.
+                Tiền mặt: Kế Toán sẽ đối soát với bạn sau giao. Chuyển khoản: ghi nhận ngay.
               </div>
             </div>
           )}
@@ -630,7 +630,7 @@ export default function PODCaptureSection({ order, user, fmt, onConfirm, onRejec
       {(actualPaymentMethod === 'BANK_TRANSFER' || actualPaymentMethod === 'SPLIT') && !isPrepaid && (
         <div style={{ padding: '0.9rem', borderRadius: 'var(--radius-md)', backgroundColor: 'rgba(37,99,235,0.08)', display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
           <strong style={{ color: 'var(--primary)', fontSize: '0.82rem' }}>
-            {actualPaymentMethod === 'SPLIT' ? '📱 Chuyển Khoản Phần (VietQR)' : 'Mã VietQR Thanh Toán Động (Napas247)'}
+            {actualPaymentMethod === 'SPLIT' ? 'Chuyển Khoản Phần (VietQR)' : 'Mã VietQR Thanh Toán Động (Napas247)'}
           </strong>
           {/* QR hiển thị đúng số tiền CK — SPLIT dùng bankAmt, còn lại dùng toàn bộ */}
           {(() => {
@@ -754,12 +754,12 @@ export default function PODCaptureSection({ order, user, fmt, onConfirm, onRejec
           />
           {!isPrepaid && (actualPaymentMethod === 'BANK_TRANSFER' || actualPaymentMethod === 'SPLIT') && !bankRefCode.trim() && (
             <div style={{ fontSize: '0.77rem', color: 'var(--danger)', fontWeight: 600, marginTop: '0.3rem', textAlign: 'center' }}>
-              ⚠️ Cần nhập Mã Giao Dịch Ngân Hàng trước khi xác nhận.
+              Cần nhập Mã Giao Dịch Ngân Hàng trước khi xác nhận.
             </div>
           )}
           {actualPaymentMethod === 'SPLIT' && bankRefCode.trim() && !splitOk && (
             <div style={{ fontSize: '0.77rem', color: 'var(--danger)', fontWeight: 600, marginTop: '0.3rem', textAlign: 'center' }}>
-              ⚠️ Tổng tiền mặt + chuyển khoản chưa khớp với giá trị đơn.
+              Tổng tiền mặt + chuyển khoản chưa khớp với giá trị đơn.
             </div>
           )}
         </div>
