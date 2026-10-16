@@ -152,6 +152,11 @@ Cả `AetherPC_KLTN.docx` (349 trang) và `_demo` (260 trang) đã sửa theo m�
   -x -f png -s 2 -o out.png in.drawio`; Hình 3.4 sinh bằng `quy_trinh_tinh_luong.py`), Bảng 3.2/3.4 sửa dòng tương ứng.
 - Script đối chiếu `--apply` chạy 16/10/2026 (sao lưu trước: `backups/before_reconcile_2026-10-16.json`, chỉ trên máy):
   bước 1 đóng PR-03468130, bước 2 trừ 106 điểm customer_demo (3041 → 2935), bước 3 xoá bút toán mồ côi 47,5tr — XONG;
-  bước 4 dừng giữa chừng (đã tạo 45.084/77.340 serial OB-, còn 508 sản phẩm thiếu 32.256 serial); bước 5–6 CHƯA chạy.
-  Chạy tiếp: `cd backend && node scripts/reconcile-2026-10-13-resume.js` (KHÔNG chạy lại script gốc).
+  bước 4–6 hoàn tất bằng `scripts/reconcile-2026-10-13-resume.js` (người dùng tự chạy): đủ 77.340 serial OB-, 0 sản phẩm thiếu
+  serial; bổ sung khoản thu COD cho ORD-551729, ORD-603601, ORD-413208, ORD-599756 (chờ Kế toán đối soát); chuẩn hoá 7/11 đơn.
+  KHÔNG chạy lại script gốc với --apply (bước 2 sẽ trừ điểm lần hai).
+- Còn cần người quyết định: 4 đơn ORD-143082, ORD-278680, ORD-576569, ORD-205210 có tổng tiền = tạm tính + 30.000đ ship,
+  tức giảm giá (500–700 nghìn) được ghi nhưng không trừ vào số tiền khách trả — phải xác định khách đã trả bao nhiêu rồi mới
+  sửa tay; 2 sản phẩm có serial khả dụng nhiều hơn tồn 1 chiếc (Logitech G Pro X TKL 1050103254: 41/40, HDD Seagate
+  Barracuda 2TB 1047243498: 17/16) — Kho kiểm kê.
 
