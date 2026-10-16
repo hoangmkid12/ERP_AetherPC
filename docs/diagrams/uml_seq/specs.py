@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-"""Đặc tả 24 sơ đồ tuần tự của mục 3.5 (mỗi tác nhân 1–2 use case tiêu biểu).
+"""Đặc tả 24 sơ đồ tuần tự của mục 3.5 (mỗi tác nhân 1-2 use case tiêu biểu).
 
-Chạy:  python docs/diagrams/uml_seq/specs.py   → sinh ucNN_seq.png cùng thư mục.
+Chạy:  python docs/diagrams/uml_seq/specs.py   -> sinh ucNN_seq.png cùng thư mục.
 Tên hàm điều khiển bám theo mã nguồn backend (auth.controller, order.controller,
 payment.controller, purchase.controller, warehouse.controller, ...).
 """
@@ -34,7 +34,7 @@ D['uc01'] = ([(A, KV), (B, GD), (C, CT), (E, KH), (X, GG), (X, EM)], [
         m(CT, KH, '2.2.2: findFirst(email | username | sdt)'),
         r(KH, CT, '2.2.3: return khachHangTrung'),
         alt(('[ĐÃ ĐƯỢC SỬ DỤNG]', [
-            r(CT, GD, '2.2.4: return loi("… đã được sử dụng bởi tài khoản khác")'),
+            r(CT, GD, '2.2.4: return loi("... đã được sử dụng bởi tài khoản khác")'),
             s(GD, '2.3: Hiển thị lỗi dưới ô nhập, giữ dữ liệu đã nhập'),
         ]), ('[HỢP LỆ]', [
             s(CT, '2.2.5: bcrypt.hash(matKhau)'),
@@ -84,7 +84,7 @@ D['uc02'] = ([(A, KV), (B, GD), (C, CT), (C, AI), (E, SP), (B, GH)], [
         ),
     m(KV, GD, '3: Chọn linh kiện cho một khe'),
     m(GD, CT, '3.1: kiemTraTuongThich(cauHinh)'),
-    s(CT, '3.1.1: So socket CPU–Mainboard, chuẩn RAM, công suất PSU, kích thước bo mạch–vỏ, socket tản nhiệt'),
+    s(CT, '3.1.1: So socket CPU-Mainboard, chuẩn RAM, công suất PSU, kích thước bo mạch-vỏ, socket tản nhiệt'),
     r(CT, GD, '3.2: return ketQua, tongGia'),
     alt(('[KHÔNG TƯƠNG THÍCH]', [
         s(GD, '3.3: Hiển thị cảnh báo tương thích (không chặn)'),
@@ -110,7 +110,7 @@ D['uc03'] = ([(A, KHG), (B, GD), (C, CT), (E, SP), (E, PR), (E, OD), (X, EM)], [
          ),
     s(CT, '2.1.3: Tính tạm tính, giảm giá hạng thành viên'),
     opt('[CÓ MÃ KHUYẾN MÃI]',
-        m(CT, PR, '2.1.4: resolvePromotion(maKhuyenMai, tamTinh) — findUnique(code)'),
+        m(CT, PR, '2.1.4: resolvePromotion(maKhuyenMai, tamTinh) - findUnique(code)'),
         r(PR, CT, '2.1.5: return khuyenMai'),
         s(CT, '2.1.6: Kiểm tra còn hiệu lực, đủ giá trị tối thiểu; máy chủ tự tính tiền giảm'),
         ),
@@ -157,7 +157,7 @@ D['uc04'] = ([(A, KHG), (B, GD), (C, CT), (X, SE), (E, OD), (E, PM), (E, LG)], [
         m(CT, LG, '2.1.7: create(INCOME, kênh BANK)'),
     ]), ('[THIẾU TIỀN / ĐƠN ĐÃ HỦY / CHUYỂN TRÙNG]', [
         m(CT, PM, '2.1.8: create(REFUND_PENDING, soTien)'),
-        m(CT, LG, '2.1.9: create(INCOME — chờ hoàn trả khách)'),
+        m(CT, LG, '2.1.9: create(INCOME - chờ hoàn trả khách)'),
     ])),
     r(CT, SE, '2.2: return success'),
     loop('[MỖI 3 GIÂY ĐẾN KHI CÓ KẾT QUẢ]',
@@ -228,7 +228,7 @@ D['uc06'] = ([(A, NV), (B, GD), (C, CT), (C, PE), (E, SP), (E, OD)], [
         s(GD, '3.3: Hiển thị lỗi, không tạo đơn'),
     ]), ('[HỢP LỆ]', [
         m(CT, OD, '3.1.3: create(đơn POS "Hoàn tất", khách theo SĐT hoặc khách lẻ, soldById)'),
-        m(CT, SP, '3.1.4: deductOrderStock() — trừ tồn, gán Serial, ghi giá vốn'),
+        m(CT, SP, '3.1.4: deductOrderStock() - trừ tồn, gán Serial, ghi giá vốn'),
         r(SP, CT, '3.1.5: return giaVon'),
         m(CT, OD, '3.1.6: create(khoản thu, bút toán thu "POS-<mã đơn>"), cộng điểm thành viên'),
         r(CT, GD, '3.4: return donHang'),
@@ -252,15 +252,15 @@ D['uc07'] = ([(A, NV), (B, GD), (C, CT), (E, OD), (E, SP), (E, OH), (X, EM)], [
     r(OD, CT, '3.1.2: return donHang (trạng thái hiện tại)'),
     s(CT, '3.1.3: orderTransitionError(donHang, "Đã xác nhận", vaiTro)'),
     alt(('[CHUYỂN TRẠNG THÁI KHÔNG HỢP LỆ]', [
-        r(CT, GD, '3.2: return loi("Không thể chuyển đơn từ … sang …")'),
+        r(CT, GD, '3.2: return loi("Không thể chuyển đơn từ ... sang ...")'),
         s(GD, '3.3: Hiển thị lỗi, đơn giữ nguyên'),
     ]), ('[HỢP LỆ]', [
         loop('[MỖI DÒNG SẢN PHẨM]',
-             m(CT, SP, '3.1.4: updateMany(tồn kho ≥ số lượng, trừ tồn), gán Serial'),
+             m(CT, SP, '3.1.4: updateMany(tồn kho >= số lượng, trừ tồn), gán Serial'),
              r(SP, CT, '3.1.5: return soDongCapNhat'),
              ),
         alt(('[TỒN KHO KHÔNG ĐỦ]', [
-            r(CT, GD, '3.4: return loi("Tồn kho không đủ") — hoàn tác giao dịch'),
+            r(CT, GD, '3.4: return loi("Tồn kho không đủ") - hoàn tác giao dịch'),
             s(GD, '3.5: Hiển thị lỗi, đơn chờ phân bổ khi nhập hàng'),
         ]), ('[THÀNH CÔNG]', [
             m(CT, OD, '3.1.6: update(Đã xác nhận), ghi giá vốn, tích điểm'),
@@ -280,11 +280,11 @@ D['uc08'] = ([(A, NV), (B, GD), (C, CT), (E, PR), (E, PO)], [
     loop('[MỖI NHÀ CUNG CẤP ĐƯỢC CHỌN]',
          m(GD, CT, '1.2: createPurchaseOrder(maNCC, dsSanPham, maPhieuDeXuat)'),
          opt('[LẬP TỪ PHIẾU ĐỀ XUẤT]',
-             m(CT, PR, '1.2.1: updateMany(Đã duyệt → Đã lập RFQ)'),
+             m(CT, PR, '1.2.1: updateMany(Đã duyệt -> Đã lập RFQ)'),
              ),
          m(CT, PO, '1.2.2: create(trạng thái RFQ, đơn giá = 0)'),
          m(GD, CT, '1.3: updatePurchaseOrderStatus(maRFQ, "Đã gửi NCC")'),
-         m(CT, PO, '1.3.1: updateMany(RFQ → Đã gửi NCC)'),
+         m(CT, PO, '1.3.1: updateMany(RFQ -> Đã gửi NCC)'),
          ),
     s(GD, '1.4: Thông báo đã gửi yêu cầu báo giá'),
     m(NV, GD, '2: Mở bảng so sánh khi nhà cung cấp đã phản hồi'),
@@ -299,7 +299,7 @@ D['uc08'] = ([(A, NV), (B, GD), (C, CT), (E, PR), (E, PO)], [
     m(CT, PO, '3.1.2: update(báo giá được chọn), hủy các báo giá còn lại'),
     m(NV, GD, '4: Bấm "Lập phiếu mua hàng"'),
     m(GD, CT, '4.1: issuePurchaseOrder(maBaoGia)'),
-    m(CT, PO, '4.1.1: create(phiếu mua hàng, Chờ BGĐ duyệt); báo giá → Đã chuyển'),
+    m(CT, PO, '4.1.1: create(phiếu mua hàng, Chờ BGĐ duyệt); báo giá -> Đã chuyển'),
     r(CT, GD, '4.2: return phieuMuaHang'),
     s(GD, '4.3: Thông báo đã trình Ban Giám đốc'),
 ])
@@ -334,7 +334,7 @@ D['uc09'] = ([(A, NCC), (B, GD), (C, CT), (E, PO), (E, POH)], [
 # ============ 10. Duyệt đơn mua hàng (Ban Giám đốc) ============
 BGD, GD, PE, AU = 'BAN GIÁM ĐỐC', 'GD_PHEDUYET', 'CTRL_PHANQUYEN', 'ENTITY_AUDITLOG'
 D['uc10'] = ([(A, BGD), (B, GD), (C, CT), (C, PE), (E, PO), (E, AU)], [
-    m(BGD, GD, '1: Mở "Trung tâm phê duyệt" → Đơn mua hàng'),
+    m(BGD, GD, '1: Mở "Trung tâm phê duyệt" -> Đơn mua hàng'),
     m(GD, CT, '1.1: getPurchaseOrders("Chờ BGĐ duyệt")'),
     m(CT, PO, '1.1.1: findMany()'),
     r(PO, CT, '1.1.2: return dsPhieu'),
@@ -348,7 +348,7 @@ D['uc10'] = ([(A, BGD), (B, GD), (C, CT), (C, PE), (E, PO), (E, AU)], [
         alt(('[KHÔNG CÓ QUYỀN]', [
             r(CT, GD, '3.2: return loi("Không có quyền duyệt PO")'),
         ]), ('[CÓ QUYỀN]', [
-            m(CT, PO, '3.1.3: updateMany(Chờ BGĐ duyệt → Đơn mua hàng), ghi lịch sử'),
+            m(CT, PO, '3.1.3: updateMany(Chờ BGĐ duyệt -> Đơn mua hàng), ghi lịch sử'),
             opt('[CẬP NHẬT THÀNH CÔNG]', m(CT, AU, '3.1.4: logAudit("APPROVE_PO")')),
             r(CT, GD, '3.3: return phieu (trạng thái hiện tại, không ghi đè)'),
             s(GD, '3.4: Hiển thị kết quả; phiếu xuất hiện trên cổng NCC'),
@@ -356,7 +356,7 @@ D['uc10'] = ([(A, BGD), (B, GD), (C, CT), (C, PE), (E, PO), (E, AU)], [
     ]), ('[TỪ CHỐI]', [
         m(BGD, GD, '4: Bấm "Từ chối", nhập lý do'),
         m(GD, CT, '4.1: updatePurchaseOrderStatus(maPO, "Đã hủy", lyDo)'),
-        m(CT, PO, '4.1.1: updateMany(→ Đã hủy, lý do), ghi lịch sử'),
+        m(CT, PO, '4.1.1: updateMany(-> Đã hủy, lý do), ghi lịch sử'),
         r(CT, GD, '4.2: return phieu'),
     ])),
 ])
@@ -364,7 +364,7 @@ D['uc10'] = ([(A, BGD), (B, GD), (C, CT), (C, PE), (E, PO), (E, AU)], [
 # ============ 11. Duyệt bảng lương toàn công ty (Ban Giám đốc) ============
 GD, CT, PL = 'GD_PHEDUYET', 'CTRL_HR', 'ENTITY_PAYROLL'
 D['uc11'] = ([(A, BGD), (B, GD), (C, CT), (C, PE), (E, PL), (E, AU)], [
-    m(BGD, GD, '1: Mở "Trung tâm phê duyệt" → Bảng lương'),
+    m(BGD, GD, '1: Mở "Trung tâm phê duyệt" -> Bảng lương'),
     m(GD, CT, '1.1: getPayrolls(kyLuong, "Chờ BGĐ duyệt")'),
     m(CT, PL, '1.1.1: findMany()'),
     r(PL, CT, '1.1.2: return dsPhieuLuong'),
@@ -376,7 +376,7 @@ D['uc11'] = ([(A, BGD), (B, GD), (C, CT), (C, PE), (E, PL), (E, AU)], [
         m(GD, CT, '3.1: approvePayrollCeo(kyLuong)'),
         m(CT, PE, '3.1.1: checkOperationalPermission("duyệt bảng lương")'),
         r(PE, CT, '3.1.2: return coQuyen'),
-        m(CT, PL, '3.1.3: updateMany(Đã duyệt – chờ giải ngân, nguoiDuyet)'),
+        m(CT, PL, '3.1.3: updateMany(Đã duyệt - chờ giải ngân, nguoiDuyet)'),
         m(CT, AU, '3.1.4: logAudit("Duyệt bảng lương")'),
         r(CT, GD, '3.2: return soPhieu'),
         s(GD, '3.3: Thông báo đã duyệt'),
@@ -453,7 +453,7 @@ D['uc14'] = ([(A, NK), (B, GD), (C, CT), (E, GR), (E, PO), (E, SN), (E, SP)], [
     s(GD, '1.3: Hiển thị số lượng được nhập'),
     m(NK, GD, '2: Quét Serial từng đơn vị, bấm "Duyệt phiếu nhập"'),
     m(GD, CT, '2.1: validateReceipt(maPhieu, dsSerial)'),
-    m(CT, GR, '2.1.1: updateMany(chưa duyệt → Đã duyệt)'),
+    m(CT, GR, '2.1.1: updateMany(chưa duyệt -> Đã duyệt)'),
     m(CT, PO, '2.1.2: Kiểm tra Đạt / Đạt một phần, lấy tỷ lệ đạt'),
     r(PO, CT, '2.1.3: return donMuaHang, tyLeDat'),
     s(CT, '2.1.4: Kiểm tra đủ số lượng, không trùng Serial'),
@@ -464,7 +464,7 @@ D['uc14'] = ([(A, NK), (B, GD), (C, CT), (E, GR), (E, PO), (E, SN), (E, SP)], [
         m(CT, SN, '2.1.5: createMany(dsSerial, Sẵn có)'),
         m(CT, SP, '2.1.6: update(+tồn kho, giá vốn bình quân gia quyền)'),
         m(CT, PO, '2.1.7: update(Đã nhận hàng)'),
-        s(CT, '2.1.8: afterReceiptValidated() — đóng đề xuất mua, allocateAwaitingOrders()'),
+        s(CT, '2.1.8: afterReceiptValidated() - đóng đề xuất mua, allocateAwaitingOrders()'),
         r(CT, GD, '2.4: return phieuNhap'),
         s(GD, '2.5: Thông báo nhập kho thành công'),
     ])),
@@ -517,7 +517,7 @@ D['uc16'] = ([(A, LR), (B, GD), (C, CT), (E, AJ), (E, OD), (X, EM)], [
         r(CT, GD, '2.2: return loi("Chờ duyệt đơn và xuất kho linh kiện")'),
         s(GD, '2.3: Hiển thị lỗi, lệnh giữ "Chờ tiếp nhận"'),
     ]), ('[ĐÃ XUẤT KHO]', [
-        s(CT, '2.1.3: orderSerialMap() — gán sẵn Serial đã xuất cho đơn'),
+        s(CT, '2.1.3: orderSerialMap() - gán sẵn Serial đã xuất cho đơn'),
         m(CT, AJ, '2.1.4: update(Đang lắp ráp, componentSerials)'),
         m(CT, OD, '2.1.5: update(Đang chuẩn bị hàng), ghi lịch sử'),
         r(CT, GD, '2.4: return lenhLapRap'),
@@ -548,18 +548,18 @@ SH, GD, WS, CT, PM, EM = 'NV GIAO HÀNG', 'GD_GIAOHANG', 'CTRL_WEBSOCKET', 'CTRL
 D['uc17'] = ([(A, SH), (B, GD), (C, WS), (C, CT), (E, OD), (E, PM), (X, EM)], [
     m(SH, GD, '1: Bấm "Nhận chuyến"'),
     m(GD, CT, '1.1: updateOrderStatus(maDon, "Đang giao")'),
-    s(CT, '1.1.1: orderTransitionError() — đơn phải được phân công cho chính shipper này'),
+    s(CT, '1.1.1: orderTransitionError() - đơn phải được phân công cho chính shipper này'),
     m(CT, OD, '1.1.2: update(Đang giao, shippedAt)'),
     r(CT, GD, '1.2: return donHang'),
     loop('[TRONG KHI ĐANG GIAO]',
          m(GD, WS, '2: SHIPPER_UPDATE_LOCATION(maDon, viDo, kinhDo)'),
-         s(WS, '2.1: canBroadcastLocation(maDon) — chỉ shipper được phân công'),
-         s(WS, '2.2: updateDeliveryLocation() — lưu vị trí, đẩy cho chủ đơn theo dõi'),
+         s(WS, '2.1: canBroadcastLocation(maDon) - chỉ shipper được phân công'),
+         s(WS, '2.2: updateDeliveryLocation() - lưu vị trí, đẩy cho chủ đơn theo dõi'),
          ),
     m(SH, GD, '3: Chụp ảnh xác nhận, thu tiền, bấm "Giao hàng thành công"'),
     m(GD, CT, '3.1: updateOrderStatus(maDon, "Đã giao", proofPhoto, cashAmount, bankAmount, bankRefCode)'),
     alt(('[KHÁCH VẮNG MẶT / TỪ CHỐI NHẬN]', [
-        m(CT, OD, '3.1.1: update(Giao không thành công / Đang hoàn về kho, lý do, ảnh) — chưa hoàn tồn'),
+        m(CT, OD, '3.1.1: update(Giao không thành công / Đang hoàn về kho, lý do, ảnh) - chưa hoàn tồn'),
     ]), ('[GIAO THÀNH CÔNG]', [
         m(CT, OD, '3.1.2: update(Đã giao, ảnh xác nhận, Đã thanh toán)'),
         alt(('[TIỀN MẶT COD]', [
@@ -583,8 +583,8 @@ D['uc18'] = ([(A, KT), (B, GD), (C, CT), (E, PO), (E, VB), (E, VP), (E, LG)], [
     r(CT, GD, '1.2: return dsDon, slNghiemThu'),
     m(KT, GD, '2: Chọn "Lập hóa đơn công nợ"'),
     m(GD, CT, '2.1: createVendorBill(maPO)'),
-    s(CT, '2.1.1: Đối chiếu 3 chứng từ: PO – phiếu nhập – hóa đơn'),
-    m(CT, VB, '2.1.2: create(tongTien = slDat × đơn giá)'),
+    s(CT, '2.1.1: Đối chiếu 3 chứng từ: PO - phiếu nhập - hóa đơn'),
+    m(CT, VB, '2.1.2: create(tongTien = slDat * đơn giá)'),
     r(CT, GD, '2.2: return hoaDon'),
     m(KT, GD, '3: Ghi nhận một đợt thanh toán (số tiền, hình thức)'),
     m(GD, CT, '3.1: registerPayment(maHoaDon, soTien, hinhThuc)'),
@@ -608,7 +608,7 @@ D['uc19'] = ([(A, KT), (B, GD), (C, CT), (E, PM), (E, LG), (E, AU), (B, GS), (A,
     opt('[NV GIAO HÀNG KHAI BÁO NỘP TIỀN]',
         m(SH, GS, '1: Bấm "Khai báo đã nộp tiền cho Kế toán"'),
         m(GS, CT, '1.1: remitMyCod()'),
-        m(CT, PM, '1.1.1: updateMany(CASH, chưa đối soát, chưa khai báo → remittedAt)'),
+        m(CT, PM, '1.1.1: updateMany(CASH, chưa đối soát, chưa khai báo -> remittedAt)'),
         m(CT, AU, '1.1.2: logAudit("REMIT_COD")'),
         r(CT, GS, '1.2: return soKhoan, tongTien'),
         s(GS, '1.3: Hiển thị "Đã khai báo nộp, chờ Kế toán xác nhận"'),
@@ -635,7 +635,7 @@ D['uc19'] = ([(A, KT), (B, GD), (C, CT), (E, PM), (E, LG), (E, AU), (B, GS), (A,
         s(CT, '4.1.7: Xác nhận (commit) giao dịch'),
         m(CT, AU, '4.1.8: logAudit("SETTLE_COD")'),
         r(CT, GD, '4.3: return soKhoan, tongTien'),
-        s(GD, '4.4: Báo "Đã đối soát thành công … đơn"'),
+        s(GD, '4.4: Báo "Đã đối soát thành công ... đơn"'),
     ])),
 ])
 
@@ -664,7 +664,7 @@ D['uc20'] = ([(A, NS), (B, GD), (C, CT), (C, PS), (E, AT), (E, PL)], [
         ),
     m(NS, GD, '3: Bấm "Trình Ban Giám đốc duyệt"'),
     m(GD, CT, '3.1: submitPayroll(kyLuong)'),
-    m(CT, PL, '3.1.1: updateMany(Nháp → Chờ BGĐ duyệt)'),
+    m(CT, PL, '3.1.1: updateMany(Nháp -> Chờ BGĐ duyệt)'),
     r(CT, GD, '3.2: return soPhieu'),
     s(GD, '3.3: Thông báo đã trình duyệt'),
 ])
@@ -683,7 +683,7 @@ D['uc21'] = ([(A, NVI), (B, GD), (C, FA), (C, CT), (E, EP), (E, AU)], [
          ),
     s(GD, '2.4: Tính vector trung bình, chụp ảnh mẫu'),
     m(GD, CT, '2.5: registerFace(vectorTB, anhMau)'),
-    m(CT, EP, '2.5.1: findUnique(nhanVien) — đã có mẫu?'),
+    m(CT, EP, '2.5.1: findUnique(nhanVien) - đã có mẫu?'),
     r(EP, CT, '2.5.2: return faceRegisteredAt'),
     alt(('[ĐÃ CÓ MẪU]', [
         r(CT, GD, '2.6: return loi("Đề nghị phòng nhân sự đặt lại")'),
@@ -715,7 +715,7 @@ D['uc22'] = ([(A, NVI), (B, GD), (C, FA), (C, CT), (E, EP), (E, AT), (E, AU)], [
     m(GD, CT, '2.3: checkAttendance(vector, anhChup)'),
     m(CT, EP, '2.3.1: findUnique(nhanVien)'),
     r(EP, CT, '2.3.2: return faceDescriptor, trangThai'),
-    s(CT, '2.3.3: euclideanDistance(mẫu, vector) ≤ 0,50?'),
+    s(CT, '2.3.3: euclideanDistance(mẫu, vector) <= 0,50?'),
     alt(('[KHÔNG KHỚP]', [
         m(CT, AU, '2.3.4: logAudit("FACE_CHECK", FAILED)'),
         r(CT, GD, '2.4: return loi("Khuôn mặt không khớp")'),
@@ -760,7 +760,7 @@ D['uc23'] = ([(A, ND), (B, GD), (B, GR), (C, CT), (E, EP), (E, SU), (E, KH), (E,
             r(CT, GD, '2.4: return loi'),
             s(GD, '2.5: Báo lỗi đăng nhập hoặc quá số lần thử'),
         ]), ('[CÓ MỘT YÊU CẦU THÀNH CÔNG]', [
-            s(CT, '2.6: issueSession(): ghi nhớ → JWT và cookie 30 ngày; không → cookie phiên'),
+            s(CT, '2.6: issueSession(): ghi nhớ -> JWT và cookie 30 ngày; không -> cookie phiên'),
             r(CT, GD, '2.7: return nguoiDung, vaiTro'),
             opt('[GHI NHỚ ĐĂNG NHẬP]',
                 s(GD, '2.8: navigator.credentials.store(taiKhoan, matKhau)'),
@@ -770,7 +770,7 @@ D['uc23'] = ([(A, ND), (B, GD), (B, GR), (C, CT), (E, EP), (E, SU), (E, KH), (E,
     ]), ('[QUÊN MẬT KHẨU]', [
         m(ND, GD, '3: Bấm "Quên mật khẩu?", nhập email, bấm "Gửi email xác nhận"'),
         m(GD, CT, '3.1: forgotPassword(email)'),
-        m(CT, KH, '3.1.1: findAccountByEmail(email) — khách hàng, nhân viên, NCC'),
+        m(CT, KH, '3.1.1: findAccountByEmail(email) - khách hàng, nhân viên, NCC'),
         r(KH, CT, '3.1.2: return taiKhoan'),
         opt('[TÀI KHOẢN TỒN TẠI VÀ ĐANG HOẠT ĐỘNG]',
             s(CT, '3.1.3: jwt.sign(purpose, id, fp = băm(passwordHash), 30 phút)'),
@@ -804,7 +804,7 @@ D['uc24'] = ([(A, QT), (B, GD), (C, CT), (E, RP), (E, EP), (E, AU)], [
     m(CT, RP, '1.1.1: findMany()'),
     r(RP, CT, '1.1.2: return maTran'),
     r(CT, GD, '1.2: return maTran'),
-    s(GD, '1.3: Hiển thị ma trận nghiệp vụ × vai trò'),
+    s(GD, '1.3: Hiển thị ma trận nghiệp vụ x vai trò'),
     m(QT, GD, '2: Bật / tắt quyền và bấm "Lưu"'),
     m(GD, CT, '2.1: updateRolePermissions(maTranMoi)'),
     s(CT, '2.1.1: Kiểm tra vai trò Quản trị viên, dữ liệu hợp lệ'),

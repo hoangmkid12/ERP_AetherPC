@@ -156,7 +156,7 @@
         <mxCell id="f7" value="Có" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#333333;strokeWidth=1.4;fontSize=9.5;fontColor=#444444;labelBackgroundColor=#FFFFFF;" edge="1" source="gw_ton" target="k1" parent="1">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="f8" value="Hàng về – tự phân bổ" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#333333;strokeWidth=1.4;fontSize=9.5;fontColor=#444444;labelBackgroundColor=#FFFFFF;" edge="1" parent="1">
+        <mxCell id="f8" value="Hàng về - tự phân bổ" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#333333;strokeWidth=1.4;fontSize=9.5;fontColor=#444444;labelBackgroundColor=#FFFFFF;" edge="1" parent="1">
           <mxGeometry relative="1" as="geometry">
             <mxPoint x="450" y="607" as="sourcePoint" />
             <mxPoint x="790" y="607" as="targetPoint" />

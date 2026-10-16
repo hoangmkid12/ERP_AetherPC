@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
-"""Luồng xử lý của 24 use case tiêu biểu — nguồn chung cho sơ đồ BPMN chức năng (mục 3.2)
+"""Luồng xử lý của 24 use case tiêu biểu - nguồn chung cho sơ đồ BPMN chức năng (mục 3.2)
 và sơ đồ hoạt động (mục 3.5). Bám theo mã nguồn nhánh feat/thanh-toan-sepay.
 
-Chạy:  python flows.py   → ucNN_bpmn.png và ucNN_act.png cùng thư mục.
+Chạy:  python flows.py   -> ucNN_bpmn.png và ucNN_act.png cùng thư mục.
 BPMN dùng nhãn rút gọn (SHORT) và bố cục ghi đè (BPMN_LAYOUT); sơ đồ hoạt động giữ đặc tả gốc.
 Nút: (id, làn, bước, lệch, loại, chữ). Cạnh: (từ, tới, nhãn, tùy chọn).
 """
@@ -182,7 +182,7 @@ FLOWS['uc09'] = dict(title='Phản Hồi Yêu Cầu Báo Giá', lanes=['Nhà Cun
 
 # 10 ---------------------------------------------------------------- Duyệt đơn mua hàng
 FLOWS['uc10'] = dict(title='Duyệt Đơn Mua Hàng', lanes=['Ban Giám Đốc', HT], nodes=[
-    S(), T('t1', 0, 1, 'Mở "Trung tâm phê duyệt" → Đơn mua hàng'),
+    S(), T('t1', 0, 1, 'Mở "Trung tâm phê duyệt" -> Đơn mua hàng'),
     T('t2', 1, 2, 'Hiển thị phiếu mua hàng chờ duyệt'),
     T('t3', 0, 3, 'Xem nhà cung cấp, đơn giá, báo giá gốc'),
     G('g1', 0, 3.8, 'Quyết định?'),
@@ -198,12 +198,12 @@ FLOWS['uc10'] = dict(title='Duyệt Đơn Mua Hàng', lanes=['Ban Giám Đốc',
 
 # 11 ---------------------------------------------------------------- Duyệt bảng lương toàn công ty
 FLOWS['uc11'] = dict(title='Duyệt Bảng Lương Toàn Công Ty', lanes=['Ban Giám Đốc', HT], nodes=[
-    S(), T('t1', 0, 1, 'Mở "Trung tâm phê duyệt" → Bảng lương'),
+    S(), T('t1', 0, 1, 'Mở "Trung tâm phê duyệt" -> Bảng lương'),
     T('t2', 1, 2, 'Hiển thị kỳ lương chờ duyệt, số nhân viên, tổng thực lĩnh'),
     T('t3', 0, 3, 'Xem chi tiết bảng lương từng nhân viên'),
     G('g1', 0, 3.8, 'Quyết định?'),
     T('t5', 0, 4.8, 'Nhập lý do trả về (bắt buộc)', 1),
-    T('t4', 1, 5, 'Kiểm tra quyền, chuyển "Đã duyệt – chờ giải ngân", ghi người duyệt'),
+    T('t4', 1, 5, 'Kiểm tra quyền, chuyển "Đã duyệt - chờ giải ngân", ghi người duyệt'),
     T('t6', 1, 6, 'Chuyển "Bị trả về", hiển thị lý do cho Nhân sự', 1),
     E(1, 7, 0.5)], edges=[
     ('s', 't1'), ('t1', 't2'), ('t2', 't3'), ('t3', 'g1'), ('g1', 't4', 'Phê duyệt'), ('g1', 't5', 'Trả về'),
@@ -317,7 +317,7 @@ FLOWS['uc18'] = dict(title='Thanh Toán Nhà Cung Cấp', lanes=['Nhân Viên K�
     S(), T('t1', 0, 1, 'Mở "Thanh toán đơn mua hàng", chọn đơn đã nhập kho'),
     T('t2', 1, 2, 'Hiển thị đơn mua và số lượng đã nghiệm thu'),
     T('t3', 0, 3, 'Chọn "Lập hóa đơn công nợ"'),
-    T('t4', 1, 4, 'Đối chiếu đơn mua – phiếu nhập – hóa đơn, tạo hóa đơn theo số lượng đạt'),
+    T('t4', 1, 4, 'Đối chiếu đơn mua - phiếu nhập - hóa đơn, tạo hóa đơn theo số lượng đạt'),
     T('t5', 0, 5, 'Ghi nhận một đợt thanh toán (số tiền, hình thức)'),
     G('g1', 1, 5.8, 'Số tiền hợp lệ?'),
     T('t6', 1, 6.8, 'Từ chối, yêu cầu nhập lại', 1),
@@ -343,7 +343,7 @@ FLOWS['uc19'] = dict(title='Đối Soát Tiền Thu Hộ', lanes=['Nhân Viên K
     T('t6', 1, 9.4, 'Trong một giao dịch: đánh dấu đã đối soát, ghi bút toán thu tiền mặt'),
     G('g2', 1, 10.2, 'Các khoản còn chờ?'),
     T('t7', 1, 11.2, 'Hủy giao dịch, báo tải lại danh sách', 1),
-    T('t8', 1, 11.2, 'Ghi nhật ký, báo "Đã đối soát thành công … đơn"'),
+    T('t8', 1, 11.2, 'Ghi nhật ký, báo "Đã đối soát thành công ... đơn"'),
     E(1, 12)], edges=[
     ('s', 'ts1'), ('ts1', 'ts2'), ('ts2', 't1'), ('t1', 't2'), ('t2', 't3'), ('t3', 'g1'),
     ('g1', 'm1', 'Đủ'), ('g1', 't4', 'Thiếu'), ('t4', 'm1'), ('m1', 't5'), ('t5', 't6'), ('t6', 'g2'),
@@ -441,7 +441,7 @@ FLOWS['uc24'] = dict(title='Quản Trị Tài Khoản, Phân Quyền Và Nhật 
 
 
 # ---------------------------------------------------------------------------------------------
-# Nhãn rút gọn cho sơ đồ BPMN (mục 3.2) — Viết Hoa, ngắn gọn như 4 sơ đồ quy trình nghiệp vụ.
+# Nhãn rút gọn cho sơ đồ BPMN (mục 3.2) - Viết Hoa, ngắn gọn như 4 sơ đồ quy trình nghiệp vụ.
 # Sơ đồ hoạt động (mục 3.5) vẫn dùng câu mô tả đầy đủ ở trên. Cổng không khai báo ở đây sẽ được
 # tự Viết Hoa từ câu hỏi gốc.
 SHORT = {
@@ -483,11 +483,11 @@ SHORT = {
     'uc09': dict(t1='Mở Mục Yêu Cầu Báo Giá', t2='Hiển Thị Yêu Cầu Chờ Phản Hồi', t3='Chọn Yêu Cầu, Xem Sản Phẩm & Số Lượng',
                  t4='Nhập Đơn Giá, Thời Gian Giao & Gửi', t5='Chọn Từ Chối, Nhập Lý Do',
                  t6='Lưu Đơn Giá, Chuyển "Đã Báo Giá"', t7='Chuyển "Đã Hủy" Kèm Lý Do'),
-    'uc10': dict(t1='Mở Trung Tâm Phê Duyệt – Đơn Mua Hàng', t2='Hiển Thị Phiếu Mua Hàng Chờ Duyệt',
+    'uc10': dict(t1='Mở Trung Tâm Phê Duyệt - Đơn Mua Hàng', t2='Hiển Thị Phiếu Mua Hàng Chờ Duyệt',
                  t3='Xem NCC, Đơn Giá, Báo Giá Gốc', t4='Nhập Lý Do Từ Chối', t5='Từ Chối Thao Tác',
                  t6='Chuyển "Đơn Mua Hàng", Ghi Nhật Ký, Gửi NCC', t7='Chuyển Phiếu "Đã Hủy" Kèm Lý Do'),
-    'uc11': dict(t1='Mở Trung Tâm Phê Duyệt – Bảng Lương', t2='Hiển Thị Kỳ Lương Chờ Duyệt & Tổng Thực Lĩnh',
-                 t3='Xem Chi Tiết Bảng Lương', t5='Nhập Lý Do Trả Về', t4='Chuyển "Đã Duyệt – Chờ Giải Ngân"',
+    'uc11': dict(t1='Mở Trung Tâm Phê Duyệt - Bảng Lương', t2='Hiển Thị Kỳ Lương Chờ Duyệt & Tổng Thực Lĩnh',
+                 t3='Xem Chi Tiết Bảng Lương', t5='Nhập Lý Do Trả Về', t4='Chuyển "Đã Duyệt - Chờ Giải Ngân"',
                  t6='Chuyển "Bị Trả Về", Báo Lý Do Cho Nhân Sự'),
     'uc12': dict(t1='Mở Đơn Mua Chờ Kiểm Định', t2='Hiển Thị Hàng Cần Kiểm Định',
                  t3='Đối Chiếu Hàng Thực Nhận, Ghi Tỷ Lệ Lấy Mẫu', t5='Nhập Số Lượng Đạt / Không Đạt',
@@ -547,7 +547,7 @@ for _k, _v in SHORT.items():
     FLOWS[_k]['short'] = _v
 
 # Bố cục riêng cho BPMN (làn ngang) ở những luồng mà vị trí dùng chung với sơ đồ hoạt động
-# làm đường nối cắt nhau hoặc chạy sát ô. Nút: id → (bước, lệch); cạnh: (từ, tới) → tùy chọn.
+# làm đường nối cắt nhau hoặc chạy sát ô. Nút: id -> (bước, lệch); cạnh: (từ, tới) -> tùy chọn.
 BPMN_LAYOUT = {
     'uc04': dict(edges={('t8', 't9'): {'midstep': 8.25}, ('t7', 't9'): {'midstep': 8.25}}),
     'uc10': dict(nodes={'t7': (5.8, -1), 'e': (6.8, 0)}),
