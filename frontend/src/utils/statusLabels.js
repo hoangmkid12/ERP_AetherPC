@@ -247,7 +247,7 @@ export const ATTENDANCE_STATUS = {
 export const ASSEMBLY_STATUS = {
   PENDING: { label: 'Chờ Tiếp Nhận', color: '#b45309', bg: '#fffbeb', border: '#fde68a' },
   ASSEMBLING: { label: 'Đang Lắp Ráp', color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe' },
-  COMPLETED: { label: 'Đã Hoàn Tất - Chờ Xuất Kho', color: '#047857', bg: '#ecfdf5', border: '#a7f3d0' },
+  COMPLETED: { label: 'Đã Nghiệm Thu - Chờ Xuất Kho', color: '#047857', bg: '#ecfdf5', border: '#a7f3d0' },
   CANCELLED: { label: 'Đã Hủy', color: '#be123c', bg: '#fff1f2', border: '#fecdd3' }
 };
 

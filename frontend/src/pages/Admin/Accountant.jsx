@@ -74,6 +74,8 @@ export default function Accountant() {
 
   const [allPOs, setAllPOs] = useState([]);
   const [loadingLedger, setLoadingLedger] = useState(false);
+  // Đang tải danh sách đơn lần đầu — Báo cáo KQKD hiện "đang tải" thay vì doanh thu 0đ khi mạng chậm
+  const [loadingOrders, setLoadingOrders] = useState(true);
 
   // Đối soát COD từ Shipper (accounting_settle_cod) — tiền mặt khách trả khi
   // nhận hàng, shipper đang giữ tới khi Kế Toán thu hồi thật.
@@ -214,7 +216,11 @@ export default function Accountant() {
   useEffect(() => {
     fetchBackendPOs();
     fetchLedgerData();
-    if (typeof getOrders === 'function') getOrders().catch(() => {});
+    if (typeof getOrders === 'function') {
+      Promise.resolve(getOrders()).catch(() => {}).finally(() => setLoadingOrders(false));
+    } else {
+      setLoadingOrders(false);
+    }
     if (typeof getReturnRequests === 'function') getReturnRequests().catch(() => {});
     if (typeof getPayrolls === 'function') getPayrolls().catch(() => {});
     loadCodSettlement();
@@ -2097,6 +2103,12 @@ export default function Accountant() {
               Kỳ tính toán: {reportStartDate || reportEndDate ? `${reportStartDate || 'Trước'} → ${reportEndDate || 'Hiện tại'}` : `Toàn bộ dữ liệu tài chính tích lũy`}
             </p>
 
+            {loadingOrders && orders.length === 0 ? (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', padding: '2rem', color: '#64748b', fontSize: '0.85rem' }}>
+                <RefreshCw size={16} style={{ animation: 'spin 1s linear infinite' }} />
+                <span>Đang tải dữ liệu đơn hàng để lập báo cáo...</span>
+              </div>
+            ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', fontSize: '0.85rem' }}>
               <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'baseline', gap: '0.5rem', padding: '0.75rem', backgroundColor: '#f8fafc', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
                 <strong style={{ color: '#334155', flex: '1 1 260px', minWidth: 0 }}>1. DOANH THU BÁN HÀNG (khách thanh toán, đã gồm VAT):</strong>
@@ -2133,6 +2145,7 @@ export default function Accountant() {
                 <strong style={{ color: '#1d4ed8', fontSize: '1.15rem', whiteSpace: 'nowrap' }}>{fmt(pnlNetProfit)}</strong>
               </div>
             </div>
+            )}
           </div>
 
           {/* VAT Tax Ledger */}

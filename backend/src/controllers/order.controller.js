@@ -2171,7 +2171,9 @@ const getReturnRequests = async (req, res, next) => {
         order: {
           include: {
             items: true,
-            statusHistory: { orderBy: { timestamp: 'desc' } }
+            statusHistory: { orderBy: { timestamp: 'desc' } },
+            // Serial thật đã xuất cho đơn — QC đối soát serial hàng khách trả về
+            serialNumbers: { select: { serial: true, productId: true, status: true } }
           }
         },
         customer: true

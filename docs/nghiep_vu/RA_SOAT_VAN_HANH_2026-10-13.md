@@ -98,8 +98,14 @@ hạng thật), QC (nhật ký thật; thẩm định kiện hoàn ORD-311404 qu
 - Đơn POS hiện kênh "Online Web" (nhận diện theo tiền tố mã POS- cũ) → nhận diện theo `soldById`.
 - Dashboard: kỹ thuật viên hiện email → hiện họ tên.
 - Nhật ký QC: mã quyết định cũ (APPROVE_REFUND…) hiện nhầm "TỪ CHỐI"; mã biên bản lặp "RMA-QA-RMA-".
-Ghi nhận thêm (chưa sửa): khi mạng chậm, Báo cáo KQKD hiện "0đ" doanh thu trong lúc đang tải danh sách đơn (nên có
-trạng thái đang tải); lệnh lắp ráp đã giao vẫn mang nhãn "Đã Hoàn Tất - Chờ Xuất Kho".
+Ghi nhận thêm — đã sửa ở commit phần 4 (16/10/2026):
+- Báo cáo KQKD hiện "0đ" khi đang tải danh sách đơn → có trạng thái "Đang tải dữ liệu đơn hàng".
+- Lệnh lắp ráp đã giao vẫn mang nhãn "Đã Hoàn Tất - Chờ Xuất Kho" → nhãn theo trạng thái thật của đơn
+  ("Đã Nghiệm Thu - Chờ Xuất Kho / Đang Giao / Đã Giao Khách / Đơn Hoàn/Hủy").
+- QC đổi trả: bỏ serial bịa "SN-RMA-xxxxxx", đối soát với serial thật đã xuất kho cho đơn (đơn nhiều linh kiện khớp
+  một trong các serial); nhãn trạng thái phiếu theo bước thật (Chờ hàng về kho / QC đạt — chờ Kho nhập / Đã nhập lại
+  kho / Đã đổi mới 1-1 / Đã hoàn tiền); nhật ký QC có thêm bộ lọc "Hoàn Kho"; bảng gọn một dòng, tên NCC rút gọn.
+- Bộ lọc ngày dùng chung: "7 ngày" → "Tuần này" (Thứ Hai → Chủ Nhật).
 
 ## 3. Việc CÒN LẠI cho phiên sau
 

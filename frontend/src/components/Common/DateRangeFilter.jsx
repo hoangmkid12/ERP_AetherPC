@@ -72,10 +72,13 @@ export default function DateRangeFilter({
         start = fmt(y, m, d);
         end = fmt(y, m, d);
         break;
-      case 'LAST_7_DAYS': {
-        const past = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-        start = fmt(past.getFullYear(), past.getMonth(), past.getDate());
-        end = fmt(y, m, d);
+      case 'THIS_WEEK': {
+        // Tuần làm việc theo lịch Việt Nam: Thứ Hai → Chủ Nhật của tuần hiện tại
+        const offset = (now.getDay() + 6) % 7;
+        const monday = new Date(y, m, d - offset);
+        const sunday = new Date(y, m, d - offset + 6);
+        start = fmt(monday.getFullYear(), monday.getMonth(), monday.getDate());
+        end = fmt(sunday.getFullYear(), sunday.getMonth(), sunday.getDate());
         break;
       }
       case 'THIS_MONTH': {
@@ -214,7 +217,7 @@ export default function DateRangeFilter({
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
         {[
           { key: 'TODAY', label: 'Hôm nay' },
-          { key: 'LAST_7_DAYS', label: '7 ngày' },
+          { key: 'THIS_WEEK', label: 'Tuần này' },
           { key: 'THIS_MONTH', label: 'Tháng này' },
           { key: 'THIS_QUARTER', label: 'Quý này' },
           { key: 'THIS_YEAR', label: 'Năm nay' },

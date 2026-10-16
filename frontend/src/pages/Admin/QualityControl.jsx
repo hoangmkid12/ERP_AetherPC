@@ -72,6 +72,18 @@ const extractDefectCategory = (text = '') => {
 };
 
 
+// Tên nhà cung cấp rút gọn cho bảng (bỏ loại hình doanh nghiệp) — tên đầy đủ xem khi rê chuột (title).
+const shortSupplierName = (name = '') => String(name || '')
+  .replace(/^(Công ty|Cty)\s+(TNHH|Cổ phần|CP|Thương mại)\s*/i, '')
+  .replace(/^(Công ty|Cty)\s+/i, '')
+  .replace(/\s*(Co\.,?\s*Ltd\.?|Pte\.?\s*Ltd\.?|Ltd\.?|JSC|Corp\.?)\s*/gi, ' ')
+  .replace(/\s*\((VN\s+)?Representative\)\s*/gi, ' ')
+  .replace(/\s+(Representative Office|Authorized Distributor|Office)$/i, '')
+  .replace(/\s{2,}/g, ' ')
+  .trim() || name;
+// Kiểu ô bảng một dòng, quá dài thì "…"
+const ellipsisCell = (maxWidth) => ({ maxWidth, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' });
+
 export default function QualityControl() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -851,6 +863,8 @@ export default function QualityControl() {
       const names = targetOrder.items.map(i => i.name).filter(Boolean);
       if (names.length > 0) return names.join(', ');
     }
+    const fromOrder = (rma.order?.items || []).map(i => i.name).filter(Boolean);
+    if (fromOrder.length > 0) return fromOrder.join(', ');
     return `Linh kiện đơn hàng #${rma.orderId || rma.id}`;
   };
 
@@ -858,8 +872,18 @@ export default function QualityControl() {
     if (!rma) return 'SN-UNKNOWN';
     if (rma.serial && rma.serial.trim()) return rma.serial;
     if (rma.serialNumber && rma.serialNumber.trim()) return rma.serialNumber;
-    const numPart = (rma.id || '').replace(/\D/g, '').slice(-6) || '883921';
-    return `SN-RMA-${numPart}`;
+    // Serial thật đã xuất kho cho đơn (máy chủ trả kèm order.serialNumbers). Không còn tự bịa
+    // "SN-RMA-xxxxxx" — không có dữ liệu thì để trống để QC quét serial trên linh kiện.
+    const real = (rma.order?.serialNumbers || []).map(s => s.serial).filter(Boolean);
+    return real.join(', ');
+  };
+  // Serial QC quét khớp hồ sơ xuất kho: trùng một trong các serial của đơn (đơn nhiều đơn vị có
+  // nhiều serial). Đơn cũ chưa có serial xuất kho thì chấp nhận serial QC quét thực tế.
+  const serialMatches = (actual, expected) => {
+    const a = String(actual || '').trim().toUpperCase();
+    const list = String(expected || '').split(',').map(x => x.trim().toUpperCase()).filter(Boolean);
+    if (!a) return false;
+    return list.length === 0 || list.includes(a) || a === list.join(', ');
   };
 
   const handleOpenRmaInspection = (rma) => {
@@ -921,7 +945,7 @@ export default function QualityControl() {
       return;
     }
 
-    const isMatched = trimmedActual.toUpperCase() === expectedSn.trim().toUpperCase();
+    const isMatched = serialMatches(trimmedActual, expectedSn);
 
     if (!isMatched && rmaDecision !== 'REJECT_RMA') {
       showToast(
@@ -1478,12 +1502,12 @@ export default function QualityControl() {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
               <thead>
                 <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569' }}>
-                  <th style={{ padding: '0.65rem 0.85rem' }}>Mã Đơn PO</th>
-                  <th style={{ padding: '0.65rem 0.85rem' }}>Thời Gian</th>
-                  <th style={{ padding: '0.65rem 0.85rem' }}>Nhà Cung Cấp</th>
-                  <th style={{ padding: '0.65rem 0.85rem', textAlign: 'center' }}>Số Lượng</th>
-                  <th style={{ padding: '0.65rem 0.85rem', textAlign: 'right' }}>Giá Trị Lô Hàng</th>
-                  <th style={{ padding: '0.65rem 0.85rem', textAlign: 'center' }}>Trạng Thái QA</th>
+                  <th style={{ padding: '0.65rem 0.85rem', whiteSpace: 'nowrap' }}>Mã PO</th>
+                  <th style={{ padding: '0.65rem 0.85rem', whiteSpace: 'nowrap' }}>Thời Gian</th>
+                  <th style={{ padding: '0.65rem 0.85rem', whiteSpace: 'nowrap' }}>Nhà Cung Cấp</th>
+                  <th style={{ padding: '0.65rem 0.85rem', textAlign: 'center', whiteSpace: 'nowrap' }}>Số Lượng</th>
+                  <th style={{ padding: '0.65rem 0.85rem', textAlign: 'right', whiteSpace: 'nowrap' }}>Giá Trị Lô</th>
+                  <th style={{ padding: '0.65rem 0.85rem', textAlign: 'center', whiteSpace: 'nowrap' }}>Trạng Thái QA</th>
                   <th style={{ padding: '0.65rem 0.85rem', textAlign: 'center', minWidth: '225px', width: '225px', whiteSpace: 'nowrap' }}>Thao Tác</th>
                 </tr>
               </thead>
@@ -1512,23 +1536,25 @@ export default function QualityControl() {
 
                     return (
                       <tr key={po.id || po.poNumber} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ padding: '0.65rem 0.85rem', fontWeight: 700, color: '#2563eb' }}>
+                        <td style={{ padding: '0.65rem 0.85rem', fontWeight: 700, color: '#2563eb', whiteSpace: 'nowrap' }}>
                           {po.poNumber || `PO-${po.id}`}
                         </td>
                         <td style={{ padding: '0.65rem 0.85rem', color: '#64748b', fontSize: '0.78rem', whiteSpace: 'nowrap' }}>
                           {formattedDate}
                         </td>
-                        <td style={{ padding: '0.65rem 0.85rem', fontWeight: 600, color: '#0f172a' }}>
-                          {po.supplier?.name || po.supplierCode || 'Nhà Cung Cấp'}
+                        <td title={po.supplier?.name || po.supplierCode || ''} style={{ padding: '0.65rem 0.85rem', fontWeight: 600, color: '#0f172a', ...ellipsisCell('220px') }}>
+                          {shortSupplierName(po.supplier?.name || po.supplierCode || 'Nhà Cung Cấp')}
                         </td>
-                        <td style={{ padding: '0.65rem 0.85rem', textAlign: 'center', fontWeight: 600 }}>
+                        <td style={{ padding: '0.65rem 0.85rem', textAlign: 'center', fontWeight: 600, whiteSpace: 'nowrap' }}>
                           {totalQty} chiếc
                         </td>
-                        <td style={{ padding: '0.65rem 0.85rem', textAlign: 'right', fontWeight: 700, color: '#16a34a' }}>
+                        <td style={{ padding: '0.65rem 0.85rem', textAlign: 'right', fontWeight: 700, color: '#16a34a', whiteSpace: 'nowrap' }}>
                           {formatPrice(po.totalAmount)}
                         </td>
-                        <td style={{ padding: '0.65rem 0.85rem', textAlign: 'center' }}>
+                        <td style={{ padding: '0.65rem 0.85rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
                           <span style={{
+                            whiteSpace: 'nowrap',
+                            display: 'inline-block',
                             backgroundColor: isPending ? '#fffbeb' : isPassed ? '#f0fdf4' : isRejected ? '#fef2f2' : '#fff7ed',
                             color: isPending ? '#b45309' : isPassed ? '#15803d' : isRejected ? '#dc2626' : '#c2410c',
                             border: `1px solid ${isPending ? '#fde68a' : isPassed ? '#bbf7d0' : isRejected ? '#fecaca' : '#fed7aa'}`,
@@ -1537,7 +1563,7 @@ export default function QualityControl() {
                             fontSize: '0.77rem',
                             fontWeight: 700
                           }}>
-                            {isPending ? 'CHỜ NGHIỆM THU' : isPassed ? 'CHO NHẬP KHO 100%' : isRejected ? 'TỪ CHỐI QC' : 'NHẬP 1 PHẦN'}
+                            {isPending ? 'CHỜ KIỂM ĐỊNH' : isPassed ? 'ĐẠT 100%' : isRejected ? 'TỪ CHỐI' : 'ĐẠT 1 PHẦN'}
                           </span>
                         </td>
                         <td style={{ padding: '0.65rem 0.85rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
@@ -1769,7 +1795,7 @@ export default function QualityControl() {
                 {[
                   { key: 'ALL', label: `Tất cả (${countAll})` },
                   { key: 'PENDING', label: `Chờ Thẩm Định / Nhập Kho (${countPending})` },
-                  { key: 'QC_PASSED', label: `Đã Duyệt Đổi Mới (${countPassed})` },
+                  { key: 'QC_PASSED', label: `Đã Duyệt (${countPassed})` },
                   { key: 'VENDOR_WARRANTY', label: `Gửi Hãng BH (${countVendor})` },
                   { key: 'REJECTED', label: `Từ Chối BH (${countRejected})` }
                 ].map(f => (
@@ -2028,7 +2054,7 @@ export default function QualityControl() {
                     >
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', flex: 1, minWidth: '280px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                          <span style={{ fontSize: '0.88rem', fontWeight: 800, color: '#8b5cf6' }}>{rma.id}</span>
+                          <span style={{ fontSize: '0.88rem', fontWeight: 800, color: '#8b5cf6', whiteSpace: 'nowrap' }}>{rma.rmaCode || rma.id}</span>
                           <span style={{ fontSize: '0.8rem', color: '#64748b' }}>• Đơn: <strong>#{rma.orderId || 'N/A'}</strong></span>
                           <span style={{
                             padding: '2px 8px',
@@ -2050,7 +2076,13 @@ export default function QualityControl() {
                             color: isPending ? '#b45309' : isPassed ? '#15803d' : isVendor ? '#c2410c' : '#dc2626',
                             border: `1px solid ${isPending ? '#fde68a' : isPassed ? '#86efac' : isVendor ? '#fdba74' : '#fca5a5'}`
                           }}>
-                            {isPending ? 'Chờ thẩm định' : isPassed ? 'Đã duyệt đổi mới' : isVendor ? 'Gửi hãng BH' : 'Từ chối BH'}
+                            {isPending
+                              ? (rma.status === 'DELIVERED_TO_WAREHOUSE' ? 'Chờ thẩm định' : 'Chờ hàng về kho')
+                              : rma.status === 'REFUNDED' ? 'Đã hoàn tiền'
+                              : rma.status === 'RESTOCKED' ? 'Đã nhập lại kho'
+                              : ['EXCHANGED', 'EXCHANGE_NEW'].includes(rma.status) ? 'Đã đổi mới 1-1'
+                              : rma.status === 'QC_PASSED' ? 'QC đạt — chờ Kho nhập'
+                              : isVendor ? 'Gửi hãng BH' : 'Từ chối BH'}
                           </span>
                         </div>
 
@@ -2058,9 +2090,11 @@ export default function QualityControl() {
                           <span style={{ fontWeight: 700, color: '#0f172a' }}>
                             {productName}
                           </span>
-                          <span style={{ fontSize: '0.77rem', backgroundColor: '#e2e8f0', color: '#334155', padding: '1px 5px', borderRadius: '4px', fontFamily: 'monospace', fontWeight: 700 }}>
-                            {serialNum}
-                          </span>
+                          {serialNum && (
+                            <span title={serialNum} style={{ fontSize: '0.74rem', backgroundColor: '#e2e8f0', color: '#334155', padding: '1px 6px', borderRadius: '4px', fontFamily: 'monospace', fontWeight: 700, maxWidth: '260px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              S/N: {serialNum}
+                            </span>
+                          )}
                           <span style={{ color: '#64748b', fontSize: '0.8rem' }}>
                             • KH: <strong>{rma.customerName || 'Khách lẻ'}</strong> ({rma.phone || 'N/A'})
                           </span>
@@ -2144,7 +2178,8 @@ export default function QualityControl() {
               {[
                 { key: 'ALL', label: 'Tất Cả Biên Bản' },
                 { key: 'INBOUND_PO', label: 'Hàng Nhập (PO)' },
-                { key: 'CUSTOMER_RMA', label: 'Đổi Trả (RMA)' }
+                { key: 'CUSTOMER_RMA', label: 'Đổi Trả (RMA)' },
+                { key: 'FAILED_DELIVERY_RESTOCK', label: 'Hoàn Kho' }
               ].map(f => (
                 <button
                   key={f.key}
@@ -2182,29 +2217,32 @@ export default function QualityControl() {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
               <thead>
                 <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569' }}>
-                  <th style={{ padding: '0.75rem 0.85rem', width: '140px', whiteSpace: 'nowrap' }}>Mã Biên Bản</th>
-                  <th style={{ padding: '0.75rem 0.85rem', width: '95px', whiteSpace: 'nowrap' }}>Thời Gian</th>
-                  <th style={{ padding: '0.75rem 0.85rem', width: '115px', whiteSpace: 'nowrap', textAlign: 'center' }}>Phân Loại</th>
-                  <th style={{ padding: '0.75rem 0.85rem', width: '140px', whiteSpace: 'nowrap' }}>Mã Đối Soát (PO / Đơn)</th>
-                  <th style={{ padding: '0.75rem 0.85rem', minWidth: '180px' }}>Đối Tượng / Khách Hàng</th>
-                  <th style={{ padding: '0.75rem 0.85rem', width: '135px', whiteSpace: 'nowrap' }}>Kiểm Định Viên</th>
-                  <th style={{ padding: '0.75rem 0.85rem', width: '135px', textAlign: 'center', whiteSpace: 'nowrap' }}>Kết Quả</th>
-                  <th style={{ padding: '0.75rem 0.85rem', minWidth: '180px' }}>Dạng Lỗi</th>
+                  <th style={{ padding: '0.65rem 0.75rem', whiteSpace: 'nowrap' }}>Mã Biên Bản</th>
+                  <th style={{ padding: '0.65rem 0.75rem', whiteSpace: 'nowrap' }}>Ngày</th>
+                  <th style={{ padding: '0.65rem 0.75rem', whiteSpace: 'nowrap', textAlign: 'center' }}>Phân Loại</th>
+                  <th style={{ padding: '0.65rem 0.75rem', whiteSpace: 'nowrap' }}>Mã PO / Đơn</th>
+                  <th style={{ padding: '0.65rem 0.75rem', whiteSpace: 'nowrap' }}>NCC / Khách Hàng</th>
+                  <th style={{ padding: '0.65rem 0.75rem', whiteSpace: 'nowrap' }}>Kiểm Định Viên</th>
+                  <th style={{ padding: '0.65rem 0.75rem', textAlign: 'center', whiteSpace: 'nowrap' }}>Kết Quả</th>
+                  <th style={{ padding: '0.65rem 0.75rem', whiteSpace: 'nowrap' }}>Dạng Lỗi</th>
                 </tr>
               </thead>
               <tbody>
                 {qaLogs
                   .filter(log => {
                     if (logFilter === 'INBOUND_PO') return log.type === 'INBOUND_PO' || !log.type;
+                    if (logFilter === 'FAILED_DELIVERY_RESTOCK') return log.type === 'FAILED_DELIVERY_RESTOCK';
                     if (logFilter === 'CUSTOMER_RMA') return log.type === 'CUSTOMER_RMA';
                     return true;
                   })
                   .filter(log => isDateInRange(log.date || log.createdAt, reportStartDate, reportEndDate))
                   .map((log, idx) => {
                     const isRma = log.type === 'CUSTOMER_RMA';
+                    const isRestock = log.type === 'FAILED_DELIVERY_RESTOCK';
+                    const cellPad = '0.6rem 0.75rem';
                     return (
                       <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ padding: '0.75rem 0.85rem', whiteSpace: 'nowrap' }}>
+                        <td style={{ padding: cellPad, whiteSpace: 'nowrap' }}>
                           <button
                             type="button"
                             onClick={() => setViewingLog(log)}
@@ -2214,9 +2252,9 @@ export default function QualityControl() {
                               border: 'none',
                               padding: 0,
                               fontFamily: 'monospace',
-                              fontSize: '0.85rem',
+                              fontSize: '0.78rem',
                               fontWeight: 800,
-                              color: isRma ? '#7c3aed' : '#2563eb',
+                              color: isRma ? '#7c3aed' : isRestock ? '#c2410c' : '#2563eb',
                               cursor: 'pointer',
                               textDecoration: 'none',
                               display: 'inline-flex',
@@ -2229,35 +2267,39 @@ export default function QualityControl() {
                             <span>{log.id}</span>
                           </button>
                         </td>
-                        <td style={{ padding: '0.75rem 0.85rem', color: '#64748b', fontSize: '0.78rem', whiteSpace: 'nowrap' }}>
-                          {log.date || '18/08/2026'}
+                        <td style={{ padding: cellPad, color: '#64748b', fontSize: '0.78rem', whiteSpace: 'nowrap' }}>
+                          {log.date || '—'}
                         </td>
-                        <td style={{ padding: '0.75rem 0.85rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                        <td style={{ padding: cellPad, textAlign: 'center', whiteSpace: 'nowrap' }}>
                           <span style={{
                             display: 'inline-block',
                             padding: '3px 8px',
                             borderRadius: '6px',
-                            fontSize: '0.75rem',
+                            fontSize: '0.72rem',
                             fontWeight: 700,
                             whiteSpace: 'nowrap',
-                            backgroundColor: isRma ? '#f5f3ff' : '#eff6ff',
-                            color: isRma ? '#7c3aed' : '#1d4ed8',
-                            border: `1px solid ${isRma ? '#ddd6fe' : '#bfdbfe'}`
+                            backgroundColor: isRma ? '#f5f3ff' : isRestock ? '#fff7ed' : '#eff6ff',
+                            color: isRma ? '#7c3aed' : isRestock ? '#c2410c' : '#1d4ed8',
+                            border: `1px solid ${isRma ? '#ddd6fe' : isRestock ? '#fed7aa' : '#bfdbfe'}`
                           }}>
-                            {isRma ? 'RMA ĐỔI TRẢ' : 'NHẬP KHO PO'}
+                            {isRma ? 'RMA ĐỔI TRẢ' : isRestock ? 'HOÀN KHO' : 'NHẬP KHO PO'}
                           </span>
                         </td>
-                        <td style={{ padding: '0.75rem 0.85rem', fontWeight: 700, color: '#0f172a', whiteSpace: 'nowrap', fontFamily: 'monospace', fontSize: '0.82rem' }}>
-                          {log.poNumber || log.rmaId || 'N/A'}
+                        <td style={{ padding: cellPad, fontWeight: 700, color: '#0f172a', whiteSpace: 'nowrap', fontFamily: 'monospace', fontSize: '0.78rem' }}>
+                          {log.poNumber || log.rmaId || log.orderId || '—'}
                         </td>
-                        <td style={{ padding: '0.75rem 0.85rem', fontWeight: 600, color: '#1e293b' }}>
-                          {log.supplierName || log.customerName || 'N/A'}
+                        <td title={log.supplierName || log.customerName || ''} style={{ padding: cellPad, fontWeight: 600, color: '#1e293b', ...ellipsisCell('200px') }}>
+                          {log.supplierName ? shortSupplierName(log.supplierName) : (log.customerName || '—')}
                         </td>
-                        <td style={{ padding: '0.75rem 0.85rem', color: '#475569', whiteSpace: 'nowrap' }}>
-                          {log.inspector}
+                        <td title={log.inspector || ''} style={{ padding: cellPad, color: '#475569', ...ellipsisCell('160px') }}>
+                          {log.inspector || '—'}
                         </td>
-                        <td style={{ padding: '0.75rem 0.85rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
-                          {isRma ? (
+                        <td style={{ padding: cellPad, textAlign: 'center', whiteSpace: 'nowrap' }}>
+                          {isRestock ? (
+                            <span style={{ fontWeight: 700, whiteSpace: 'nowrap', color: log.decision === 'CARRIER_DAMAGE_DISPUTE' ? '#dc2626' : '#16a34a' }}>
+                              {log.decision === 'CARRIER_DAMAGE_DISPUTE' ? 'HƯ HỎNG VC' : log.decision === 'RESTOCK_OUTLET' ? 'KỆ OPEN-BOX' : 'NHẬP LẠI KHO'}
+                            </span>
+                          ) : isRma ? (
                             <span style={{
                               fontWeight: 700,
                               whiteSpace: 'nowrap',
@@ -2271,8 +2313,8 @@ export default function QualityControl() {
                             </span>
                           )}
                         </td>
-                        <td style={{ padding: '0.75rem 0.85rem', fontSize: '0.78rem', color: '#475569' }}>
-                          {DEFECT_LABELS[log.defectCategory] || log.defectCategory || 'None'}
+                        <td title={DEFECT_LABELS[log.defectCategory] || log.defectCategory || ''} style={{ padding: cellPad, fontSize: '0.78rem', color: '#475569', ...ellipsisCell('220px') }}>
+                          {DEFECT_LABELS[log.defectCategory] || log.defectCategory || '—'}
                         </td>
                       </tr>
                     );
@@ -2363,9 +2405,9 @@ export default function QualityControl() {
                     <tbody>
                       {supplierScorecards.map(s => (
                         <tr key={s.supplierName} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                          <td style={{ padding: '0.65rem 0.7rem', fontWeight: 700, color: '#0f172a' }}>
-                            {s.supplierName}
-                            <div style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 500 }}>
+                          <td title={s.supplierName} style={{ padding: '0.65rem 0.7rem', fontWeight: 700, color: '#0f172a', ...ellipsisCell('190px') }}>
+                            {shortSupplierName(s.supplierName)}
+                            <div style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                               {s.rejectAllCount > 0 && `${s.rejectAllCount} lô bị hoàn trả toàn bộ`}
                               {s.rejectAllCount > 0 && s.partialCount > 0 && ' • '}
                               {s.partialCount > 0 && `${s.partialCount} lô nghiệm thu một phần`}
@@ -2758,7 +2800,7 @@ export default function QualityControl() {
         const expectedSerial = getRmaSerial(selectedRMA);
         const trimmedActual = (actualSerial || '').trim();
         const isSerialEmpty = !trimmedActual;
-        const isSerialMatched = !isSerialEmpty && trimmedActual.toUpperCase() === expectedSerial.trim().toUpperCase();
+        const isSerialMatched = !isSerialEmpty && serialMatches(trimmedActual, expectedSerial);
         const isSerialMismatch = !isSerialEmpty && !isSerialMatched;
 
         return (
@@ -2792,7 +2834,7 @@ export default function QualityControl() {
                     </div>
                     <div>
                       <span style={{ color: '#64748b' }}>Serial xuất bán: </span>
-                      <code style={{ color: '#2563eb', fontWeight: 700, backgroundColor: '#eff6ff', padding: '2px 6px', borderRadius: '4px' }}>{getRmaSerial(selectedRMA)}</code>
+                      <code style={{ color: '#2563eb', fontWeight: 700, backgroundColor: '#eff6ff', padding: '2px 6px', borderRadius: '4px' }}>{getRmaSerial(selectedRMA) || "Chưa có serial xuất kho"}</code>
                     </div>
                   </div>
                   <div style={{ marginTop: '0.35rem', paddingTop: '0.35rem', borderTop: '1px dashed #cbd5e1', color: '#dc2626', fontSize: '0.78rem' }}>
@@ -3705,7 +3747,7 @@ export default function QualityControl() {
 
                 <div style={{ marginTop: '0.4rem', paddingTop: '0.4rem', borderTop: '1px dashed #cbd5e1' }}>
                   <div>Linh Kiện Yêu Cầu: <strong style={{ color: '#2563eb' }}>{getRmaProductName(detailRMA)}</strong></div>
-                  <div style={{ marginTop: '0.2rem' }}>Mã Serial / IMEI: <code style={{ backgroundColor: '#e2e8f0', padding: '2px 6px', borderRadius: '4px', color: '#1e293b', fontWeight: 700 }}>{getRmaSerial(detailRMA)}</code></div>
+                  <div style={{ marginTop: '0.2rem' }}>Mã Serial / IMEI: <code style={{ backgroundColor: '#e2e8f0', padding: '2px 6px', borderRadius: '4px', color: '#1e293b', fontWeight: 700 }}>{getRmaSerial(detailRMA) || "Chưa có serial xuất kho"}</code></div>
                 </div>
               </div>
 

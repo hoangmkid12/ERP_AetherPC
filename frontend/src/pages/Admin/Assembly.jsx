@@ -275,8 +275,16 @@ export default function Assembly() {
   };
 
   // Status Badge Helper
-  const getJobStatusBadge = (status) => {
+  // Lệnh đã nghiệm thu: nhãn theo tiến độ thật của đơn hàng (máy chủ trả job.orderStatus) — trước đây
+  // lệnh đã giao xong cho khách vẫn mang nhãn "Đã Hoàn Tất - Chờ Xuất Kho".
+  const getJobStatusBadge = (status, job) => {
     const info = getStatusInfo(ASSEMBLY_STATUS, status);
+    const orderStatus = job?.orderStatus || (orders || []).find(o => o.orderId === job?.orderId || o.id === job?.orderId)?.status;
+    if (status === 'COMPLETED' && orderStatus) {
+      if (orderStatus === 'SHIPPED') return { bg: '#eff6ff', color: '#1d4ed8', border: '#bfdbfe', text: 'Đã Nghiệm Thu - Đang Giao' };
+      if (['DELIVERED', 'COMPLETED'].includes(orderStatus)) return { bg: '#f0fdf4', color: '#15803d', border: '#bbf7d0', text: 'Đã Nghiệm Thu - Đã Giao Khách' };
+      if (['RETURNING_TO_WAREHOUSE', 'CANCELLED', 'REFUNDED'].includes(orderStatus)) return { bg: '#f8fafc', color: '#475569', border: '#e2e8f0', text: 'Đã Nghiệm Thu - Đơn Hoàn/Hủy' };
+    }
     return { bg: info.bg, color: info.color, border: info.border, text: info.label };
   };
 
@@ -487,7 +495,7 @@ export default function Assembly() {
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
               {jobs.map(job => {
-                const badge = getJobStatusBadge(job.status);
+                const badge = getJobStatusBadge(job.status, job);
                 const checkedCount = Object.values(job.checklist || {}).filter(Boolean).length;
 
                 return (
@@ -581,7 +589,7 @@ export default function Assembly() {
                 </div>
               ) : (
                 filteredJobsList.map(job => {
-                  const badge = getJobStatusBadge(job.status);
+                  const badge = getJobStatusBadge(job.status, job);
                   const isSelected = job.id === activeJobId;
 
                   return (
@@ -644,11 +652,11 @@ export default function Assembly() {
                       borderRadius: '12px',
                       fontSize: '0.77rem',
                       fontWeight: 700,
-                      backgroundColor: getJobStatusBadge(activeJob.status).bg,
-                      color: getJobStatusBadge(activeJob.status).color,
-                      border: `1px solid ${getJobStatusBadge(activeJob.status).border}`
+                      backgroundColor: getJobStatusBadge(activeJob.status, activeJob).bg,
+                      color: getJobStatusBadge(activeJob.status, activeJob).color,
+                      border: `1px solid ${getJobStatusBadge(activeJob.status, activeJob).border}`
                     }}>
-                      {getJobStatusBadge(activeJob.status).text}
+                      {getJobStatusBadge(activeJob.status, activeJob).text}
                     </span>
                   </div>
                   <p style={{ margin: '0.25rem 0 0', fontSize: '0.8rem', color: '#64748b' }}>
