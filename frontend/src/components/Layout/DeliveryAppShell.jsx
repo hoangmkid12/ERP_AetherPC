@@ -129,7 +129,7 @@ export default function DeliveryAppShell({ children }) {
   const cskhCustomerName = `🚚 Shipper ${displayName} (${regionShortName})`;
   const cskhGreeting = () => ({
     sender: 'cskh',
-    text: 'Xin chào! Đây là kênh chat trực tiếp với CSKH dành cho Shipper — hãy nhắn nếu đơn hàng đang giao gặp vấn đề (khách từ chối nhận, sai địa chỉ, không liên lạc được...), CSKH sẽ hỗ trợ ngay.',
+    text: 'Xin chào! Đây là kênh nhắn tin trực tiếp với bộ phận chăm sóc khách hàng dành cho nhân viên giao hàng, hãy nhắn nếu đơn hàng đang giao gặp vấn đề (khách từ chối nhận, sai địa chỉ, không liên lạc được...), CSKH sẽ hỗ trợ ngay.',
     time: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
   });
 
@@ -142,6 +142,7 @@ export default function DeliveryAppShell({ children }) {
 
   // ── Thông báo thông minh cho Shipper (Hẹn giờ, Trễ hẹn, Đơn mới, Tiền mặt COD)
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
   const READ_NOTIFS_KEY = `aether_shipper_read_notifs_${userIdStr || 'unknown'}`;
   const [readNotifIds, setReadNotifIds] = useState(() => {
     try {
@@ -277,14 +278,20 @@ export default function DeliveryAppShell({ children }) {
         {/* Top Bar */}
         <div className="delivery-topbar" style={{ position: 'relative', zIndex: 100 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', minWidth: 0 }}>
-            <div style={{
-              width: '38px', height: '38px', borderRadius: '50%', flexShrink: 0,
-              background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary-hover) 100%)',
-              color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: '0.9rem', fontWeight: 800
-            }}>
+            <button
+              type="button"
+              onClick={() => setShowProfile(true)}
+              title="Tài khoản"
+              className="delivery-pressable"
+              style={{
+                width: '38px', height: '38px', borderRadius: '50%', flexShrink: 0, border: 'none', cursor: 'pointer',
+                background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary-hover) 100%)',
+                color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: '0.9rem', fontWeight: 800
+              }}
+            >
               {initials}
-            </div>
+            </button>
             <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
               <strong style={{ fontSize: '0.88rem', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {displayName}
@@ -326,7 +333,7 @@ export default function DeliveryAppShell({ children }) {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-            <button type="button" onClick={openChatModal} className="delivery-icon-btn" title="Chat với CSKH" style={{ position: 'relative' }}>
+            <button type="button" onClick={openChatModal} className="delivery-icon-btn" title="Nhắn tin với chăm sóc khách hàng" style={{ position: 'relative' }}>
               <MessageCircle size={18} />
               {hasUnreadChat && (
                 <span style={{
@@ -359,10 +366,53 @@ export default function DeliveryAppShell({ children }) {
                 </span>
               )}
             </button>
-            <button type="button" onClick={handleLogout} className="delivery-icon-btn" title="Đăng xuất">
-              <LogOut size={18} />
-            </button>
           </div>
+
+          {/* Menu cá nhân: thông tin, trạng thái nhận đơn, đăng xuất */}
+          {showProfile && (
+            <>
+              <div
+                onClick={() => setShowProfile(false)}
+                style={{ position: 'fixed', inset: 0, zIndex: 9998, background: 'rgba(15, 23, 42, 0.35)' }}
+              />
+              <div style={{
+                position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 9999, maxWidth: '480px', margin: '0 auto',
+                backgroundColor: 'var(--bg-primary)', borderRadius: '16px 16px 0 0', padding: '0.6rem 1rem calc(1rem + env(safe-area-inset-bottom))',
+                boxShadow: '0 -8px 24px rgba(15,23,42,0.15)'
+              }}>
+                <div style={{ width: '40px', height: '4px', borderRadius: '999px', backgroundColor: 'var(--border-glass)', margin: '0 auto 0.9rem' }} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.7rem', marginBottom: '0.9rem' }}>
+                  <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary-hover) 100%)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800 }}>{initials}</div>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--text-primary)' }}>{displayName}</div>
+                    <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Nhân viên giao hàng · {regionShortName}</div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={toggleShipperStatus}
+                  style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.6rem', padding: '0.75rem 0.85rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-glass)', backgroundColor: 'var(--bg-app)', cursor: 'pointer', textAlign: 'left', marginBottom: '0.6rem' }}
+                >
+                  <span>
+                    <span style={{ display: 'block', fontSize: '0.86rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                      {shipperStatus.isOnline ? 'Đang sẵn sàng nhận đơn' : 'Đang tạm dừng nhận đơn'}
+                    </span>
+                    <span style={{ display: 'block', fontSize: '0.72rem', color: 'var(--text-muted)' }}>Trạng thái này lưu trên thiết bị của bạn</span>
+                  </span>
+                  <span style={{ position: 'relative', width: '40px', height: '22px', borderRadius: '999px', flexShrink: 0, backgroundColor: shipperStatus.isOnline ? 'var(--success)' : 'var(--border-glass)' }}>
+                    <span style={{ position: 'absolute', top: '3px', left: shipperStatus.isOnline ? '21px' : '3px', width: '16px', height: '16px', borderRadius: '50%', backgroundColor: '#fff', boxShadow: '0 1px 2px rgba(0,0,0,0.3)', transition: 'left var(--transition-fast)' }} />
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.45rem', padding: '0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid rgba(220,38,38,0.35)', backgroundColor: 'rgba(220,38,38,0.06)', color: 'var(--danger)', fontSize: '0.86rem', fontWeight: 800, cursor: 'pointer' }}
+                >
+                  <LogOut size={17} /> Đăng xuất
+                </button>
+              </div>
+            </>
+          )}
 
           {/* Notifications Dropdown anchored to Topbar */}
           {showNotifications && (

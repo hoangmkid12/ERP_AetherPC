@@ -617,7 +617,7 @@ export default function Delivery() {
     try {
       const result = await rejectAssignment(ordId, user, reason);
       if (result?.success) {
-        addNotification(`Đã từ chối đơn #${ordId}. Kho sẽ phân công lại cho shipper khác.`, 'info');
+        addNotification(`Đã từ chối đơn #${ordId}. Kho sẽ phân công lại cho người khác.`, 'info');
       } else {
         addNotification(result?.message || `Không thể từ chối đơn #${ordId}.`, 'error');
       }
@@ -685,7 +685,7 @@ export default function Delivery() {
     if (!isManagerOrAdmin) {
       const matchedOrder = orders.find(o => String(o.orderId || o.id) === String(ret.orderId));
       if (matchedOrder && !isShipperMatched(matchedOrder)) {
-        notify(`Chỉ Shipper đã trực tiếp giao đơn #${ret.orderId} (${matchedOrder.assignedShipperName || matchedOrder.assignedShipper}) mới có quyền thu hồi đơn này!`, 'error');
+        notify(`Chỉ nhân viên giao hàng đã trực tiếp giao đơn #${ret.orderId} (${matchedOrder.assignedShipperName || matchedOrder.assignedShipper}) mới có quyền thu hồi đơn này!`, 'error');
         return;
       }
     }
@@ -702,14 +702,14 @@ export default function Delivery() {
     if (!isManagerOrAdmin) {
       const matchedOrder = orders.find(o => String(o.orderId || o.id) === String(ret.orderId));
       if (matchedOrder && !isShipperMatched(matchedOrder)) {
-        notify(`Chỉ Shipper đã trực tiếp giao đơn #${ret.orderId} mới có quyền bàn giao kiện hàng về kho!`, 'error');
+        notify(`Chỉ nhân viên giao hàng đã trực tiếp giao đơn #${ret.orderId} mới có quyền bàn giao kiện hàng về kho!`, 'error');
         return;
       }
     }
     try {
       await updateReturnStatus(ret.id, 'DELIVERED_TO_WAREHOUSE', { note: `Shipper ${user?.fullname || user?.username} đã bàn giao kiện hàng về kho cho QC` });
       setApiReturns(prev => prev.map(item => item.id === ret.id ? { ...item, status: 'DELIVERED_TO_WAREHOUSE' } : item));
-      addNotification('Đã bàn giao kiện hàng về kho thành công! Chờ QC kiểm định.', 'success');
+      addNotification('Đã bàn giao kiện hàng về kho thành công! Chờ bộ phận kiểm định.', 'success');
     } catch (err) {
       addNotification(`Không thể bàn giao: ${err.message || 'lỗi kết nối máy chủ'}.`, 'error');
     }
@@ -719,7 +719,7 @@ export default function Delivery() {
     if (!isManagerOrAdmin) {
       const matchedOrder = orders.find(o => String(o.orderId || o.id) === String(ret.orderId));
       if (matchedOrder && !isShipperMatched(matchedOrder)) {
-        notify(`Chỉ Shipper phụ trách đơn #${ret.orderId} mới có quyền nhận hàng trả lại cho khách!`, 'error');
+        notify(`Chỉ nhân viên giao hàng phụ trách đơn #${ret.orderId} mới có quyền nhận hàng trả lại cho khách!`, 'error');
         return;
       }
     }
@@ -738,7 +738,7 @@ export default function Delivery() {
     if (!isManagerOrAdmin) {
       const matchedOrder = orders.find(o => String(o.orderId || o.id) === String(ret.orderId));
       if (matchedOrder && !isShipperMatched(matchedOrder)) {
-        notify(`Chỉ Shipper phụ trách đơn #${ret.orderId} mới có quyền xác nhận hoàn trả!`, 'error');
+        notify(`Chỉ nhân viên giao hàng phụ trách đơn #${ret.orderId} mới có quyền xác nhận hoàn trả!`, 'error');
         return;
       }
     }
@@ -1230,8 +1230,11 @@ export default function Delivery() {
           failedCount={failedCount}
           countAwaiting={countAwaiting}
           totalCodCollected={totalCodCollected}
+          backlogCount={backlogCount}
           onClaim={handleClaimOrder}
           onGoToReturns={() => setTab('returns')}
+          onGoToActive={() => setTab('active')}
+          onGoToPending={() => setTab('pending')}
         />
       )}
 

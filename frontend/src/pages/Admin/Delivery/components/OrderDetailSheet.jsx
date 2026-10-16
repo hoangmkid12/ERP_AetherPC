@@ -70,7 +70,7 @@ export default function OrderDetailSheet({ order: ord, onClose, fmt, actions = {
               <CreditCard size={16} /> Thanh Toán
             </div>
             <Row label="Tổng tiền đơn hàng" value={formatMoney(codAmount)} />
-            <Row label="Hình thức đặt hàng" value={isPrepaid ? 'Đã trả online' : 'Thu hộ khi nhận hàng (COD)'} />
+            <Row label="Hình thức đặt hàng" value={isPrepaid ? 'Đã trả trước' : 'Thu tiền khi giao hàng'} />
 
             {isDelivered ? (
               <>
@@ -205,7 +205,7 @@ export default function OrderDetailSheet({ order: ord, onClose, fmt, actions = {
               {ord.returnProofPhoto ? (
                 <img src={ord.returnProofPhoto} alt="Return Proof" style={{ width: '100%', borderRadius: 'var(--radius-md)', display: 'block', marginBottom: '0.6rem' }} />
               ) : (
-                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '0.6rem' }}>Shipper đã bỏ qua chụp ảnh cho lần hoàn kho này.</div>
+                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '0.6rem' }}>Nhân viên giao hàng đã bỏ qua chụp ảnh cho lần hoàn kho này.</div>
               )}
               {ord.returnNote && <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Ghi chú: {ord.returnNote}</div>}
             </div>

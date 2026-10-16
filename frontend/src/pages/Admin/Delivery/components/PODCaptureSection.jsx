@@ -572,7 +572,7 @@ export default function PODCaptureSection({ order, user, fmt, onConfirm, onRejec
           {actualPaymentMethod === 'CASH' && (
             <div style={{ fontSize: '0.79rem', color: 'var(--success)', fontWeight: 600, padding: '0.4rem 0.6rem', backgroundColor: 'rgba(22,163,74,0.06)', borderRadius: '6px' }}>
               ✅ Xác nhận thu đủ <strong>{fmt(codAmount)}</strong> tiền mặt từ khách.
-              <br /><span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>Tiền sẽ được Kế Toán đối soát COD với bạn sau khi giao.</span>
+              <br /><span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>Kế toán sẽ đối soát số tiền này với bạn sau khi giao.</span>
             </div>
           )}
 

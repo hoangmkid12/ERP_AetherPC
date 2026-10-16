@@ -56,7 +56,7 @@ export default function DeliveryNotificationSheet({
       case 'NEW_ORDER':
         return { bg: 'rgba(16, 185, 129, 0.12)', text: '#059669', label: 'ĐƠN MỚI TẠI KHO' };
       case 'COD_THRESHOLD':
-        return { bg: 'rgba(139, 92, 246, 0.12)', text: '#7c3aed', label: 'NHẮC TIỀN MẶT COD' };
+        return { bg: 'rgba(139, 92, 246, 0.12)', text: '#7c3aed', label: 'NHẮC NỘP TIỀN THU HỘ' };
       case 'RETURNING_REMINDER':
         return { bg: 'rgba(249, 115, 22, 0.12)', text: '#ea580c', label: 'HOÀN KHO' };
       default:

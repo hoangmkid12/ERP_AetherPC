@@ -23,6 +23,14 @@ export default function OrderCard({ order: ord, variant, fmt, getOrderTimeClassi
   const isHCM = addrStr.includes('hồ chí minh') || addrStr.includes('hcm') || addrStr.includes('tp.hcm') || addrStr.includes('quận');
 
   const orderId = String(ord.orderId || ord.id || '');
+  const phoneDigits = String(ord.phone || '').replace(/[^\d+]/g, '');
+  const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(ord.shippingAddress || '')}`;
+  const showContactActions = variant !== 'history' && !isDelivered;
+  const contactBtn = {
+    flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem',
+    padding: '0.5rem', borderRadius: 'var(--radius-md)', fontSize: '0.8rem', fontWeight: 700,
+    textDecoration: 'none', border: '1px solid var(--border-glass)', backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)'
+  };
   const isEffectiveGps = Boolean(
     isGpsActive ||
     (orderId && typeof window !== 'undefined' && localStorage.getItem('aether_active_gps_order_id') === orderId)
@@ -124,16 +132,34 @@ export default function OrderCard({ order: ord, variant, fmt, getOrderTimeClassi
         </span>
       </div>
 
+      {/* Thao tác nhanh: gọi khách, mở chỉ đường */}
+      {showContactActions && (
+        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.55rem' }} onClick={(e) => e.stopPropagation()}>
+          {phoneDigits && (
+            <a href={`tel:${phoneDigits}`} className="delivery-tap-target" style={{ ...contactBtn, color: 'var(--success)' }}>
+              <Phone size={15} /> Gọi khách
+            </a>
+          )}
+          {ord.shippingAddress && (
+            <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="delivery-tap-target" style={{ ...contactBtn, color: 'var(--primary)' }}>
+              <MapPin size={15} /> Chỉ đường
+            </a>
+          )}
+        </div>
+      )}
+
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.77rem', color: 'var(--text-muted)', marginBottom: '0.55rem' }}>
         <Clock size={12} />
         <span>
-          {isDelivered 
-            ? `Đã giao: ${timeInfo.formatted}` 
-            : isAwaiting 
-              ? 'Chờ khách gọi lại (24h)' 
-              : isOrderRedelivery(ord) 
-                ? `Giao lại hôm nay: ${timeInfo.formatted}` 
-                : timeInfo.formatted}
+          {isDelivered
+            ? `Đã giao lúc ${timeInfo.formatted}`
+            : isAwaiting
+              ? 'Chờ khách gọi lại (24h)'
+              : isOrderRedelivery(ord)
+                ? `Giao lại hôm nay: ${timeInfo.formatted}`
+                : variant === 'pending'
+                  ? `Kho bàn giao lúc ${timeInfo.formatted}`
+                  : `Nhận hàng lúc ${timeInfo.formatted}`}
         </span>
       </div>
 
@@ -153,7 +179,7 @@ export default function OrderCard({ order: ord, variant, fmt, getOrderTimeClassi
         }}>
           {isDelivered
             ? (ord.actualPaymentMethod === 'CASH' ? 'ĐÃ THU TIỀN MẶT' : ord.actualPaymentMethod === 'BANK_TRANSFER' ? 'ĐÃ THU CHUYỂN KHOẢN' : isPrepaid ? 'ĐÃ TRẢ TRƯỚC' : 'ĐÃ THU')
-            : (isPrepaid ? 'ĐÃ TRẢ ONLINE' : 'CẦN THU COD')}
+            : (isPrepaid ? 'ĐÃ TRẢ TRƯỚC' : 'CẦN THU HỘ')}
         </span>
         <strong style={{
           fontSize: '0.92rem',
@@ -180,7 +206,7 @@ export default function OrderCard({ order: ord, variant, fmt, getOrderTimeClassi
             type="button"
             className="delivery-tap-target"
             onClick={() => actions.onRejectAssignment && actions.onRejectAssignment(ord)}
-            title="Từ chối nhận đơn này — quay lại chờ Kho phân công cho shipper khác"
+            title="Từ chối nhận đơn này, đơn quay lại chờ Kho phân công người khác"
             style={{ flexShrink: 0, backgroundColor: 'transparent', color: 'var(--danger)', border: '1px solid var(--danger)', borderRadius: 'var(--radius-md)', padding: '0.65rem 0.85rem', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer' }}
           >
             Từ Chối
@@ -209,13 +235,13 @@ export default function OrderCard({ order: ord, variant, fmt, getOrderTimeClassi
                 onClick={() => onOpenDetail && onOpenDetail(ord)}
                 style={{ flex: 1, backgroundColor: 'rgba(22,163,74,0.1)', color: 'var(--success)', border: 'none', borderRadius: 'var(--radius-md)', padding: '0.55rem', fontSize: '0.8rem', fontWeight: 800, cursor: 'pointer' }}
               >
-                Xem Chi Tiết & Ảnh POD
+                Xem chi tiết & ảnh giao hàng
               </button>
               <button
                 type="button"
                 className="delivery-tap-target"
                 onClick={() => actions.onRedeliver && actions.onRedeliver(orderId)}
-                title="Nếu giao nhầm hoặc cần chụp lại POD"
+                title="Nếu giao nhầm hoặc cần chụp lại ảnh xác nhận"
                 style={{ backgroundColor: 'transparent', color: 'var(--text-muted)', border: '1px solid var(--border-glass)', borderRadius: 'var(--radius-md)', padding: '0.55rem 0.7rem', fontSize: '0.79rem', fontWeight: 600, cursor: 'pointer' }}
               >
                 Giao Lại
@@ -275,7 +301,7 @@ export default function OrderCard({ order: ord, variant, fmt, getOrderTimeClassi
                 onClick={() => actions.onEscalate && actions.onEscalate(orderId)}
                 style={{ flex: 0.9, backgroundColor: 'rgba(37,99,235,0.1)', color: 'var(--primary)', border: 'none', borderRadius: 'var(--radius-md)', padding: '0.55rem', fontSize: '0.79rem', fontWeight: 700, cursor: 'pointer' }}
               >
-                Báo CSKH
+                Báo chăm sóc KH
               </button>
             </>
           ) : isReturning ? (
@@ -285,7 +311,7 @@ export default function OrderCard({ order: ord, variant, fmt, getOrderTimeClassi
               onClick={() => actions.onResume && actions.onResume(orderId)}
               style={{ flex: 1, backgroundColor: 'transparent', color: 'var(--primary)', border: '1px solid var(--primary)', borderRadius: 'var(--radius-md)', padding: '0.55rem', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}
             >
-              Khách Đổi Ý → Tiếp Tục Giao
+              Khách đổi ý, giao tiếp
             </button>
           ) : (
             <button

@@ -531,7 +531,7 @@ export default function DeliveryNavigationModal({
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>
             <div style={{ whiteSpace: 'nowrap', textAlign: 'right' }}>
-              <span style={{ color: '#64748b', fontSize: '0.78rem' }}>Thu hộ COD: </span>
+              <span style={{ color: '#64748b', fontSize: '0.78rem' }}>Cần thu hộ: </span>
               <strong style={{ color: isPrepaid ? '#16a34a' : '#ef4444', fontSize: '0.95rem' }}>
                 {isPrepaid ? 'Đã Thanh Toán Online' : fmt ? fmt(codAmount) : `${codAmount.toLocaleString('vi-VN')} ₫`}
               </strong>

@@ -1,7 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Filter, RefreshCw, History as HistoryIcon, Calendar, Wallet } from 'lucide-react';
-import { api } from '../../../services/api';
-import { notify, confirm } from '../../../context/NotificationContext';
+import React, { useState, useEffect } from 'react';
+import { Filter, RefreshCw, History as HistoryIcon, Calendar } from 'lucide-react';
 import OrderCard from './components/OrderCard';
 import FilterSheet from './components/FilterSheet';
 import DateFilterControl from './components/DateFilterControl';
@@ -28,37 +26,6 @@ export default function HistoryTab({
     setOrderDateFilter,
     sortOrder, setSortOrder
   } = filterState;
-
-  // Tiền mặt COD thật sự đang giữ — lấy từ OrderPayment (settledAt/remittedAt)
-  // ở backend, không ước tính từ danh sách đơn (đơn đổi sang chuyển khoản /
-  // split / đã được Kế toán thu sẽ bị tính sai nếu cộng totalAmount).
-  const [cod, setCod] = useState(null);
-  const [remitting, setRemitting] = useState(false);
-  const loadMyCod = useCallback(async () => {
-    try {
-      const res = await api.get('/ledger/cod/my');
-      setCod(res.data || null);
-    } catch {
-      setCod(null);
-    }
-  }, []);
-  useEffect(() => { loadMyCod(); }, [loadMyCod, orders]);
-
-  const handleRemit = async () => {
-    if (!cod || cod.holdingAmount <= 0) return;
-    const count = cod.pending.filter(p => !p.remittedAt).length;
-    if (!(await confirm(`Khai báo đã nộp ${fmt(cod.holdingAmount)} tiền mặt (${count} đơn) cho Kế toán? Kế toán sẽ kiểm đếm và xác nhận.`))) return;
-    setRemitting(true);
-    try {
-      const res = await api.post('/ledger/cod/my/remit', {});
-      notify(res.message || 'Đã khai báo nộp tiền.', 'success');
-      loadMyCod();
-    } catch (err) {
-      notify(err?.message || 'Không thể khai báo nộp tiền.', 'error');
-    } finally {
-      setRemitting(false);
-    }
-  };
 
   const isDefaultDate = orderDateFilter?.period === 'TODAY';
   const hasActiveFilters = search || paymentFilter !== 'ALL' || !isDefaultDate || sortOrder !== 'NEWEST';
@@ -111,40 +78,6 @@ export default function HistoryTab({
           )}
         </div>
       </div>
-
-      {cod && (
-        <div className="delivery-card" style={{ marginBottom: '0.85rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
-            <div>
-              <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Tiền mặt COD đang giữ</div>
-              <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
-                Cần nộp Kế toán • {cod.pending.filter(p => !p.remittedAt).length} đơn
-              </div>
-            </div>
-            <strong style={{ fontSize: '1rem', color: cod.holdingAmount > 0 ? 'var(--warning)' : 'var(--success)' }}>{fmt(cod.holdingAmount)}</strong>
-          </div>
-          {cod.remittedPendingAmount > 0 && (
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.77rem', color: 'var(--text-secondary)' }}>
-              <span>Đã khai báo nộp, chờ Kế toán xác nhận</span>
-              <strong style={{ color: 'var(--primary)' }}>{fmt(cod.remittedPendingAmount)}</strong>
-            </div>
-          )}
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.77rem', color: 'var(--text-secondary)' }}>
-            <span>Kế toán đã xác nhận thu (30 ngày)</span>
-            <strong style={{ color: 'var(--success)' }}>{fmt(cod.settledAmount30d)}</strong>
-          </div>
-          {cod.holdingAmount > 0 && (
-            <button
-              type="button"
-              onClick={handleRemit}
-              disabled={remitting}
-              style={{ width: '100%', padding: '0.6rem', fontSize: '0.82rem', fontWeight: 800, color: '#fff', backgroundColor: 'var(--success)', border: 'none', borderRadius: 'var(--radius-md)', cursor: remitting ? 'default' : 'pointer', opacity: remitting ? 0.6 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}
-            >
-              <Wallet size={15} /> {remitting ? 'Đang gửi...' : 'Khai Báo Đã Nộp Tiền Cho Kế Toán'}
-            </button>
-          )}
-        </div>
-      )}
 
       <div {...pullHandlers} style={{ overflowY: 'auto' }}>
         {(isRefreshing || pullDistance > 0) && (
@@ -206,8 +139,8 @@ export default function HistoryTab({
           <label style={labelStyle}>Hình thức thanh toán</label>
           <select value={paymentFilter} onChange={e => setPaymentFilter(e.target.value)} style={selectStyle}>
             <option value="ALL">Tất Cả Hình Thức</option>
-            <option value="COD">Thu Tiền Mặt COD</option>
-            <option value="PREPAID">Đã Trả Online</option>
+            <option value="COD">Thu tiền khi giao</option>
+            <option value="PREPAID">Đã trả trước</option>
           </select>
         </div>
 
@@ -216,8 +149,8 @@ export default function HistoryTab({
           <select value={sortOrder} onChange={e => setSortOrder(e.target.value)} style={selectStyle}>
             <option value="NEWEST">Mới Nhất Trước</option>
             <option value="OLDEST">Cũ Nhất Trước</option>
-            <option value="COD_DESC">Tiền COD Cao Nhất</option>
-            <option value="COD_ASC">Tiền COD Thấp Nhất</option>
+            <option value="COD_DESC">Tiền thu hộ cao nhất</option>
+            <option value="COD_ASC">Tiền thu hộ thấp nhất</option>
           </select>
         </div>
       </FilterSheet>

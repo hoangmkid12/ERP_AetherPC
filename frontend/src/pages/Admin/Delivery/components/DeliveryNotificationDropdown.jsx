@@ -55,7 +55,7 @@ export default function DeliveryNotificationDropdown({
       case 'NEW_ORDER':
         return { bg: 'rgba(16, 185, 129, 0.12)', text: '#059669', label: 'ĐƠN MỚI' };
       case 'COD_THRESHOLD':
-        return { bg: 'rgba(139, 92, 246, 0.12)', text: '#7c3aed', label: 'TIỀN COD' };
+        return { bg: 'rgba(139, 92, 246, 0.12)', text: '#7c3aed', label: 'TIỀN THU HỘ' };
       case 'COD_SETTLED':
         return { bg: 'rgba(22, 163, 74, 0.12)', text: '#15803d', label: 'ĐÃ DUYỆT NỘP' };
       case 'RETURNING_REMINDER':

@@ -4,7 +4,6 @@ import OrderCard from './components/OrderCard';
 import FilterSheet from './components/FilterSheet';
 import DateFilterControl from './components/DateFilterControl';
 import RouteOptimizerPanel from './components/RouteOptimizerPanel';
-import { getDateFilterLabel } from './deliveryHelpers';
 
 const PAGE_SIZE = 25;
 
@@ -109,42 +108,30 @@ export default function ActiveTab({
         </button>
       </div>
 
-      {/* Cảnh báo đơn tồn qua đêm — shipper đang giữ hàng (và có thể cả tiền
-          COD) từ hôm trước, cần chốt: giao, hẹn lại hoặc hoàn kho. */}
-      {backlogCount > 0 && (
-        <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.6rem',
-          padding: '0.65rem 0.8rem', marginBottom: '0.75rem', borderRadius: 'var(--radius-md)',
-          backgroundColor: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.35)'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
-            <AlertTriangle size={18} style={{ color: 'var(--danger)', flexShrink: 0, marginTop: '1px' }} />
-            <div>
-              <div style={{ fontSize: '0.84rem', fontWeight: 800, color: 'var(--danger)' }}>
-                {backlogCount} đơn tồn từ hôm trước — cần xử lý ngay
-              </div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.15rem' }}>
-                Giao trong hôm nay, báo hẹn lại hoặc hoàn kho. Đơn giao thất bại quá hạn (chờ gọi lại &gt; 24h, hẹn lại &gt; 3 ngày) sẽ được hệ thống tự chuyển hoàn kho.
-              </div>
-            </div>
-          </div>
-          {incidentFilter !== 'BACKLOG' && (
-            <button
-              type="button"
-              onClick={() => setIncidentFilter('BACKLOG')}
-              style={{ flexShrink: 0, padding: '0.45rem 0.7rem', fontSize: '0.77rem', fontWeight: 800, color: '#fff', backgroundColor: 'var(--danger)', border: 'none', borderRadius: 'var(--radius-md)', cursor: 'pointer' }}
-            >
-              Xem đơn tồn
-            </button>
-          )}
-        </div>
+      {/* Cảnh báo đơn tồn qua đêm: một dòng, bấm để lọc các đơn tồn */}
+      {backlogCount > 0 && incidentFilter !== 'BACKLOG' && (
+        <button
+          type="button"
+          onClick={() => setIncidentFilter('BACKLOG')}
+          style={{
+            width: '100%', display: 'flex', alignItems: 'center', gap: '0.5rem', textAlign: 'left',
+            padding: '0.55rem 0.75rem', marginBottom: '0.6rem', borderRadius: 'var(--radius-md)', cursor: 'pointer',
+            backgroundColor: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.35)'
+          }}
+        >
+          <AlertTriangle size={16} style={{ color: 'var(--danger)', flexShrink: 0 }} />
+          <span style={{ flex: 1, fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+            <strong style={{ color: 'var(--danger)' }}>{backlogCount} đơn tồn từ hôm trước</strong> - giao, hẹn lại hoặc hoàn kho trong hôm nay
+          </span>
+          <span style={{ fontSize: '0.77rem', fontWeight: 800, color: 'var(--danger)', flexShrink: 0 }}>Xem</span>
+        </button>
       )}
 
       {/* Interactive Quick Time Filter Bar */}
       <div style={{
         display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.77rem', color: 'var(--text-secondary)',
         padding: '0.45rem 0.7rem', backgroundColor: 'var(--bg-primary)', border: '1px solid var(--border-glass)',
-        borderRadius: 'var(--radius-md)', marginBottom: '0.85rem', flexWrap: 'wrap', gap: '0.4rem'
+        borderRadius: 'var(--radius-md)', marginBottom: '0.7rem', flexWrap: 'wrap', gap: '0.4rem'
       }}>
         <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', flexWrap: 'wrap' }}>
           <button
@@ -202,9 +189,6 @@ export default function ActiveTab({
           </button>
         </div>
 
-        <span style={{ fontSize: '0.74rem', color: 'var(--primary)', fontWeight: 600 }}>
-          Thời gian: {getDateFilterLabel(orderDateFilter)}
-        </span>
       </div>
 
       {/* Route Optimizer Panel — hiện khi có ≥ 2 đơn đang giao */}
@@ -349,7 +333,7 @@ export default function ActiveTab({
           <select value={regionFilter} onChange={e => setRegionFilter(e.target.value)} style={selectStyle}>
             <option value="ALL">Tất Cả Khu Vực</option>
             <option value="HCM">Nội Thành TP.HCM</option>
-            <option value="PROVINCE">Ngoại Tỉnh (3PL)</option>
+            <option value="PROVINCE">Ngoại tỉnh (gửi đối tác vận chuyển)</option>
           </select>
         </div>
 
@@ -357,8 +341,8 @@ export default function ActiveTab({
           <label style={labelStyle}>Hình thức thanh toán</label>
           <select value={paymentFilter} onChange={e => setPaymentFilter(e.target.value)} style={selectStyle}>
             <option value="ALL">Tất Cả Hình Thức</option>
-            <option value="COD">Thu Tiền Mặt COD</option>
-            <option value="PREPAID">Đã Trả Online</option>
+            <option value="COD">Thu tiền khi giao</option>
+            <option value="PREPAID">Đã trả trước</option>
           </select>
         </div>
 
@@ -367,8 +351,8 @@ export default function ActiveTab({
           <select value={sortOrder} onChange={e => setSortOrder(e.target.value)} style={selectStyle}>
             <option value="NEWEST">Mới Nhất Trước</option>
             <option value="OLDEST">Cũ Nhất Trước</option>
-            <option value="COD_DESC">Tiền COD Cao Nhất</option>
-            <option value="COD_ASC">Tiền COD Thấp Nhất</option>
+            <option value="COD_DESC">Tiền thu hộ cao nhất</option>
+            <option value="COD_ASC">Tiền thu hộ thấp nhất</option>
           </select>
         </div>
       </FilterSheet>

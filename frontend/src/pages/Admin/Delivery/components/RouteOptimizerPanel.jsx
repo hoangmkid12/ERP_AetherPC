@@ -477,9 +477,9 @@ export default function RouteOptimizerPanel({
 
   return (
     <div style={{
-      marginBottom: '0.85rem',
+      marginBottom: '0.7rem',
       borderRadius: 'var(--radius-md)',
-      border: '1.5px solid',
+      border: '1px solid',
       borderColor: status === 'done' ? 'rgba(37,99,235,0.25)' : 'var(--border-glass)',
       background: status === 'done'
         ? 'linear-gradient(135deg, rgba(37,99,235,0.06) 0%, rgba(124,58,237,0.04) 100%)'
@@ -492,7 +492,7 @@ export default function RouteOptimizerPanel({
         onClick={() => status === 'done' && setCollapsed(c => !c)}
         style={{
           display: 'flex', alignItems: 'center', gap: '0.6rem',
-          padding: '0.75rem 0.85rem',
+          padding: status === 'idle' ? '0.5rem 0.7rem' : '0.75rem 0.85rem',
           cursor: status === 'done' ? 'pointer' : 'default',
           borderBottom: (!collapsed && status === 'done') ? '1px solid var(--border-glass)' : 'none'
         }}
@@ -507,10 +507,10 @@ export default function RouteOptimizerPanel({
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: '0.82rem', fontWeight: 800, color: 'var(--text-primary)' }}>
-            Tối Ưu Lộ Trình (Tùy chọn)
+            Tối ưu lộ trình
           </div>
           <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.05rem' }}>
-            {status === 'idle' && 'Nhấn Tối Ưu để AI xếp tuyến, hoặc chọn giao tự do từng đơn bên dưới.'}
+            {status === 'idle' && `${eligibleOrders.length} đơn · xếp thứ tự giao`}
             {status === 'picking' && 'Chọn điểm xuất phát …'}
             {status === 'loading' && (
               gpsStatus === 'locating'
@@ -539,7 +539,7 @@ export default function RouteOptimizerPanel({
                 opacity: status === 'picking' ? 0.7 : 1
               }}
             >
-              <Sparkles size={13} /> Tối Ưu
+              <Sparkles size={13} /> Sắp xếp
             </button>
             {status === 'idle' && (
               <button

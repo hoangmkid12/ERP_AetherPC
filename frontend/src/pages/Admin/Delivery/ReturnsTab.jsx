@@ -72,7 +72,7 @@ export default function ReturnsTab({
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', gap: '0.5rem' }}>
         <strong style={{ fontSize: '0.9rem', color: 'var(--text-primary)' }}>
-          Thu Hồi & Trả Hàng RMA ({filteredReturns.length}/{pendingReturns.length})
+          Thu hồi & trả hàng ({filteredReturns.length}/{pendingReturns.length})
         </strong>
         <button type="button" onClick={() => setSheetOpen(true)} className="delivery-icon-btn" style={{ position: 'relative' }} title="Bộ lọc">
           <Filter size={16} />
@@ -111,7 +111,7 @@ export default function ReturnsTab({
       </div>
 
       <p style={{ fontSize: '0.79rem', color: 'var(--text-muted)', margin: '0 0 0.75rem' }}>
-        Thu hồi kiện hàng lỗi về kho cho QC hoặc nhận hàng bị từ chối giao trả lại khách.
+        Thu hồi hàng đổi trả về kho để kiểm định, hoặc giao trả lại khách hàng bị từ chối đổi trả.
       </p>
 
       <div {...pullHandlers} style={{ overflowY: 'auto' }}>
@@ -146,7 +146,7 @@ export default function ReturnsTab({
                 : isDeliveredToWarehouse
                   ? { text: 'ĐÃ VỀ KHO', bg: 'rgba(22,163,74,0.12)', color: 'var(--success)' }
                   : isRejectedByQc
-                    ? { text: 'QC TỪ CHỐI - CHỜ TRẢ KHÁCH', bg: '#fee2e2', color: '#dc2626' }
+                    ? { text: 'KIỂM ĐỊNH TỪ CHỐI - CHỜ TRẢ KHÁCH', bg: '#fee2e2', color: '#dc2626' }
                     : isReturningToCustomer
                       ? { text: 'ĐANG GIAO TRẢ KHÁCH', bg: '#ffedd5', color: '#ea580c' }
                       : isReturnedToCustomer
@@ -190,7 +190,7 @@ export default function ReturnsTab({
                 {(isRejectedByQc || isReturningToCustomer || isReturnedToCustomer) && (
                   <div style={{ backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', padding: '0.5rem 0.65rem', marginBottom: '0.65rem', fontSize: '0.79rem' }}>
                     <div style={{ fontWeight: 800, color: '#dc2626', marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                      <span>⚠️ Lý do QC từ chối đổi trả:</span>
+                      <span>⚠️ Lý do kiểm định từ chối đổi trả:</span>
                     </div>
                     <div style={{ color: '#991b1b', lineHeight: 1.35, fontWeight: 500 }}>
                       {ret.qcNotes || ret.reason || 'Sản phẩm vi phạm điều kiện đổi trả / tem niêm phong / sai Serial'}
@@ -198,7 +198,7 @@ export default function ReturnsTab({
                     {ret.qcProofPhoto && (
                       <div style={{ marginTop: '4px' }}>
                         <a href={ret.qcProofPhoto} target="_blank" rel="noopener noreferrer" style={{ color: '#2563eb', fontWeight: 700, textDecoration: 'underline' }}>
-                          📷 Xem ảnh minh chứng vi phạm của QC
+                          📷 Xem ảnh minh chứng của bộ phận kiểm định
                         </a>
                       </div>
                     )}
@@ -220,12 +220,12 @@ export default function ReturnsTab({
                     onClick={() => onDeliverWarehouse(ret)}
                     style={{ width: '100%', backgroundColor: 'var(--success)', color: '#fff', border: 'none', borderRadius: 'var(--radius-md)', padding: '0.6rem', fontSize: '0.8rem', fontWeight: 800, cursor: 'pointer' }}
                   >
-                    Bàn Giao Về Kho Cho QC
+                    Bàn Giao Về Kho Để Kiểm Định
                   </button>
                 )}
                 {isDeliveredToWarehouse && (
                   <div style={{ textAlign: 'center', fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600 }}>
-                    Hoàn tất bàn giao về kho cho QC
+                    Đã bàn giao về kho để kiểm định
                   </div>
                 )}
                 {isRejectedByQc && (
@@ -266,12 +266,12 @@ export default function ReturnsTab({
         )}
       </div>
 
-      <FilterSheet isOpen={sheetOpen} onClose={() => setSheetOpen(false)} title="Bộ Lọc Thu Hồi RMA" onReset={resetFilters}>
+      <FilterSheet isOpen={sheetOpen} onClose={() => setSheetOpen(false)} title="Bộ Lọc Thu Hồi & Trả Hàng" onReset={resetFilters}>
         <div>
           <label style={labelStyle}>Tìm kiếm</label>
           <input
             type="text"
-            placeholder="Mã RMA, mã đơn, tên khách, SĐT, địa chỉ..."
+            placeholder="Mã phiếu đổi trả, mã đơn, tên khách, SĐT, địa chỉ..."
             value={rmaSearch}
             onChange={e => setRmaSearch(e.target.value)}
             style={selectStyle}
@@ -284,8 +284,8 @@ export default function ReturnsTab({
             <option value="ALL">Tất Cả Tiến Độ</option>
             <option value="PENDING_PICKUP">Chờ Thu Hồi Tại Nhà</option>
             <option value="RETURNING">Đang Chuyển Về Kho</option>
-            <option value="DELIVERED_WAREHOUSE">Đã Về Kho Cho QC</option>
-            <option value="REJECTED_RETURN">QC Từ Chối - Chờ Giao Trả Khách</option>
+            <option value="DELIVERED_WAREHOUSE">Đã Về Kho Chờ Kiểm Định</option>
+            <option value="REJECTED_RETURN">Kiểm Định Từ Chối - Chờ Giao Trả Khách</option>
             <option value="RETURNING_TO_CUSTOMER">Đang Giao Trả Khách</option>
             <option value="RETURNED_TO_CUSTOMER">Đã Hoàn Trả Khách</option>
           </select>
