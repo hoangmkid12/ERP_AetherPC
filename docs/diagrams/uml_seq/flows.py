@@ -145,7 +145,7 @@ FLOWS['uc07'] = dict(title='Xử Lý Và Cập Nhật Đơn Hàng', lanes=['Nhâ
     G('g1', 1, 4.8, 'Đủ tồn kho?'),
     T('t5', 1, 5.8, 'Báo tồn kho không đủ, giữ đơn chờ phân bổ khi nhập hàng', 1),
     T('t6', 1, 5.8, 'Ghi giá vốn, tích điểm, chuyển "Đã xác nhận"'),
-    T('t7', 1, 6.8, 'Lưu lịch sử, gửi email; đơn Build PC chuyển sang lắp ráp'),
+    T('t7', 1, 6.8, 'Lưu lịch sử, gửi email; đơn tự cấu hình máy tính chuyển sang lắp ráp'),
     E(1, 7.6), E(1, 6.8, 1, 'e2')], edges=[
     ('s', 't1'), ('t1', 't2'), ('t2', 't3'), ('t3', 't4'), ('t4', 'g1'), ('g1', 't6', 'Có'),
     ('g1', 't5', 'Không'), ('t5', 'e2'), ('t6', 't7'), ('t7', 'e')])
@@ -233,7 +233,7 @@ FLOWS['uc13'] = dict(title='Thẩm Định Hàng Hoàn Trả', lanes=['Nhân Vi�
     T('t3', 0, 3, 'Kiểm tra tem, ngoại quan, hoạt động, đối chiếu Serial đã xuất cho đơn'),
     G('g1', 0, 3.8, 'Đạt?'),
     T('t6', 0, 4.8, 'Ghi lý do không đạt (mất tem, lỗi người dùng)', 1),
-    T('t4', 1, 5, 'Chuyển yêu cầu "QC đạt", lưu dạng lỗi, ảnh minh chứng'),
+    T('t4', 1, 5, 'Chuyển yêu cầu "Đạt kiểm định", lưu dạng lỗi, ảnh minh chứng'),
     T('t5', 1, 6, 'Chờ Kho phân luồng kệ, sau đó Kế toán hoàn tiền hoặc tạo đơn đổi mới'),
     T('t7', 1, 6, 'Chuyển "Từ chối", đơn về "Đã giao" để giao trả khách', 1),
     E(1, 7, 0.5)], edges=[
@@ -277,7 +277,7 @@ FLOWS['uc15'] = dict(title='Xác Nhận Xuất Kho Và Phân Công Giao Hàng', 
 
 # 16 ---------------------------------------------------------------- Cập nhật tiến độ lắp ráp
 FLOWS['uc16'] = dict(title='Cập Nhật Tiến Độ Lắp Ráp', lanes=['Nhân Viên Lắp Ráp', HT], nodes=[
-    S(), T('t1', 0, 1, 'Mở lệnh lắp ráp (tự sinh từ đơn Build PC), bấm "Bắt đầu"'),
+    S(), T('t1', 0, 1, 'Mở lệnh lắp ráp (tự sinh từ đơn tự cấu hình), bấm "Bắt đầu"'),
     G('g0', 1, 1.8, 'Đơn đã xuất kho?'),
     T('t0', 1, 2.8, 'Từ chối, báo chờ duyệt đơn và xuất kho linh kiện', 1),
     T('t2', 1, 2.8, 'Gán sẵn Serial đã xuất cho đơn, đơn chuyển "Đang chuẩn bị hàng"'),
@@ -495,7 +495,7 @@ SHORT = {
                  t7='Chuyển "Không Đạt", Hủy Phiếu Nhập', t8='Lưu Biên Bản, Báo Kho Nhập Kho'),
     'uc13': dict(t1='Mở Yêu Cầu Đổi Trả Đã Về Kho', t2='Hiển Thị Yêu Cầu & Lý Do Khách Báo',
                  t3='Kiểm Tra Tem, Ngoại Quan, Hoạt Động, Serial Của Đơn', t6='Ghi Lý Do Không Đạt',
-                 t4='Chuyển "QC Đạt", Lưu Dạng Lỗi & Ảnh', t5='Kho Phân Luồng Kệ, Kế Toán Hoàn Tiền / Đổi Mới',
+                 t4='Chuyển "Đạt Kiểm Định", Lưu Dạng Lỗi & Ảnh', t5='Kho Phân Luồng Kệ, Kế Toán Hoàn Tiền / Đổi Mới',
                  t7='Chuyển "Từ Chối", Giao Trả Khách'),
     'uc14': dict(t1='Mở Phiếu Nhập Kho Của Đơn Mua', t2='Hiển Thị Số Lượng Được Nhập Theo Kiểm Định',
                  t3='Quét Serial, Bấm Duyệt Phiếu Nhập', t4='Từ Chối, Báo Serial Thiếu / Trùng',

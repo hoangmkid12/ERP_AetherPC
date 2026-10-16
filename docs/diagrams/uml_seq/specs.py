@@ -430,8 +430,8 @@ D['uc13'] = ([(A, QC), (B, GD), (C, CT), (E, RR), (E, OD2)], [
     m(GD, CT, '2.1: qcInspectReturn(maYeuCau, qcDecision, actualSerial, dangLoi, anh)'),
     s(CT, '2.1.1: Kiểm tra phiếu ở trạng thái "Đã về kho"'),
     alt(('[ĐẠT]', [
-        m(CT, RR, '2.1.2: update(QC đạt, dạng lỗi, Serial đối soát, ảnh, người thẩm định)'),
-        m(CT, OD2, '2.1.3: update(trạng thái "QC đạt")'),
+        m(CT, RR, '2.1.2: update(Đạt kiểm định, dạng lỗi, Serial đối soát, ảnh, người thẩm định)'),
+        m(CT, OD2, '2.1.3: update(trạng thái "Đạt kiểm định")'),
         r(CT, GD, '2.2: return ketQua'),
         s(GD, '2.3: Chờ Kho phân luồng kệ, rồi Kế toán hoàn tiền hoặc tạo đơn đổi mới'),
     ]), ('[KHÔNG ĐẠT]', [
