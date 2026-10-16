@@ -2,7 +2,7 @@
 """Luồng xử lý của 24 use case tiêu biểu - nguồn chung cho sơ đồ BPMN chức năng (mục 3.2)
 và sơ đồ hoạt động (mục 3.5). Bám theo mã nguồn nhánh feat/thanh-toan-sepay.
 
-Chạy:  python flows.py   -> ucNN_bpmn.png và ucNN_act.png cùng thư mục.
+Chạy:  python flows.py   => ucNN_bpmn.png và ucNN_act.png cùng thư mục.
 BPMN dùng nhãn rút gọn (SHORT) và bố cục ghi đè (BPMN_LAYOUT); sơ đồ hoạt động giữ đặc tả gốc.
 Nút: (id, làn, bước, lệch, loại, chữ). Cạnh: (từ, tới, nhãn, tùy chọn).
 """
@@ -182,7 +182,7 @@ FLOWS['uc09'] = dict(title='Phản Hồi Yêu Cầu Báo Giá', lanes=['Nhà Cun
 
 # 10 ---------------------------------------------------------------- Duyệt đơn mua hàng
 FLOWS['uc10'] = dict(title='Duyệt Đơn Mua Hàng', lanes=['Ban Giám Đốc', HT], nodes=[
-    S(), T('t1', 0, 1, 'Mở "Trung tâm phê duyệt" -> Đơn mua hàng'),
+    S(), T('t1', 0, 1, 'Mở "Trung tâm phê duyệt" => Đơn mua hàng'),
     T('t2', 1, 2, 'Hiển thị phiếu mua hàng chờ duyệt'),
     T('t3', 0, 3, 'Xem nhà cung cấp, đơn giá, báo giá gốc'),
     G('g1', 0, 3.8, 'Quyết định?'),
@@ -198,7 +198,7 @@ FLOWS['uc10'] = dict(title='Duyệt Đơn Mua Hàng', lanes=['Ban Giám Đốc',
 
 # 11 ---------------------------------------------------------------- Duyệt bảng lương toàn công ty
 FLOWS['uc11'] = dict(title='Duyệt Bảng Lương Toàn Công Ty', lanes=['Ban Giám Đốc', HT], nodes=[
-    S(), T('t1', 0, 1, 'Mở "Trung tâm phê duyệt" -> Bảng lương'),
+    S(), T('t1', 0, 1, 'Mở "Trung tâm phê duyệt" => Bảng lương'),
     T('t2', 1, 2, 'Hiển thị kỳ lương chờ duyệt, số nhân viên, tổng thực lĩnh'),
     T('t3', 0, 3, 'Xem chi tiết bảng lương từng nhân viên'),
     G('g1', 0, 3.8, 'Quyết định?'),
@@ -547,7 +547,7 @@ for _k, _v in SHORT.items():
     FLOWS[_k]['short'] = _v
 
 # Bố cục riêng cho BPMN (làn ngang) ở những luồng mà vị trí dùng chung với sơ đồ hoạt động
-# làm đường nối cắt nhau hoặc chạy sát ô. Nút: id -> (bước, lệch); cạnh: (từ, tới) -> tùy chọn.
+# làm đường nối cắt nhau hoặc chạy sát ô. Nút: id => (bước, lệch); cạnh: (từ, tới) => tùy chọn.
 BPMN_LAYOUT = {
     'uc04': dict(edges={('t8', 't9'): {'midstep': 8.25}, ('t7', 't9'): {'midstep': 8.25}}),
     'uc10': dict(nodes={'t7': (5.8, -1), 'e': (6.8, 0)}),

@@ -1,5 +1,5 @@
 # Sinh sơ đồ BPMN "Quy trình Chấm Công & Tính Lương" (Hình 3.4 trong báo cáo).
-# Chạy: python quy_trinh_tinh_luong.py  -> quy_trinh_tinh_luong.png cùng thư mục.
+# Chạy: python quy_trinh_tinh_luong.py  => quy_trinh_tinh_luong.png cùng thư mục.
 # Cổng rẽ nhánh là hình thoi trống, đồng bộ với Hình 3.1–3.3 và các sơ đồ chức năng.
 import os
 import matplotlib
@@ -89,7 +89,7 @@ note = ('• Công chuẩn = số ngày làm việc trong tháng; nghỉ lễ, p
         '• Tăng ca 150% ngày thường · 200% ngày nghỉ · 300% ngày lễ\n'
         '• Hoa hồng bán hàng, thưởng lắp ráp; trừ chuyên cần theo phút đi muộn\n'
         '• BH NLĐ 10,5% (BHXH 8%, BHYT 1,5%, BHTN 1%); DN đóng 21,5%\n'
-        '• Thuế TNCN lũy tiến sau giảm trừ gia cảnh -> Thực lĩnh')
+        '• Thuế TNCN lũy tiến sau giảm trừ gia cảnh => Thực lĩnh')
 ax.add_patch(Rectangle((146, HT - 11), 81, 22, fc='#fffde7', ec='#999999', lw=0.9))
 ax.text(148, HT, note, fontsize=7.6, va='center', ha='left', linespacing=1.45)
 flow([(141, HT), (146, HT)], dashed=True)
