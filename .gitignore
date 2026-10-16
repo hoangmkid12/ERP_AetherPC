@@ -70,3 +70,10 @@ backend/email_logs.json
 # Database backups (pg_dump) — included in git to preserve database state across clones
 # **/backups/*.dump
 
+# Media / test screen recordings - NEVER commit or push videos to repo
+video/
+*.mp4
+*.mov
+*.avi
+*.webm
+

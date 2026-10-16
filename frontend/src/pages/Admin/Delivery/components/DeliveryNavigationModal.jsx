@@ -358,9 +358,18 @@ export default function DeliveryNavigationModal({
     // Xoá marker đích cũ nếu có
     if (markersRef.current.destination) markersRef.current.destination.remove();
 
-    // Marker Kho chỉ vẽ nếu có toạ độ Kho và Kho cách xa Shipper
-    if (warehouse?.lat && warehouse?.lng) {
-      if (markersRef.current.warehouse) markersRef.current.warehouse.remove();
+    // Marker Kho chỉ vẽ nếu KHÔNG có vị trí GPS của Shipper hoặc Kho nằm cách xa vị trí Shipper (> 300m)
+    if (markersRef.current.warehouse) {
+      markersRef.current.warehouse.remove();
+      markersRef.current.warehouse = null;
+    }
+
+    const isShipperNearWarehouse = Boolean(
+      shipperLoc?.lat && shipperLoc?.lng && warehouse?.lat && warehouse?.lng &&
+      (Math.abs(shipperLoc.lat - warehouse.lat) < 0.003 && Math.abs(shipperLoc.lng - warehouse.lng) < 0.003)
+    );
+
+    if (warehouse?.lat && warehouse?.lng && !isShipperNearWarehouse) {
       markersRef.current.warehouse = new goongjs.Marker({ element: createWarehouseElement(), anchor: 'bottom' })
         .setLngLat([warehouse.lng, warehouse.lat])
         .setPopup(new goongjs.Popup({ offset: 28 }).setHTML(`<strong>🏬 Kho Xuất Phát:</strong><br/>${warehouse.name || 'Kho AetherPC'}`))
