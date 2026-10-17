@@ -14,9 +14,10 @@ const {
 // Tra cứu danh sách tài liệu tri thức (Toàn bộ nhân viên có tài khoản đều được truy cập theo quyền)
 router.get('/', authMiddleware(), getKnowledgeDocuments);
 
-// @route   POST /api/v1/knowledge/seed-samples
+// @route   POST /api/v1/knowledge/seed-samples (alias: /seed)
 // Khởi tạo các tài liệu mẫu quy chuẩn AetherPC (Chỉ Admin / CEO)
 router.post('/seed-samples', authMiddleware(['ADMIN', 'CEO']), seedSampleKnowledge);
+router.post('/seed', authMiddleware(['ADMIN', 'CEO']), seedSampleKnowledge);
 
 // @route   GET /api/v1/knowledge/:idOrSlug
 // Chi tiết một tài liệu tri thức
