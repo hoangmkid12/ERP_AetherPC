@@ -6,6 +6,7 @@ import { useNotification, notify } from '../../../context/NotificationContext';
 import { api } from '../../../services/api';
 import { getAddressCoordinates } from '../../../utils/deliveryRegions';
 import { fetchRoadRoute, sampleRoutePoints, forwardGeocode } from '../../../utils/routingService';
+import { isOrderPrepaid } from '../../../utils/statusLabels';
 
 import OverviewTab from './OverviewTab';
 import PendingTab from './PendingTab';
@@ -29,7 +30,7 @@ import {
   isOrderRedelivery,
   isDirectlyAssignedShipper,
   ACTIVE_DELIVERY_STATUSES,
-  isHcmAddress, getCollectedPaymentMethod
+  isHcmAddress, getCollectedPaymentMethod, isCodOrder, getOrderCashAmount
 } from './deliveryHelpers';
 
 // Refetch orders/returns while the tab is visible, paused otherwise.
@@ -345,7 +346,7 @@ export default function Delivery() {
 
   const totalCodCollected = myDeliveryOrders
     .filter(o => o.status === 'DELIVERED' && (isManagerOrAdmin || isDirectlyAssigned(o)))
-    .reduce((sum, o) => sum + (o.paymentMethod === 'COD' || !o.paymentMethod ? (parseFloat(o.totalAmount || o.total || 0)) : 0), 0);
+    .reduce((sum, o) => sum + (isCodOrder(o) ? getOrderCashAmount(o) : 0), 0);
 
   const pendingReturns = allReturnRequests.filter(r => {
     const isRmaStatus = ['PENDING', 'RETURN_APPROVED', 'RETURNING_TO_WAREHOUSE', 'RETURN_REQUESTED', 'DELIVERED_TO_WAREHOUSE', 'PROCESSING', 'REJECTED', 'RETURNING_TO_CUSTOMER', 'RETURNED_TO_CUSTOMER'].includes(r.status);
@@ -383,7 +384,7 @@ export default function Delivery() {
       if (regionFilter === 'HCM' && !isHCM) return false;
       if (regionFilter === 'PROVINCE' && isHCM) return false;
 
-      const isPaid = o.paymentStatus === 'PAID' || o.paymentMethod === 'ONLINE_GATEWAY' || o.paymentMethod === 'BANK_TRANSFER' || (parseFloat(o.totalAmount || o.total || 0) === 0);
+      const isPaid = isOrderPrepaid(o) || (parseFloat(o.totalAmount || o.total || 0) === 0);
       if (activeTab === 'history') {
         // Lịch sử: lọc theo cách đã thu thực tế (đơn COD giao xong đã là PAID)
         if (historyPaymentFilter !== 'ALL' && getCollectedPaymentMethod(o) !== historyPaymentFilter) return false;
@@ -488,9 +489,9 @@ export default function Delivery() {
   const deliveringIdsRef = useRef(new Set());
 
   const handleConfirmDelivered = async (ord, payload) => {
-    if (!ord) return;
+    if (!ord) return false;
     const ordId = ord.orderId || ord.id;
-    if (deliveringIdsRef.current.has(String(ordId))) return;
+    if (deliveringIdsRef.current.has(String(ordId))) return false;
     deliveringIdsRef.current.add(String(ordId));
     const payLabel = payload.actualPaymentMethod === 'BANK_TRANSFER' ? `Chuyển khoản VietQR (${payload.bankRefCode})` : (payload.actualPaymentMethod === 'CASH' ? 'Tiền mặt' : 'Đã thanh toán trước');
 
@@ -513,8 +514,10 @@ export default function Delivery() {
     try {
       await updateOrderStatus(ordId, 'DELIVERED', payload);
       addNotification(`Đơn hàng #${ordId} giao thành công! Hình thức thanh toán: [${payLabel}], Người nhận: [${payload.receiverNameActual}].`, 'success', '/admin/delivery?tab=history');
+      return true;
     } catch (err) {
-      addNotification(`Lỗi cập nhật trạng thái đơn #${ordId}: ${err.message}`, 'error');
+      addNotification(`Chưa xác nhận được giao đơn #${ordId}: ${err.message}. Thông tin đã nhập vẫn giữ nguyên, hãy thử lại.`, 'error');
+      return false;
     } finally {
       deliveringIdsRef.current.delete(String(ordId));
       fetchApiData(true);
@@ -1193,8 +1196,12 @@ export default function Delivery() {
           isGpsActive={gpsOrderId === String(navigationModalOrder.orderId || navigationModalOrder.id)}
           onStartDeliveryWithGps={handleStartDeliveryWithGps}
           onStopGps={stopGps}
-          onConfirmDelivered={(payload) => {
-            handleConfirmDelivered(navigationModalOrder, payload);
+          onConfirmDelivered={async (payload) => {
+            // Máy chủ từ chối (mất mạng, thiếu mã giao dịch...) => ở lại màn hình,
+            // giữ ảnh & thông tin thu tiền đã nhập; trước đây vẫn đóng và nhảy sang
+            // đơn kế tiếp dù đơn này chưa được ghi nhận giao.
+            const ok = await handleConfirmDelivered(navigationModalOrder, payload);
+            if (!ok) return;
 
             // Nếu đang đi theo lộ trình tối ưu và còn đơn tiếp theo trong hàng đợi
             if (optimizedRouteQueue && optimizedRouteQueue.length > 1) {
@@ -1319,7 +1326,10 @@ export default function Delivery() {
           user={user}
           fmt={fmt}
           onClose={() => setDeliverModal(null)}
-          onConfirm={(payload) => { handleConfirmDelivered(deliverModal, payload); setDeliverModal(null); }}
+          onConfirm={async (payload) => {
+            // Chỉ đóng khi máy chủ đã nhận — lỗi thì giữ nguyên ảnh/thông tin để thử lại
+            if (await handleConfirmDelivered(deliverModal, payload)) setDeliverModal(null);
+          }}
         />
       )}
 

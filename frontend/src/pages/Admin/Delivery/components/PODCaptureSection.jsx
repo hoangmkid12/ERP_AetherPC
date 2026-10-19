@@ -47,7 +47,14 @@ function SwipeConfirmButton({ onConfirm, disabled, label = "Trượt để hoàn
       if (typeof navigator !== 'undefined' && navigator.vibrate) {
         try { navigator.vibrate([40, 60, 40]); } catch (_) {}
       }
-      onConfirm();
+      // onConfirm trả false (máy chủ từ chối / lỗi mạng) => mở khoá thanh trượt
+      // để Shipper thử lại; trước đây thanh trượt khoá vĩnh viễn sau 1 lần trượt.
+      const unlock = () => {
+        completedRef.current = false;
+        setIsCompleted(false);
+        setSliderPos(0);
+      };
+      Promise.resolve(onConfirm()).then(ok => { if (ok === false) unlock(); }).catch(unlock);
     }
   };
 
@@ -346,7 +353,7 @@ export default function PODCaptureSection({ order, user, fmt, onConfirm, onRejec
     const receiverNameFinal = receivedByType === 'DIRECT_CUSTOMER' ? (order.customerName || 'Khách hàng') : (receiverNameActual || 'Người nhận thay');
     const bankRefFinal = payMethodFinal === 'BANK_TRANSFER' ? (bankRefCode || null) : null;
 
-    onConfirm({
+    return onConfirm({
       proofPhoto,
       receiverNote,
       actualPaymentMethod: payMethodFinal,

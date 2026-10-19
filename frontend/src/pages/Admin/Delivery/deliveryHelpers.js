@@ -541,9 +541,13 @@ export const getDateFilterLabel = (filterConfig) => {
 // ── Tiền mặt COD của 1 đơn ─────────────────────────────────────────────
 // Lấy theo OrderPayment CASH khi backend trả kèm payments, chỉ fallback về
 // totalAmount khi chưa có dữ liệu thanh toán.
-export const isCodOrder = (o) =>
-  o.paymentMethod === 'COD' || o.actualPaymentMethod === 'COD' || o.actualPaymentMethod === 'CASH' ||
-  (!o.paymentMethod && !o.actualPaymentMethod);
+export const isCodOrder = (o) => {
+  const actual = String(o.actualPaymentMethod || '').toUpperCase();
+  // Đã giao và khách trả bằng chuyển khoản / đã trả trước => shipper không giữ tiền mặt
+  if (actual === 'BANK_TRANSFER' || actual === 'PREPAID') return false;
+  return o.paymentMethod === 'COD' || actual === 'COD' || actual === 'CASH' ||
+    (!o.paymentMethod && !o.actualPaymentMethod);
+};
 
 const getCashPayments = (o) => (Array.isArray(o.payments) ? o.payments.filter(p => p.method === 'CASH') : []);
 

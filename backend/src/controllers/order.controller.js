@@ -1029,6 +1029,16 @@ const updateOrderStatus = async (req, res, next) => {
       const receivedType = req.body.receivedByType || 'DIRECT_CUSTOMER';
       const receiverName = req.body.receiverNameActual || (receivedType === 'DIRECT_CUSTOMER' ? (existingOrder.customer?.name || 'Khách hàng') : 'Người nhận thay');
 
+      // Đơn chọn chuyển khoản/cổng online lúc đặt nhưng chưa có xác nhận tiền về
+      // (nhân viên chuyển tay khỏi "Chờ thanh toán") — không được ghi nhận "đã trả
+      // trước" khi giao, nếu không đơn bị đóng PAID mà công ty chưa nhận đồng nào.
+      if (status === 'DELIVERED' && !isRestoreDelivered && actualPayMethod === 'PREPAID'
+          && existingOrder.paymentStatus !== 'PAID' && parseFloat(existingOrder.totalAmount) > 0) {
+        const error = new Error('Đơn chưa nhận được tiền thanh toán trước — cần thu tiền mặt hoặc chuyển khoản khi giao.');
+        error.statusCode = 400;
+        throw error;
+      }
+
       // Validate: chuyển khoản phải có mã giao dịch
       if (status === 'DELIVERED' && !isRestoreDelivered && actualPayMethod === 'BANK_TRANSFER' && !req.body.bankRefCode) {
         const error = new Error('Cần nhập Mã Giao Dịch Ngân Hàng trước khi xác nhận đã nhận chuyển khoản.');
@@ -1202,6 +1212,9 @@ const updateOrderStatus = async (req, res, next) => {
 
       // Ghi nhật ký lịch sử trạng thái
       let historyLogNote = note;
+      // Trước đây shipper ghi "ghi chú ký nhận" thì dòng lịch sử chỉ còn ghi chú đó,
+      // mất thông tin người nhận & phương thức thu tiền dùng để đối soát.
+      if (status === 'DELIVERED' && !isRestoreDelivered) historyLogNote = null;
       if (!historyLogNote) {
         if (status === 'DELIVERED') {
           let payLabel;
@@ -1212,7 +1225,7 @@ const updateOrderStatus = async (req, res, next) => {
           } else {
             payLabel = 'Đã thanh toán trước';
           }
-          historyLogNote = `Giao hàng thành công (Người nhận: ${receiverName} - ${receivedType === 'DIRECT_CUSTOMER' ? 'Chính chủ' : 'Nhận thay'}, Thanh toán: ${payLabel}) bởi Shipper ${changedBy}`;
+          historyLogNote = `Giao hàng thành công (Người nhận: ${receiverName} - ${receivedType === 'DIRECT_CUSTOMER' ? 'Chính chủ' : 'Nhận thay'}, Thanh toán: ${payLabel}) bởi Shipper ${changedBy}${note ? ` — Ghi chú: ${note}` : ''}`;
         } else if (status === 'SHIPPING_FAILED') {
 
           historyLogNote = `Giao thất bại: ${req.body.failReason || 'Không liên lạc được'} (${req.body.isAwaitingCallback ? 'Chờ gọi lại 24h' : 'Hẹn lại'}) bởi ${changedBy}`;
@@ -1647,10 +1660,19 @@ const shipperDeliverWarehouseReturn = async (req, res, next) => {
       orderBy: { createdAt: 'desc' }
     });
 
-    if (returnReq && returnReq.status !== 'RETURNING_TO_WAREHOUSE') {
+    if (!returnReq) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy yêu cầu đổi trả.' });
+    }
+    if (returnReq.status !== 'RETURNING_TO_WAREHOUSE') {
       return res.status(409).json({ success: false, message: 'Kiện hàng đổi trả này chưa được shipper thu hồi hoặc đã bàn giao kho trước đó.' });
     }
-    if (returnReq) {
+    // Chỉ shipper đã thu hồi kiện mới được xác nhận bàn giao (trước đây shipper
+    // bất kỳ cũng bấm được cho kiện của người khác)
+    if (req.user?.role === 'DELIVERY' && returnReq.pickupShipperId
+        && ![String(req.user.id), String(req.user.username || '')].includes(String(returnReq.pickupShipperId))) {
+      return res.status(403).json({ success: false, message: 'Kiện hàng này do shipper khác thu hồi.' });
+    }
+    {
       await prisma.returnRequest.update({
         where: { id: returnReq.id },
         data: {
@@ -1771,6 +1793,20 @@ const shipperRedeliverReturn = async (req, res, next) => {
 
     const targetStatus = status === 'RETURNED_TO_CUSTOMER' ? 'RETURNED_TO_CUSTOMER' : 'RETURNING_TO_CUSTOMER';
     const isCompleted = targetStatus === 'RETURNED_TO_CUSTOMER';
+
+    // Chỉ kiện ĐÃ về kho và bị QC từ chối mới giao trả khách; "đã trả khách" chỉ
+    // sau bước "đang giao trả". Trước đây không kiểm tra gì — 1 phiếu vừa tạo
+    // (hàng còn ở nhà khách) cũng nhảy thẳng được sang "Đã trả lại khách".
+    const qcRejectedAtWarehouse = ['REJECTED', 'QC_REJECTED'].includes(returnReq.status) && Boolean(returnReq.deliveredWarehouseAt);
+    const allowed = isCompleted ? returnReq.status === 'RETURNING_TO_CUSTOMER' || qcRejectedAtWarehouse : qcRejectedAtWarehouse;
+    if (!allowed) {
+      return res.status(409).json({
+        success: false,
+        message: isCompleted
+          ? 'Chỉ xác nhận "đã trả khách" cho kiện đang được giao trả.'
+          : 'Chỉ giao trả khách các kiện đã về kho và bị QC từ chối đổi trả.'
+      });
+    }
 
     await prisma.returnRequest.update({
       where: { id: returnReq.id },

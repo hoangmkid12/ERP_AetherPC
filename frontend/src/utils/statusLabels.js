@@ -40,16 +40,14 @@ export const isOrderPrepaid = (ord) => {
   if (method === 'COD') return false;
   if (actualMethod === 'CASH') return false;
 
-  // Phương thức thanh toán online trước
-  if (
-    method === 'ONLINE_GATEWAY' ||
-    method === 'BANK_TRANSFER' ||
-    method === 'VNPAY' ||
-    method === 'MOMO' ||
-    method === 'ZALOPAY' ||
-    actualMethod === 'PREPAID'
-  ) {
-    return true;
+  if (actualMethod === 'PREPAID') return true;
+
+  // Chọn thanh toán online/chuyển khoản lúc đặt chỉ là "trả trước" khi tiền đã
+  // về (paymentStatus=PAID, do webhook SePay ghi). Đơn bị chuyển tay khỏi "Chờ
+  // thanh toán" mà chưa trả thì shipper PHẢI thu tiền — trước đây app hiện
+  // "Đã thanh toán online, thu 0đ" cho cả những đơn này.
+  if (['ONLINE_GATEWAY', 'BANK_TRANSFER', 'VNPAY', 'MOMO', 'ZALOPAY'].includes(method)) {
+    return ord.paymentStatus === 'PAID';
   }
 
   // Nếu không ghi nhận method là COD và đã thanh toán trước khi giao

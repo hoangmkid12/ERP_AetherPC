@@ -133,7 +133,7 @@ export default function ReturnsTab({
             const isReturning = ret.status === 'RETURNING_TO_WAREHOUSE';
             const isDeliveredToWarehouse = ret.status === 'DELIVERED_TO_WAREHOUSE';
             const isPickupPending = ['PENDING', 'RETURN_APPROVED', 'RETURN_REQUESTED', 'PROCESSING'].includes(ret.status);
-            const isRejectedByQc = ret.status === 'REJECTED';
+            const isRejectedByQc = ret.status === 'REJECTED' && Boolean(ret.deliveredWarehouseAt);
             const isReturningToCustomer = ret.status === 'RETURNING_TO_CUSTOMER';
             const isReturnedToCustomer = ret.status === 'RETURNED_TO_CUSTOMER';
             const matchedOrder = orders.find(o => String(o.orderId || o.id) === String(ret.orderId));

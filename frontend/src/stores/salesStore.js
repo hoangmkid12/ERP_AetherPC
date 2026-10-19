@@ -878,16 +878,13 @@ export const useSalesStore = create((set, get) => ({
         localStorage.setItem(STORAGE_KEYS.returnRequests, JSON.stringify(returnRequests));
       } catch (e) {}
 
-      if (targetOrderId) {
-        if (isApprove) {
-          get().updateOrderStatus(targetOrderId, 'RETURNING_TO_WAREHOUSE', `CSKH đã duyệt yêu cầu đổi trả #${returnId}. Chuyển Shipper thu hồi.`);
-        } else {
-          get().updateOrderStatus(targetOrderId, 'DELIVERED', `CSKH từ chối yêu cầu đổi trả #${returnId}. Lý do: ${note || 'Không đủ điều kiện'}`);
-        }
-      }
-
       return { returnRequests };
     });
+
+    // Máy chủ (/returns/:id/review) đã tự cập nhật trạng thái đơn và ghi lịch sử —
+    // trước đây gọi thêm updateOrderStatus nên lịch sử bị ghi trùng và khách nhận
+    // thêm 1 email trạng thái. Chỉ cần tải lại danh sách đơn.
+    if (targetOrderId) get().getOrders().catch(() => {});
   },
 
   /**
