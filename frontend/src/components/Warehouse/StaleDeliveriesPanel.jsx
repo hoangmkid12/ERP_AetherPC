@@ -13,7 +13,8 @@ export default function StaleDeliveriesPanel() {
   const [groups, setGroups] = useState([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
-  const [expanded, setExpanded] = useState(true);
+  // Mặc định thu gọn: khung chỉ hiện tóm tắt số đơn tồn, bấm "Xem chi tiết" mới mở danh sách
+  const [expanded, setExpanded] = useState(false);
   const [shippers, setShippers] = useState([]);
   const [reassign, setReassign] = useState({}); // { [orderId]: shipperId }
   const [busyOrderId, setBusyOrderId] = useState(null);
