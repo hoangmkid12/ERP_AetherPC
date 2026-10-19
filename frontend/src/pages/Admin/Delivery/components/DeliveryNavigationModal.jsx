@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { X, Navigation, Phone, MapPin, Compass, AlertCircle, Gauge, ExternalLink, Pause, Locate } from 'lucide-react';
 import '@goongmaps/goong-js/dist/goong-js.css';
-import { fetchRoadRoute, forwardGeocode } from '../../../../utils/routingService';
-import { goongjs, GOONG_STYLE_URL, CARTO_VOYAGER_STYLE, createWarehouseElement, createDestinationElement, createShipperElement, updateShipperElementHeading } from '../../../../utils/mapIcons';
+import { fetchRoadRoute, forwardGeocode, GEO_PRECISION_LABEL } from '../../../../utils/routingService';
+import { goongjs, GOONG_STYLE_URL, CARTO_VOYAGER_STYLE, createDestinationElement, createShipperElement, updateShipperElementHeading } from '../../../../utils/mapIcons';
 import { getAddressCoordinates } from '../../../../utils/deliveryRegions';
 import { isOrderPrepaid } from '../../../../utils/statusLabels';
 import PODCaptureSection from './PODCaptureSection';
@@ -16,6 +16,23 @@ function haversineKm(a, b) {
   const lat2 = b.lat * Math.PI / 180;
   const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
   return R * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+}
+
+// Khoảng cách ngắn nhất (mét) từ vị trí Shipper tới tuyến đang vẽ — dùng để
+// phát hiện đi lệch tuyến. Chiếu phẳng cục bộ, sai số không đáng kể trong vài km.
+function distanceToRouteM(p, coordsLatLng) {
+  if (!p || !coordsLatLng || coordsLatLng.length < 2) return Infinity;
+  const kx = 111320 * Math.cos(p.lat * Math.PI / 180), ky = 110540;
+  let best = Infinity;
+  for (let i = 1; i < coordsLatLng.length; i++) {
+    const ax = (coordsLatLng[i - 1][1] - p.lng) * kx, ay = (coordsLatLng[i - 1][0] - p.lat) * ky;
+    const bx = (coordsLatLng[i][1] - p.lng) * kx, by = (coordsLatLng[i][0] - p.lat) * ky;
+    const dx = bx - ax, dy = by - ay;
+    const len2 = dx * dx + dy * dy;
+    const t = len2 ? Math.max(0, Math.min(1, -(ax * dx + ay * dy) / len2)) : 0;
+    best = Math.min(best, Math.hypot(ax + t * dx, ay + t * dy));
+  }
+  return best;
 }
 
 // fetchRoadRoute trả toạ độ dạng [lat,lng] (quy ước dùng chung với tính năng
@@ -62,7 +79,6 @@ const AUTO_FOLLOW_PAUSE_MS = 15000;
 export default function DeliveryNavigationModal({
   order,
   user,
-  warehouse,
   destination,
   isGpsActive,
   onStartDeliveryWithGps,
@@ -105,45 +121,48 @@ export default function DeliveryNavigationModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Tự động phân giải địa chỉ thực tế (Forward Geocoding) để lấy toạ độ chính xác thay vì chỉ toạ độ khu vực
+  // Định vị điểm giao tới số nhà/hẻm (máy chủ /routes/geocode). Trong lúc chờ
+  // chỉ dùng toạ độ khu vực để căn bản đồ, CHƯA vẽ đường đi — tránh vẽ 1 tuyến
+  // sai rồi vài giây sau lại nhảy sang tuyến khác.
   const [exactDestination, setExactDestination] = useState(() => {
-    if (address) {
-      const quick = getAddressCoordinates(address);
-      if (quick?.lat && quick?.lng) return { ...destination, ...quick };
-    }
-    return destination;
+    const quick = address ? getAddressCoordinates(address) : null;
+    return quick?.lat && quick?.lng ? { ...destination, ...quick } : destination;
   });
+  const [geoStatus, setGeoStatus] = useState('loading'); // loading | done | failed
+  const [geoInfo, setGeoInfo] = useState(null); // { precision, displayName }
 
   useEffect(() => {
-    if (address) {
-      const quick = getAddressCoordinates(address);
-      if (quick?.lat && quick?.lng) {
-        setExactDestination(prev => ({ ...prev, ...quick, label: address }));
-      }
-    }
     let isMounted = true;
-    if (address) {
-      forwardGeocode(address).then(geo => {
-        if (isMounted && geo && typeof geo.lat === 'number' && typeof geo.lng === 'number') {
-          setExactDestination(prev => ({
-            ...prev,
-            lat: geo.lat,
-            lng: geo.lng
-          }));
-        }
-      });
+    setGeoStatus('loading');
+    setGeoInfo(null);
+    if (!address) {
+      setGeoStatus('failed');
+      return undefined;
     }
+    forwardGeocode(address).then(geo => {
+      if (!isMounted) return;
+      if (geo && typeof geo.lat === 'number' && typeof geo.lng === 'number') {
+        setExactDestination(prev => ({ ...prev, lat: geo.lat, lng: geo.lng, label: address }));
+        setGeoInfo({ precision: geo.precision || 'approx', displayName: geo.displayName });
+        setGeoStatus('done');
+      } else {
+        setGeoStatus('failed');
+      }
+    }).catch(() => { if (isMounted) setGeoStatus('failed'); });
     return () => { isMounted = false; };
   }, [address]);
 
   const googleMapsUrl = (() => {
-    const dest = (exactDestination?.lat && exactDestination?.lng)
+    // Ưu tiên toạ độ chỉ khi đã định vị tới số nhà/tên đường; còn lại đưa
+    // nguyên văn địa chỉ để Google Maps tự tìm (thường chính xác hơn tâm phường)
+    const preciseEnough = geoStatus === 'done' && ['house', 'street'].includes(geoInfo?.precision);
+    const dest = preciseEnough && exactDestination?.lat && exactDestination?.lng
       ? `${exactDestination.lat},${exactDestination.lng}`
       : encodeURIComponent(address);
     const originParam = (shipperLoc?.lat && shipperLoc?.lng)
       ? `&origin=${shipperLoc.lat},${shipperLoc.lng}`
       : '';
-    return `https://www.google.com/maps/dir/?api=1${originParam}&destination=${dest}&travelmode=driving`;
+    return `https://www.google.com/maps/dir/?api=1${originParam}&destination=${dest}&travelmode=two-wheeler`;
   })();
 
   // 1. Khởi tạo bản đồ goong-js
@@ -325,7 +344,7 @@ export default function DeliveryNavigationModal({
       (err) => {
         console.warn('Không thể lấy vị trí tức thời của Shipper:', err.message);
         if (isInitial) {
-          setLocError('Chưa có GPS vệ tinh - Sử dụng vị trí Kho xuất phát làm điểm bắt đầu.');
+          setLocError('Chưa có tín hiệu GPS — cần bật định vị để vẽ đường từ vị trí của bạn tới điểm giao.');
         }
       },
       { enableHighAccuracy: true, timeout: 8000, maximumAge: isInitial ? 10000 : 0 }
@@ -336,91 +355,73 @@ export default function DeliveryNavigationModal({
     fetchCurrentPosition(true);
   }, [fetchCurrentPosition]);
 
-  // Tần suất tính lại lộ trình "còn lại" theo GPS sống của Shipper. GPS thực
-  // tế bắn toạ độ mới mỗi vài giây (kể cả lúc đứng yên, do sai số vệ tinh) —
-  // nếu effect vẽ route phụ thuộc thẳng vào shipperLoc và xoá/vẽ lại toàn bộ
-  // marker + gọi fitBounds ở MỌI lần đó, bản đồ sẽ nháy liên tục và tự động
-  // zoom-out về khung nhìn toàn tuyến, đè mất thao tác zoom tay của người
-  // dùng. Throttle + tách riêng phần vẽ lại (3b) khỏi phần khởi tạo (3a) để
-  // chỉ fitBounds đúng 1 lần lúc đầu, giống cách DeliveryMap.jsx đã làm.
-  const LIVE_RECALC_INTERVAL_MS = 15000;
-  const lastLiveRecalcRef = useRef(0);
-
-  // 3a. Vẽ lộ trình chính (Ưu tiên xuất phát từ chính vị trí GPS của Shipper nếu đã có, fallback về Kho)
-  const effectiveOrigin = (shipperLoc?.lat && shipperLoc?.lng) ? shipperLoc : warehouse;
+  // 3. Vẽ đường đi từ VỊ TRÍ GPS CỦA SHIPPER tới điểm giao (không còn vẽ từ kho).
+  // GPS bắn toạ độ mới mỗi vài giây — nếu gọi lại API dẫn đường + fitBounds ở
+  // mọi lần đó bản đồ sẽ nháy và tự zoom-out liên tục. Chỉ tính lại khi:
+  //   - chưa có tuyến / điểm giao vừa đổi (định vị xong số nhà)
+  //   - Shipper đi lệch khỏi tuyến > OFF_ROUTE_M (rẽ nhầm, đi đường khác)
+  //   - hoặc đã đi thêm > MOVE_RECALC_M và qua ROUTE_REFRESH_MS (cập nhật ETA)
+  // fitBounds chỉ chạy ở lần vẽ đầu tiên cho mỗi điểm giao.
+  const OFF_ROUTE_M = 60;
+  const MOVE_RECALC_M = 150;
+  const ROUTE_REFRESH_MS = 30000;
+  const MIN_RECALC_GAP_MS = 6000;
+  const routeStateRef = useRef({ destKey: '', origin: null, at: 0, fitted: false, inFlight: false });
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !styleReadyRef.current || !effectiveOrigin || !exactDestination) return;
+    if (!map || !styleReadyRef.current || !exactDestination?.lat || !exactDestination?.lng) return;
 
-    setLoadingRoute(true);
-
-    // Xoá marker đích cũ nếu có
+    // Marker điểm giao luôn hiển thị (kể cả khi chưa có GPS)
     if (markersRef.current.destination) markersRef.current.destination.remove();
-
-    // Marker Kho chỉ vẽ nếu KHÔNG có vị trí GPS của Shipper hoặc Kho nằm cách xa vị trí Shipper (> 300m)
-    if (markersRef.current.warehouse) {
-      markersRef.current.warehouse.remove();
-      markersRef.current.warehouse = null;
-    }
-
-    const isShipperNearWarehouse = Boolean(
-      shipperLoc?.lat && shipperLoc?.lng && warehouse?.lat && warehouse?.lng &&
-      (Math.abs(shipperLoc.lat - warehouse.lat) < 0.003 && Math.abs(shipperLoc.lng - warehouse.lng) < 0.003)
-    );
-
-    if (warehouse?.lat && warehouse?.lng && !isShipperNearWarehouse) {
-      markersRef.current.warehouse = new goongjs.Marker({ element: createWarehouseElement(), anchor: 'bottom' })
-        .setLngLat([warehouse.lng, warehouse.lat])
-        .setPopup(new goongjs.Popup({ offset: 28 }).setHTML(`<strong>🏬 Kho Xuất Phát:</strong><br/>${warehouse.name || 'Kho AetherPC'}`))
-        .addTo(map);
-    }
-
     markersRef.current.destination = new goongjs.Marker({ element: createDestinationElement(), anchor: 'bottom' })
       .setLngLat([exactDestination.lng, exactDestination.lat])
-      .setPopup(new goongjs.Popup({ offset: 28 }).setHTML(`<strong>🏠 Điểm Giao Hàng:</strong><br/>${customerName}<br/>${address}`))
+      .setPopup(new goongjs.Popup({ offset: 28 }).setHTML(`<strong>Điểm Giao Hàng:</strong><br/>${customerName}<br/>${address}`))
       .addTo(map);
 
-    let isMounted = true;
-    fetchRoadRoute(effectiveOrigin, exactDestination).then(route => {
-      if (!isMounted || !mapRef.current) return;
+    if (!shipperLoc) {
       setLoadingRoute(false);
+      if (!routeStateRef.current.fitted) map.flyTo({ center: [exactDestination.lng, exactDestination.lat], zoom: 15, duration: 600 });
+    }
+  }, [exactDestination?.lat, exactDestination?.lng, styleReadyTick]);
 
-      if (route && route.coordinates && route.coordinates.length > 0) {
-        setRouteInfo(route);
-        routeCoordsRef.current = route.coordinates;
-
-        const feature = toLineFeature(route.coordinates);
-        mapRef.current.getSource('main-route')?.setData(feature);
-
-        // Căn góc nhìn bao trọn tuyến đường lúc khởi tạo
-        const coords = feature.geometry.coordinates;
-        const bounds = coords.reduce((b, c) => b.extend(c), new goongjs.LngLatBounds(coords[0], coords[0]));
-        if (shipperLoc) bounds.extend([shipperLoc.lng, shipperLoc.lat]);
-        mapRef.current.fitBounds(bounds, { padding: { top: 60, bottom: 50, left: 50, right: 70 } });
-      }
-    });
-
-    return () => { isMounted = false; };
-  }, [effectiveOrigin?.lat, effectiveOrigin?.lng, exactDestination?.lat, exactDestination?.lng, styleReadyTick]);
-
-  // 3b. Tính lại lộ trình "còn lại" khi Shipper di chuyển tiếp
   useEffect(() => {
-    if (!mapRef.current || !styleReadyRef.current || !shipperLoc || !exactDestination) return;
-    const now = Date.now();
-    if (now - lastLiveRecalcRef.current < LIVE_RECALC_INTERVAL_MS) return;
-    lastLiveRecalcRef.current = now;
+    const map = mapRef.current;
+    if (!map || !styleReadyRef.current || !shipperLoc || !exactDestination?.lat || geoStatus === 'loading') return;
 
-    let cancelled = false;
+    const st = routeStateRef.current;
+    const destKey = `${exactDestination.lat.toFixed(6)},${exactDestination.lng.toFixed(6)}`;
+    const now = Date.now();
+    const destChanged = st.destKey !== destKey;
+    const moved = st.origin ? haversineKm(st.origin, shipperLoc) * 1000 : Infinity;
+    const offRoute = distanceToRouteM(shipperLoc, routeCoordsRef.current) > OFF_ROUTE_M;
+    const due = destChanged || !routeCoordsRef.current.length
+      || (offRoute && now - st.at > MIN_RECALC_GAP_MS)
+      || (moved > MOVE_RECALC_M && now - st.at > ROUTE_REFRESH_MS);
+    if (!due || st.inFlight) return;
+
+    st.inFlight = true;
+    st.at = now;
+    st.origin = { lat: shipperLoc.lat, lng: shipperLoc.lng };
+    if (destChanged) { st.destKey = destKey; st.fitted = false; }
+    if (!routeCoordsRef.current.length) setLoadingRoute(true);
+
     fetchRoadRoute(shipperLoc, exactDestination).then(route => {
-      if (cancelled || !mapRef.current || !route?.coordinates?.length) return;
+      st.inFlight = false;
+      if (!mapRef.current) return;
+      setLoadingRoute(false);
+      if (!route?.coordinates?.length) return;
       setRouteInfo(route);
       routeCoordsRef.current = route.coordinates;
       mapRef.current.getSource('remaining-route')?.setData(toLineFeature(route.coordinates));
-    });
-
-    return () => { cancelled = true; };
-  }, [shipperLoc?.lat, shipperLoc?.lng, exactDestination?.lat, exactDestination?.lng, styleReadyTick]);
+      if (!st.fitted) {
+        st.fitted = true;
+        const coords = route.coordinates.map(([lat, lng]) => [lng, lat]);
+        const bounds = coords.reduce((b, c) => b.extend(c), new goongjs.LngLatBounds(coords[0], coords[0]));
+        mapRef.current.fitBounds(bounds, { padding: { top: 60, bottom: 50, left: 50, right: 70 }, maxZoom: 17 });
+      }
+    }).catch(() => { st.inFlight = false; setLoadingRoute(false); });
+  }, [shipperLoc?.lat, shipperLoc?.lng, exactDestination?.lat, exactDestination?.lng, geoStatus, styleReadyTick]);
 
   // 4. Cập nhật vị trí Marker Shipper theo thời gian thực (kèm xoay hướng la bàn)
   useEffect(() => {
@@ -597,6 +598,18 @@ export default function DeliveryNavigationModal({
         }}>
           <MapPin size={14} style={{ color: '#ef4444', flexShrink: 0, marginTop: '2px' }} />
           <span><strong style={{ color: '#475569' }}>Địa chỉ:</strong> {address}</span>
+        </div>
+        <div style={{
+          marginTop: '0.3rem', fontSize: '0.74rem', fontWeight: 700,
+          color: geoStatus === 'loading' ? '#64748b'
+            : geoStatus === 'failed' || ['ward', 'approx'].includes(geoInfo?.precision) ? '#b45309' : '#15803d'
+        }}>
+          {geoStatus === 'loading' && 'Đang định vị số nhà...'}
+          {geoStatus === 'failed' && 'Không định vị được địa chỉ trên bản đồ — gọi khách hỏi đường hoặc mở Google Maps.'}
+          {geoStatus === 'done' && GEO_PRECISION_LABEL[geoInfo?.precision]}
+          {geoStatus === 'done' && geoInfo?.displayName && geoInfo.precision !== 'house' && (
+            <span style={{ fontWeight: 500, color: '#64748b' }}> · Bản đồ khớp: {geoInfo.displayName}</span>
+          )}
         </div>
       </div>
 
@@ -798,10 +811,10 @@ export default function DeliveryNavigationModal({
       }}>
         <div style={{ minWidth: 0 }}>
           <div style={{ fontSize: '1.3rem', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.2 }}>
-            {loadingRoute ? 'Đang tính...' : routeInfo ? `${routeInfo.durationMinutes} phút` : '—'}
+            {!shipperLoc ? 'Chờ GPS...' : loadingRoute ? 'Đang tính...' : routeInfo ? `${routeInfo.durationMinutes} phút` : '—'}
           </div>
           <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-            {routeInfo ? `${routeInfo.distanceKm} km` : 'Tìm tuyến đường tối ưu'}
+            {!shipperLoc ? 'Bật GPS để vẽ đường từ vị trí của bạn' : routeInfo ? `${routeInfo.distanceKm} km${routeInfo.source === 'straight_line' ? ' (đường chim bay)' : ''}` : 'Tìm tuyến đường tối ưu'}
             {distanceRemaining != null && ` · Còn ${distanceRemaining < 0.15 ? 'đã đến nơi' : distanceRemaining < 1 ? `${Math.round(distanceRemaining * 1000)} m` : `${distanceRemaining.toFixed(1)} km`}`}
           </div>
         </div>
@@ -849,7 +862,7 @@ export default function DeliveryNavigationModal({
       </div>
 
       {/* Cảnh báo nếu chưa có toạ độ thực tế */}
-      {locError && !isEffectiveGpsActive && (
+      {locError && !shipperLoc && (
         <div style={{
           padding: '0.45rem 1rem',
           backgroundColor: '#fffbeb',

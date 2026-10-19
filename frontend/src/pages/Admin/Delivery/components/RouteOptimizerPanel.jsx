@@ -31,7 +31,7 @@ function formatCurrency(amount) {
 }
 
 // Mini-map component dùng goongjs hiển thị lộ trình trực quan
-function RoutePreviewMap({ optimizedRoute, warehouse }) {
+function RoutePreviewMap({ optimizedRoute, origin: startPoint }) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
 
@@ -39,7 +39,7 @@ function RoutePreviewMap({ optimizedRoute, warehouse }) {
     if (!optimizedRoute?.length || !containerRef.current) return;
 
     const stops = optimizedRoute.filter(s => s.lat && s.lng);
-    const origin = warehouse?.lat && warehouse?.lng ? warehouse : (stops[0] || null);
+    const origin = startPoint?.lat && startPoint?.lng ? startPoint : (stops[0] || null);
     if (!origin) return;
 
     const map = new goongjs.Map({
@@ -53,9 +53,9 @@ function RoutePreviewMap({ optimizedRoute, warehouse }) {
     map.on('load', async () => {
       const bounds = new goongjs.LngLatBounds();
 
-      // Điểm xuất phát (Kho hoặc vị trí Shipper/Địa chỉ thủ công)
-      if (warehouse?.lat && warehouse?.lng) {
-        bounds.extend([warehouse.lng, warehouse.lat]);
+      // Điểm xuất phát: vị trí hiện tại của Shipper (GPS hoặc điểm tự chọn)
+      if (startPoint?.lat && startPoint?.lng) {
+        bounds.extend([startPoint.lng, startPoint.lat]);
         const originEl = document.createElement('div');
         originEl.innerHTML = `
           <div style="background:linear-gradient(135deg, #1d4ed8, #7c3aed);color:#fff;width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;border:2.5px solid #fff;box-shadow:0 3px 10px rgba(0,0,0,0.35)">
@@ -63,8 +63,8 @@ function RoutePreviewMap({ optimizedRoute, warehouse }) {
           </div>
         `;
         new goongjs.Marker({ element: originEl, anchor: 'center' })
-          .setLngLat([warehouse.lng, warehouse.lat])
-          .setPopup(new goongjs.Popup({ offset: 16 }).setHTML(`<strong>Điểm xuất phát</strong><br/>${warehouse.name || 'Kho xuất phát'}`))
+          .setLngLat([startPoint.lng, startPoint.lat])
+          .setPopup(new goongjs.Popup({ offset: 16 }).setHTML(`<strong>Điểm xuất phát</strong><br/>${startPoint.name || 'Vị trí của bạn'}`))
           .addTo(map);
       }
 
@@ -90,7 +90,7 @@ function RoutePreviewMap({ optimizedRoute, warehouse }) {
 
       // Vẽ đường bộ OSRM qua các điểm dừng
       const allWaypoints = [
-        warehouse?.lat && warehouse?.lng ? warehouse : null,
+        startPoint?.lat && startPoint?.lng ? startPoint : null,
         ...stops
       ].filter(Boolean);
 
@@ -129,7 +129,7 @@ function RoutePreviewMap({ optimizedRoute, warehouse }) {
       map.remove();
       mapRef.current = null;
     };
-  }, [optimizedRoute, warehouse]);
+  }, [optimizedRoute, startPoint]);
 
   return (
     <div ref={containerRef} style={{
@@ -152,7 +152,7 @@ export default function RouteOptimizerPanel({
   const [showMap, setShowMap] = useState(false);
   const [gpsStatus, setGpsStatus] = useState(null); // null | 'locating' | { lat, lng } | 'denied'
   // Origin picker
-  const [originMode, setOriginMode] = useState('gps');     // 'gps' | 'manual' | 'warehouse'
+  const [originMode, setOriginMode] = useState('gps');     // 'gps' | 'manual'
   const [manualAddress, setManualAddress] = useState('');
   const [selectedManualCoord, setSelectedManualCoord] = useState(null);
   const [geocodingAddr, setGeocodingAddr] = useState(false);
@@ -178,9 +178,11 @@ export default function RouteOptimizerPanel({
         },
         () => {
           setGpsStatus('denied');
-          resolve(null); // Fallback về kho
+          resolve(null);
         },
-        { timeout: 8000, maximumAge: 30000, enableHighAccuracy: false }
+        // Độ chính xác cao (GPS vệ tinh) — chế độ thấp chỉ dựa vào wifi/trạm
+        // phát sóng, có thể lệch vài trăm mét tới vài km làm sai thứ tự giao.
+        { timeout: 12000, maximumAge: 10000, enableHighAccuracy: true }
       );
     });
 
@@ -206,6 +208,13 @@ export default function RouteOptimizerPanel({
 
     if (originMode === 'gps') {
       shipperCoord = await getShipperLocation();
+      if (!shipperCoord) {
+        setErrorMsg('Không lấy được vị trí GPS. Hãy cho phép định vị, hoặc chọn "Chọn điểm xuất phát" và chấm vị trí của bạn trên bản đồ.');
+        setOriginMode('manual');
+        setStatus('picking');
+        return;
+      }
+      shipperCoord = { ...shipperCoord, name: 'Vị trí GPS hiện tại của bạn' };
     } else if (originMode === 'manual') {
       if (selectedManualCoord?.lat && selectedManualCoord?.lng) {
         shipperCoord = {
@@ -232,18 +241,16 @@ export default function RouteOptimizerPanel({
         setGpsStatus(shipperCoord);
       }
     }
-    // originMode === 'warehouse' → shipperCoord = null → fallback về kho
 
     const orderIds = eligibleOrders.map(o => o.orderId || o.id);
     try {
-      const payload = { orderIds };
-      if (shipperCoord) {
-        payload.originLat = shipperCoord.lat;
-        payload.originLng = shipperCoord.lng;
-      }
+      const payload = { orderIds, originLat: shipperCoord.lat, originLng: shipperCoord.lng, originName: shipperCoord.name };
+      // api.post trả nguyên body { success, data } — trước đây đọc nhầm
+      // res.data.success (luôn undefined) nên kết quả máy chủ bị bỏ, lần nào
+      // cũng rơi xuống bản tính dự phòng ở trình duyệt.
       const res = await api.post('/routes/optimize', payload);
-      if (res.data?.success && res.data?.data) {
-        const backendData = res.data.data;
+      if (res?.success && res?.data) {
+        const backendData = res.data;
         const enrichedRoute = (backendData.optimizedRoute || []).map(stop => {
           const ord = eligibleOrders.find(o => String(o.orderId || o.id) === String(stop.orderId));
           const apt = getAppointmentInfo(ord || stop);
@@ -279,10 +286,17 @@ export default function RouteOptimizerPanel({
         setStatus('done');
         setCollapsed(false);
       } else {
-        throw new Error(res.data?.message || 'Lỗi không xác định từ server.');
+        throw new Error(res?.message || 'Lỗi không xác định từ server.');
       }
     } catch (err) {
-      console.warn('[RouteOptimizer] Backend lỗi, thử frontend fallback:', err.message);
+      // Lỗi nghiệp vụ (4xx: thiếu vị trí, không định vị được đơn nào...) báo thẳng;
+      // chỉ lỗi mạng / máy chủ mới tính dự phòng ở trình duyệt.
+      if (err?.status && err.status < 500) {
+        setErrorMsg(err.message);
+        setStatus('error');
+        return;
+      }
+      console.warn('[RouteOptimizer] Máy chủ lỗi, tính dự phòng ở trình duyệt:', err.message);
       await runFrontendFallback(orderIds, shipperCoord);
     }
   };
@@ -296,11 +310,24 @@ export default function RouteOptimizerPanel({
     const [promoted] = currentList.splice(targetIdx, 1);
     currentList.unshift(promoted);
 
+    // Có ma trận từ máy chủ => tính lại đúng thời gian/quãng đường từng chặng
+    // theo thứ tự mới (trước đây giữ nguyên "phút từ điểm trước" của thứ tự cũ
+    // nên ETA và km sai ngay sau khi đảo).
+    const m = result.matrix;
     const now = new Date();
-    let cumMinutes = 5;
+    let clockSec = m?.prepSeconds ?? 5 * 60;
+    let prevIdx = 0;
     const recomputed = currentList.map((stop, seq) => {
-      cumMinutes += (stop.durationFromPrevMinutes || 5);
-      const etaDate = new Date(now.getTime() + cumMinutes * 60 * 1000);
+      let legSec = (stop.durationFromPrevMinutes || 5) * 60;
+      let legKm = stop.distanceFromPrevKm;
+      if (m && Number.isInteger(stop.matrixIndex)) {
+        legSec = m.durations[prevIdx][stop.matrixIndex];
+        legKm = +(m.distances[prevIdx][stop.matrixIndex] / 1000).toFixed(1);
+        prevIdx = stop.matrixIndex;
+      }
+      clockSec += legSec;
+      const etaDate = new Date(now.getTime() + clockSec * 1000);
+      clockSec += m?.serviceSeconds ?? 4 * 60;
       const apt = stop.appointmentInfo || getAppointmentInfo(stop);
       let appointmentAdherence = stop.appointmentAdherence;
       if (apt?.hasAppointment && apt.startMinutes !== null && apt.endMinutes !== null) {
@@ -316,6 +343,8 @@ export default function RouteOptimizerPanel({
       return {
         ...stop,
         sequence: seq + 1,
+        durationFromPrevMinutes: Math.max(1, Math.round(legSec / 60)),
+        distanceFromPrevKm: legKm,
         estimatedArrival: etaDate.toISOString(),
         appointmentAdherence
       };
@@ -323,24 +352,30 @@ export default function RouteOptimizerPanel({
 
     setResult(prev => ({
       ...prev,
-      optimizedRoute: recomputed
+      optimizedRoute: recomputed,
+      summary: {
+        ...prev.summary,
+        totalDurationMinutes: Math.round(clockSec / 60),
+        totalDistanceKm: +recomputed.reduce((sum, r) => sum + (Number(r.distanceFromPrevKm) || 0), 0).toFixed(1),
+        estimatedFinish: new Date(now.getTime() + clockSec * 1000).toISOString()
+      }
     }));
   };
 
   const runFrontendFallback = async (orderIds, shipperCoord = null) => {
     try {
-      // Dùng GPS thực tế nếu có, không thì dùng kho
-      const originCoord = shipperCoord
-        ? { ...shipperCoord, name: '📍 Vị trí hiện tại của bạn' }
-        : { lat: 10.7769, lng: 106.7009, name: 'Kho AetherPC' };
+      const originCoord = { ...shipperCoord, name: shipperCoord.name || 'Vị trí hiện tại của bạn' };
       const geocodedOrders = await Promise.all(
         eligibleOrders.map(async (ord) => {
           const geo = await forwardGeocode(ord.shippingAddress || ord.address || '');
-          return { ...ord, lat: geo?.lat || null, lng: geo?.lng || null };
+          return { ...ord, lat: geo?.lat || null, lng: geo?.lng || null, geoPrecision: geo?.precision };
         })
       );
 
       const validOrders = geocodedOrders.filter(o => o.lat && o.lng);
+      const unlocated = geocodedOrders.filter(o => !(o.lat && o.lng)).map(o => ({
+        orderId: o.orderId || o.id, customerName: o.customerName || o.customer?.name || 'Khách hàng', shippingAddress: o.shippingAddress || o.address || ''
+      }));
       if (validOrders.length < 2) {
         setErrorMsg('Không thể xác định tọa độ đủ số đơn để tối ưu. Kiểm tra lại địa chỉ giao hàng.');
         setStatus('error');
@@ -401,7 +436,8 @@ export default function RouteOptimizerPanel({
           appointmentAdherence,
           durationFromPrevMinutes: Math.round(stop.durationFromPrev / 60),
           estimatedArrival: etaDate.toISOString(),
-          distanceFromPrevKm: +((stop.durationFromPrev / 3600) * 20).toFixed(1)
+          distanceFromPrevKm: +((stop.durationFromPrev / 3600) * 20).toFixed(1),
+          geoPrecision: ord.geoPrecision || 'approx'
         };
       });
 
@@ -409,7 +445,8 @@ export default function RouteOptimizerPanel({
       const totalDist = routeResult.reduce((s, r) => s + r.distanceFromPrevKm, 0).toFixed(1);
 
       setResult({
-        warehouse: originCoord,
+        origin: originCoord,
+        unlocated,
         optimizedRoute: routeResult,
         summary: {
           totalOrders: routeResult.length,
@@ -610,14 +647,8 @@ export default function RouteOptimizerPanel({
             {
               mode: 'manual',
               icon: <MapPin size={15} />,
-              label: 'Nhập địa chỉ thủ công',
-              desc: 'Nhập địa chỉ bất kỳ để test'
-            },
-            {
-              mode: 'warehouse',
-              icon: <span style={{ fontSize: '14px' }}>🏭</span>,
-              label: 'Kho AetherPC (mặc định)',
-              desc: 'Tối ưu từ kho xuất phát'
+              label: 'Chọn điểm xuất phát',
+              desc: 'Khi GPS yếu: tìm địa chỉ hoặc chấm vị trí của bạn trên bản đồ'
             }
           ].map(({ mode, icon, label, desc }) => (
             <div
@@ -743,44 +774,32 @@ export default function RouteOptimizerPanel({
             ))}
           </div>
 
-          {/* GPS / Warehouse origin badge */}
-          {gpsStatus && typeof gpsStatus === 'object' ? (
+          {/* Đơn không định vị được — không bị âm thầm bỏ khỏi tuyến nữa */}
+          {result.unlocated?.length > 0 && (
             <div style={{
-              display: 'flex', alignItems: 'center', gap: '0.5rem',
-              padding: '0.35rem 0.6rem', borderRadius: 'var(--radius-sm)',
-              backgroundColor: 'rgba(22,163,74,0.08)', border: '1px solid rgba(22,163,74,0.2)'
+              padding: '0.45rem 0.6rem', borderRadius: 'var(--radius-sm)',
+              backgroundColor: 'rgba(234,88,12,0.08)', border: '1px solid rgba(234,88,12,0.25)',
+              fontSize: '0.75rem', color: '#c2410c'
             }}>
-              <Locate size={13} style={{ color: 'var(--success)', flexShrink: 0 }} />
-              <span style={{ fontSize: '0.75rem', color: 'var(--success)', fontWeight: 700 }}>
-                Điểm xuất phát: Vị trí GPS hiện tại của bạn
-              </span>
-            </div>
-          ) : (
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: '0.5rem',
-              padding: '0.35rem 0.6rem', borderRadius: 'var(--radius-sm)',
-              backgroundColor: 'rgba(37,99,235,0.06)', border: '1px solid rgba(37,99,235,0.15)'
-            }}>
-              <span style={{ fontSize: '11px' }}>🏭</span>
-              <span style={{ fontSize: '0.75rem', color: 'var(--primary)', fontWeight: 700 }}>
-                Điểm xuất phát: {result.warehouse.name}
-                {gpsStatus === 'denied' && <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}> (GPS bị từ chối)</span>}
-              </span>
+              <div style={{ fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                <AlertCircle size={13} /> {result.unlocated.length} đơn chưa định vị được, chưa xếp vào tuyến:
+              </div>
+              {result.unlocated.map(u => (
+                <div key={u.orderId} style={{ marginTop: '0.2rem' }}>#{u.orderId} · {u.customerName} — {u.shippingAddress}</div>
+              ))}
+              <div style={{ marginTop: '0.2rem', color: 'var(--text-muted)' }}>Gọi khách xác nhận lại địa chỉ rồi bấm Tính lại.</div>
             </div>
           )}
 
           {/* Danh sách đơn theo thứ tự tối ưu */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
             {/* Xuất phát */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.4rem 0.55rem', backgroundColor: 'rgba(37,99,235,0.08)', borderRadius: 'var(--radius-sm)' }}>
-              <div style={{ width: 22, height: 22, borderRadius: '50%', backgroundColor: typeof gpsStatus === 'object' ? '#16a34a' : '#1d4ed8', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                {typeof gpsStatus === 'object'
-                  ? <Locate size={11} color="#fff" />
-                  : <span style={{ fontSize: '9px', fontWeight: 900, color: '#fff' }}>KHO</span>
-                }
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.4rem 0.55rem', backgroundColor: 'rgba(22,163,74,0.08)', borderRadius: 'var(--radius-sm)' }}>
+              <div style={{ width: 22, height: 22, borderRadius: '50%', backgroundColor: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <Locate size={11} color="#fff" />
               </div>
-              <span style={{ fontSize: '0.77rem', fontWeight: 700, color: typeof gpsStatus === 'object' ? 'var(--success)' : 'var(--primary)' }}>
-                Xuất phát: {result.warehouse.name}
+              <span style={{ fontSize: '0.77rem', fontWeight: 700, color: 'var(--success)' }}>
+                Xuất phát: {result.origin?.name || 'Vị trí của bạn'}
               </span>
             </div>
 
@@ -830,6 +849,14 @@ export default function RouteOptimizerPanel({
                       <MapPin size={10} style={{ display: 'inline', marginRight: '0.2rem' }} />
                       {stop.shippingAddress}
                     </div>
+                    {stop.geoPrecision && stop.geoPrecision !== 'house' && (
+                      <div style={{ fontSize: '0.7rem', color: '#b45309', marginTop: '0.1rem' }}>
+                        {stop.geoPrecision === 'street' ? 'Chỉ định vị tới tên đường' : 'Vị trí gần đúng'} — nên gọi khách trước khi tới
+                      </div>
+                    )}
+                    {stop.waitMinutes > 0 && (
+                      <div style={{ fontSize: '0.7rem', color: '#0891b2', marginTop: '0.1rem' }}>Đến sớm, chờ ~{stop.waitMinutes} phút tới khung hẹn</div>
+                    )}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', marginTop: '0.25rem', flexWrap: 'wrap' }}>
                       <span style={{ fontSize: '0.75rem', fontWeight: 700, color: stop.paymentMethod === 'COD' ? '#ea580c' : 'var(--success)' }}>
                         {stop.paymentMethod === 'COD' ? `💵 COD ${formatCurrency(stop.totalAmount)}` : `✅ Đã TT`}
@@ -880,7 +907,7 @@ export default function RouteOptimizerPanel({
               </div>
             ))}
 
-            {/* Kết thúc — quay về kho */}
+            {/* Kết thúc ca giao (không quay về kho) */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.2rem 0.55rem' }}>
               <div style={{ width: 2, height: 16, backgroundColor: '#6b7280', borderRadius: 2, marginLeft: '0.55rem', opacity: 0.3 }} />
               <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600 }}>Kết thúc ca giao</span>
@@ -917,7 +944,7 @@ export default function RouteOptimizerPanel({
           {showMap && (
             <RoutePreviewMap
               optimizedRoute={result.optimizedRoute}
-              warehouse={result.warehouse}
+              origin={result.origin}
             />
           )}
 
@@ -925,7 +952,7 @@ export default function RouteOptimizerPanel({
           {onStartOptimized && (
             <button
               type="button"
-              onClick={() => onStartOptimized(result.optimizedRoute, { originMode, originCoord: result.warehouse })}
+              onClick={() => onStartOptimized(result.optimizedRoute, { originMode, originCoord: result.origin })}
               style={{
                 width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-md)',
                 border: 'none', cursor: 'pointer',

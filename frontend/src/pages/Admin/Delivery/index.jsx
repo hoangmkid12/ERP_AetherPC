@@ -4,8 +4,8 @@ import { useSalesStore } from '../../../stores';
 import { useAuth } from '../../../context/AuthContext';
 import { useNotification, notify } from '../../../context/NotificationContext';
 import { api } from '../../../services/api';
-import { detectDeliveryRegion, REGION_COORDS, getAddressCoordinates } from '../../../utils/deliveryRegions';
-import { fetchRoadRoute, sampleRoutePoints } from '../../../utils/routingService';
+import { getAddressCoordinates } from '../../../utils/deliveryRegions';
+import { fetchRoadRoute, sampleRoutePoints, forwardGeocode } from '../../../utils/routingService';
 
 import OverviewTab from './OverviewTab';
 import PendingTab from './PendingTab';
@@ -770,7 +770,7 @@ export default function Delivery() {
   const [simulatingOrderId, setSimulatingOrderId] = useState(null);
   const [navigationModalOrder, setNavigationModalOrder] = useState(null);
   const [optimizedRouteQueue, setOptimizedRouteQueue] = useState(null); // null | [{orderId, ...}]
-  const [currentRouteOrigin, setCurrentRouteOrigin] = useState(null); // null | { originMode: 'gps'|'manual'|'warehouse', originCoord: {lat, lng, name, address} }
+  const [currentRouteOrigin, setCurrentRouteOrigin] = useState(null); // null | { originMode: 'gps'|'manual', originCoord: {lat, lng, name, address} }
   const [nextRouteOrderPrompt, setNextRouteOrderPrompt] = useState(null); // null | {deliveredOrder, nextOrder, remainingCount}
   // Màn hình "Bắt Đầu Giao" giờ hiện cùng lúc với thanh tab dưới cùng (không
   // còn là modal fixed che hết nữa) nên khi Shipper bấm sang tab khác (Tổng
@@ -806,9 +806,16 @@ export default function Delivery() {
   const simulationTimerRef = useRef(null);
 
   const GPS_SEND_INTERVAL_MS = 8000;
-  // 2 kho thật trong hệ thống (xem prisma/seed.js) — Hà Nội phục vụ khu vực
-  // miền Bắc, còn lại xuất từ Kho Tổng TP.HCM.
-  const getOriginForRegion = (region) => (region === 'HN_NORTH' ? { lat: 21.0139, lng: 105.8228 } : { lat: 10.7756, lng: 106.6919 });
+  // Vị trí GPS hiện tại của thiết bị (độ chính xác cao) — điểm xuất phát duy
+  // nhất cho dẫn đường/giả lập, không còn dùng toạ độ kho cố định.
+  const getCurrentGps = () => new Promise((resolve) => {
+    if (!navigator.geolocation) { resolve(null); return; }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      () => resolve(null),
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 10000 }
+    );
+  });
 
   const openWsConnection = () => {
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -872,7 +879,7 @@ export default function Delivery() {
       lng: coords.lng,
       speed: coords.speed ?? null,
       heading: effectiveHeading ?? null,
-      originType: currentRouteOrigin?.originMode || 'warehouse',
+      originType: currentRouteOrigin?.originMode || 'gps',
       originCoord: currentRouteOrigin?.originCoord || null
     };
     const ws = gpsSocketRef.current;
@@ -885,7 +892,7 @@ export default function Delivery() {
     }
   };
 
-  const startGps = (orderId, initialCoords = null, isSilent = false, originType = 'warehouse') => {
+  const startGps = (orderId, initialCoords = null, isSilent = false, originType = 'gps') => {
     if (!navigator.geolocation) {
       if (!isSilent) addNotification('Trình duyệt này không hỗ trợ định vị GPS.', 'error');
       return;
@@ -902,7 +909,7 @@ export default function Delivery() {
         type: 'SHIPPER_JOIN_DELIVERY',
         payload: {
           orderId,
-          originType: originType || currentRouteOrigin?.originMode || 'warehouse',
+          originType: originType || currentRouteOrigin?.originMode || 'gps',
           originCoord: initialCoords || currentRouteOrigin?.originCoord || null
         }
       }));
@@ -989,9 +996,13 @@ export default function Delivery() {
     if (gpsOrderId) stopGps();
     if (simulationTimerRef.current) clearInterval(simulationTimerRef.current);
 
-    const region = ord.deliveryRegion || detectDeliveryRegion(ord.shippingAddress || ord.address || '');
-    const from = getOriginForRegion(region);
-    const to = getAddressCoordinates(ord.shippingAddress || ord.address || '');
+    const from = await getCurrentGps();
+    if (!from) {
+      addNotification('Cần bật định vị GPS để giả lập lộ trình từ vị trí của bạn.', 'error');
+      return;
+    }
+    const addr = ord.shippingAddress || ord.address || '';
+    const to = (await forwardGeocode(addr)) || getAddressCoordinates(addr);
 
     setSimulatingOrderId(orderId);
     addNotification(`Đang tính toán tuyến đường phố thực tế cho đơn #${orderId}...`, 'info');
@@ -1015,7 +1026,7 @@ export default function Delivery() {
     const startRun = () => {
       ws.send(JSON.stringify({ type: 'SHIPPER_JOIN_DELIVERY', payload: { orderId } }));
 
-      // Phát ngay điểm xuất phát tại Kho
+      // Phát ngay điểm xuất phát (vị trí GPS hiện tại)
       const [startLat, startLng] = roadPoints[0];
       ws.send(JSON.stringify({
         type: 'SHIPPER_UPDATE_LOCATION',
@@ -1079,7 +1090,7 @@ export default function Delivery() {
     if (!orderId) return;
     if (gpsOrderId && gpsOrderId !== orderId) stopGps();
     const effectiveOriginCoord = initialCoords || currentRouteOrigin?.originCoord;
-    const effectiveOriginMode = currentRouteOrigin?.originMode || (effectiveOriginCoord ? 'manual' : 'warehouse');
+    const effectiveOriginMode = currentRouteOrigin?.originMode || 'gps';
     const nowIso = new Date().toISOString();
     const payload = {
       status: 'SHIPPED',
@@ -1175,13 +1186,6 @@ export default function Delivery() {
         <DeliveryNavigationModal
           order={navigationModalOrder}
           user={user}
-          warehouse={
-            currentRouteOrigin?.originCoord?.lat && currentRouteOrigin?.originCoord?.lng
-              ? currentRouteOrigin.originCoord
-              : getOriginForRegion(navigationModalOrder.deliveryRegion || detectDeliveryRegion(navigationModalOrder.shippingAddress || navigationModalOrder.address || ''))
-          }
-          originType={currentRouteOrigin?.originMode || 'warehouse'}
-          originCoord={currentRouteOrigin?.originCoord}
           destination={{
             ...getAddressCoordinates(navigationModalOrder.shippingAddress || navigationModalOrder.address || ''),
             label: navigationModalOrder.shippingAddress || navigationModalOrder.address || 'Địa chỉ nhận hàng'

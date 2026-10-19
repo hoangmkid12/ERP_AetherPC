@@ -1,3 +1,5 @@
+import { api } from '../services/api';
+
 // OSRM (Open Source Routing Machine) - dịch vụ chỉ đường đường bộ thực tế miễn phí của OpenStreetMap
 // Mặc định gọi server demo công khai (không có SLA); trỏ VITE_OSRM_BASE_URL
 const OSRM_BASE_URL = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_OSRM_BASE_URL) || 'https://router.project-osrm.org';
@@ -9,10 +11,65 @@ const OSRM_BASE_URL = (typeof import.meta !== 'undefined' && import.meta.env?.VI
 // nếu chưa cấu hình, toàn bộ hệ thống tự động dùng lại Nominatim như trước.
 const GOONG_API_KEY = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_GOONG_API_KEY) || 'X7wwio8EL8HNn0PTMeM3BWVXHNMyXcc1Im59lkRa';
 
+// Giải mã encoded polyline (thuật toán Google, độ chính xác 1e-5) mà Goong
+// Direction trả về => mảng [lat, lng]
+function decodePolyline(str) {
+  const coords = [];
+  let index = 0, lat = 0, lng = 0;
+  while (index < str.length) {
+    let result = 0, shift = 0, b;
+    do { b = str.charCodeAt(index++) - 63; result |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
+    lat += (result & 1) ? ~(result >> 1) : (result >> 1);
+    result = 0; shift = 0;
+    do { b = str.charCodeAt(index++) - 63; result |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
+    lng += (result & 1) ? ~(result >> 1) : (result >> 1);
+    coords.push([lat / 1e5, lng / 1e5]);
+  }
+  return coords;
+}
+
+// Tuyến đường XE MÁY qua Goong Direction (vehicle=bike) — sát thực tế VN hơn
+// OSRM demo công khai (chỉ có profile ô tô, hay quá tải, không đi được hẻm).
+async function fetchGoongBikeRoute(origin, destination) {
+  if (!GOONG_API_KEY) return null;
+  try {
+    const url = `https://rsapi.goong.io/Direction?origin=${origin.lat},${origin.lng}&destination=${destination.lat},${destination.lng}&vehicle=bike&api_key=${GOONG_API_KEY}`;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 6000);
+    const res = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeoutId);
+    if (!res.ok) return null;
+    const data = await res.json();
+    const route = data?.routes?.[0];
+    const leg = route?.legs?.[0];
+    const points = route?.overview_polyline?.points;
+    if (!leg || !points) return null;
+    const coordinates = decodePolyline(points);
+    if (coordinates.length < 2) return null;
+    const distanceMeters = Math.round(leg.distance?.value || 0);
+    const durationMinutes = Math.max(1, Math.round((leg.duration?.value || 0) / 60));
+    const distanceKm = (distanceMeters / 1000).toFixed(1);
+    return {
+      coordinates,
+      distanceMeters,
+      distanceKm,
+      durationMinutes,
+      source: 'goong_bike',
+      summary: `Lộ trình xe máy: ~${distanceKm} km (ước tính ${durationMinutes} phút)`
+    };
+  } catch (err) {
+    console.warn('Không thể tải tuyến đường Goong:', err.message);
+    return null;
+  }
+}
+
 export async function fetchRoadRoute(origin, destination) {
   if (!origin?.lat || !origin?.lng || !destination?.lat || !destination?.lng) {
     return null;
   }
+
+  const goongRoute = await fetchGoongBikeRoute(origin, destination);
+  if (goongRoute) return goongRoute;
 
   try {
     const url = `${OSRM_BASE_URL}/route/v1/driving/${origin.lng},${origin.lat};${destination.lng},${destination.lat}?overview=full&geometries=geojson`;
@@ -38,6 +95,7 @@ export async function fetchRoadRoute(origin, destination) {
         distanceMeters,
         distanceKm,
         durationMinutes,
+        source: 'osrm',
         summary: `Lộ trình đường bộ: ~${distanceKm} km (ước tính ${durationMinutes} phút)`
       };
     }
@@ -64,6 +122,7 @@ export async function fetchRoadRoute(origin, destination) {
     distanceMeters: Math.round(km * 1000),
     distanceKm: km,
     durationMinutes: Math.round(km * 3), // ~20km/h trong đô thị
+    source: 'straight_line',
     summary: `Khoảng cách ước tính: ~${km} km`
   };
 }
@@ -204,10 +263,42 @@ async function geocodeQueryNominatim(q) {
   return null;
 }
 
+// Nhãn hiển thị cho độ chính xác định vị (backend /routes/geocode trả về)
+export const GEO_PRECISION_LABEL = {
+  house: 'Chính xác tới số nhà',
+  street: 'Chính xác tới tên đường — hãy gọi khách khi tới đầu đường/hẻm',
+  ward: 'Chỉ xác định được phường/xã — gọi khách để hỏi đường',
+  approx: 'Vị trí phỏng đoán — gọi khách xác nhận địa chỉ'
+};
+
+/**
+ * Định vị địa chỉ giao hàng. Ưu tiên máy chủ (/routes/geocode: khớp tới số
+ * nhà/hẻm, có cache, dùng chung với bộ tối ưu lộ trình nên bản đồ và thứ tự
+ * giao luôn cùng 1 toạ độ). Chỉ khi máy chủ không phản hồi mới tự tra ở trình
+ * duyệt. Trả {lat, lng, displayName, precision} hoặc null — không còn tự gán
+ * tâm Quận 1 khi không tìm được, để giao diện báo rõ cho Shipper.
+ */
 export async function forwardGeocode(address) {
   if (!address || typeof address !== 'string') return null;
   const cleanKey = address.trim().toLowerCase();
   if (geocodeCache.has(cleanKey)) return geocodeCache.get(cleanKey);
+
+  try {
+    const res = await api.get(`/routes/geocode?address=${encodeURIComponent(address.trim())}`);
+    const d = res?.data;
+    if (d && typeof d.lat === 'number' && typeof d.lng === 'number') {
+      const result = { lat: d.lat, lng: d.lng, displayName: d.matchedAddress || address, precision: d.precision || 'approx' };
+      geocodeCache.set(cleanKey, result);
+      return result;
+    }
+  } catch (err) {
+    // 404 = máy chủ đã thử hết mà không định vị được — không cần tra lại ở trình duyệt
+    if (err?.status === 404) return null;
+  }
+  return forwardGeocodeInBrowser(address, cleanKey);
+}
+
+async function forwardGeocodeInBrowser(address, cleanKey) {
 
   // 1. Làm sạch sơ bộ chuỗi địa chỉ — CHỈ bỏ ghi chú/tổ dân phố, GIỮ NGUYÊN số
   // nhà/tên đường. Trước đây hàm này cắt bỏ hẳn "Số ..." khỏi mọi query, khiến
@@ -300,11 +391,13 @@ export async function forwardGeocode(address) {
     const result = (await geocodeQueryGoong(q)) || (await geocodeQueryNominatim(q));
     if (result && typeof result.lat === 'number' && typeof result.lng === 'number') {
       // Nếu địa chỉ ở TP.HCM thì bắt buộc tọa độ phải trong TP.HCM (tránh Nominatim khớp nhầm sang Hà Nội / miền Bắc)
-      if (isHcm && (result.lat < 10.2 || result.lat > 11.2 || result.lng < 106.2 || result.lng > 107.2)) {
+      if (isHcm && (result.lat < 10.2 || result.lat > 11.4 || result.lng < 106.2 || result.lng > 107.6)) {
         continue;
       }
-      geocodeCache.set(cleanKey, result);
-      return result;
+      // Tra ở trình duyệt không kiểm được khớp số nhà => luôn coi là phỏng đoán
+      const tagged = { ...result, precision: 'approx' };
+      geocodeCache.set(cleanKey, tagged);
+      return tagged;
     }
   }
 
@@ -316,18 +409,16 @@ export async function forwardGeocode(address) {
       const fallbackResult = {
         lat: item.lat,
         lng: item.lng,
-        displayName: item.name
+        displayName: item.name,
+        precision: 'ward'
       };
       geocodeCache.set(cleanKey, fallbackResult);
       return fallbackResult;
     }
   }
 
-  // Nếu là đơn hàng ở TP.HCM mà không khớp được, fallback về Quận 1 TP.HCM (không để văng ra tỉnh khác)
-  if (isHcm) {
-    return { lat: 10.7769, lng: 106.7009, displayName: 'Quận 1, TP. Hồ Chí Minh' };
-  }
-
+  // Không định vị được: trả null để giao diện báo cho Shipper (trước đây tự
+  // gán tâm Quận 1 — bản đồ chỉ sai chỗ mà không ai biết).
   return null;
 }
 

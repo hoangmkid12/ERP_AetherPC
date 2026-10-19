@@ -6,9 +6,6 @@ import {
   goongjs,
   GOONG_STYLE_URL,
   CARTO_VOYAGER_STYLE,
-  createWarehouseElement,
-  createOriginHubElement,
-  createGpsOriginElement,
   createDestinationElement,
   createShipperElement,
   updateShipperElementHeading
@@ -63,21 +60,20 @@ function padLngLatBounds(bounds, ratio) {
   );
 }
 
+// Bản đồ theo dõi đơn của khách: chỉ hiển thị Shipper (GPS sống) => nhà khách.
+// Các prop cũ warehouse/originType/originCoord nơi gọi còn truyền vào sẽ bị bỏ
+// qua — đường đi không còn vẽ từ kho.
 export default function DeliveryMap({
-  warehouse,
   destination,
   shipperPosition,
   shipperName,
   shipperPhone,
-  originType = 'warehouse',
-  originCoord = null,
   height = '370px'
 }) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const markersRef = useRef({});
   const styleReadyRef = useRef(false);
-  const [routeInfo, setRouteInfo] = useState(null);
   const [lastUpdatedLabel, setLastUpdatedLabel] = useState('');
   const routeCoordsRef = useRef([]);
   const animFrameRef = useRef(null);
@@ -97,17 +93,6 @@ export default function DeliveryMap({
     }
     return destination;
   });
-
-  useEffect(() => {
-    if (destination?.label) {
-      const quick = getAddressCoordinates(destination.label);
-      if (quick?.lat && quick?.lng) {
-        setExactDestination(prev => ({ ...prev, ...quick, label: destination.label }));
-        return;
-      }
-    }
-    setExactDestination(destination);
-  }, [destination?.lat, destination?.lng, destination?.label]);
 
   useEffect(() => {
     let isMounted = true;
@@ -212,97 +197,54 @@ export default function DeliveryMap({
     };
   }, []);
 
-  // Xác định điểm xuất phát hiệu dụng theo 1 trong 3 option
-  const effectiveOrigin = (() => {
-    if (originType === 'manual' && originCoord?.lat && originCoord?.lng) {
-      return {
-        lat: originCoord.lat,
-        lng: originCoord.lng,
-        name: originCoord.name || 'Trạm xuất phát / Điểm giao hàng',
-        address: originCoord.address || ''
-      };
-    }
-    if (originType === 'gps' && shipperPosition?.lat && shipperPosition?.lng) {
-      return {
-        lat: shipperPosition.lat,
-        lng: shipperPosition.lng,
-        name: 'Vị trí bắt đầu của Shipper',
-        address: currentAddress || 'Tọa độ GPS hiện tại'
-      };
-    }
-    return warehouse;
-  })();
-
-  // Tải và vẽ lộ trình đường bộ thực tế (OSRM Road Routing) giữa Điểm xuất phát và Nhà khách
+  // Điểm nhận hàng luôn hiển thị; đường đi CHỈ vẽ từ vị trí GPS sống của
+  // Shipper tới nhà khách (không còn vẽ từ kho / điểm xuất phát giả định).
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !styleReadyRef.current || !effectiveOrigin || !exactDestination) return;
-
-    // Xóa marker cũ
-    if (markersRef.current.warehouse) markersRef.current.warehouse.remove();
+    if (!map || !styleReadyRef.current || !exactDestination?.lat || !exactDestination?.lng) return;
     if (markersRef.current.destination) markersRef.current.destination.remove();
-    map.getSource('remaining-route')?.setData(EMPTY_LINE);
-    setRemainingInfo(null);
-    setCurrentAddress('');
-    lastLiveRecalcRef.current = 0;
-
-    // Xác định icon & nội dung popup Điểm xuất phát A
-    let originEl = createWarehouseElement();
-    let popupTitle = 'Kho xuất phát';
-    let popupName = effectiveOrigin.name || 'Kho AetherPC';
-    let popupSub = effectiveOrigin.address || '';
-
-    if (originType === 'manual') {
-      originEl = createOriginHubElement();
-      popupTitle = 'Trạm xuất phát giao hàng';
-      popupName = effectiveOrigin.name || 'Điểm tập kết / Bưu cục';
-      popupSub = effectiveOrigin.address || 'Shipper xuất phát từ trạm này';
-    } else if (originType === 'gps') {
-      originEl = createGpsOriginElement();
-      popupTitle = 'Vị trí xuất phát của Shipper';
-      popupName = shipperName ? `Shipper: ${shipperName}` : 'Định vị GPS thực tế';
-      popupSub = 'Xuất phát từ vị trí hiện tại';
-    }
-
-    // Marker Điểm xuất phát A
-    markersRef.current.warehouse = new goongjs.Marker({ element: originEl, anchor: 'bottom' })
-      .setLngLat([effectiveOrigin.lng, effectiveOrigin.lat])
-      .setPopup(new goongjs.Popup({ offset: 28 }).setHTML(
-        `<div style="padding:2px 4px;font-size:0.82rem;"><strong>${popupTitle}</strong><br/>${popupName}${popupSub ? `<br/><span style="font-size:0.75rem;color:#5f6368;">${popupSub}</span>` : ''}</div>`
-      ))
-      .addTo(map);
-
-    // Marker Nhà khách
     markersRef.current.destination = new goongjs.Marker({ element: createDestinationElement(), anchor: 'bottom' })
       .setLngLat([exactDestination.lng, exactDestination.lat])
       .setPopup(new goongjs.Popup({ offset: 28 }).setHTML(`<div style="padding:2px 4px;font-size:0.82rem;"><strong>Điểm nhận hàng</strong><br/>${exactDestination.label || destination?.label || 'Địa chỉ nhận hàng'}</div>`))
       .addTo(map);
+    if (!shipperPosition) map.flyTo({ center: [exactDestination.lng, exactDestination.lat], zoom: 15, duration: 600 });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [exactDestination?.lat, exactDestination?.lng, styleReadyTick]);
 
-    let isMounted = true;
+  // Tính lại tuyến khi có vị trí Shipper mới — throttle theo
+  // LIVE_RECALC_INTERVAL_MS, fitBounds chỉ lần đầu cho mỗi điểm giao.
+  const routeStateRef = useRef({ destKey: '', fitted: false });
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !styleReadyRef.current || !shipperPosition || !exactDestination?.lat) return;
+    const st = routeStateRef.current;
+    const destKey = `${exactDestination.lat.toFixed(6)},${exactDestination.lng.toFixed(6)}`;
+    const destChanged = st.destKey !== destKey;
+    const now = Date.now();
+    if (!destChanged && now - lastLiveRecalcRef.current < LIVE_RECALC_INTERVAL_MS) return;
+    lastLiveRecalcRef.current = now;
+    if (destChanged) { st.destKey = destKey; st.fitted = false; }
 
-    // Gọi dịch vụ OSRM để lấy toàn bộ các góc phố, khúc cua của con đường thực tế
-    fetchRoadRoute(effectiveOrigin, exactDestination).then(route => {
-      if (!isMounted || !mapRef.current) return;
-
-      if (route && route.coordinates && route.coordinates.length > 0) {
-        setRouteInfo(route);
-        routeCoordsRef.current = route.coordinates;
-
-        const feature = toLineFeature(route.coordinates);
-        mapRef.current.getSource('main-route')?.setData(feature);
-
-        // Tự động căn góc nhìn bao trọn toàn bộ con đường
-        const coords = feature.geometry.coordinates;
+    let cancelled = false;
+    fetchRoadRoute(shipperPosition, exactDestination).then((route) => {
+      if (cancelled || !mapRef.current || !route?.coordinates?.length) return;
+      setRemainingInfo(route);
+      routeCoordsRef.current = route.coordinates;
+      mapRef.current.getSource('remaining-route')?.setData(toLineFeature(route.coordinates));
+      if (!st.fitted) {
+        st.fitted = true;
+        const coords = route.coordinates.map(([lat, lng]) => [lng, lat]);
         const bounds = coords.reduce((b, c) => b.extend(c), new goongjs.LngLatBounds(coords[0], coords[0]));
-        if (shipperPosition) bounds.extend([shipperPosition.lng, shipperPosition.lat]);
-        mapRef.current.fitBounds(bounds, { padding: 45 });
+        mapRef.current.fitBounds(bounds, { padding: 45, maxZoom: 17 });
       }
     });
 
-    return () => {
-      isMounted = false;
-    };
-  }, [effectiveOrigin?.lat, effectiveOrigin?.lng, exactDestination?.lat, exactDestination?.lng, styleReadyTick, originType]);
+    reverseGeocode(shipperPosition.lat, shipperPosition.lng).then((addr) => {
+      if (!cancelled && addr) setCurrentAddress(addr);
+    });
+
+    return () => { cancelled = true; };
+  }, [shipperPosition, exactDestination?.lat, exactDestination?.lng, styleReadyTick]);
 
   const currentHeadingRef = useRef(0);
 
@@ -373,31 +315,6 @@ export default function DeliveryMap({
     }
   }, [shipperPosition, shipperName, shipperPhone]);
 
-  // ETA/quãng đường còn lại "sống" — tính lại từ vị trí hiện tại của Shipper
-  // đến điểm giao (khác route toàn tuyến ở effect trên chỉ tính 1 lần lúc đầu
-  // từ Kho), cộng thêm địa chỉ hiện tại (reverse geocode) kiểu Grab. Throttle
-  // theo LIVE_RECALC_INTERVAL_MS để không gọi OSRM/Nominatim ở mọi lần GPS gửi.
-  useEffect(() => {
-    if (!shipperPosition || !exactDestination || !styleReadyRef.current) return;
-    const now = Date.now();
-    if (now - lastLiveRecalcRef.current < LIVE_RECALC_INTERVAL_MS) return;
-    lastLiveRecalcRef.current = now;
-
-    let cancelled = false;
-
-    fetchRoadRoute(shipperPosition, exactDestination).then((route) => {
-      if (cancelled || !mapRef.current || !route?.coordinates?.length) return;
-      setRemainingInfo(route);
-      mapRef.current.getSource('remaining-route')?.setData(toLineFeature(route.coordinates));
-    });
-
-    reverseGeocode(shipperPosition.lat, shipperPosition.lng).then((address) => {
-      if (!cancelled && address) setCurrentAddress(address);
-    });
-
-    return () => { cancelled = true; };
-  }, [shipperPosition, exactDestination, styleReadyTick]);
-
   const fitFullRoute = useCallback(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -408,12 +325,14 @@ export default function DeliveryMap({
       const coords = routeCoordsRef.current.map(([lat, lng]) => [lng, lat]);
       const bounds = coords.reduce((b, c) => b.extend(c), new goongjs.LngLatBounds(coords[0], coords[0]));
       map.fitBounds(bounds, { padding: 45, animate: true });
-    } else if (effectiveOrigin && exactDestination) {
-      const bounds = new goongjs.LngLatBounds([effectiveOrigin.lng, effectiveOrigin.lat], [effectiveOrigin.lng, effectiveOrigin.lat])
+    } else if (shipperPosition && exactDestination?.lat) {
+      const bounds = new goongjs.LngLatBounds([shipperPosition.lng, shipperPosition.lat], [shipperPosition.lng, shipperPosition.lat])
         .extend([exactDestination.lng, exactDestination.lat]);
       map.fitBounds(bounds, { padding: 45, animate: true });
+    } else if (exactDestination?.lat) {
+      map.flyTo({ center: [exactDestination.lng, exactDestination.lat], zoom: 15 });
     }
-  }, [effectiveOrigin, exactDestination]);
+  }, [shipperPosition, exactDestination]);
 
   // Khoảng cách đường chim bay từ Shipper đến bạn — chỉ có ý nghĩa khi đã có
   // tín hiệu GPS sống; không dùng lại cho trường hợp chưa có vị trí (đã có
@@ -481,29 +400,11 @@ export default function DeliveryMap({
           <div style={{ fontSize: '1.3rem', fontWeight: 700, color: '#202124', lineHeight: 1.2 }}>
             {remainingInfo
               ? `${remainingInfo.durationMinutes} phút`
-              : routeInfo ? `${routeInfo.durationMinutes} phút` : 'Đang tính toán...'}
+              : shipperPosition ? 'Đang tính toán...' : 'Chờ Shipper xuất phát'}
           </div>
           <div style={{ fontSize: '0.8rem', color: '#5f6368' }}>
-            {(remainingInfo || routeInfo) ? `${(remainingInfo || routeInfo).distanceKm} km` : 'Tìm tuyến đường tối ưu'}
+            {remainingInfo ? `${remainingInfo.distanceKm} km` : shipperPosition ? 'Tìm tuyến đường' : 'Bản đồ sẽ hiện đường đi khi Shipper bật GPS'}
             {distanceDisplay ? ` · Cách bạn ${distanceDisplay}` : ''}
-          </div>
-          <div style={{ marginTop: '0.3rem', display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
-            <span style={{
-              fontSize: '0.72rem',
-              fontWeight: 700,
-              color: originType === 'manual' ? '#047857' : originType === 'gps' ? '#6d28d9' : '#1d4ed8',
-              backgroundColor: originType === 'manual' ? '#d1fae5' : originType === 'gps' ? '#ede9fe' : '#eff6ff',
-              border: `1px solid ${originType === 'manual' ? '#a7f3d0' : originType === 'gps' ? '#ddd6fe' : '#bfdbfe'}`,
-              padding: '0.15rem 0.5rem',
-              borderRadius: '999px',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.25rem'
-            }}>
-              {originType === 'manual' && '📍 Xuất phát: Điểm hẹn / Trạm trung chuyển'}
-              {originType === 'gps' && '📡 Xuất phát: Vị trí GPS của Shipper'}
-              {originType === 'warehouse' && '🏢 Xuất phát: Kho Tổng AetherPC'}
-            </span>
           </div>
         </div>
 

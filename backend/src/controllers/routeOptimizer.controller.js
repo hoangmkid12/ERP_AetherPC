@@ -1,339 +1,291 @@
 /**
  * Route Optimizer Controller
- * Tối ưu lộ trình giao hàng cho Shipper sử dụng:
- *   1. Goong Geocoding API + Fallback TP.HCM dictionary (định vị chuẩn xác số nhà VN)
- *   2. OSRM Table API — lấy ma trận thời gian đi thực tế đường bộ
- *   3. VRPTW (Vehicle Routing Problem with Time Windows) Heuristic:
- *      - Đơn ĐÃ TRỄ / SẮP TRỄ: Ưu tiên cứu nguy số 1 (High Penalty nếu để trễ thêm)
- *      - Đơn ĐÚNG KHUNG GIỜ HẸN: Giao đúng khung giờ vàng của khách
- *      - Đơn HẸN TƯƠNG LAI (ví dụ hẹn chiều mà bây giờ mới trưa): Phạt đến quá sớm (Early Penalty), dời về sau
- *      - Đơn TỰ DO (không hẹn giờ): Gom tiện đường giữa các điểm hẹn theo khoảng cách ngắn nhất
+ * Tối ưu thứ tự giao hàng cho Shipper, xuất phát từ VỊ TRÍ HIỆN TẠI của Shipper
+ * (GPS hoặc điểm Shipper tự chọn) — không còn mặc định xuất phát từ kho:
+ *   1. Định vị từng đơn tới số nhà / hẻm (geo.service: Goong AutoComplete + Detail)
+ *   2. Ma trận thời gian & quãng đường xe máy thực tế (Goong DistanceMatrix,
+ *      dự phòng OSRM, cuối cùng ước tính đường chim bay)
+ *   3. Giải bài toán giao hàng có khung giờ hẹn (VRPTW):
+ *      - Lời giải ban đầu: tham lam theo độ khẩn cấp khung giờ + gần nhất
+ *      - Cải thiện cục bộ: 2-opt + dời 1 điểm (or-opt), chỉ nhận thay đổi
+ *        làm giảm (số phút trễ hẹn, tổng thời gian) theo thứ tự ưu tiên đó
  */
 
 const prisma = require('../config/database');
+const { geocodeAddress, getTravelMatrix } = require('../services/geo.service');
 
-const OSRM_BASE_URL = process.env.OSRM_BASE_URL || 'https://router.project-osrm.org';
-const GOONG_API_KEY = process.env.GOONG_API_KEY || 'X7wwio8EL8HNn0PTMeM3BWVXHNMyXcc1Im59lkRa';
+const SERVICE_SECONDS = 5 * 60;   // thời gian giao tại mỗi điểm (gọi khách, chụp POD, thu tiền)
+const PREP_SECONDS = 2 * 60;      // chuẩn bị xuất phát
+const EARLY_SLACK_MIN = 15;       // được đến sớm tối đa 15 phút trước khung hẹn
+const VN_OFFSET_MS = 7 * 60 * 60 * 1000;
 
-// Từ điển tọa độ chuẩn các quận huyện TP.HCM để fallback tuyệt đối, không bao giờ văng ra tỉnh khác
-const DISTRICT_COORDS_HCM = [
-  { keys: ['đa kao', 'da kao'], lat: 10.7861, lng: 106.6942 },
-  { keys: ['bến nghé', 'ben nghe', 'lê lợi', 'nam kỳ khởi nghĩa'], lat: 10.7713, lng: 106.7058 },
-  { keys: ['bến thành', 'ben thanh'], lat: 10.7725, lng: 106.6980 },
-  { keys: ['quận 1', 'quan 1', 'q1', 'q.1'], lat: 10.7769, lng: 106.7009 },
-  { keys: ['quận 3', 'quan 3', 'q3', 'q.3', 'nguyễn thị minh khai'], lat: 10.7844, lng: 106.6845 },
-  { keys: ['quận 10', 'quan 10', 'q10', 'q.10'], lat: 10.7674, lng: 106.6669 },
-  { keys: ['bình thạnh', 'binh thanh', 'điện biên phủ'], lat: 10.8012, lng: 106.7114 },
-  { keys: ['gò vấp', 'go vap', 'phan văn trị'], lat: 10.8386, lng: 106.6653 },
-  { keys: ['phú nhuận', 'phu nhuan'], lat: 10.7992, lng: 106.6803 },
-  { keys: ['tân bình', 'tan binh'], lat: 10.8015, lng: 106.6526 },
-  { keys: ['quận 5', 'quan 5', 'q5', 'q.5'], lat: 10.7554, lng: 106.6627 },
-  { keys: ['quận 7', 'quan 7', 'q7', 'q.7'], lat: 10.7411, lng: 106.6989 },
-  { keys: ['thủ đức', 'thu duc', 'quận 2', 'quận 9'], lat: 10.8494, lng: 106.7717 }
-];
-
-// ---- Geocode địa chỉ văn bản → {lat, lng} ưu tiên Goong API, fallback TP.HCM ----
-async function geocodeAddress(address) {
-  if (!address || typeof address !== 'string') return null;
-  // Chỉ ép toạ độ vào khung TP.HCM khi địa chỉ thật sự ở TP.HCM — trước đây
-  // mọi đơn Hà Nội/Hải Phòng/Cần Thơ đều bị loại kết quả đúng và rơi về Quận 1.
-  const lowerAddr = address.toLowerCase();
-  const isHcm = ['hồ chí minh', 'ho chi minh', 'hcm', 'sài gòn', 'sai gon'].some(k => lowerAddr.includes(k));
-  const inBox = (lat, lng) => !isHcm || (lat >= 10.2 && lat <= 11.2 && lng >= 106.2 && lng <= 107.2);
-
-  // 1. Thử Goong Geocoding API (chuẩn nhất cho địa chỉ Việt Nam)
-  if (GOONG_API_KEY) {
-    try {
-      const url = `https://rsapi.goong.io/geocode?address=${encodeURIComponent(address)}&api_key=${GOONG_API_KEY}`;
-      const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
-      if (res.ok) {
-        const data = await res.json();
-        const loc = data?.results?.[0]?.geometry?.location;
-        if (loc?.lat && loc?.lng) {
-          // Bắt buộc nằm trong phạm vi TP.HCM và lân cận (tránh văng ra tỉnh xa)
-          if (inBox(loc.lat, loc.lng)) {
-            return { lat: loc.lat, lng: loc.lng };
-          }
-        }
-      }
-    } catch (_) { /* ignore Goong error and fallback */ }
-  }
-
-  // 2. Thử Nominatim với viewbox TP.HCM
-  try {
-    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&countrycodes=vn&limit=1${isHcm ? "&viewbox=106.3,11.2,107.1,10.3" : ""}`;
-    const res = await fetch(url, {
-      headers: { 'User-Agent': 'AetherPC-ERP/1.0 (contact@aetherpc.vn)' },
-      signal: AbortSignal.timeout(4000)
-    });
-    if (res.ok) {
-      const list = await res.json();
-      if (Array.isArray(list) && list.length > 0 && list[0].lat && list[0].lon) {
-        const lat = parseFloat(list[0].lat);
-        const lng = parseFloat(list[0].lon);
-        if (inBox(lat, lng)) {
-          return { lat, lng };
-        }
-      }
-    }
-  } catch (_) { /* ignore */ }
-
-  // 3. Fallback theo từ điển quận huyện TP.HCM
-  const lower = address.toLowerCase();
-  for (const item of DISTRICT_COORDS_HCM) {
-    if (item.keys.some(k => lower.includes(k))) {
-      return { lat: item.lat, lng: item.lng };
-    }
-  }
-
-  // Mặc định trả về trung tâm TP.HCM (Quận 1)
-  return { lat: 10.7769, lng: 106.7009 };
-}
+// Phút trong ngày & ngày (YYYY-MM-DD) theo giờ Việt Nam — máy chủ (Railway)
+// chạy UTC, dùng getHours() trực tiếp sẽ lệch 7 tiếng so với giờ hẹn của khách.
+const vnClock = (date = new Date()) => {
+  const d = new Date(date.getTime() + VN_OFFSET_MS);
+  return { minutes: d.getUTCHours() * 60 + d.getUTCMinutes(), day: d.toISOString().slice(0, 10) };
+};
 
 // ---- Trích xuất thông tin hẹn giờ từ notes và failNote ----
 function parseAppointment(notes, failNote) {
   const text = `${notes || ''} ${failNote || ''}`;
   const match = text.match(/\[HEN:(?:(\d{4}-\d{2}-\d{2})_)?(\d{1,2}:\d{2})-(\d{1,2}:\d{2})\]/);
   if (!match) return null;
-
-  const dateStr = match[1] || null;
-  const startTime = match[2];
-  const endTime = match[3];
-
-  const [sH, sM] = startTime.split(':').map(Number);
-  const [eH, eM] = endTime.split(':').map(Number);
-
+  const [sH, sM] = match[2].split(':').map(Number);
+  const [eH, eM] = match[3].split(':').map(Number);
   return {
-    date: dateStr,
+    date: match[1] || null,
     startMinutes: sH * 60 + sM,
     endMinutes: eH * 60 + eM,
-    timeWindow: `${startTime} - ${endTime}`
+    timeWindow: `${match[2]} - ${match[3]}`
   };
 }
 
-// ---- Gọi OSRM Table API: lấy ma trận thời gian (giây) giữa N điểm ----
-async function fetchOsrmDurationMatrix(coords) {
-  const coordStr = coords.map(c => `${c.lng},${c.lat}`).join(';');
-  const url = `${OSRM_BASE_URL}/table/v1/driving/${coordStr}?annotations=duration`;
-  try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
-    if (!res.ok) throw new Error(`Dịch vụ tìm đường OSRM lỗi ${res.status}`);
-    const data = await res.json();
-    if (data.code === 'Ok' && data.durations) return data.durations;
-  } catch (err) {
-    console.warn('[RouteOptimizer] OSRM Table API lỗi, dùng Haversine fallback:', err.message);
-  }
-  return buildHaversineMatrix(coords);
-}
-
-// ---- Fallback: ma trận Haversine khi OSRM không khả dụng ----
-function buildHaversineMatrix(coords) {
-  const n = coords.length;
-  const R = 6371;
-  const matrix = Array.from({ length: n }, () => Array(n).fill(0));
-  for (let i = 0; i < n; i++) {
-    for (let j = 0; j < n; j++) {
-      if (i === j) continue;
-      const a = coords[i], b = coords[j];
-      const dLat = (b.lat - a.lat) * Math.PI / 180;
-      const dLng = (b.lng - a.lng) * Math.PI / 180;
-      const sinLat = Math.sin(dLat / 2);
-      const sinLng = Math.sin(dLng / 2);
-      const hav = sinLat * sinLat + Math.cos(a.lat * Math.PI / 180) * Math.cos(b.lat * Math.PI / 180) * sinLng * sinLng;
-      const km = R * 2 * Math.atan2(Math.sqrt(hav), Math.sqrt(1 - hav));
-      matrix[i][j] = Math.round((km / 22) * 3600); // 22 km/h đô thị xe máy → giây
+/**
+ * Mô phỏng 1 thứ tự giao: trả về số phút trễ hẹn, tổng thời gian và chi tiết
+ * từng điểm. `order` là mảng index trong ma trận (0 = điểm xuất phát).
+ */
+function simulate(order, matrix, windows, startMinutes) {
+  let clockSec = startMinutes * 60 + PREP_SECONDS;
+  let prev = 0;
+  let lateMin = 0;
+  const stops = [];
+  for (const idx of order) {
+    const travel = matrix.durations[prev][idx];
+    clockSec += travel;
+    const w = windows[idx];
+    let waitSec = 0;
+    if (w && clockSec < (w.startMinutes - EARLY_SLACK_MIN) * 60) {
+      waitSec = (w.startMinutes - EARLY_SLACK_MIN) * 60 - clockSec;
+      clockSec += waitSec;
     }
+    const arrivalSec = clockSec;
+    const late = w ? Math.max(0, Math.round((arrivalSec - w.endMinutes * 60) / 60)) : 0;
+    lateMin += late;
+    stops.push({ idx, travelSec: travel, distanceM: matrix.distances[prev][idx], waitSec, arrivalSec, lateMin: late });
+    clockSec += SERVICE_SECONDS;
+    prev = idx;
   }
-  return matrix;
+  return { lateMin, totalSec: clockSec - startMinutes * 60, stops };
 }
 
-// ---- Thuật toán VRPTW (Vehicle Routing Problem with Time Windows) ----
-function solveVRPTW(matrix, startIdx, ordersWithMeta, startMinutesOfDay) {
-  const unvisited = new Set(ordersWithMeta.map((_, i) => i + 1)); // 1..n
-  const route = [];
-  let current = startIdx;
-  let currentMinutes = startMinutesOfDay + 5; // 5 phút chuẩn bị xuất phát
+// So sánh lời giải: ít phút trễ hẹn hơn là tốt hơn; bằng nhau thì tổng thời gian ngắn hơn
+const better = (a, b) => a.lateMin < b.lateMin || (a.lateMin === b.lateMin && a.totalSec < b.totalSec - 1);
 
-  while (unvisited.size > 0) {
-    let bestIdx = -1;
-    let bestScore = Infinity;
-    let bestTravelSec = 0;
-
+// Lời giải ban đầu: chọn điểm kế tiếp theo (khẩn cấp khung giờ, rồi gần nhất)
+function greedyInitial(n, matrix, windows, startMinutes) {
+  const unvisited = new Set(Array.from({ length: n }, (_, i) => i + 1));
+  const order = [];
+  let cur = 0;
+  let clockSec = startMinutes * 60 + PREP_SECONDS;
+  while (unvisited.size) {
+    let best = null;
     for (const idx of unvisited) {
-      const travelSec = matrix[current][idx] || 300;
-      const travelMin = Math.round(travelSec / 60);
-      const arrivalMin = currentMinutes + travelMin;
-      const ord = ordersWithMeta[idx - 1];
-      const apt = ord.appointment;
-
-      let penalty = 0;
-
-      if (apt && apt.startMinutes != null && apt.endMinutes != null) {
-        const { startMinutes: sMin, endMinutes: eMin } = apt;
-
-        if (arrivalMin > eMin) {
-          // ⚠️ ĐÃ TRỄ HẸN hoặc SẼ TRỄ HẸN:
-          // Đây là vi phạm nghiêm trọng SLA. Phải giải quyết khẩn cấp!
-          // Điểm phạt cực âm để kéo lên đầu, đơn nào trễ nhiều hơn thì càng khẩn cấp.
-          const minutesLate = arrivalMin - eMin;
-          penalty = -10000 - (minutesLate * 25);
-        } else if (arrivalMin < sMin - 15) {
-          // ⏳ ĐẾN QUÁ SỚM (ví dụ hẹn 15:30 mà 13:50 đã tới):
-          // Khách đi làm chưa về, Shipper tới sẽ không giao được hoặc phải chờ cả tiếng!
-          // Phạt dương rất nặng để thuật toán dời đơn này về sau.
-          const minutesEarly = (sMin - 15) - arrivalMin;
-          penalty = 5000 + (minutesEarly * 60);
-        } else {
-          // ✅ ĐÚNG KHUNG GIỜ VÀNG [sMin - 15, eMin]:
-          // Lý tưởng nhất! Thưởng điểm ưu tiên cao để thực hiện ngay.
-          penalty = -3000;
-        }
-      } else {
-        // Đơn tự do (không hẹn giờ):
-        // Không phạt thời gian, linh hoạt xếp theo khoảng cách di chuyển ngắn nhất.
-        penalty = 0;
+      const arrival = clockSec + matrix.durations[cur][idx];
+      const w = windows[idx];
+      let score = matrix.durations[cur][idx];
+      if (w) {
+        const slackSec = w.endMinutes * 60 - arrival;                       // còn bao lâu là trễ
+        const earlySec = (w.startMinutes - EARLY_SLACK_MIN) * 60 - arrival; // đến sớm bao lâu
+        if (slackSec < 30 * 60) score -= 6 * 3600 - Math.max(0, slackSec);  // sắp/đã trễ: kéo lên đầu
+        else if (earlySec > 0) score += earlySec * 2;                        // quá sớm: dời về sau
       }
+      if (!best || score < best.score) best = { idx, score };
+    }
+    unvisited.delete(best.idx);
+    order.push(best.idx);
+    clockSec += matrix.durations[cur][best.idx] + SERVICE_SECONDS;
+    cur = best.idx;
+  }
+  return order;
+}
 
-      // Tổng chi phí = Thời gian di chuyển (phút) + Trọng số Time Window
-      const score = travelMin + penalty;
+function nearestNeighbor(n, matrix) {
+  const unvisited = new Set(Array.from({ length: n }, (_, i) => i + 1));
+  const order = [];
+  let cur = 0;
+  while (unvisited.size) {
+    let best = null;
+    for (const idx of unvisited) if (best === null || matrix.durations[cur][idx] < matrix.durations[cur][best]) best = idx;
+    unvisited.delete(best);
+    order.push(best);
+    cur = best;
+  }
+  return order;
+}
 
-      if (score < bestScore) {
-        bestScore = score;
-        bestIdx = idx;
-        bestTravelSec = travelSec;
+// Cải thiện cục bộ: 2-opt (đảo đoạn) + or-opt (dời 1 điểm sang vị trí khác)
+function improve(order, matrix, windows, startMinutes) {
+  let bestOrder = [...order];
+  let bestSim = simulate(bestOrder, matrix, windows, startMinutes);
+  const n = bestOrder.length;
+  let improved = true;
+  let guard = 0;
+  while (improved && guard++ < 200) {
+    improved = false;
+    for (let i = 0; i < n - 1 && !improved; i++) {
+      for (let k = i + 1; k < n && !improved; k++) {
+        const cand = [...bestOrder.slice(0, i), ...bestOrder.slice(i, k + 1).reverse(), ...bestOrder.slice(k + 1)];
+        const sim = simulate(cand, matrix, windows, startMinutes);
+        if (better(sim, bestSim)) { bestOrder = cand; bestSim = sim; improved = true; }
       }
     }
-
-    if (bestIdx === -1) break;
-
-    unvisited.delete(bestIdx);
-    const chosenTravelMin = Math.round(bestTravelSec / 60);
-    currentMinutes += chosenTravelMin + 4; // +4 phút thời gian giao hàng POD tại điểm
-    route.push({
-      index: bestIdx,
-      durationFromPrev: bestTravelSec
-    });
-    current = bestIdx;
+    for (let i = 0; i < n && !improved; i++) {
+      for (let j = 0; j < n && !improved; j++) {
+        if (i === j) continue;
+        const cand = [...bestOrder];
+        const [moved] = cand.splice(i, 1);
+        cand.splice(j, 0, moved);
+        const sim = simulate(cand, matrix, windows, startMinutes);
+        if (better(sim, bestSim)) { bestOrder = cand; bestSim = sim; improved = true; }
+      }
+    }
   }
-
-  return route;
+  return { order: bestOrder, sim: bestSim };
 }
+
+function solveRoute(n, matrix, windows, startMinutes) {
+  const candidates = [greedyInitial(n, matrix, windows, startMinutes), nearestNeighbor(n, matrix)];
+  let best = null;
+  for (const c of candidates) {
+    const r = improve(c, matrix, windows, startMinutes);
+    if (!best || better(r.sim, best.sim)) best = r;
+  }
+  return best;
+}
+
+// ---- Handler: GET /api/v1/routes/geocode?address=... ----
+exports.geocode = async (req, res) => {
+  const address = String(req.query.address || '').trim();
+  if (address.length < 4 || address.length > 300) {
+    return res.status(400).json({ success: false, message: 'Địa chỉ không hợp lệ.' });
+  }
+  try {
+    const result = await geocodeAddress(address);
+    if (!result) return res.status(404).json({ success: false, message: 'Không định vị được địa chỉ này.' });
+    res.json({ success: true, data: result });
+  } catch (err) {
+    console.error('[Geocode] Lỗi:', err.message);
+    res.status(502).json({ success: false, message: 'Dịch vụ bản đồ đang lỗi, thử lại sau.' });
+  }
+};
 
 // ---- Handler chính: POST /api/v1/routes/optimize ----
 exports.optimizeRoute = async (req, res) => {
   try {
-    const { orderIds, originLat, originLng } = req.body;
+    const { orderIds, originLat, originLng, originName } = req.body;
     if (!Array.isArray(orderIds) || orderIds.length === 0) {
       return res.status(400).json({ success: false, message: 'Thiếu danh sách đơn hàng (orderIds).' });
     }
     if (orderIds.length < 2) {
       return res.status(400).json({ success: false, message: 'Cần ít nhất 2 đơn hàng để tối ưu lộ trình.' });
     }
+    if (orderIds.length > 30) {
+      return res.status(400).json({ success: false, message: 'Tối đa 30 đơn mỗi lần tối ưu.' });
+    }
+    // Điểm xuất phát bắt buộc là vị trí của Shipper (GPS hoặc điểm tự chọn)
+    const lat = Number(originLat), lng = Number(originLng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) {
+      return res.status(400).json({ success: false, message: 'Cần vị trí hiện tại của Shipper (bật GPS hoặc chọn điểm xuất phát).' });
+    }
+    const origin = { lat, lng, name: originName ? String(originName).slice(0, 120) : 'Vị trí hiện tại của bạn' };
 
-    // 1. Lấy thông tin đơn hàng từ DB
     const orders = await prisma.order.findMany({
       where: { orderId: { in: orderIds } },
       select: {
-        orderId: true,
-        shippingAddress: true,
-        totalAmount: true,
-        paymentMethod: true,
-        notes: true,
-        failNote: true,
-        customer: { select: { name: true, phone: true } }
+        orderId: true, shippingAddress: true, totalAmount: true, paymentMethod: true,
+        notes: true, failNote: true, customer: { select: { name: true, phone: true } }
       }
     });
-
     if (orders.length === 0) {
       return res.status(404).json({ success: false, message: 'Không tìm thấy đơn hàng nào.' });
     }
 
-    // 2. Điểm xuất phát: dùng GPS thực tế của Shipper nếu có, fallback về Kho AetherPC (Quận 1)
-    const usingGps = typeof originLat === 'number' && typeof originLng === 'number';
-    const warehouseCoord = usingGps
-      ? { lat: originLat, lng: originLng, name: '📍 Vị trí hiện tại của bạn' }
-      : { lat: 10.7769, lng: 106.7009, name: 'Kho AetherPC' };
+    // 1. Định vị từng đơn — đơn không định vị được tách riêng, KHÔNG gán bừa toạ độ
+    const today = vnClock().day;
+    const geocoded = await Promise.all(orders.map(async (ord) => {
+      const geo = await geocodeAddress(ord.shippingAddress).catch(() => null);
+      const apt = parseAppointment(ord.notes, ord.failNote);
+      return {
+        ...ord,
+        customerName: ord.customer?.name || 'Khách hàng',
+        geo,
+        // Hẹn ngày khác hôm nay thì không ràng buộc khung giờ của tuyến hôm nay
+        appointment: apt && (!apt.date || apt.date === today) ? apt : null
+      };
+    }));
+    const located = geocoded.filter(o => o.geo);
+    const unlocated = geocoded.filter(o => !o.geo).map(o => ({
+      orderId: o.orderId, customerName: o.customerName, shippingAddress: o.shippingAddress
+    }));
+    if (located.length === 0) {
+      return res.status(422).json({ success: false, message: 'Không định vị được địa chỉ nào trong các đơn đã chọn.', data: { unlocated } });
+    }
 
-    console.log(`[RouteOptimizer] Điểm xuất phát: ${warehouseCoord.name} (${warehouseCoord.lat}, ${warehouseCoord.lng})`);
+    // 2. Ma trận thời gian/quãng đường: [xuất phát, đơn1, đơn2, ...]
+    const points = [origin, ...located.map(o => ({ lat: o.geo.lat, lng: o.geo.lng }))];
+    const matrix = await getTravelMatrix(points);
+    const windows = [null, ...located.map(o => o.appointment)];
 
-    // 3. Geocode tọa độ từng đơn hàng chuẩn xác
-    const ordersWithMeta = await Promise.all(
-      orders.map(async (ord) => {
-        const geo = await geocodeAddress(ord.shippingAddress);
-        const apt = parseAppointment(ord.notes, ord.failNote);
-        return {
-          ...ord,
-          customerName: ord.customerName || ord.customer?.name || 'Khách Hàng',
-          coord: geo || warehouseCoord,
-          appointment: apt
-        };
-      })
-    );
-
-    // 4. Xây dựng mảng tọa độ: [điểm xuất phát, đơn1, đơn2, ...]
-    const allCoords = [warehouseCoord, ...ordersWithMeta.map(o => o.coord)];
-
-    // 5. Lấy ma trận thời gian từ OSRM Table API
-    const matrix = await fetchOsrmDurationMatrix(allCoords);
-
-    // 6. Tính phút hiện tại trong ngày để thuật toán VRPTW biết khung giờ thực tế
+    // 3. Giải
     const now = new Date();
-    const currentMinutesOfDay = now.getHours() * 60 + now.getMinutes();
+    const startMinutes = vnClock(now).minutes;
+    const { order: bestOrder, sim } = located.length === 1
+      ? { order: [1], sim: simulate([1], matrix, windows, startMinutes) }
+      : solveRoute(located.length, matrix, windows, startMinutes);
 
-    // 7. Giải bài toán VRPTW kết hợp Time Window & Khoảng cách đường bộ
-    const optimizedRoute = solveVRPTW(matrix, 0, ordersWithMeta, currentMinutesOfDay);
-
-    // 8. Tính ETA tích lũy theo từng điểm dừng
-    let cumulativeSeconds = 5 * 60; // 5 phút chuẩn bị xuất phát
-
-    const result = optimizedRoute.map((stop, seq) => {
-      cumulativeSeconds += stop.durationFromPrev;
-      const eta = new Date(now.getTime() + cumulativeSeconds * 1000);
-      cumulativeSeconds += 4 * 60; // +4 phút thời gian giao tại nhà khách
-
-      const ord = ordersWithMeta[stop.index - 1];
-      const isRedeliv = Boolean(ord.notes?.includes('GIAO_LAI') || ord.failNote?.includes('GIAO_LAI'));
-      const distanceKm = +(((stop.durationFromPrev / 3600) * 22)).toFixed(1);
-
+    const toIso = (sec) => new Date(now.getTime() + (sec - startMinutes * 60) * 1000).toISOString();
+    const optimizedRoute = sim.stops.map((st, seq) => {
+      const ord = located[st.idx - 1];
       return {
         sequence: seq + 1,
+        matrixIndex: st.idx,
         orderId: ord.orderId,
         customerName: ord.customerName,
         shippingAddress: ord.shippingAddress,
         totalAmount: ord.totalAmount,
         paymentMethod: ord.paymentMethod,
-        lat: ord.coord.lat,
-        lng: ord.coord.lng,
-        isRedelivery: isRedeliv,
+        lat: ord.geo.lat,
+        lng: ord.geo.lng,
+        geoPrecision: ord.geo.precision,
+        matchedAddress: ord.geo.matchedAddress,
+        isRedelivery: Boolean(ord.notes?.includes('GIAO_LAI') || ord.failNote?.includes('GIAO_LAI')),
         notes: ord.notes,
         appointment: ord.appointment,
-        durationFromPrevSeconds: stop.durationFromPrev,
-        durationFromPrevMinutes: Math.max(1, Math.round(stop.durationFromPrev / 60)),
-        estimatedArrival: eta.toISOString(),
-        distanceFromPrevKm: distanceKm
+        durationFromPrevSeconds: st.travelSec,
+        durationFromPrevMinutes: Math.max(1, Math.round(st.travelSec / 60)),
+        distanceFromPrevKm: +(st.distanceM / 1000).toFixed(1),
+        waitMinutes: Math.round(st.waitSec / 60),
+        lateMinutes: st.lateMin,
+        estimatedArrival: toIso(st.arrivalSec)
       };
     });
 
-    const totalDurationMinutes = Math.round(cumulativeSeconds / 60);
-    const totalDistanceKm = result.reduce((sum, s) => sum + s.distanceFromPrevKm, 0).toFixed(1);
-
+    const totalDistanceKm = +(sim.stops.reduce((s, st) => s + st.distanceM, 0) / 1000).toFixed(1);
     res.json({
       success: true,
       data: {
-        warehouse: warehouseCoord,
-        optimizedRoute: result,
+        origin,
+        optimizedRoute,
+        unlocated,
+        // Trả kèm ma trận để giao diện tự tính lại ETA khi Shipper đổi thứ tự tay
+        matrix: { durations: matrix.durations, distances: matrix.distances, serviceSeconds: SERVICE_SECONDS, prepSeconds: PREP_SECONDS },
         summary: {
-          totalOrders: result.length,
-          totalDurationMinutes,
-          totalDistanceKm: +totalDistanceKm,
-          estimatedFinish: new Date(now.getTime() + cumulativeSeconds * 1000).toISOString(),
-          algorithm: 'vrptw_time_windows',
-          matrixSource: 'osrm_table_with_goong_geocoding'
+          totalOrders: optimizedRoute.length,
+          totalDurationMinutes: Math.round(sim.totalSec / 60),
+          totalDistanceKm,
+          totalLateMinutes: sim.lateMin,
+          estimatedFinish: new Date(now.getTime() + sim.totalSec * 1000).toISOString(),
+          algorithm: 'vrptw_greedy_2opt_oropt',
+          matrixSource: matrix.source
         }
       }
     });
   } catch (err) {
-    console.error('[RouteOptimizer] Lỗi xử lý VRPTW:', err);
+    console.error('[RouteOptimizer] Lỗi tối ưu lộ trình:', err);
     res.status(500).json({ success: false, message: 'Lỗi hệ thống khi tối ưu lộ trình.' });
   }
 };
+
+// Xuất để kiểm thử thuật toán độc lập
+exports._internal = { simulate, solveRoute, vnClock, parseAppointment };
