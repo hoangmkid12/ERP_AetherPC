@@ -370,15 +370,21 @@ export const useSalesStore = create((set, get) => ({
   /**
    * Update order details (name, phone, address, notes)
    */
-  updateOrderDetails: (orderId, details) => {
+  updateOrderDetails: async (orderId, details) => {
+    // Gọi máy chủ TRƯỚC rồi mới cập nhật giao diện — trước đây cập nhật
+    // localStorage ngay và nuốt lỗi API, nên khi máy chủ từ chối (đơn đã qua
+    // Chờ xác nhận, sai quyền...) khách vẫn thấy địa chỉ mới trong khi DB và
+    // shipper vẫn giữ địa chỉ cũ.
+    const res = await api.patch(`/orders/${orderId}/details`, details);
+    const saved = res?.data || res || {};
     set(state => {
       const orders = state.orders.map(o => {
-        if ((o.orderId === orderId || o.id === orderId) && o.status === 'PENDING') {
+        if (o.orderId === orderId || o.id === orderId) {
           return {
             ...o,
             customerName: details.customerName || o.customerName,
             phone: details.phone || o.phone,
-            shippingAddress: details.shippingAddress || o.shippingAddress,
+            shippingAddress: saved.shippingAddress || details.shippingAddress || o.shippingAddress,
             lastNote: details.notes !== undefined ? details.notes : o.lastNote
           };
         }
@@ -389,8 +395,7 @@ export const useSalesStore = create((set, get) => ({
       } catch (e) {}
       return { orders };
     });
-
-    api.patch(`/orders/${orderId}/details`, details).catch(err => console.warn('[SalesStore] Order details sync notice:', err.message));
+    return saved;
   },
 
   /**

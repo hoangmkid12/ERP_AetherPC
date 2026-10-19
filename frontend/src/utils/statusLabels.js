@@ -36,9 +36,9 @@ export const isOrderPrepaid = (ord) => {
   const method = String(ord.paymentMethod || '').toUpperCase();
   const actualMethod = String(ord.actualPaymentMethod || '').toUpperCase();
 
-  // Đơn COD hoặc thanh toán thực tế là tiền mặt / split thì KHÔNG PHẢI trả trước
+  // Đơn COD hoặc thanh toán thực tế là tiền mặt thì KHÔNG PHẢI trả trước
   if (method === 'COD') return false;
-  if (actualMethod === 'CASH' || actualMethod === 'SPLIT') return false;
+  if (actualMethod === 'CASH') return false;
 
   // Phương thức thanh toán online trước
   if (

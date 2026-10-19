@@ -998,19 +998,26 @@ const updateOrderStatus = async (req, res, next) => {
       }
 
       // Cập nhật trạng thái đơn hàng & thông tin POD giao vận
-      // ---------------------------------------------------------------
-      // Split payment: UI có thể gửi cashAmount + bankAmount cùng lúc.
-      // Nếu chỉ gửi actualPaymentMethod thì dùng như cũ (1 phương thức).
-      // ---------------------------------------------------------------
+      // UI gửi actualPaymentMethod (CASH | BANK_TRANSFER | PREPAID); cashAmount/bankAmount
+      // chỉ còn để nhận diện phương thức từ client cũ.
       const cashAmount  = parseFloat(req.body.cashAmount  ?? 0) || 0;
       const bankAmount  = parseFloat(req.body.bankAmount   ?? 0) || 0;
-      const totalOrderAmount = parseFloat(existingOrder.totalAmount);
 
       // Xác định actualPaymentMethod đồng nhất để ghi lên Order.actualPaymentMethod
+      // Đơn đã từng giao xong rồi quay lại DELIVERED (vd. CSKH từ chối đổi trả):
+      // giữ nguyên thông tin giao hàng & thanh toán gốc, không ghi đè ngày giao,
+      // phương thức thu, mã giao dịch, ảnh biên lai bằng giá trị mặc định.
+      const isRestoreDelivered = status === 'DELIVERED' && Boolean(existingOrder.deliveredAt);
+
+      // Chỉ chấp nhận 1 phương thức thu tiền khi giao: tiền mặt HOẶC chuyển khoản.
+      // Thanh toán kết hợp (SPLIT) đã bỏ — chặn ở đây để client cũ không gửi lên được.
+      if (status === 'DELIVERED' && !isRestoreDelivered && ((cashAmount > 0 && bankAmount > 0) || req.body.actualPaymentMethod === 'SPLIT')) {
+        const error = new Error('Chỉ hỗ trợ thu bằng tiền mặt hoặc chuyển khoản, không hỗ trợ thanh toán kết hợp.');
+        error.statusCode = 400;
+        throw error;
+      }
       let actualPayMethod;
-      if (cashAmount > 0 && bankAmount > 0) {
-        actualPayMethod = 'SPLIT'; // vừa tiền mặt vừa chuyển khoản
-      } else if (cashAmount > 0) {
+      if (cashAmount > 0) {
         actualPayMethod = 'CASH';
       } else if (bankAmount > 0) {
         actualPayMethod = 'BANK_TRANSFER';
@@ -1023,20 +1030,10 @@ const updateOrderStatus = async (req, res, next) => {
       const receiverName = req.body.receiverNameActual || (receivedType === 'DIRECT_CUSTOMER' ? (existingOrder.customer?.name || 'Khách hàng') : 'Người nhận thay');
 
       // Validate: chuyển khoản phải có mã giao dịch
-      if (status === 'DELIVERED' && (actualPayMethod === 'BANK_TRANSFER' || actualPayMethod === 'SPLIT') && bankAmount > 0 && !req.body.bankRefCode) {
+      if (status === 'DELIVERED' && !isRestoreDelivered && actualPayMethod === 'BANK_TRANSFER' && !req.body.bankRefCode) {
         const error = new Error('Cần nhập Mã Giao Dịch Ngân Hàng trước khi xác nhận đã nhận chuyển khoản.');
         error.statusCode = 400;
         throw error;
-      }
-
-      // Validate: tổng split phải khớp với totalAmount
-      if (status === 'DELIVERED' && actualPayMethod === 'SPLIT') {
-        const splitTotal = cashAmount + bankAmount;
-        if (Math.abs(splitTotal - totalOrderAmount) > 1) { // dung sai 1đ làm tròn
-          const error = new Error(`Tổng thanh toán (${splitTotal.toLocaleString('vi-VN')}đ) không khớp với giá trị đơn hàng (${totalOrderAmount.toLocaleString('vi-VN')}đ).`);
-          error.statusCode = 400;
-          throw error;
-        }
       }
 
       // Kho "Xác Nhận Xuất Kho" gửi kèm assignedShipperId/deliveryRegion khi
@@ -1114,7 +1111,7 @@ const updateOrderStatus = async (req, res, next) => {
           // ở tab Chờ Nhận nữa.
           ...(isRejectingAssignment ? { assignedShipperId: null } : (assignedShipperIdInt !== null ? { assignedShipperId: assignedShipperIdInt } : {})),
           ...(req.body.deliveryRegion !== undefined ? { deliveryRegion: req.body.deliveryRegion } : {}),
-          ...(status === 'DELIVERED' ? {
+          ...(status === 'DELIVERED' && !isRestoreDelivered ? {
             deliveredAt: new Date(),
             paymentStatus: 'PAID',
             proofPhoto: req.body.proofPhoto !== undefined ? req.body.proofPhoto : existingOrder.proofPhoto,
@@ -1161,34 +1158,10 @@ const updateOrderStatus = async (req, res, next) => {
       }
 
       // Nếu đơn giao thành công, ghi nhận giao dịch thanh toán OrderPayment
-      // Hỗ trợ split payment: tạo 2 rows riêng nếu có cả tiền mặt + chuyển khoản
       if (status === 'DELIVERED' && existingOrder.paymentStatus !== 'PAID') {
         const paymentRows = [];
 
-        if (actualPayMethod === 'SPLIT') {
-          // Split: Tiền mặt shipper thu (cần đối soát) + Chuyển khoản đã xác nhận
-          if (cashAmount > 0) {
-            paymentRows.push({
-              orderId: id,
-              method: 'CASH',
-              amount: cashAmount,
-              transactionId: `CASH-${id}-${Date.now().toString().slice(-4)}`,
-              status: 'SUCCESS'
-              // settledAt null → Kế Toán cần đối soát COD với Shipper
-            });
-          }
-          if (bankAmount > 0) {
-            paymentRows.push({
-              orderId: id,
-              method: 'BANK_TRANSFER',
-              amount: bankAmount,
-              transactionId: req.body.bankRefCode || `BANK-${id}-${Date.now().toString().slice(-4)}`,
-              status: 'SUCCESS',
-              settledAt: new Date(), // chuyển khoản ghi nhận ngay, không cần đối soát
-              settledBy: changedBy
-            });
-          }
-        } else if (actualPayMethod === 'CASH') {
+        if (actualPayMethod === 'CASH') {
           // COD tiền mặt: Shipper đang giữ, Kế Toán đối soát sau
           paymentRows.push({
             orderId: id,
@@ -1232,9 +1205,7 @@ const updateOrderStatus = async (req, res, next) => {
       if (!historyLogNote) {
         if (status === 'DELIVERED') {
           let payLabel;
-          if (actualPayMethod === 'SPLIT') {
-            payLabel = `Tiền mặt ${cashAmount.toLocaleString('vi-VN')}đ + Chuyển khoản ${bankAmount.toLocaleString('vi-VN')}đ (Mã GD: ${req.body.bankRefCode || 'N/A'})`;
-          } else if (actualPayMethod === 'BANK_TRANSFER') {
+          if (actualPayMethod === 'BANK_TRANSFER') {
             payLabel = `Chuyển khoản VietQR (Mã GD: ${req.body.bankRefCode || 'Napas247'})`;
           } else if (actualPayMethod === 'CASH') {
             payLabel = 'Tiền mặt (COD - Shipper thu)';

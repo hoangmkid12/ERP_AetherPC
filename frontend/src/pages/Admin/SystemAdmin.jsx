@@ -1405,6 +1405,10 @@ export default function SystemAdmin() {
   // cảm thật: đăng nhập thất bại, đổi mật khẩu, tạo/sửa nhân viên, duyệt PO,
   // duyệt/giải ngân lương, đổi RBAC, backup/restore).
   const [auditLogs, setAuditLogs] = useState([]);
+  // Bộ lọc nhật ký: tìm người thực hiện/hành động, lọc phân hệ & kết quả
+  const [auditSearch, setAuditSearch] = useState('');
+  const [auditModuleFilter, setAuditModuleFilter] = useState('ALL');
+  const [auditStatusFilter, setAuditStatusFilter] = useState('ALL');
   const [loadingAuditLogs, setLoadingAuditLogs] = useState(false);
 
   // Trước đây chỉ fetch khi activeTab === 'audit' — nghĩa là 2 thẻ KPI ở tab
@@ -1468,6 +1472,14 @@ export default function SystemAdmin() {
   // đây ghi cứng "Online 99.9%" — giờ phản ánh đúng serverStatus (xem
   // loadCompanySettings ở trên).
   const failedSecurityCount = auditLogs.filter(l => l.status === 'FAILED').length;
+  const filteredAuditLogs = auditLogs.filter(log => {
+    const q = auditSearch.trim().toLowerCase();
+    if (q && ![log.user, log.action, log.ip].some(v => String(v || '').toLowerCase().includes(q))) return false;
+    if (auditModuleFilter !== 'ALL' && log.module !== auditModuleFilter) return false;
+    if (auditStatusFilter === 'SUCCESS' && log.status !== 'SUCCESS') return false;
+    if (auditStatusFilter === 'FAILED' && log.status === 'SUCCESS') return false;
+    return true;
+  });
   const dbStatusLabel = serverStatus === 'ok' ? 'Trực tuyến' : serverStatus === 'down' ? 'Mất kết nối' : 'Đang kiểm tra...';
   const dbStatusVariant = serverStatus === 'ok' ? 'success' : serverStatus === 'down' ? 'danger' : 'warning';
   const dbStatusColor = BADGE_VARIANTS[dbStatusVariant].color;
@@ -4348,6 +4360,27 @@ export default function SystemAdmin() {
             <span style={badgeStyle('danger')}>Thất bại: {failedSecurityCount}</span>
           </div>
 
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
+            <input
+              type="text"
+              value={auditSearch}
+              onChange={e => setAuditSearch(e.target.value)}
+              placeholder="Tìm theo người thực hiện, hành động, địa chỉ IP..."
+              style={{ flex: '1 1 240px', padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.8rem' }}
+            />
+            <select value={auditModuleFilter} onChange={e => setAuditModuleFilter(e.target.value)} style={{ padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.8rem', backgroundColor: '#fff' }}>
+              <option value="ALL">Tất cả phân hệ</option>
+              {[...new Set(auditLogs.map(l => l.module).filter(Boolean))].sort().map(m => (
+                <option key={m} value={m}>{m}</option>
+              ))}
+            </select>
+            <select value={auditStatusFilter} onChange={e => setAuditStatusFilter(e.target.value)} style={{ padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.8rem', backgroundColor: '#fff' }}>
+              <option value="ALL">Tất cả kết quả</option>
+              <option value="SUCCESS">Thành công</option>
+              <option value="FAILED">Thất bại</option>
+            </select>
+          </div>
+
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
               <thead>
@@ -4363,9 +4396,9 @@ export default function SystemAdmin() {
               <tbody>
                 {loadingAuditLogs ? (
                   <tr><td colSpan={6} style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>Đang tải nhật ký...</td></tr>
-                ) : auditLogs.length === 0 ? (
-                  <tr><td colSpan={6} style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>Chưa có sự kiện nào được ghi nhận.</td></tr>
-                ) : auditLogs.map(log => (
+                ) : filteredAuditLogs.length === 0 ? (
+                  <tr><td colSpan={6} style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>{auditLogs.length === 0 ? 'Chưa có sự kiện nào được ghi nhận.' : 'Không có sự kiện nào khớp bộ lọc.'}</td></tr>
+                ) : filteredAuditLogs.map(log => (
                   <tr key={log.id} style={{ borderBottom: '1px solid #f1f5f9', backgroundColor: log.status === 'FAILED' ? '#fef2f2' : undefined }}>
                     <td style={{ padding: '0.65rem 0.85rem', color: '#64748b', fontFamily: 'monospace' }}>{log.timestamp}</td>
                     <td style={{ padding: '0.65rem 0.85rem', fontWeight: 600, color: '#0f172a' }}>{log.user}</td>

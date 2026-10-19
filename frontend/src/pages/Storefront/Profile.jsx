@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { MapPin, Plus, User, X } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
@@ -72,35 +72,32 @@ export default function Profile() {
       .catch(err => console.warn('AddressKit provinces fetch error:', err));
   }, []);
 
-  // Fetch live wards for selected province and district
-  const fetchWardsForDistrict = (provName, districtName) => {
+  // Tải phường/xã MỚI (2 cấp) của tỉnh; máy chủ quy đổi tên tỉnh cũ sang tỉnh
+  // mới và trả provinceCode để form đổi ô Tỉnh/TP sang đúng tên mới.
+  const wardsRequestRef = useRef(0);
+  const fetchWardsForProvince = (provName) => {
+    // Chỉ nhận phản hồi của lần chọn tỉnh mới nhất (tránh phản hồi cũ về sau ghi đè)
+    const reqId = ++wardsRequestRef.current;
     if (!provName) {
       setApiCommunes([]);
       return;
     }
     setLoadingCommunes(true);
-    const params = new URLSearchParams();
-    params.set('province', provName);
-    if (districtName) params.set('district', districtName);
-
-    api.get(`/address/wards?${params.toString()}`)
+    api.get(`/address/wards?province=${encodeURIComponent(provName)}`)
       .then(res => {
-        const wards = res?.data?.wards;
-        if (Array.isArray(wards) && wards.length > 0) {
-          setApiCommunes(wards);
-        } else {
-          // Fallback to communes
-          const list = apiProvinces.length > 0 ? apiProvinces : VIETNAM_PROVINCES;
-          const found = list.find(p => p.name === provName || p.code === provName || p.id === provName);
-          if (found?.code) {
-            return api.get(`/address/provinces/${found.code}/communes`).then(cRes => {
-              setApiCommunes(cRes?.data?.communes || []);
-            });
-          }
-        }
+        if (reqId !== wardsRequestRef.current) return;
+        const wards = Array.isArray(res?.data?.wards) ? res.data.wards : [];
+        setApiCommunes(wards);
+        const newProvName = res?.data?.provinceName;
+        setAddressForm(prev => {
+          const next = { ...prev };
+          if (newProvName && prev.city === provName && newProvName !== provName) next.city = newProvName;
+          if (prev.ward && wards.length > 0 && !wards.some(w => w.name === prev.ward)) next.ward = '';
+          return next;
+        });
       })
       .catch(err => console.warn('Wards fetch error:', err))
-      .finally(() => setLoadingCommunes(false));
+      .finally(() => { if (reqId === wardsRequestRef.current) setLoadingCommunes(false); });
   };
 
   useEffect(() => {
@@ -150,17 +147,6 @@ export default function Profile() {
       notify('Vui lòng chọn Tỉnh / Thành phố.', 'error');
       return;
     }
-    const matched = VIETNAM_PROVINCES.find(p => {
-      if (!addressForm.city) return false;
-      return p.name === addressForm.city || p.name.includes(addressForm.city) || addressForm.city.includes(p.name) || p.code === addressForm.city;
-    });
-    const hasDistricts = Boolean(matched && matched.districts?.length > 0);
-    const isTwoTier = addressForm.isTwoTier ?? !hasDistricts;
-
-    if (!isTwoTier && !addressForm.district?.trim()) {
-      notify('Vui lòng chọn Quận / Huyện.', 'error');
-      return;
-    }
     if (!addressForm.ward?.trim()) {
       notify('Vui lòng chọn Phường / Xã.', 'error');
       return;
@@ -172,7 +158,7 @@ export default function Profile() {
     try {
       const payload = {
         ...addressForm,
-        district: isTwoTier ? '' : (addressForm.district || '')
+        district: ''
       };
       if (editingAddress) await api.put(`/customers/addresses/${editingAddress.id}`, payload);
       else await api.post('/customers/addresses', payload);
@@ -235,7 +221,7 @@ export default function Profile() {
     setEditingAddress(address);
     setAddressForm({ ...emptyAddress, ...address });
     if (address.city) {
-      fetchWardsForDistrict(address.city, address.district || '');
+      fetchWardsForProvince(address.city);
     } else {
       setApiCommunes([]);
     }
@@ -450,8 +436,7 @@ export default function Profile() {
           provinces={apiProvinces.length > 0 ? apiProvinces : VIETNAM_PROVINCES}
           communes={apiCommunes}
           loadingCommunes={loadingCommunes}
-          onProvinceChange={(prov) => fetchWardsForDistrict(prov, '')}
-          onDistrictChange={(prov, dist) => fetchWardsForDistrict(prov, dist)}
+          onProvinceChange={(prov) => fetchWardsForProvince(prov)}
         />
       )}
     </div>
@@ -600,39 +585,13 @@ function AddressModal({
   provinces = [],
   communes = [],
   loadingCommunes = false,
-  onProvinceChange,
-  onDistrictChange
+  onProvinceChange
 }) {
   const update = key => event => setForm({ ...form, [key]: event.target.type === 'checkbox' ? event.target.checked : event.target.value });
 
-  // Find matching province in VIETNAM_PROVINCES to retrieve standard districts
-  const currentProvinceObj = VIETNAM_PROVINCES.find(p => {
-    if (!form.city) return false;
-    return p.name === form.city || p.name.includes(form.city) || form.city.includes(p.name) || p.code === form.city;
-  }) || { districts: [] };
-
-  const hasDistricts = Boolean(currentProvinceObj.districts && currentProvinceObj.districts.length > 0);
-  const isTwoTier = form.isTwoTier ?? (!hasDistricts && Boolean(form.city));
-
   const handleCityChange = (cityName) => {
-    const matched = VIETNAM_PROVINCES.find(p => {
-      if (!cityName) return false;
-      return p.name === cityName || p.name.includes(cityName) || cityName.includes(p.name) || p.code === cityName;
-    });
-    const provHasDistricts = Boolean(matched && matched.districts?.length > 0);
-    setForm(prev => ({
-      ...prev,
-      city: cityName,
-      district: '',
-      ward: '',
-      isTwoTier: !provHasDistricts
-    }));
-    if (onProvinceChange) onProvinceChange(cityName, '');
-  };
-
-  const handleDistrictChange = (districtName) => {
-    setForm(prev => ({ ...prev, district: districtName, ward: '' }));
-    if (onDistrictChange) onDistrictChange(form.city, districtName);
+    setForm(prev => ({ ...prev, city: cityName, district: '', ward: '' }));
+    if (onProvinceChange) onProvinceChange(cityName);
   };
 
   const handleWardChange = (wardName) => {
@@ -664,54 +623,21 @@ function AddressModal({
           />
         </Field>
 
-        <div style={{
-          display: isTwoTier ? 'block' : 'grid',
-          gridTemplateColumns: isTwoTier ? undefined : '1fr 1fr',
-          gap: '0.85rem'
-        }}>
-          {!isTwoTier && (
-            <Field label={TEXT.district} required>
-              <SearchableSelect
-                value={form.district}
-                onChange={handleDistrictChange}
-                options={currentProvinceObj.districts || []}
-                placeholder={!form.city ? "-- Chọn Tỉnh/TP trước --" : "-- Chọn Quận / Huyện --"}
-                disabled={!form.city}
-              />
-            </Field>
-          )}
-
-          <Field label={TEXT.ward} required>
-            <SearchableSelect
-              value={form.ward}
-              onChange={handleWardChange}
-              options={communes}
-              placeholder={
-                !form.city
-                  ? "-- Chọn Tỉnh/TP trước --"
-                  : (!isTwoTier && !form.district)
-                  ? "-- Chọn Quận / Huyện trước --"
-                  : (loadingCommunes ? "-- Đang tải Phường/Xã... --" : "-- Chọn Phường / Xã --")
-              }
-              disabled={!form.city || (!isTwoTier && !form.district) || loadingCommunes}
-              loading={loadingCommunes}
-            />
-          </Field>
-        </div>
-
-        {/* Toggle 2 cấp / 3 cấp */}
-        <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.78rem', color: '#475569', fontWeight: 600, cursor: 'pointer' }}>
-          <input
-            type="checkbox"
-            checked={isTwoTier}
-            onChange={e => {
-              const checked = e.target.checked;
-              setForm(prev => ({ ...prev, isTwoTier: checked, district: checked ? '' : prev.district }));
-            }}
-            style={{ accentColor: '#2563eb', cursor: 'pointer' }}
+        {/* Địa giới 2 cấp (từ 01/07/2025): Tỉnh/TP => Phường/Xã, không còn Quận/Huyện */}
+        <Field label={TEXT.ward} required>
+          <SearchableSelect
+            value={form.ward}
+            onChange={handleWardChange}
+            options={communes}
+            placeholder={
+              !form.city
+                ? "-- Chọn Tỉnh/TP trước --"
+                : (loadingCommunes ? "-- Đang tải Phường/Xã... --" : "-- Chọn Phường / Xã --")
+            }
+            disabled={!form.city || loadingCommunes}
+            loading={loadingCommunes}
           />
-          <span>Địa phương 2 cấp (Chỉ gồm Tỉnh/TP và Xã/Phường, không có Quận/Huyện)</span>
-        </label>
+        </Field>
 
         <Field label={TEXT.street} required>
           <textarea required rows={2} value={form.addressLine} onChange={update('addressLine')} placeholder="Số nhà, ngõ/ngách, tên đường (Ví dụ: Số 123 Nguyễn Huệ)..." />

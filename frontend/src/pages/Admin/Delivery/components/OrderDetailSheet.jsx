@@ -81,11 +81,9 @@ export default function OrderDetailSheet({ order: ord, onClose, fmt, actions = {
                       ? 'Tiền mặt'
                       : ord.actualPaymentMethod === 'BANK_TRANSFER'
                         ? 'Chuyển khoản VietQR'
-                        : ord.actualPaymentMethod === 'SPLIT'
-                          ? 'Kết hợp (Tiền mặt + QR)'
-                          : isPrepaid
-                            ? 'Đã trả trước qua cổng online'
-                            : 'Đã thanh toán'
+                        : isPrepaid
+                          ? 'Đã trả trước qua cổng online'
+                          : 'Đã thanh toán'
                   }
                 />
                 <Row

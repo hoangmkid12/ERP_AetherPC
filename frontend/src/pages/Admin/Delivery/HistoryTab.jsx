@@ -21,7 +21,7 @@ export default function HistoryTab({
 
   const {
     search, setSearch,
-    paymentFilter, setPaymentFilter,
+    historyPaymentFilter: paymentFilter = 'ALL', setHistoryPaymentFilter: setPaymentFilter,
     orderDateFilter = getDefaultDateFilter(),
     setOrderDateFilter,
     sortOrder, setSortOrder
@@ -139,7 +139,8 @@ export default function HistoryTab({
           <label style={labelStyle}>Hình thức thanh toán</label>
           <select value={paymentFilter} onChange={e => setPaymentFilter(e.target.value)} style={selectStyle}>
             <option value="ALL">Tất Cả Hình Thức</option>
-            <option value="COD">Thu tiền khi giao</option>
+            <option value="CASH">Thu tiền mặt</option>
+            <option value="BANK_TRANSFER">Khách chuyển khoản</option>
             <option value="PREPAID">Đã trả trước</option>
           </select>
         </div>

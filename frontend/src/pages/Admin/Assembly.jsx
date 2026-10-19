@@ -69,6 +69,7 @@ export default function Assembly() {
   const [activeJobId, setActiveJobId] = useState(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [jobSearch, setJobSearch] = useState('');
+  const [qaSearch, setQaSearch] = useState('');
   const [jobStatusFilter, setJobStatusFilter] = useState('ALL');
 
   // Manual Job Creation Form State
@@ -150,6 +151,15 @@ export default function Assembly() {
       return matchSearch && matchStatus;
     });
   }, [jobs, jobSearch, jobStatusFilter]);
+
+  // Tab 'qa': chỉ lệnh đã nghiệm thu, tìm theo mã lệnh / mã đơn / khách hàng
+  const completedQaJobs = useMemo(() => {
+    const q = qaSearch.trim().toLowerCase();
+    return jobs.filter(j => j.status === 'COMPLETED' && (!q ||
+      String(j.id || '').toLowerCase().includes(q) ||
+      String(j.orderId || '').toLowerCase().includes(q) ||
+      String(j.customer || '').toLowerCase().includes(q)));
+  }, [jobs, qaSearch]);
 
   // Checklist Actions
   const toggleChecklist = (jobId, key) => {
@@ -918,6 +928,13 @@ export default function Assembly() {
             <p style={{ color: '#64748b', fontSize: '0.85rem', margin: '0.25rem 0 0' }}>
               Nhật ký nghiệm thu 4 bài kiểm thử stress test, lưu vết mã Serial Number từng linh kiện
             </p>
+            <input
+              type="text"
+              value={qaSearch}
+              onChange={e => setQaSearch(e.target.value)}
+              placeholder="Tìm theo mã lệnh, mã đơn hoặc khách hàng..."
+              style={{ marginTop: '0.75rem', width: '100%', maxWidth: '360px', padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.82rem', boxSizing: 'border-box' }}
+            />
           </div>
 
           <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', overflow: 'hidden' }}>
@@ -933,14 +950,14 @@ export default function Assembly() {
                 </tr>
               </thead>
               <tbody>
-                {jobs.filter(j => j.status === 'COMPLETED').length === 0 ? (
+                {completedQaJobs.length === 0 ? (
                   <tr>
                     <td colSpan="6" style={{ textAlign: 'center', padding: '3rem', color: '#64748b' }}>
-                      Chưa có lệnh lắp ráp nào hoàn tất nghiệm thu xuất xưởng.
+                      {qaSearch.trim() ? 'Không có biên bản nào khớp từ khóa tìm kiếm.' : 'Chưa có lệnh lắp ráp nào hoàn tất nghiệm thu xuất xưởng.'}
                     </td>
                   </tr>
                 ) : (
-                  jobs.filter(j => j.status === 'COMPLETED').map(job => (
+                  completedQaJobs.map(job => (
                     <tr 
                       key={job.id} 
                       onClick={() => setSelectedQADetailJob(job)}

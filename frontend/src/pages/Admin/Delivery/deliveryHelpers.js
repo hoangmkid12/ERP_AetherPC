@@ -1,3 +1,5 @@
+import { isHcmProvinceAddress } from '../../../utils/deliveryRegions';
+
 // Builds the payload for a "delivery failed" status update — shared by
 // FailModal (full reason picker) and QuickFailSheet (1-tap common reasons)
 // so the attempt-count / 24h-callback-deadline logic lives in one place.
@@ -537,12 +539,11 @@ export const getDateFilterLabel = (filterConfig) => {
  * Các trạng thái thể hiện đơn hàng đang trong hành trình giao thật sự của Shipper
  */
 // ── Tiền mặt COD của 1 đơn ─────────────────────────────────────────────
-// Đơn SPLIT (vừa tiền mặt vừa chuyển khoản) chỉ có phần tiền mặt là shipper
-// giữ — lấy theo OrderPayment CASH khi backend trả kèm payments, chỉ fallback
-// về totalAmount khi chưa có dữ liệu thanh toán.
+// Lấy theo OrderPayment CASH khi backend trả kèm payments, chỉ fallback về
+// totalAmount khi chưa có dữ liệu thanh toán.
 export const isCodOrder = (o) =>
   o.paymentMethod === 'COD' || o.actualPaymentMethod === 'COD' || o.actualPaymentMethod === 'CASH' ||
-  o.actualPaymentMethod === 'SPLIT' || (!o.paymentMethod && !o.actualPaymentMethod);
+  (!o.paymentMethod && !o.actualPaymentMethod);
 
 const getCashPayments = (o) => (Array.isArray(o.payments) ? o.payments.filter(p => p.method === 'CASH') : []);
 
@@ -803,3 +804,19 @@ export const generateShipperNotifications = (
   return notifs;
 };
 
+
+// ── Khu vực giao: đơn trong TP.HCM hay ngoại tỉnh ──────────────────────
+// Trước đây coi mọi địa chỉ có chữ "quận" là TP.HCM (nên Quận Hoàn Kiếm - Hà
+// Nội cũng bị xếp nội thành). Giờ xác định theo tỉnh/thành ở cuối địa chỉ.
+export const isHcmAddress = (address) => isHcmProvinceAddress(address);
+
+// ── Cách shipper đã thu tiền thực tế (dùng cho bộ lọc tab Lịch sử) ──────
+// 'CASH' | 'BANK_TRANSFER' | 'PREPAID'. Đơn COD sau khi giao đã chuyển sang
+// paymentStatus=PAID nên không thể lọc "thu khi giao" theo paymentStatus nữa.
+export const getCollectedPaymentMethod = (o) => {
+  const actual = String(o.actualPaymentMethod || '').toUpperCase();
+  if (actual === 'CASH' || actual === 'COD') return 'CASH';
+  if (actual === 'BANK_TRANSFER') return 'BANK_TRANSFER';
+  if (actual === 'PREPAID') return 'PREPAID';
+  return isCodOrder(o) ? 'CASH' : 'PREPAID';
+};

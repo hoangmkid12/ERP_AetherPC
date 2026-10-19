@@ -149,7 +149,10 @@ export const DISTRICT_COORDS = [
 export function getAddressCoordinates(address) {
   if (!address || typeof address !== 'string') return REGION_COORDS.ALL;
   const norm = address.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd');
-  for (const item of DISTRICT_COORDS) {
+  // Toạ độ quận/phường trong từ điển chỉ là của TP.HCM — địa chỉ tỉnh khác
+  // (vd. "Trần Phú, Đà Nẵng" chứa chữ "an phu") không được khớp vào đây.
+  const zone = detectProvinceZone(address).zone;
+  for (const item of (zone === null || zone === 'HCM') ? DISTRICT_COORDS : []) {
     if (item.match.every(m => norm.includes(m))) {
       return { lat: item.lat, lng: item.lng };
     }
@@ -158,77 +161,92 @@ export function getAddressCoordinates(address) {
   return REGION_COORDS[region] || REGION_COORDS.ALL;
 }
 
+// ── Nhận diện tỉnh/thành từ chuỗi địa chỉ ─────────────────────────────
+// Tên tỉnh cũ (63) và mới (34, NQ 202/2025/QH15) => nhóm vùng giao hàng.
+// Đọc từ CUỐI địa chỉ lên (tỉnh luôn ở cuối) để tên đường như "Nguyễn Huệ",
+// "Xa lộ Hà Nội" hay tên phường trùng tên tỉnh không làm nhận nhầm tỉnh.
+const PROVINCE_ZONE = {
+  'ho chi minh': 'HCM', 'tp hcm': 'HCM', 'tphcm': 'HCM', 'hcm': 'HCM', 'sai gon': 'HCM',
+  'binh duong': 'HCM_OUTER', 'ba ria vung tau': 'HCM_OUTER', 'ba ria': 'HCM_OUTER', 'vung tau': 'HCM_OUTER',
+  'ha noi': 'NORTH', 'cao bang': 'NORTH', 'tuyen quang': 'NORTH', 'ha giang': 'NORTH', 'dien bien': 'NORTH',
+  'lai chau': 'NORTH', 'son la': 'NORTH', 'lao cai': 'NORTH', 'yen bai': 'NORTH', 'thai nguyen': 'NORTH',
+  'bac kan': 'NORTH', 'lang son': 'NORTH', 'quang ninh': 'NORTH', 'bac ninh': 'NORTH', 'bac giang': 'NORTH',
+  'phu tho': 'NORTH', 'vinh phuc': 'NORTH', 'hoa binh': 'NORTH', 'hai phong': 'NORTH', 'hai duong': 'NORTH',
+  'hung yen': 'NORTH', 'thai binh': 'NORTH', 'ninh binh': 'NORTH', 'ha nam': 'NORTH', 'nam dinh': 'NORTH',
+  'thanh hoa': 'CENTRAL', 'nghe an': 'CENTRAL', 'ha tinh': 'CENTRAL', 'quang tri': 'CENTRAL', 'quang binh': 'CENTRAL',
+  'hue': 'CENTRAL', 'thua thien hue': 'CENTRAL', 'da nang': 'CENTRAL', 'quang nam': 'CENTRAL', 'quang ngai': 'CENTRAL',
+  'kon tum': 'CENTRAL', 'gia lai': 'CENTRAL', 'binh dinh': 'CENTRAL', 'khanh hoa': 'CENTRAL', 'ninh thuan': 'CENTRAL',
+  'dak lak': 'CENTRAL', 'phu yen': 'CENTRAL', 'lam dong': 'CENTRAL', 'dak nong': 'CENTRAL', 'binh thuan': 'CENTRAL',
+  'dong nai': 'SOUTH', 'binh phuoc': 'SOUTH', 'tay ninh': 'SOUTH', 'long an': 'SOUTH', 'can tho': 'SOUTH',
+  'soc trang': 'SOUTH', 'hau giang': 'SOUTH', 'vinh long': 'SOUTH', 'ben tre': 'SOUTH', 'tra vinh': 'SOUTH',
+  'dong thap': 'SOUTH', 'tien giang': 'SOUTH', 'ca mau': 'SOUTH', 'bac lieu': 'SOUTH', 'an giang': 'SOUTH', 'kien giang': 'SOUTH'
+};
+
+// Phường/xã thuộc Bình Dương & Bà Rịa - Vũng Tàu cũ, nay nằm trong TP.HCM mới —
+// xa trung tâm nên xếp vùng ngoại thành thay vì KV1-4 nội thành.
+const HCM_OUTER_KEYS = ['thu dau mot', 'di an', 'thuan an', 'ben cat', 'tan uyen', 'bau bang', 'dau tieng', 'phu giao',
+  'vung tau', 'ba ria', 'long dien', 'dat do', 'xuyen moc', 'chau duc', 'con dao', 'ngai giao', 'kim long'];
+
+const normalizeAddr = (address) => String(address || '')
+  .replace(/\(ghi chú[^)]*\)/gi, '')
+  .toLowerCase().normalize('NFD').replace(/\p{M}/gu, '').replace(/đ/g, 'd');
+
+const stripUnitPrefix = (seg) => seg
+  .replace(/^(thanh pho|tinh|tp\.?|t\.)\s*/, '')
+  .replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+
+const hasWord = (text, key) => new RegExp(`(^|[^a-z0-9])${key}($|[^a-z0-9])`).test(text);
+
+// Trả về { zone, rest } — zone: HCM | HCM_OUTER | NORTH | CENTRAL | SOUTH | null;
+// rest: phần địa chỉ phía trước tỉnh (số nhà, phường...) để chia khu vực chi tiết.
+export const detectProvinceZone = (address = '') => {
+  const segments = normalizeAddr(address).split(',').map(s => s.trim()).filter(Boolean);
+  for (let i = segments.length - 1; i >= 0; i--) {
+    const bare = stripUnitPrefix(segments[i]);
+    if (PROVINCE_ZONE[bare]) return { zone: PROVINCE_ZONE[bare], rest: segments.slice(0, i).join(', ') };
+    // "TP. Hồ Chí Minh (gồm ...)" / "Thành phố HCM - Việt Nam"
+    if (hasWord(bare, 'ho chi minh') || hasWord(bare, 'tp hcm') || hasWord(bare, 'tphcm')) {
+      return { zone: 'HCM', rest: segments.slice(0, i).join(', ') };
+    }
+  }
+  return { zone: null, rest: segments.join(', ') };
+};
+
+// Chia khu vực nội thành TP.HCM theo tên quận/huyện cũ hoặc tên phường mới
+// mang tên khu vực cũ (vd. "Phường Gò Vấp", "Phường Bình Thạnh").
+const HCM_KV_KEYS = {
+  HCM_KV1: ['quan 1', 'quan 3', 'quan 4', 'quan 5', 'quan 10', 'phu nhuan', 'ben nghe', 'ben thanh', 'da kao', 'sai gon',
+    'tan dinh', 'vo thi sau', 'xuan hoa', 'ban co', 'vinh hoi', 'khanh hoi', 'xom chieu', 'cho quan', 'an dong', 'dien hong', 'hoa hung'],
+  HCM_KV2: ['thu duc', 'quan 2', 'quan 9', 'binh thanh', 'go vap', 'thao dien', 'an khanh', 'binh trung', 'cat lai', 'hiep phu',
+    'tang nhon phu', 'long binh', 'linh xuan', 'tam binh', 'hiep binh', 'gia dinh', 'thanh my tay', 'hanh thong', 'an nhon', 'thong tay hoi'],
+  HCM_KV3: ['quan 7', 'quan 8', 'nha be', 'binh chanh', 'can gio', 'tan phong', 'phu my hung', 'tan thuan', 'tan my', 'tan hung',
+    'chanh hung', 'binh dong', 'phu dinh', 'hiep phuoc'],
+  HCM_KV4: ['tan binh', 'tan phu', 'binh tan', 'quan 6', 'quan 11', 'quan 12', 'hoc mon', 'cu chi', 'tan son nhat', 'bay hien',
+    'tan son', 'phu tho hoa', 'binh tri dong', 'an lac', 'binh phu', 'minh phung', 'trung my tay', 'dong hung thuan']
+};
+const detectHcmKv = (addr) => {
+  for (const [kv, keys] of Object.entries(HCM_KV_KEYS)) {
+    if (keys.some(k => hasWord(addr, k))) return kv;
+  }
+  return null;
+};
+
 export const detectDeliveryRegion = (address = '') => {
-  const addr = (address || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
-
-  // KV1: Q1, Q3, Q4, Q5, Q10, Phu Nhuan
-  if (
-    (addr.includes('quan 1') && !addr.includes('quan 10') && !addr.includes('quan 11') && !addr.includes('quan 12')) ||
-    addr.includes('quan 3') || addr.includes('quan 4') || addr.includes('quan 5') ||
-    addr.includes('quan 10') || addr.includes('phu nhuan') ||
-    addr.includes('ben nghe') || addr.includes('ben thanh') || addr.includes('da kao')
-  ) {
-    return 'HCM_KV1';
+  const { zone, rest } = detectProvinceZone(address);
+  if (zone === 'NORTH') return 'HN_NORTH';
+  if (zone === 'CENTRAL') return 'CENTRAL';
+  if (zone === 'SOUTH' || zone === 'HCM_OUTER') return 'SOUTH_PROVINCE';
+  if (zone === 'HCM') {
+    if (HCM_OUTER_KEYS.some(k => hasWord(rest, k))) return 'SOUTH_PROVINCE';
+    return detectHcmKv(rest) || 'HCM_KV1';
   }
+  // Không ghi tỉnh (địa chỉ cũ kiểu "..., Quận 1"): thử theo tên quận TP.HCM
+  return detectHcmKv(rest) || 'SOUTH_PROVINCE';
+};
 
-  // KV2: Thu Duc, Q2, Q9, Binh Thanh, Go Vap
-  if (
-    addr.includes('thu duc') || addr.includes('quan 2') || addr.includes('quan 9') ||
-    addr.includes('binh thanh') || addr.includes('go vap') || addr.includes('thao dien') || addr.includes('an phu')
-  ) {
-    return 'HCM_KV2';
-  }
-
-  // KV3: Q7, Q8, Nha Be, Binh Chanh, Can Gio
-  if (
-    addr.includes('quan 7') || addr.includes('quan 8') ||
-    addr.includes('nha be') || addr.includes('binh chanh') || addr.includes('can gio') || addr.includes('tan phong') || addr.includes('phu my hung')
-  ) {
-    return 'HCM_KV3';
-  }
-
-  // KV4: Tan Binh, Tan Phu, Binh Tan, Q6, Q11, Q12, Hoc Mon, Cu Chi
-  if (
-    addr.includes('tan binh') || addr.includes('tan phu') || addr.includes('binh tan') ||
-    addr.includes('quan 6') || addr.includes('quan 11') || addr.includes('quan 12') ||
-    addr.includes('hoc mon') || addr.includes('cu chi')
-  ) {
-    return 'HCM_KV4';
-  }
-
-  // North / Hanoi
-  if (
-    addr.includes('ha noi') || addr.includes('hanoi') || addr.includes('hai phong') ||
-    addr.includes('quang ninh') || addr.includes('bac ninh') || addr.includes('thai nguyen') ||
-    addr.includes('hai duong') || addr.includes('nam dinh') || addr.includes('ha giang') || addr.includes('ngoc ha')
-  ) {
-    return 'HN_NORTH';
-  }
-
-  // Central / Danang
-  if (
-    addr.includes('da nang') || addr.includes('hue') || addr.includes('quang nam') ||
-    addr.includes('khanh hoa') || addr.includes('nha trang') || addr.includes('binh dinh') ||
-    addr.includes('quy nhon') || addr.includes('dak lak') || addr.includes('gia lai')
-  ) {
-    return 'CENTRAL';
-  }
-
-  // South Provinces (Bà Rịa - Vũng Tàu, Phú Mỹ, Đồng Nai, Bình Dương, Tây Nam Bộ)
-  if (
-    addr.includes('can tho') || addr.includes('binh duong') || addr.includes('dong nai') ||
-    addr.includes('vung tau') || addr.includes('ba ria') || (addr.includes('phu my') && !addr.includes('phu my hung')) ||
-    addr.includes('tan phuoc') || addr.includes('long an') || addr.includes('tien giang') ||
-    addr.includes('an giang') || addr.includes('kien giang') || addr.includes('ben tre') ||
-    addr.includes('vinh long') || addr.includes('tay ninh')
-  ) {
-    return 'SOUTH_PROVINCE';
-  }
-
-  // General HCM fallback
-  if (addr.includes('ho chi minh') || addr.includes('hcm') || addr.includes('sai gon')) {
-    return 'HCM_KV1';
-  }
-
-  return 'SOUTH_PROVINCE';
+// Địa chỉ có thuộc TP.HCM (kể cả phần sáp nhập từ Bình Dương / BR-VT) hay không
+export const isHcmProvinceAddress = (address = '') => {
+  const { zone, rest } = detectProvinceZone(address);
+  if (zone) return zone === 'HCM' || zone === 'HCM_OUTER';
+  return Boolean(detectHcmKv(rest));
 };

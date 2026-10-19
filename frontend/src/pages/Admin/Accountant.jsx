@@ -648,6 +648,12 @@ export default function Accountant() {
 
   const [refundSearch, setRefundSearch] = useState('');
   const [refundStatusFilter, setRefundStatusFilter] = useState('ALL');
+  // Bộ lọc tab Thanh toán NCC: tìm theo mã PO / tên NCC + trạng thái công nợ
+  const [poPaySearch, setPoPaySearch] = useState('');
+  const [poPayFilter, setPoPayFilter] = useState('ALL'); // ALL | NO_BILL | UNPAID | PAID
+  // Bộ lọc tab Chi trả lương: tìm theo tên nhân viên + trạng thái chi trả
+  const [payrollSearch, setPayrollSearch] = useState('');
+  const [payrollPayFilter, setPayrollPayFilter] = useState('ALL'); // ALL | READY | WAITING | PAID
 
   const pendingRefunds = refundReturnRequests.filter(r => r.status !== 'REFUNDED');
   const pendingRefundTotal = pendingRefunds.reduce((sum, r) => sum + (parseFloat(r.refundAmount || r.totalAmount || 0)), 0);
@@ -1536,7 +1542,18 @@ export default function Accountant() {
       {/* ========================================================================= */}
       {/* TAB 3: PO PAYMENTS (THANH TOÁN ĐƠN MUA HÀNG) */}
       {/* ========================================================================= */}
-      {activeTab === 'po_payments' && (
+      {activeTab === 'po_payments' && (() => {
+        const q = poPaySearch.trim().toLowerCase();
+        const filteredBillablePOs = effectivePOs.filter(isPoBillable).filter(po => {
+          if (q && !String(po.poNumber || `PO-${po.id}`).toLowerCase().includes(q)
+            && !String(po.supplier?.name || po.supplierCode || '').toLowerCase().includes(q)) return false;
+          const bill = getPoBill(po);
+          if (poPayFilter === 'NO_BILL') return !bill;
+          if (poPayFilter === 'UNPAID') return Boolean(bill) && bill.status !== 'PAID';
+          if (poPayFilter === 'PAID') return Boolean(bill) && bill.status === 'PAID';
+          return true;
+        });
+        return (
         <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1.25rem' }}>
           <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
             <ShoppingBag size={18} style={{ color: '#f59e0b' }} />
@@ -1545,6 +1562,26 @@ export default function Accountant() {
           <p style={{ color: '#64748b', fontSize: '0.78rem', marginBottom: '1.25rem' }}>
             Lập hóa đơn công nợ và ghi nhận thanh toán cho các đơn PO đã nhập kho — mọi thao tác đều gọi API thật, ghi trực tiếp vào cơ sở dữ liệu (VendorBill/VendorPayment), không phải dữ liệu giả lập.
           </p>
+
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.85rem' }}>
+            <input
+              type="text"
+              value={poPaySearch}
+              onChange={e => setPoPaySearch(e.target.value)}
+              placeholder="Tìm theo mã PO hoặc tên nhà cung cấp..."
+              style={{ flex: '1 1 240px', padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.8rem' }}
+            />
+            <select
+              value={poPayFilter}
+              onChange={e => setPoPayFilter(e.target.value)}
+              style={{ padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.8rem', backgroundColor: '#fff' }}
+            >
+              <option value="ALL">Tất cả trạng thái thanh toán</option>
+              <option value="NO_BILL">Chưa lập hóa đơn</option>
+              <option value="UNPAID">Còn công nợ</option>
+              <option value="PAID">Đã thanh toán đủ</option>
+            </select>
+          </div>
 
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
@@ -1559,7 +1596,7 @@ export default function Accountant() {
                 </tr>
               </thead>
               <tbody>
-                {effectivePOs.filter(isPoBillable).map((po, pIdx) => {
+                {filteredBillablePOs.map((po, pIdx) => {
                   const bill = getPoBill(po);
                   const poStatusInfo = getStatusInfo(PO_STATUS, po.status);
                   const billStatusInfo = bill ? getStatusInfo(VENDOR_BILL_STATUS, bill.status) : null;
@@ -1616,10 +1653,12 @@ export default function Accountant() {
                     </tr>
                   );
                 })}
-                {effectivePOs.filter(isPoBillable).length === 0 && (
+                {filteredBillablePOs.length === 0 && (
                   <tr>
                     <td colSpan={6} style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>
-                      Chưa có đơn mua hàng nào đã nhập kho cần lập hóa đơn/thanh toán.
+                      {effectivePOs.some(isPoBillable)
+                        ? 'Không có đơn mua hàng nào khớp bộ lọc.'
+                        : 'Chưa có đơn mua hàng nào đã nhập kho cần lập hóa đơn/thanh toán.'}
                     </td>
                   </tr>
                 )}
@@ -1627,7 +1666,8 @@ export default function Accountant() {
             </table>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* ========================================================================= */}
       {/* TAB: ĐỐI SOÁT COD TỪ SHIPPER (accounting_settle_cod) */}
@@ -2004,6 +2044,26 @@ export default function Accountant() {
             </button>
           </div>
 
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.85rem' }}>
+            <input
+              type="text"
+              value={payrollSearch}
+              onChange={e => setPayrollSearch(e.target.value)}
+              placeholder="Tìm theo tên nhân viên..."
+              style={{ flex: '1 1 220px', padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.8rem' }}
+            />
+            <select
+              value={payrollPayFilter}
+              onChange={e => setPayrollPayFilter(e.target.value)}
+              style={{ padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.8rem', backgroundColor: '#fff' }}
+            >
+              <option value="ALL">Tất cả trạng thái</option>
+              <option value="READY">Sẵn sàng chi trả</option>
+              <option value="WAITING">Chờ Giám đốc duyệt</option>
+              <option value="PAID">Đã chi trả</option>
+            </select>
+          </div>
+
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
               <thead>
@@ -2018,7 +2078,14 @@ export default function Accountant() {
                 </tr>
               </thead>
               <tbody>
-                {payrolls.map((p, pIdx) => {
+                {payrolls.filter(p => {
+                  const q = payrollSearch.trim().toLowerCase();
+                  if (q && !String(p.empName || '').toLowerCase().includes(q)) return false;
+                  if (payrollPayFilter === 'READY') return p.status === 'APPROVED_BY_CEO';
+                  if (payrollPayFilter === 'PAID') return p.status === 'PAID';
+                  if (payrollPayFilter === 'WAITING') return p.status !== 'PAID' && p.status !== 'APPROVED_BY_CEO';
+                  return true;
+                }).map((p, pIdx) => {
                   const isPaid = p.status === 'PAID';
                   // SUBMITTED_TO_ACCOUNTING means HR just filed it — CEO hasn't approved
                   // yet. Treating that as "ready" let Chi Lương disburse real money before

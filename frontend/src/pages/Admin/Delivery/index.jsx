@@ -28,7 +28,8 @@ import {
   getDateFilterLabel,
   isOrderRedelivery,
   isDirectlyAssignedShipper,
-  ACTIVE_DELIVERY_STATUSES
+  ACTIVE_DELIVERY_STATUSES,
+  isHcmAddress, getCollectedPaymentMethod
 } from './deliveryHelpers';
 
 // Refetch orders/returns while the tab is visible, paused otherwise.
@@ -194,6 +195,7 @@ export default function Delivery() {
   const [search, setSearch] = useState('');
   const [regionFilter, setRegionFilter] = useState('ALL');
   const [paymentFilter, setPaymentFilter] = useState('ALL');
+  const [historyPaymentFilter, setHistoryPaymentFilter] = useState('ALL');
   const [incidentFilter, setIncidentFilter] = useState('ALL');
   // Tab Đang Giao mặc định hiển thị Tất Cả đơn đang phụ trách (không ẩn đơn tồn/đơn cũ),
   // Tab Lịch sử mới mặc định theo Hôm Nay
@@ -377,14 +379,18 @@ export default function Delivery() {
 
       if (!matchSearch) return false;
 
-      const addr = (o.shippingAddress || '').toLowerCase();
-      const isHCM = addr.includes('hồ chí minh') || addr.includes('hcm') || addr.includes('tp.hcm') || addr.includes('sài gòn') || addr.includes('quận') || addr.includes('thủ đức') || addr.includes('bình thạnh') || addr.includes('tân bình') || addr.includes('gò vấp');
+      const isHCM = isHcmAddress(o.shippingAddress);
       if (regionFilter === 'HCM' && !isHCM) return false;
       if (regionFilter === 'PROVINCE' && isHCM) return false;
 
       const isPaid = o.paymentStatus === 'PAID' || o.paymentMethod === 'ONLINE_GATEWAY' || o.paymentMethod === 'BANK_TRANSFER' || (parseFloat(o.totalAmount || o.total || 0) === 0);
-      if (paymentFilter === 'COD' && isPaid) return false;
-      if (paymentFilter === 'PREPAID' && !isPaid) return false;
+      if (activeTab === 'history') {
+        // Lịch sử: lọc theo cách đã thu thực tế (đơn COD giao xong đã là PAID)
+        if (historyPaymentFilter !== 'ALL' && getCollectedPaymentMethod(o) !== historyPaymentFilter) return false;
+      } else {
+        if (paymentFilter === 'COD' && isPaid) return false;
+        if (paymentFilter === 'PREPAID' && !isPaid) return false;
+      }
 
       // TAB PENDING: Sẵn sàng tại kho — hiển thị tất cả các đơn chờ nhận khớp shipper/khu vực (không lọc theo ngày)
       if (activeTab === 'pending') {
@@ -452,7 +458,7 @@ export default function Delivery() {
       return 0;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [myDeliveryOrders, search, regionFilter, paymentFilter, incidentFilter, orderDateFilter, sortOrder, activeTab, userIdStr, isManagerOrAdmin, user]);
+  }, [myDeliveryOrders, search, regionFilter, paymentFilter, historyPaymentFilter, incidentFilter, orderDateFilter, sortOrder, activeTab, userIdStr, isManagerOrAdmin, user]);
 
   const handleClaimOrder = async (orderId) => {
     const sId = user?.id || user?.username || 'SHIPPER';
@@ -1134,6 +1140,7 @@ export default function Delivery() {
     search, setSearch,
     regionFilter, setRegionFilter,
     paymentFilter, setPaymentFilter,
+    historyPaymentFilter, setHistoryPaymentFilter,
     incidentFilter, setIncidentFilter,
     orderDateFilter, setOrderDateFilter,
     dateFilterPeriod: orderDateFilter.period,

@@ -178,16 +178,13 @@ export default function PODCaptureSection({ order, user, fmt, onConfirm, onRejec
   // không có. Để trống, bắt Shipper tự gõ mô tả thật (hoặc để trống nếu không
   // có gì đặc biệt) thay vì mặc định khẳng định 1 việc chưa chắc đã xảy ra.
   const [receiverNote, setReceiverNote] = useState('');
-  // actualPaymentMethod: 'CASH' | 'BANK_TRANSFER' | 'SPLIT' | 'PREPAID'
+  // actualPaymentMethod: 'CASH' | 'BANK_TRANSFER' | 'PREPAID'
   const [actualPaymentMethod, setActualPaymentMethod] = useState(isPrepaid ? 'PREPAID' : 'CASH');
   const [bankRefCode, setBankRefCode] = useState('');
   const [paymentProofPhoto, setPaymentProofPhoto] = useState('');
   const [receivedByType, setReceivedByType] = useState('DIRECT_CUSTOMER');
   const [receiverNameActual, setReceiverNameActual] = useState(order.customerName || '');
   const [showVietQR, setShowVietQR] = useState(false);
-  // Split payment: nhập số tiền mặt và chuyển khoản riêng
-  const [cashInput, setCashInput] = useState('');
-  const [bankInput, setBankInput] = useState('');
 
   // Tài khoản ngân hàng mặc định của công ty dùng cho VietQR
   const [companyBank, setCompanyBank] = useState({
@@ -344,26 +341,17 @@ export default function PODCaptureSection({ order, user, fmt, onConfirm, onRejec
   const bankHolder = companyBank?.accountHolder || 'AETHERPC ERP CORP';
   const qrUrl = `https://img.vietqr.io/image/${bankBinOrCode}-${bankAccNo}-compact2.jpg?amount=${Math.round(codAmount)}&addInfo=DH%20${cleanOrdCode}&accountName=${encodeURIComponent(bankHolder)}`;
 
-  // Tổng đã nhập khi split
-  const cashAmt  = parseFloat(cashInput)  || 0;
-  const bankAmt  = parseFloat(bankInput)   || 0;
-  const splitOk  = actualPaymentMethod === 'SPLIT'
-    ? Math.abs(cashAmt + bankAmt - codAmount) <= 1
-    : true;
-
   const handleSubmit = () => {
     const payMethodFinal = isPrepaid ? 'PREPAID' : actualPaymentMethod;
     const receiverNameFinal = receivedByType === 'DIRECT_CUSTOMER' ? (order.customerName || 'Khách hàng') : (receiverNameActual || 'Người nhận thay');
-    const bankRefFinal = (payMethodFinal === 'BANK_TRANSFER' || payMethodFinal === 'SPLIT') ? (bankRefCode || null) : null;
+    const bankRefFinal = payMethodFinal === 'BANK_TRANSFER' ? (bankRefCode || null) : null;
 
     onConfirm({
       proofPhoto,
       receiverNote,
       actualPaymentMethod: payMethodFinal,
       bankRefCode: bankRefFinal,
-      paymentProofPhoto: (payMethodFinal === 'BANK_TRANSFER' || payMethodFinal === 'SPLIT') ? paymentProofPhoto : null,
-      // Split payment: gửi thêm cashAmount + bankAmount để backend tạo 2 OrderPayment rows
-      ...(payMethodFinal === 'SPLIT' ? { cashAmount: cashAmt, bankAmount: bankAmt } : {}),
+      paymentProofPhoto: payMethodFinal === 'BANK_TRANSFER' ? paymentProofPhoto : null,
       receivedByType,
       receiverNameActual: receiverNameFinal,
       deliveredAt: new Date().toISOString()
@@ -522,8 +510,8 @@ export default function PODCaptureSection({ order, user, fmt, onConfirm, onRejec
             Thu COD: {fmt(codAmount)}
           </div>
 
-          {/* 3 nút chọn phương thức */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.4rem' }}>
+          {/* 2 nút chọn phương thức: Tiền mặt hoặc Chuyển khoản */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem' }}>
             <button
               type="button"
               className="delivery-tap-target"
@@ -552,20 +540,6 @@ export default function PODCaptureSection({ order, user, fmt, onConfirm, onRejec
             >
               Quét QR/CK
             </button>
-            <button
-              type="button"
-              className="delivery-tap-target"
-              onClick={() => { setActualPaymentMethod('SPLIT'); setShowVietQR(false); }}
-              style={{
-                padding: '0.5rem 0.3rem', borderRadius: 'var(--radius-md)',
-                border: actualPaymentMethod === 'SPLIT' ? '2px solid #f59e0b' : '1px solid var(--border-glass)',
-                backgroundColor: actualPaymentMethod === 'SPLIT' ? 'rgba(245,158,11,0.12)' : 'var(--bg-primary)',
-                color: actualPaymentMethod === 'SPLIT' ? '#b45309' : 'var(--text-secondary)',
-                fontWeight: 750, fontSize: '0.77rem', cursor: 'pointer', textAlign: 'center'
-              }}
-            >
-              Kết Hợp
-            </button>
           </div>
 
           {/* CASH: xác nhận đơn giản */}
@@ -576,65 +550,17 @@ export default function PODCaptureSection({ order, user, fmt, onConfirm, onRejec
             </div>
           )}
 
-          {/* SPLIT: nhập tiền mặt + chuyển khoản */}
-          {actualPaymentMethod === 'SPLIT' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              <div style={{ fontSize: '0.77rem', color: '#b45309', fontWeight: 700 }}>
-                Thanh toán kết hợp — nhập số tiền từng hình thức:
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: 'var(--success)', marginBottom: '0.15rem' }}>Tiền mặt (đ)</label>
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    placeholder="0"
-                    value={cashInput}
-                    onChange={e => setCashInput(e.target.value)}
-                    style={{ width: '100%', padding: '0.45rem 0.5rem', borderRadius: 'var(--radius-sm)', border: '1.5px solid var(--success)', fontSize: '0.82rem', boxSizing: 'border-box', fontWeight: 700 }}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: 700, color: 'var(--primary)', marginBottom: '0.15rem' }}>Chuyển khoản (đ)</label>
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    placeholder="0"
-                    value={bankInput}
-                    onChange={e => setBankInput(e.target.value)}
-                    style={{ width: '100%', padding: '0.45rem 0.5rem', borderRadius: 'var(--radius-sm)', border: '1.5px solid var(--primary)', fontSize: '0.82rem', boxSizing: 'border-box', fontWeight: 700 }}
-                  />
-                </div>
-              </div>
-              {/* Hiển thị tổng & validation */}
-              <div style={{
-                fontSize: '0.77rem', fontWeight: 700, padding: '0.35rem 0.5rem', borderRadius: '6px',
-                backgroundColor: splitOk ? 'rgba(22,163,74,0.08)' : 'rgba(239,68,68,0.08)',
-                color: splitOk ? 'var(--success)' : 'var(--danger)'
-              }}>
-                {cashAmt + bankAmt > 0 ? (
-                  splitOk
-                    ? `Tổng: ${fmt(cashAmt + bankAmt)} — Khớp đủ ${fmt(codAmount)}`
-                    : `Tổng: ${fmt(cashAmt + bankAmt)} — Cần đủ ${fmt(codAmount)} (thiếu/dư ${fmt(Math.abs(cashAmt + bankAmt - codAmount))})`
-                ) : `Nhập số tiền mặt + chuyển khoản để tổng = ${fmt(codAmount)}`}
-              </div>
-              <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
-                Tiền mặt: Kế Toán sẽ đối soát với bạn sau giao. Chuyển khoản: ghi nhận ngay.
-              </div>
-            </div>
-          )}
         </div>
       )}
 
-      {/* VietQR box — hiện cho BANK_TRANSFER hoặc SPLIT (phần CK) */}
-      {(actualPaymentMethod === 'BANK_TRANSFER' || actualPaymentMethod === 'SPLIT') && !isPrepaid && (
+      {/* VietQR box — chỉ hiện khi khách chuyển khoản */}
+      {actualPaymentMethod === 'BANK_TRANSFER' && !isPrepaid && (
         <div style={{ padding: '0.9rem', borderRadius: 'var(--radius-md)', backgroundColor: 'rgba(37,99,235,0.08)', display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
           <strong style={{ color: 'var(--primary)', fontSize: '0.82rem' }}>
-            {actualPaymentMethod === 'SPLIT' ? 'Chuyển Khoản Phần (VietQR)' : 'Mã VietQR Thanh Toán Động (Napas247)'}
+            Mã VietQR Thanh Toán Động (Napas247)
           </strong>
-          {/* QR hiển thị đúng số tiền CK — SPLIT dùng bankAmt, còn lại dùng toàn bộ */}
           {(() => {
-            const qrAmt = actualPaymentMethod === 'SPLIT' ? (bankAmt || codAmount) : codAmount;
+            const qrAmt = codAmount;
             const qrUrlDynamic = `https://img.vietqr.io/image/${bankBinOrCode}-${bankAccNo}-compact2.jpg?amount=${Math.round(qrAmt)}&addInfo=DH%20${cleanOrdCode}&accountName=${encodeURIComponent(bankHolder)}`;
             return (
               <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
@@ -741,25 +667,17 @@ export default function PODCaptureSection({ order, user, fmt, onConfirm, onRejec
             disabled={
               !proofPhoto ||
               // Chuyển khoản: cần mã GD
-              ((actualPaymentMethod === 'BANK_TRANSFER') && !isPrepaid && !bankRefCode.trim()) ||
-              // Kết hợp: cần mã GD + tổng tiền khớp
-              (actualPaymentMethod === 'SPLIT' && (!bankRefCode.trim() || !splitOk))
+              (actualPaymentMethod === 'BANK_TRANSFER' && !isPrepaid && !bankRefCode.trim())
             }
             label={
               isPrepaid ? 'Trượt Để Xác Nhận Bàn Giao' :
               actualPaymentMethod === 'BANK_TRANSFER' ? 'Trượt Để Xác Nhận Đã Nhận CK' :
-              actualPaymentMethod === 'SPLIT' ? 'Trượt Xác Nhận Thanh Toán Kết Hợp' :
               'Trượt Để Xác Nhận Thu Tiền & Giao'
             }
           />
-          {!isPrepaid && (actualPaymentMethod === 'BANK_TRANSFER' || actualPaymentMethod === 'SPLIT') && !bankRefCode.trim() && (
+          {!isPrepaid && actualPaymentMethod === 'BANK_TRANSFER' && !bankRefCode.trim() && (
             <div style={{ fontSize: '0.77rem', color: 'var(--danger)', fontWeight: 600, marginTop: '0.3rem', textAlign: 'center' }}>
               Cần nhập Mã Giao Dịch Ngân Hàng trước khi xác nhận.
-            </div>
-          )}
-          {actualPaymentMethod === 'SPLIT' && bankRefCode.trim() && !splitOk && (
-            <div style={{ fontSize: '0.77rem', color: 'var(--danger)', fontWeight: 600, marginTop: '0.3rem', textAlign: 'center' }}>
-              Tổng tiền mặt + chuyển khoản chưa khớp với giá trị đơn.
             </div>
           )}
         </div>

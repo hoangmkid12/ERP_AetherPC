@@ -35,6 +35,11 @@ const DISTRICT_COORDS_HCM = [
 // ---- Geocode địa chỉ văn bản → {lat, lng} ưu tiên Goong API, fallback TP.HCM ----
 async function geocodeAddress(address) {
   if (!address || typeof address !== 'string') return null;
+  // Chỉ ép toạ độ vào khung TP.HCM khi địa chỉ thật sự ở TP.HCM — trước đây
+  // mọi đơn Hà Nội/Hải Phòng/Cần Thơ đều bị loại kết quả đúng và rơi về Quận 1.
+  const lowerAddr = address.toLowerCase();
+  const isHcm = ['hồ chí minh', 'ho chi minh', 'hcm', 'sài gòn', 'sai gon'].some(k => lowerAddr.includes(k));
+  const inBox = (lat, lng) => !isHcm || (lat >= 10.2 && lat <= 11.2 && lng >= 106.2 && lng <= 107.2);
 
   // 1. Thử Goong Geocoding API (chuẩn nhất cho địa chỉ Việt Nam)
   if (GOONG_API_KEY) {
@@ -46,7 +51,7 @@ async function geocodeAddress(address) {
         const loc = data?.results?.[0]?.geometry?.location;
         if (loc?.lat && loc?.lng) {
           // Bắt buộc nằm trong phạm vi TP.HCM và lân cận (tránh văng ra tỉnh xa)
-          if (loc.lat >= 10.2 && loc.lat <= 11.2 && loc.lng >= 106.2 && loc.lng <= 107.2) {
+          if (inBox(loc.lat, loc.lng)) {
             return { lat: loc.lat, lng: loc.lng };
           }
         }
@@ -56,7 +61,7 @@ async function geocodeAddress(address) {
 
   // 2. Thử Nominatim với viewbox TP.HCM
   try {
-    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&countrycodes=vn&viewbox=106.3,11.2,107.1,10.3&limit=1`;
+    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&countrycodes=vn&limit=1${isHcm ? "&viewbox=106.3,11.2,107.1,10.3" : ""}`;
     const res = await fetch(url, {
       headers: { 'User-Agent': 'AetherPC-ERP/1.0 (contact@aetherpc.vn)' },
       signal: AbortSignal.timeout(4000)
@@ -66,7 +71,7 @@ async function geocodeAddress(address) {
       if (Array.isArray(list) && list.length > 0 && list[0].lat && list[0].lon) {
         const lat = parseFloat(list[0].lat);
         const lng = parseFloat(list[0].lon);
-        if (lat >= 10.2 && lat <= 11.2 && lng >= 106.2 && lng <= 107.2) {
+        if (inBox(lat, lng)) {
           return { lat, lng };
         }
       }

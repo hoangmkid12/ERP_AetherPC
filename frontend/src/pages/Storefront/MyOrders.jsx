@@ -3,7 +3,7 @@ import { useSalesStore, useUtilityStore, useInventoryStore } from '../../stores'
 import { useAuth } from '../../context/AuthContext';
 import { useNotification, notify, confirm } from '../../context/NotificationContext';
 import { COMPLAINT_STATUS, getStatusInfo, getStatusLabel, formatRmaCode } from '../../utils/statusLabels';
-import { Search, Package, Clock, ShieldCheck, CheckCircle2, ChevronRight, ChevronDown, ChevronUp, HelpCircle, RefreshCw, X, AlertCircle, Sparkles, Eye, Upload, CheckCircle, MapPin, Camera, FileText } from 'lucide-react';
+import { Search, Package, Clock, ShieldCheck, CheckCircle2, ChevronRight, ChevronDown, ChevronUp, HelpCircle, RefreshCw, X, AlertCircle, Eye, Upload, CheckCircle, MapPin, Camera, FileText } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { api } from '../../services/api';
 import { REGION_COORDS, detectDeliveryRegion, getAddressCoordinates } from '../../utils/deliveryRegions';
@@ -12,6 +12,23 @@ import DeliveryMap from '../../components/DeliveryMap';
 import SepayPayment from '../../components/Storefront/SepayPayment';
 import { PLACEHOLDER_IMG } from '../../components/Storefront/catalog';
 import InvoiceModal from '../../components/Storefront/InvoiceModal';
+
+// Nhóm trạng thái cho bộ lọc "Đơn Hàng Của Bạn" — gom các trạng thái nội bộ
+// thành các bước khách hàng hiểu được.
+const CUSTOMER_ORDER_FILTERS = [
+  { key: 'ALL', label: 'Tất cả' },
+  { key: 'PENDING', label: 'Chờ xác nhận', statuses: ['PENDING', 'WAITING_PAYMENT'] },
+  { key: 'PROCESSING', label: 'Đang xử lý', statuses: ['CONFIRMED', 'PROCESSING', 'PACKED', 'AWAITING_STOCK', 'ASSEMBLING', 'READY_TO_SHIP'] },
+  { key: 'SHIPPING', label: 'Đang giao', statuses: ['SHIPPED', 'SHIPPING_FAILED', 'FAILED_DELIVERY', 'RETURNING_TO_WAREHOUSE'] },
+  { key: 'DELIVERED', label: 'Đã giao', statuses: ['DELIVERED', 'COMPLETED'] },
+  { key: 'CANCELLED', label: 'Đã hủy', statuses: ['CANCELLED'] },
+  { key: 'RETURN', label: 'Đổi trả', statuses: ['RETURN_REQUESTED', 'RETURN_APPROVED', 'RETURNING', 'RETURNED', 'REFUNDED', 'EXCHANGED', 'DELIVERED_TO_WAREHOUSE', 'QC_PASSED', 'RESTOCKED', 'VENDOR_WARRANTY', 'RETURNING_TO_CUSTOMER', 'RETURNED_TO_CUSTOMER'] }
+];
+const matchesCustomerOrderFilter = (order, key) => {
+  if (key === 'ALL') return true;
+  const group = CUSTOMER_ORDER_FILTERS.find(f => f.key === key);
+  return Boolean(group?.statuses?.includes(order.status));
+};
 
 export default function MyOrders() {
   const orders = useSalesStore(state => state.orders) || [];
@@ -38,6 +55,7 @@ export default function MyOrders() {
   const [confirmingReceivedId, setConfirmingReceivedId] = useState(null);
   const [justPaidOrderId, setJustPaidOrderId] = useState(null);
   const [showAllOrders, setShowAllOrders] = useState(false);
+  const [orderStatusFilter, setOrderStatusFilter] = useState('ALL');
 
   useEffect(() => {
     if (typeof getOrders === 'function') getOrders().catch(() => { });
@@ -1059,13 +1077,40 @@ export default function MyOrders() {
               </span>
             </div>
 
+            {/* Bộ lọc trạng thái đơn */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
+              {CUSTOMER_ORDER_FILTERS.map(f => {
+                const count = f.key === 'ALL' ? matchedOrders.length : matchedOrders.filter(o => matchesCustomerOrderFilter(o, f.key)).length;
+                const active = orderStatusFilter === f.key;
+                return (
+                  <button
+                    key={f.key}
+                    type="button"
+                    onClick={() => { setOrderStatusFilter(f.key); setShowAllOrders(false); }}
+                    style={{
+                      padding: '0.25rem 0.6rem', borderRadius: '999px', fontSize: '0.74rem', fontWeight: 700, cursor: 'pointer',
+                      border: active ? '1px solid #2563eb' : '1px solid #e2e8f0',
+                      backgroundColor: active ? '#eff6ff' : '#ffffff',
+                      color: active ? '#1d4ed8' : '#475569'
+                    }}
+                  >
+                    {f.label} ({count})
+                  </button>
+                );
+              })}
+            </div>
+
             {/* List Orders */}
             {(() => {
+              const statusFiltered = matchedOrders.filter(o => matchesCustomerOrderFilter(o, orderStatusFilter));
+              if (statusFiltered.length === 0) {
+                return <div style={{ fontSize: '0.8rem', color: '#64748b', textAlign: 'center', padding: '1rem 0' }}>Không có đơn hàng nào ở trạng thái này.</div>;
+              }
               const displayedOrders = (() => {
-                if (showAllOrders) return matchedOrders;
-                const top5 = matchedOrders.slice(0, 5);
+                if (showAllOrders) return statusFiltered;
+                const top5 = statusFiltered.slice(0, 5);
                 if (selectedOrderId && !top5.some(o => o.orderId === selectedOrderId)) {
-                  const current = matchedOrders.find(o => o.orderId === selectedOrderId);
+                  const current = statusFiltered.find(o => o.orderId === selectedOrderId);
                   if (current) return [...top5, current];
                 }
                 return top5;
@@ -1165,7 +1210,7 @@ export default function MyOrders() {
                     })}
                   </div>
 
-                  {matchedOrders.length > 5 && (
+                  {statusFiltered.length > 5 && (
                     <button
                       type="button"
                       onClick={() => setShowAllOrders(prev => !prev)}
@@ -1253,42 +1298,6 @@ export default function MyOrders() {
                               </span>
                             )}
 
-                            {/* Demo Helper Button */}
-                            {['PENDING'].includes(selectedOrder.status) && (
-                              <button
-                                onClick={() => {
-                                  // Directly simulate 5h+ age and trigger auto-approval flow
-                                  const stored = localStorage.getItem('erp_orders');
-                                  if (stored) {
-                                    const parsed = JSON.parse(stored);
-                                    const updated = parsed.map(o => {
-                                      if (o.orderId === selectedOrder.orderId) {
-                                        return { ...o, createdAtTime: Date.now() - 5.1 * 60 * 60 * 1000 };
-                                      }
-                                      return o;
-                                    });
-                                    localStorage.setItem('erp_orders', JSON.stringify(updated));
-                                    // Reload page so ERPContext scheduler picks up new createdAtTime
-                                    setTimeout(() => window.location.reload(), 100);
-                                  }
-                                }}
-                                className="btn"
-                                style={{
-                                  padding: '0.25rem 0.625rem',
-                                  fontSize: '0.75rem',
-                                  background: 'rgba(59,130,246,0.1)',
-                                  color: '#3b82f6',
-                                  border: '1px solid rgba(59,130,246,0.25)',
-                                  borderRadius: '4px',
-                                  cursor: 'pointer',
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '0.25rem'
-                                }}
-                              >
-                                <Sparkles size={12} /> Tua nhanh 5h
-                              </button>
-                            )}
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
                             <p style={{ fontSize: '0.8125rem', color: '#64748b', margin: 0 }}>
@@ -2945,12 +2954,18 @@ export default function MyOrders() {
             {/* Modal Footer - Fixed */}
             <div style={{ padding: '1rem 1.5rem 1.5rem 1.5rem', borderTop: '1px solid #e2e8f0', display: 'flex', gap: '1rem' }}>
               <button onClick={() => setShowEditModal(false)} className="btn btn-secondary" style={{ flex: 1, padding: '0.75rem', borderRadius: '8px', fontWeight: 600 }}>Hủy</button>
-              <button onClick={() => {
-                if (updateOrderDetails) {
-                  updateOrderDetails(editTargetOrder.orderId, editForm);
+              <button onClick={async () => {
+                if (!editForm.shippingAddress?.trim()) {
+                  addNotification('Vui lòng nhập địa chỉ giao hàng.', 'error');
+                  return;
                 }
-                setShowEditModal(false);
-                addNotification(`Đơn hàng #${editTargetOrder.orderId} cập nhật thông tin thành công!`, 'success', '/my-orders');
+                try {
+                  await updateOrderDetails(editTargetOrder.orderId, { ...editForm, shippingAddress: editForm.shippingAddress.trim() });
+                  setShowEditModal(false);
+                  addNotification(`Đơn hàng #${editTargetOrder.orderId} cập nhật thông tin thành công!`, 'success', '/my-orders');
+                } catch (err) {
+                  addNotification(err?.message || 'Không cập nhật được thông tin giao hàng, vui lòng thử lại.', 'error');
+                }
               }} className="btn btn-primary" style={{ flex: 1, padding: '0.75rem', borderRadius: '8px', fontWeight: 600, backgroundColor: '#2563eb', color: 'white', border: 'none' }}>Lưu Thay Đổi</button>
             </div>
 

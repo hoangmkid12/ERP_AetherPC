@@ -1,6 +1,6 @@
 import React from 'react';
 import { Truck, Clock, Eye, Navigation, Phone, MapPin, RotateCcw } from 'lucide-react';
-import { getDeliveryIncidentStatus, isOrderRedelivery, getAppointmentInfo } from '../deliveryHelpers';
+import { getDeliveryIncidentStatus, isOrderRedelivery, getAppointmentInfo, isHcmAddress } from '../deliveryHelpers';
 import { isOrderPrepaid } from '../../../../utils/statusLabels';
 
 // Shared full-width mobile card used by PendingTab / ActiveTab / HistoryTab.
@@ -19,8 +19,7 @@ export default function OrderCard({ order: ord, variant, fmt, getOrderTimeClassi
   const appointment = getAppointmentInfo(ord);
   const codAmount = parseFloat(ord.totalAmount || ord.total || 0);
   const isPrepaid = isOrderPrepaid(ord);
-  const addrStr = (ord.shippingAddress || '').toLowerCase();
-  const isHCM = addrStr.includes('hồ chí minh') || addrStr.includes('hcm') || addrStr.includes('tp.hcm') || addrStr.includes('quận');
+  const isHCM = isHcmAddress(ord.shippingAddress);
 
   const orderId = String(ord.orderId || ord.id || '');
   const phoneDigits = String(ord.phone || '').replace(/[^\d+]/g, '');

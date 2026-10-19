@@ -88,6 +88,8 @@ export default function CustomerService() {
   const [loadingAutoApprove, setLoadingAutoApprove] = useState(false);
   const [isBatchApproving, setIsBatchApproving] = useState(false);
   const [returnStatusFilter, setReturnStatusFilter] = useState('ALL');
+  // Lọc đánh giá gần đây theo mức sao: ALL | NEGATIVE (1-2) | NEUTRAL (3) | POSITIVE (4-5)
+  const [feedbackRatingFilter, setFeedbackRatingFilter] = useState('ALL');
   const [returnSearch, setReturnSearch] = useState('');
   const [rejectModal, setRejectModal] = useState(null); // { returnItem, reason }
   const [actionLoadingId, setActionLoadingId] = useState(null);
@@ -1453,15 +1455,35 @@ export default function CustomerService() {
 
           {/* Customer Feedback Feed */}
           <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1.25rem' }}>
-            <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', marginBottom: '1rem' }}>
-              Đánh Giá & Phản Hồi Mới Nhất Từ Khách Hàng
-            </h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
+              <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                Đánh Giá & Phản Hồi Mới Nhất Từ Khách Hàng
+              </h3>
+              <select
+                value={feedbackRatingFilter}
+                onChange={e => setFeedbackRatingFilter(e.target.value)}
+                style={{ padding: '0.35rem 0.6rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.78rem', backgroundColor: '#fff' }}
+              >
+                <option value="ALL">Tất cả mức sao</option>
+                <option value="NEGATIVE">Tiêu cực (1–2 sao)</option>
+                <option value="NEUTRAL">Trung lập (3 sao)</option>
+                <option value="POSITIVE">Tích cực (4–5 sao)</option>
+              </select>
+            </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              {(feedback?.recent || []).length === 0 && (
-                <div style={{ fontSize: '0.8rem', color: '#94a3b8', textAlign: 'center', padding: '1.5rem 0' }}>Chưa có đánh giá nào.</div>
-              )}
-              {(feedback?.recent || []).map((fb, fbIdx) => (
+              {(() => {
+                const recent = (feedback?.recent || []).filter(fb => {
+                  const r = Number(fb.rating) || 0;
+                  if (feedbackRatingFilter === 'NEGATIVE') return r <= 2;
+                  if (feedbackRatingFilter === 'NEUTRAL') return r === 3;
+                  if (feedbackRatingFilter === 'POSITIVE') return r >= 4;
+                  return true;
+                });
+                if (recent.length === 0) {
+                  return <div style={{ fontSize: '0.8rem', color: '#94a3b8', textAlign: 'center', padding: '1.5rem 0' }}>{(feedback?.recent || []).length === 0 ? 'Chưa có đánh giá nào.' : 'Không có đánh giá nào ở mức sao này.'}</div>;
+                }
+                return recent.map((fb, fbIdx) => (
                 <div key={fbIdx} style={{ padding: '0.75rem', borderRadius: '6px', border: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem' }}>
                     <strong style={{ fontSize: '0.82rem', color: '#0f172a' }}>{fb.name}</strong>
@@ -1472,7 +1494,8 @@ export default function CustomerService() {
                   {fb.comment && <p style={{ fontSize: '0.78rem', color: '#475569', margin: '0 0 0.3rem 0' }}>"{fb.comment}"</p>}
                   <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{fb.productName ? `${fb.productName} · ` : ''}{new Date(fb.createdAt).toLocaleDateString('vi-VN')}</span>
                 </div>
-              ))}
+                ));
+              })()}
             </div>
           </div>
 

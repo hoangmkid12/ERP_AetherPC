@@ -132,7 +132,6 @@ export default function Cart() {
   
   // Structured address states - customers select manually & all are required
   const [selectedProvince, setSelectedProvince] = useState('');
-  const [selectedDistrict, setSelectedDistrict] = useState('');
   const [ward, setWard] = useState('');
   const [streetAddress, setStreetAddress] = useState('');
   const [savedAddresses, setSavedAddresses] = useState([]);
@@ -201,34 +200,34 @@ export default function Cart() {
     return () => { active = false; };
   }, [user]);
 
-  // Fetch live wards for selected province & district
-  const fetchWardsForDistrict = (provName, districtName) => {
+  // Tải phường/xã MỚI (2 cấp, sau 01/07/2025) của tỉnh đã chọn. Máy chủ tự quy đổi
+  // tên tỉnh cũ (vd. "Tỉnh Bình Dương" trong địa chỉ đã lưu) sang tỉnh mới và trả
+  // provinceCode để ô Tỉnh/TP hiển thị đúng tên mới.
+  const wardsRequestRef = useRef(0);
+  const fetchWardsForProvince = (provName, keepWard = '') => {
+    // Chỉ nhận phản hồi của lần chọn tỉnh MỚI NHẤT — đổi tỉnh nhanh thì phản hồi
+    // của tỉnh trước về sau không được ghi đè danh sách phường của tỉnh hiện tại.
+    const reqId = ++wardsRequestRef.current;
     if (!provName) {
       setApiCommunes([]);
       return;
     }
     setLoadingCommunes(true);
-    const params = new URLSearchParams();
-    params.set('province', provName);
-    if (districtName) params.set('district', districtName);
-
-    api.get(`/address/wards?${params.toString()}`)
+    api.get(`/address/wards?province=${encodeURIComponent(provName)}`)
       .then(res => {
-        const wards = res?.data?.wards;
-        if (Array.isArray(wards) && wards.length > 0) {
-          setApiCommunes(wards);
-        } else {
-          // Fallback to communes
-          const foundProv = apiProvinces.find(p => p.name === provName || p.code === provName);
-          if (foundProv?.code) {
-            return api.get(`/address/provinces/${foundProv.code}/communes`).then(cRes => {
-              setApiCommunes(cRes?.data?.communes || []);
-            });
-          }
+        if (reqId !== wardsRequestRef.current) return;
+        const wards = Array.isArray(res?.data?.wards) ? res.data.wards : [];
+        setApiCommunes(wards);
+        const newProvName = res?.data?.provinceName;
+        if (newProvName && newProvName !== provName) setSelectedProvince(newProvName);
+        // Phường cũ không còn trong danh sách mới => bắt khách chọn lại cho đúng
+        if (keepWard && wards.length > 0 && !wards.some(w => w.name === keepWard)) {
+          setWard('');
+          addNotification('Địa chỉ đã lưu dùng tên Phường/Xã cũ — vui lòng chọn lại Phường/Xã theo địa giới mới.', 'info');
         }
       })
       .catch(err => console.warn('Wards fetch error:', err))
-      .finally(() => setLoadingCommunes(false));
+      .finally(() => { if (reqId === wardsRequestRef.current) setLoadingCommunes(false); });
   };
 
   const useSavedAddress = (address) => {
@@ -238,9 +237,8 @@ export default function Cart() {
     setStreetAddress(address.addressLine || '');
     setSelectedProvince(address.city || '');
     setWard(address.ward || '');
-    setSelectedDistrict(address.district || '');
     setApiCommunes([]);
-    fetchWardsForDistrict(address.city || '', address.district || '');
+    fetchWardsForProvince(address.city || '', address.ward || '');
   };
 
   // Tự điền địa chỉ mặc định (hoặc địa chỉ mới nhất) một lần khi danh sách tải xong, nếu khách chưa nhập
@@ -254,29 +252,14 @@ export default function Cart() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [savedAddresses]);
 
-  // Update district, ward & fetch live communes when province changes
+  // Đổi tỉnh => xoá phường đã chọn và tải danh sách phường/xã mới của tỉnh đó
   const handleProvinceChange = (val) => {
     const provName = typeof val === 'string' ? val : val?.target?.value;
     setSelectedProvince(provName);
-    setSelectedDistrict('');
     setWard('');
     setApiCommunes([]);
+    fetchWardsForProvince(provName);
   };
-
-  const handleDistrictChange = (distVal) => {
-    setSelectedDistrict(distVal);
-    setWard('');
-    setApiCommunes([]);
-    if (distVal && selectedProvince) {
-      fetchWardsForDistrict(selectedProvince, distVal);
-    }
-  };
-
-  // Find matching province in VIETNAM_PROVINCES to retrieve standard districts
-  const currentProvinceObj = VIETNAM_PROVINCES.find(p => {
-    if (!selectedProvince) return false;
-    return p.name === selectedProvince || p.name.includes(selectedProvince) || selectedProvince.includes(p.name) || p.code === selectedProvince;
-  }) || { districts: [] };
 
 
   // Shipping calculation: 100% Miễn phí vận chuyển toàn quốc cho mọi đơn hàng
@@ -384,11 +367,6 @@ export default function Cart() {
       return;
     }
 
-    if (currentProvinceObj.districts?.length > 0 && !selectedDistrict.trim()) {
-      addNotification('Vui lòng chọn Quận / Huyện!', 'error');
-      return;
-    }
-
     setCheckingOut(true);
 
     try {
@@ -406,8 +384,8 @@ export default function Cart() {
       const baseAddress = buildStandardAddress({
         streetAddress,
         ward,
-        district: selectedDistrict,
-        city: selectedProvince
+        city: selectedProvince,
+        isTwoTier: true
       });
 
       const fullAddress = orderNote.trim()
@@ -1016,43 +994,23 @@ export default function Cart() {
                       />
                     </div>
 
-                    {/* District & Ward */}
-                    <div style={{
-                      display: 'grid',
-                      gridTemplateColumns: '1fr 1fr',
-                      gap: '0.5rem'
-                    }}>
-                      <div style={{ minWidth: 0 }}>
-                        <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#64748b', marginBottom: '0.25rem' }}>
-                          Quận / Huyện <span style={{ color: '#ef4444' }}>*</span>
-                        </label>
-                        <SearchableSelect
-                          value={selectedDistrict}
-                          onChange={handleDistrictChange}
-                          options={currentProvinceObj.districts || []}
-                          placeholder={!selectedProvince ? "-- Chọn Tỉnh/TP trước --" : "-- Chọn Quận / Huyện --"}
-                          disabled={!selectedProvince}
-                        />
-                      </div>
-                      <div style={{ minWidth: 0 }}>
-                        <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#64748b', marginBottom: '0.25rem' }}>
-                          Phường / Xã <span style={{ color: '#ef4444' }}>*</span>
-                        </label>
-                        <SearchableSelect
-                          value={ward}
-                          onChange={val => setWard(val)}
-                          options={apiCommunes}
-                          placeholder={
-                            !selectedProvince
-                              ? "-- Chọn Tỉnh/TP trước --"
-                              : !selectedDistrict
-                              ? "-- Chọn Quận / Huyện trước --"
-                              : (loadingCommunes ? "-- Đang tải Phường/Xã... --" : "-- Chọn Phường / Xã --")
-                          }
-                          disabled={loadingCommunes || !selectedProvince || !selectedDistrict}
-                          loading={loadingCommunes}
-                        />
-                      </div>
+                    {/* Ward (địa giới 2 cấp: không còn Quận/Huyện) */}
+                    <div style={{ minWidth: 0 }}>
+                      <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, color: '#64748b', marginBottom: '0.25rem' }}>
+                        Phường / Xã <span style={{ color: '#ef4444' }}>*</span>
+                      </label>
+                      <SearchableSelect
+                        value={ward}
+                        onChange={val => setWard(val)}
+                        options={apiCommunes}
+                        placeholder={
+                          !selectedProvince
+                            ? "-- Chọn Tỉnh/TP trước --"
+                            : (loadingCommunes ? "-- Đang tải Phường/Xã... --" : "-- Chọn Phường / Xã --")
+                        }
+                        disabled={loadingCommunes || !selectedProvince}
+                        loading={loadingCommunes}
+                      />
                     </div>
 
                     {/* Street address */}
