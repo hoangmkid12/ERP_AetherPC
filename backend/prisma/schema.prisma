@@ -582,6 +582,13 @@ model PurchaseOrder {
   // và không còn được thao tác tiếp. Cùng mẫu thiết kế với blanketRefId ở trên.
   sourceRfqId          Int?                @map("source_rfq_id")
 
+  // Mã đợt so sánh báo giá: 1 lần "Gửi YCBG đồng thời cho nhiều NCC" tạo N RFQ
+  // (mỗi NCC 1 bản ghi) cùng 1 mã đợt. Mua Hàng chọn NCC trúng thầu trong đợt
+  // (POST /purchasing/rfq-batches/award) thì các RFQ còn lại cùng đợt chuyển
+  // NOT_AWARDED. Trước đây "đợt" được đoán bằng cách so trùng danh sách sản
+  // phẩm — 2 lần hỏi giá khác ngày/khác số lượng bị gộp nhầm vào 1 đợt.
+  rfqBatchCode         String?             @map("rfq_batch_code") @db.VarChar(40)
+
   supplier             Supplier            @relation(fields: [supplierCode], references: [code])
   items                PurchaseOrderItem[]
   receipts             GoodsReceipt[]
@@ -598,6 +605,7 @@ model PurchaseOrder {
   @@index([expectedDeliveryDate])
   @@index([blanketRefId])
   @@index([sourceRfqId])
+  @@index([rfqBatchCode])
   @@map("purchase_orders")
 }
 

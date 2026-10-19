@@ -17,6 +17,55 @@ import StaleDeliveriesPanel from '../../components/Warehouse/StaleDeliveriesPane
 import { printDocument } from '../../utils/printDocument';
 import { numberToVietnameseWords } from '../../utils/numberToWords';
 import PeriodFilterBar, { isDateInPeriod } from '../../components/Common/PeriodFilterBar';
+import { FilterToolbar, PeriodSelect, SortSelect, sortItems, inPeriod, byDateDesc, byDateAsc, byNumDesc, byNumAsc, byText, FILTER_CONTROL_STYLE, FILTER_SEARCH_STYLE } from '../../components/Common/ListControls';
+
+// Tuỳ chọn sắp xếp theo từng loại danh sách của Kho
+const orderDate = o => o.createdAt || o.date;
+const ORDER_SORTS = [
+  { key: 'NEWEST', label: 'Mới nhất' },
+  { key: 'OLDEST', label: 'Cũ nhất' },
+  { key: 'VALUE_DESC', label: 'Giá trị cao → thấp' },
+  { key: 'VALUE_ASC', label: 'Giá trị thấp → cao' }
+];
+const ORDER_SORTERS = {
+  NEWEST: byDateDesc(orderDate),
+  OLDEST: byDateAsc(orderDate),
+  VALUE_DESC: byNumDesc(o => o.totalAmount || o.total),
+  VALUE_ASC: byNumAsc(o => o.totalAmount || o.total)
+};
+// Đơn chờ hàng: mặc định chờ lâu nhất lên đầu (cần xử lý trước)
+const BACKORDER_SORTS = [{ key: 'OLDEST', label: 'Chờ lâu nhất' }, ...ORDER_SORTS.filter(o => o.key !== 'OLDEST')];
+const DATE_SORTS = [{ key: 'NEWEST', label: 'Mới nhất' }, { key: 'OLDEST', label: 'Cũ nhất' }];
+const dateSorters = get => ({ NEWEST: byDateDesc(get), OLDEST: byDateAsc(get) });
+const INVENTORY_SORTS = [
+  { key: 'DEFAULT', label: 'Mặc định' },
+  { key: 'STOCK_ASC', label: 'Tồn kho tăng dần' },
+  { key: 'STOCK_DESC', label: 'Tồn kho giảm dần' },
+  { key: 'VALUE_DESC', label: 'Giá trị tồn cao → thấp' },
+  { key: 'PRICE_DESC', label: 'Giá bán cao → thấp' },
+  { key: 'PRICE_ASC', label: 'Giá bán thấp → cao' },
+  { key: 'NAME', label: 'Tên A → Z' }
+];
+const INVENTORY_SORTERS = {
+  STOCK_ASC: byNumAsc(i => i.stock),
+  STOCK_DESC: byNumDesc(i => i.stock),
+  VALUE_DESC: byNumDesc(i => (parseFloat(i.stock) || 0) * (parseFloat(i.averageCost ?? i.price) || 0)),
+  PRICE_DESC: byNumDesc(i => i.price),
+  PRICE_ASC: byNumAsc(i => i.price),
+  NAME: byText(i => i.name)
+};
+const RESTOCK_SORTS = [
+  { key: 'SHORTAGE_DESC', label: 'Thiếu nhiều nhất' },
+  { key: 'STOCK_ASC', label: 'Tồn thấp nhất' },
+  { key: 'NAME', label: 'Tên A → Z' }
+];
+const RESTOCK_SORTERS = {
+  SHORTAGE_DESC: byNumDesc(i => (parseFloat(i.threshold) || 5) - (parseFloat(i.stock) || 0)),
+  STOCK_ASC: byNumAsc(i => i.stock),
+  NAME: byText(i => i.name)
+};
+const MOVEMENT_SORTS = [...DATE_SORTS, { key: 'QTY_DESC', label: 'Số lượng lớn nhất' }];
+const MOVEMENT_SORTERS = { ...dateSorters(m => m.timestamp), QTY_DESC: byNumDesc(m => Math.abs(parseFloat(m.quantity) || 0)) };
 import { SignatureRow, SignatureCell, displaySigner, historySigner } from '../../components/Signature/ESignature';
 
 // Nút hành động dùng chung cho bảng "Hoạt Động / Lệnh Giao Hàng" — style cố định
@@ -3325,8 +3374,8 @@ export default function Warehouse() {
   // Filter States
   const [receiptStatusFilter, setReceiptStatusFilter] = useState('ALL');
   const [receiptSearch, setReceiptSearch] = useState('');
-  const [grnStartDate, setGrnStartDate] = useState('');
-  const [grnEndDate, setGrnEndDate] = useState('');
+  const [grnPeriod, setGrnPeriod] = useState('ALL');
+  const [grnSort, setGrnSort] = useState('NEWEST');
 
   // Inventory Filter States
   const [searchQuery, setSearchQuery] = useState('');
@@ -3334,16 +3383,19 @@ export default function Warehouse() {
   const [selectedLocationStatus, setSelectedLocationStatus] = useState('ALL');
   const [selectedSupplier, setSelectedSupplier] = useState('ALL');
   const [stockStatusFilter, setStockStatusFilter] = useState('ALL');
+  const [inventorySort, setInventorySort] = useState('DEFAULT');
 
   // Delivery Filter States
   const [deliverySearch, setDeliverySearch] = useState('');
   const [deliveryFilter, setDeliveryFilter] = useState('PENDING');
   const [deliveryShipperFilter, setDeliveryShipperFilter] = useState('ALL');
+  const [deliveryPeriod, setDeliveryPeriod] = useState('ALL');
+  const [deliverySort, setDeliverySort] = useState('NEWEST');
 
   // History Filter States
   const [movementTypeFilter, setMovementTypeFilter] = useState('ALL');
-  const [historyStartDate, setHistoryStartDate] = useState('');
-  const [historyEndDate, setHistoryEndDate] = useState('');
+  const [historyPeriod, setHistoryPeriod] = useState('ALL');
+  const [historySort, setHistorySort] = useState('NEWEST');
   const [historySearch, setHistorySearch] = useState('');
 
   // Direct Intake Form States
@@ -3405,16 +3457,21 @@ export default function Warehouse() {
   const [rfqSearch, setRfqSearch] = useState('');
   const [rfqSupplierFilter, setRfqSupplierFilter] = useState('ALL');
   const [rfqStockStatusFilter, setRfqStockStatusFilter] = useState('ALL');
+  const [rfqSort, setRfqSort] = useState('SHORTAGE_DESC');
 
   // Backorders & Order Detail Modal State
   const [backorderSearch, setBackorderSearch] = useState('');
   const [backorderStockFilter, setBackorderStockFilter] = useState('ALL');
+  const [backorderPeriod, setBackorderPeriod] = useState('ALL');
+  const [backorderSort, setBackorderSort] = useState('OLDEST');
   const [selectedOrderForDetail, setSelectedOrderForDetail] = useState(null);
 
   // RMA Returns Filter States
   const [returnStatusTab, setReturnStatusTab] = useState('ALL'); // 'ALL' | 'PENDING' | 'PROCESSED'
   const [returnSearch, setReturnSearch] = useState('');
   const [returnSpecificStatus, setReturnSpecificStatus] = useState('ALL');
+  const [returnPeriod, setReturnPeriod] = useState('ALL');
+  const [returnSort, setReturnSort] = useState('NEWEST');
 
   const getMergedRfqLogs = () => {
     let explicitLogs = [];
@@ -4144,7 +4201,7 @@ export default function Warehouse() {
   // must include them too, not just lowStockItems (dưới ngưỡng nhưng còn hàng).
   const restockNeededItems = activeInventory.filter(item => Number(item.stock) <= Number(item.threshold || 5));
   const rfqSupplierOptions = [...new Set(restockNeededItems.map(item => item.supplier).filter(Boolean))].sort();
-  const filteredRfqItems = restockNeededItems.filter(item => {
+  const filteredRfqItems = sortItems(restockNeededItems.filter(item => {
     const matchSearch = !rfqSearch.trim() ||
       (item.name && item.name.toLowerCase().includes(rfqSearch.toLowerCase())) ||
       (item.supplier && item.supplier.toLowerCase().includes(rfqSearch.toLowerCase()));
@@ -4153,7 +4210,7 @@ export default function Warehouse() {
       (rfqStockStatusFilter === 'OUT_OF_STOCK' && Number(item.stock) === 0) ||
       (rfqStockStatusFilter === 'LOW_STOCK' && Number(item.stock) > 0);
     return matchSearch && matchSupplier && matchStatus;
-  });
+  }), rfqSort, RESTOCK_SORTERS);
   const effectiveReceipts = receipts || [];
   const effectiveReturnRequests = returnRequests || [];
   const readyReceipts = effectiveReceipts.filter(r => r.status === 'READY');
@@ -4229,7 +4286,7 @@ export default function Warehouse() {
     return aliases.some(a => itemCatUpper === a || itemCatUpper.includes(a));
   };
 
-  const filteredProducts = activeInventory.filter(item => {
+  const filteredProducts = sortItems(activeInventory.filter(item => {
     const matchSearch = !searchQuery.trim() || item.name.toLowerCase().includes(searchQuery.toLowerCase()) || (item.supplier && item.supplier.toLowerCase().includes(searchQuery.toLowerCase()));
     const matchCat = matchesCategoryFilter(item, selectedCategory);
     const matchLoc = selectedLocationStatus === 'ALL' || (selectedLocationStatus === 'ASSIGNED' ? (!!item.location && item.location !== 'Chưa xếp kệ') : (!item.location || item.location === 'Chưa xếp kệ'));
@@ -4241,7 +4298,7 @@ export default function Warehouse() {
     if (stockStatusFilter === 'OUT_OF_STOCK') matchStock = Number(item.stock) === 0;
 
     return matchSearch && matchCat && matchLoc && matchSup && matchStock;
-  });
+  }), inventorySort, INVENTORY_SORTERS);
 
   // Dynamic suppliers available for current selected category
   const categoryMatchedInventory = activeInventory.filter(item => matchesCategoryFilter(item, selectedCategory));
@@ -4260,13 +4317,13 @@ export default function Warehouse() {
   const countLowStock = baseForStockStatus.filter(i => Number(i.stock) > 0 && Number(i.stock) <= Number(i.threshold || 5)).length;
   const countOutOfStock = baseForStockStatus.filter(i => Number(i.stock) === 0).length;
 
-  const filteredReceiptsList = effectiveReceipts.filter(r => {
+  const filteredReceiptsList = sortItems(effectiveReceipts.filter(r => {
     const poNum = r.po?.poNumber || r.poId || r.receiptNumber;
     const matchSearch = !receiptSearch.trim() || r.receiptNumber.toLowerCase().includes(receiptSearch.toLowerCase()) || String(poNum).toLowerCase().includes(receiptSearch.toLowerCase());
     const matchStatus = receiptStatusFilter === 'ALL' || r.status === receiptStatusFilter;
-    const matchDate = isDateInRange(r.createdAt, grnStartDate, grnEndDate);
+    const matchDate = inPeriod(r.createdAt, grnPeriod);
     return matchSearch && matchStatus && matchDate;
-  });
+  }), grnSort, dateSorters(r => r.createdAt));
 
   // QC/QA badge for a receipt row: prefers the real QcInspection record persisted by the
   // backend, falls back to the local QC log (offline/legacy entries), then to the PO status.
@@ -4344,7 +4401,7 @@ export default function Warehouse() {
   const deliveryShipperOptions = [...new Set(
     orders.filter(o => DELIVERY_RELEVANT_STATUSES.includes(o.status) && o.assignedShipper).map(o => o.assignedShipper)
   )].sort();
-  const filteredDeliveriesList = orders.filter(o => {
+  const filteredDeliveriesList = sortItems(orders.filter(o => {
     const matchSearch = !deliverySearch.trim() || String(o.orderId || o.id).toLowerCase().includes(deliverySearch.toLowerCase()) || (o.customerName && o.customerName.toLowerCase().includes(deliverySearch.toLowerCase()));
     const matchStatus = deliveryFilter === 'ALL' ||
       (deliveryFilter === 'PENDING' && isAwaitingKhoExport(o)) ||
@@ -4357,15 +4414,15 @@ export default function Warehouse() {
     const matchShipper = deliveryShipperFilter === 'ALL' ||
       (deliveryShipperFilter === 'UNASSIGNED' && !o.assignedShipper) ||
       o.assignedShipper === deliveryShipperFilter;
-    return matchSearch && matchStatus && matchShipper;
-  });
+    return matchSearch && matchStatus && matchShipper && inPeriod(orderDate(o), deliveryPeriod);
+  }), deliverySort, ORDER_SORTERS);
 
-  const filteredHistoryList = effectiveStockMovements.filter(m => {
+  const filteredHistoryList = sortItems(effectiveStockMovements.filter(m => {
     const matchSearch = !historySearch.trim() || (m.productName && m.productName.toLowerCase().includes(historySearch.toLowerCase())) || (m.reference && m.reference.toLowerCase().includes(historySearch.toLowerCase()));
     const matchType = movementTypeFilter === 'ALL' || m.type === movementTypeFilter;
-    const matchDate = isDateInRange(m.timestamp, historyStartDate, historyEndDate);
+    const matchDate = inPeriod(m.timestamp, historyPeriod);
     return matchSearch && matchType && matchDate;
-  });
+  }), historySort, MOVEMENT_SORTERS);
 
   // Backorders List (Orders with AWAITING_STOCK status)
   const backorderOrders = orders.filter(o => o && o.status === 'AWAITING_STOCK');
@@ -4376,7 +4433,7 @@ export default function Warehouse() {
     const currentStock = inv ? Number(inv.stock) : 0;
     return currentStock >= (Number(item.quantity) || 1);
   });
-  const filteredBackordersList = backorderOrders.filter(o => {
+  const filteredBackordersList = sortItems(backorderOrders.filter(o => {
     const matchSearch = !backorderSearch.trim() ||
       String(o.orderId || o.id).toLowerCase().includes(backorderSearch.toLowerCase()) ||
       (o.customerName && o.customerName.toLowerCase().includes(backorderSearch.toLowerCase())) ||
@@ -4384,8 +4441,8 @@ export default function Warehouse() {
     const matchStock = backorderStockFilter === 'ALL' ||
       (backorderStockFilter === 'READY' && isOrderFulfillable(o)) ||
       (backorderStockFilter === 'MISSING' && !isOrderFulfillable(o));
-    return matchSearch && matchStock;
-  });
+    return matchSearch && matchStock && inPeriod(orderDate(o), backorderPeriod);
+  }), backorderSort, ORDER_SORTERS);
 
   // RMA Returns Classification & Filtering
   const isReturnProcessed = (item) => {
@@ -4396,7 +4453,8 @@ export default function Warehouse() {
   const pendingReturnsList = effectiveReturnRequests.filter(item => !isReturnProcessed(item));
   const processedReturnsList = effectiveReturnRequests.filter(item => isReturnProcessed(item));
 
-  const filteredReturnsList = effectiveReturnRequests.filter(item => {
+  const filteredReturnsList = sortItems(effectiveReturnRequests.filter(item => {
+    if (!inPeriod(item.createdAt || item.date, returnPeriod)) return false;
     const processed = isReturnProcessed(item);
     const st = item?.status || 'PENDING';
 
@@ -4429,7 +4487,7 @@ export default function Warehouse() {
     }
 
     return true;
-  });
+  }), returnSort, dateSorters(r => r.createdAt || r.date));
 
   return (
     <div style={{ backgroundColor: '#f8fafc', minHeight: '100vh', padding: '1.5rem 2rem', maxWidth: '1400px', margin: '0 auto' }}>
@@ -4788,24 +4846,27 @@ export default function Warehouse() {
           </div>
 
           {/* Search Filter Bar */}
-          <div style={{ backgroundColor: '#ffffff', padding: '0.85rem 1rem', borderRadius: '8px', border: '1px solid #e3e8ef', marginBottom: '1.25rem', display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <FilterToolbar
+            shown={filteredBackordersList.length}
+            total={backorderOrders.length}
+            dirty={Boolean(backorderSearch) || backorderStockFilter !== 'ALL' || backorderPeriod !== 'ALL' || backorderSort !== 'OLDEST'}
+            onReset={() => { setBackorderSearch(''); setBackorderStockFilter('ALL'); setBackorderPeriod('ALL'); setBackorderSort('OLDEST'); }}
+          >
             <input
               type="text"
               placeholder="Tìm theo mã đơn hàng, tên khách hàng, tên linh kiện..."
               value={backorderSearch}
               onChange={e => setBackorderSearch(e.target.value)}
-              style={{ flex: '1 1 260px', padding: '0.55rem 0.85rem', fontSize: '0.83rem', border: '1px solid #e3e8ef', borderRadius: '6px' }}
+              style={FILTER_SEARCH_STYLE}
             />
-            <select
-              value={backorderStockFilter}
-              onChange={e => setBackorderStockFilter(e.target.value)}
-              style={{ padding: '0.55rem 0.85rem', fontSize: '0.83rem', border: '1px solid #e3e8ef', borderRadius: '6px' }}
-            >
+            <select value={backorderStockFilter} onChange={e => setBackorderStockFilter(e.target.value)} style={{ ...FILTER_CONTROL_STYLE, flex: '0 1 230px' }}>
               <option value="ALL">Tất cả tình trạng tồn kho</option>
               <option value="READY">Đã đủ hàng (sẵn sàng đóng gói)</option>
               <option value="MISSING">Còn thiếu hàng</option>
             </select>
-          </div>
+            <PeriodSelect value={backorderPeriod} onChange={setBackorderPeriod} title="Lọc theo ngày đặt hàng" />
+            <SortSelect value={backorderSort} onChange={setBackorderSort} options={BACKORDER_SORTS} />
+          </FilterToolbar>
 
           {/* Backorders Table */}
           <div className="table-responsive" style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', overflowX: 'auto', WebkitOverflowScrolling: 'touch', maxWidth: '100%' }}>
@@ -5053,24 +5114,27 @@ export default function Warehouse() {
           </div>
 
           {/* Filter bar */}
-          <div style={{ backgroundColor: '#ffffff', padding: '1rem', borderRadius: '8px', border: '1px solid #e3e8ef', marginBottom: '1.25rem', display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
+          <FilterToolbar
+            shown={filteredReceiptsList.length}
+            total={effectiveReceipts.length}
+            dirty={Boolean(receiptSearch) || receiptStatusFilter !== 'ALL' || grnPeriod !== 'ALL' || grnSort !== 'NEWEST'}
+            onReset={() => { setReceiptSearch(''); setReceiptStatusFilter('ALL'); setGrnPeriod('ALL'); setGrnSort('NEWEST'); }}
+          >
             <input
               type="text"
               placeholder="Tìm theo mã phiếu nhập GRN, mã PO..."
               value={receiptSearch}
               onChange={(e) => setReceiptSearch(e.target.value)}
-              style={{ flex: 1, minWidth: '220px', padding: '0.55rem 0.85rem', fontSize: '0.83rem', border: '1px solid #e3e8ef', borderRadius: '6px' }}
+              style={FILTER_SEARCH_STYLE}
             />
-            <select
-              value={receiptStatusFilter}
-              onChange={(e) => setReceiptStatusFilter(e.target.value)}
-              style={{ padding: '0.55rem 0.85rem', fontSize: '0.83rem', border: '1px solid #e3e8ef', borderRadius: '6px' }}
-            >
+            <select value={receiptStatusFilter} onChange={(e) => setReceiptStatusFilter(e.target.value)} style={{ ...FILTER_CONTROL_STYLE, flex: '0 1 170px' }}>
               <option value="ALL">Tất cả trạng thái</option>
               <option value="READY">Chờ nhập kho</option>
               <option value="DONE">Đã nhập kho</option>
             </select>
-          </div>
+            <PeriodSelect value={grnPeriod} onChange={setGrnPeriod} title="Lọc theo ngày tạo phiếu" />
+            <SortSelect value={grnSort} onChange={setGrnSort} options={DATE_SORTS} />
+          </FilterToolbar>
 
           {/* Receipts Table */}
           <div className="table-responsive" style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', overflowX: 'auto', WebkitOverflowScrolling: 'touch', maxWidth: '100%' }}>
@@ -5315,19 +5379,19 @@ export default function Warehouse() {
           <StaleDeliveriesPanel />
 
           {/* Filter bar */}
-          <div style={{ backgroundColor: '#ffffff', padding: '1rem', borderRadius: '8px', border: '1px solid #e3e8ef', marginBottom: '1.25rem', display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
+          <FilterToolbar
+            shown={filteredDeliveriesList.length}
+            dirty={Boolean(deliverySearch) || deliveryFilter !== 'PENDING' || deliveryShipperFilter !== 'ALL' || deliveryPeriod !== 'ALL' || deliverySort !== 'NEWEST'}
+            onReset={() => { setDeliverySearch(''); setDeliveryFilter('PENDING'); setDeliveryShipperFilter('ALL'); setDeliveryPeriod('ALL'); setDeliverySort('NEWEST'); }}
+          >
             <input
               type="text"
               placeholder="Tìm theo mã đơn hàng ORD, tên khách hàng..."
               value={deliverySearch}
               onChange={(e) => setDeliverySearch(e.target.value)}
-              style={{ flex: 1, minWidth: '220px', padding: '0.55rem 0.85rem', fontSize: '0.83rem', border: '1px solid #e3e8ef', borderRadius: '6px' }}
+              style={FILTER_SEARCH_STYLE}
             />
-            <select
-              value={deliveryFilter}
-              onChange={(e) => setDeliveryFilter(e.target.value)}
-              style={{ padding: '0.55rem 0.85rem', fontSize: '0.83rem', border: '1px solid #e3e8ef', borderRadius: '6px' }}
-            >
+            <select value={deliveryFilter} onChange={(e) => setDeliveryFilter(e.target.value)} style={{ ...FILTER_CONTROL_STYLE, flex: '0 1 220px' }}>
               <option value="PENDING">Chờ xuất kho & bàn giao</option>
               <option value="ASSEMBLING">Đang lắp ráp (chưa tới lượt Kho)</option>
               <option value="SHIPPED">Đang giao hàng</option>
@@ -5337,18 +5401,16 @@ export default function Warehouse() {
               <option value="FAILED_DELIVERY">Giao thất bại</option>
               <option value="ALL">Tất cả đơn hàng</option>
             </select>
-            <select
-              value={deliveryShipperFilter}
-              onChange={(e) => setDeliveryShipperFilter(e.target.value)}
-              style={{ padding: '0.55rem 0.85rem', fontSize: '0.83rem', border: '1px solid #e3e8ef', borderRadius: '6px' }}
-            >
+            <select value={deliveryShipperFilter} onChange={(e) => setDeliveryShipperFilter(e.target.value)} style={{ ...FILTER_CONTROL_STYLE, flex: '0 1 170px' }}>
               <option value="ALL">Tất cả Shipper</option>
               <option value="UNASSIGNED">Chưa phân công</option>
               {deliveryShipperOptions.map(name => (
                 <option key={name} value={name}>{name}</option>
               ))}
             </select>
-          </div>
+            <PeriodSelect value={deliveryPeriod} onChange={setDeliveryPeriod} title="Lọc theo ngày đặt hàng" />
+            <SortSelect value={deliverySort} onChange={setDeliverySort} options={ORDER_SORTS} />
+          </FilterToolbar>
 
           {/* Delivery Orders Table */}
           <div className="table-responsive" style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', overflowX: 'auto', WebkitOverflowScrolling: 'touch', maxWidth: '100%' }}>
@@ -6157,34 +6219,32 @@ export default function Warehouse() {
           )}
 
           {/* Filter bar */}
-          <div style={{ backgroundColor: '#ffffff', padding: '1rem', borderRadius: '8px', border: '1px solid #e3e8ef', marginBottom: '1.25rem', display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
+          <FilterToolbar
+            shown={filteredRfqItems.length}
+            total={restockNeededItems.length}
+            dirty={Boolean(rfqSearch) || rfqSupplierFilter !== 'ALL' || rfqStockStatusFilter !== 'ALL' || rfqSort !== 'SHORTAGE_DESC'}
+            onReset={() => { setRfqSearch(''); setRfqSupplierFilter('ALL'); setRfqStockStatusFilter('ALL'); setRfqSort('SHORTAGE_DESC'); }}
+          >
             <input
               type="text"
               placeholder="Tìm theo tên sản phẩm, nhà cung cấp..."
               value={rfqSearch}
               onChange={(e) => setRfqSearch(e.target.value)}
-              style={{ flex: 1, minWidth: '220px', padding: '0.55rem 0.85rem', fontSize: '0.83rem', border: '1px solid #e3e8ef', borderRadius: '6px' }}
+              style={FILTER_SEARCH_STYLE}
             />
-            <select
-              value={rfqSupplierFilter}
-              onChange={(e) => setRfqSupplierFilter(e.target.value)}
-              style={{ padding: '0.55rem 0.85rem', fontSize: '0.83rem', border: '1px solid #e3e8ef', borderRadius: '6px' }}
-            >
+            <select value={rfqSupplierFilter} onChange={(e) => setRfqSupplierFilter(e.target.value)} style={{ ...FILTER_CONTROL_STYLE, flex: '0 1 200px' }}>
               <option value="ALL">Tất cả nhà cung cấp</option>
               {rfqSupplierOptions.map(sup => (
                 <option key={sup} value={sup}>{sup}</option>
               ))}
             </select>
-            <select
-              value={rfqStockStatusFilter}
-              onChange={(e) => setRfqStockStatusFilter(e.target.value)}
-              style={{ padding: '0.55rem 0.85rem', fontSize: '0.83rem', border: '1px solid #e3e8ef', borderRadius: '6px' }}
-            >
+            <select value={rfqStockStatusFilter} onChange={(e) => setRfqStockStatusFilter(e.target.value)} style={{ ...FILTER_CONTROL_STYLE, flex: '0 1 160px' }}>
               <option value="ALL">Tất cả trạng thái</option>
               <option value="OUT_OF_STOCK">Hết Hàng</option>
               <option value="LOW_STOCK">Cảnh Báo Tồn</option>
             </select>
-          </div>
+            <SortSelect value={rfqSort} onChange={setRfqSort} options={RESTOCK_SORTS} />
+          </FilterToolbar>
 
           {/* Low stock table */}
           <div className="table-responsive" style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', overflowX: 'auto', WebkitOverflowScrolling: 'touch', maxWidth: '100%' }}>
@@ -6549,14 +6609,18 @@ export default function Warehouse() {
                 <option value="SCRAP">Phế Phẩm / Kho Lỗi (Kệ D)</option>
                 <option value="REJECTED">Từ Chối Bảo Hành</option>
               </select>
+              <PeriodSelect value={returnPeriod} onChange={setReturnPeriod} title="Lọc theo ngày tạo phiếu" style={{ height: '34px', fontSize: '0.8rem' }} />
+              <SortSelect value={returnSort} onChange={setReturnSort} options={DATE_SORTS} style={{ height: '34px', fontSize: '0.8rem' }} />
 
-              {(returnSearch || returnSpecificStatus !== 'ALL' || returnStatusTab !== 'ALL') && (
+              {(returnSearch || returnSpecificStatus !== 'ALL' || returnStatusTab !== 'ALL' || returnPeriod !== 'ALL' || returnSort !== 'NEWEST') && (
                 <button
                   type="button"
                   onClick={() => {
                     setReturnStatusTab('ALL');
                     setReturnSearch('');
                     setReturnSpecificStatus('ALL');
+                    setReturnPeriod('ALL');
+                    setReturnSort('NEWEST');
                   }}
                   style={{
                     padding: '0.45rem 0.75rem',
@@ -6842,7 +6906,7 @@ export default function Warehouse() {
             border: '1px solid #e3e8ef',
             marginBottom: '1.25rem',
             display: 'grid',
-            gridTemplateColumns: 'minmax(220px, 1.8fr) minmax(140px, 1fr) minmax(160px, 1.2fr) minmax(170px, 1.2fr) minmax(130px, 1fr)',
+            gridTemplateColumns: 'minmax(220px, 2fr) repeat(5, minmax(150px, 1fr))',
             gap: '0.75rem',
             alignItems: 'center'
           }}>
@@ -6959,6 +7023,7 @@ export default function Warehouse() {
               <option value="ASSIGNED">Đã xếp kệ</option>
               <option value="UNASSIGNED">Chưa xếp kệ</option>
             </select>
+            <SortSelect value={inventorySort} onChange={setInventorySort} options={INVENTORY_SORTS} style={{ width: '100%' }} />
           </div>
 
           {/* Inventory Table */}
@@ -7107,24 +7172,27 @@ export default function Warehouse() {
           </div>
 
           {/* Filter Toolbar */}
-          <div style={{ backgroundColor: '#ffffff', padding: '1rem', borderRadius: '8px', border: '1px solid #e3e8ef', marginBottom: '1.25rem', display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
+          <FilterToolbar
+            shown={filteredHistoryList.length}
+            total={effectiveStockMovements.length}
+            dirty={Boolean(historySearch) || movementTypeFilter !== 'ALL' || historyPeriod !== 'ALL' || historySort !== 'NEWEST'}
+            onReset={() => { setHistorySearch(''); setMovementTypeFilter('ALL'); setHistoryPeriod('ALL'); setHistorySort('NEWEST'); }}
+          >
             <input
               type="text"
               placeholder="Tìm theo mã chứng từ GRN/ORD, tên sản phẩm..."
               value={historySearch}
               onChange={(e) => setHistorySearch(e.target.value)}
-              style={{ flex: 1, minWidth: '220px', padding: '0.55rem 0.85rem', fontSize: '0.83rem', border: '1px solid #e3e8ef', borderRadius: '6px' }}
+              style={FILTER_SEARCH_STYLE}
             />
-            <select
-              value={movementTypeFilter}
-              onChange={(e) => setMovementTypeFilter(e.target.value)}
-              style={{ padding: '0.55rem 0.85rem', fontSize: '0.83rem', border: '1px solid #e3e8ef', borderRadius: '6px' }}
-            >
+            <select value={movementTypeFilter} onChange={(e) => setMovementTypeFilter(e.target.value)} style={{ ...FILTER_CONTROL_STYLE, flex: '0 1 190px' }}>
               <option value="ALL">Tất cả loại biến động</option>
               <option value="IN">Nhập Kho (IN)</option>
               <option value="OUT">Xuất Kho (OUT)</option>
             </select>
-          </div>
+            <PeriodSelect value={historyPeriod} onChange={setHistoryPeriod} />
+            <SortSelect value={historySort} onChange={setHistorySort} options={MOVEMENT_SORTS} />
+          </FilterToolbar>
 
           {/* History Table with Full Click & Detail Viewer */}
           <div className="table-responsive" style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', overflowX: 'auto', WebkitOverflowScrolling: 'touch', maxWidth: '100%' }}>

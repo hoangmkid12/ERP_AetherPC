@@ -779,7 +779,70 @@ const sendPasswordResetEmail = async ({ toEmail, customerName, resetUrl, expires
   return result;
 };
 
+/**
+ * Thông báo kết quả đợt báo giá cho Nhà Cung Cấp: trúng thầu (awarded) hoặc
+ * không trúng thầu. Thư gửi NCC không trúng tuyệt đối không nêu tên / giá của
+ * NCC khác (bảo mật thông tin chào giá giữa các đối tác).
+ */
+const sendRfqResultEmail = async ({ toEmail, supplierName, rfqNumber, batchCode, awarded, items = [], totalAmount, quoted = true }) => {
+  const rows = items.map(it => `
+    <tr>
+      <td style="padding: 8px 10px; border-bottom: 1px solid #e2e8f0; font-size: 12.5px; color: #0f172a;">${escapeHtml(it.name)}</td>
+      <td style="padding: 8px 10px; border-bottom: 1px solid #e2e8f0; font-size: 12.5px; text-align: center;">${Number(it.quantity) || 0}</td>
+      ${awarded ? `<td style="padding: 8px 10px; border-bottom: 1px solid #e2e8f0; font-size: 12.5px; text-align: right;">${money(it.unitCost)}</td>` : ''}
+    </tr>`).join('');
+
+  const message = awarded
+    ? `Chúng tôi trân trọng thông báo báo giá của Quý đối tác cho Yêu Cầu Báo Giá <strong>${escapeHtml(rfqNumber)}</strong>
+       đã được <strong style="color:#047857;">lựa chọn</strong>. Phòng Mua Hàng sẽ lập Phiếu Mua Hàng chính thức và gửi tới Quý đối tác
+       sau khi Ban Giám Đốc phê duyệt. Vui lòng giữ nguyên đơn giá và tiến độ giao hàng đã chào.`
+    : quoted
+      ? `Cảm ơn Quý đối tác đã gửi báo giá cho Yêu Cầu Báo Giá <strong>${escapeHtml(rfqNumber)}</strong>.
+         Sau khi đánh giá tổng hợp (giá, tiến độ giao hàng, điều khoản và chất lượng), rất tiếc lần này báo giá của Quý đối tác
+         <strong>chưa được lựa chọn</strong>. Chúng tôi mong tiếp tục hợp tác trong các đợt mua hàng tiếp theo.`
+      : `Yêu Cầu Báo Giá <strong>${escapeHtml(rfqNumber)}</strong> gửi tới Quý đối tác đã <strong>kết thúc</strong>
+         do Phòng Mua Hàng đã hoàn tất lựa chọn nhà cung cấp cho đợt này. Quý đối tác không cần gửi báo giá cho yêu cầu này nữa.
+         Chúng tôi mong tiếp tục hợp tác trong các đợt mua hàng tiếp theo.`;
+
+  const bodyHtml = `
+    <p style="font-size: 14px; color: #0f172a; margin: 0 0 4px 0;">Kính gửi <strong>${escapeHtml(supplierName || 'Quý đối tác')}</strong>,</p>
+    <p style="font-size: 13.5px; color: #334155; line-height: 1.6; margin: 0 0 16px 0;">${message}</p>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 14px;">
+      <tr style="background-color: #f8fafc;">
+        <th style="padding: 8px 10px; font-size: 12px; text-align: left; color: #475569;">Mặt hàng</th>
+        <th style="padding: 8px 10px; font-size: 12px; text-align: center; color: #475569;">Số lượng</th>
+        ${awarded ? '<th style="padding: 8px 10px; font-size: 12px; text-align: right; color: #475569;">Đơn giá đã chào</th>' : ''}
+      </tr>
+      ${rows}
+    </table>
+    ${awarded && totalAmount ? `<p style="font-size: 13.5px; color: #0f172a; margin: 0 0 12px 0;">Tổng giá trị báo giá: <strong>${money(totalAmount)}</strong></p>` : ''}
+    <p style="font-size: 12px; color: #64748b; margin: 0;">Mã đợt báo giá: ${escapeHtml(batchCode || '—')} · Tra cứu chi tiết tại Cổng Nhà Cung Cấp AetherPC.</p>
+  `;
+
+  const html = renderShell({
+    title: awarded ? 'Thông báo trúng thầu báo giá' : 'Thông báo kết quả báo giá',
+    heading: awarded ? 'THÔNG BÁO LỰA CHỌN BÁO GIÁ' : 'THÔNG BÁO KẾT QUẢ BÁO GIÁ',
+    subheading: `${escapeHtml(rfqNumber)} · ${formatVietnamDateTime()}`,
+    bodyHtml
+  });
+  const subject = awarded
+    ? `[AetherPC] Báo giá ${rfqNumber} đã được lựa chọn`
+    : `[AetherPC] Kết quả Yêu Cầu Báo Giá ${rfqNumber}`;
+
+  logEmail({
+    id: `MAIL-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`,
+    type: awarded ? 'RFQ_AWARDED' : 'RFQ_NOT_AWARDED',
+    toEmail,
+    customerName: supplierName || 'Nhà cung cấp',
+    subject,
+    html,
+    sentAt: new Date().toISOString()
+  });
+  return dispatchEmail({ toEmail, customerName: supplierName, subject, html });
+};
+
 module.exports = {
+  sendRfqResultEmail,
   sendOrderConfirmationEmail,
   sendOrderStatusUpdateEmail,
   sendWelcomeEmail,

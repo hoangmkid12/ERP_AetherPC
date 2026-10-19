@@ -12,11 +12,23 @@ const listCustomers = async (req, res, next) => {
   try {
     const search = (req.query.search || '').trim();
     const status = req.query.status;
+    // Lọc hạng & sắp xếp phải làm ở máy chủ: trước đây lọc hạng ở trình duyệt
+    // chỉ áp trên trang đang xem (50 khách), tổng số & phân trang sai.
+    const tier = req.query.tier;
+    const SORTS = {
+      NEWEST: { createdAt: 'desc' },
+      OLDEST: { createdAt: 'asc' },
+      POINTS_DESC: { loyaltyPoints: 'desc' },
+      ORDERS_DESC: { orders: { _count: 'desc' } },
+      NAME: { name: 'asc' }
+    };
+    const orderBy = SORTS[req.query.sort] || SORTS.NEWEST;
     const pageNum = Math.max(1, parseInt(req.query.page, 10) || 1);
     const limitNum = Math.max(1, Math.min(100, parseInt(req.query.limit, 10) || 50));
 
     const where = {
       ...(status && status !== 'ALL' ? { status } : {}),
+      ...(tier && tier !== 'ALL' ? { tier: String(tier).slice(0, 20) } : {}),
       ...(search ? {
         OR: [
           { name: { contains: search, mode: 'insensitive' } },
@@ -37,7 +49,7 @@ const listCustomers = async (req, res, next) => {
           createdAt: true,
           _count: { select: { orders: true } }
         },
-        orderBy: { createdAt: 'desc' },
+        orderBy: [orderBy, { customerId: 'asc' }],
         skip: (pageNum - 1) * limitNum,
         take: limitNum
       })

@@ -111,6 +111,7 @@ export const PO_STATUS = {
   QUOTED: { label: 'NCC Đã Báo Giá', color: '#b45309', bg: '#fffbeb', border: '#fde68a' },
   PENDING_PO_DRAFT: { label: 'Đã Duyệt — Chờ Lập Phiếu', color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe' },
   CONVERTED: { label: 'Đã Lập Phiếu Mua Hàng', color: '#64748b', bg: '#f1f5f9', border: '#cbd5e1' },
+  NOT_AWARDED: { label: 'Không Trúng Thầu', color: '#475569', bg: '#f1f5f9', border: '#94a3b8' },
   QUOTED_PENDING_CEO: { label: 'Chờ CEO Duyệt', color: '#b45309', bg: '#fffbeb', border: '#fde68a' },
   APPROVED: { label: 'Đã Phê Duyệt', color: '#047857', bg: '#ecfdf5', border: '#a7f3d0' },
   APPROVED_BY_CEO: { label: 'CEO Đã Duyệt', color: '#047857', bg: '#ecfdf5', border: '#a7f3d0' },

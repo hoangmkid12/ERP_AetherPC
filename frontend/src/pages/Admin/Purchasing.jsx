@@ -20,6 +20,52 @@ import { printDocument } from '../../utils/printDocument';
 import DateRangeFilter from '../../components/Common/DateRangeFilter';
 import PeriodFilterBar, { isDateInPeriod } from '../../components/Common/PeriodFilterBar';
 import SupplierConfirmationModal from '../../components/SupplierConfirmationModal';
+import RfqComparisonModal from './purchasing/RfqComparisonModal';
+import { PeriodSelect, SortSelect, sortItems, inPeriod, byDateDesc, byDateAsc, byNumDesc, byNumAsc, byText, FILTER_CONTROL_STYLE } from '../../components/Common/ListControls';
+
+// Tuỳ chọn sắp xếp của Mua Hàng
+const poDate = po => po.createdAt || po.date || po.issueDate;
+const PO_SORTS = [
+  { key: 'NEWEST', label: 'Mới nhất' },
+  { key: 'OLDEST', label: 'Cũ nhất' },
+  { key: 'VALUE_DESC', label: 'Giá trị cao → thấp' },
+  { key: 'VALUE_ASC', label: 'Giá trị thấp → cao' },
+  { key: 'DELIVERY_SOON', label: 'Ngày giao gần nhất' }
+];
+const PO_SORTERS = {
+  NEWEST: byDateDesc(poDate),
+  OLDEST: byDateAsc(poDate),
+  VALUE_DESC: byNumDesc(po => po.totalAmount),
+  VALUE_ASC: byNumAsc(po => po.totalAmount),
+  // Đơn chưa có ngày giao xếp cuối
+  DELIVERY_SOON: (a, b) => (a.expectedDeliveryDate ? new Date(a.expectedDeliveryDate).getTime() : Infinity) - (b.expectedDeliveryDate ? new Date(b.expectedDeliveryDate).getTime() : Infinity)
+};
+const PR_SORTS = [
+  { key: 'NEWEST', label: 'Mới nhất' },
+  { key: 'OLDEST', label: 'Cũ nhất' },
+  { key: 'QTY_DESC', label: 'Số lượng cần mua nhiều nhất' }
+];
+const PR_SORTERS = { NEWEST: byDateDesc(r => r.createdAt), OLDEST: byDateAsc(r => r.createdAt), QTY_DESC: byNumDesc(r => r.quantity) };
+const CATALOG_SORTS = [
+  { key: 'DEFAULT', label: 'Mặc định' },
+  { key: 'STOCK_ASC', label: 'Tồn kho tăng dần' },
+  { key: 'STOCK_DESC', label: 'Tồn kho giảm dần' },
+  { key: 'PRICE_DESC', label: 'Giá cao → thấp' },
+  { key: 'PRICE_ASC', label: 'Giá thấp → cao' },
+  { key: 'NAME', label: 'Tên A → Z' }
+];
+const stockOf = p => (p.stock !== undefined ? p.stock : p.stockQuantity);
+const CATALOG_SORTERS = {
+  STOCK_ASC: byNumAsc(stockOf), STOCK_DESC: byNumDesc(stockOf),
+  PRICE_DESC: byNumDesc(p => p.price), PRICE_ASC: byNumAsc(p => p.price),
+  NAME: byText(p => p.name)
+};
+const SUPPLIER_SORTS = [
+  { key: 'NAME', label: 'Tên A → Z' },
+  { key: 'RATING_DESC', label: 'Điểm đánh giá cao nhất' },
+  { key: 'SPEND_DESC', label: 'Tổng giá trị mua nhiều nhất' },
+  { key: 'LEADTIME_ASC', label: 'Giao hàng nhanh nhất' }
+];
 import { SignatureRow, SignatureCell, displaySigner, historySigner } from '../../components/Signature/ESignature';
 
 const CAT_ALIASES = {
@@ -155,6 +201,12 @@ export default function Purchasing() {
   const [loadingPRs, setLoadingPRs] = useState(false);
   const [prSearchTerm, setPrSearchTerm] = useState('');
   const [prStatusFilter, setPrStatusFilter] = useState('ALL');
+  const [prPeriod, setPrPeriod] = useState('ALL');
+  const [prSort, setPrSort] = useState('NEWEST');
+  const [poSort, setPoSort] = useState('NEWEST');
+  const [supplierStatusFilter, setSupplierStatusFilter] = useState('ALL');
+  const [supplierSort, setSupplierSort] = useState('NAME');
+  const [productSort, setProductSort] = useState('DEFAULT');
   const [selectedViewPR, setSelectedViewPR] = useState(null);
   const [selectedProcessPR, setSelectedProcessPR] = useState(null);
   const [processQty, setProcessQty] = useState(1);
@@ -185,24 +237,56 @@ export default function Purchasing() {
   const [supplierSubmitting, setSupplierSubmitting] = useState(false);
   const [supplierFormError, setSupplierFormError] = useState(null);
 
-  // Build groups of RFQs that share the same set of product IDs (same batch from multi-supplier RFQ)
+  // Đợt so sánh báo giá: các RFQ cùng mã đợt (rfqBatchCode, sinh khi "Gửi YCBG
+  // đồng thời cho nhiều NCC"). Chỉ RFQ cũ (tạo trước khi có mã đợt) mới còn
+  // đoán theo bộ sản phẩm trùng nhau — cách cũ gộp nhầm 2 lần hỏi giá khác
+  // ngày/khác số lượng vào cùng 1 đợt. Đợt còn ít nhất 1 RFQ đang mở mới hiện.
   const rfqGroups = (() => {
-    const comparableOrders = orders.filter(po => ['RFQ', 'RFQ_SENT', 'QUOTED'].includes(po.status));
+    const OPEN = ['RFQ', 'RFQ_SENT', 'SENT', 'QUOTED'];
     const groups = {};
-    for (const po of comparableOrders) {
+    for (const po of orders) {
+      if (po.rfqBatchCode) {
+        const key = `batch:${po.rfqBatchCode}`;
+        (groups[key] = groups[key] || { key, batchCode: po.rfqBatchCode, list: [] }).list.push(po);
+        continue;
+      }
+      if (!OPEN.includes(po.status)) continue;
       const productIds = (po.items || [])
         .map(it => String(it.productId || it.product?.id || ''))
         .filter(Boolean)
         .sort()
         .join(',');
       if (!productIds) continue;
-      if (!groups[productIds]) groups[productIds] = [];
-      groups[productIds].push(po);
+      const key = `legacy:${productIds}`;
+      (groups[key] = groups[key] || { key, batchCode: null, list: [] }).list.push(po);
     }
-    return Object.entries(groups)
-      .filter(([, list]) => list.length >= 2)
-      .map(([key, list]) => ({ key, list }));
+    return Object.values(groups)
+      .map(g => ({
+        ...g,
+        // Đợt có mã: giữ cả RFQ đã đóng để thấy toàn cảnh; chỉ hiện khi còn RFQ mở
+        list: g.batchCode ? g.list.filter(po => [...OPEN, 'NOT_AWARDED', 'PENDING_PO_DRAFT', 'CANCELLED'].includes(po.status)) : g.list,
+        createdAt: g.list.reduce((min, po) => (!min || new Date(po.createdAt) < new Date(min) ? po.createdAt : min), null)
+      }))
+      .filter(g => g.list.length >= 2 && g.list.some(po => OPEN.includes(po.status)))
+      .sort((x, y) => new Date(y.createdAt || 0) - new Date(x.createdAt || 0));
   })();
+
+  // Mua Hàng chốt NCC trúng thầu trong đợt (POST /purchasing/rfq-batches/award):
+  // máy chủ đổi trạng thái mọi RFQ của đợt, ghi lịch sử và gửi email kết quả
+  const handleAwardRfq = async (winnerPo, reason, group) => {
+    try {
+      const res = await api.post('/purchasing/rfq-batches/award', {
+        winnerId: winnerPo.id,
+        reason,
+        ...(group.batchCode ? {} : { memberIds: group.list.map(po => po.id) })
+      });
+      notify(res?.message || 'Đã chốt nhà cung cấp trúng thầu.', 'success');
+      setShowCompareModal(false);
+      await fetchData();
+    } catch (err) {
+      notify(`Chưa chốt được trúng thầu: ${err.message || 'lỗi kết nối'}.`, 'error');
+    }
+  };
 
   // Create PO Form State
   const [selectedSupplier, setSelectedSupplier] = useState('');
@@ -488,7 +572,7 @@ export default function Purchasing() {
     // QUOTED_PENDING_CEO/PO thuộc về bản ghi PO THẬT (lập từ POST .../issue-po,
     // xem sourceRfqId) — không còn là giai đoạn của RFQ. PENDING_PO_DRAFT/
     // CONVERTED vẫn là trạng thái của RFQ (đã duyệt chọn / đã lập phiếu).
-    const isRfq = typeof po === 'object' && po !== null ? (['RFQ', 'RFQ_SENT', 'AWAITING_SUPPLIER_QUOTE', 'QUOTED', 'PENDING_PO_DRAFT', 'CONVERTED', 'DRAFT_RFQ'].includes(po.status) || po.type === 'BACKORDER_RFQ' || po.type === 'RFQ') : false;
+    const isRfq = typeof po === 'object' && po !== null ? (['RFQ', 'RFQ_SENT', 'AWAITING_SUPPLIER_QUOTE', 'QUOTED', 'PENDING_PO_DRAFT', 'CONVERTED', 'NOT_AWARDED', 'DRAFT_RFQ'].includes(po.status) || po.type === 'BACKORDER_RFQ' || po.type === 'RFQ') : false;
     const prefix = isRfq ? 'RFQ' : 'PO';
 
     const matchFull = raw.match(/^(?:PO|RFQ|PR)-(\d{4})-(\d+)$/i);
@@ -568,6 +652,7 @@ export default function Purchasing() {
         // Trạng thái đóng của một RFQ sau khi đã lập Phiếu Mua Hàng riêng
         // (xem POST .../issue-po) — bản ghi RFQ này dừng lại vĩnh viễn ở đây.
         'CONVERTED': 100,
+        'NOT_AWARDED': 1000,
         'CANCELLED': 1000
       };
 
@@ -908,6 +993,9 @@ export default function Purchasing() {
         const validSuppliers = selectedSuppliersList.filter(Boolean);
         const createdPOs = [];
         let failedCount = 0;
+        // Mã đợt so sánh dùng chung cho mọi RFQ của lượt gửi này
+        const d = new Date();
+        const rfqBatchCode = `RFQB-${String(d.getFullYear()).slice(2)}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
         for (const supCode of validSuppliers) {
           const supplierObj = suppliers.find(s => s.code === supCode);
           const payload = {
@@ -921,6 +1009,7 @@ export default function Purchasing() {
               unitCost: parseFloat(item.unitCost || 0)
             })),
             isMultiRfqGroup: true,
+            rfqBatchCode,
             ...(rfqSourcePrId ? { purchaseRequestId: rfqSourcePrId } : {})
           };
 
@@ -944,7 +1033,7 @@ export default function Purchasing() {
           if (rfqSourcePrId) { setRfqSourcePrId(null); loadPurchaseRequests(true); }
         }
         if (failedCount === 0 && createdPOs.length > 0) {
-          notify(`Đã khởi tạo thành công ${createdPOs.length} Yêu Cầu Báo Giá (RFQ) gửi tới các Nhà Cung Cấp.`, 'success');
+          notify(`Đã khởi tạo đợt so sánh ${rfqBatchCode}: ${createdPOs.length} Yêu Cầu Báo Giá (RFQ) gửi tới các Nhà Cung Cấp.`, 'success');
         } else if (createdPOs.length > 0) {
           notify(`Đã gửi ${createdPOs.length}/${validSuppliers.length} RFQ thành công. ${failedCount} NCC còn lại gửi thất bại — vui lòng thử lại riêng cho các NCC đó.`, 'warning');
         } else {
@@ -1144,7 +1233,7 @@ export default function Purchasing() {
     QA_PASSED: 3, QA_PARTIAL: 3, QA_REJECTED: 3,
     RECEIVED: 4, DONE: 5, COMPLETED: 5
   };
-  const RFQ_STAGE_STATUSES = ['RFQ', 'RFQ_SENT', 'SENT', 'QUOTED', 'PENDING_PO_DRAFT', 'CONVERTED'];
+  const RFQ_STAGE_STATUSES = ['RFQ', 'RFQ_SENT', 'SENT', 'QUOTED', 'PENDING_PO_DRAFT', 'CONVERTED', 'NOT_AWARDED'];
 
   // Danh sách trạng thái cho dropdown lọc — chỉ liệt kê các giá trị mà
   // backend thực sự gán được cho PurchaseOrder.status (xem allowedTransitions
@@ -1152,7 +1241,7 @@ export default function Purchasing() {
   // trước đây có mặt ở đây nhưng không code path nào set chúng, nên lọc theo
   // 2 giá trị đó luôn ra danh sách rỗng — nhãn lấy qua getStatusText() để
   // luôn khớp với badge hiển thị trong bảng, tránh 2 nơi ghi text lệch nhau.
-  const RFQ_FILTER_STATUSES = ['RFQ', 'RFQ_SENT', 'QUOTED', 'PENDING_PO_DRAFT', 'CONVERTED'];
+  const RFQ_FILTER_STATUSES = ['RFQ', 'RFQ_SENT', 'QUOTED', 'PENDING_PO_DRAFT', 'CONVERTED', 'NOT_AWARDED'];
   const PO_FILTER_STATUSES = ['QUOTED_PENDING_CEO', 'PO', 'CONFIRMED_BY_SUPPLIER', 'QA_PASSED', 'QA_PARTIAL', 'QA_REJECTED', 'RECEIVED', 'DONE', 'CANCELLED'];
 
   // QA_PASSED/QA_PARTIAL/QA_REJECTED chỉ là kết quả nghiệm thu TẠM THỜI: ngay
@@ -1181,12 +1270,7 @@ export default function Purchasing() {
       const matchesDate = isDateInRange(po.createdAt || po.date || po.issueDate, poStartDate, poEndDate);
       return matchesSearch && matchesStatus && matchesSup && matchesDate;
     })
-    .sort((a, b) => {
-      const dA = new Date(a.createdAt || a.date || a.issueDate || 0);
-      const dB = new Date(b.createdAt || b.date || b.issueDate || 0);
-      if (dB.getTime() !== dA.getTime()) return dB.getTime() - dA.getTime();
-      return String(b.poNumber || b.id || '').localeCompare(String(a.poNumber || a.id || ''), 'vi', { numeric: true });
-    });
+    .sort(PO_SORTERS[poSort] || PO_SORTERS.NEWEST);
 
   // Dynamic suppliers available for current selected category in products tab
   const categoryMatchedCatalog = effectiveCatalog.filter(item => {
@@ -1198,7 +1282,7 @@ export default function Purchasing() {
   const availableProductSuppliers = [...new Set(categoryMatchedCatalog.map(i => i.supplier).filter(Boolean))].sort();
 
   // Filtered products for Tab 'products'
-  const filteredProductsList = effectiveCatalog.filter(p => {
+  const filteredProductsList = sortItems(effectiveCatalog.filter(p => {
     const matchSearch = !productSearch.trim() || 
       (p.name && p.name.toLowerCase().includes(productSearch.toLowerCase())) || 
       (p.sku && p.sku.toLowerCase().includes(productSearch.toLowerCase())) ||
@@ -1220,7 +1304,7 @@ export default function Purchasing() {
     if (productStockStatusFilter === 'OUT_OF_STOCK') matchStock = stockQty === 0;
 
     return matchSearch && matchCat && matchSup && matchStock;
-  });
+  }), productSort, CATALOG_SORTERS);
 
   const totalProductPages = Math.ceil(filteredProductsList.length / ITEMS_PER_PAGE) || 1;
   const paginatedProducts = filteredProductsList.slice((productPage - 1) * ITEMS_PER_PAGE, productPage * ITEMS_PER_PAGE);
@@ -1228,7 +1312,7 @@ export default function Purchasing() {
   // Reset page to 1 when filters change
   useEffect(() => {
     setProductPage(1);
-  }, [productSearch, productCategoryFilter, productSupplierFilter, productStockStatusFilter]);
+  }, [productSearch, productCategoryFilter, productSupplierFilter, productStockStatusFilter, productSort]);
 
   // KPI Calculations filtered by overview period
   const ordersInPeriod = useMemo(() => {
@@ -1735,7 +1819,8 @@ export default function Purchasing() {
         const awaitingManagerCount = purchaseRequests.filter(r => r.status === 'PENDING').length;
         const rejectedCount = purchaseRequests.filter(r => r.status === 'REJECTED').length;
 
-        const filteredRequests = purchaseRequests.filter(r => {
+        const filteredRequests = sortItems(purchaseRequests.filter(r => {
+          if (!inPeriod(r.createdAt, prPeriod)) return false;
           const matchSearch = !prSearchTerm ||
             (r.prCode || '').toLowerCase().includes(prSearchTerm.toLowerCase()) ||
             (r.productName || '').toLowerCase().includes(prSearchTerm.toLowerCase()) ||
@@ -1744,7 +1829,7 @@ export default function Purchasing() {
 
           if (prStatusFilter !== 'ALL') return matchSearch && r.status === prStatusFilter;
           return matchSearch;
-        });
+        }), prSort, PR_SORTERS);
 
         return (
           <div>
@@ -1895,6 +1980,11 @@ export default function Purchasing() {
                     {f.label}
                   </button>
                 ))}
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <PeriodSelect value={prPeriod} onChange={setPrPeriod} title="Lọc theo ngày đề xuất" />
+                <SortSelect value={prSort} onChange={setPrSort} options={PR_SORTS} />
               </div>
             </div>
 
@@ -2210,15 +2300,15 @@ export default function Purchasing() {
             </button>
           </div>
 
-          {/* Filter Toolbar (Grid 5 cột đồng nhất với Warehouse.jsx) */}
-          <div style={{
+          {/* Filter Toolbar (lưới đồng nhất với Warehouse.jsx) */}
+          <div className="admin-filter-toolbar" style={{
             backgroundColor: '#ffffff',
             padding: '0.85rem 1rem',
             borderRadius: '8px',
             border: '1px solid #e3e8ef',
             marginBottom: '1.25rem',
             display: 'grid',
-            gridTemplateColumns: 'minmax(220px, 1.8fr) minmax(140px, 1fr) minmax(160px, 1.2fr) minmax(140px, 1fr) minmax(140px, 1fr)',
+            gridTemplateColumns: 'minmax(220px, 2fr) repeat(5, minmax(150px, 1fr))',
             gap: '0.75rem',
             alignItems: 'center'
           }}>
@@ -2316,6 +2406,8 @@ export default function Purchasing() {
                 backgroundColor: '#ffffff'
               }}
             />
+
+            <SortSelect value={poSort} onChange={setPoSort} options={PO_SORTS} style={{ width: '100%' }} />
           </div>
 
           {/* Orders Data Table */}
@@ -2592,8 +2684,8 @@ export default function Purchasing() {
                 Quản lý hồ sơ đối tác, danh mục phân phối chính và lịch sử giao dịch mua hàng ({suppliers.length} đối tác)
               </p>
             </div>
-            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-              <div style={{ width: '320px' }}>
+            <div className="admin-filter-toolbar" style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>
+              <div style={{ width: '280px', maxWidth: '100%' }}>
                 <input
                   type="text"
                   placeholder="Tìm theo tên, email, số điện thoại NCC..."
@@ -2602,6 +2694,12 @@ export default function Purchasing() {
                   style={{ width: '100%', height: '38px', padding: '0 0.85rem', fontSize: '0.83rem', border: '1px solid #e3e8ef', borderRadius: '6px', boxSizing: 'border-box' }}
                 />
               </div>
+              <select value={supplierStatusFilter} onChange={e => setSupplierStatusFilter(e.target.value)} style={{ ...FILTER_CONTROL_STYLE, width: '160px' }}>
+                <option value="ALL">Mọi trạng thái</option>
+                <option value="ACTIVE">Đang hợp tác</option>
+                <option value="INACTIVE">Ngừng hợp tác</option>
+              </select>
+              <SortSelect value={supplierSort} onChange={setSupplierSort} options={SUPPLIER_SORTS} style={{ width: '230px' }} />
               {(isPurchasing || isCEO || isAdmin) && (
                 <button
                   onClick={handleOpenAddSupplier}
@@ -2615,8 +2713,22 @@ export default function Purchasing() {
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.25rem' }}>
-            {suppliers
-              .filter(s => !supplierSearch.trim() || s.name?.toLowerCase().includes(supplierSearch.toLowerCase()) || s.email?.toLowerCase().includes(supplierSearch.toLowerCase()))
+            {(() => {
+              const spendOf = sup => orders
+                .filter(o => o.supplierCode === sup.code || o.supplier?.name === sup.name)
+                .reduce((sum, o) => sum + (parseFloat(o.totalAmount) || 0), 0);
+              const sorters = {
+                NAME: byText(x => x.name),
+                RATING_DESC: (a, b) => (getSupplierAvgScore(b) ?? -1) - (getSupplierAvgScore(a) ?? -1),
+                SPEND_DESC: (a, b) => spendOf(b) - spendOf(a),
+                LEADTIME_ASC: (a, b) => (Number(a.leadTimeDays) || Infinity) - (Number(b.leadTimeDays) || Infinity)
+              };
+              const q = supplierSearch.trim().toLowerCase();
+              return sortItems(suppliers.filter(s =>
+                (!q || s.name?.toLowerCase().includes(q) || s.email?.toLowerCase().includes(q) || String(s.phone || '').includes(q)) &&
+                (supplierStatusFilter === 'ALL' || (supplierStatusFilter === 'ACTIVE' ? (s.status || 'ACTIVE') === 'ACTIVE' : (s.status || 'ACTIVE') !== 'ACTIVE'))
+              ), supplierSort, sorters);
+            })()
               .map((sup, idx) => {
                 const supOrders = orders.filter(o => o.supplierCode === sup.code || o.supplier?.name === sup.name);
                 const totalSupSpend = supOrders.reduce((sum, o) => sum + (parseFloat(o.totalAmount) || 0), 0);
@@ -2863,7 +2975,10 @@ export default function Purchasing() {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
                     <div>
                       <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
-                        Lô Báo Giá #{gIdx + 1} — {group.list.length} Nhà Cung Cấp
+                        {group.batchCode ? `Đợt ${group.batchCode}` : `Lô Báo Giá #${gIdx + 1}`} — {group.list.length} Nhà Cung Cấp
+                        <span style={{ marginLeft: '0.5rem', fontSize: '0.78rem', fontWeight: 700, color: '#2563eb' }}>
+                          ({group.list.filter(po => po.status === 'QUOTED').length}/{group.list.length} đã báo giá)
+                        </span>
                       </h3>
                       <span style={{ fontSize: '0.78rem', color: '#64748b' }}>
                         Sản phẩm: {group.list[0]?.items?.map(i => i.product?.name || i.productName || i.productId).join(', ')}
@@ -2873,7 +2988,7 @@ export default function Purchasing() {
                       onClick={() => { setSelectedGroupKey(group.key); setShowCompareModal(true); }}
                       style={{ backgroundColor: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', borderRadius: '6px', padding: '0.4rem 0.9rem', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer' }}
                     >
-                      Xem Bảng Chi Tiết & Chốt Duyệt PO →
+                      So Sánh Chi Tiết & Chốt Trúng Thầu →
                     </button>
                   </div>
 
@@ -2929,7 +3044,7 @@ export default function Purchasing() {
             border: '1px solid #e3e8ef', 
             marginBottom: '1.25rem', 
             display: 'grid', 
-            gridTemplateColumns: 'minmax(200px, 2fr) minmax(140px, 1.2fr) minmax(160px, 1.3fr) minmax(140px, 1fr)', 
+            gridTemplateColumns: 'minmax(220px, 2fr) repeat(4, minmax(150px, 1fr))', 
             gap: '0.75rem', 
             alignItems: 'center' 
           }}>
@@ -2984,6 +3099,8 @@ export default function Purchasing() {
               <option value="LOW_STOCK">Cảnh báo tồn</option>
               <option value="OUT_OF_STOCK">Hết hàng</option>
             </select>
+
+            <SortSelect value={productSort} onChange={setProductSort} options={CATALOG_SORTS} style={{ width: '100%' }} />
           </div>
 
           <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', overflow: 'hidden' }}>
@@ -3908,6 +4025,10 @@ export default function Purchasing() {
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem 1rem', backgroundColor: '#fff1f2', border: '1px solid #fecdd3', borderRadius: '8px', marginBottom: '1.25rem', fontSize: '0.85rem', fontWeight: 800, color: '#be123c' }}>
                 <X size={16} /> Đơn Hàng Đã Bị Hủy
               </div>
+            ) : selectedPO.status === 'NOT_AWARDED' ? (
+              <div style={{ padding: '0.75rem 1rem', backgroundColor: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '8px', marginBottom: '1.25rem', fontSize: '0.85rem', color: '#475569' }}>
+                <strong style={{ color: '#334155' }}>Không trúng thầu</strong>{selectedPO.rfqBatchCode ? ` — đợt ${selectedPO.rfqBatchCode}` : ''}. Phòng Mua Hàng đã chọn báo giá khác trong đợt so sánh; nhà cung cấp đã được thông báo kết quả.
+              </div>
             ) : (() => {
               const isRfqRecord = RFQ_STAGE_STATUSES.includes(selectedPO.status);
               const stepIndexMap = isRfqRecord ? RFQ_PIPELINE_STEP_INDEX : PO_PIPELINE_STEP_INDEX;
@@ -4688,124 +4809,18 @@ export default function Purchasing() {
       })()}
 
       {showCompareModal && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(6px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '1.5rem' }}>
-          <div style={{ width: '100%', maxWidth: '950px', maxHeight: '90vh', overflowY: 'auto', padding: '2rem', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e3e8ef', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-              <div>
-                <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
-                  So Sánh & Đánh Giá Báo Giá Nhà Cung Cấp
-                </h3>
-                <p style={{ fontSize: '0.8rem', color: '#64748b', margin: '0.15rem 0 0' }}>
-                  Đối soát báo giá giữa các đơn vị để tối ưu chi phí mua hàng
-                </p>
-              </div>
-              <button onClick={() => setShowCompareModal(false)} style={{ background: '#f1f5f9', border: '1px solid #e3e8ef', color: '#475569', cursor: 'pointer', padding: '0.4rem', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <X size={18} />
-              </button>
-            </div>
-
-            {rfqGroups.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '2.5rem', color: '#64748b' }}>
-                <BarChart2 size={40} style={{ margin: '0 auto 0.75rem', opacity: 0.3 }} />
-                <p style={{ fontSize: '0.9rem' }}>Hiện chưa có nhóm Yêu Cầu Báo Giá đồng thời nào để so sánh.</p>
-              </div>
-            ) : (
-              <div>
-                {(selectedGroupKey ? rfqGroups.filter(g => g.key === selectedGroupKey) : rfqGroups).map((group) => (
-                  <div key={group.key} style={{ marginBottom: '1.5rem' }}>
-                    <div style={{ backgroundColor: '#f8fafc', padding: '0.75rem 1rem', borderRadius: '6px', border: '1px solid #e2e8f0', marginBottom: '0.75rem' }}>
-                      <strong style={{ fontSize: '0.88rem', color: '#0f172a' }}>Nhóm Sản Phẩm Cần Nhập:</strong>
-                      <span style={{ fontSize: '0.82rem', color: '#2563eb', marginLeft: '0.5rem' }}>
-                        {group.list[0]?.items?.map(i => `${i.product?.name || i.productName || i.productId} (x${i.quantity})`).join(', ')}
-                      </span>
-                    </div>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(group.list.length, 3)}, 1fr)`, gap: '1rem' }}>
-                      {group.list.map((po, pIdx) => {
-                        const isCheapest = group.list.every(other => (parseFloat(other.totalAmount) || Infinity) >= (parseFloat(po.totalAmount) || Infinity));
-                        const isQuoted = po.status === 'QUOTED';
-                        const poSupplier = suppliers.find(s => s.code === (po.supplierCode || po.supplier?.code));
-                        const poAvgScore = getSupplierAvgScore(poSupplier);
-
-                        return (
-                          // key phải là po.id (định danh thật), không phải vị trí trong
-                          // mảng (pIdx) — khi 1 báo giá trong nhóm bị huỷ/đổi trạng thái,
-                          // list co lại và các vị trí dịch chuyển, khiến React tái dùng
-                          // nhầm DOM node cũ cho báo giá khác, hiển thị sai tên NCC/giá
-                          // của thẻ đứng trước cho đến khi trang được tải lại hẳn.
-                          <div key={po.id} style={{
-                            backgroundColor: '#ffffff',
-                            borderRadius: '8px',
-                            border: isCheapest && po.totalAmount > 0 ? '2px solid #10b981' : '1px solid #e3e8ef',
-                            padding: '1rem',
-                            position: 'relative'
-                          }}>
-                            {isCheapest && po.totalAmount > 0 && (
-                              <span style={{ position: 'absolute', top: '-10px', right: '10px', backgroundColor: '#10b981', color: '#ffffff', fontSize: '0.72rem', fontWeight: 800, padding: '2px 8px', borderRadius: '10px' }}>
-                                GIÁ RẺ NHẤT
-                              </span>
-                            )}
-
-                            <h4 style={{ margin: '0 0 0.35rem', fontSize: '0.95rem', fontWeight: 800, color: '#0f172a' }}>
-                              {getSupplierName(po)}
-                            </h4>
-                            <div style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '0.4rem' }}>
-                              Mã: {formatPurchaseReference(po)}
-                            </div>
-                            <div style={{ fontSize: '0.8rem', color: poAvgScore === null ? '#94a3b8' : '#b45309', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '3px', fontWeight: 700 }}>
-                              <Star size={12} fill={poAvgScore === null ? 'none' : '#b45309'} />
-                              {poAvgScore === null ? 'NCC chưa được đánh giá' : `Điểm đánh giá NCC: ${poAvgScore}/10`}
-                            </div>
-
-                            <div style={{ fontSize: '1.2rem', fontWeight: 800, color: po.totalAmount > 0 ? '#16a34a' : '#d97706', marginBottom: '0.75rem' }}>
-                              {po.totalAmount > 0 ? formatCurrency(po.totalAmount) : 'Chờ NCC báo giá'}
-                            </div>
-
-                            {/* So sánh & duyệt chọn báo giá là việc của Phòng Mua Hàng, không phải
-                                CEO. Duyệt ở đây chỉ chuyển RFQ sang "Chờ Lập Phiếu" — Mua Hàng còn
-                                phải mở form Lập Phiếu Mua Hàng riêng (bước 2) mới thật sự tạo PO. */}
-                            {isQuoted && isPurchasingConfirmer && (() => {
-                              const poItems = po.items || [];
-                              const blocked = poItems.length === 0 || poItems.some(it => !(parseFloat(it.unitCost) > 0)) || !(parseFloat(po.totalAmount) > 0);
-                              return (
-                                <button
-                                  onClick={async () => {
-                                    if (blocked) return;
-                                    // Mọi báo giá khác trong cùng đợt so sánh bị huỷ luôn — quyết
-                                    // định đã có, không cần chờ NCC này nữa.
-                                    const losers = group.list.filter(other => other.id !== po.id && other.status === 'QUOTED');
-                                    await handleUpdateStatus(po.id, 'PENDING_PO_DRAFT', { loserIds: losers.map(l => l.id) });
-                                    setShowCompareModal(false);
-                                  }}
-                                  disabled={blocked}
-                                  title={blocked ? 'Còn linh kiện chưa có đơn giá' : undefined}
-                                  style={{
-                                    width: '100%',
-                                    backgroundColor: blocked ? '#9ca3af' : '#10b981',
-                                    color: '#ffffff',
-                                    border: 'none',
-                                    borderRadius: '6px',
-                                    padding: '0.45rem',
-                                    fontSize: '0.78rem',
-                                    fontWeight: 700,
-                                    cursor: blocked ? 'not-allowed' : 'pointer',
-                                    opacity: blocked ? 0.75 : 1
-                                  }}
-                                >
-                                  {blocked ? 'Thiếu Đơn Giá' : 'Duyệt Báo Giá Này (Chờ Lập Phiếu)'}
-                                </button>
-                              );
-                            })()}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
+        <RfqComparisonModal
+          groups={rfqGroups}
+          selectedGroupKey={selectedGroupKey}
+          suppliers={suppliers}
+          getSupplierName={getSupplierName}
+          getSupplierAvgScore={getSupplierAvgScore}
+          formatPurchaseReference={formatPurchaseReference}
+          formatCurrency={formatCurrency}
+          canAward={isPurchasingConfirmer}
+          onAward={handleAwardRfq}
+          onClose={() => setShowCompareModal(false)}
+        />
       )}
 
       {/* ================= MODAL LẬP PHIẾU MUA HÀNG (bước 2 sau khi đã Duyệt Báo Giá) ================= */}

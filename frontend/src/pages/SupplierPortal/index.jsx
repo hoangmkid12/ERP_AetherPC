@@ -42,7 +42,7 @@ export default function SupplierPortal() {
   const formatPurchaseReference = (po) => {
     if (!po) return '';
     const raw = String(po.poNumber || po.reference || po.id || '').trim();
-    const isRfq = ['RFQ', 'RFQ_SENT', 'AWAITING_SUPPLIER_QUOTE', 'QUOTED', 'PENDING_PO_DRAFT', 'CONVERTED', 'DRAFT_RFQ'].includes(po.status) || po.type === 'BACKORDER_RFQ' || po.type === 'RFQ';
+    const isRfq = ['RFQ', 'RFQ_SENT', 'AWAITING_SUPPLIER_QUOTE', 'QUOTED', 'PENDING_PO_DRAFT', 'CONVERTED', 'NOT_AWARDED', 'DRAFT_RFQ'].includes(po.status) || po.type === 'BACKORDER_RFQ' || po.type === 'RFQ';
     const prefix = isRfq ? 'RFQ' : 'PO';
 
     // Standard format: PREFIX-YYYY-NNNN (4-digit year, sequential number)
@@ -149,7 +149,7 @@ export default function SupplierPortal() {
 
   // Filter POs for this supplier using flexible status and supplier matching
   const myPOs = orders.filter(po => {
-    const isStatusMatch = ['RFQ', 'RFQ_SENT', 'SENT', 'QUOTED', 'PENDING_PO_DRAFT', 'CONVERTED', 'QUOTED_PENDING_CEO', 'PO', 'APPROVED', 'CONFIRMED_BY_SUPPLIER', 'QA_PASSED', 'QA_PARTIAL', 'QA_REJECTED', 'RECEIVED', 'DONE', 'COMPLETED', 'CANCELLED'].includes(po?.status);
+    const isStatusMatch = ['RFQ', 'RFQ_SENT', 'SENT', 'QUOTED', 'PENDING_PO_DRAFT', 'CONVERTED', 'QUOTED_PENDING_CEO', 'PO', 'APPROVED', 'CONFIRMED_BY_SUPPLIER', 'QA_PASSED', 'QA_PARTIAL', 'QA_REJECTED', 'RECEIVED', 'DONE', 'COMPLETED', 'CANCELLED', 'NOT_AWARDED'].includes(po?.status);
     
     const uCode = (user?.code || '').toLowerCase();
     const uName = (user?.fullname || user?.username || '').toLowerCase();
@@ -175,7 +175,7 @@ export default function SupplierPortal() {
       case 'QUOTED':
         return <span className="badge badge-info" style={{ backgroundColor: 'rgba(99,102,241,0.15)', color: '#818cf8' }}>Đã Báo Giá (Chờ Xác Nhận)</span>;
       case 'PENDING_PO_DRAFT':
-        return <span className="badge badge-info" style={{ backgroundColor: 'rgba(99,102,241,0.15)', color: '#818cf8' }}>Đã Được Chọn (Đang Lập Phiếu)</span>;
+        return <span className="badge badge-success" style={{ backgroundColor: 'rgba(34,197,94,0.15)', color: '#16a34a', border: '1px solid #bbf7d0' }}>Trúng Thầu (Đang Lập Phiếu)</span>;
       case 'CONVERTED':
         return <span className="badge badge-success" style={{ backgroundColor: 'rgba(34,197,94,0.15)', color: '#16a34a', border: '1px solid #bbf7d0' }}>Báo Giá Đã Được Chọn (Xem Đơn PO Mới)</span>;
       case 'QUOTED_PENDING_CEO':
@@ -199,6 +199,8 @@ export default function SupplierPortal() {
         return <span className="badge badge-success" style={{ backgroundColor: 'rgba(16,185,129,0.15)', color: 'var(--success)' }}>Hoàn Tất (Đã Nhập Kho)</span>;
       case 'CANCELLED':
         return <span className="badge badge-danger" style={{ backgroundColor: 'rgba(239,68,68,0.15)', color: '#ef4444' }}>Đã Từ Chối / Hủy</span>;
+      case 'NOT_AWARDED':
+        return <span className="badge badge-secondary" style={{ backgroundColor: 'rgba(100,116,139,0.15)', color: '#475569', border: '1px solid #cbd5e1' }}>Không Trúng Thầu</span>;
       default:
         return <span className="badge badge-secondary">{getStatusLabel(PO_STATUS, status)}</span>;
     }
@@ -614,7 +616,7 @@ export default function SupplierPortal() {
     { id: 'SHIPPING', label: 'Đang Giao/Chờ QC', match: ['CONFIRMED_BY_SUPPLIER', 'PENDING_QA'] },
     { id: 'QA_DONE', label: 'QC Đã Kiểm Định', match: ['QA_PASSED', 'QA_PARTIAL', 'QA_REJECTED', 'RECEIVED'] },
     { id: 'DONE', label: 'Hoàn Tất', match: ['DONE', 'COMPLETED'] },
-    { id: 'CANCELLED', label: 'Đã Hủy', match: ['CANCELLED'] }
+    { id: 'CANCELLED', label: 'Đã Hủy / Không Trúng Thầu', match: ['CANCELLED', 'NOT_AWARDED'] }
   ];
 
   const filteredMyPOs = myPOs
@@ -733,6 +735,26 @@ export default function SupplierPortal() {
           <DollarSign size={16} /> Báo Cáo Doanh Thu & Tài Chính
         </button>
       </div>
+
+      {/* Thông báo kết quả báo giá trong 7 ngày gần đây (ngoài email gửi NCC) */}
+      {(() => {
+        const since = Date.now() - 7 * 24 * 60 * 60 * 1000;
+        const results = myPOs.filter(po => ['NOT_AWARDED', 'PENDING_PO_DRAFT'].includes(po.status) && new Date(po.updatedAt || po.createdAt).getTime() >= since);
+        if (results.length === 0) return null;
+        return (
+          <div className="card-glass" style={{ padding: '0.85rem 1.1rem', marginBottom: '1.25rem', borderRadius: '10px', border: '1px solid #cbd5e1' }}>
+            <strong style={{ fontSize: '0.88rem' }}>Kết quả báo giá gần đây ({results.length})</strong>
+            {results.map(po => (
+              <div key={po.id} style={{ fontSize: '0.8rem', marginTop: '0.35rem', color: po.status === 'PENDING_PO_DRAFT' ? '#15803d' : '#475569' }}>
+                {po.status === 'PENDING_PO_DRAFT' ? '✔ Trúng thầu' : '• Không trúng thầu'} — {formatPurchaseReference(po)}
+                {po.status === 'PENDING_PO_DRAFT'
+                  ? ': báo giá của Quý đối tác đã được lựa chọn, vui lòng chờ Phiếu Mua Hàng chính thức.'
+                  : `: ${po.cancelReason || 'báo giá chưa được lựa chọn trong đợt này.'}`}
+              </div>
+            ))}
+          </div>
+        );
+      })()}
 
       {/* TAB 1: ORDERS & QUOTES MANAGEMENT */}
       {activeTab === 'orders' && (
@@ -890,7 +912,17 @@ export default function SupplierPortal() {
                         <p style={{ fontSize: '0.73rem', color: 'var(--text-muted)', marginTop: '0.25rem', margin: '0.25rem 0 0' }}>
                           Ngày tạo: {po.createdAt ? new Date(po.createdAt).toLocaleDateString('vi-VN') : 'N/A'}
                         </p>
-                        {po.cancelReason && (
+                        {po.status === 'NOT_AWARDED' && (
+                          <p style={{ fontSize: '0.72rem', color: '#475569', fontStyle: 'italic', margin: '0.2rem 0 0' }}>
+                            {po.cancelReason || 'Rất tiếc, báo giá của Quý đối tác chưa được lựa chọn trong đợt này.'}
+                          </p>
+                        )}
+                        {po.status === 'PENDING_PO_DRAFT' && (
+                          <p style={{ fontSize: '0.72rem', color: '#15803d', fontStyle: 'italic', margin: '0.2rem 0 0' }}>
+                            Báo giá đã được lựa chọn — Phiếu Mua Hàng chính thức sẽ được gửi sau khi Ban Giám Đốc phê duyệt.
+                          </p>
+                        )}
+                        {po.cancelReason && po.status !== 'NOT_AWARDED' && (
                           (() => {
                             const r = po.cancelReason;
                             const isCompleted = ['DONE', 'COMPLETED', 'RECEIVED'].includes(po.status);
@@ -1249,6 +1281,10 @@ export default function SupplierPortal() {
                           ) : po.status === 'CANCELLED' ? (
                             <span className="badge badge-danger" style={{ backgroundColor: 'rgba(239,68,68,0.15)', color: '#ef4444', padding: '0.35rem 0.75rem', borderRadius: '12px', fontSize: '0.75rem' }}>
                               Đã Hủy Đơn
+                            </span>
+                          ) : po.status === 'NOT_AWARDED' ? (
+                            <span className="badge badge-secondary" style={{ backgroundColor: 'rgba(100,116,139,0.15)', color: '#475569', padding: '0.35rem 0.75rem', borderRadius: '12px', fontSize: '0.75rem' }}>
+                              Không Trúng Thầu
                             </span>
                           ) : (
                             <span className="badge badge-secondary" style={{ padding: '0.35rem 0.75rem', borderRadius: '12px', fontSize: '0.75rem' }}>

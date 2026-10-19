@@ -5,6 +5,7 @@ const { logAudit } = require('../utils/auditLog');
 const { afterReceiptValidated } = require('../services/receiptFollowUp');
 const { hasOperationalPermission } = require('../middlewares/rbac.middleware');
 const { PO_STATUS_VI, labelOf } = require('../constants/statusLabels');
+const { sendRfqResultEmail } = require('../services/emailService');
 
 // Neither the supplier-quote submission nor the CEO PO-approval action on the frontend
 // ever sends a reason/note (there's no free-text field for either step), so every such
@@ -14,6 +15,7 @@ const DEFAULT_TRANSITION_NOTES = {
   RFQ_SENT: 'Phòng Mua Hàng đã gửi Yêu Cầu Báo Giá đến Nhà Cung Cấp.',
   QUOTED: 'Nhà cung cấp đã gửi báo giá cho Yêu Cầu Báo Giá.',
   PENDING_PO_DRAFT: 'Phòng Mua Hàng đã duyệt chọn báo giá này, chuẩn bị lập Phiếu Mua Hàng chính thức.',
+  NOT_AWARDED: 'Báo giá không được lựa chọn trong đợt so sánh.',
   QUOTED_PENDING_CEO: 'Phòng Mua Hàng đã lập Phiếu Mua Hàng, trình Ban Giám Đốc phê duyệt.',
   PO: 'CEO đã phê duyệt báo giá, phát hành PO chính thức.'
 };
@@ -303,6 +305,11 @@ const getPurchaseOrders = async (req, res, next) => {
 const createPurchaseOrder = async (req, res, next) => {
   try {
     const { supplierCode, expectedDeliveryDate, items, isBlanket, blanketCapAmount, blanketValidUntil, blanketRefId, purchaseRequestId } = req.body;
+    // Mã đợt so sánh (frontend sinh 1 lần cho cả lượt gửi nhiều NCC)
+    const rfqBatchCode = req.body.rfqBatchCode ? String(req.body.rfqBatchCode).trim().toUpperCase() : null;
+    if (rfqBatchCode && !/^RFQB-[A-Z0-9-]{4,34}$/.test(rfqBatchCode)) {
+      return res.status(400).json({ success: false, message: 'Mã đợt so sánh báo giá không hợp lệ.' });
+    }
     const createdBy = req.user ? req.user.name || req.user.email || req.user.code || 'Staff' : 'Staff';
 
     if (!supplierCode || !items || items.length === 0) {
@@ -440,6 +447,7 @@ const createPurchaseOrder = async (req, res, next) => {
           blanketCapAmount: isBlanket && blanketCapAmount ? parseFloat(blanketCapAmount) : null,
           blanketValidUntil: isBlanket && blanketValidUntil ? new Date(blanketValidUntil) : null,
           blanketRefId: blanket ? blanket.id : null,
+          rfqBatchCode: isBlanket || blanket ? null : rfqBatchCode,
           items: {
             create: itemsData
           }
@@ -462,7 +470,9 @@ const createPurchaseOrder = async (req, res, next) => {
             ? 'Khởi tạo Hợp Đồng Khung (Blanket PO)'
             : blanket
               ? `Tạo đơn mua theo hợp đồng khung ${blanket.poNumber}`
-              : 'Khởi tạo Yêu Cầu Báo Giá (RFQ)',
+              : rfqBatchCode
+                ? `Khởi tạo Yêu Cầu Báo Giá (RFQ) thuộc đợt so sánh ${rfqBatchCode} — gửi đồng thời nhiều nhà cung cấp`
+                : 'Khởi tạo Yêu Cầu Báo Giá (RFQ)',
           changedBy: req.user?.name || req.user?.email || req.user?.code || null,
           changedByRole: req.user?.role || null
         }
@@ -830,10 +840,11 @@ const updatePurchaseOrderStatus = async (req, res, next) => {
           if (!Number.isInteger(loserId) || loserId === po.id) continue;
           const loser = await tx.purchaseOrder.findUnique({ where: { id: loserId } });
           if (!loser || loser.status !== 'QUOTED') continue;
-          const cancelNote = `Đã chọn báo giá của NCC ${po.supplierCode} trong cùng đợt so sánh.`;
-          await tx.purchaseOrder.update({ where: { id: loserId }, data: { status: 'CANCELLED', cancelReason: cancelNote } });
+          // Không ghi tên NCC trúng thầu vào ghi chú của NCC khác (NCC đọc được lịch sử RFQ của mình)
+          const cancelNote = 'Rất tiếc, báo giá của Quý đối tác chưa được lựa chọn trong đợt này.';
+          await tx.purchaseOrder.update({ where: { id: loserId }, data: { status: 'NOT_AWARDED', cancelReason: cancelNote } });
           await tx.purchaseOrderStatusHistory.create({
-            data: { poId: loserId, status: 'CANCELLED', note: cancelNote, changedBy: req.user?.name || req.user?.email || req.user?.code || null, changedByRole: userRole || null }
+            data: { poId: loserId, status: 'NOT_AWARDED', note: 'Không trúng thầu trong đợt so sánh — Phòng Mua Hàng đã lựa chọn nhà cung cấp phù hợp hơn.', changedBy: req.user?.name || req.user?.email || req.user?.code || null, changedByRole: userRole || null }
           });
         }
       }
@@ -899,6 +910,170 @@ const updatePurchaseOrderStatus = async (req, res, next) => {
       success: true,
       message: `Đã cập nhật trạng thái thành "${labelOf(PO_STATUS_VI, status)}".`,
       data: updatedPOClean
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// POST /api/v1/purchasing/rfq-batches/award
+// Chốt chọn NCC trúng thầu trong 1 đợt so sánh báo giá, trong CÙNG 1 giao dịch:
+//   - RFQ được chọn: QUOTED -> PENDING_PO_DRAFT (bước 2 vẫn là Lập Phiếu Mua Hàng)
+//   - MỌI RFQ còn lại của đợt (kể cả NCC chưa kịp gửi giá): -> NOT_AWARDED, để
+//     không nằm treo ở "Chờ báo giá"/"Đã báo giá" mãi và NCC biết kết quả
+//   - Ghi lịch sử cho từng RFQ + nhật ký kiểm toán (bảng so sánh đầy đủ)
+//   - Gửi email kết quả cho từng NCC (sau khi giao dịch đã ghi xong)
+// Ghi chú gửi NCC không trúng KHÔNG nêu tên/giá NCC khác (NCC đọc được lịch sử
+// RFQ của chính mình qua API) — chi tiết so sánh chỉ nằm trong nhật ký nội bộ.
+// Body: { winnerId, reason, memberIds? } — memberIds chỉ dùng cho RFQ cũ tạo
+// trước khi có mã đợt (rfqBatchCode = null).
+const AWARD_OPEN_STATUSES = ['RFQ', 'RFQ_SENT', 'SENT', 'QUOTED'];
+const awardRfqBatch = async (req, res, next) => {
+  try {
+    const winnerId = parseInt(req.body.winnerId, 10);
+    const reason = String(req.body.reason || '').trim().slice(0, 500);
+    if (!Number.isInteger(winnerId)) {
+      return res.status(400).json({ success: false, message: 'Thiếu báo giá được chọn (winnerId).' });
+    }
+    if (reason.length < 5) {
+      return res.status(400).json({ success: false, message: 'Vui lòng ghi rõ lý do lựa chọn nhà cung cấp (tối thiểu 5 ký tự).' });
+    }
+    const actorName = req.user?.name || req.user?.email || req.user?.code || null;
+    const actorRole = req.user?.role || null;
+
+    const result = await prisma.$transaction(async (tx) => {
+      const winner = await tx.purchaseOrder.findUnique({
+        where: { id: winnerId },
+        include: { items: { include: { product: { select: { name: true } } } }, supplier: true }
+      });
+      if (!winner) throw Object.assign(new Error('Không tìm thấy báo giá được chọn.'), { statusCode: 404 });
+
+      // Khoá theo đợt để 2 người bấm chốt cùng lúc không cùng chọn 2 NCC khác nhau
+      const lockKey = winner.rfqBatchCode || `rfq-legacy:${winner.id}`;
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${'rfq-award:' + lockKey}))::text`;
+
+      if (winner.status !== 'QUOTED') {
+        throw Object.assign(new Error('Chỉ chọn được báo giá đang ở trạng thái "NCC Đã Báo Giá".'), { statusCode: 409 });
+      }
+      if (winner.items.length === 0 || winner.items.some(it => !(parseFloat(it.unitCost) > 0)) || !(parseFloat(winner.totalAmount) > 0)) {
+        throw Object.assign(new Error('Báo giá được chọn còn mặt hàng chưa có đơn giá.'), { statusCode: 400 });
+      }
+
+      // Thành viên của đợt
+      let members;
+      if (winner.rfqBatchCode) {
+        members = await tx.purchaseOrder.findMany({
+          where: { rfqBatchCode: winner.rfqBatchCode },
+          include: { items: { include: { product: { select: { name: true } } } }, supplier: true }
+        });
+      } else {
+        const ids = (Array.isArray(req.body.memberIds) ? req.body.memberIds : [])
+          .map(x => parseInt(x, 10)).filter(Number.isInteger);
+        members = await tx.purchaseOrder.findMany({
+          where: { id: { in: [...new Set([winner.id, ...ids])] }, rfqBatchCode: null },
+          include: { items: { include: { product: { select: { name: true } } } }, supplier: true }
+        });
+        // RFQ cũ: chỉ nhận các RFQ hỏi đúng cùng bộ sản phẩm với RFQ được chọn
+        const keyOf = po => po.items.map(i => i.productId).sort().join(',');
+        const winnerKey = keyOf(winner);
+        members = members.filter(m => keyOf(m) === winnerKey);
+      }
+
+      const quotedMembers = members.filter(m => m.status === 'QUOTED' || m.id === winner.id);
+      const ranked = [...quotedMembers].sort((a, b) => parseFloat(a.totalAmount) - parseFloat(b.totalAmount));
+      const rank = ranked.findIndex(m => m.id === winner.id) + 1;
+      const cheapest = ranked[0];
+      const batchLabel = winner.rfqBatchCode || 'đợt so sánh';
+
+      // 1. NCC trúng thầu
+      const claim = await tx.purchaseOrder.updateMany({
+        where: { id: winner.id, status: 'QUOTED' },
+        data: { status: 'PENDING_PO_DRAFT' }
+      });
+      if (claim.count !== 1) {
+        throw Object.assign(new Error('Báo giá này vừa được người khác xử lý — tải lại trang để xem kết quả mới.'), { statusCode: 409 });
+      }
+      await tx.purchaseOrderStatusHistory.create({
+        data: {
+          poId: winner.id,
+          status: 'PENDING_PO_DRAFT',
+          note: `Được chọn trúng thầu ${batchLabel}: nhận ${quotedMembers.length}/${members.length} báo giá, báo giá này xếp hạng giá ${rank}/${quotedMembers.length}. Lý do chọn: ${reason}`,
+          changedBy: actorName,
+          changedByRole: actorRole
+        }
+      });
+
+      // 2. Các NCC còn lại trong đợt
+      const losers = [];
+      for (const m of members) {
+        if (m.id === winner.id || !AWARD_OPEN_STATUSES.includes(m.status)) continue;
+        const quoted = m.status === 'QUOTED';
+        const supplierMessage = quoted
+          ? 'Rất tiếc, báo giá của Quý đối tác chưa được lựa chọn trong đợt này. Cảm ơn Quý đối tác đã tham gia chào giá.'
+          : 'Đợt báo giá đã kết thúc trước khi nhận được báo giá của Quý đối tác.';
+        const done = await tx.purchaseOrder.updateMany({
+          where: { id: m.id, status: m.status },
+          data: { status: 'NOT_AWARDED', cancelReason: supplierMessage }
+        });
+        if (done.count !== 1) continue;
+        await tx.purchaseOrderStatusHistory.create({
+          data: {
+            poId: m.id,
+            status: 'NOT_AWARDED',
+            note: `Không trúng thầu ${batchLabel}${quoted ? '' : ' (chưa gửi báo giá trước khi chốt)'} — Phòng Mua Hàng đã lựa chọn nhà cung cấp phù hợp hơn. Kết quả hiển thị trên Cổng Nhà Cung Cấp${m.supplier?.email ? ' và được gửi email' : ' (NCC chưa khai báo email)'}.`,
+            changedBy: actorName,
+            changedByRole: actorRole
+          }
+        });
+        losers.push({ ...m, quoted });
+      }
+
+      return { winner, losers, members, quotedMembers, rank, cheapest };
+    }, { maxWait: 10000, timeout: 30000 });
+
+    const { winner, losers, members, quotedMembers, rank, cheapest } = result;
+    const fmtMoney = n => `${Number(n || 0).toLocaleString('vi-VN')}đ`;
+    logAudit({
+      req,
+      action: 'AWARD_RFQ',
+      module: 'Mua Hàng',
+      targetId: winner.id,
+      note: `Chọn ${winner.supplierCode} (${winner.poNumber}, ${fmtMoney(winner.totalAmount)}, hạng giá ${rank}/${quotedMembers.length}) trong ${winner.rfqBatchCode || 'đợt so sánh'}. `
+        + `Các báo giá khác: ${quotedMembers.filter(m => m.id !== winner.id).map(m => `${m.supplierCode} ${fmtMoney(m.totalAmount)}`).join(', ') || 'không có'}. `
+        + `${cheapest && cheapest.id !== winner.id ? `Không chọn giá thấp nhất (${cheapest.supplierCode} ${fmtMoney(cheapest.totalAmount)}). ` : ''}`
+        + `Lý do: ${reason}`
+    });
+
+    // Email kết quả — không chặn phản hồi, lỗi gửi thư không làm hỏng quyết định đã ghi
+    const itemsOf = po => po.items.map(i => ({ name: i.product?.name || i.productId, quantity: i.quantity, unitCost: i.unitCost }));
+    const notifications = [
+      { po: winner, awarded: true, quoted: true },
+      ...losers.map(l => ({ po: l, awarded: false, quoted: l.quoted }))
+    ];
+    let emailed = 0;
+    await Promise.all(notifications.map(async ({ po, awarded, quoted }) => {
+      if (!po.supplier?.email) return;
+      try {
+        await sendRfqResultEmail({
+          toEmail: po.supplier.email,
+          supplierName: po.supplier.name,
+          rfqNumber: po.poNumber,
+          batchCode: po.rfqBatchCode,
+          awarded,
+          quoted,
+          items: itemsOf(po),
+          totalAmount: po.totalAmount
+        });
+        emailed++;
+      } catch (err) {
+        console.warn(`[RFQ Award] Không gửi được email tới ${po.supplier.email}:`, err.message);
+      }
+    }));
+
+    res.json({
+      success: true,
+      message: `Đã chọn ${winner.supplier?.name || winner.supplierCode}. ${losers.length} nhà cung cấp còn lại được chuyển "Không trúng thầu"; đã gửi email thông báo ${emailed}/${notifications.length} NCC.`,
+      data: { winnerId: winner.id, notAwardedIds: losers.map(l => l.id), invited: members.length, quoted: quotedMembers.length, emailed }
     });
   } catch (err) {
     next(err);
@@ -1266,6 +1441,7 @@ module.exports = {
   getPurchaseOrders,
   createPurchaseOrder,
   updatePurchaseOrderStatus,
+  awardRfqBatch,
   issuePurchaseOrder,
   createVendorBill,
   registerPayment,

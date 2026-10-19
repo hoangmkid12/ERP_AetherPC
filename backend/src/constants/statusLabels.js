@@ -45,6 +45,7 @@ const PO_STATUS_VI = {
   SENT: 'Đã Gửi Yêu Cầu Báo Giá',
   QUOTED: 'Nhà Cung Cấp Đã Báo Giá',
   PENDING_PO_DRAFT: 'Đã Chọn Báo Giá - Chờ Lập Phiếu',
+  NOT_AWARDED: 'Không Trúng Thầu',
   CONVERTED: 'Đã Lập Phiếu Mua Hàng',
   QUOTED_PENDING_CEO: 'Chờ Ban Giám Đốc Duyệt',
   PO: 'Đơn Mua Hàng Đã Duyệt',

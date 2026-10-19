@@ -10,6 +10,44 @@ import { api } from '../../services/api';
 import { ORDER_STATUS, getStatusInfo, CUSTOMER_TIER, getStatusLabel } from '../../utils/statusLabels';
 import ActorNotificationBar from '../../components/ActorNotificationBar';
 import DateRangeFilter from '../../components/Common/DateRangeFilter';
+import { SortSelect, sortItems, byDateDesc, byDateAsc, byNumDesc, byNumAsc, byText } from '../../components/Common/ListControls';
+
+// Tuỳ chọn sắp xếp của Bán Hàng
+const salesOrderDate = o => o.createdAt || o.date;
+const SALES_ORDER_SORTS = [
+  { key: 'NEWEST', label: 'Mới nhất' },
+  { key: 'OLDEST', label: 'Cũ nhất' },
+  { key: 'VALUE_DESC', label: 'Giá trị cao → thấp' },
+  { key: 'VALUE_ASC', label: 'Giá trị thấp → cao' }
+];
+const SALES_ORDER_SORTERS = {
+  NEWEST: byDateDesc(salesOrderDate),
+  OLDEST: byDateAsc(salesOrderDate),
+  VALUE_DESC: byNumDesc(o => o.totalAmount || o.total),
+  VALUE_ASC: byNumAsc(o => o.totalAmount || o.total)
+};
+// Sắp xếp khách hàng chạy ở máy chủ (danh sách có phân trang)
+const CUSTOMER_SORTS = [
+  { key: 'NEWEST', label: 'Mới đăng ký' },
+  { key: 'OLDEST', label: 'Đăng ký lâu nhất' },
+  { key: 'POINTS_DESC', label: 'Điểm tích luỹ cao nhất' },
+  { key: 'ORDERS_DESC', label: 'Nhiều đơn hàng nhất' },
+  { key: 'NAME', label: 'Tên A → Z' }
+];
+const PRODUCT_SORTS = [
+  { key: 'DEFAULT', label: 'Mặc định' },
+  { key: 'PRICE_ASC', label: 'Giá thấp → cao' },
+  { key: 'PRICE_DESC', label: 'Giá cao → thấp' },
+  { key: 'STOCK_DESC', label: 'Tồn kho nhiều nhất' },
+  { key: 'STOCK_ASC', label: 'Tồn kho ít nhất' },
+  { key: 'NAME', label: 'Tên A → Z' }
+];
+const productStock = p => (p.stock !== undefined ? p.stock : p.stockQuantity);
+const PRODUCT_SORTERS = {
+  PRICE_ASC: byNumAsc(p => p.price), PRICE_DESC: byNumDesc(p => p.price),
+  STOCK_DESC: byNumDesc(productStock), STOCK_ASC: byNumAsc(productStock),
+  NAME: byText(p => p.name)
+};
 import PeriodFilterBar, { isDateInPeriod } from '../../components/Common/PeriodFilterBar';
 import { 
   Search, ShoppingCart, Plus, Minus, Trash2, Printer, FileText,
@@ -159,6 +197,10 @@ export default function SalesPOS() {
   // Orders Management State
   const [orderSearch, setOrderSearch] = useState('');
   const [orderStatusFilter, setOrderStatusFilter] = useState('ALL');
+  const [orderSort, setOrderSort] = useState('NEWEST');
+  const [customerSort, setCustomerSort] = useState('NEWEST');
+  const [catalogSort, setCatalogSort] = useState('DEFAULT');
+  const [posSort, setPosSort] = useState('DEFAULT');
   const [allocatingStock, setAllocatingStock] = useState(false);
   // Rà lại các đơn "Chờ hàng": đơn nào nay đã đủ tồn thì máy chủ duyệt & xuất kho ngay (đơn cũ nhất trước)
   const handleAllocateAwaitingStock = async () => {
@@ -213,6 +255,8 @@ export default function SalesPOS() {
       });
       if (customerSearch.trim()) params.set('search', customerSearch.trim());
       if (customerStatusFilter !== 'ALL') params.set('status', customerStatusFilter);
+      if (customerTierFilter !== 'ALL') params.set('tier', customerTierFilter);
+      params.set('sort', customerSort);
       const res = await api.get(`/customer-accounts?${params.toString()}`);
       setCustomerAccounts(res.data || []);
       setCustomerTotalPages(res.pagination?.totalPages || 1);
@@ -229,14 +273,12 @@ export default function SalesPOS() {
     const timer = setTimeout(() => { loadCustomerAccounts(); }, 300);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, customerPage, customerSearch, customerStatusFilter]);
+  }, [activeTab, customerPage, customerSearch, customerStatusFilter, customerTierFilter, customerSort]);
 
   // Tier filter is applied client-side on the current page (real Customer.tier
   // values: BRONZE/SILVER/GOLD/PLATINUM/B2B) — search/status filter server-side.
-  const filteredCustomerAccounts = useMemo(() => {
-    if (customerTierFilter === 'ALL') return customerAccounts;
-    return customerAccounts.filter(c => c.tier === customerTierFilter);
-  }, [customerAccounts, customerTierFilter]);
+  // Lọc hạng & sắp xếp đã làm ở máy chủ (đúng trên toàn bộ danh sách có phân trang)
+  const filteredCustomerAccounts = customerAccounts;
 
   const openCreateCustomerModal = () => {
     setEditingCustomer(null);
@@ -591,12 +633,13 @@ export default function SalesPOS() {
       return matchSearch && matchCat;
     });
   }, [effectiveCatalog, posSearch, posCategoryFilter]);
+  const sortedPosProducts = useMemo(() => sortItems(filteredPosProducts, posSort, PRODUCT_SORTERS), [filteredPosProducts, posSort]);
 
   const totalPosPages = Math.ceil(filteredPosProducts.length / POS_ITEMS_PER_PAGE) || 1;
   const paginatedPosProducts = useMemo(() => {
     const start = (posPage - 1) * POS_ITEMS_PER_PAGE;
-    return filteredPosProducts.slice(start, start + POS_ITEMS_PER_PAGE);
-  }, [filteredPosProducts, posPage]);
+    return sortedPosProducts.slice(start, start + POS_ITEMS_PER_PAGE);
+  }, [sortedPosProducts, posPage]);
 
   // Order status badge helper — nguồn nhãn dùng chung toàn hệ thống, tránh
   // mỗi trang tự định nghĩa lại (từng thiếu 10/19 trạng thái, rơi vào raw
@@ -621,12 +664,8 @@ export default function SalesPOS() {
         const matchDate = isDateInRange(o.date || o.createdAt, orderStartDate, orderEndDate);
         return matchSearch && matchStatus && matchDate;
       })
-      .sort((a, b) => {
-        const dA = new Date(a.createdAt || a.date || 0);
-        const dB = new Date(b.createdAt || b.date || 0);
-        return dB.getTime() - dA.getTime();
-      });
-  }, [orders, orderSearch, orderStatusFilter, orderStartDate, orderEndDate]);
+      .sort(SALES_ORDER_SORTERS[orderSort] || SALES_ORDER_SORTERS.NEWEST);
+  }, [orders, orderSearch, orderStatusFilter, orderStartDate, orderEndDate, orderSort]);
 
   // Overview Period Filter
   const [overviewPeriod, setOverviewPeriod] = useState('ALL');
@@ -1140,7 +1179,7 @@ export default function SalesPOS() {
           <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', padding: '1.25rem' }}>
             
             {/* Filter toolbar */}
-            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '0.75rem', marginBottom: '1rem' }}>
+            <div className="admin-filter-toolbar" style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '0.75rem', marginBottom: '1rem' }}>
               <input
                 type="text"
                 placeholder="Tìm linh kiện theo tên, SKU..."
@@ -1167,6 +1206,7 @@ export default function SalesPOS() {
                 <option value="KEYBOARD">Keyboard</option>
                 <option value="MOUSE">Mouse</option>
               </select>
+              <SortSelect value={posSort} onChange={v => { setPosSort(v); setPosPage(1); }} options={PRODUCT_SORTS} style={{ width: '100%' }} />
             </div>
 
             {/* Products Grid */}
@@ -1446,7 +1486,7 @@ export default function SalesPOS() {
           }}>
             <div style={{
               display: 'grid',
-              gridTemplateColumns: 'minmax(200px, 2fr) minmax(180px, 1.3fr)',
+              gridTemplateColumns: 'minmax(220px, 2fr) repeat(2, minmax(190px, 1fr))',
               gap: '0.75rem',
               alignItems: 'center'
             }}>
@@ -1478,6 +1518,7 @@ export default function SalesPOS() {
                 <option value="REFUNDED">Đã hoàn tiền</option>
                 <option value="CANCELLED">Đã hủy</option>
               </select>
+              <SortSelect value={orderSort} onChange={setOrderSort} options={SALES_ORDER_SORTS} style={{ width: '100%' }} />
             </div>
             {(isSalesManager || isCEO || isAdmin) && orders.some(o => o.status === 'AWAITING_STOCK') && (
               <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', padding: '0.6rem 0.75rem', backgroundColor: '#fffbeb', border: '1px solid #fde68a', borderRadius: '6px', fontSize: '0.8rem', color: '#92400e' }}>
@@ -1665,7 +1706,7 @@ export default function SalesPOS() {
             border: '1px solid #e3e8ef',
             marginBottom: '1.25rem',
             display: 'grid',
-            gridTemplateColumns: 'minmax(220px, 2fr) minmax(160px, 1fr) minmax(160px, 1fr)',
+            gridTemplateColumns: 'minmax(220px, 2fr) repeat(3, minmax(170px, 1fr))',
             gap: '0.75rem',
             alignItems: 'center'
           }}>
@@ -1678,14 +1719,17 @@ export default function SalesPOS() {
             />
             <select
               value={customerTierFilter}
-              onChange={(e) => setCustomerTierFilter(e.target.value)}
+              onChange={(e) => { setCustomerPage(1); setCustomerTierFilter(e.target.value); }}
               style={{ width: '100%', height: '38px', padding: '0 0.65rem', fontSize: '0.83rem', border: '1px solid #e3e8ef', borderRadius: '6px', color: '#0f172a', boxSizing: 'border-box', backgroundColor: '#ffffff', cursor: 'pointer' }}
             >
               <option value="ALL">Tất cả hạng thành viên</option>
+              <option value="REGULAR">Hạng Thường</option>
               <option value="BRONZE">Hạng Đồng</option>
               <option value="SILVER">Hạng Bạc</option>
               <option value="GOLD">Hạng Vàng</option>
               <option value="PLATINUM">Hạng Bạch Kim</option>
+              <option value="DIAMOND">Hạng Kim Cương</option>
+              <option value="B2B">Doanh Nghiệp (B2B)</option>
             </select>
             <select
               value={customerStatusFilter}
@@ -1696,6 +1740,7 @@ export default function SalesPOS() {
               <option value="ACTIVE">Đang hoạt động</option>
               <option value="INACTIVE">Đã vô hiệu hóa</option>
             </select>
+            <SortSelect value={customerSort} onChange={v => { setCustomerPage(1); setCustomerSort(v); }} options={CUSTOMER_SORTS} style={{ width: '100%' }} />
           </div>
 
           {customerAccountsLoading ? (
@@ -1841,7 +1886,7 @@ export default function SalesPOS() {
           the full product-edit modal in /admin/warehouse. */}
       {/* ========================================================================= */}
       {activeTab === 'catalog' && (() => {
-        const filteredCatalog = effectiveCatalog.filter(p => {
+        const filteredCatalog = sortItems(effectiveCatalog.filter(p => {
           const matchSearch = !catalogSearch.trim() || (p.name || '').toLowerCase().includes(catalogSearch.toLowerCase());
           const matchCategory = catalogCategoryFilter === 'ALL' || p.category === catalogCategoryFilter;
           const isVisible = p.available !== false;
@@ -1849,7 +1894,7 @@ export default function SalesPOS() {
             (catalogVisibilityFilter === 'VISIBLE' && isVisible) ||
             (catalogVisibilityFilter === 'HIDDEN' && !isVisible);
           return matchSearch && matchCategory && matchVisibility;
-        });
+        }), catalogSort, PRODUCT_SORTERS);
 
         return (
         <div>
@@ -1864,7 +1909,7 @@ export default function SalesPOS() {
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.25rem', flexWrap: 'wrap' }}>
+          <div className="admin-filter-toolbar" style={{ display: 'flex', gap: '0.6rem', marginBottom: '1.25rem', flexWrap: 'wrap', backgroundColor: '#ffffff', padding: '0.75rem 1rem', borderRadius: '8px', border: '1px solid #e3e8ef' }}>
             <input
               type="text"
               placeholder="Tìm theo tên sản phẩm..."
@@ -1883,6 +1928,8 @@ export default function SalesPOS() {
               <option value="VISIBLE">Đang hiển thị</option>
               <option value="HIDDEN">Đang ẩn</option>
             </select>
+            <SortSelect value={catalogSort} onChange={setCatalogSort} options={PRODUCT_SORTS} />
+            <span style={{ marginLeft: 'auto', alignSelf: 'center', fontSize: '0.78rem', color: '#64748b' }}>{filteredCatalog.length} sản phẩm</span>
           </div>
 
           <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e3e8ef', overflow: 'hidden' }}>

@@ -66,6 +66,18 @@ export const isDateInPeriod = (dateVal, period) => {
     return itemDate.getFullYear() === today.getFullYear();
   }
 
+  // Khoảng trượt tính cả hôm nay (7 / 30 ngày gần nhất)
+  if (period === 'LAST_7_DAYS' || period === 'LAST_30_DAYS') {
+    const from = new Date(today);
+    from.setDate(today.getDate() - (period === 'LAST_7_DAYS' ? 6 : 29));
+    return itemDate >= from && itemDate <= today;
+  }
+
+  if (period === 'LAST_MONTH') {
+    const lm = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    return itemDate.getFullYear() === lm.getFullYear() && itemDate.getMonth() === lm.getMonth();
+  }
+
   return true;
 };
 

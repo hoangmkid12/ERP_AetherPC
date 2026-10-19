@@ -13,6 +13,7 @@ const {
   getPurchaseOrders,
   createPurchaseOrder,
   updatePurchaseOrderStatus,
+  awardRfqBatch,
   issuePurchaseOrder,
   createVendorBill,
   registerPayment,
@@ -62,6 +63,12 @@ router.patch('/orders/:id/status', authMiddleware(['PURCHASING', 'CEO', 'ADMIN',
 // @desc    Bước 2 sau khi Mua Hàng đã duyệt chọn báo giá (PATCH .../status ->
 //          PENDING_PO_DRAFT): lập Phiếu Mua Hàng chính thức — một bản ghi
 //          PurchaseOrder MỚI (chứng từ riêng, số riêng) để trình CEO duyệt.
+// @route   POST /api/v1/purchasing/rfq-batches/award
+// @desc    Chốt NCC trúng thầu trong 1 đợt so sánh báo giá; các RFQ còn lại cùng
+//          đợt chuyển "Không trúng thầu", ghi lịch sử và gửi email cho từng NCC
+// @body    { winnerId: number, reason: string, memberIds?: number[] }
+router.post('/rfq-batches/award', authMiddleware(['PURCHASING', 'ADMIN']), awardRfqBatch);
+
 router.post('/orders/:id/issue-po', authMiddleware(['PURCHASING', 'ADMIN']), issuePurchaseOrder);
 
 // @route   POST /api/v1/purchasing/orders/:id/bills
