@@ -274,15 +274,15 @@ D['uc07'] = ([(A, NV), (B, GD), (C, CT), (E, OD), (E, SP), (E, OH), (X, EM)], [
 
 # ============ 08. Lập yêu cầu báo giá và so sánh báo giá (Nhân viên mua hàng) ============
 NV, GD, CT, PR, PO = 'NV MUA HÀNG', 'GD_MUAHANG', 'CTRL_PURCHASE', 'ENTITY_PURCHASEREQUEST', 'ENTITY_PURCHASEORDER'
-D['uc08'] = ([(A, NV), (B, GD), (C, CT), (E, PR), (E, PO)], [
+D['uc08'] = ([(A, NV), (B, GD), (C, CT), (E, PR), (E, PO), (X, 'HỆ THỐNG EMAIL')], [
     m(NV, GD, '1: Chọn "Tạo yêu cầu báo giá mới", chọn sản phẩm, số lượng, các nhà cung cấp'),
     s(GD, '1.1: Kiểm tra đã chọn sản phẩm và nhà cung cấp'),
     loop('[MỖI NHÀ CUNG CẤP ĐƯỢC CHỌN]',
-         m(GD, CT, '1.2: createPurchaseOrder(maNCC, dsSanPham, maPhieuDeXuat)'),
+         m(GD, CT, '1.2: createPurchaseOrder(maNCC, dsSanPham, maPhieuDeXuat, rfqBatchCode)'),
          opt('[LẬP TỪ PHIẾU ĐỀ XUẤT]',
              m(CT, PR, '1.2.1: updateMany(Đã duyệt => Đã lập RFQ)'),
              ),
-         m(CT, PO, '1.2.2: create(trạng thái RFQ, đơn giá = 0)'),
+         m(CT, PO, '1.2.2: create(trạng thái RFQ, đơn giá = 0, mã đợt so sánh)'),
          m(GD, CT, '1.3: updatePurchaseOrderStatus(maRFQ, "Đã gửi NCC")'),
          m(CT, PO, '1.3.1: updateMany(RFQ => Đã gửi NCC)'),
          ),
@@ -292,11 +292,15 @@ D['uc08'] = ([(A, NV), (B, GD), (C, CT), (E, PR), (E, PO)], [
     m(CT, PO, '2.1.1: findMany()'),
     r(PO, CT, '2.1.2: return dsBaoGia (Đã báo giá / Đã hủy)'),
     r(CT, GD, '2.2: return dsBaoGia'),
-    s(GD, '2.3: So sánh đơn giá, thời gian giao'),
-    m(NV, GD, '3: Chọn báo giá tốt nhất'),
-    m(GD, CT, '3.1: updatePurchaseOrderStatus(maBaoGia, "Chờ lập phiếu", loserIds)'),
-    s(CT, '3.1.1: Kiểm tra mọi mặt hàng đã có đơn giá'),
-    m(CT, PO, '3.1.2: update(báo giá được chọn), hủy các báo giá còn lại'),
+    s(GD, '2.3: So sánh đơn giá từng mặt hàng, tiến độ, điểm tổng hợp; đề xuất nhà cung cấp'),
+    m(NV, GD, '3: Chọn nhà cung cấp trúng thầu, ghi lý do'),
+    m(GD, CT, '3.1: awardRfqBatch(maBaoGia, lyDo)'),
+    s(CT, '3.1.1: Khóa theo mã đợt; kiểm tra báo giá "Đã báo giá" và đủ đơn giá'),
+    m(CT, PO, '3.1.2: updateMany(Đã báo giá => Chờ lập phiếu) cho báo giá được chọn'),
+    loop('[MỖI YÊU CẦU CÒN LẠI CỦA ĐỢT]',
+         m(CT, PO, '3.1.3: updateMany(=> Không trúng thầu), ghi lịch sử'),
+         ),
+    m(CT, 'HỆ THỐNG EMAIL', '3.1.4: sendRfqResultEmail(từng nhà cung cấp, trúng / không trúng)'),
     m(NV, GD, '4: Bấm "Lập phiếu mua hàng"'),
     m(GD, CT, '4.1: issuePurchaseOrder(maBaoGia)'),
     m(CT, PO, '4.1.1: create(phiếu mua hàng, Chờ BGĐ duyệt); báo giá => Đã chuyển'),
@@ -556,8 +560,8 @@ D['uc17'] = ([(A, SH), (B, GD), (C, WS), (C, CT), (E, OD), (E, PM), (X, EM)], [
          s(WS, '2.1: canBroadcastLocation(maDon) - chỉ shipper được phân công'),
          s(WS, '2.2: updateDeliveryLocation() - lưu vị trí, đẩy cho chủ đơn theo dõi'),
          ),
-    m(SH, GD, '3: Chụp ảnh xác nhận, thu tiền, bấm "Giao hàng thành công"'),
-    m(GD, CT, '3.1: updateOrderStatus(maDon, "Đã giao", proofPhoto, cashAmount, bankAmount, bankRefCode)'),
+    m(SH, GD, '3: Chụp ảnh xác nhận, chọn tiền mặt hoặc chuyển khoản, trượt "Giao hàng thành công"'),
+    m(GD, CT, '3.1: updateOrderStatus(maDon, "Đã giao", proofPhoto, actualPaymentMethod, bankRefCode)'),
     alt(('[KHÁCH VẮNG MẶT / TỪ CHỐI NHẬN]', [
         m(CT, OD, '3.1.1: update(Giao không thành công / Đang hoàn về kho, lý do, ảnh) - chưa hoàn tồn'),
     ]), ('[GIAO THÀNH CÔNG]', [
