@@ -176,7 +176,8 @@ export default function OverviewTab({
     let values = [];
     let title = 'Tiền thu hộ trong tuần';
 
-    if (period === 'TODAY' || period === 'YESTERDAY' || period === 'SPECIFIC_DATE') {
+    const singleDay = period === 'CUSTOM' && dateFilter.customStartDate && dateFilter.customStartDate === dateFilter.customEndDate;
+    if (period === 'TODAY' || period === 'YESTERDAY' || period === 'SPECIFIC_DATE' || singleDay) {
       title = `Tiền thu hộ theo khung giờ (${getDateFilterLabel(dateFilter)})`;
       labels = ['07h - 11h', '11h - 14h', '14h - 17h', '17h - 21h'];
       const buckets = [0, 0, 0, 0];
@@ -321,7 +322,7 @@ export default function OverviewTab({
           </div>
         </div>
 
-        {/* Quick filter selector bar: Hôm nay, Tháng này, Năm nay, Tùy chọn */}
+        {/* Lọc theo khoảng ngày */}
         <DateFilterControl
           variant="inline"
           dateFilter={dateFilter}

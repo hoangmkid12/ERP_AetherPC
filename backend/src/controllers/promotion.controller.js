@@ -11,7 +11,8 @@ const serializePromotion = (p) => ({
   minSpend: parseFloat(p.minSpend),
   expiry: p.expiresAt ? new Date(p.expiresAt).toLocaleDateString('vi-VN') : null,
   expiresAt: p.expiresAt,
-  status: p.status
+  status: p.status,
+  createdAt: p.createdAt
 });
 
 // GET /api/v1/promotions — danh sách khuyến mãi thật, nhân viên Sales dùng để

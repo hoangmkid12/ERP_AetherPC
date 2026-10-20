@@ -10,7 +10,7 @@ import { api } from '../../services/api';
 import { ORDER_STATUS, getStatusInfo, CUSTOMER_TIER, getStatusLabel } from '../../utils/statusLabels';
 import ActorNotificationBar from '../../components/ActorNotificationBar';
 import DateRangeFilter from '../../components/Common/DateRangeFilter';
-import { SortSelect, sortItems, byDateDesc, byDateAsc, byNumDesc, byNumAsc, byText } from '../../components/Common/ListControls';
+import { FilterToolbar, SortSelect, sortItems, byDateDesc, byDateAsc, byNumDesc, byNumAsc, byText, FILTER_CONTROL_STYLE, FILTER_SEARCH_STYLE } from '../../components/Common/ListControls';
 
 // Tuỳ chọn sắp xếp của Bán Hàng
 const salesOrderDate = o => o.createdAt || o.date;
@@ -406,6 +406,10 @@ export default function SalesPOS() {
   const [promoFormData, setPromoFormData] = useState({});
   const [promoFormSaving, setPromoFormSaving] = useState(false);
   const [promoActionBusyId, setPromoActionBusyId] = useState(null);
+  const [promoSearch, setPromoSearch] = useState('');
+  const [promoStatusFilter, setPromoStatusFilter] = useState('ALL'); // ALL | ACTIVE | EXPIRING | INACTIVE | EXPIRED
+  const [promoTypeFilter, setPromoTypeFilter] = useState('ALL'); // ALL | PERCENT | FIXED
+  const [promoSort, setPromoSort] = useState('NEWEST');
 
   const loadPromotions = async () => {
     setPromotionsLoading(true);
@@ -2024,15 +2028,76 @@ export default function SalesPOS() {
             )}
           </div>
 
+          {(() => {
+            // Trạng thái hiệu lực theo hạn dùng; "sắp hết hạn" = còn hiệu lực và hết hạn trong 7 ngày tới
+            const promoState = (pr) => {
+              const exp = pr.expiresAt ? new Date(pr.expiresAt) : null;
+              if (exp && exp < new Date()) return 'EXPIRED';
+              if (pr.status !== 'ACTIVE') return 'INACTIVE';
+              if (exp && exp - Date.now() <= 7 * 86400000) return 'EXPIRING';
+              return 'ACTIVE';
+            };
+            const PROMO_SORTERS = {
+              NEWEST: byDateDesc(pr => pr.createdAt),
+              EXPIRY_ASC: (a, b) => (a.expiresAt ? new Date(a.expiresAt).getTime() : Infinity) - (b.expiresAt ? new Date(b.expiresAt).getTime() : Infinity),
+              PERCENT_DESC: byNumDesc(pr => pr.type === 'PERCENT' ? pr.discount : 0),
+              AMOUNT_DESC: byNumDesc(pr => pr.type === 'PERCENT' ? 0 : pr.discount),
+              MINSPEND_ASC: byNumAsc(pr => pr.minSpend),
+              CODE: byText(pr => pr.code)
+            };
+            const q = promoSearch.trim().toLowerCase();
+            const visiblePromos = sortItems(promotionsList.filter(pr => {
+              if (q && !`${pr.code || ''} ${pr.title || ''}`.toLowerCase().includes(q)) return false;
+              if (promoTypeFilter !== 'ALL' && (pr.type === 'PERCENT' ? 'PERCENT' : 'FIXED') !== promoTypeFilter) return false;
+              if (promoStatusFilter !== 'ALL') {
+                const st = promoState(pr);
+                // "Đang áp dụng" gồm cả mã sắp hết hạn
+                if (promoStatusFilter === 'ACTIVE' ? !['ACTIVE', 'EXPIRING'].includes(st) : st !== promoStatusFilter) return false;
+              }
+              return true;
+            }), promoSort, PROMO_SORTERS);
+            const dirty = Boolean(promoSearch) || promoStatusFilter !== 'ALL' || promoTypeFilter !== 'ALL' || promoSort !== 'NEWEST';
+            return (<>
+          {!promotionsLoading && promotionsList.length > 0 && (
+            <FilterToolbar
+              shown={visiblePromos.length}
+              total={promotionsList.length}
+              dirty={dirty}
+              onReset={() => { setPromoSearch(''); setPromoStatusFilter('ALL'); setPromoTypeFilter('ALL'); setPromoSort('NEWEST'); }}
+            >
+              <input type="text" placeholder="Tìm mã hoặc tên chương trình..." value={promoSearch} onChange={e => setPromoSearch(e.target.value)} style={FILTER_SEARCH_STYLE} />
+              <select value={promoStatusFilter} onChange={e => setPromoStatusFilter(e.target.value)} style={{ ...FILTER_CONTROL_STYLE, flex: '0 1 180px' }} title="Lọc theo trạng thái">
+                <option value="ALL">Tất cả trạng thái</option>
+                <option value="ACTIVE">Đang áp dụng</option>
+                <option value="EXPIRING">Sắp hết hạn (7 ngày)</option>
+                <option value="INACTIVE">Đã tắt</option>
+                <option value="EXPIRED">Hết hạn</option>
+              </select>
+              <select value={promoTypeFilter} onChange={e => setPromoTypeFilter(e.target.value)} style={{ ...FILTER_CONTROL_STYLE, flex: '0 1 170px' }} title="Lọc theo hình thức giảm">
+                <option value="ALL">Mọi hình thức giảm</option>
+                <option value="PERCENT">Giảm theo %</option>
+                <option value="FIXED">Giảm số tiền</option>
+              </select>
+              <SortSelect value={promoSort} onChange={setPromoSort} options={[
+                { key: 'NEWEST', label: 'Mới tạo gần nhất' },
+                { key: 'EXPIRY_ASC', label: 'Sắp hết hạn trước' },
+                { key: 'PERCENT_DESC', label: 'Giảm % cao nhất' },
+                { key: 'AMOUNT_DESC', label: 'Giảm tiền cao nhất' },
+                { key: 'MINSPEND_ASC', label: 'Đơn tối thiểu thấp nhất' },
+                { key: 'CODE', label: 'Mã A-Z' }
+              ]} />
+            </FilterToolbar>
+          )}
+
           {promotionsLoading ? (
             <div style={{ textAlign: 'center', padding: '3rem', color: '#64748b' }}>Đang tải danh sách khuyến mãi...</div>
-          ) : promotionsList.length === 0 ? (
+          ) : visiblePromos.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '3rem', color: '#64748b', backgroundColor: '#fff', border: '1px dashed #cbd5e1', borderRadius: '8px' }}>
-              Chưa có chương trình khuyến mãi nào.
+              {promotionsList.length === 0 ? 'Chưa có chương trình khuyến mãi nào.' : 'Không có chương trình nào khớp bộ lọc.'}
             </div>
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
-              {promotionsList.map((promo) => {
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1.25rem' }}>
+              {visiblePromos.map((promo) => {
                 const isExpired = promo.expiresAt && new Date(promo.expiresAt) < new Date();
                 const isActive = promo.status === 'ACTIVE' && !isExpired;
                 const busy = promoActionBusyId === promo.id;
@@ -2110,6 +2175,8 @@ export default function SalesPOS() {
               })}
             </div>
           )}
+            </>);
+          })()}
         </div>
       )}
 

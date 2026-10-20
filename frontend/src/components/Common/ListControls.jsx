@@ -1,6 +1,6 @@
 import React from 'react';
 import { RotateCcw } from 'lucide-react';
-import { isDateInPeriod, parsePeriodDate } from './PeriodFilterBar';
+import { isDateInPeriod, parsePeriodDate, parseRangeValue, toRangeValue, DateRangeInput } from './PeriodFilterBar';
 
 // Bộ điều khiển danh sách dùng chung cho Kho / Mua Hàng / Bán Hàng: chọn kỳ
 // thời gian, sắp xếp tăng/giảm và thanh lọc có nút "Xoá lọc" + đếm kết quả,
@@ -21,24 +21,10 @@ export const FILTER_CONTROL_STYLE = {
 
 export const FILTER_SEARCH_STYLE = { ...FILTER_CONTROL_STYLE, cursor: 'text', flex: '2 1 240px', padding: '0 0.85rem' };
 
-export const LIST_PERIOD_OPTIONS = [
-  { key: 'ALL', label: 'Mọi thời gian' },
-  { key: 'TODAY', label: 'Hôm nay' },
-  { key: 'LAST_7_DAYS', label: '7 ngày qua' },
-  { key: 'THIS_WEEK', label: 'Tuần này' },
-  { key: 'LAST_30_DAYS', label: '30 ngày qua' },
-  { key: 'THIS_MONTH', label: 'Tháng này' },
-  { key: 'LAST_MONTH', label: 'Tháng trước' },
-  { key: 'THIS_QUARTER', label: 'Quý này' },
-  { key: 'THIS_YEAR', label: 'Năm nay' }
-];
-
-export function PeriodSelect({ value, onChange, style = {}, title = 'Lọc theo thời gian' }) {
-  return (
-    <select value={value} onChange={e => onChange(e.target.value)} title={title} style={{ ...FILTER_CONTROL_STYLE, flex: '0 1 150px', ...style }}>
-      {LIST_PERIOD_OPTIONS.map(o => <option key={o.key} value={o.key}>{o.label}</option>)}
-    </select>
-  );
+// Lọc theo khoảng ngày (Từ ngày – Đến ngày); value theo quy ước của PeriodFilterBar ('ALL' | 'RANGE:...')
+export function PeriodSelect({ value, onChange, style = {}, title = 'Lọc theo khoảng ngày' }) {
+  const { from, to } = parseRangeValue(value);
+  return <DateRangeInput from={from} to={to} onChange={(f, t) => onChange(toRangeValue(f, t))} title={title} height={style.height || '38px'} style={style} />;
 }
 
 // options: [{ key, label }]

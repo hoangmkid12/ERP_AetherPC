@@ -32,7 +32,7 @@ import OrderDetailModal from '../../components/OrderDetailModal';
 import { getRoleName } from '../../utils/rbacEngine';
 import { SignatureRow, SignatureCell, displaySigner, historySigner } from '../../components/Signature/ESignature';
 import { formatCompactVnd } from '../../utils/formatCompact';
-import PeriodFilterBar from '../../components/Common/PeriodFilterBar';
+import PeriodFilterBar, { isDateInPeriod, parseRangeValue } from '../../components/Common/PeriodFilterBar';
 import { netOfVat } from '../../utils/vat';
 import { isRevenueOrder, payrollCostOf } from '../../utils/revenue';
 
@@ -77,6 +77,7 @@ const parseDateVal = (val) => {
 
 const isDateInFilter = (dateVal, period, customStart, customEnd) => {
   if (period === 'ALL') return true;
+  if (typeof period === 'string' && period.startsWith('RANGE:')) return isDateInPeriod(dateVal, period);
   const d = parseDateVal(dateVal);
   if (!d) return true;
 
@@ -794,7 +795,14 @@ export default function Dashboard() {
     let start = new Date(Math.min(...times));
     let end = new Date(Math.max(...times));
     let unit;
-    if (dateFilterPeriod === 'TODAY' || dateFilterPeriod === 'THIS_WEEK') {
+    const range = parseRangeValue(dateFilterPeriod);
+    if (range.from || range.to) {
+      // Trục theo đúng khoảng đã chọn; đầu bỏ trống lấy theo dữ liệu
+      if (range.from) start = new Date(`${range.from}T00:00:00`);
+      if (range.to) end = new Date(`${range.to}T00:00:00`);
+      const spanDays = (end - start) / 86400000;
+      unit = spanDays <= 31 ? 'day' : spanDays <= 120 ? 'week' : 'month';
+    } else if (dateFilterPeriod === 'TODAY' || dateFilterPeriod === 'THIS_WEEK') {
       unit = 'day';
       if (dateFilterPeriod === 'THIS_WEEK') { start = new Date(now); start.setDate(now.getDate() - ((now.getDay() + 6) % 7)); }
       else start = new Date(now);

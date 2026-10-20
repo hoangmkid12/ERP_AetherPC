@@ -1,5 +1,5 @@
 import React from 'react';
-import { Calendar } from 'lucide-react';
+import { Calendar, X } from 'lucide-react';
 
 /**
  * Helper chuẩn hóa và kiểm tra ngày tháng theo bộ lọc kỳ thời gian (Period).
@@ -27,137 +27,92 @@ export const parsePeriodDate = (val) => {
   return null;
 };
 
+// Giá trị kỳ lọc: 'ALL' (không lọc) hoặc 'RANGE:<từ ngày>:<đến ngày>' theo YYYY-MM-DD,
+// một đầu có thể bỏ trống (chỉ "từ ngày" hoặc chỉ "đến ngày").
+export const toRangeValue = (from, to) => (from || to ? `RANGE:${from || ''}:${to || ''}` : 'ALL');
+export const parseRangeValue = (value) => {
+  if (typeof value !== 'string' || !value.startsWith('RANGE:')) return { from: '', to: '' };
+  const [, from = '', to = ''] = value.split(':');
+  return { from, to };
+};
+
+const toYmd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
 export const isDateInPeriod = (dateVal, period) => {
   if (!period || period === 'ALL') return true;
   const d = parsePeriodDate(dateVal);
   if (!d) return false;
-
-  const now = new Date();
-
-  // So sánh theo ngày (bỏ qua giờ phút giây)
-  const itemDate = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-
-  if (period === 'TODAY') {
-    return itemDate.getTime() === today.getTime();
+  if (period.startsWith('RANGE:')) {
+    const { from, to } = parseRangeValue(period);
+    const ymd = toYmd(d);
+    if (from && ymd < from) return false;
+    if (to && ymd > to) return false;
+    return true;
   }
-
-  if (period === 'THIS_WEEK') {
-    const day = today.getDay();
-    const diffToMon = day === 0 ? -6 : 1 - day; // Thứ 2 là đầu tuần
-    const monday = new Date(today);
-    monday.setDate(today.getDate() + diffToMon);
-    const sunday = new Date(monday);
-    sunday.setDate(monday.getDate() + 6);
-    return itemDate >= monday && itemDate <= sunday;
-  }
-
-  if (period === 'THIS_MONTH') {
-    return itemDate.getFullYear() === today.getFullYear() && itemDate.getMonth() === today.getMonth();
-  }
-
-  if (period === 'THIS_QUARTER') {
-    const currentQuarter = Math.floor(today.getMonth() / 3);
-    const itemQuarter = Math.floor(itemDate.getMonth() / 3);
-    return itemDate.getFullYear() === today.getFullYear() && itemQuarter === currentQuarter;
-  }
-
-  if (period === 'THIS_YEAR') {
-    return itemDate.getFullYear() === today.getFullYear();
-  }
-
-  // Khoảng trượt tính cả hôm nay (7 / 30 ngày gần nhất)
-  if (period === 'LAST_7_DAYS' || period === 'LAST_30_DAYS') {
-    const from = new Date(today);
-    from.setDate(today.getDate() - (period === 'LAST_7_DAYS' ? 6 : 29));
-    return itemDate >= from && itemDate <= today;
-  }
-
-  if (period === 'LAST_MONTH') {
-    const lm = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-    return itemDate.getFullYear() === lm.getFullYear() && itemDate.getMonth() === lm.getMonth();
-  }
-
+  // Mã kỳ cũ (giữ tương thích nếu nơi khác còn truyền): chỉ còn "hôm nay"
+  if (period === 'TODAY') return toYmd(d) === toYmd(new Date());
   return true;
 };
 
-export const PERIOD_OPTIONS = [
-  { key: 'ALL', label: 'Tất cả' },
-  { key: 'TODAY', label: 'Hôm nay' },
-  { key: 'THIS_WEEK', label: 'Tuần này' },
-  { key: 'THIS_MONTH', label: 'Tháng này' },
-  { key: 'THIS_QUARTER', label: 'Quý này' },
-  { key: 'THIS_YEAR', label: 'Năm nay' }
-];
+const dateInputStyle = (active) => ({
+  border: 'none',
+  outline: 'none',
+  background: 'transparent',
+  fontSize: '0.8rem',
+  color: active ? '#0f172a' : '#64748b',
+  fontWeight: active ? 700 : 500,
+  width: '118px',
+  minWidth: 0,
+  padding: 0,
+  fontFamily: 'inherit',
+  cursor: 'pointer'
+});
 
 /**
- * Thanh nút bấm lọc kỳ thời gian chuẩn Odoo / ERP AetherPC
- * Hỗ trợ linh hoạt cả các prop: selectedPeriod/period và onSelectPeriod/onChange
+ * Ô chọn khoảng ngày gọn một dòng: [lịch] Từ ngày – Đến ngày [x].
+ * Dùng chung cho thanh tổng quan và thanh lọc danh sách của mọi phân hệ.
  */
-export default function PeriodFilterBar({
-  period,
-  selectedPeriod,
-  onChange,
-  onSelectPeriod,
-  style = {}
-}) {
-  const activeKey = selectedPeriod || period || 'ALL';
-
-  const handleClick = (key) => {
-    if (typeof onSelectPeriod === 'function') {
-      onSelectPeriod(key);
-    }
-    if (typeof onChange === 'function') {
-      onChange(key);
-    }
-  };
-
+export function DateRangeInput({ from = '', to = '', onChange, height = '38px', title = 'Lọc theo khoảng ngày', style = {} }) {
+  const active = Boolean(from || to);
   return (
     <div
+      title={title}
       style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: '0.35rem',
-        flexWrap: 'wrap',
-        backgroundColor: '#ffffff',
-        padding: '0.3rem 0.55rem',
-        borderRadius: '8px',
-        border: '1px solid #e3e8ef',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
-        ...style
+        display: 'inline-flex', alignItems: 'center', gap: '0.4rem', height, boxSizing: 'border-box',
+        padding: '0 0.6rem', borderRadius: '6px', backgroundColor: active ? '#eff6ff' : '#ffffff',
+        border: `1px solid ${active ? '#93c5fd' : '#e3e8ef'}`, flex: '0 1 auto', maxWidth: '100%', ...style
       }}
     >
-      <Calendar size={15} style={{ color: '#2563eb', marginRight: '0.15rem' }} />
-      {PERIOD_OPTIONS.map(p => {
-        const active = activeKey === p.key;
-        return (
-          <button
-            key={p.key}
-            type="button"
-            onClick={() => handleClick(p.key)}
-            style={{
-              padding: '0.28rem 0.6rem',
-              fontSize: '0.78rem',
-              fontWeight: active ? 800 : 600,
-              borderRadius: '5px',
-              border: 'none',
-              backgroundColor: active ? '#2563eb' : 'transparent',
-              color: active ? '#ffffff' : '#475569',
-              cursor: 'pointer',
-              transition: 'all 0.15s ease',
-              lineHeight: 1.2
-            }}
-            onMouseEnter={e => {
-              if (!active) e.currentTarget.style.backgroundColor = '#f1f5f9';
-            }}
-            onMouseLeave={e => {
-              if (!active) e.currentTarget.style.backgroundColor = 'transparent';
-            }}
-          >
-            {p.label}
-          </button>
-        );
-      })}
+      <Calendar size={14} style={{ color: '#2563eb', flexShrink: 0 }} />
+      <input type="date" aria-label="Từ ngày" value={from} max={to || undefined} onChange={e => onChange(e.target.value, to)} style={dateInputStyle(Boolean(from))} />
+      <span style={{ color: '#94a3b8', fontSize: '0.8rem' }}>–</span>
+      <input type="date" aria-label="Đến ngày" value={to} min={from || undefined} onChange={e => onChange(from, e.target.value)} style={dateInputStyle(Boolean(to))} />
+      {active && (
+        <button
+          type="button"
+          onClick={() => onChange('', '')}
+          title="Bỏ lọc ngày"
+          aria-label="Bỏ lọc ngày"
+          style={{ border: 'none', background: 'none', padding: 0, display: 'inline-flex', color: '#64748b', cursor: 'pointer' }}
+        >
+          <X size={14} />
+        </button>
+      )}
     </div>
   );
+}
+
+/**
+ * Bộ lọc kỳ của các trang tổng quan. Giữ tên prop cũ (period/selectedPeriod,
+ * onChange/onSelectPeriod) để các phân hệ không phải sửa.
+ */
+export default function PeriodFilterBar({ period, selectedPeriod, onChange, onSelectPeriod, style = {} }) {
+  const value = selectedPeriod || period || 'ALL';
+  const { from, to } = parseRangeValue(value);
+  const emit = (f, t) => {
+    const next = toRangeValue(f, t);
+    if (typeof onSelectPeriod === 'function') onSelectPeriod(next);
+    if (typeof onChange === 'function') onChange(next);
+  };
+  return <DateRangeInput from={from} to={to} onChange={emit} title="Kỳ thống kê" style={style} />;
 }

@@ -1,6 +1,5 @@
-import React, { useState } from 'react';
-import { Calendar, ChevronDown, X } from 'lucide-react';
-import { getDateFilterLabel } from '../deliveryHelpers';
+import React from 'react';
+import { Calendar, X } from 'lucide-react';
 
 const selectStyle = {
   width: '100%',
@@ -96,21 +95,9 @@ export default function DateFilterControl({
   variant = 'sheet', // 'sheet' | 'inline'
   onQuickSelect
 }) {
-  const [showCustomModal, setShowCustomModal] = useState(false);
 
   const now = new Date();
   const todayStr = toIsoDateString(now);
-
-  const yDate = new Date(now);
-  yDate.setDate(yDate.getDate() - 1);
-  const yesterdayStr = toIsoDateString(yDate);
-
-  const past7 = new Date(now);
-  past7.setDate(past7.getDate() - 6);
-  const past7Str = toIsoDateString(past7);
-
-  const monthStartStr = toIsoDateString(new Date(now.getFullYear(), now.getMonth(), 1));
-  const monthEndStr = toIsoDateString(new Date(now.getFullYear(), now.getMonth() + 1, 0));
 
   const currentRange = getEffectiveDateRange(dateFilter, now);
 
@@ -151,218 +138,21 @@ export default function DateFilterControl({
     if (onQuickSelect) onQuickSelect('ALL');
   };
 
-  const quickPresets = [
-    {
-      id: 'ALL',
-      label: 'Tất Cả',
-      action: handleClearDate,
-      isActive: dateFilter?.period === 'ALL' || (!currentRange.start && !currentRange.end)
-    },
-    {
-      id: 'TODAY',
-      label: 'Hôm Nay',
-      action: () => {
-        onChange({
-          ...dateFilter,
-          period: 'TODAY',
-          customStartDate: todayStr,
-          customEndDate: todayStr
-        });
-        if (onQuickSelect) onQuickSelect('TODAY');
-      },
-      isActive: dateFilter?.period === 'TODAY' || (currentRange.start === todayStr && currentRange.end === todayStr)
-    },
-    {
-      id: 'YESTERDAY',
-      label: 'Hôm Qua',
-      action: () => {
-        onChange({
-          ...dateFilter,
-          period: 'CUSTOM',
-          customStartDate: yesterdayStr,
-          customEndDate: yesterdayStr
-        });
-        if (onQuickSelect) onQuickSelect('YESTERDAY');
-      },
-      isActive: dateFilter?.period === 'YESTERDAY' || (currentRange.start === yesterdayStr && currentRange.end === yesterdayStr)
-    },
-    {
-      id: '7DAYS',
-      label: '7 Ngày Qua',
-      action: () => {
-        onChange({
-          ...dateFilter,
-          period: 'CUSTOM',
-          customStartDate: past7Str,
-          customEndDate: todayStr
-        });
-        if (onQuickSelect) onQuickSelect('7DAYS');
-      },
-      isActive: currentRange.start === past7Str && currentRange.end === todayStr
-    },
-    {
-      id: 'THIS_MONTH',
-      label: 'Tháng Này',
-      action: () => {
-        onChange({
-          ...dateFilter,
-          period: 'CUSTOM',
-          customStartDate: monthStartStr,
-          customEndDate: monthEndStr
-        });
-        if (onQuickSelect) onQuickSelect('THIS_MONTH');
-      },
-      isActive: dateFilter?.period === 'THIS_MONTH' || (currentRange.start === monthStartStr && currentRange.end === monthEndStr)
-    }
-  ];
-
   // --- Inline Bar (Used on Top of OverviewTab or Tabs) ---
   if (variant === 'inline') {
-    const inlineItems = [
-      { id: 'TODAY', label: 'Hôm Nay' },
-      { id: 'THIS_MONTH', label: 'Tháng Này' },
-      { id: 'THIS_YEAR', label: 'Năm Nay' },
-      { id: 'ALL', label: 'Tất Cả' }
-    ];
-
-    const isCustomActive = !inlineItems.some(item => item.id === dateFilter.period);
-
+    const active = Boolean(currentRange.start || currentRange.end);
+    const inputStyle = { ...selectStyle, width: 'auto', flex: '1 1 0', minWidth: 0, padding: '0.4rem 0.5rem', cursor: 'pointer' };
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.4rem', flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', flex: 1 }}>
-            {inlineItems.map(item => {
-              const active = dateFilter.period === item.id;
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => {
-                    if (item.id === 'ALL') handleClearDate();
-                    else if (item.id === 'TODAY') {
-                      onChange({ ...dateFilter, period: 'TODAY', customStartDate: todayStr, customEndDate: todayStr });
-                      if (onQuickSelect) onQuickSelect('TODAY');
-                    } else if (item.id === 'THIS_MONTH') {
-                      onChange({ ...dateFilter, period: 'THIS_MONTH', customStartDate: monthStartStr, customEndDate: monthEndStr });
-                      if (onQuickSelect) onQuickSelect('THIS_MONTH');
-                    } else {
-                      onChange({ ...dateFilter, period: item.id });
-                      if (onQuickSelect) onQuickSelect(item.id);
-                    }
-                  }}
-                  style={{
-                    padding: '0.35rem 0.7rem',
-                    borderRadius: '20px',
-                    fontSize: '0.79rem',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    transition: 'all 0.15s ease',
-                    border: active ? '1.5px solid var(--primary)' : '1px solid var(--border-glass)',
-                    backgroundColor: active ? 'var(--primary)' : 'var(--bg-primary)',
-                    color: active ? '#ffffff' : 'var(--text-secondary)',
-                    boxShadow: active ? '0 2px 6px rgba(37,99,235,0.25)' : 'none'
-                  }}
-                >
-                  {item.label}
-                </button>
-              );
-            })}
-
-            <button
-              type="button"
-              onClick={() => setShowCustomModal(!showCustomModal)}
-              style={{
-                padding: '0.35rem 0.7rem',
-                borderRadius: '20px',
-                fontSize: '0.79rem',
-                fontWeight: 700,
-                cursor: 'pointer',
-                transition: 'all 0.15s ease',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.25rem',
-                border: isCustomActive ? '1.5px solid var(--primary)' : '1px solid var(--border-glass)',
-                backgroundColor: isCustomActive ? 'rgba(37,99,235,0.12)' : 'var(--bg-primary)',
-                color: isCustomActive ? 'var(--primary)' : 'var(--text-secondary)'
-              }}
-            >
-              <Calendar size={12} />
-              <span>{isCustomActive ? getDateFilterLabel(dateFilter) : 'Chọn Ngày...'}</span>
-              <ChevronDown size={11} />
-            </button>
-          </div>
-        </div>
-
-        {/* Inline Extended Filter Drawer */}
-        {showCustomModal && (
-          <div style={{
-            backgroundColor: 'var(--bg-primary)',
-            border: '1px solid var(--border-glass)',
-            borderRadius: 'var(--radius-md)',
-            padding: '0.75rem',
-            marginTop: '0.25rem',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '0.6rem',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.06)'
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                <Calendar size={13} style={{ color: 'var(--primary)' }} />
-                Chọn Khoảng Thời Gian
-              </span>
-              <button
-                type="button"
-                onClick={() => setShowCustomModal(false)}
-                style={{ background: 'none', border: 'none', fontSize: '0.77rem', color: 'var(--primary)', fontWeight: 700, cursor: 'pointer' }}
-              >
-                Đóng
-              </button>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-              <div>
-                <span style={{ display: 'block', fontSize: '0.74rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.2rem' }}>Từ ngày</span>
-                <input
-                  type="date"
-                  value={currentRange.start}
-                  onChange={e => handleStartDateChange(e.target.value)}
-                  style={{ ...selectStyle, padding: '0.45rem 0.5rem' }}
-                />
-              </div>
-              <div>
-                <span style={{ display: 'block', fontSize: '0.74rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.2rem' }}>Đến ngày</span>
-                <input
-                  type="date"
-                  value={currentRange.end}
-                  onChange={e => handleEndDateChange(e.target.value)}
-                  style={{ ...selectStyle, padding: '0.45rem 0.5rem' }}
-                />
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap' }}>
-              {quickPresets.map(preset => (
-                <button
-                  key={preset.id}
-                  type="button"
-                  onClick={preset.action}
-                  style={{
-                    padding: '0.2rem 0.55rem',
-                    borderRadius: '999px',
-                    fontSize: '0.74rem',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    border: preset.isActive ? '1.5px solid var(--primary)' : '1px solid var(--border-glass)',
-                    backgroundColor: preset.isActive ? 'rgba(37,99,235,0.1)' : 'var(--bg-primary)',
-                    color: preset.isActive ? 'var(--primary)' : 'var(--text-secondary)'
-                  }}
-                >
-                  {preset.label}
-                </button>
-              ))}
-            </div>
-          </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', width: '100%' }}>
+        <Calendar size={14} style={{ color: 'var(--primary)', flexShrink: 0 }} />
+        <input type="date" aria-label="Từ ngày" value={currentRange.start} max={currentRange.end || undefined} onChange={e => handleStartDateChange(e.target.value)} style={inputStyle} />
+        <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>–</span>
+        <input type="date" aria-label="Đến ngày" value={currentRange.end} min={currentRange.start || undefined} onChange={e => handleEndDateChange(e.target.value)} style={inputStyle} />
+        {active && (
+          <button type="button" onClick={handleClearDate} title="Bỏ lọc ngày" aria-label="Bỏ lọc ngày"
+            style={{ background: 'none', border: 'none', padding: '0.2rem', display: 'inline-flex', color: 'var(--text-muted)', cursor: 'pointer' }}>
+            <X size={15} />
+          </button>
         )}
       </div>
     );
@@ -429,29 +219,6 @@ export default function DateFilterControl({
         </div>
       </div>
 
-      {/* Quick preset buttons */}
-      <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', marginTop: '0.15rem' }}>
-        {quickPresets.map(preset => (
-          <button
-            key={preset.id}
-            type="button"
-            onClick={preset.action}
-            style={{
-              padding: '0.25rem 0.6rem',
-              borderRadius: '999px',
-              fontSize: '0.77rem',
-              fontWeight: 700,
-              cursor: 'pointer',
-              transition: 'all 0.15s ease',
-              border: preset.isActive ? '1.5px solid var(--primary)' : '1px solid var(--border-glass)',
-              backgroundColor: preset.isActive ? 'rgba(37,99,235,0.1)' : 'var(--bg-primary)',
-              color: preset.isActive ? 'var(--primary)' : 'var(--text-secondary)'
-            }}
-          >
-            {preset.label}
-          </button>
-        ))}
-      </div>
     </div>
   );
 }

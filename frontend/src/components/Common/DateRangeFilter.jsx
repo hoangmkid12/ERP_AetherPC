@@ -51,67 +51,6 @@ export default function DateRangeFilter({
   compact = false,
   style = {}
 }) {
-  const applyPreset = (presetKey) => {
-    const now = new Date();
-    const y = now.getFullYear();
-    const m = now.getMonth();
-    const d = now.getDate();
-
-    const fmt = (year, monthIdx, dayNum) => {
-      const sY = year;
-      const sM = String(monthIdx + 1).padStart(2, '0');
-      const sD = String(dayNum).padStart(2, '0');
-      return `${sY}-${sM}-${sD}`;
-    };
-
-    let start = '';
-    let end = '';
-
-    switch (presetKey) {
-      case 'TODAY':
-        start = fmt(y, m, d);
-        end = fmt(y, m, d);
-        break;
-      case 'THIS_WEEK': {
-        // Tuần làm việc theo lịch Việt Nam: Thứ Hai → Chủ Nhật của tuần hiện tại
-        const offset = (now.getDay() + 6) % 7;
-        const monday = new Date(y, m, d - offset);
-        const sunday = new Date(y, m, d - offset + 6);
-        start = fmt(monday.getFullYear(), monday.getMonth(), monday.getDate());
-        end = fmt(sunday.getFullYear(), sunday.getMonth(), sunday.getDate());
-        break;
-      }
-      case 'THIS_MONTH': {
-        start = fmt(y, m, 1);
-        const lastDay = new Date(y, m + 1, 0).getDate();
-        end = fmt(y, m, lastDay);
-        break;
-      }
-      case 'THIS_QUARTER': {
-        const qStartMonth = Math.floor(m / 3) * 3;
-        start = fmt(y, qStartMonth, 1);
-        const qEndMonth = qStartMonth + 2;
-        const lastDayQ = new Date(y, qEndMonth + 1, 0).getDate();
-        end = fmt(y, qEndMonth, lastDayQ);
-        break;
-      }
-      case 'THIS_YEAR': {
-        start = `${y}-01-01`;
-        end = `${y}-12-31`;
-        break;
-      }
-      case 'ALL':
-      default:
-        start = '';
-        end = '';
-        break;
-    }
-
-    if (typeof onChange === 'function') {
-      onChange({ startDate: start, endDate: end, preset: presetKey });
-    }
-  };
-
   const handleStartChange = (val) => {
     if (typeof onChange === 'function') {
       onChange({ startDate: val, endDate, preset: 'CUSTOM' });
@@ -142,7 +81,7 @@ export default function DateRangeFilter({
       padding: compact ? '0.65rem 0.85rem' : '0.85rem 1rem',
       display: 'flex',
       alignItems: 'center',
-      justifyContent: 'space-between',
+      justifyContent: 'flex-start',
       flexWrap: 'wrap',
       gap: '0.75rem',
       boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
@@ -213,46 +152,6 @@ export default function DateRangeFilter({
         )}
       </div>
 
-      {/* Cụm phím chọn nhanh thời gian (Presets) */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
-        {[
-          { key: 'TODAY', label: 'Hôm nay' },
-          { key: 'THIS_WEEK', label: 'Tuần này' },
-          { key: 'THIS_MONTH', label: 'Tháng này' },
-          { key: 'THIS_QUARTER', label: 'Quý này' },
-          { key: 'THIS_YEAR', label: 'Năm nay' },
-          { key: 'ALL', label: 'Tất cả' }
-        ].map(p => (
-          <button
-            key={p.key}
-            type="button"
-            onClick={() => applyPreset(p.key)}
-            style={{
-              padding: '0.35rem 0.65rem',
-              borderRadius: '5px',
-              border: '1px solid #e2e8f0',
-              backgroundColor: '#f8fafc',
-              color: '#475569',
-              fontSize: '0.8rem',
-              fontWeight: 600,
-              cursor: 'pointer',
-              transition: 'all 0.15s ease'
-            }}
-            onMouseOver={(e) => {
-              e.currentTarget.style.backgroundColor = '#eff6ff';
-              e.currentTarget.style.color = '#2563eb';
-              e.currentTarget.style.borderColor = '#bfdbfe';
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.backgroundColor = '#f8fafc';
-              e.currentTarget.style.color = '#475569';
-              e.currentTarget.style.borderColor = '#e2e8f0';
-            }}
-          >
-            {p.label}
-          </button>
-        ))}
-      </div>
     </div>
   );
 }

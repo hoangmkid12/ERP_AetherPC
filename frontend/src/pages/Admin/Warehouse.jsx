@@ -3473,6 +3473,60 @@ export default function Warehouse() {
   const [returnPeriod, setReturnPeriod] = useState('ALL');
   const [returnSort, setReturnSort] = useState('NEWEST');
 
+  // ── Cấu hình: bộ lọc vị trí kệ & danh mục ──
+  const [locSearch, setLocSearch] = useState('');
+  const [locWarehouse, setLocWarehouse] = useState('ALL');
+  const [locZone, setLocZone] = useState('ALL');
+  const [locFill, setLocFill] = useState('ALL'); // ALL | EMPTY | AVAILABLE | NEAR_FULL | FULL
+  const [locSort, setLocSort] = useState('CODE');
+  const [catSearch, setCatSearch] = useState('');
+  const [catStock, setCatStock] = useState('ALL'); // ALL | HAS_PRODUCTS | EMPTY
+  const [catSort, setCatSort] = useState('NAME');
+
+  const locFillRatio = (l) => (Number(l.capacity) > 0 ? (Number(l.assignedCount) || 0) / Number(l.capacity) : 0);
+  const locFillStatus = (l) => {
+    if (!(Number(l.assignedCount) > 0)) return 'EMPTY';
+    const r = locFillRatio(l);
+    if (Number(l.capacity) > 0 && r >= 1) return 'FULL';
+    return r >= 0.8 ? 'NEAR_FULL' : 'AVAILABLE';
+  };
+  const locCode = (l) => `${l.zone}-${l.shelf}-${l.bin}`;
+  const locWarehouseOptions = [...new Map(warehouseLocations.map(l => [String(l.warehouseId), l.warehouse?.name || `Kho #${l.warehouseId}`])).entries()];
+  const locZoneOptions = [...new Set(warehouseLocations
+    .filter(l => locWarehouse === 'ALL' || String(l.warehouseId) === locWarehouse)
+    .map(l => l.zone).filter(Boolean))].sort((a, b) => String(a).localeCompare(String(b), 'vi', { numeric: true }));
+  const LOC_SORTERS = {
+    CODE: byText(locCode),
+    FILL_DESC: byNumDesc(locFillRatio),
+    FILL_ASC: byNumAsc(locFillRatio),
+    CAPACITY_DESC: byNumDesc(l => l.capacity),
+    ASSIGNED_DESC: byNumDesc(l => l.assignedCount)
+  };
+  const filteredLocations = sortItems(warehouseLocations.filter(l => {
+    const q = locSearch.trim().toLowerCase();
+    if (q && !`${locCode(l)} ${l.warehouse?.name || ''}`.toLowerCase().includes(q)) return false;
+    if (locWarehouse !== 'ALL' && String(l.warehouseId) !== locWarehouse) return false;
+    if (locZone !== 'ALL' && l.zone !== locZone) return false;
+    if (locFill !== 'ALL' && locFillStatus(l) !== locFill) return false;
+    return true;
+  }), locSort, LOC_SORTERS);
+  const locFiltersDirty = Boolean(locSearch) || locWarehouse !== 'ALL' || locZone !== 'ALL' || locFill !== 'ALL' || locSort !== 'CODE';
+
+  const CAT_SORTERS = {
+    NAME: byText(c => c.name),
+    PRODUCTS_DESC: byNumDesc(c => c.productCount),
+    VALUE_DESC: byNumDesc(c => c.totalInventoryValue),
+    VALUE_ASC: byNumAsc(c => c.totalInventoryValue)
+  };
+  const filteredCategories = sortItems(realCategories.filter(c => {
+    const q = catSearch.trim().toLowerCase();
+    if (q && !`${c.name || ''} ${c.slug || ''}`.toLowerCase().includes(q)) return false;
+    if (catStock === 'HAS_PRODUCTS' && !(Number(c.productCount) > 0)) return false;
+    if (catStock === 'EMPTY' && Number(c.productCount) > 0) return false;
+    return true;
+  }), catSort, CAT_SORTERS);
+  const catFiltersDirty = Boolean(catSearch) || catStock !== 'ALL' || catSort !== 'NAME';
+
   const getMergedRfqLogs = () => {
     let explicitLogs = [];
     try {
@@ -7325,11 +7379,42 @@ export default function Warehouse() {
             </div>
           )}
 
+          <FilterToolbar
+            shown={filteredLocations.length}
+            total={warehouseLocations.length}
+            dirty={locFiltersDirty}
+            onReset={() => { setLocSearch(''); setLocWarehouse('ALL'); setLocZone('ALL'); setLocFill('ALL'); setLocSort('CODE'); }}
+          >
+            <input type="text" placeholder="Tìm mã vị trí (VD: A-01-02) hoặc tên kho..." value={locSearch} onChange={e => setLocSearch(e.target.value)} style={FILTER_SEARCH_STYLE} />
+            <select value={locWarehouse} onChange={e => { setLocWarehouse(e.target.value); setLocZone('ALL'); }} style={{ ...FILTER_CONTROL_STYLE, flex: '0 1 190px' }} title="Lọc theo kho">
+              <option value="ALL">Tất cả kho</option>
+              {locWarehouseOptions.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+            </select>
+            <select value={locZone} onChange={e => setLocZone(e.target.value)} style={{ ...FILTER_CONTROL_STYLE, flex: '0 1 130px' }} title="Lọc theo khu">
+              <option value="ALL">Tất cả khu</option>
+              {locZoneOptions.map(z => <option key={z} value={z}>Khu {z}</option>)}
+            </select>
+            <select value={locFill} onChange={e => setLocFill(e.target.value)} style={{ ...FILTER_CONTROL_STYLE, flex: '0 1 170px' }} title="Lọc theo mức lấp đầy">
+              <option value="ALL">Mọi mức lấp đầy</option>
+              <option value="EMPTY">Còn trống</option>
+              <option value="AVAILABLE">Còn chỗ (dưới 80%)</option>
+              <option value="NEAR_FULL">Gần đầy (từ 80%)</option>
+              <option value="FULL">Đã đầy</option>
+            </select>
+            <SortSelect value={locSort} onChange={setLocSort} options={[
+              { key: 'CODE', label: 'Mã vị trí A-Z' },
+              { key: 'FILL_DESC', label: 'Lấp đầy cao nhất' },
+              { key: 'FILL_ASC', label: 'Lấp đầy thấp nhất' },
+              { key: 'CAPACITY_DESC', label: 'Sức chứa lớn nhất' },
+              { key: 'ASSIGNED_DESC', label: 'Nhiều hàng nhất' }
+            ]} />
+          </FilterToolbar>
+
           {loadingLocations ? (
             <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>Đang tải...</div>
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1.25rem' }}>
-              {warehouseLocations.map(loc => (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '1.25rem' }}>
+              {filteredLocations.map(loc => (
                 <div key={loc.id}
                   onClick={() => setViewingLocationProducts(loc)}
                   style={{
@@ -7411,8 +7496,10 @@ export default function Warehouse() {
                   </div>
                 </div>
               ))}
-              {warehouseLocations.length === 0 && (
-                <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>Chưa có vị trí kệ nào được tạo.</div>
+              {filteredLocations.length === 0 && (
+                <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>
+                  {warehouseLocations.length === 0 ? 'Chưa có vị trí kệ nào được tạo.' : 'Không có vị trí kệ nào khớp bộ lọc.'}
+                </div>
               )}
             </div>
           )}
@@ -7454,6 +7541,26 @@ export default function Warehouse() {
             </div>
           )}
 
+          <FilterToolbar
+            shown={filteredCategories.length}
+            total={realCategories.length}
+            dirty={catFiltersDirty}
+            onReset={() => { setCatSearch(''); setCatStock('ALL'); setCatSort('NAME'); }}
+          >
+            <input type="text" placeholder="Tìm tên danh mục hoặc đường dẫn..." value={catSearch} onChange={e => setCatSearch(e.target.value)} style={FILTER_SEARCH_STYLE} />
+            <select value={catStock} onChange={e => setCatStock(e.target.value)} style={{ ...FILTER_CONTROL_STYLE, flex: '0 1 190px' }} title="Lọc theo tình trạng sản phẩm">
+              <option value="ALL">Mọi danh mục</option>
+              <option value="HAS_PRODUCTS">Đang có sản phẩm</option>
+              <option value="EMPTY">Chưa có sản phẩm</option>
+            </select>
+            <SortSelect value={catSort} onChange={setCatSort} options={[
+              { key: 'NAME', label: 'Tên A-Z' },
+              { key: 'PRODUCTS_DESC', label: 'Nhiều sản phẩm nhất' },
+              { key: 'VALUE_DESC', label: 'Trị giá tồn cao nhất' },
+              { key: 'VALUE_ASC', label: 'Trị giá tồn thấp nhất' }
+            ]} />
+          </FilterToolbar>
+
           {loadingCategories ? (
             <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>Đang tải...</div>
           ) : (
@@ -7469,7 +7576,7 @@ export default function Warehouse() {
                   </tr>
                 </thead>
                 <tbody>
-                  {realCategories.map(cat => (
+                  {filteredCategories.map(cat => (
                     <tr key={cat.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
                       <td style={{ padding: '0.75rem 1rem', fontWeight: 800, color: '#2563eb' }}>{cat.name}</td>
                       <td style={{ padding: '0.75rem 1rem', color: '#94a3b8', fontFamily: 'monospace', fontSize: '0.78rem' }}>{cat.slug}</td>
@@ -7508,8 +7615,8 @@ export default function Warehouse() {
                       </td>
                     </tr>
                   ))}
-                  {realCategories.length === 0 && (
-                    <tr><td colSpan={5} style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>Chưa có danh mục nào.</td></tr>
+                  {filteredCategories.length === 0 && (
+                    <tr><td colSpan={5} style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>{realCategories.length === 0 ? 'Chưa có danh mục nào.' : 'Không có danh mục nào khớp bộ lọc.'}</td></tr>
                   )}
                 </tbody>
               </table>

@@ -25,6 +25,7 @@ import { useHRStore, useSalesStore, useInventoryStore, useFinanceStore } from '.
 import { DELIVERY_REGIONS } from '../../utils/deliveryRegions';
 import { notify, confirm } from '../../context/NotificationContext';
 import { AUDIT_LOG_STATUS, getStatusLabel, ORDER_STATUS } from '../../utils/statusLabels';
+import { PeriodSelect, SortSelect, sortItems, inPeriod, byDateDesc, byDateAsc } from '../../components/Common/ListControls';
 import {
   ERP_SYSTEM_MODULES,
   ERP_ROLES,
@@ -1409,6 +1410,8 @@ export default function SystemAdmin() {
   const [auditSearch, setAuditSearch] = useState('');
   const [auditModuleFilter, setAuditModuleFilter] = useState('ALL');
   const [auditStatusFilter, setAuditStatusFilter] = useState('ALL');
+  const [auditPeriod, setAuditPeriod] = useState('ALL');
+  const [auditSort, setAuditSort] = useState('NEWEST');
   const [loadingAuditLogs, setLoadingAuditLogs] = useState(false);
 
   // Trước đây chỉ fetch khi activeTab === 'audit' — nghĩa là 2 thẻ KPI ở tab
@@ -1428,6 +1431,7 @@ export default function SystemAdmin() {
             module: l.module,
             note: l.note || '',
             timestamp: new Date(l.createdAt).toLocaleString('vi-VN'),
+            createdAt: l.createdAt,
             ip: l.ipAddress || '—',
             status: l.status
           })));
@@ -1472,14 +1476,15 @@ export default function SystemAdmin() {
   // đây ghi cứng "Online 99.9%" — giờ phản ánh đúng serverStatus (xem
   // loadCompanySettings ở trên).
   const failedSecurityCount = auditLogs.filter(l => l.status === 'FAILED').length;
-  const filteredAuditLogs = auditLogs.filter(log => {
+  const filteredAuditLogs = sortItems(auditLogs.filter(log => {
+    if (!inPeriod(log.createdAt, auditPeriod)) return false;
     const q = auditSearch.trim().toLowerCase();
     if (q && ![log.user, log.action, log.ip].some(v => String(v || '').toLowerCase().includes(q))) return false;
     if (auditModuleFilter !== 'ALL' && log.module !== auditModuleFilter) return false;
     if (auditStatusFilter === 'SUCCESS' && log.status !== 'SUCCESS') return false;
     if (auditStatusFilter === 'FAILED' && log.status === 'SUCCESS') return false;
     return true;
-  });
+  }), auditSort, { NEWEST: byDateDesc(l => l.createdAt), OLDEST: byDateAsc(l => l.createdAt) });
   const dbStatusLabel = serverStatus === 'ok' ? 'Trực tuyến' : serverStatus === 'down' ? 'Mất kết nối' : 'Đang kiểm tra...';
   const dbStatusVariant = serverStatus === 'ok' ? 'success' : serverStatus === 'down' ? 'danger' : 'warning';
   const dbStatusColor = BADGE_VARIANTS[dbStatusVariant].color;
@@ -4379,6 +4384,8 @@ export default function SystemAdmin() {
               <option value="SUCCESS">Thành công</option>
               <option value="FAILED">Thất bại</option>
             </select>
+            <PeriodSelect value={auditPeriod} onChange={setAuditPeriod} title="Lọc theo ngày ghi nhận" style={{ height: '34px' }} />
+            <SortSelect value={auditSort} onChange={setAuditSort} options={[{ key: 'NEWEST', label: 'Mới nhất' }, { key: 'OLDEST', label: 'Cũ nhất' }]} style={{ height: '34px', flex: '0 1 140px' }} />
           </div>
 
           <div style={{ overflowX: 'auto' }}>
