@@ -31,7 +31,7 @@ export const ERP_ROLES = [
   { code: 'HR', name: 'Quản Trị Nhân Sự', color: '#ec4899', desc: 'Quản lý hồ sơ nhân viên, chấm công và chế độ đãi ngộ' },
   // Tài khoản nhân viên chung: không có phân hệ nghiệp vụ nào, chỉ dùng
   // Cổng Nhân Viên tự phục vụ (/admin/me) vốn mở cho mọi nhân viên, không qua ma trận này.
-  { code: 'EMPLOYEE', name: 'Nhân Viên', color: '#475569', desc: 'Tự chấm công khuôn mặt, xin nghỉ phép, xem phiếu lương và tài liệu nội bộ' }
+  { code: 'EMPLOYEE', name: 'Nhân Viên', color: '#475569', desc: 'Tự chấm công khuôn mặt, xin nghỉ phép, xem phiếu lương và cập nhật hồ sơ cá nhân' }
 ];
 
 // Tên tiếng Việt của một mã vai trò (UPPER_SNAKE) để HIỂN THỊ — mã trong JWT/CSDL giữ

@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
-  LayoutDashboard, ScanFace, CalendarDays, CalendarCheck, Wallet, UserCircle, BookOpen,
-  Clock, LogIn, LogOut, AlertTriangle, CheckCircle2, X, Send, Trash2, Save, KeyRound, Search
+  LayoutDashboard, ScanFace, CalendarDays, CalendarCheck, Wallet, UserCircle,
+  Clock, LogIn, LogOut, AlertTriangle, CheckCircle2, Send, Trash2, Save, KeyRound
 } from 'lucide-react';
 import { api } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
@@ -20,8 +20,7 @@ const TABS = [
   { key: 'attendance', label: 'Lịch Sử Chấm Công', icon: CalendarDays },
   { key: 'leaves', label: 'Nghỉ Phép', icon: CalendarCheck },
   { key: 'payslip', label: 'Phiếu Lương', icon: Wallet },
-  { key: 'profile', label: 'Hồ Sơ Cá Nhân', icon: UserCircle },
-  { key: 'docs', label: 'Tài Liệu Nội Bộ', icon: BookOpen }
+  { key: 'profile', label: 'Hồ Sơ Cá Nhân', icon: UserCircle }
 ];
 
 const LEAVE_TYPES = [
@@ -114,7 +113,7 @@ export default function EmployeePortal() {
           const active = tab === key;
           return (
             <button key={key} type="button" onClick={() => setTab(key)}
-              style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', padding: '0.7rem 0.75rem', fontSize: '0.9rem', fontWeight: active ? 600 : 500, cursor: 'pointer', whiteSpace: 'nowrap',
+              style={{ flex: '1 0 auto', justifyContent: 'center', display: 'flex', alignItems: 'center', gap: '0.45rem', padding: '0.7rem 0.75rem', fontSize: '0.9rem', fontWeight: active ? 600 : 500, cursor: 'pointer', whiteSpace: 'nowrap',
                 border: 'none', borderBottom: active ? '2px solid #2563eb' : '2px solid transparent', marginBottom: '-1px', backgroundColor: 'transparent', color: active ? '#2563eb' : '#475569' }}>
               <Icon size={17} /> {l}
             </button>
@@ -212,7 +211,6 @@ export default function EmployeePortal() {
       )}
 
       {tab === 'profile' && <ProfileTab profile={profile} onSaved={loadProfile} />}
-      {tab === 'docs' && <DocsTab />}
 
       <style>{'@media (max-width: 720px){ .portal-payslip-grid{ grid-template-columns: 1fr !important; } } .portal-tabs::-webkit-scrollbar{ height: 0; }'}</style>
     </div>
@@ -469,50 +467,6 @@ function ProfileTab({ profile, onSaved }) {
           <button type="button" onClick={changePassword} style={btn('#0f172a')}><KeyRound size={15} /> Đổi mật khẩu</button>
         </div>
       </div>
-    </div>
-  );
-}
-
-const DOC_CATEGORIES = { WARRANTY_RMA: 'Bảo hành & Đổi trả', SALES_POLICY: 'Chính sách bán hàng', WAREHOUSE_LOGISTICS: 'Kho vận', TECHNICAL_SOP: 'Quy trình kỹ thuật', ERP_MANUAL: 'Hướng dẫn ERP', GENERAL: 'Quy định chung' };
-
-function DocsTab() {
-  const [docs, setDocs] = useState([]);
-  const [q, setQ] = useState('');
-  const [open, setOpen] = useState(null);
-
-  useEffect(() => {
-    api.get('/knowledge').then(r => setDocs(r.data || [])).catch(err => notify(err.message, 'error'));
-  }, []);
-
-  const filtered = docs.filter(d => !q || `${d.title} ${d.summary || ''}`.toLowerCase().includes(q.toLowerCase()));
-
-  return (
-    <div style={card}>
-      <div style={{ position: 'relative', maxWidth: 360, marginBottom: '0.85rem' }}>
-        <Search size={15} style={{ position: 'absolute', left: 10, top: 10, color: '#94a3b8' }} />
-        <input value={q} onChange={e => setQ(e.target.value)} placeholder="Tìm quy trình, chính sách, hướng dẫn..." style={{ ...input, paddingLeft: '2rem' }} />
-      </div>
-      {filtered.length === 0 && <div style={{ fontSize: '0.9rem', color: '#94a3b8' }}>Không có tài liệu nào.</div>}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '0.65rem' }}>
-        {filtered.map(d => (
-          <button key={d.id} type="button" onClick={() => setOpen(d)} style={{ textAlign: 'left', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.75rem', backgroundColor: '#ffffff', cursor: 'pointer' }}>
-            <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#2563eb', textTransform: 'uppercase' }}>{DOC_CATEGORIES[d.category] || d.category}</div>
-            <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#0f172a', margin: '0.2rem 0' }}>{d.title}</div>
-            <div style={{ fontSize: '0.82rem', color: '#64748b', lineHeight: 1.4 }}>{(d.summary || d.content || '').slice(0, 130)}{(d.summary || d.content || '').length > 130 ? '…' : ''}</div>
-          </button>
-        ))}
-      </div>
-      {open && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }} onClick={() => setOpen(null)}>
-          <div style={{ ...card, maxWidth: 760, width: '100%', maxHeight: '85vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem' }}>
-              <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 700 }}>{open.title}</h3>
-              <button type="button" onClick={() => setOpen(null)} style={{ border: 'none', background: '#f1f5f9', borderRadius: 6, padding: 4, cursor: 'pointer' }}><X size={18} /></button>
-            </div>
-            <div style={{ whiteSpace: 'pre-wrap', fontSize: '0.9rem', color: '#334155', lineHeight: 1.6, marginTop: '0.75rem' }}>{open.content}</div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
