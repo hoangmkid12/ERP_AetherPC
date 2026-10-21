@@ -200,7 +200,7 @@ sequenceDiagram
     Kế Toán->>Hệ Thống ERP: Đối soát tiền thu hộ theo từng shipper -> ghi bút toán thu (INCOME)
 ```
 
-> Quy trình đổi trả – bảo hành và chấm công – tính lương được mô tả bằng BPMN 2.0 trong báo cáo (Hình 3.3, 3.4); 24 quy trình chức năng ở Hình 3.5–3.28.
+> Quy trình đổi trả – bảo hành, chấm công – tính lương và 24 quy trình chức năng được mô tả bằng BPMN 2.0 trong báo cáo khóa luận.
 
 ---
 
@@ -305,7 +305,7 @@ Tỷ lệ chi phí tiết kiệm được khi phê duyệt phương án rẻ nh�
 $$P_{\text{save}} = \left( \frac{T_{\max} - T_{\min}}{T_{\max}} \right) \times 100\%$$
 
 ### 6.2. Công Thức Tính Bảng Lương Hàng Tháng (Payroll Model)
-Theo mục 4.3.4 của báo cáo (`backend/src/services/payrollService.js`, `hrPolicy.js`). Công chuẩn $N_c$ là số ngày làm việc trong tháng theo lịch công ty (không cố định 26 ngày):
+Cài đặt tại `backend/src/services/payrollService.js` và `hrPolicy.js`. Công chuẩn $N_c$ là số ngày làm việc trong tháng theo lịch công ty (không cố định 26 ngày):
 $$L = (LCB + PCV) \times \frac{N_{\text{đl}} + N_{\text{hl}}}{N_c}$$
 $$L_{TC} = Đg \times (1{,}5\,G_t + 2\,G_n + 3\,G_l), \quad Đg = \frac{LCB + PCV}{N_c \times \text{giờ chuẩn/ngày}}$$
 $$TN = L + PC + L_{TC} + HH + TLR + TK$$
@@ -380,30 +380,30 @@ Kênh riêng biệt hoàn toàn khỏi `/ws/cskh` (2 `WebSocketServer` độc l�
 
 ## 8. Bộ Kịch Bản Kiểm Thử Chi Tiết (Comprehensive Test Suite)
 
-Hệ thống được kiểm thử bằng 102 ca kiểm thử chạy tự động theo đúng trình tự nghiệp vụ (đơn mua hàng tạo ở bước trước được dùng cho bước kiểm định, nhập kho, thanh toán ở bước sau) trên một CSDL PostgreSQL riêng, sao chép mới từ dữ liệu mẫu trước mỗi lần chạy. Lần chạy cuối cùng: **102/102 ca đạt**. Chi tiết từng ca (mô tả, điều kiện trước, các bước, dữ liệu, kết quả mong đợi và thực tế) nằm ở mục 6.1.3 của báo cáo.
+Hệ thống được kiểm thử bằng 146 ca kiểm thử qua bốn đợt: chạy tự động theo đúng trình tự nghiệp vụ (đơn mua hàng tạo ở bước trước được dùng cho bước kiểm định, nhập kho, thanh toán ở bước sau) trên một CSDL PostgreSQL riêng sao chép mới từ dữ liệu mẫu trước mỗi lần chạy, kết hợp chạy toàn bộ luồng nghiệp vụ trên hệ thống đã triển khai. Lần chạy cuối cùng: **146/146 ca đạt**. Chi tiết từng ca (mô tả, điều kiện trước, các bước, dữ liệu, kết quả mong đợi và thực tế) được trình bày trong báo cáo khóa luận.
 
 | STT | Chức năng | Mã nhóm | Số ca |
 | :---: | :--- | :--- | :---: |
-| 1 | Đăng ký tài khoản | `TC_DK` | 5 |
-| 2 | Đăng nhập | `TC_DN` | 6 |
+| 1 | Đăng ký tài khoản | `TC_DK` | 7 |
+| 2 | Đăng nhập | `TC_DN` | 15 |
 | 3 | Đặt hàng | `TC_DH` | 6 |
-| 4 | Bán hàng tại quầy | `TC_POS` | 4 |
-| 5 | Xử lý và cập nhật đơn hàng | `TC_XLDH` | 5 |
+| 4 | Bán hàng tại quầy | `TC_BQ` | 5 |
+| 5 | Xử lý và cập nhật đơn hàng | `TC_XLDH` | 9 |
 | 6 | Lập phiếu đề xuất mua hàng | `TC_DX` | 5 |
-| 7 | Yêu cầu báo giá và duyệt đơn mua hàng | `TC_MH` | 8 |
-| 8 | Kiểm định hàng nhập và nghiệm thu nhập kho | `TC_QC` | 7 |
-| 9 | Thanh toán nhà cung cấp | `TC_TT` | 4 |
-| 10 | Cập nhật tiến độ lắp ráp | `TC_LR` | 4 |
-| 11 | Xuất kho, giao hàng và thu tiền hộ | `TC_GH` | 4 |
-| 12 | Đối soát tiền thu hộ | `TC_DS` | 4 |
-| 13 | Yêu cầu đổi trả và thẩm định hàng hoàn trả | `TC_DT` | 6 |
-| 14 | Trả lời chat trực tuyến | `TC_CHAT` | 5 |
+| 7 | Yêu cầu báo giá và duyệt đơn mua hàng | `TC_MH` | 12 |
+| 8 | Kiểm định hàng nhập và nghiệm thu nhập kho | `TC_KD` | 9 |
+| 9 | Thanh toán nhà cung cấp | `TC_TT` | 7 |
+| 10 | Cập nhật tiến độ lắp ráp | `TC_LR` | 7 |
+| 11 | Xuất kho, giao hàng và thu tiền hộ | `TC_GH` | 10 |
+| 12 | Đối soát tiền thu hộ | `TC_DS` | 9 |
+| 13 | Yêu cầu đổi trả và thẩm định hàng hoàn trả | `TC_DT` | 11 |
+| 14 | Trả lời chat trực tuyến | `TC_TV` | 5 |
 | 15 | Đăng ký khuôn mặt | `TC_KM` | 4 |
 | 16 | Chấm công bằng khuôn mặt | `TC_CC` | 5 |
 | 17 | Xin nghỉ phép | `TC_NP` | 6 |
 | 18 | Tính lương và phê duyệt bảng lương | `TC_TL` | 10 |
 | 19 | Quản trị tài khoản và phân quyền | `TC_QT` | 4 |
-| | **Tổng cộng** | | **102** |
+| | **Tổng cộng** | | **146** |
 
 Các ca kiểm thử bao gồm cả trường hợp lỗi và kiểm soát quyền, ví dụ: nhân viên kho tự duyệt phiếu đề xuất, nhân viên mua hàng tự duyệt đơn mua hàng, hai nhân viên cùng xác nhận khi chỉ còn 1 sản phẩm, nhập kho thiếu/trùng Serial, nghiệm thu lắp ráp khi chưa đủ mục kiểm thử, khách giả danh nhân viên gửi tin nhắn CSKH, giải ngân lương khi chưa được duyệt.
 
@@ -474,13 +474,13 @@ ERP_AetherPC/
 ├── backups/                  # Bản sao lưu CSDL (kltn_erp_backup.dump, init.sql)
 ├── deploy/                   # Cấu hình Nginx cho bản triển khai production
 ├── docs/
-│   ├── bao_cao/              # Báo cáo KLTN (.docx, .pdf) và mẫu báo cáo của khoa
+│   ├── bao_cao/              # Báo cáo KLTN (.docx, .pdf)
 │   ├── diagrams/             # Sơ đồ báo cáo kèm script sinh: bpmn (4 quy trình nghiệp vụ), uml_seq (BPMN chức năng,
 │   │                         #   hoạt động, tuần tự của 24 use case — flows.py, specs.py), usecase, lop_domain,
-│   │                         #   kientruc, sitemap, cong_nghe, hien_thuc (hình chương 5)
-│   ├── railway/              # Ảnh chụp bảng điều khiển Railway (chương 5)
-│   ├── screenshots/          # Ảnh giao diện chương 5 và shoot.js (chụp tự động bằng Playwright)
-│   ├── danh_gia/             # Script & kết quả đánh giá hiệu năng, nhận diện khuôn mặt (chương 6)
+│   │                         #   kientruc, sitemap, cong_nghe, hien_thuc
+│   ├── railway/              # Ảnh chụp bảng điều khiển Railway
+│   ├── screenshots/          # Ảnh giao diện và shoot.js (chụp tự động bằng Playwright)
+│   ├── danh_gia/             # Script & kết quả đánh giá hiệu năng, nhận diện khuôn mặt
 │   ├── nghiep_vu/            # Mô tả nghiệp vụ: khách hàng đặt hàng, quy trình xử lý đơn, đổi hàng / hoàn tiền
 │   ├── ky_thuat/             # Ghi chú kỹ thuật: chỉ mục CSDL, WebSocket, chuyển đổi store, lộ trình cải tiến
 │   └── scripts_baocao/       # Script sinh bản nháp báo cáo .docx ban đầu
@@ -602,8 +602,8 @@ Modal Điều Phối Vận Chuyển (`Warehouse.jsx`, mục 5.1.3) tự nhận d
 
 ## Báo Cáo Khóa Luận Tốt Nghiệp
 
-Báo cáo chính thức (7 chương, theo mẫu của Khoa): [`docs/bao_cao/AetherPC_KLTN.docx`](docs/bao_cao/AetherPC_KLTN.docx), bản PDF [`docs/bao_cao/AetherPC_KLTN.pdf`](docs/bao_cao/AetherPC_KLTN.pdf).  
-Toàn bộ sơ đồ trong báo cáo được sinh lại từ script trong `docs/diagrams/` (ví dụ `python docs/diagrams/uml_seq/flows.py` vẽ lại 24 sơ đồ BPMN chức năng và 24 sơ đồ hoạt động).
+Báo cáo chính thức: [`docs/bao_cao/AetherPC_KLTN.docx`](docs/bao_cao/AetherPC_KLTN.docx), bản PDF [`docs/bao_cao/AetherPC_KLTN.pdf`](docs/bao_cao/AetherPC_KLTN.pdf).  
+Toàn bộ sơ đồ trong báo cáo được sinh lại từ script trong `docs/diagrams/` (ví dụ `python docs/diagrams/uml_seq/flows.py` vẽ lại 24 sơ đồ BPMN chức năng và 24 sơ đồ hoạt động, `python docs/diagrams/uml_seq/specs.py` vẽ lại 24 sơ đồ tuần tự, `python docs/diagrams/usecase/usecase_tongquat.py` vẽ lại sơ đồ use case tổng quát).
 
 ---
 
