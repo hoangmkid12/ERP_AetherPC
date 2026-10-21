@@ -598,7 +598,7 @@ const issuePurchaseOrder = async (req, res, next) => {
 
     res.status(201).json({
       success: true,
-      message: 'Đã lập Phiếu Mua Hàng chính thức, trình CEO phê duyệt.',
+      message: 'Đã lập Phiếu Mua Hàng chính thức, trình Ban Giám đốc phê duyệt.',
       data: newPO
     });
   } catch (err) {
@@ -647,7 +647,7 @@ const updatePurchaseOrderStatus = async (req, res, next) => {
       if (status === 'PO' && po.status === 'QUOTED_PENDING_CEO' && !isNoOpResubmit) {
         const allowed = await hasOperationalPermission(userRole, 'purchasing_approve_po');
         if (!allowed) {
-          const error = new Error('Tài khoản của bạn không có quyền duyệt PO (đã bị quản trị viên tắt trong Ma Trận Phân Quyền).');
+          const error = new Error('Tài khoản của bạn chưa được cấp quyền duyệt đơn mua hàng trong Ma Trận Phân Quyền.');
           error.statusCode = 403;
           throw error;
         }
@@ -720,12 +720,33 @@ const updatePurchaseOrderStatus = async (req, res, next) => {
         }
       }
 
+      // Kết luận kiểm định: số đạt + số lỗi phải bằng đúng tổng số lượng của đơn và
+      // khớp với kết luận (đạt toàn bộ / một phần / từ chối). Kho nhập theo tỷ lệ
+      // đạt/tổng, còn kế toán lập hóa đơn theo số đã nhập — số liệu lệch ở đây sẽ
+      // làm tồn kho và công nợ nhà cung cấp lệch nhau.
+      if (!isNoOpResubmit && ['QA_PASSED', 'QA_PARTIAL', 'QA_REJECTED'].includes(status)) {
+        const totalQty = po.items.reduce((sum, i) => sum + i.quantity, 0);
+        const hasPassed = passedQty !== undefined && passedQty !== null && passedQty !== '';
+        const hasFailed = failedQty !== undefined && failedQty !== null && failedQty !== '';
+        const p = hasPassed ? Number(passedQty) : (status === 'QA_PASSED' ? totalQty : status === 'QA_REJECTED' ? 0 : NaN);
+        const f = hasFailed ? Number(failedQty) : (Number.isInteger(p) ? totalQty - p : NaN);
+        const invalid = !Number.isInteger(p) || !Number.isInteger(f) || p < 0 || f < 0 || p + f !== totalQty
+          || (status === 'QA_PASSED' && f !== 0)
+          || (status === 'QA_REJECTED' && p !== 0)
+          || (status === 'QA_PARTIAL' && (p === 0 || f === 0));
+        if (invalid) {
+          const error = new Error(`Số lượng kiểm định không hợp lệ: số đạt (${hasPassed ? passedQty : '?'}) cộng số lỗi (${hasFailed ? failedQty : '?'}) phải bằng tổng ${totalQty} sản phẩm và khớp với kết luận kiểm định.`);
+          error.statusCode = 400;
+          throw error;
+        }
+      }
+
       // Duyệt QUOTED_PENDING_CEO -> PO: chỉ CEO/ADMIN được quyền phát hành PO
       // chính thức, bất kể giá trị đơn — CEO cần nắm được mọi đơn mua hàng,
       // không đặt hạn mức.
       if (status === 'PO' && po.status === 'QUOTED_PENDING_CEO') {
         if (userRole !== 'CEO' && userRole !== 'ADMIN') {
-          const error = new Error('Chỉ CEO (Ban Giám Đốc) mới có quyền duyệt báo giá thành PO chính thức.');
+          const error = new Error('Chỉ Ban Giám đốc mới có quyền duyệt phiếu mua hàng thành đơn mua hàng chính thức.');
           error.statusCode = 403;
           throw error;
         }
@@ -1088,11 +1109,22 @@ const createVendorBill = async (req, res, next) => {
     const result = await prisma.$transaction(async (tx) => {
       const po = await tx.purchaseOrder.findUnique({
         where: { id: parseInt(id) },
-        include: { supplier: true }
+        include: { supplier: true, items: true }
       });
       if (!po) throw Object.assign(new Error(`Không tìm thấy đơn mua hàng: ${id}`), { statusCode: 404 });
       if (!['RECEIVED', 'DONE', 'COMPLETED'].includes(po.status)) {
         const error = new Error('Chỉ có thể ghi nhận hóa đơn NCC sau khi kho đã hoàn tất nhập hàng.');
+        error.statusCode = 409;
+        throw error;
+      }
+
+      // Mỗi đơn mua hàng chỉ có một hóa đơn công nợ: khóa theo mã đơn trong giao
+      // dịch để hai lần bấm "Lập hóa đơn" (hai thẻ, bấm đúp) không tạo hai hóa đơn
+      // và ghi nợ nhà cung cấp gấp đôi.
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(7311, ${po.id}::int)`;
+      const existingBill = await tx.vendorBill.findFirst({ where: { poId: po.id } });
+      if (existingBill) {
+        const error = new Error(`Đơn ${po.poNumber} đã có hóa đơn ${existingBill.billNumber} — không lập thêm hóa đơn mới.`);
         error.statusCode = 409;
         throw error;
       }
@@ -1110,18 +1142,23 @@ const createVendorBill = async (req, res, next) => {
         where: { poId: po.id },
         include: { qcInspections: true }
       });
-      const inspections = receipts.flatMap(r => r.qcInspections);
-      const totalPassed = inspections.reduce((sum, i) => sum + (i.passedQuantity || 0), 0);
-      const totalDefective = inspections.reduce((sum, i) => sum + (i.defectiveQuantity || 0), 0);
-      const totalInspected = totalPassed + totalDefective;
+      // Lấy biên bản kiểm định mới nhất và tính tiền theo ĐÚNG số lượng kho đã nhập
+      // (cùng công thức với validateReceipt: số nhập = làm tròn(số đặt x số đạt / tổng)),
+      // để công nợ nhà cung cấp luôn khớp với số hàng thực nhận vào kho.
+      const inspections = receipts.flatMap(r => r.qcInspections).sort((a, b) => b.id - a.id);
+      const latest = inspections[0];
+      const totalQty = po.items.reduce((sum, i) => sum + i.quantity, 0);
+      const totalPassed = latest ? (latest.passedQuantity || 0) : totalQty;
+      const totalInspected = latest ? totalQty : 0;
 
       const originalAmount = parseFloat(po.totalAmount) || 0;
       let amountTotal = originalAmount;
       let acceptRatio = null;
-      if (totalInspected > 0) {
-        acceptRatio = totalPassed / totalInspected;
+      if (latest && totalQty > 0) {
+        acceptRatio = Math.max(0, Math.min(1, totalPassed / totalQty));
         if (acceptRatio < 1) {
-          amountTotal = Math.round(originalAmount * acceptRatio);
+          amountTotal = Math.round(po.items.reduce(
+            (sum, it) => sum + Math.round(it.quantity * acceptRatio) * (parseFloat(it.unitCost) || 0), 0));
         }
       }
 
@@ -1184,10 +1221,15 @@ const checkAndUpdatePoCompletion = async (tx, poId) => {
   const billsPaid = allBills.length > 0 && allBills.every(b => b.status === 'PAID');
 
   if (receiptsDone && billsPaid) {
-    await tx.purchaseOrder.update({
-      where: { id: poId },
+    const done = await tx.purchaseOrder.updateMany({
+      where: { id: poId, status: { not: 'DONE' } },
       data: { status: 'DONE' }
     });
+    if (done.count === 1) {
+      await tx.purchaseOrderStatusHistory.create({
+        data: { poId, status: 'DONE', note: 'Đã nhập kho và thanh toán đủ cho nhà cung cấp — đơn mua hàng hoàn tất.' }
+      });
+    }
     return true;
   }
   return false;
@@ -1205,10 +1247,13 @@ const registerPayment = async (req, res, next) => {
         include: { supplier: true, po: true }
       });
       if (!bill) throw Object.assign(new Error(`Không tìm thấy hoá đơn nhà cung cấp: ${billId}`), { statusCode: 404 });
-      if (bill.status === 'PAID') throw new Error('Hoá đơn này đã được thanh toán đủ.');
+      if (bill.status === 'PAID') throw Object.assign(new Error('Hoá đơn này đã được thanh toán đủ.'), { statusCode: 409 });
 
-      const payAmount = amount ? parseFloat(amount) : parseFloat(bill.amountDue);
-      if (!(payAmount > 0)) {
+      // Không gửi số tiền = trả hết công nợ còn lại; gửi 0 hoặc số âm là lỗi nhập liệu,
+      // không được hiểu thành "trả toàn bộ".
+      const omitted = amount === undefined || amount === null || amount === '';
+      const payAmount = omitted ? parseFloat(bill.amountDue) : Number(amount);
+      if (!Number.isFinite(payAmount) || !(payAmount > 0)) {
         const error = new Error('Số tiền thanh toán phải lớn hơn 0.');
         error.statusCode = 400;
         throw error;
@@ -1219,23 +1264,27 @@ const registerPayment = async (req, res, next) => {
         throw error;
       }
 
+      // Trừ công nợ bằng câu lệnh cập nhật có điều kiện: hai kế toán ghi nhận cùng lúc
+      // trên cùng một hóa đơn không thể cùng đọc một số dư cũ rồi trả vượt công nợ.
+      const claim = await tx.vendorBill.updateMany({
+        where: { id: bill.id, status: { not: 'PAID' }, amountDue: { gte: payAmount } },
+        data: { amountPaid: { increment: payAmount }, amountDue: { decrement: payAmount } }
+      });
+      if (claim.count !== 1) {
+        const error = new Error('Công nợ của hóa đơn vừa thay đổi (có người khác vừa ghi nhận thanh toán) — vui lòng tải lại và nhập lại số tiền.');
+        error.statusCode = 409;
+        throw error;
+      }
+      const afterPay = await tx.vendorBill.findUnique({ where: { id: bill.id } });
+      if (parseFloat(afterPay.amountDue) <= 0) {
+        await tx.vendorBill.update({ where: { id: bill.id }, data: { status: 'PAID' } });
+      }
+
       const newPayment = await tx.vendorPayment.create({
         data: {
           billId: bill.id,
           amount: payAmount,
           paymentMethod: paymentMethod || 'Bank Transfer',
-        }
-      });
-
-      const newAmountPaid = parseFloat(bill.amountPaid) + payAmount;
-      const newAmountDue = parseFloat(bill.amountTotal) - newAmountPaid;
-
-      await tx.vendorBill.update({
-        where: { id: bill.id },
-        data: {
-          amountPaid: newAmountPaid,
-          amountDue: newAmountDue,
-          status: newAmountDue <= 0 ? 'PAID' : 'POSTED'
         }
       });
 

@@ -572,15 +572,24 @@ export default function Accountant() {
     }
   };
 
+  // Ghi nhận thanh toán theo từng đợt: số tiền mặc định là toàn bộ công nợ còn lại,
+  // kế toán có thể sửa để trả một phần; hình thức chuyển khoản hoặc tiền mặt.
+  const [payDraft, setPayDraft] = useState(null); // { poId, amount, method }
   const handleRegisterPayment = async (po) => {
     const bill = getPoBill(po);
-    if (!bill) return;
-    if (!(await confirm(`Xác nhận chi trả ${fmt(bill.amountDue)} cho hóa đơn ${bill.billNumber} (NCC: ${po.supplier?.name || po.supplierCode})?`))) return;
+    if (!bill || !payDraft || payDraft.poId !== po.id) return;
+    const due = Number(bill.amountDue) || 0;
+    const amount = Math.round(Number(String(payDraft.amount).replace(/[^\d]/g, '')));
+    if (!(amount > 0)) { notify('Vui lòng nhập số tiền thanh toán lớn hơn 0.', 'error'); return; }
+    if (amount > due) { notify(`Số tiền thanh toán vượt công nợ còn lại (${fmt(due)}).`, 'error'); return; }
+    const methodLabel = payDraft.method === 'Tiền mặt' ? 'tiền mặt' : 'chuyển khoản';
+    if (!(await confirm(`Xác nhận chi ${fmt(amount)} bằng ${methodLabel} cho hóa đơn ${bill.billNumber} (NCC: ${po.supplier?.name || po.supplierCode})?${amount < due ? `\nCông nợ còn lại sau đợt này: ${fmt(due - amount)}.` : ''}`))) return;
     setPayingPOId(po.id);
     try {
-      const res = await api.post(`/purchasing/bills/${bill.id}/payments`, { paymentMethod: 'Bank Transfer' });
+      const res = await api.post(`/purchasing/bills/${bill.id}/payments`, { amount, paymentMethod: payDraft.method });
       if (res?.success) {
-        notify(`Đã giải ngân thành công cho hóa đơn ${bill.billNumber}. Bút toán đã được ghi nhận vào Sổ Cái.`, 'success');
+        setPayDraft(null);
+        notify(`Đã ghi nhận thanh toán ${fmt(amount)} cho hóa đơn ${bill.billNumber}. Bút toán chi đã được ghi vào Sổ Cái.`, 'success');
         await fetchBackendPOs();
         await fetchLedgerData();
       } else {
@@ -1639,13 +1648,49 @@ export default function Accountant() {
                             {isBusy ? 'Đang xử lý...' : 'Lập Hóa Đơn'}
                           </button>
                         ) : bill.status !== 'PAID' ? (
-                          <button
-                            onClick={() => handleRegisterPayment(po)}
-                            disabled={isBusy}
-                            style={{ backgroundColor: '#16a34a', color: '#ffffff', border: 'none', borderRadius: '4px', padding: '0.35rem 0.75rem', fontSize: '0.8rem', fontWeight: 800, cursor: isBusy ? 'default' : 'pointer', opacity: isBusy ? 0.6 : 1 }}
-                          >
-                            {isBusy ? 'Đang xử lý...' : 'Chi Trả Ngay'}
-                          </button>
+                          payDraft?.poId === po.id ? (
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', justifyContent: 'center', alignItems: 'center' }}>
+                              <input
+                                type="text"
+                                inputMode="numeric"
+                                aria-label="Số tiền thanh toán"
+                                value={payDraft.amount}
+                                onChange={e => setPayDraft(d => ({ ...d, amount: e.target.value.replace(/[^\d]/g, '') }))}
+                                style={{ width: '110px', padding: '0.3rem 0.45rem', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '0.8rem', textAlign: 'right' }}
+                              />
+                              <select
+                                aria-label="Hình thức thanh toán"
+                                value={payDraft.method}
+                                onChange={e => setPayDraft(d => ({ ...d, method: e.target.value }))}
+                                style={{ padding: '0.3rem 0.4rem', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '0.8rem', backgroundColor: '#fff' }}
+                              >
+                                <option value="Chuyển khoản">Chuyển khoản</option>
+                                <option value="Tiền mặt">Tiền mặt</option>
+                              </select>
+                              <button
+                                onClick={() => handleRegisterPayment(po)}
+                                disabled={isBusy}
+                                style={{ backgroundColor: '#16a34a', color: '#ffffff', border: 'none', borderRadius: '4px', padding: '0.35rem 0.6rem', fontSize: '0.8rem', fontWeight: 800, cursor: isBusy ? 'default' : 'pointer', opacity: isBusy ? 0.6 : 1 }}
+                              >
+                                {isBusy ? 'Đang xử lý...' : 'Xác nhận'}
+                              </button>
+                              <button
+                                onClick={() => setPayDraft(null)}
+                                disabled={isBusy}
+                                style={{ backgroundColor: '#f1f5f9', color: '#475569', border: '1px solid #e2e8f0', borderRadius: '4px', padding: '0.35rem 0.6rem', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}
+                              >
+                                Hủy
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => setPayDraft({ poId: po.id, amount: String(Math.round(Number(bill.amountDue) || 0)), method: 'Chuyển khoản' })}
+                              disabled={isBusy}
+                              style={{ backgroundColor: '#16a34a', color: '#ffffff', border: 'none', borderRadius: '4px', padding: '0.35rem 0.75rem', fontSize: '0.8rem', fontWeight: 800, cursor: isBusy ? 'default' : 'pointer', opacity: isBusy ? 0.6 : 1 }}
+                            >
+                              Ghi Nhận Thanh Toán
+                            </button>
+                          )
                         ) : (
                           <span style={{ fontSize: '0.8rem', color: '#64748b' }}>Hoàn tất</span>
                         )}
