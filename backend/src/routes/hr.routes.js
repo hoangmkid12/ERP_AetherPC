@@ -831,7 +831,8 @@ const payrollLedgerRows = (p) => {
   const who = p.employee?.fullName || `NV #${p.employeeId}`;
   const statutory = Math.round(Number(p.employeeInsurance || 0) + Number(p.employerInsurance || 0) + Number(p.personalIncomeTax || 0));
   return [
-    { type: 'EXPENSE', amount: p.netSalary, description: `Chi trả lương kỳ ${p.period} — ${who}`, referenceId: `PAYROLL-${p.id}` },
+    // Phiếu lương 0đ (không có ngày công) không phát sinh dòng tiền — không ghi bút toán 0đ vào Sổ Cái
+    ...(Number(p.netSalary) > 0 ? [{ type: 'EXPENSE', amount: p.netSalary, description: `Chi trả lương kỳ ${p.period} — ${who}`, referenceId: `PAYROLL-${p.id}` }] : []),
     ...(statutory > 0 ? [{
       type: 'EXPENSE',
       amount: statutory,
@@ -852,7 +853,8 @@ router.post('/payrolls/:id/disburse', authMiddleware(['ACCOUNTANT', 'CEO', 'ADMI
     // Cập nhật có điều kiện theo trạng thái để 2 lần bấm đồng thời không chi trả trùng.
     const claimed = await tx.payroll.updateMany({ where: { id: payroll.id, status: 'APPROVED_BY_CEO' }, data: { status: 'PAID', paidAt: new Date() } });
     if (claimed.count === 0) throw httpError(409, 'Bảng lương này vừa được xử lý bởi người khác.');
-    await tx.ledgerEntry.createMany({ data: payrollLedgerRows(payroll) });
+    const rows = payrollLedgerRows(payroll);
+    if (rows.length) await tx.ledgerEntry.createMany({ data: rows });
     return tx.payroll.findUnique({ where: { id: payroll.id }, include: PAYROLL_INCLUDE });
   });
   logAudit({ req, action: 'DISBURSE_PAYROLL', module: 'Kế Toán', targetId: result.id, note: `${result.employee?.fullName || `NV #${result.employeeId}`}: ${result.netSalary}đ` });
@@ -863,12 +865,20 @@ router.post('/payrolls/:id/disburse', authMiddleware(['ACCOUNTANT', 'CEO', 'ADMI
 router.post('/payrolls/disburse-all', authMiddleware(['ACCOUNTANT', 'CEO', 'ADMIN']), checkOperationalPermission('accounting_disburse_payroll'), ah(async (req, res) => {
   const eligible = await prisma.payroll.findMany({ where: { status: 'APPROVED_BY_CEO' }, include: { employee: { select: { fullName: true } } } });
   if (eligible.length === 0) throw httpError(409, 'Không có bảng lương nào đang chờ giải ngân.');
-  await prisma.$transaction(async (tx) => {
-    await tx.payroll.updateMany({ where: { id: { in: eligible.map(p => p.id) }, status: 'APPROVED_BY_CEO' }, data: { status: 'PAID', paidAt: new Date() } });
-    await tx.ledgerEntry.createMany({ data: eligible.flatMap(payrollLedgerRows) });
+  // Chuyển từng phiếu có điều kiện để chỉ ghi sổ cho phiếu chính lần này giải ngân — nếu 2 kế toán
+  // bấm cùng lúc, phiếu đã được người kia chi trả sẽ không bị ghi bút toán chi lần thứ hai.
+  const paid = await prisma.$transaction(async (tx) => {
+    const done = [];
+    for (const p of eligible) {
+      const claimed = await tx.payroll.updateMany({ where: { id: p.id, status: 'APPROVED_BY_CEO' }, data: { status: 'PAID', paidAt: new Date() } });
+      if (claimed.count === 1) done.push(p);
+    }
+    const rows = done.flatMap(payrollLedgerRows);
+    if (rows.length) await tx.ledgerEntry.createMany({ data: rows });
+    return done;
   });
-  logAudit({ req, action: 'DISBURSE_PAYROLL', module: 'Kế Toán', note: `Giải ngân hàng loạt: ${eligible.length} bảng lương` });
-  res.json({ success: true, message: `Đã giải ngân ${eligible.length} bảng lương.`, data: { count: eligible.length } });
+  logAudit({ req, action: 'DISBURSE_PAYROLL', module: 'Kế Toán', note: `Giải ngân hàng loạt: ${paid.length} bảng lương` });
+  res.json({ success: true, message: `Đã giải ngân ${paid.length} bảng lương.`, data: { count: paid.length } });
 }));
 
 module.exports = router;

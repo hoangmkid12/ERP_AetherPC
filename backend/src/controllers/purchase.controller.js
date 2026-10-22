@@ -403,8 +403,14 @@ const createPurchaseOrder = async (req, res, next) => {
           throw Object.assign(new Error(`Không tìm thấy sản phẩm trong CSDL với mã: ${item.productId}`), { statusCode: 404 });
         }
 
-        const quantity = parseInt(item.quantity);
+        const quantity = parseInt(item.quantity, 10);
+        if (!Number.isInteger(quantity) || quantity <= 0) {
+          throw Object.assign(new Error(`Số lượng đặt mua không hợp lệ cho sản phẩm ${prod.name}.`), { statusCode: 400 });
+        }
         const unitCost = item.unitCost ? parseFloat(item.unitCost) : 0; // RFQ: NCC sẽ nhập giá sau
+        if (!Number.isFinite(unitCost) || unitCost < 0) {
+          throw Object.assign(new Error(`Đơn giá không hợp lệ cho sản phẩm ${prod.name}.`), { statusCode: 400 });
+        }
         const totalCost = unitCost * quantity;
 
         totalAmount += totalCost;
@@ -753,22 +759,27 @@ const updatePurchaseOrderStatus = async (req, res, next) => {
       }
 
       // If supplier is quoting prices (RFQ_SENT → QUOTED) or confirming (→ PO / CONFIRMED_BY_SUPPLIER), update item prices first
-      if (['QUOTED', 'QUOTED_PENDING_CEO', 'PO', 'CONFIRMED_BY_SUPPLIER'].includes(status) && itemPrices && itemPrices.length > 0) {
-        let newTotal = 0;
+      // Chỉ nhận đơn giá ở bước NCC báo giá (→ QUOTED). Sau khi CEO đã duyệt (PO) hay NCC xác nhận
+      // giao hàng, giá đã chốt — trước đây NCC gửi kèm itemPrices lúc xác nhận PO là ghi đè được giá đã duyệt.
+      if (status === 'QUOTED' && ['RFQ', 'RFQ_SENT', 'SENT', 'QUOTED'].includes(po.status) && itemPrices && itemPrices.length > 0) {
+        const lineTotals = new Map(po.items.map(i => [i.id, parseFloat(i.totalCost) || 0]));
         for (const priceInfo of itemPrices) {
           const item = po.items.find(i => String(i.id) === String(priceInfo.itemId));
-          if (item && priceInfo.unitCost > 0) {
-            const totalCost = parseFloat(priceInfo.unitCost) * item.quantity;
+          const unitCost = parseFloat(priceInfo.unitCost);
+          if (item && Number.isFinite(unitCost) && unitCost > 0) {
+            const totalCost = unitCost * item.quantity;
             await tx.purchaseOrderItem.update({
               where: { id: item.id },
               data: {
-                unitCost: parseFloat(priceInfo.unitCost),
+                unitCost,
                 totalCost: totalCost
               }
             });
-            newTotal += totalCost;
+            lineTotals.set(item.id, totalCost);
           }
         }
+        // Tổng PO cộng mọi dòng (dòng chưa báo giá lần này giữ giá cũ), không chỉ các dòng vừa gửi
+        const newTotal = [...lineTotals.values()].reduce((s, v) => s + v, 0);
 
         // Update total amount on the PO
         if (newTotal > 0) {

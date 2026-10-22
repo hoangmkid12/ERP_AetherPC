@@ -116,6 +116,12 @@ const createOrder = async (req, res, next) => {
         if (!prod) {
           throw new Error(`Không tìm thấy sản phẩm với mã: ${cartItem.productId}`);
         }
+        // Sản phẩm đã ẩn / ngừng kinh doanh không được bán nữa (giỏ hàng cũ còn lưu trong trình duyệt vẫn gửi lên được)
+        if (prod.available === false) {
+          const error = new Error(`Sản phẩm "${prod.name}" đã ngừng kinh doanh, vui lòng xoá khỏi giỏ hàng.`);
+          error.statusCode = 400;
+          throw error;
+        }
 
         const qty = parseInt(cartItem.quantity);
         if (!Number.isInteger(qty) || qty <= 0 || qty > 10000) {
@@ -1085,6 +1091,14 @@ const updateOrderStatus = async (req, res, next) => {
           error.statusCode = 400;
           throw error;
         }
+      }
+
+      // Đơn chuyển sang "Đang giao" phải có shipper phụ trách — đơn SHIPPED không người giữ
+      // sẽ không hiện trong app shipper nào, không ai giao, COD không ai đối soát.
+      if (status === 'SHIPPED' && existingOrder.status !== 'SHIPPED' && !existingOrder.assignedShipperId && assignedShipperIdInt === null) {
+        const error = new Error('Đơn chưa được phân công nhân viên giao hàng — hãy phân công shipper trước khi xuất giao.');
+        error.statusCode = 409;
+        throw error;
       }
 
       // Shipper tự từ chối 1 đơn đang chờ nhận (nút "Từ Chối" ở tab Chờ Nhận
@@ -2343,9 +2357,10 @@ const updateDeliveryLocationHttp = async (req, res, next) => {
 // deliveryRegions.js/OrderCard đã dùng ở nơi khác trong dự án.
 // Quyền xem lộ trình giao hàng của một đơn: chủ đơn (khách) hoặc nhân viên nội bộ.
 function trackingAccessError(req, order) {
-  if (!order) return { status: 404, message: 'Không tìm thấy đơn hàng.' };
+  // Kiểm tra đăng nhập trước khi báo "không tìm thấy" để khách vãng lai không dò được mã đơn nào tồn tại
   const role = req.user?.role;
   if (!role) return { status: 401, message: 'Vui lòng đăng nhập để theo dõi đơn hàng.' };
+  if (!order) return { status: 404, message: 'Không tìm thấy đơn hàng.' };
   if (role === 'SUPPLIER') return { status: 403, message: 'Bạn không có quyền xem đơn hàng này.' };
   if (role === 'CUSTOMER' && order.customerId !== req.user.id) return { status: 404, message: 'Không tìm thấy đơn hàng.' };
   return null;
@@ -2452,6 +2467,7 @@ const IN_TRANSIT_STATUSES = ['SHIPPED', 'SHIPPING_FAILED', 'FAILED_DELIVERY', 'R
 // là lời hứa trên giao diện — không job nào thực hiện, đơn treo mãi).
 const AWAITING_CALLBACK_LIMIT_MS = 24 * 60 * 60 * 1000;
 const FAILED_DELIVERY_LIMIT_MS = 3 * 24 * 60 * 60 * 1000;
+const FAILED_DELIVERY_STATUSES = ['SHIPPING_FAILED', 'FAILED_DELIVERY'];
 
 // Cùng bộ từ khoá với getDeliveryIncidentStatus (frontend deliveryHelpers.js)
 const isAwaitingCallbackFail = (order) => {
@@ -2486,7 +2502,8 @@ const getStatusSinceMap = async (client, orders) => {
 // để shipper mang hàng về kho thay vì giữ vô thời hạn.
 const autoReturnOverdueFailedDeliveries = async () => {
   const failed = await prisma.order.findMany({
-    where: { status: 'SHIPPING_FAILED' },
+    // FAILED_DELIVERY: trạng thái giao thất bại cũ (vẫn hợp lệ) — trước đây job bỏ sót nên đơn treo mãi
+    where: { status: { in: FAILED_DELIVERY_STATUSES } },
     select: { orderId: true, status: true, failReason: true, failNote: true, shippedAt: true, createdAt: true }
   });
   if (failed.length === 0) return [];
@@ -2508,7 +2525,7 @@ const autoReturnOverdueFailedDeliveries = async () => {
       const done = await prisma.$transaction(async (tx) => {
         await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${'sepay:' + ord.orderId}))::text`;
         const current = await tx.order.findUnique({ where: { orderId: ord.orderId }, select: { status: true } });
-        if (current?.status !== 'SHIPPING_FAILED') return false; // shipper vừa tự xử lý
+        if (current?.status !== ord.status) return false; // shipper vừa tự xử lý
         await tx.order.update({
           where: { orderId: ord.orderId },
           data: {
