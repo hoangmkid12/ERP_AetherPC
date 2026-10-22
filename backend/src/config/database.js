@@ -18,6 +18,14 @@ function withPoolDefaults(url) {
 
 const prisma = new PrismaClient({
   datasources: { db: { url: withPoolDefaults(process.env.DATABASE_URL) } },
+  // Mã băm mật khẩu không bao giờ được rời máy chủ: bỏ khỏi mọi truy vấn (kể cả quan hệ include
+  // supplier/customer lồng trong PO, phiếu nhập, đổi trả — trước đây trả nguyên cho trình duyệt).
+  // Chỉ luồng đăng nhập / đổi & đặt lại mật khẩu (auth.controller.js) chủ động lấy lại bằng omit: WITH_PASSWORD_HASH.
+  omit: {
+    customer: { passwordHash: true },
+    employee: { passwordHash: true },
+    supplier: { passwordHash: true },
+  },
   log: process.env.NODE_ENV === 'development' ? ['query', 'info', 'warn', 'error'] : ['error'],
 });
 

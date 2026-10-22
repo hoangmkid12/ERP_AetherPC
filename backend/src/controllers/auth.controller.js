@@ -4,6 +4,8 @@ const jwt = require('jsonwebtoken');
 const prisma = require('../config/database');
 const { sendWelcomeEmail, sendPasswordResetEmail } = require('../services/emailService');
 const { logAudit } = require('../utils/auditLog');
+// Prisma bỏ passwordHash khỏi mọi truy vấn (config/database.js) — chỉ các truy vấn kiểm tra/đổi mật khẩu dưới đây lấy lại
+const WITH_PASSWORD_HASH = { passwordHash: false };
 
 const getJWTSecret = () => {
   const secret = process.env.JWT_SECRET;
@@ -65,7 +67,7 @@ const loginCustomer = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'Vui lòng nhập tài khoản và mật khẩu.' });
     }
 
-    const customer = await prisma.customer.findFirst({
+    const customer = await prisma.customer.findFirst({ omit: WITH_PASSWORD_HASH,
       where: {
         OR: [
           { email: { equals: loginIdentifier, mode: 'insensitive' } },
@@ -187,7 +189,7 @@ const loginEmployee = async (req, res, next) => {
     const lowerId = loginIdentifier.toLowerCase();
     const emailCandidate = lowerId.includes('@') ? lowerId : `${lowerId}@kltn-erp.vn`;
 
-    let user = await prisma.employee.findFirst({
+    let user = await prisma.employee.findFirst({ omit: WITH_PASSWORD_HASH,
       where: {
         OR: [
           { email: { equals: loginIdentifier, mode: 'insensitive' } },
@@ -203,7 +205,7 @@ const loginEmployee = async (req, res, next) => {
 
     if (!user) {
       // Check if it is a Supplier
-      const supplier = await prisma.supplier.findFirst({
+      const supplier = await prisma.supplier.findFirst({ omit: WITH_PASSWORD_HASH,
         where: {
           OR: [
             { email: { equals: loginIdentifier, mode: 'insensitive' } },
@@ -436,7 +438,7 @@ const changePassword = async (req, res, next) => {
     }
 
     if (req.user.role === 'CUSTOMER') {
-      const customer = await prisma.customer.findUnique({
+      const customer = await prisma.customer.findUnique({ omit: WITH_PASSWORD_HASH,
         where: { customerId: req.user.id }
       });
       if (!customer) {
@@ -455,7 +457,7 @@ const changePassword = async (req, res, next) => {
       logAudit({ req, action: 'CHANGE_PASSWORD', module: 'Bảo Mật', targetId: req.user.id });
       return res.json({ success: true, message: 'Đổi mật khẩu thành công!' });
     } else if (req.user.role === 'SUPPLIER') {
-      const supplier = await prisma.supplier.findUnique({
+      const supplier = await prisma.supplier.findUnique({ omit: WITH_PASSWORD_HASH,
         where: { code: req.user.id }
       });
       if (!supplier) {
@@ -478,7 +480,7 @@ const changePassword = async (req, res, next) => {
       if (!Number.isInteger(employeeId)) {
         return res.status(400).json({ success: false, message: 'Tài khoản nhân viên không hợp lệ.' });
       }
-      const employee = await prisma.employee.findUnique({
+      const employee = await prisma.employee.findUnique({ omit: WITH_PASSWORD_HASH,
         where: { id: employeeId }
       });
       if (!employee) {
@@ -522,28 +524,28 @@ const getAppUrl = () => {
 
 const findAccountByEmail = async (email) => {
   const where = { email: { equals: email, mode: 'insensitive' } };
-  const customer = await prisma.customer.findFirst({ where });
+  const customer = await prisma.customer.findFirst({ omit: WITH_PASSWORD_HASH, where });
   if (customer) return { kind: 'customer', id: customer.customerId, name: customer.name, email: customer.email, passwordHash: customer.passwordHash, active: !customer.status || customer.status === 'ACTIVE' };
-  const employee = await prisma.employee.findFirst({ where });
+  const employee = await prisma.employee.findFirst({ omit: WITH_PASSWORD_HASH, where });
   if (employee) return { kind: 'employee', id: String(employee.id), name: employee.fullName, email: employee.email, passwordHash: employee.passwordHash, active: employee.status !== 'INACTIVE' };
-  const supplier = await prisma.supplier.findFirst({ where });
+  const supplier = await prisma.supplier.findFirst({ omit: WITH_PASSWORD_HASH, where });
   if (supplier) return { kind: 'supplier', id: supplier.code, name: supplier.name, email: supplier.email, passwordHash: supplier.passwordHash, active: true };
   return null;
 };
 
 const findAccountById = async (kind, id) => {
   if (kind === 'customer') {
-    const c = await prisma.customer.findUnique({ where: { customerId: id } });
+    const c = await prisma.customer.findUnique({ omit: WITH_PASSWORD_HASH, where: { customerId: id } });
     return c && { kind, id, name: c.name, email: c.email, passwordHash: c.passwordHash, active: !c.status || c.status === 'ACTIVE' };
   }
   if (kind === 'employee') {
     const employeeId = parseInt(id, 10);
     if (!Number.isInteger(employeeId)) return null;
-    const e = await prisma.employee.findUnique({ where: { id: employeeId } });
+    const e = await prisma.employee.findUnique({ omit: WITH_PASSWORD_HASH, where: { id: employeeId } });
     return e && { kind, id, name: e.fullName, email: e.email, passwordHash: e.passwordHash, active: e.status !== 'INACTIVE' };
   }
   if (kind === 'supplier') {
-    const s = await prisma.supplier.findUnique({ where: { code: id } });
+    const s = await prisma.supplier.findUnique({ omit: WITH_PASSWORD_HASH, where: { code: id } });
     return s && { kind, id, name: s.name, email: s.email, passwordHash: s.passwordHash, active: true };
   }
   return null;
