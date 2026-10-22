@@ -33,8 +33,6 @@ const parseAnyDate = (v) => {
 };
 const formatVnDate = (date) => new Date(date).toLocaleDateString('vi-VN', { timeZone: 'UTC' });
 const PERIOD_RE = /^\d{4}-\d{2}$/;
-// Kỳ lương hiện tại theo giờ Việt Nam (máy chủ có thể chạy UTC), dạng YYYY-MM
-const currentPeriodVN = () => new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().slice(0, 7);
 const MAX_PHOTO_CHARS = 250000; // ~180KB ảnh JPEG đã thu nhỏ ở client
 
 const cleanPhoto = (img) => (typeof img === 'string' && img.startsWith('data:image/') && img.length <= MAX_PHOTO_CHARS ? img : null);
@@ -742,8 +740,6 @@ router.get('/payrolls/:id(\\d+)', authMiddleware(STAFF_ROLES), ah(async (req, re
 router.post('/payrolls', authMiddleware(HR_MANAGER_ROLES), ah(async (req, res) => {
   const period = String(req.body.period || '').trim();
   if (!PERIOD_RE.test(period)) throw httpError(400, 'Vui lòng nhập kỳ lương đúng định dạng YYYY-MM (VD: 2026-09).');
-  // Kỳ chưa tới chưa có ngày công — trước đây vẫn tính ra cả bảng phiếu 0đ, duyệt & chi trả được
-  if (period > currentPeriodVN()) throw httpError(400, `Kỳ ${period} chưa tới — chỉ tính lương được cho kỳ hiện tại hoặc các kỳ đã qua.`);
 
   const employees = await prisma.employee.findMany({ where: { status: 'ACTIVE' } });
   const existing = await prisma.payroll.findMany({ where: { period } });
